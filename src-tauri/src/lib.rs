@@ -2,11 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileItem {
     name: String,
     path: String,
     is_dir: bool,
+    children: Option<Vec<FileItem>>,
 }
 
 #[tauri::command]
@@ -43,7 +44,12 @@ fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
         let is_pdf = !is_dir && name.to_lowercase().ends_with(".pdf");
 
         if is_dir || is_pdf {
-            items.push(FileItem { name, path, is_dir });
+            items.push(FileItem { 
+                name, 
+                path, 
+                is_dir,
+                children: None,
+            });
         }
     }
 

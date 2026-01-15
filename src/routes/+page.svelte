@@ -1,11 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
-
-  interface FileItem {
-    name: string;
-    path:string;
-    is_dir: boolean;
-  }
+  import type { FileItem } from '../lib/types';
+  import FileTree from '../lib/FileTree.svelte';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -46,9 +42,7 @@
 
     <ul>
       {#each files as file}
-        <li>
-          {file.is_dir ? '📁' : '📄'} {file.name} - {file.path}
-        </li>
+        <FileTree item={file} level={0} />
       {/each}
     </ul>
   {/if}
