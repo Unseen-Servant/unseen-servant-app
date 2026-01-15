@@ -5,6 +5,7 @@
 
   let selectedFolder = '';
   let files: FileItem[] = [];
+  let selectedPaths = new Set<string>;
   let error = '';
 
   async function handleSelectFolder() {
@@ -28,6 +29,58 @@
       files = [];
     }
   }
+
+  function toogleSelection(path: string, isDir: boolean, item: FileItem) {
+    if (isDir) {
+      // Toggle folder: recursively add/remove all PDFs
+      toggleFolderRecursive(item);
+    } else {
+      // Toggle single PDF file
+      if (selectedPaths.has(path)) {
+        selectedPaths.delete(path);
+      } else {
+        selectedPaths.add(path);
+      }
+      selectedPaths = selectedPaths; // Trigger reactivity
+    }
+  }
+
+  function toggleFolderRecursive(folder: FileItem) {
+    if (!folder.children) return;
+
+    // Check if folder is currently selected (has any child selected)
+    const shouldSelect = !isFolderSelected(folder);
+
+    // Recursively add/remove all children
+    if (folder.children) {
+      for (const child of folder.children) {
+        if (child.is_dir) {
+          toggleFolderRecursive(child);
+        } else {
+          // It's a PDF file
+          if (shouldSelect) {
+            selectedPaths.add(child.path);
+          } else {
+            selectedPaths.delete(child.path);
+          }
+        }
+      }
+    }
+  }
+
+  function isFolderSelected(folder: FileItem): boolean {
+    if (!folder.is_dir || !folder.children) return false;
+
+    // Check if any child is selected
+    for (const child of folder.children) {
+      if (child.is_dir) {
+        if (isFolderSelected(child)) return true;
+      } else {
+        if (selectedPaths.has(child.path)) return true;
+      }
+    }
+    return false;
+  }
 </script>
 
 <main>
@@ -40,11 +93,18 @@
   {#if selectedFolder}
     <h2>Folder: {selectedFolder}</h2>
 
-    <ul>
+    <p>Selected: {selectedPaths.size} items</p>
+
+    <div class="file-tree">
       {#each files as file}
-        <FileTree item={file} level={0} />
+        <FileTree 
+          item={file} 
+          level={0}
+          {selectedPaths}
+          onToggle={toogleSelection} 
+        />
       {/each}
-    </ul>
+    </div>
   {/if}
 
   {#if error}
@@ -56,15 +116,11 @@
   main {
     padding: 2rem;
   }
-  ul {
-    list-style: none;
-    padding: 0;
-  }
-  li {
-    padding: 0.5rem;
-    cursor: pointer;
-  }
-  li:hover {
-    background: #f0f0f0;
+  .file-tree {
+    margin-top: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 1rem;
+    background: white;
   }
 </style>
