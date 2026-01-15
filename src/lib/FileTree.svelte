@@ -10,7 +10,9 @@
   let isExpanded: boolean = false;
 
   // Check if this item is selected
-  $: isSelected = selectedPaths.has(item.path);
+  $: isSelected = item.is_dir
+    ? isFolderSelected(item)
+    : selectedPaths.has(item.path);
 
   async function toggleExpand() {
     if (!item.is_dir) return;
@@ -30,6 +32,19 @@
 
   function handleCheckboxChange() {
     onToggle(item.path, item.is_dir, item);
+  }
+
+  function isFolderSelected(folder: FileItem): boolean {
+    if (!folder.is_dir || !folder.children) return false;
+
+    for (const child of folder.children) {
+      if (child.is_dir) {
+        if (isFolderSelected(child)) return true;
+      } else {
+        if (selectedPaths.has(child.path)) return true;
+      }
+    }
+    return false;
   }
 </script>
 

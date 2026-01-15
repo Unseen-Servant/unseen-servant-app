@@ -30,10 +30,10 @@
     }
   }
 
-  function toogleSelection(path: string, isDir: boolean, item: FileItem) {
+  async function toogleSelection(path: string, isDir: boolean, item: FileItem) {
     if (isDir) {
       // Toggle folder: recursively add/remove all PDFs
-      toggleFolderRecursive(item);
+      await toggleFolderRecursive(item);
     } else {
       // Toggle single PDF file
       if (selectedPaths.has(path)) {
@@ -45,20 +45,61 @@
     }
   }
 
-  function toggleFolderRecursive(folder: FileItem) {
+  async function toggleFolderRecursive(folder: FileItem) {
     if (!folder.children) return;
 
-    // Check if folder is currently selected (has any child selected)
-    const shouldSelect = !isFolderSelected(folder);
+    // If children are not loaded, load them first
+    if (folder.children === null) {
+      try {
+        folder.children = await invoke<FileItem[]>('list_files', { folderPath: folder.path });
+        files = files; // Trigger reactivity
+      } catch (e) {
+        console.error('Failed to load folder:', e);
+        folder.children = [];
+      }
+    }
+    
+    // Check if any children are currently selected
+    const anySelected = isFolderSelected(folder);
+    const shouldSelect = !anySelected;
 
     // Recursively add/remove all children
     if (folder.children) {
       for (const child of folder.children) {
         if (child.is_dir) {
-          toggleFolderRecursive(child);
+          await setFolderSelection(child, shouldSelect);
         } else {
           // It's a PDF file
           if (shouldSelect) {
+            selectedPaths.add(child.path);
+          } else {
+            selectedPaths.delete(child.path);
+          }
+        }
+      }
+    }
+    selectedPaths = selectedPaths; // Trigger reactivity
+  }
+
+  async function setFolderSelection(folder: FileItem, select: boolean) {
+    if (!folder.is_dir) return;
+
+    if (folder.children === null) {
+      try {
+        folder.children = await invoke<FileItem[]>('list_files', { folderPath: folder.path });
+        files = files; // Trigger reactivity
+      } catch (e) {
+        console.error('Failed to load folder:', e);
+        folder.children = [];
+      }
+    }
+
+    if (folder.children) {
+      for (const child of folder.children) {
+        if (child.is_dir) {
+          await setFolderSelection(child, select);
+        } else {
+          if (select) {
             selectedPaths.add(child.path);
           } else {
             selectedPaths.delete(child.path);
