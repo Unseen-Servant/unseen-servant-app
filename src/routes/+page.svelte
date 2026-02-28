@@ -46,8 +46,6 @@
   }
 
   async function toggleFolderRecursive(folder: FileItem) {
-    if (!folder.children) return;
-
     // If children are not loaded, load them first
     if (folder.children === null) {
       try {
