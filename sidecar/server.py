@@ -39,6 +39,49 @@ def parse_args():
 # Pure helpers (no dependencies — safe to import in tests)
 # ---------------------------------------------------------------------------
 
+KNOWN_SYSTEMS: dict[str, list[str]] = {
+    "D&D 5E": ["d&d 5e", "dnd 5e", "dnd5e", "5th edition", "5e srd"],
+    "D&D 3.5": ["d&d 3.5", "dnd 3.5", "3.5 edition", "3.5e", "d&d 3.5e"],
+    "Pathfinder 1E": ["pathfinder 1e", "pathfinder1e", "pf1e"],
+    "Pathfinder 2E": ["pathfinder 2e", "pathfinder2e", "pf2e"],
+    "Dragonbane": ["dragonbane"],
+    "Call of Cthulhu": ["call of cthulhu", "coc 7e", "coc 7th"],
+    "Shadowrun": ["shadowrun"],
+    "MORK BORG": ["mork borg", "morkborg"],
+    "Blades in the Dark": ["blades in the dark", "bitd"],
+    "Savage Worlds": ["savage worlds"],
+    "GURPS": ["gurps"],
+    "Fate": ["fate core", "fate accelerated", "fate condensed"],
+    "OSR": ["old school essentials", "ose", "basic fantasy", "labyrinth lord"],
+}
+
+
+def detect_game_system(pdf_path: Path, text: str | None = None) -> str:
+    """Detect the TTRPG game system from folder path or PDF content.
+
+    Detection priority:
+    1. Folder name match (user's deliberate organization)
+    2. Content keyword match (first 2000 chars of extracted text)
+    3. Fallback to "unknown"
+    """
+    # Check path components (folder names)
+    path_lower = str(pdf_path).lower()
+    for system, keywords in KNOWN_SYSTEMS.items():
+        for keyword in keywords:
+            if keyword in path_lower:
+                return system
+
+    # Check content if provided
+    if text:
+        text_sample = text[:2000].lower()
+        for system, keywords in KNOWN_SYSTEMS.items():
+            for keyword in keywords:
+                if keyword in text_sample:
+                    return system
+
+    return "unknown"
+
+
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
     """Split text into overlapping chunks.
 
@@ -59,12 +102,14 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[st
 
 class IndexFilesRequest(BaseModel):
     paths: list[str]
+    game_system: str | None = None
 
 class IndexStatusRequest(BaseModel):
     selected_paths: list[str]
 
 class SyncIndexRequest(BaseModel):
     selected_paths: list[str]
+    game_system_overrides: dict[str, str] | None = None
 
 class SearchRequest(BaseModel):
     query: str
@@ -84,6 +129,7 @@ class ManifestEntry(BaseModel):
     mtime: float
     chunk_count: int
     indexed_at: str
+    game_system: str = "unknown"
 
 
 class IndexManifest(BaseModel):
@@ -110,13 +156,16 @@ def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
 # Reusable indexing / deletion helpers
 # ---------------------------------------------------------------------------
 
-def index_single_pdf(pdf_path: Path, collection) -> tuple[int, str | None]:
+def index_single_pdf(
+    pdf_path: Path, collection, game_system: str | None = None
+) -> tuple[int, str | None, str]:
     """Extract, chunk, and upsert a single PDF into ChromaDB.
 
-    Returns (chunk_count, error_message). error_message is None on success.
+    Returns (chunk_count, error_message, game_system).
+    error_message is None on success.
     """
     if not pdf_path.exists():
-        return 0, f"{pdf_path.name}: File not found"
+        return 0, f"{pdf_path.name}: File not found", "unknown"
 
     try:
         reader = PdfReader(pdf_path)
@@ -127,8 +176,9 @@ def index_single_pdf(pdf_path: Path, collection) -> tuple[int, str | None]:
                 text += page_text
 
         if not text.strip():
-            return 0, f"{pdf_path.name}: Empty or scanned PDF"
+            return 0, f"{pdf_path.name}: Empty or scanned PDF", "unknown"
 
+        resolved_system = game_system or detect_game_system(pdf_path, text)
         chunks = chunk_text(text)
 
         batch_size = 100
@@ -137,7 +187,8 @@ def index_single_pdf(pdf_path: Path, collection) -> tuple[int, str | None]:
             batch_metadatas = [{
                 "source": str(pdf_path),
                 "filename": pdf_path.name,
-                "chunk": batch_idx + chunk_idx
+                "chunk": batch_idx + chunk_idx,
+                "game_system": resolved_system,
             } for chunk_idx in range(len(batch_chunks))]
             batch_ids = [
                 f"{pdf_path.stem}_{batch_idx + chunk_idx}"
@@ -150,10 +201,10 @@ def index_single_pdf(pdf_path: Path, collection) -> tuple[int, str | None]:
                 ids=batch_ids
             )
 
-        return len(chunks), None
+        return len(chunks), None, resolved_system
 
     except Exception as e:
-        return 0, f"{pdf_path.name}: {str(e)}"
+        return 0, f"{pdf_path.name}: {str(e)}", "unknown"
 
 
 def delete_source_chunks(filename: str, collection) -> int:
@@ -301,7 +352,9 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         for pdf_path_str in request.paths:
             pdf_path = Path(pdf_path_str)
-            chunk_count, error = index_single_pdf(pdf_path, collection)
+            chunk_count, error, detected_system = index_single_pdf(
+                pdf_path, collection, game_system=request.game_system
+            )
 
             if error:
                 errors.append(error)
@@ -313,6 +366,7 @@ def create_app(collection=None, data_dir: Path | None = None):
                         mtime=os.path.getmtime(pdf_path),
                         chunk_count=chunk_count,
                         indexed_at=datetime.now(timezone.utc).isoformat(),
+                        game_system=detected_system,
                     )
 
         if manifest and data_dir:
@@ -382,7 +436,13 @@ def create_app(collection=None, data_dir: Path | None = None):
         # Phase 2: Index new files
         for entry in diff["to_add"]:
             pdf_path = Path(entry["path"])
-            chunk_count, error = index_single_pdf(pdf_path, collection)
+            override = (
+                request.game_system_overrides.get(entry["path"])
+                if request.game_system_overrides else None
+            )
+            chunk_count, error, detected_system = index_single_pdf(
+                pdf_path, collection, game_system=override
+            )
             if error:
                 errors.append(error)
             else:
@@ -392,12 +452,19 @@ def create_app(collection=None, data_dir: Path | None = None):
                     mtime=os.path.getmtime(pdf_path),
                     chunk_count=chunk_count,
                     indexed_at=datetime.now(timezone.utc).isoformat(),
+                    game_system=detected_system,
                 )
 
         # Phase 3: Re-index modified files
         for entry in diff["to_update"]:
             pdf_path = Path(entry["path"])
-            chunk_count, error = index_single_pdf(pdf_path, collection)
+            override = (
+                request.game_system_overrides.get(entry["path"])
+                if request.game_system_overrides else None
+            )
+            chunk_count, error, detected_system = index_single_pdf(
+                pdf_path, collection, game_system=override
+            )
             if error:
                 errors.append(error)
             else:
@@ -407,6 +474,7 @@ def create_app(collection=None, data_dir: Path | None = None):
                     mtime=os.path.getmtime(pdf_path),
                     chunk_count=chunk_count,
                     indexed_at=datetime.now(timezone.utc).isoformat(),
+                    game_system=detected_system,
                 )
 
         save_manifest(data_dir, manifest)

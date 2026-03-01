@@ -264,3 +264,56 @@ def test_index_files_writes_manifest(client, sample_pdf_path, tmp_path):
 
     manifest_raw = json.loads(manifest_path.read_text())
     assert str(sample_pdf_path) in manifest_raw["files"]
+
+
+# ---------------------------------------------------------------------------
+# Game system in manifest
+# ---------------------------------------------------------------------------
+
+def test_sync_stores_game_system_in_manifest(
+    client, dnd5e_pdf_path, tmp_path
+):
+    """Sync should store detected game_system in the manifest."""
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(dnd5e_pdf_path)]
+    })
+
+    manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
+    entry = manifest_raw["files"][str(dnd5e_pdf_path)]
+    assert entry["game_system"] == "D&D 5E"
+
+
+def test_sync_with_game_system_override(
+    client, untagged_pdf_path, tmp_path
+):
+    """Game system overrides should be stored in the manifest."""
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(untagged_pdf_path)],
+        "game_system_overrides": {
+            str(untagged_pdf_path): "Call of Cthulhu",
+        },
+    })
+
+    manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
+    entry = manifest_raw["files"][str(untagged_pdf_path)]
+    assert entry["game_system"] == "Call of Cthulhu"
+
+
+def test_manifest_backward_compat_missing_game_system(tmp_path):
+    """Old manifests without game_system should load with 'unknown' default."""
+    old_manifest = {
+        "version": 1,
+        "files": {
+            "/old/book.pdf": {
+                "filename": "book.pdf",
+                "mtime": 1000.0,
+                "chunk_count": 5,
+                "indexed_at": "2026-01-01T00:00:00Z",
+            }
+        }
+    }
+    (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(old_manifest))
+
+    from server import load_manifest
+    manifest = load_manifest(tmp_path)
+    assert manifest.files["/old/book.pdf"].game_system == "unknown"

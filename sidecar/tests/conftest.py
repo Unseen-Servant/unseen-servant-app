@@ -174,3 +174,50 @@ def special_chars_pdf_path(tmp_path):
     c.drawString(72, 750, "This is the player's guide to dragons and dungeons.")
     c.save()
     return pdf_path
+
+
+# ---------------------------------------------------------------------------
+# Game system detection fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def dnd5e_pdf_path(tmp_path):
+    """PDF in a D&D 5E folder for game system detection testing."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    dnd_dir = tmp_path / "D&D 5E"
+    dnd_dir.mkdir()
+    pdf_path = dnd_dir / "player_handbook.pdf"
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    c.drawString(72, 750, "Character creation rules for heroes and adventurers.")
+    c.save()
+    return pdf_path
+
+
+@pytest.fixture
+def dragonbane_pdf_path(tmp_path):
+    """PDF in a Dragonbane folder for game system detection testing."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    db_dir = tmp_path / "Dragonbane"
+    db_dir.mkdir()
+    pdf_path = db_dir / "dragonbane_core.pdf"
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    c.drawString(72, 750, "Welcome to the Misty Vale, a land of adventure.")
+    c.save()
+    return pdf_path
+
+
+@pytest.fixture
+def untagged_pdf_path(tmp_path):
+    """PDF in a generic folder with no game system hints."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    pdf_path = tmp_path / "random_supplement.pdf"
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    c.drawString(72, 750, "A collection of random tables for any game.")
+    c.save()
+    return pdf_path

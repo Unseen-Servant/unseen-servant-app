@@ -132,3 +132,45 @@ def test_index_empty_paths_list(client):
     assert data["indexed"] == 0
     assert data["total"] == 0
     assert data["errors"] == []
+
+
+# ---------------------------------------------------------------------------
+# Game system metadata
+# ---------------------------------------------------------------------------
+
+def test_index_stores_game_system_metadata(
+    client, dnd5e_pdf_path, test_collection
+):
+    """Chunks from a D&D 5E folder should have game_system in metadata."""
+    client.post("/api/index-files", json={
+        "paths": [str(dnd5e_pdf_path)]
+    })
+
+    results = test_collection.get(include=["metadatas"])
+    for metadata in results["metadatas"]:
+        assert metadata["game_system"] == "D&D 5E"
+
+
+def test_index_unknown_game_system(client, untagged_pdf_path, test_collection):
+    """PDF with no system hints should get game_system='unknown'."""
+    client.post("/api/index-files", json={
+        "paths": [str(untagged_pdf_path)]
+    })
+
+    results = test_collection.get(include=["metadatas"])
+    for metadata in results["metadatas"]:
+        assert metadata["game_system"] == "unknown"
+
+
+def test_index_with_game_system_override(
+    client, untagged_pdf_path, test_collection
+):
+    """Manual game_system override should take priority over detection."""
+    client.post("/api/index-files", json={
+        "paths": [str(untagged_pdf_path)],
+        "game_system": "Savage Worlds",
+    })
+
+    results = test_collection.get(include=["metadatas"])
+    for metadata in results["metadatas"]:
+        assert metadata["game_system"] == "Savage Worlds"
