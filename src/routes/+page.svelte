@@ -264,8 +264,19 @@
       <p class="sync-status">Checking index status...</p>
     {:else if indexStatus}
       {@const pending = indexStatus.summary.add + indexStatus.summary.remove + indexStatus.summary.update}
+      {@const indexEmpty = indexStatus.summary.up_to_date === 0 && indexStatus.summary.remove === 0 && indexStatus.summary.update === 0}
       {#if pending === 0 && indexStatus.summary.up_to_date > 0}
         <p class="sync-status sync-ok">Index up to date ({indexStatus.summary.up_to_date} PDFs)</p>
+      {:else if indexEmpty && indexStatus.summary.add > 0}
+        <div class="sync-status sync-empty">
+          <p>No PDFs indexed yet. {indexStatus.summary.add} selected PDF{indexStatus.summary.add === 1 ? '' : 's'} ready to index.</p>
+          <button
+            on:click={handleSync}
+            disabled={isSyncing}
+          >
+            {isSyncing ? 'Syncing...' : `Index ${indexStatus.summary.add} PDFs`}
+          </button>
+        </div>
       {:else if pending > 0 || indexStatus.summary.errors > 0}
         <div class="sync-status sync-pending">
           <p>
@@ -344,6 +355,10 @@
   .sync-ok {
     background: #f0fff0;
     color: #2d7d2d;
+  }
+  .sync-empty {
+    background: #f3f4f6;
+    color: #4b5563;
   }
   .sync-pending {
     background: #fff8f0;
