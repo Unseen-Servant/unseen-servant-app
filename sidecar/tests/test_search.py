@@ -168,3 +168,81 @@ def test_unfiltered_search_still_works(multi_indexed_client):
     # Should have results from both indexed PDFs
     assert len(filenames) >= 1  # At least one source
     assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Game system filter tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def multi_system_client(client, dnd5e_pdf_path, dragonbane_pdf_path):
+    """Client with PDFs from two different game systems indexed."""
+    client.post("/api/index-files", json={
+        "paths": [str(dnd5e_pdf_path), str(dragonbane_pdf_path)]
+    })
+    return client
+
+
+def test_search_filter_by_game_system(multi_system_client):
+    """With game_system filter, results should only match that system."""
+    response = multi_system_client.post("/api/search", json={
+        "query": "adventure rules",
+        "n_results": 10,
+        "game_system": "D&D 5E",
+    })
+
+    data = response.json()
+    assert len(data["results"]) > 0
+    for result in data["results"]:
+        assert result["game_system"] == "D&D 5E"
+
+
+def test_search_game_system_no_match(multi_system_client):
+    """Filtering to a system with no docs should return empty."""
+    response = multi_system_client.post("/api/search", json={
+        "query": "adventure",
+        "n_results": 5,
+        "game_system": "Call of Cthulhu",
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["results"] == []
+
+
+def test_search_no_game_system_returns_all(multi_system_client):
+    """Without game_system filter, results from all systems should appear."""
+    response = multi_system_client.post("/api/search", json={
+        "query": "adventure rules",
+        "n_results": 10,
+    })
+
+    data = response.json()
+    systems = {r["game_system"] for r in data["results"]}
+    assert len(systems) >= 1
+
+
+def test_search_combined_filters(multi_system_client):
+    """Both source_filter and game_system can be used together."""
+    response = multi_system_client.post("/api/search", json={
+        "query": "adventure",
+        "n_results": 10,
+        "source_filter": "dragonbane_core.pdf",
+        "game_system": "Dragonbane",
+    })
+
+    data = response.json()
+    for result in data["results"]:
+        assert result["filename"] == "dragonbane_core.pdf"
+        assert result["game_system"] == "Dragonbane"
+
+
+def test_search_result_includes_game_system(indexed_client):
+    """Search results should include game_system field."""
+    response = indexed_client.post("/api/search", json={
+        "query": "dragon",
+        "n_results": 1,
+    })
+
+    result = response.json()["results"][0]
+    assert "game_system" in result

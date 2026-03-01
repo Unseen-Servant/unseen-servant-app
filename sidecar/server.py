@@ -115,6 +115,11 @@ class SearchRequest(BaseModel):
     query: str
     n_results: int = 5
     source_filter: str | None = None
+    game_system: str | None = None
+
+class SetGameSystemRequest(BaseModel):
+    filename: str
+    game_system: str
 
 
 # ---------------------------------------------------------------------------
@@ -520,12 +525,75 @@ def create_app(collection=None, data_dir: Path | None = None):
                     sources_info[filename] = {
                         "filename": filename,
                         "source": metadata.get("source", ""),
-                        "chunks": 0
+                        "chunks": 0,
+                        "game_system": metadata.get("game_system", "unknown"),
                     }
                 sources_info[filename]["chunks"] += 1
 
             sources_list = sorted(sources_info.values(), key=lambda x: x["filename"])
             return {"sources": sources_list, "count": len(sources_list)}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/game-systems")
+    async def get_game_systems():
+        """List all distinct game systems found in the index."""
+        try:
+            results = collection.get(include=["metadatas"])
+            if not results["metadatas"]:
+                return {"game_systems": [], "count": 0}
+
+            systems = set()
+            for metadata in results["metadatas"]:
+                systems.add(metadata.get("game_system", "unknown"))
+
+            sorted_systems = sorted(systems)
+            return {"game_systems": sorted_systems, "count": len(sorted_systems)}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/set-game-system")
+    async def set_game_system(request: SetGameSystemRequest):
+        """Update the game system tag for all chunks of a file.
+
+        Changes metadata in ChromaDB and the manifest without re-indexing.
+        """
+        try:
+            results = collection.get(
+                where={"filename": request.filename},
+                include=["metadatas"],
+            )
+
+            if not results["ids"]:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Source not found: {request.filename}",
+                )
+
+            updated_metadatas = [
+                {**metadata, "game_system": request.game_system}
+                for metadata in results["metadatas"]
+            ]
+
+            collection.update(
+                ids=results["ids"],
+                metadatas=updated_metadatas,
+            )
+
+            if data_dir:
+                manifest = load_manifest(data_dir)
+                for entry in manifest.files.values():
+                    if entry.filename == request.filename:
+                        entry.game_system = request.game_system
+                save_manifest(data_dir, manifest)
+
+            return {
+                "filename": request.filename,
+                "game_system": request.game_system,
+                "chunks_updated": len(results["ids"]),
+            }
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -588,8 +656,17 @@ def create_app(collection=None, data_dir: Path | None = None):
                 "query_texts": [request.query],
                 "n_results": request.n_results,
             }
+
+            where_clauses = []
             if request.source_filter:
-                query_kwargs["where"] = {"filename": request.source_filter}
+                where_clauses.append({"filename": request.source_filter})
+            if request.game_system:
+                where_clauses.append({"game_system": request.game_system})
+
+            if len(where_clauses) == 1:
+                query_kwargs["where"] = where_clauses[0]
+            elif len(where_clauses) > 1:
+                query_kwargs["where"] = {"$and": where_clauses}
 
             results = collection.query(**query_kwargs)
 
@@ -607,6 +684,7 @@ def create_app(collection=None, data_dir: Path | None = None):
                     "filename": metadata["filename"],
                     "source": metadata.get("source", ""),
                     "chunk": metadata.get("chunk", 0),
+                    "game_system": metadata.get("game_system", "unknown"),
                     "relevance": round(1 - distance, 3)
                 })
 
