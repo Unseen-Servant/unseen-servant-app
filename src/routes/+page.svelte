@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { load } from '@tauri-apps/plugin-store';
   import type { FileItem } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
 
@@ -8,11 +10,38 @@
   let selectedPaths = new Set<string>;
   let error = '';
 
+  onMount(async () => {
+    try {
+      const store = await load('settings.json');
+      const savedFolder = await store.get<string>('selectedFolder');
+      const savedPaths = await store.get<string[]>('selectedPaths');
+
+      if (savedFolder) {
+        selectedFolder = savedFolder;
+        await loadFiles(savedFolder);
+      }
+      if (savedPaths) {
+        selectedPaths = new Set(savedPaths);
+      }
+    } catch (e) {
+      // No saved state on first run — that's fine
+      console.log('No saved state:', e);
+    }
+  });
+
+  async function saveState() {
+    const store = await load('settings.json');
+    await store.set('selectedFolder', selectedFolder);
+    await store.set('selectedPaths', Array.from(selectedPaths));
+    await store.save();
+  }
+
   async function handleSelectFolder() {
     try {
       selectedFolder = await invoke<string>('select_folder');
       await loadFiles(selectedFolder);
       error = '';
+      await saveState();
     } catch (e) {
       error = String(e);
       selectedFolder = '';
@@ -42,6 +71,7 @@
         selectedPaths.add(path);
       }
       selectedPaths = selectedPaths; // Trigger reactivity
+      await saveState();
     }
   }
 
@@ -77,6 +107,7 @@
       }
     }
     selectedPaths = selectedPaths; // Trigger reactivity
+    await saveState();
   }
 
   async function setFolderSelection(folder: FileItem, select: boolean) {
