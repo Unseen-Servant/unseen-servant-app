@@ -1,0 +1,259 @@
+"""
+Unseen Servant — ChromaDB indexing sidecar.
+
+Started automatically by the Tauri desktop app.
+Provides HTTP endpoints for indexing PDFs and searching indexed content.
+
+Usage:
+    python server.py --port 8420 --data-dir /path/to/app/data
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import chromadb
+from chromadb.utils import embedding_functions
+from pypdf import PdfReader
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+
+
+# ---------------------------------------------------------------------------
+# CLI arguments (parsed before anything else)
+# ---------------------------------------------------------------------------
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Unseen Servant indexing sidecar")
+    parser.add_argument("--port", type=int, default=8420, help="HTTP port")
+    parser.add_argument("--data-dir", type=str, default=None,
+                        help="Directory for ChromaDB storage (default: ./chroma_db)")
+    return parser.parse_args()
+
+args = parse_args()
+
+# ---------------------------------------------------------------------------
+# ChromaDB + Ollama setup
+# ---------------------------------------------------------------------------
+
+data_dir = Path(args.data_dir) if args.data_dir else Path(__file__).parent / "chroma_db"
+data_dir.mkdir(parents=True, exist_ok=True)
+
+chroma_client = chromadb.PersistentClient(path=str(data_dir))
+
+ollama_ef = embedding_functions.OllamaEmbeddingFunction(
+    url="http://localhost:11434/api/embeddings",
+    model_name="nomic-embed-text"
+)
+
+collection = chroma_client.get_or_create_collection(
+    name="ttrpg_docs",
+    embedding_function=ollama_ef
+)
+
+# ---------------------------------------------------------------------------
+# FastAPI app
+# ---------------------------------------------------------------------------
+
+app = FastAPI(title="Unseen Servant Sidecar")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------------------------
+# Request/response models
+# ---------------------------------------------------------------------------
+
+class IndexFilesRequest(BaseModel):
+    paths: list[str]
+
+class SearchRequest(BaseModel):
+    query: str
+    n_results: int = 5
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+async def health():
+    """Health check for startup detection."""
+    return {"status": "ok"}
+
+
+@app.post("/api/index-files")
+async def index_files(request: IndexFilesRequest):
+    """Index specific PDF files by path."""
+    total = len(request.paths)
+    indexed = 0
+    errors = []
+
+    for pdf_path_str in request.paths:
+        pdf_path = Path(pdf_path_str)
+
+        if not pdf_path.exists():
+            errors.append(f"{pdf_path.name}: File not found")
+            continue
+
+        try:
+            reader = PdfReader(pdf_path)
+            text = ""
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
+
+            if not text.strip():
+                errors.append(f"{pdf_path.name}: Empty or scanned PDF")
+                continue
+
+            # Chunk: 1000 chars, 200 overlap
+            chunk_size = 1000
+            overlap = 200
+            chunks = []
+            for i in range(0, len(text), chunk_size - overlap):
+                chunk = text[i:i + chunk_size]
+                if chunk.strip():
+                    chunks.append(chunk)
+
+            # Store in ChromaDB in batches of 100
+            batch_size = 100
+            for batch_idx in range(0, len(chunks), batch_size):
+                batch_chunks = chunks[batch_idx:batch_idx + batch_size]
+                batch_metadatas = [{
+                    "source": str(pdf_path),
+                    "filename": pdf_path.name,
+                    "chunk": batch_idx + chunk_idx
+                } for chunk_idx in range(len(batch_chunks))]
+                batch_ids = [
+                    f"{pdf_path.stem}_{batch_idx + chunk_idx}"
+                    for chunk_idx in range(len(batch_chunks))
+                ]
+
+                collection.add(
+                    documents=batch_chunks,
+                    metadatas=batch_metadatas,
+                    ids=batch_ids
+                )
+
+            indexed += 1
+
+        except Exception as e:
+            errors.append(f"{pdf_path.name}: {str(e)}")
+
+    return {
+        "indexed": indexed,
+        "total": total,
+        "errors": errors
+    }
+
+
+@app.get("/api/stats")
+async def get_stats():
+    """Database statistics."""
+    try:
+        count = collection.count()
+        results = collection.get(include=["metadatas"])
+        unique_sources = (
+            len(set(m.get("filename") for m in results["metadatas"]))
+            if results["metadatas"] else 0
+        )
+        return {
+            "total_chunks": count,
+            "total_documents": unique_sources,
+            "collection_name": collection.name
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/sources")
+async def get_sources():
+    """List all indexed PDFs with chunk counts."""
+    try:
+        results = collection.get(include=["metadatas"])
+        if not results["metadatas"]:
+            return {"sources": [], "count": 0}
+
+        sources_info = {}
+        for metadata in results["metadatas"]:
+            filename = metadata["filename"]
+            if filename not in sources_info:
+                sources_info[filename] = {
+                    "filename": filename,
+                    "source": metadata.get("source", ""),
+                    "chunks": 0
+                }
+            sources_info[filename]["chunks"] += 1
+
+        sources_list = sorted(sources_info.values(), key=lambda x: x["filename"])
+        return {"sources": sources_list, "count": len(sources_list)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/source/{filename}")
+async def delete_source(filename: str):
+    """Delete a source and all its chunks."""
+    try:
+        results = collection.get(include=["metadatas"])
+        ids_to_delete = [
+            id for id, metadata in zip(results["ids"], results["metadatas"])
+            if metadata.get("filename") == filename
+        ]
+
+        if not ids_to_delete:
+            raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
+
+        collection.delete(ids=ids_to_delete)
+        return {"message": f"Deleted {len(ids_to_delete)} chunks from {filename}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search")
+async def search(request: SearchRequest):
+    """Semantic search across indexed documents."""
+    try:
+        results = collection.query(
+            query_texts=[request.query],
+            n_results=request.n_results
+        )
+
+        if not results["documents"][0]:
+            return {"results": [], "message": "No results found."}
+
+        formatted = []
+        for doc, metadata, distance in zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0]
+        ):
+            formatted.append({
+                "text": doc,
+                "filename": metadata["filename"],
+                "source": metadata.get("source", ""),
+                "chunk": metadata.get("chunk", 0),
+                "relevance": round(1 - distance, 3)
+            })
+
+        return {"results": formatted}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    print(f"Starting sidecar on port {args.port}, data dir: {data_dir}")
+    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="info")

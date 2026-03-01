@@ -9,6 +9,8 @@
   let files: FileItem[] = [];
   let selectedPaths = new Set<string>;
   let error = '';
+  let isIndexing = false;
+  let indexResult = '';
 
   onMount(async () => {
     try {
@@ -152,6 +154,27 @@
     }
     return ancestors;
   }
+
+  // Index selected PDFs via the Python sidecar
+  async function handleIndex() {
+    isIndexing = true;
+    indexResult = '';
+    try {
+      const result = await invoke<{ indexed: number; total: number; errors: string[] }>(
+        'index_files',
+        { paths: Array.from(selectedPaths) }
+      );
+      if (result.errors.length > 0) {
+        indexResult = `Indexed ${result.indexed}/${result.total} PDFs. ${result.errors.length} error(s).`;
+      } else {
+        indexResult = `Successfully indexed ${result.indexed} PDFs.`;
+      }
+    } catch (e) {
+      indexResult = `Indexing failed: ${String(e)}`;
+    } finally {
+      isIndexing = false;
+    }
+  }
 </script>
 
 <main>
@@ -165,6 +188,17 @@
     <h2>Folder: {selectedFolder}</h2>
 
     <p>Selected: {selectedPaths.size} items</p>
+
+    <button
+      on:click={handleIndex}
+      disabled={selectedPaths.size === 0 || isIndexing}
+    >
+      {isIndexing ? 'Indexing...' : `Index ${selectedPaths.size} PDFs`}
+    </button>
+
+    {#if indexResult}
+      <p class="index-result">{indexResult}</p>
+    {/if}
 
     <div class="file-tree">
       {#each files as file}
@@ -194,5 +228,11 @@
     border-radius: 4px;
     padding: 1rem;
     background: white;
+  }
+  .index-result {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #f0f7ff;
+    border-radius: 4px;
   }
 </style>
