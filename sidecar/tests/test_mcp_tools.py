@@ -1,10 +1,13 @@
 """
-Tests for MCP server tools.
+Tests for MCP server tools, resources, and prompts.
 
 These tests mock the HTTP calls to the sidecar, so we're testing
-that each tool correctly transforms sidecar responses into
+that each tool/resource correctly transforms sidecar responses into
 human-readable text — NOT that the sidecar itself works (those
 tests live in test_search.py, test_sources.py, etc.).
+
+Prompt tests don't need mocking — prompts are pure functions that
+build instruction text without calling the sidecar.
 
 Why mock? The MCP server is a separate process from the sidecar.
 In production, it calls the sidecar over HTTP. In tests, we
@@ -25,6 +28,14 @@ from mcp_server import (
     library_stats,
     compare_sources,
     random_table,
+    resource_sources,
+    resource_source_content,
+    resource_stats,
+    session_prep,
+    rule_lookup,
+    encounter_builder,
+    npc_generator,
+    lore_researcher,
     sidecar,
 )
 
@@ -284,3 +295,202 @@ async def test_random_table_no_results(mock_sidecar):
 
     result = await random_table("something obscure")
     assert "No tables found" in result
+
+
+# ---------------------------------------------------------------------------
+# resource_sources tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resource_sources_returns_list(mock_sidecar):
+    mock_sidecar.set_get("/api/sources", {
+        "sources": [
+            {"filename": "core_rules.pdf", "source": "/path/core_rules.pdf", "chunks": 12},
+            {"filename": "monsters.pdf", "source": "/path/monsters.pdf", "chunks": 8},
+        ],
+        "count": 2,
+    })
+
+    result = await resource_sources()
+    assert "2 document(s)" in result
+    assert "core_rules.pdf" in result
+    assert "monsters.pdf" in result
+
+
+@pytest.mark.asyncio
+async def test_resource_sources_empty(mock_sidecar):
+    mock_sidecar.set_get("/api/sources", {"sources": [], "count": 0})
+
+    result = await resource_sources()
+    assert "No documents indexed" in result
+
+
+@pytest.mark.asyncio
+async def test_resource_sources_sidecar_down(mock_sidecar):
+    mock_sidecar.set_get("/api/sources", "Cannot connect to Unseen Servant app.")
+
+    result = await resource_sources()
+    assert "Cannot connect" in result
+
+
+# ---------------------------------------------------------------------------
+# resource_source_content tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resource_source_content_returns_text(mock_sidecar):
+    mock_sidecar.set_get("/api/source/dragonbane_monsters.pdf/content", {
+        "filename": "dragonbane_monsters.pdf",
+        "chunks": 3,
+        "content": "Fire Drake\nArmor Class: 14\nHit Points: 45",
+    })
+
+    result = await resource_source_content("dragonbane_monsters.pdf")
+    assert "dragonbane_monsters.pdf" in result
+    assert "3 chunks" in result
+    assert "Fire Drake" in result
+
+
+@pytest.mark.asyncio
+async def test_resource_source_content_not_found(mock_sidecar):
+    mock_sidecar.set_get(
+        "/api/source/nonexistent.pdf/content",
+        "Sidecar error: 404 — Source not found: nonexistent.pdf",
+    )
+
+    result = await resource_source_content("nonexistent.pdf")
+    assert "404" in result
+
+
+# ---------------------------------------------------------------------------
+# resource_stats tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resource_stats_returns_overview(mock_sidecar):
+    mock_sidecar.set_get("/api/stats", {
+        "total_chunks": 150,
+        "total_documents": 5,
+        "collection_name": "ttrpg_docs",
+    })
+
+    result = await resource_stats()
+    assert "150" in result
+    assert "5" in result
+    assert "ttrpg_docs" in result
+
+
+@pytest.mark.asyncio
+async def test_resource_stats_sidecar_down(mock_sidecar):
+    mock_sidecar.set_get("/api/stats", "Cannot connect to Unseen Servant app.")
+
+    result = await resource_stats()
+    assert "Cannot connect" in result
+
+
+# ---------------------------------------------------------------------------
+# session_prep tests
+# ---------------------------------------------------------------------------
+
+def test_session_prep_basic():
+    result = session_prep("players enter the Haunted Mine")
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert "Haunted Mine" in result[0].content.text
+    assert "search_library" in result[0].content.text
+    assert "Key Rules" in result[0].content.text
+
+
+def test_session_prep_with_sources():
+    result = session_prep("dragon encounter", sources="core.pdf,monsters.pdf")
+    text = result[0].content.text
+    assert "core.pdf" in text
+    assert "monsters.pdf" in text
+    assert "search_in_document" in text
+
+
+# ---------------------------------------------------------------------------
+# rule_lookup tests
+# ---------------------------------------------------------------------------
+
+def test_rule_lookup_basic():
+    result = rule_lookup("how does grappling work")
+    assert isinstance(result, list)
+    text = result[0].content.text
+    assert "grappling" in text
+    assert "search_library" in text
+    assert "Source" in text
+
+
+def test_rule_lookup_with_game_system():
+    result = rule_lookup("initiative rules", game_system="Dragonbane")
+    text = result[0].content.text
+    assert "Dragonbane" in text
+
+
+# ---------------------------------------------------------------------------
+# encounter_builder tests
+# ---------------------------------------------------------------------------
+
+def test_encounter_builder_basic():
+    result = encounter_builder("level 3")
+    assert isinstance(result, list)
+    text = result[0].content.text
+    assert "level 3" in text
+    assert "search_library" in text
+    assert "Encounter Setup" in text
+
+
+def test_encounter_builder_with_options():
+    result = encounter_builder(
+        "level 5", theme="undead ambush", game_system="D&D 5E"
+    )
+    text = result[0].content.text
+    assert "undead ambush" in text
+    assert "D&D 5E" in text
+
+
+# ---------------------------------------------------------------------------
+# npc_generator tests
+# ---------------------------------------------------------------------------
+
+def test_npc_generator_basic():
+    result = npc_generator("tavern keeper")
+    assert isinstance(result, list)
+    text = result[0].content.text
+    assert "tavern keeper" in text
+    assert "search_library" in text
+    assert "Personality" in text
+
+
+def test_npc_generator_with_context():
+    result = npc_generator(
+        "blacksmith",
+        game_system="Dragonbane",
+        npc_context="in a mining town under siege",
+    )
+    text = result[0].content.text
+    assert "Dragonbane" in text
+    assert "mining town" in text
+
+
+# ---------------------------------------------------------------------------
+# lore_researcher tests
+# ---------------------------------------------------------------------------
+
+def test_lore_researcher_basic():
+    result = lore_researcher("elven history")
+    assert isinstance(result, list)
+    text = result[0].content.text
+    assert "elven history" in text
+    assert "search_library" in text
+    assert "Source Breakdown" in text
+
+
+def test_lore_researcher_with_sources():
+    result = lore_researcher(
+        "dragon types", sources="monster_manual.pdf,draconomicon.pdf"
+    )
+    text = result[0].content.text
+    assert "monster_manual.pdf" in text
+    assert "compare_sources" in text
