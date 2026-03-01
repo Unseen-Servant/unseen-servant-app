@@ -101,6 +101,7 @@ async def search_library(
     query: str,
     n_results: int = 5,
     source_filter: str | None = None,
+    game_system: str | None = None,
 ) -> str:
     """Search your TTRPG PDF library for relevant content.
 
@@ -113,10 +114,14 @@ async def search_library(
         n_results: How many results to return (default 5)
         source_filter: Optional PDF filename to restrict search
                        to one book (e.g., "dragonbane_core.pdf")
+        game_system: Optional game system to filter by
+                     (e.g., "D&D 5E", "Dragonbane", "Pathfinder 2E")
     """
     payload = {"query": query, "n_results": n_results}
     if source_filter:
         payload["source_filter"] = source_filter
+    if game_system:
+        payload["game_system"] = game_system
 
     data = await sidecar.post("/api/search", payload)
     if isinstance(data, str):
@@ -129,7 +134,8 @@ async def search_library(
     lines = [f"Found {len(results)} result(s) for \"{query}\":\n"]
     for i, r in enumerate(results, 1):
         lines.append(f"--- Result {i} (relevance: {r['relevance']}) ---")
-        lines.append(f"Source: {r['filename']}")
+        system_tag = r.get('game_system', 'unknown')
+        lines.append(f"Source: {r['filename']} [{system_tag}]")
         lines.append(f"Chunk: {r['chunk']}")
         lines.append(r["text"])
         lines.append("")
@@ -197,7 +203,8 @@ async def list_sources() -> str:
 
     lines = [f"Indexed library: {data['count']} document(s)\n"]
     for s in sources:
-        lines.append(f"  - {s['filename']} ({s['chunks']} chunks)")
+        system_tag = f" [{s['game_system']}]" if s.get('game_system') else ""
+        lines.append(f"  - {s['filename']} ({s['chunks']} chunks){system_tag}")
 
     return "\n".join(lines)
 
@@ -219,6 +226,28 @@ async def library_stats() -> str:
         f"  Total chunks: {data['total_chunks']}\n"
         f"  Collection: {data['collection_name']}"
     )
+
+
+@mcp.tool()
+async def list_game_systems() -> str:
+    """List all game systems detected in your indexed library.
+
+    Shows which TTRPG systems are represented in your collection.
+    Use this to see what game_system values are available for filtering
+    searches with search_library.
+    """
+    data = await sidecar.get("/api/game-systems")
+    if isinstance(data, str):
+        return data
+
+    systems = data.get("game_systems", [])
+    if not systems:
+        return "No game systems detected yet. Index some PDFs first."
+
+    lines = [f"Game systems in library ({data['count']}):\n"]
+    for s in systems:
+        lines.append(f"  - {s}")
+    return "\n".join(lines)
 
 
 @mcp.tool()
@@ -344,7 +373,8 @@ async def resource_sources() -> str:
 
     lines = [f"Indexed library: {data['count']} document(s)\n"]
     for s in sources:
-        lines.append(f"  - {s['filename']} ({s['chunks']} chunks)")
+        system_tag = f" [{s['game_system']}]" if s.get('game_system') else ""
+        lines.append(f"  - {s['filename']} ({s['chunks']} chunks){system_tag}")
 
     return "\n".join(lines)
 
@@ -364,6 +394,23 @@ async def resource_source_content(filename: str) -> str:
         f"=== {data['filename']} ({data['chunks']} chunks) ===\n\n"
         f"{data['content']}"
     )
+
+
+@mcp.resource("library://game-systems")
+async def resource_game_systems() -> str:
+    """List of all game systems detected in the indexed library."""
+    data = await sidecar.get("/api/game-systems")
+    if isinstance(data, str):
+        return data
+
+    systems = data.get("game_systems", [])
+    if not systems:
+        return "No game systems detected yet."
+
+    lines = [f"Game systems in library ({data['count']}):\n"]
+    for s in systems:
+        lines.append(f"  - {s}")
+    return "\n".join(lines)
 
 
 @mcp.resource("library://stats")
@@ -444,8 +491,8 @@ def rule_lookup(question: str, game_system: str | None = None) -> list[UserMessa
     if game_system:
         system_filter = (
             f" Focus specifically on {game_system} rules. "
-            f"If possible, use the search_library tool with source_filter "
-            f"to limit results to {game_system} sourcebooks."
+            f"Use the search_library tool with game_system=\"{game_system}\" "
+            f"to filter results to {game_system} sourcebooks."
         )
 
     return [
@@ -488,7 +535,10 @@ def encounter_builder(
 
     system_instruction = ""
     if game_system:
-        system_instruction = f" Use {game_system} rules and sourcebooks."
+        system_instruction = (
+            f" Use {game_system} rules and sourcebooks. "
+            f"Filter searches with game_system=\"{game_system}\"."
+        )
 
     return [
         UserMessage(
@@ -527,7 +577,10 @@ def npc_generator(
     """
     system_instruction = ""
     if game_system:
-        system_instruction = f" Use {game_system} rules for any stat blocks."
+        system_instruction = (
+            f" Use {game_system} rules for any stat blocks. "
+            f"Filter searches with game_system=\"{game_system}\"."
+        )
 
     context_instruction = ""
     if npc_context:

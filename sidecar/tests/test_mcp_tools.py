@@ -25,12 +25,14 @@ from mcp_server import (
     search_in_document,
     read_document,
     list_sources,
+    list_game_systems,
     library_stats,
     compare_sources,
     random_table,
     resource_sources,
     resource_source_content,
     resource_stats,
+    resource_game_systems,
     session_prep,
     rule_lookup,
     encounter_builder,
@@ -102,6 +104,7 @@ async def test_search_library_returns_formatted_results(mock_sidecar):
                 "filename": "dragonbane_monsters.pdf",
                 "source": "/path/to/dragonbane_monsters.pdf",
                 "chunk": 0,
+                "game_system": "Dragonbane",
                 "relevance": 0.85,
             }
         ]
@@ -111,6 +114,7 @@ async def test_search_library_returns_formatted_results(mock_sidecar):
     assert "Fire Drake" in result
     assert "dragonbane_monsters.pdf" in result
     assert "0.85" in result
+    assert "[Dragonbane]" in result
 
 
 @pytest.mark.asyncio
@@ -127,6 +131,21 @@ async def test_search_library_sidecar_down(mock_sidecar):
 
     result = await search_library("anything")
     assert "Cannot connect" in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_with_game_system(mock_sidecar):
+    """game_system parameter should be included in the payload."""
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+
+    await search_library("initiative", game_system="D&D 5E")
+    assert captured.get("game_system") == "D&D 5E"
 
 
 # ---------------------------------------------------------------------------
@@ -190,8 +209,8 @@ async def test_read_document_not_found(mock_sidecar):
 async def test_list_sources_shows_documents(mock_sidecar):
     mock_sidecar.set_get("/api/sources", {
         "sources": [
-            {"filename": "core_rules.pdf", "source": "/path/core_rules.pdf", "chunks": 12},
-            {"filename": "monsters.pdf", "source": "/path/monsters.pdf", "chunks": 8},
+            {"filename": "core_rules.pdf", "source": "/path/core_rules.pdf", "chunks": 12, "game_system": "D&D 5E"},
+            {"filename": "monsters.pdf", "source": "/path/monsters.pdf", "chunks": 8, "game_system": "D&D 5E"},
         ],
         "count": 2,
     })
@@ -201,6 +220,7 @@ async def test_list_sources_shows_documents(mock_sidecar):
     assert "core_rules.pdf" in result
     assert "monsters.pdf" in result
     assert "12 chunks" in result
+    assert "[D&D 5E]" in result
 
 
 @pytest.mark.asyncio
@@ -227,6 +247,34 @@ async def test_library_stats_returns_overview(mock_sidecar):
     assert "150" in result
     assert "5" in result
     assert "ttrpg_docs" in result
+
+
+# ---------------------------------------------------------------------------
+# list_game_systems tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_list_game_systems_shows_systems(mock_sidecar):
+    mock_sidecar.set_get("/api/game-systems", {
+        "game_systems": ["D&D 5E", "Dragonbane", "unknown"],
+        "count": 3,
+    })
+
+    result = await list_game_systems()
+    assert "3" in result
+    assert "D&D 5E" in result
+    assert "Dragonbane" in result
+
+
+@pytest.mark.asyncio
+async def test_list_game_systems_empty(mock_sidecar):
+    mock_sidecar.set_get("/api/game-systems", {
+        "game_systems": [],
+        "count": 0,
+    })
+
+    result = await list_game_systems()
+    assert "No game systems detected" in result
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +415,18 @@ async def test_resource_source_content_not_found(mock_sidecar):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_resource_game_systems_returns_list(mock_sidecar):
+    mock_sidecar.set_get("/api/game-systems", {
+        "game_systems": ["D&D 5E", "Dragonbane"],
+        "count": 2,
+    })
+
+    result = await resource_game_systems()
+    assert "D&D 5E" in result
+    assert "Dragonbane" in result
+
+
+@pytest.mark.asyncio
 async def test_resource_stats_returns_overview(mock_sidecar):
     mock_sidecar.set_get("/api/stats", {
         "total_chunks": 150,
@@ -426,6 +486,7 @@ def test_rule_lookup_with_game_system():
     result = rule_lookup("initiative rules", game_system="Dragonbane")
     text = result[0].content.text
     assert "Dragonbane" in text
+    assert 'game_system="Dragonbane"' in text
 
 
 # ---------------------------------------------------------------------------
@@ -448,6 +509,7 @@ def test_encounter_builder_with_options():
     text = result[0].content.text
     assert "undead ambush" in text
     assert "D&D 5E" in text
+    assert 'game_system="D&D 5E"' in text
 
 
 # ---------------------------------------------------------------------------
@@ -472,6 +534,7 @@ def test_npc_generator_with_context():
     text = result[0].content.text
     assert "Dragonbane" in text
     assert "mining town" in text
+    assert 'game_system="Dragonbane"' in text
 
 
 # ---------------------------------------------------------------------------
