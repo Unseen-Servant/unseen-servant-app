@@ -53,6 +53,12 @@ fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
         }
     }
 
+    // Sort: folders first, then alphabetically (case-insensitive)
+    items.sort_by(|a, b| {
+        b.is_dir.cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+
     Ok(items)
 }
 
