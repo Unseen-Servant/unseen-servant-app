@@ -33,6 +33,7 @@ Unseen Servant is a desktop application for tabletop RPG Game Masters to:
 3. **Separation of concerns:** Rust handles filesystem/ChromaDB, Svelte handles UI
 4. **State management:** Start simple (Set, props), can refactor to stores later
 5. **Persistence:** Build features first, add save/load after core works
+6. **Local support:** Promote modules working directly on the user's machine for privacy. Use Markdown files for easy collaboration between human and machine.
 
 ## Teaching Philosophy
 

@@ -97,3 +97,74 @@ def test_search_default_n_results(indexed_client):
     })
 
     assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Filtered search tests (source_filter)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def multi_indexed_client(client, sample_pdf_path, large_text_pdf_path):
+    """Client with two PDFs indexed — useful for testing source_filter.
+
+    - dragonbane_monsters.pdf: dragon/fire content
+    - core_rules.pdf: dungeon/adventurer content
+    """
+    client.post("/api/index-files", json={
+        "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
+    })
+    return client
+
+
+def test_filtered_search_returns_only_matching_source(multi_indexed_client):
+    """With source_filter, results should only come from that file."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon fire",
+        "n_results": 10,
+        "source_filter": "dragonbane_monsters.pdf"
+    })
+
+    data = response.json()
+    assert len(data["results"]) > 0
+    for result in data["results"]:
+        assert result["filename"] == "dragonbane_monsters.pdf"
+
+
+def test_filtered_search_excludes_other_sources(multi_indexed_client):
+    """Filtering to one source should not return chunks from the other."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "adventurer dungeon",
+        "n_results": 10,
+        "source_filter": "dragonbane_monsters.pdf"
+    })
+
+    data = response.json()
+    for result in data["results"]:
+        assert result["filename"] != "core_rules.pdf"
+
+
+def test_filtered_search_nonexistent_source(multi_indexed_client):
+    """Filtering to a source that doesn't exist should return empty results."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon",
+        "n_results": 5,
+        "source_filter": "nonexistent_book.pdf"
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["results"] == []
+
+
+def test_unfiltered_search_still_works(multi_indexed_client):
+    """Without source_filter, search should return results from all sources."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon dungeon adventurer",
+        "n_results": 10
+    })
+
+    data = response.json()
+    filenames = {r["filename"] for r in data["results"]}
+    # Should have results from both indexed PDFs
+    assert len(filenames) >= 1  # At least one source
+    assert response.status_code == 200

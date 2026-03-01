@@ -60,6 +60,7 @@ class IndexFilesRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     n_results: int = 5
+    source_filter: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -232,14 +233,54 @@ def create_app(collection=None):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    @app.get("/api/source/{filename}/content")
+    async def get_source_content(filename: str):
+        """Retrieve the full text content of an indexed PDF.
+
+        Fetches all chunks for the given filename from ChromaDB,
+        sorts them by chunk index, and concatenates them into
+        one continuous text.
+        """
+        try:
+            results = collection.get(
+                where={"filename": filename},
+                include=["documents", "metadatas"],
+            )
+
+            if not results["ids"]:
+                raise HTTPException(
+                    status_code=404, detail=f"Source not found: {filename}"
+                )
+
+            # Sort chunks by their index so the text reads in order
+            paired = sorted(
+                zip(results["documents"], results["metadatas"]),
+                key=lambda pair: pair[1].get("chunk", 0),
+            )
+            content = "\n".join(doc for doc, _ in paired)
+
+            return {
+                "filename": filename,
+                "chunks": len(paired),
+                "content": content,
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.post("/api/search")
     async def search(request: SearchRequest):
         """Semantic search across indexed documents."""
         try:
-            results = collection.query(
-                query_texts=[request.query],
-                n_results=request.n_results
-            )
+            query_kwargs = {
+                "query_texts": [request.query],
+                "n_results": request.n_results,
+            }
+            if request.source_filter:
+                query_kwargs["where"] = {"filename": request.source_filter}
+
+            results = collection.query(**query_kwargs)
 
             if not results["documents"][0]:
                 return {"results": [], "message": "No results found."}
