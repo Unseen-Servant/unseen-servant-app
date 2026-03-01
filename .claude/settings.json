@@ -36,6 +36,8 @@
       "Bash(gh label list:*)",
       "Bash(gh label view:*)",
       "Bash(pytest:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(.venv/bin/pytest:*)",
       "Bash(.venv/bin/python -m pytest:*)",
       "Read(*)",
       "Write(/tmp/*)",
