@@ -5,13 +5,14 @@
   export let item: FileItem;
   export let level: number = 0;
   export let selectedPaths: Set<string>;
+  export let foldersWithSelections: Set<string>;
   export let onToggle: (path: string, isDir: boolean, item: FileItem) => void;
 
   let isExpanded: boolean = false;
 
-  // Check if this item is selected
+  // Check if this item is selected — O(1) Set lookup, works even for unloaded folders
   $: isSelected = item.is_dir
-    ? isFolderSelected(item)
+    ? foldersWithSelections.has(item.path)
     : selectedPaths.has(item.path);
 
   async function toggleExpand() {
@@ -32,19 +33,6 @@
 
   function handleCheckboxChange() {
     onToggle(item.path, item.is_dir, item);
-  }
-
-  function isFolderSelected(folder: FileItem): boolean {
-    if (!folder.is_dir || !folder.children) return false;
-
-    for (const child of folder.children) {
-      if (child.is_dir) {
-        if (isFolderSelected(child)) return true;
-      } else {
-        if (selectedPaths.has(child.path)) return true;
-      }
-    }
-    return false;
   }
 </script>
 
@@ -69,10 +57,11 @@
 
   {#if isExpanded && item.children}
     {#each item.children as child}
-      <svelte:self 
-        item={child} 
-        level={level + 1} 
+      <svelte:self
+        item={child}
+        level={level + 1}
         {selectedPaths}
+        {foldersWithSelections}
         {onToggle}
       />
     {/each}

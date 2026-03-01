@@ -87,8 +87,8 @@
       }
     }
     
-    // Check if any children are currently selected
-    const anySelected = isFolderSelected(folder);
+    // Check if any descendants are currently selected (O(1) lookup)
+    const anySelected = foldersWithSelections.has(folder.path);
     const shouldSelect = !anySelected;
 
     // Recursively add/remove all children
@@ -138,18 +138,19 @@
     }
   }
 
-  function isFolderSelected(folder: FileItem): boolean {
-    if (!folder.is_dir || !folder.children) return false;
+  // Derive which folders contain selected items — purely from path strings, no tree walking
+  $: foldersWithSelections = computeAncestorPaths(selectedPaths);
 
-    // Check if any child is selected
-    for (const child of folder.children) {
-      if (child.is_dir) {
-        if (isFolderSelected(child)) return true;
-      } else {
-        if (selectedPaths.has(child.path)) return true;
+  function computeAncestorPaths(paths: Set<string>): Set<string> {
+    const ancestors = new Set<string>();
+    for (const p of paths) {
+      let dir = p;
+      while ((dir = dir.substring(0, dir.lastIndexOf('/'))) !== '') {
+        if (ancestors.has(dir)) break; // Already traced this branch
+        ancestors.add(dir);
       }
     }
-    return false;
+    return ancestors;
   }
 </script>
 
@@ -167,11 +168,12 @@
 
     <div class="file-tree">
       {#each files as file}
-        <FileTree 
-          item={file} 
+        <FileTree
+          item={file}
           level={0}
           {selectedPaths}
-          onToggle={toogleSelection} 
+          {foldersWithSelections}
+          onToggle={toogleSelection}
         />
       {/each}
     </div>
