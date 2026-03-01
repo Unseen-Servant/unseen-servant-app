@@ -33,12 +33,15 @@ Unseen Servant is built around three ideas:
 
 ## Current Features
 
-- **Folder Browser** — Select your TTRPG folder and explore it as a tree, with lazy expansion on
-  demand
+- **Folder Browser** — Select your TTRPG folder and explore it as a sorted tree (folders first,
+  then files alphabetically), with lazy expansion on demand
 - **PDF Detection** — Automatically filters to only show `.pdf` files and subdirectories
 - **Checkbox Selection** — Select individual PDFs or entire folders (with recursive toggle)
-- **Indeterminate State** — Folder checkbox shows a mixed state when only some children are
-  selected
+- **Ancestor Awareness** — Parent folders visually indicate when nested files are selected, even
+  before expanding
+- **Persistent Selections** — Folder and file selections are saved across sessions
+- **PDF Indexing** — Index selected PDFs into ChromaDB for semantic search via a Python sidecar
+  (uses Ollama embeddings locally)
 
 ### Roadmap
 
@@ -48,34 +51,41 @@ Unseen Servant is built around three ideas:
 | ✅     | List files in folder                              |
 | ✅     | Recursive tree structure with expand/collapse     |
 | ✅     | Checkbox selection (individual + recursive)       |
-| 🔜     | Persist folder selections across sessions         |
-| 🔜     | ChromaDB integration — index PDFs semantically    |
-| 🔜     | Claude AI via MCP — answer questions from library |
+| ✅     | Persist folder selections across sessions         |
+| ✅     | ChromaDB integration — index PDFs semantically    |
 | 🔜     | Search UI — query indexed content during sessions |
+| 🔜     | Claude AI via MCP — answer questions from library |
 
 ---
 
 ## Tech Stack
 
-| Layer                    | Choice                                             | Why                                              |
-|--------------------------|----------------------------------------------------|--------------------------------------------------|
-| Desktop framework        | [Tauri v2](https://tauri.app)                      | ~3MB binary vs Electron's 150MB+. Rust backend.  |
-| Frontend                 | [SvelteKit](https://kit.svelte.dev) + TypeScript   | Lightweight, fast, great reactivity model        |
-| Backend                  | Rust                                               | Ships with Tauri; safe filesystem access         |
-| Vector DB *(upcoming)*   | [ChromaDB](https://www.trychroma.com)              | Semantic search for PDF content                  |
-| AI integration *(soon)*  | Claude via [MCP](https://modelcontextprotocol.io)  | Query your library in natural language           |
+| Layer                   | Choice                                             | Why                                              |
+|-------------------------|----------------------------------------------------|--------------------------------------------------|
+| Desktop framework       | [Tauri v2](https://tauri.app)                      | ~3MB binary vs Electron's 150MB+. Rust backend.  |
+| Frontend                | [SvelteKit](https://kit.svelte.dev) + TypeScript   | Lightweight, fast, great reactivity model        |
+| Backend                 | Rust                                               | Ships with Tauri; safe filesystem access         |
+| Indexing sidecar        | Python + [FastAPI](https://fastapi.tiangolo.com)   | Mature PDF/ML ecosystem, managed by Tauri        |
+| Vector DB               | [ChromaDB](https://www.trychroma.com)              | Semantic search for PDF content                  |
+| Embeddings              | [Ollama](https://ollama.com) (nomic-embed-text)    | Local embeddings, no API keys needed             |
+| AI integration *(soon)* | Claude via [MCP](https://modelcontextprotocol.io)  | Query your library in natural language           |
 
 ---
 
 ## Prerequisites
 
+### All Platforms
+
+- [Rust](https://www.rust-lang.org/tools/install)
+- Node.js 18+ (via [nvm](https://github.com/nvm-sh/nvm) or your preferred manager)
+- Python 3.10+ (via [pyenv](https://github.com/pyenv/pyenv) or system install)
+- [Ollama](https://ollama.com) with the `nomic-embed-text` model:
+  `ollama pull nomic-embed-text`
+
 ### macOS
 
 - [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/):
   `xcode-select --install`
-- [Rust](https://www.rust-lang.org/tools/install):
-  `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- Node.js 18+ (via [nvm](https://github.com/nvm-sh/nvm) or [Homebrew](https://brew.sh))
 
 ### Windows
 
@@ -83,14 +93,10 @@ Unseen Servant is built around three ideas:
   with "Desktop development with C++"
 - [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on
   Windows 11)
-- [Rust](https://www.rust-lang.org/tools/install)
-- Node.js 18+
 
 ### Linux
 
 - GTK3 dev libraries: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev`
-- [Rust](https://www.rust-lang.org/tools/install)
-- Node.js 18+
 
 See the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/) for full details.
 
@@ -106,13 +112,26 @@ cd unseen-server
 # 2. Install frontend dependencies
 npm install
 
-# 3. Run in development mode (compiles Rust + starts frontend with HMR)
+# 3. Set up the Python sidecar (one-time)
+cd sidecar
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cd ..
+
+# 4. Make sure Ollama is running with the embedding model
+ollama pull nomic-embed-text
+
+# 5. Run in development mode (compiles Rust + starts frontend with HMR)
 npm run tauri dev
 ```
 
 > **Important:** Always use `npm run tauri dev`, not `npm run dev`.
 > Plain `npm run dev` starts only the SvelteKit frontend in a browser — Tauri APIs
 > (file system access, native dialogs) won't work there.
+>
+> The Tauri app automatically starts and stops the Python sidecar — you don't need
+> to run it manually.
 
 ---
 
@@ -135,6 +154,15 @@ npm run check:watch   # Type checking in watch mode
 npm run preview       # Preview the production frontend build in browser
 ```
 
+### Sidecar Tests
+
+```bash
+cd sidecar
+source .venv/bin/activate
+pip install -r requirements-test.txt   # One-time: adds pytest, reportlab, etc.
+python -m pytest tests/ -v             # Run all 39 tests (no Ollama needed)
+```
+
 ---
 
 ## Project Structure
@@ -143,7 +171,7 @@ npm run preview       # Preview the production frontend build in browser
 unseen-server/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
-│   │   ├── +page.svelte        # Main UI: folder picker, file tree, selection state
+│   │   ├── +page.svelte        # Main UI: folder picker, file tree, indexing
 │   │   └── +layout.ts          # Disables SSR (SPA mode for Tauri)
 │   └── lib/
 │       ├── FileTree.svelte     # Recursive file tree component
@@ -151,10 +179,27 @@ unseen-server/
 │
 ├── src-tauri/                  # Backend (Rust)
 │   ├── src/
-│   │   ├── lib.rs              # Tauri commands: select_folder, list_files
+│   │   ├── lib.rs              # Tauri commands + sidecar lifecycle
 │   │   └── main.rs             # App entry point
+│   ├── capabilities/
+│   │   └── default.json        # Tauri permissions (dialog, store, etc.)
 │   ├── tauri.conf.json         # App config (window size, bundle ID, icons)
 │   └── Cargo.toml              # Rust dependencies
+│
+├── sidecar/                    # Python indexing sidecar
+│   ├── server.py               # FastAPI server (ChromaDB + PDF extraction)
+│   ├── requirements.txt        # Production dependencies
+│   ├── requirements-test.txt   # Test dependencies (pytest, reportlab)
+│   ├── pytest.ini              # Test configuration
+│   └── tests/                  # 39 tests across 7 files
+│       ├── conftest.py         # Shared fixtures (test DB, PDF generators)
+│       ├── test_chunking.py    # Text chunking unit tests
+│       ├── test_health.py      # Health endpoint
+│       ├── test_indexing.py    # PDF indexing tests
+│       ├── test_search.py      # Semantic search tests
+│       ├── test_stats.py       # Database statistics
+│       ├── test_sources.py     # Source listing + deletion
+│       └── test_error_cases.py # Edge cases and robustness
 │
 ├── static/                     # Static assets (favicon, etc.)
 ├── package.json
@@ -163,7 +208,9 @@ unseen-server/
 
 ---
 
-## Architecture: How Svelte Talks to Rust
+## Architecture
+
+### How Svelte Talks to Rust
 
 Tauri uses a command pattern to bridge the frontend and backend:
 
@@ -185,6 +232,29 @@ User action in Svelte
 |-----------------|-------------------------------------------------------------|
 | `select_folder` | Opens a native OS folder picker dialog, returns chosen path |
 | `list_files`    | Reads a directory, returns `FileItem[]` (PDFs + subfolders) |
+| `index_files`   | Sends selected PDF paths to the sidecar for indexing        |
+
+### How Indexing Works
+
+The Tauri app manages a Python sidecar process for PDF indexing:
+
+```text
+Tauri app launches
+        ↓
+  Spawns Python sidecar (FastAPI on port 8420)
+        ↓
+  User selects PDFs and clicks "Index"
+        ↓
+  Rust sends HTTP POST to sidecar with file paths
+        ↓
+  Sidecar extracts text (pypdf) → chunks (1000 chars, 200 overlap)
+        ↓
+  Embeds via Ollama (nomic-embed-text) → stores in ChromaDB
+        ↓
+  Returns { indexed, total, errors } to Rust → Svelte
+        ↓
+  Tauri app closes → kills sidecar process
+```
 
 ---
 

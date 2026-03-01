@@ -17,3 +17,4 @@ src-tauri/gen/schemas
 __pycache__
 *.pyc
 chroma_db
+.pytest_cache
