@@ -54,14 +54,16 @@ def test_collection():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def client(test_collection):
+def client(test_collection, tmp_path):
     """HTTP test client wired to an in-memory ChromaDB.
 
     FastAPI's TestClient lets us make HTTP requests without
     starting a real server. It handles the async event loop
     internally, so our test code stays synchronous and simple.
+
+    tmp_path is used as data_dir for manifest storage during tests.
     """
-    app = create_app(collection=test_collection)
+    app = create_app(collection=test_collection, data_dir=tmp_path)
     return TestClient(app)
 
 

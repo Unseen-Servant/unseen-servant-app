@@ -9,6 +9,9 @@ Usage:
 """
 
 import argparse
+import json
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import chromadb
@@ -57,6 +60,12 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[st
 class IndexFilesRequest(BaseModel):
     paths: list[str]
 
+class IndexStatusRequest(BaseModel):
+    selected_paths: list[str]
+
+class SyncIndexRequest(BaseModel):
+    selected_paths: list[str]
+
 class SearchRequest(BaseModel):
     query: str
     n_results: int = 5
@@ -64,10 +73,174 @@ class SearchRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Index manifest — tracks what's been indexed and when
+# ---------------------------------------------------------------------------
+
+MANIFEST_FILENAME = "index_manifest.json"
+
+
+class ManifestEntry(BaseModel):
+    filename: str
+    mtime: float
+    chunk_count: int
+    indexed_at: str
+
+
+class IndexManifest(BaseModel):
+    version: int = 1
+    files: dict[str, ManifestEntry] = {}
+
+
+def load_manifest(data_dir: Path) -> IndexManifest:
+    """Load the index manifest from disk, or return an empty one."""
+    manifest_path = data_dir / MANIFEST_FILENAME
+    if manifest_path.exists():
+        raw = json.loads(manifest_path.read_text())
+        return IndexManifest(**raw)
+    return IndexManifest()
+
+
+def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
+    """Write the index manifest to disk."""
+    manifest_path = data_dir / MANIFEST_FILENAME
+    manifest_path.write_text(manifest.model_dump_json(indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Reusable indexing / deletion helpers
+# ---------------------------------------------------------------------------
+
+def index_single_pdf(pdf_path: Path, collection) -> tuple[int, str | None]:
+    """Extract, chunk, and upsert a single PDF into ChromaDB.
+
+    Returns (chunk_count, error_message). error_message is None on success.
+    """
+    if not pdf_path.exists():
+        return 0, f"{pdf_path.name}: File not found"
+
+    try:
+        reader = PdfReader(pdf_path)
+        text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+
+        if not text.strip():
+            return 0, f"{pdf_path.name}: Empty or scanned PDF"
+
+        chunks = chunk_text(text)
+
+        batch_size = 100
+        for batch_idx in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[batch_idx:batch_idx + batch_size]
+            batch_metadatas = [{
+                "source": str(pdf_path),
+                "filename": pdf_path.name,
+                "chunk": batch_idx + chunk_idx
+            } for chunk_idx in range(len(batch_chunks))]
+            batch_ids = [
+                f"{pdf_path.stem}_{batch_idx + chunk_idx}"
+                for chunk_idx in range(len(batch_chunks))
+            ]
+
+            collection.upsert(
+                documents=batch_chunks,
+                metadatas=batch_metadatas,
+                ids=batch_ids
+            )
+
+        return len(chunks), None
+
+    except Exception as e:
+        return 0, f"{pdf_path.name}: {str(e)}"
+
+
+def delete_source_chunks(filename: str, collection) -> int:
+    """Delete all chunks for a given filename from ChromaDB.
+
+    Returns the number of deleted chunks, or 0 if not found.
+    """
+    results = collection.get(include=["metadatas"])
+    ids_to_delete = [
+        id for id, metadata in zip(results["ids"], results["metadatas"])
+        if metadata.get("filename") == filename
+    ]
+
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+
+    return len(ids_to_delete)
+
+
+def compute_diff(
+    selected_paths: list[str], manifest: IndexManifest
+) -> dict[str, list[dict]]:
+    """Compare selected paths against the manifest to find what changed.
+
+    Returns a dict with keys: to_add, to_remove, to_update, up_to_date, errors.
+    Each value is a list of dicts describing the file.
+    """
+    selected = set(selected_paths)
+    indexed = set(manifest.files.keys())
+
+    to_add = []
+    to_update = []
+    up_to_date = []
+    errors = []
+
+    for path_str in selected:
+        path = Path(path_str)
+        if path_str not in indexed:
+            # New file — not yet indexed
+            if not path.exists():
+                errors.append({"path": path_str, "error": "File not found on disk"})
+            else:
+                to_add.append({"path": path_str, "filename": path.name})
+        else:
+            # Already indexed — check if modified
+            entry = manifest.files[path_str]
+            if not path.exists():
+                errors.append({"path": path_str, "error": "File not found on disk"})
+            else:
+                current_mtime = os.path.getmtime(path_str)
+                if current_mtime != entry.mtime:
+                    to_update.append({
+                        "path": path_str,
+                        "filename": path.name,
+                        "chunk_count": entry.chunk_count,
+                    })
+                else:
+                    up_to_date.append({
+                        "path": path_str,
+                        "filename": path.name,
+                        "chunk_count": entry.chunk_count,
+                    })
+
+    # Files in manifest but no longer selected → to_remove
+    to_remove = [
+        {
+            "path": path_str,
+            "filename": manifest.files[path_str].filename,
+            "chunk_count": manifest.files[path_str].chunk_count,
+        }
+        for path_str in (indexed - selected)
+    ]
+
+    return {
+        "to_add": to_add,
+        "to_remove": to_remove,
+        "to_update": to_update,
+        "up_to_date": up_to_date,
+        "errors": errors,
+    }
+
+
+# ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
-def create_app(collection=None):
+def create_app(collection=None, data_dir: Path | None = None):
     """Create the FastAPI app, optionally with a pre-configured collection.
 
     In production: called with no arguments — sets up Ollama + PersistentClient.
@@ -76,6 +249,12 @@ def create_app(collection=None):
     This pattern is called "dependency injection." The endpoints don't care
     HOW the collection was created — they just use it. This lets tests swap
     in a lightweight in-memory collection without needing Ollama running.
+
+    Args:
+        collection: ChromaDB collection (None = production auto-setup).
+        data_dir: Directory for ChromaDB and manifest storage.
+                  In production, resolved from --data-dir CLI arg.
+                  In tests, pass tmp_path.
     """
     if collection is None:
         # Production path: same setup as before, but now only runs
@@ -118,57 +297,126 @@ def create_app(collection=None):
         total = len(request.paths)
         indexed = 0
         errors = []
+        manifest = load_manifest(data_dir) if data_dir else None
 
         for pdf_path_str in request.paths:
             pdf_path = Path(pdf_path_str)
+            chunk_count, error = index_single_pdf(pdf_path, collection)
 
-            if not pdf_path.exists():
-                errors.append(f"{pdf_path.name}: File not found")
-                continue
-
-            try:
-                reader = PdfReader(pdf_path)
-                text = ""
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text
-
-                if not text.strip():
-                    errors.append(f"{pdf_path.name}: Empty or scanned PDF")
-                    continue
-
-                chunks = chunk_text(text)
-
-                # Store in ChromaDB in batches of 100
-                batch_size = 100
-                for batch_idx in range(0, len(chunks), batch_size):
-                    batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    batch_metadatas = [{
-                        "source": str(pdf_path),
-                        "filename": pdf_path.name,
-                        "chunk": batch_idx + chunk_idx
-                    } for chunk_idx in range(len(batch_chunks))]
-                    batch_ids = [
-                        f"{pdf_path.stem}_{batch_idx + chunk_idx}"
-                        for chunk_idx in range(len(batch_chunks))
-                    ]
-
-                    collection.upsert(
-                        documents=batch_chunks,
-                        metadatas=batch_metadatas,
-                        ids=batch_ids
+            if error:
+                errors.append(error)
+            else:
+                indexed += 1
+                if manifest and data_dir:
+                    manifest.files[pdf_path_str] = ManifestEntry(
+                        filename=pdf_path.name,
+                        mtime=os.path.getmtime(pdf_path),
+                        chunk_count=chunk_count,
+                        indexed_at=datetime.now(timezone.utc).isoformat(),
                     )
 
-                indexed += 1
-
-            except Exception as e:
-                errors.append(f"{pdf_path.name}: {str(e)}")
+        if manifest and data_dir:
+            save_manifest(data_dir, manifest)
 
         return {
             "indexed": indexed,
             "total": total,
             "errors": errors
+        }
+
+    @app.post("/api/index-status")
+    async def index_status(request: IndexStatusRequest):
+        """Compare selected files against the current index.
+
+        Read-only — does not modify the index or manifest.
+        Returns categorized lists: to_add, to_remove, to_update, up_to_date.
+        """
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        manifest = load_manifest(data_dir)
+        diff = compute_diff(request.selected_paths, manifest)
+
+        return {
+            **diff,
+            "summary": {
+                "add": len(diff["to_add"]),
+                "remove": len(diff["to_remove"]),
+                "update": len(diff["to_update"]),
+                "up_to_date": len(diff["up_to_date"]),
+                "errors": len(diff["errors"]),
+            },
+        }
+
+    @app.post("/api/sync-index")
+    async def sync_index(request: SyncIndexRequest):
+        """Apply index changes: add new, remove deselected, re-index modified.
+
+        This is the main reconciliation endpoint. It computes the diff
+        between selected paths and the manifest, then:
+        1. Deletes chunks for deselected files
+        2. Indexes new and modified files
+        3. Updates the manifest
+        """
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        manifest = load_manifest(data_dir)
+        diff = compute_diff(request.selected_paths, manifest)
+
+        removed = 0
+        added = 0
+        updated = 0
+        errors = []
+
+        # Phase 1: Remove deselected files
+        for entry in diff["to_remove"]:
+            delete_source_chunks(entry["filename"], collection)
+            del manifest.files[entry["path"]]
+            removed += 1
+
+        # Phase 2: Index new files
+        for entry in diff["to_add"]:
+            pdf_path = Path(entry["path"])
+            chunk_count, error = index_single_pdf(pdf_path, collection)
+            if error:
+                errors.append(error)
+            else:
+                added += 1
+                manifest.files[entry["path"]] = ManifestEntry(
+                    filename=pdf_path.name,
+                    mtime=os.path.getmtime(pdf_path),
+                    chunk_count=chunk_count,
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                )
+
+        # Phase 3: Re-index modified files
+        for entry in diff["to_update"]:
+            pdf_path = Path(entry["path"])
+            chunk_count, error = index_single_pdf(pdf_path, collection)
+            if error:
+                errors.append(error)
+            else:
+                updated += 1
+                manifest.files[entry["path"]] = ManifestEntry(
+                    filename=pdf_path.name,
+                    mtime=os.path.getmtime(pdf_path),
+                    chunk_count=chunk_count,
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                )
+
+        save_manifest(data_dir, manifest)
+
+        return {
+            "added": added,
+            "removed": removed,
+            "updated": updated,
+            "errors": errors,
+            "total_indexed": len(manifest.files),
         }
 
     @app.get("/api/stats")
@@ -217,17 +465,12 @@ def create_app(collection=None):
     async def delete_source(filename: str):
         """Delete a source and all its chunks."""
         try:
-            results = collection.get(include=["metadatas"])
-            ids_to_delete = [
-                id for id, metadata in zip(results["ids"], results["metadatas"])
-                if metadata.get("filename") == filename
-            ]
+            deleted = delete_source_chunks(filename, collection)
 
-            if not ids_to_delete:
+            if not deleted:
                 raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
 
-            collection.delete(ids=ids_to_delete)
-            return {"message": f"Deleted {len(ids_to_delete)} chunks from {filename}"}
+            return {"message": f"Deleted {deleted} chunks from {filename}"}
         except HTTPException:
             raise
         except Exception as e:

@@ -30,6 +30,48 @@ struct IndexResult {
     errors: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct FileStatusEntry {
+    path: String,
+    filename: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunk_count: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct FileErrorEntry {
+    path: String,
+    error: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct IndexStatusSummary {
+    add: u32,
+    remove: u32,
+    update: u32,
+    up_to_date: u32,
+    errors: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct IndexStatusResult {
+    to_add: Vec<FileStatusEntry>,
+    to_remove: Vec<FileStatusEntry>,
+    to_update: Vec<FileStatusEntry>,
+    up_to_date: Vec<FileStatusEntry>,
+    errors: Vec<FileErrorEntry>,
+    summary: IndexStatusSummary,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SyncResult {
+    added: u32,
+    removed: u32,
+    updated: u32,
+    errors: Vec<String>,
+    total_indexed: u32,
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — file system
 // ---------------------------------------------------------------------------
@@ -103,6 +145,42 @@ async fn index_files(paths: Vec<String>) -> Result<IndexResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     let result: IndexResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/index-status", SIDECAR_URL))
+        .json(&serde_json::json!({ "selected_paths": paths }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: IndexStatusResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn sync_index(paths: Vec<String>) -> Result<SyncResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/sync-index", SIDECAR_URL))
+        .json(&serde_json::json!({ "selected_paths": paths }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: SyncResult = response
         .json()
         .await
         .map_err(|e| format!("Invalid response from indexer: {}", e))?;
@@ -203,7 +281,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_mcp_config])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_mcp_config])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
