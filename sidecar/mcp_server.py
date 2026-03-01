@@ -387,7 +387,7 @@ async def resource_stats() -> str:
 # Prompts
 # ---------------------------------------------------------------------------
 
-@mcp.prompt()
+@mcp.prompt(name="Session Prep")
 def session_prep(session_topic: str, sources: str | None = None) -> list[UserMessage]:
     """Structured session preparation for a TTRPG game session.
 
@@ -427,7 +427,7 @@ def session_prep(session_topic: str, sources: str | None = None) -> list[UserMes
     ]
 
 
-@mcp.prompt()
+@mcp.prompt(name="Rule Lookup")
 def rule_lookup(question: str, game_system: str | None = None) -> list[UserMessage]:
     """Quick rule reference with citations from indexed sourcebooks.
 
@@ -463,7 +463,7 @@ def rule_lookup(question: str, game_system: str | None = None) -> list[UserMessa
     ]
 
 
-@mcp.prompt()
+@mcp.prompt(name="Encounter Builder")
 def encounter_builder(
     party_level: str,
     theme: str | None = None,
@@ -506,7 +506,7 @@ def encounter_builder(
     ]
 
 
-@mcp.prompt()
+@mcp.prompt(name="NPC Generator")
 def npc_generator(
     role: str,
     game_system: str | None = None,
@@ -550,7 +550,7 @@ def npc_generator(
     ]
 
 
-@mcp.prompt()
+@mcp.prompt(name="Lore Researcher")
 def lore_researcher(topic: str, sources: str | None = None) -> list[UserMessage]:
     """Deep lore cross-referencing across indexed sourcebooks.
 
