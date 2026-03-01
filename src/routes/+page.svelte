@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
 
   let selectedFolder = '';
@@ -12,6 +12,13 @@
   let isIndexing = false;
   let indexResult = '';
   let mcpCopyStatus = '';
+
+  // Index sync state
+  let indexStatus: IndexStatusResult | null = null;
+  let isLoadingStatus = false;
+  let isSyncing = false;
+  let syncResult = '';
+  let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onMount(async () => {
     try {
@@ -25,12 +32,36 @@
       }
       if (savedPaths) {
         selectedPaths = new Set(savedPaths);
+        if (savedPaths.length > 0) {
+          await refreshIndexStatus();
+        }
       }
     } catch (e) {
       // No saved state on first run — that's fine
       console.log('No saved state:', e);
     }
   });
+
+  async function refreshIndexStatus() {
+    isLoadingStatus = true;
+    try {
+      indexStatus = await invoke<IndexStatusResult>(
+        'get_index_status',
+        { paths: Array.from(selectedPaths) }
+      );
+    } catch (e) {
+      // Sidecar might not be ready yet on startup
+      console.log('Could not fetch index status:', e);
+      indexStatus = null;
+    } finally {
+      isLoadingStatus = false;
+    }
+  }
+
+  function scheduleStatusRefresh() {
+    if (statusTimeout) clearTimeout(statusTimeout);
+    statusTimeout = setTimeout(() => refreshIndexStatus(), 500);
+  }
 
   async function saveState() {
     const store = await load('settings.json');
@@ -75,6 +106,7 @@
       }
       selectedPaths = selectedPaths; // Trigger reactivity
       await saveState();
+      scheduleStatusRefresh();
     }
   }
 
@@ -111,6 +143,7 @@
     }
     selectedPaths = selectedPaths; // Trigger reactivity
     await saveState();
+    scheduleStatusRefresh();
   }
 
   async function setFolderSelection(folder: FileItem, select: boolean) {
@@ -167,7 +200,32 @@
     }
   }
 
-  // Index selected PDFs via the Python sidecar
+  // Sync index: add new, remove deselected, re-index modified
+  async function handleSync() {
+    isSyncing = true;
+    syncResult = '';
+    try {
+      const result = await invoke<SyncResult>(
+        'sync_index',
+        { paths: Array.from(selectedPaths) }
+      );
+      const parts = [];
+      if (result.added > 0) parts.push(`${result.added} added`);
+      if (result.removed > 0) parts.push(`${result.removed} removed`);
+      if (result.updated > 0) parts.push(`${result.updated} updated`);
+      if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
+      syncResult = parts.length > 0
+        ? `Synced: ${parts.join(', ')}.`
+        : 'Nothing to sync.';
+      await refreshIndexStatus();
+    } catch (e) {
+      syncResult = `Sync failed: ${String(e)}`;
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  // Legacy index for backward compatibility (kept but no longer primary)
   async function handleIndex() {
     isIndexing = true;
     indexResult = '';
@@ -181,6 +239,7 @@
       } else {
         indexResult = `Successfully indexed ${result.indexed} PDFs.`;
       }
+      await refreshIndexStatus();
     } catch (e) {
       indexResult = `Indexing failed: ${String(e)}`;
     } finally {
@@ -201,15 +260,43 @@
 
     <p>Selected: {selectedPaths.size} items</p>
 
-    <button
-      on:click={handleIndex}
-      disabled={selectedPaths.size === 0 || isIndexing}
-    >
-      {isIndexing ? 'Indexing...' : `Index ${selectedPaths.size} PDFs`}
-    </button>
+    {#if isLoadingStatus}
+      <p class="sync-status">Checking index status...</p>
+    {:else if indexStatus}
+      {@const pending = indexStatus.summary.add + indexStatus.summary.remove + indexStatus.summary.update}
+      {#if pending === 0 && indexStatus.summary.up_to_date > 0}
+        <p class="sync-status sync-ok">Index up to date ({indexStatus.summary.up_to_date} PDFs)</p>
+      {:else if pending > 0 || indexStatus.summary.errors > 0}
+        <div class="sync-status sync-pending">
+          <p>
+            {#if indexStatus.summary.add > 0}
+              <span class="sync-badge add">{indexStatus.summary.add} to add</span>
+            {/if}
+            {#if indexStatus.summary.remove > 0}
+              <span class="sync-badge remove">{indexStatus.summary.remove} to remove</span>
+            {/if}
+            {#if indexStatus.summary.update > 0}
+              <span class="sync-badge update">{indexStatus.summary.update} modified</span>
+            {/if}
+            {#if indexStatus.summary.up_to_date > 0}
+              <span class="sync-badge ok">{indexStatus.summary.up_to_date} up to date</span>
+            {/if}
+            {#if indexStatus.summary.errors > 0}
+              <span class="sync-badge error">{indexStatus.summary.errors} not found</span>
+            {/if}
+          </p>
+          <button
+            on:click={handleSync}
+            disabled={isSyncing}
+          >
+            {isSyncing ? 'Syncing...' : 'Sync Index'}
+          </button>
+        </div>
+      {/if}
+    {/if}
 
-    {#if indexResult}
-      <p class="index-result">{indexResult}</p>
+    {#if syncResult}
+      <p class="sync-result">{syncResult}</p>
     {/if}
 
     <div class="file-tree">
@@ -249,7 +336,31 @@
     padding: 1rem;
     background: white;
   }
-  .index-result {
+  .sync-status {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+  }
+  .sync-ok {
+    background: #f0fff0;
+    color: #2d7d2d;
+  }
+  .sync-pending {
+    background: #fff8f0;
+  }
+  .sync-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    margin-right: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .sync-badge.add { background: #e3f2fd; color: #1565c0; }
+  .sync-badge.remove { background: #fce4ec; color: #c62828; }
+  .sync-badge.update { background: #fff3e0; color: #e65100; }
+  .sync-badge.ok { background: #e8f5e9; color: #2e7d32; }
+  .sync-badge.error { background: #fbe9e7; color: #bf360c; }
+  .sync-result {
     margin-top: 0.5rem;
     padding: 0.5rem;
     background: #f0f7ff;
