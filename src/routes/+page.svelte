@@ -11,6 +11,7 @@
   let error = '';
   let isIndexing = false;
   let indexResult = '';
+  let mcpCopyStatus = '';
 
   onMount(async () => {
     try {
@@ -155,6 +156,17 @@
     return ancestors;
   }
 
+  // Copy MCP config to clipboard
+  async function handleCopyMcpConfig() {
+    try {
+      const config = await invoke<string>('get_mcp_config');
+      await navigator.clipboard.writeText(config);
+      mcpCopyStatus = 'Copied to clipboard!';
+    } catch (e) {
+      mcpCopyStatus = `Failed: ${String(e)}`;
+    }
+  }
+
   // Index selected PDFs via the Python sidecar
   async function handleIndex() {
     isIndexing = true;
@@ -216,6 +228,14 @@
   {#if error}
     <p style="color: red;">Error: {error}</p>
   {/if}
+
+  <hr />
+  <button on:click={handleCopyMcpConfig}>
+    Copy MCP Config
+  </button>
+  {#if mcpCopyStatus}
+    <p class="mcp-status">{mcpCopyStatus}</p>
+  {/if}
 </main>
 
 <style>
@@ -230,6 +250,12 @@
     background: white;
   }
   .index-result {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #f0f7ff;
+    border-radius: 4px;
+  }
+  .mcp-status {
     margin-top: 0.5rem;
     padding: 0.5rem;
     background: #f0f7ff;

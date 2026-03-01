@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import random
+import sys
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -593,5 +594,21 @@ def lore_researcher(topic: str, sources: str | None = None) -> list[UserMessage]
 # Main
 # ---------------------------------------------------------------------------
 
+def check_sidecar_health(url: str) -> None:
+    """Log whether the FastAPI sidecar is reachable. Non-blocking — the
+    MCP server starts regardless, since the sidecar may launch later."""
+    try:
+        resp = httpx.get(f"{url}/health", timeout=2.0)
+        resp.raise_for_status()
+        print(f"Sidecar is running at {url}", file=sys.stderr)
+    except (httpx.ConnectError, httpx.TimeoutException):
+        print(
+            f"Warning: Sidecar not reachable at {url}. "
+            f"Make sure the Unseen Servant app is running.",
+            file=sys.stderr,
+        )
+
+
 if __name__ == "__main__":
+    check_sidecar_health(args.sidecar_url)
     mcp.run(transport="stdio")

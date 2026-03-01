@@ -111,6 +111,47 @@ async fn index_files(paths: Vec<String>) -> Result<IndexResult, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Tauri commands — MCP config generation
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn get_mcp_config() -> Result<String, String> {
+    let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
+
+    let mcp_server_py = sidecar_dir
+        .join("mcp_server.py")
+        .canonicalize()
+        .map_err(|e| format!("Cannot find mcp_server.py: {}", e))?;
+
+    let venv_python = sidecar_dir.join(".venv/bin/python3");
+    let python_path = if venv_python.exists() {
+        venv_python
+            .canonicalize()
+            .map_err(|e| format!("Cannot resolve Python path: {}", e))?
+            .to_string_lossy()
+            .into_owned()
+    } else {
+        "python3".to_string()
+    };
+
+    let config = serde_json::json!({
+        "mcpServers": {
+            "unseen-servant": {
+                "command": python_path,
+                "args": [
+                    mcp_server_py.to_string_lossy(),
+                    "--sidecar-url",
+                    SIDECAR_URL,
+                ]
+            }
+        }
+    });
+
+    serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))
+}
+
+// ---------------------------------------------------------------------------
 // Sidecar lifecycle
 // ---------------------------------------------------------------------------
 
@@ -162,7 +203,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_mcp_config])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

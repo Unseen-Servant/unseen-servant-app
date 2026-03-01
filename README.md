@@ -79,15 +79,31 @@ source .venv/bin/activate
 python server.py --port 8420
 ```
 
-**Step 2 — Configure Claude Desktop.** Add this to your MCP config
-(`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+**Step 2 — Configure Claude Desktop.** Add the MCP config snippet to your Claude Desktop
+config file:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+**Easiest way:** Run the app with `npm run tauri dev` and call `get_mcp_config` from the
+browser console — it returns a ready-to-paste JSON snippet with the correct absolute paths
+for your machine:
+
+```js
+await window.__TAURI__.invoke('get_mcp_config')
+```
+
+**Manual setup:** If you prefer to build the config yourself:
 
 ```json
 {
   "mcpServers": {
-    "Unseen Servant": {
-      "command": "/full/path/to/your/python3",
-      "args": ["/full/path/to/unseen-server/sidecar/mcp_server.py"]
+    "unseen-servant": {
+      "command": "/full/path/to/sidecar/.venv/bin/python3",
+      "args": [
+        "/full/path/to/unseen-server/sidecar/mcp_server.py",
+        "--sidecar-url", "http://localhost:8420"
+      ]
     }
   }
 }
@@ -95,7 +111,6 @@ python server.py --port 8420
 
 > **Important:** Use the **full path** to your Python interpreter, not bare `python` or
 > `python3`. Claude Desktop has a limited PATH and won't find pyenv shims or virtualenvs.
-> For example: `/Users/you/.pyenv/versions/your-venv/bin/python3`
 
 **Step 3 — Make sure the Python environment has the dependencies** from
 `sidecar/requirements.txt` installed (notably `mcp` and `httpx`).
@@ -284,11 +299,12 @@ User action in Svelte
 
 **Current commands:**
 
-| Command         | Description                                                 |
-|-----------------|-------------------------------------------------------------|
-| `select_folder` | Opens a native OS folder picker dialog, returns chosen path |
-| `list_files`    | Reads a directory, returns `FileItem[]` (PDFs + subfolders) |
-| `index_files`   | Sends selected PDF paths to the sidecar for indexing        |
+| Command          | Description                                                  |
+|------------------|--------------------------------------------------------------|
+| `select_folder`  | Opens a native OS folder picker dialog, returns chosen path  |
+| `list_files`     | Reads a directory, returns `FileItem[]` (PDFs + subfolders)  |
+| `index_files`    | Sends selected PDF paths to the sidecar for indexing         |
+| `get_mcp_config` | Returns a ready-to-paste MCP config JSON with absolute paths |
 
 ### How Indexing Works
 
