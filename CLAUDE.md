@@ -7,6 +7,7 @@ Unseen Servant is a local-first, AI-augmented toolkit for tabletop RPG Game Mast
 ### Target User
 
 A TTRPG Game Master who:
+
 - Owns a large PDF library (hundreds to thousands of rulebooks, supplements, and adventures)
 - Needs to find specific rules, tables, or lore quickly during session prep and live play
 - Wants AI assistance for homebrew content, rule comparisons, and creative prompts
@@ -26,12 +27,14 @@ A TTRPG Game Master who:
 The core desktop application — Tauri v2 shell with SvelteKit frontend and a Python sidecar for PDF indexing and search.
 
 ### What it does
+
 - **Tauri + Rust:** Native desktop window, filesystem access, sidecar lifecycle management
 - **SvelteKit + TypeScript:** File browser UI with recursive tree, lazy loading, persistent selection
 - **Python sidecar (FastAPI):** PDF text extraction, ChromaDB indexing, semantic search API (port 8420)
 - **MCP server:** 7 tools for Claude Desktop integration (search, compare, random tables, etc.)
 
 ### Quick reference
+
 ```bash
 npm run tauri dev          # Development (compiles Rust + starts frontend with HMR)
 npm run tauri build        # Production build
@@ -39,6 +42,7 @@ cd sidecar && pytest -v    # Run sidecar tests (39 tests)
 ```
 
 ### Key files
+
 - `src/routes/+page.svelte` — Main UI page
 - `src/lib/FileTree.svelte` — Recursive file tree component
 - `src/lib/types.ts` — Shared TypeScript types
@@ -61,12 +65,14 @@ Unseen Servant spans four repositories:
 | `unseen-script` | Utility scripts | Python |
 
 ### Shared infrastructure
+
 - **Ollama** with `nomic-embed-text` for local embeddings (no API keys)
 - **ChromaDB** for vector storage and semantic search
 - **MCP (Model Context Protocol)** for Claude Desktop integration
 - **pypdf** for PDF text extraction
 
 ### Data flow
+
 ```
 PDF files on disk
   → text extraction (pypdf)
@@ -92,6 +98,7 @@ PDF files on disk
 ## Development Process
 
 ### Workflow
+
 1. **Plan** — For non-trivial work, create a GitHub Issue describing the goal, approach, and acceptance criteria
 2. **Branch** — Create a feature branch off `main` with a descriptive name (e.g., `add-search-ui`, `fix-chunking-overlap`)
 3. **Code** — Implement incrementally. Commit logical chunks, not entire features at once
@@ -100,16 +107,19 @@ PDF files on disk
 6. **PR** — Optional for solo work, but use PRs for any change that benefits from a second look or documentation trail
 
 ### Commit messages
+
 - Start with a verb: "Add search filtering by source," "Fix chunking overlap at page boundaries"
 - Keep the first line under 72 characters
 - Add a body for non-obvious changes explaining the reasoning
 
 ### Testing expectations
+
 - **Python sidecar:** pytest suite in `sidecar/tests/`. New endpoints or logic need tests. Tests use in-memory ChromaDB (no Ollama required)
 - **Rust:** Compiler is your first line of defense. Add integration tests for Tauri commands when feasible
 - **Svelte:** Manual testing via `npm run tauri dev` for UI changes. Consider component tests for complex logic
 
 ### When to create issues
+
 - New features or user-facing changes
 - Bugs that need investigation before fixing
 - Refactors that touch multiple files
@@ -120,9 +130,11 @@ PDF files on disk
 ## Teaching Approach
 
 ### Developer profile
+
 Jerome is a PM/AI-ML Senior Director with a physics engineering background, based in Montreal. He's comfortable with concepts and architectural thinking, and is learning implementation details hands-on. He prefers understanding trade-offs before writing code and thinks in terms of scalability (e.g., "will this work for 18GB of PDFs?").
 
 ### How Claude should teach
+
 - **Explain "why" before "how."** Always give the reasoning behind a decision before showing the implementation. Compare trade-offs between approaches.
 - **Break down complexity.** Start with the simplest working version. Add complexity incrementally. Celebrate what works before optimizing.
 - **Encourage critical thinking.** Ask leading questions ("What would happen if...?") rather than handing over solutions. Validate good reasoning.
@@ -130,6 +142,7 @@ Jerome is a PM/AI-ML Senior Director with a physics engineering background, base
 - **Guide debugging, don't just fix.** Point toward the problem. Let Jerome find the solution. Validate his diagnosis.
 
 ### Tone
+
 - Encouraging and honest — acknowledge what's correct, then point out improvements
 - Concise — Jerome appreciates directness over lengthy explanations
 - Socratic — ask questions that lead to discovery
@@ -137,6 +150,7 @@ Jerome is a PM/AI-ML Senior Director with a physics engineering background, base
 - Present at most 2-3 options when offering choices, not 10
 
 ### What to avoid
+
 - Providing complete solutions without explanation
 - Assuming prior knowledge of implementation details
 - Moving too fast through new concepts
@@ -147,17 +161,20 @@ Jerome is a PM/AI-ML Senior Director with a physics engineering background, base
 ## Code Standards
 
 ### Rust (src-tauri)
+
 - Use `Result<T, String>` for Tauri commands with descriptive error messages via `.map_err()`
 - Snake_case for functions and variables
 - Register all commands in `tauri::generate_handler![]`
 
 ### TypeScript / Svelte (src)
+
 - Separate type definitions in dedicated files (e.g., `types.ts`)
 - CamelCase for variables and functions, PascalCase for components
 - Force Svelte reactivity through reassignment, not mutation
 - Use `invoke<T>()` with explicit type parameters for Tauri IPC calls
 
 ### Python (sidecar)
+
 - Type hints on all function signatures (Python 3.10+)
 - Async/await for all FastAPI endpoints
 - Descriptive error messages in HTTP responses

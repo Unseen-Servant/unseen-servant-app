@@ -54,7 +54,63 @@ Unseen Servant is built around three ideas:
 | ✅     | Persist folder selections across sessions         |
 | ✅     | ChromaDB integration — index PDFs semantically    |
 | 🔜     | Search UI — query indexed content during sessions |
-| 🔜     | Claude AI via MCP — answer questions from library |
+| ✅     | Claude AI via MCP — answer questions from library |
+
+---
+
+## MCP Server (Claude Desktop)
+
+The MCP server lets Claude Desktop search your indexed PDF library during a conversation. It runs
+as a separate stdio process that Claude Desktop launches automatically, and calls the FastAPI
+sidecar over HTTP to fulfill requests.
+
+```text
+Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP :8420) ←→ ChromaDB
+```
+
+### Connecting to Claude Desktop
+
+**Step 1 — Start the sidecar**, either via `npm run tauri dev` (starts it automatically) or
+manually:
+
+```bash
+cd sidecar
+source .venv/bin/activate
+python server.py --port 8420
+```
+
+**Step 2 — Configure Claude Desktop.** Add this to your MCP config
+(`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "Unseen Servant": {
+      "command": "/full/path/to/your/python3",
+      "args": ["/full/path/to/unseen-server/sidecar/mcp_server.py"]
+    }
+  }
+}
+```
+
+> **Important:** Use the **full path** to your Python interpreter, not bare `python` or
+> `python3`. Claude Desktop has a limited PATH and won't find pyenv shims or virtualenvs.
+> For example: `/Users/you/.pyenv/versions/your-venv/bin/python3`
+
+**Step 3 — Make sure the Python environment has the dependencies** from
+`sidecar/requirements.txt` installed (notably `mcp` and `httpx`).
+
+### Available tools
+
+| Tool                 | Description                                           |
+|----------------------|-------------------------------------------------------|
+| `search_library`     | Semantic search across all indexed PDFs               |
+| `search_in_document` | Search within a specific sourcebook                   |
+| `read_document`      | Read the full text of an indexed PDF                  |
+| `list_sources`       | List all indexed documents                            |
+| `library_stats`      | Overview of indexed library size                      |
+| `compare_sources`    | Compare how different books cover the same topic      |
+| `random_table`       | Find and roll on a random table from your sourcebooks |
 
 ---
 
