@@ -6,6 +6,7 @@
   export let level: number = 0;
   export let selectedPaths: Set<string>;
   export let foldersWithSelections: Set<string>;
+  export let gameSystemMap: Map<string, string> = new Map();
   export let onToggle: (path: string, isDir: boolean, item: FileItem) => void;
 
   let isExpanded: boolean = false;
@@ -52,6 +53,9 @@
         <span class="icon">📄</span>
       {/if}
       <span>{item.name}</span>
+      {#if !item.is_dir && gameSystemMap.has(item.path)}
+        <span class="game-system-badge">{gameSystemMap.get(item.path)}</span>
+      {/if}
     </button>
   </div>
 
@@ -62,6 +66,7 @@
         level={level + 1}
         {selectedPaths}
         {foldersWithSelections}
+        {gameSystemMap}
         {onToggle}
       />
     {/each}
@@ -99,5 +104,15 @@
   }
   .name {
     font-family: monospace;
+  }
+  .game-system-badge {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    margin-left: 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    background: #e8eaf6;
+    color: #3949ab;
+    white-space: nowrap;
   }
 </style>

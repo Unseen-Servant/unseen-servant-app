@@ -36,6 +36,8 @@ struct FileStatusEntry {
     filename: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     chunk_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    game_system: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,6 +72,19 @@ struct SyncResult {
     updated: u32,
     errors: Vec<String>,
     total_indexed: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct GameSystemsResult {
+    game_systems: Vec<String>,
+    count: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SetGameSystemResult {
+    filename: String,
+    game_system: String,
+    chunks_updated: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +204,52 @@ async fn sync_index(paths: Vec<String>) -> Result<SyncResult, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Tauri commands — game system management
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_game_systems() -> Result<GameSystemsResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/game-systems", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: GameSystemsResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn set_game_system(filename: String, game_system: String) -> Result<SetGameSystemResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/set-game-system", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "filename": filename,
+            "game_system": game_system,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Sidecar error: {}", response.status()));
+    }
+
+    let result: SetGameSystemResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands — MCP config generation
 // ---------------------------------------------------------------------------
 
@@ -281,7 +342,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_mcp_config])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, set_game_system, get_mcp_config])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

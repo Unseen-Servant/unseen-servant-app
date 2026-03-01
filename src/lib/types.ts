@@ -9,6 +9,18 @@ export interface FileStatusEntry {
   path: string;
   filename: string;
   chunk_count?: number;
+  game_system?: string;
+}
+
+export interface GameSystemsResult {
+  game_systems: string[];
+  count: number;
+}
+
+export interface SetGameSystemResult {
+  filename: string;
+  game_system: string;
+  chunks_updated: number;
 }
 
 export interface FileErrorEntry {

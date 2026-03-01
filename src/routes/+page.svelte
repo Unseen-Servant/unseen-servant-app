@@ -177,6 +177,20 @@
   // Derive which folders contain selected items — purely from path strings, no tree walking
   $: foldersWithSelections = computeAncestorPaths(selectedPaths);
 
+  // Build a map of file path → game system from index status data
+  $: gameSystemMap = buildGameSystemMap(indexStatus);
+
+  function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string> {
+    const map = new Map<string, string>();
+    if (!status) return map;
+    for (const entry of [...status.up_to_date, ...status.to_update, ...status.to_remove]) {
+      if (entry.game_system && entry.game_system !== 'unknown') {
+        map.set(entry.path, entry.game_system);
+      }
+    }
+    return map;
+  }
+
   function computeAncestorPaths(paths: Set<string>): Set<string> {
     const ancestors = new Set<string>();
     for (const p of paths) {
@@ -317,6 +331,7 @@
           level={0}
           {selectedPaths}
           {foldersWithSelections}
+          {gameSystemMap}
           onToggle={toogleSelection}
         />
       {/each}

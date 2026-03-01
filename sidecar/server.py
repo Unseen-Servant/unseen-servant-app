@@ -265,12 +265,14 @@ def compute_diff(
                         "path": path_str,
                         "filename": path.name,
                         "chunk_count": entry.chunk_count,
+                        "game_system": entry.game_system,
                     })
                 else:
                     up_to_date.append({
                         "path": path_str,
                         "filename": path.name,
                         "chunk_count": entry.chunk_count,
+                        "game_system": entry.game_system,
                     })
 
     # Files in manifest but no longer selected → to_remove
@@ -279,6 +281,7 @@ def compute_diff(
             "path": path_str,
             "filename": manifest.files[path_str].filename,
             "chunk_count": manifest.files[path_str].chunk_count,
+            "game_system": manifest.files[path_str].game_system,
         }
         for path_str in (indexed - selected)
     ]
