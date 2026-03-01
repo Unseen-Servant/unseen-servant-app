@@ -139,7 +139,7 @@ await window.__TAURI__.invoke('get_mcp_config')
 | Indexing sidecar        | Python + [FastAPI](https://fastapi.tiangolo.com)   | Mature PDF/ML ecosystem, managed by Tauri        |
 | Vector DB               | [ChromaDB](https://www.trychroma.com)              | Semantic search for PDF content                  |
 | Embeddings              | [Ollama](https://ollama.com) (nomic-embed-text)    | Local embeddings, no API keys needed             |
-| AI integration *(soon)* | Claude via [MCP](https://modelcontextprotocol.io)  | Query your library in natural language           |
+| AI integration          | Claude via [MCP](https://modelcontextprotocol.io)  | Query your library in natural language           |
 
 ---
 
