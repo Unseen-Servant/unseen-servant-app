@@ -60,6 +60,12 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[st
 class IndexFilesRequest(BaseModel):
     paths: list[str]
 
+class IndexStatusRequest(BaseModel):
+    selected_paths: list[str]
+
+class SyncIndexRequest(BaseModel):
+    selected_paths: list[str]
+
 class SearchRequest(BaseModel):
     query: str
     n_results: int = 5
@@ -167,6 +173,69 @@ def delete_source_chunks(filename: str, collection) -> int:
     return len(ids_to_delete)
 
 
+def compute_diff(
+    selected_paths: list[str], manifest: IndexManifest
+) -> dict[str, list[dict]]:
+    """Compare selected paths against the manifest to find what changed.
+
+    Returns a dict with keys: to_add, to_remove, to_update, up_to_date, errors.
+    Each value is a list of dicts describing the file.
+    """
+    selected = set(selected_paths)
+    indexed = set(manifest.files.keys())
+
+    to_add = []
+    to_update = []
+    up_to_date = []
+    errors = []
+
+    for path_str in selected:
+        path = Path(path_str)
+        if path_str not in indexed:
+            # New file — not yet indexed
+            if not path.exists():
+                errors.append({"path": path_str, "error": "File not found on disk"})
+            else:
+                to_add.append({"path": path_str, "filename": path.name})
+        else:
+            # Already indexed — check if modified
+            entry = manifest.files[path_str]
+            if not path.exists():
+                errors.append({"path": path_str, "error": "File not found on disk"})
+            else:
+                current_mtime = os.path.getmtime(path_str)
+                if current_mtime != entry.mtime:
+                    to_update.append({
+                        "path": path_str,
+                        "filename": path.name,
+                        "chunk_count": entry.chunk_count,
+                    })
+                else:
+                    up_to_date.append({
+                        "path": path_str,
+                        "filename": path.name,
+                        "chunk_count": entry.chunk_count,
+                    })
+
+    # Files in manifest but no longer selected → to_remove
+    to_remove = [
+        {
+            "path": path_str,
+            "filename": manifest.files[path_str].filename,
+            "chunk_count": manifest.files[path_str].chunk_count,
+        }
+        for path_str in (indexed - selected)
+    ]
+
+    return {
+        "to_add": to_add,
+        "to_remove": to_remove,
+        "to_update": to_update,
+        "up_to_date": up_to_date,
+        "errors": errors,
+    }
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -253,6 +322,101 @@ def create_app(collection=None, data_dir: Path | None = None):
             "indexed": indexed,
             "total": total,
             "errors": errors
+        }
+
+    @app.post("/api/index-status")
+    async def index_status(request: IndexStatusRequest):
+        """Compare selected files against the current index.
+
+        Read-only — does not modify the index or manifest.
+        Returns categorized lists: to_add, to_remove, to_update, up_to_date.
+        """
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        manifest = load_manifest(data_dir)
+        diff = compute_diff(request.selected_paths, manifest)
+
+        return {
+            **diff,
+            "summary": {
+                "add": len(diff["to_add"]),
+                "remove": len(diff["to_remove"]),
+                "update": len(diff["to_update"]),
+                "up_to_date": len(diff["up_to_date"]),
+                "errors": len(diff["errors"]),
+            },
+        }
+
+    @app.post("/api/sync-index")
+    async def sync_index(request: SyncIndexRequest):
+        """Apply index changes: add new, remove deselected, re-index modified.
+
+        This is the main reconciliation endpoint. It computes the diff
+        between selected paths and the manifest, then:
+        1. Deletes chunks for deselected files
+        2. Indexes new and modified files
+        3. Updates the manifest
+        """
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        manifest = load_manifest(data_dir)
+        diff = compute_diff(request.selected_paths, manifest)
+
+        removed = 0
+        added = 0
+        updated = 0
+        errors = []
+
+        # Phase 1: Remove deselected files
+        for entry in diff["to_remove"]:
+            delete_source_chunks(entry["filename"], collection)
+            del manifest.files[entry["path"]]
+            removed += 1
+
+        # Phase 2: Index new files
+        for entry in diff["to_add"]:
+            pdf_path = Path(entry["path"])
+            chunk_count, error = index_single_pdf(pdf_path, collection)
+            if error:
+                errors.append(error)
+            else:
+                added += 1
+                manifest.files[entry["path"]] = ManifestEntry(
+                    filename=pdf_path.name,
+                    mtime=os.path.getmtime(pdf_path),
+                    chunk_count=chunk_count,
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                )
+
+        # Phase 3: Re-index modified files
+        for entry in diff["to_update"]:
+            pdf_path = Path(entry["path"])
+            chunk_count, error = index_single_pdf(pdf_path, collection)
+            if error:
+                errors.append(error)
+            else:
+                updated += 1
+                manifest.files[entry["path"]] = ManifestEntry(
+                    filename=pdf_path.name,
+                    mtime=os.path.getmtime(pdf_path),
+                    chunk_count=chunk_count,
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                )
+
+        save_manifest(data_dir, manifest)
+
+        return {
+            "added": added,
+            "removed": removed,
+            "updated": updated,
+            "errors": errors,
+            "total_indexed": len(manifest.files),
         }
 
     @app.get("/api/stats")
