@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
@@ -240,7 +241,7 @@
   async function handleCopyMcpConfig() {
     try {
       const config = await invoke<string>('get_mcp_config');
-      await navigator.clipboard.writeText(config);
+      await writeText(config);
       mcpCopyStatus = 'Copied to clipboard!';
     } catch (e) {
       mcpCopyStatus = `Failed: ${String(e)}`;

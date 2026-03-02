@@ -12,6 +12,7 @@
       "identifier": "opener:allow-open-path",
       "allow": [{ "path": "$HOME/**" }]
     },
+    "clipboard-manager:allow-write-text",
     "dialog:default",
     "store:default"
   ]

@@ -369,6 +369,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config])
         .setup(|app| {
