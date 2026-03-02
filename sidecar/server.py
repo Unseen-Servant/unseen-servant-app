@@ -39,21 +39,7 @@ def parse_args():
 # Pure helpers (no dependencies — safe to import in tests)
 # ---------------------------------------------------------------------------
 
-KNOWN_SYSTEMS: dict[str, list[str]] = {
-    "D&D 5E": ["d&d 5e", "dnd 5e", "dnd5e", "5th edition", "5e srd"],
-    "D&D 3.5": ["d&d 3.5", "dnd 3.5", "3.5 edition", "3.5e", "d&d 3.5e"],
-    "Pathfinder 1E": ["pathfinder 1e", "pathfinder1e", "pf1e"],
-    "Pathfinder 2E": ["pathfinder 2e", "pathfinder2e", "pf2e"],
-    "Dragonbane": ["dragonbane"],
-    "Call of Cthulhu": ["call of cthulhu", "coc 7e", "coc 7th"],
-    "Shadowrun": ["shadowrun"],
-    "MORK BORG": ["mork borg", "morkborg"],
-    "Blades in the Dark": ["blades in the dark", "bitd"],
-    "Savage Worlds": ["savage worlds"],
-    "GURPS": ["gurps"],
-    "Fate": ["fate core", "fate accelerated", "fate condensed"],
-    "OSR": ["old school essentials", "ose", "basic fantasy", "labyrinth lord"],
-}
+from game_systems import KNOWN_SYSTEMS
 
 
 def detect_game_system(pdf_path: Path, text: str | None = None) -> str:

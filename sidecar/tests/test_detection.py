@@ -10,7 +10,21 @@ folder paths and PDF content, using a three-tier approach:
 
 from pathlib import Path
 
+from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
 from server import detect_game_system
+
+
+def test_game_systems_structure():
+    """Each entry in GAME_SYSTEMS should have tag, game_system, and keywords."""
+    assert len(GAME_SYSTEMS) > 0
+    for entry in GAME_SYSTEMS:
+        assert "tag" in entry, f"Missing 'tag' in {entry}"
+        assert "game_system" in entry, f"Missing 'game_system' in {entry}"
+        assert "keywords" in entry, f"Missing 'keywords' in {entry}"
+        assert isinstance(entry["keywords"], list)
+        assert len(entry["keywords"]) > 0, f"Empty keywords for {entry['tag']}"
+    # KNOWN_SYSTEMS should have same number of entries
+    assert len(KNOWN_SYSTEMS) == len(GAME_SYSTEMS)
 
 
 def test_detect_from_folder_dnd5e():
@@ -26,9 +40,9 @@ def test_detect_from_folder_dragonbane():
 
 
 def test_detect_from_folder_pathfinder_2e():
-    """Path containing 'Pathfinder 2E' should detect Pathfinder 2E."""
+    """Path containing 'Pathfinder 2E' should detect PF2E."""
     path = Path("/Games/Pathfinder 2E/Bestiary.pdf")
-    assert detect_game_system(path) == "Pathfinder 2E"
+    assert detect_game_system(path) == "PF2E"
 
 
 def test_detect_from_folder_case_insensitive():
@@ -100,7 +114,7 @@ def test_detect_savage_worlds():
 def test_detect_call_of_cthulhu():
     """Path with 'Call of Cthulhu' should match."""
     path = Path("/RPGs/Call of Cthulhu/Keeper Rulebook.pdf")
-    assert detect_game_system(path) == "Call of Cthulhu"
+    assert detect_game_system(path) == "CoC 7E"
 
 
 def test_detect_osr_from_content():
