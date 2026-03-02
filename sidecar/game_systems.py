@@ -83,22 +83,22 @@ GAME_SYSTEMS: list[dict] = [
     },
     # --- Fantasy ---
     {
-        "tag": "Warhammer Fantasy Roleplay",
+        "tag": "WFRP",
         "game_system": "Warhammer Fantasy Roleplay",
         "keywords": ["warhammer fantasy roleplay", "wfrp"],
     },
     {
-        "tag": "Warhammer 40K RPG",
+        "tag": "W40KRP",
         "game_system": "Warhammer 40K RPG",
         "keywords": ["dark heresy", "rogue trader", "deathwatch", "black crusade", "only war"],
     },
     {
-        "tag": "SofDL",
+        "tag": "SotDL",
         "game_system": "Shadow of the Demon Lord",
         "keywords": ["shadow of the demon lord", "sotdl"],
     },
     {
-        "tag": "SofWW",
+        "tag": "SotWW",
         "game_system": "Shadow of the Weird Wizard",
         "keywords": ["shadow of the weird wizard", "sotww"],
     },
