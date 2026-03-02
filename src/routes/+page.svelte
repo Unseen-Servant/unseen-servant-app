@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
 
   let selectedFolder = '';
@@ -12,6 +12,9 @@
   let isIndexing = false;
   let indexResult = '';
   let mcpCopyStatus = '';
+
+  // Game system tag editing
+  let knownSystems: KnownGameSystem[] = [];
 
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
@@ -40,6 +43,7 @@
       // No saved state on first run — that's fine
       console.log('No saved state:', e);
     }
+
   });
 
   async function refreshIndexStatus() {
@@ -49,6 +53,14 @@
         'get_index_status',
         { paths: Array.from(selectedPaths) }
       );
+
+      // Load known systems for tag editing (retry until loaded)
+      if (knownSystems.length === 0) {
+        const result = await invoke<KnownGameSystemsResult>('get_known_game_systems');
+        knownSystems = result.systems.sort((a, b) =>
+          a.tag.toLowerCase().localeCompare(b.tag.toLowerCase())
+        );
+      }
     } catch (e) {
       // Sidecar might not be ready yet on startup
       console.log('Could not fetch index status:', e);
@@ -180,6 +192,9 @@
   // Build a map of file path → game system from index status data
   $: gameSystemMap = buildGameSystemMap(indexStatus);
 
+  // Track which files are in the index (so untagged indexed files show the "+" button)
+  $: indexedPaths = buildIndexedPaths(indexStatus);
+
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string> {
     const map = new Map<string, string>();
     if (!status) return map;
@@ -189,6 +204,24 @@
       }
     }
     return map;
+  }
+
+  function buildIndexedPaths(status: IndexStatusResult | null): Set<string> {
+    const paths = new Set<string>();
+    if (!status) return paths;
+    for (const entry of [...status.up_to_date, ...status.to_update, ...status.to_remove]) {
+      paths.add(entry.path);
+    }
+    return paths;
+  }
+
+  async function handleSetGameSystem(path: string, filename: string, tag: string) {
+    try {
+      await invoke('set_game_system', { filename, gameSystem: tag });
+      await refreshIndexStatus();
+    } catch (e) {
+      console.error('Failed to set game system:', e);
+    }
   }
 
   function computeAncestorPaths(paths: Set<string>): Set<string> {
@@ -332,7 +365,10 @@
           {selectedPaths}
           {foldersWithSelections}
           {gameSystemMap}
+          {knownSystems}
+          {indexedPaths}
           onToggle={toogleSelection}
+          onSetGameSystem={handleSetGameSystem}
         />
       {/each}
     </div>

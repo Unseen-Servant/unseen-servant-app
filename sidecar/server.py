@@ -39,7 +39,7 @@ def parse_args():
 # Pure helpers (no dependencies — safe to import in tests)
 # ---------------------------------------------------------------------------
 
-from game_systems import KNOWN_SYSTEMS
+from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
 
 
 def detect_game_system(pdf_path: Path, text: str | None = None) -> str:
@@ -540,6 +540,15 @@ def create_app(collection=None, data_dir: Path | None = None):
             return {"game_systems": sorted_systems, "count": len(sorted_systems)}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/known-game-systems")
+    async def get_known_game_systems():
+        """Return all predefined game systems from game_systems.py."""
+        systems = sorted(
+            [{"tag": e["tag"], "game_system": e["game_system"]} for e in GAME_SYSTEMS],
+            key=lambda s: s["tag"].lower(),
+        )
+        return {"systems": systems}
 
     @app.post("/api/set-game-system")
     async def set_game_system(request: SetGameSystemRequest):

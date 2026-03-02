@@ -87,6 +87,17 @@ struct SetGameSystemResult {
     chunks_updated: u32,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct KnownGameSystem {
+    tag: String,
+    game_system: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct KnownGameSystemsResult {
+    systems: Vec<KnownGameSystem>,
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — file system
 // ---------------------------------------------------------------------------
@@ -225,6 +236,23 @@ async fn get_game_systems() -> Result<GameSystemsResult, String> {
 }
 
 #[tauri::command]
+async fn get_known_game_systems() -> Result<KnownGameSystemsResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/known-game-systems", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: KnownGameSystemsResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
 async fn set_game_system(filename: String, game_system: String) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -342,7 +370,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, set_game_system, get_mcp_config])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

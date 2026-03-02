@@ -23,6 +23,15 @@ export interface SetGameSystemResult {
   chunks_updated: number;
 }
 
+export interface KnownGameSystem {
+  tag: string;
+  game_system: string;
+}
+
+export interface KnownGameSystemsResult {
+  systems: KnownGameSystem[];
+}
+
 export interface FileErrorEntry {
   path: string;
   error: string;
