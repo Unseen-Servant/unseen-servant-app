@@ -42,6 +42,12 @@ Unseen Servant is built around three ideas:
 - **Persistent Selections** — Folder and file selections are saved across sessions
 - **PDF Indexing** — Index selected PDFs into ChromaDB for semantic search via a Python sidecar
   (uses Ollama embeddings locally)
+- **Double-click to Open** — Double-click any file in the tree to open it in your system's
+  default viewer
+- **Game System Tagging** — Tag indexed files with their game system (D&D 5e, Pathfinder, etc.)
+  via clickable badges in the file tree
+- **Copy MCP Config** — One-click button to copy the Claude Desktop MCP configuration to your
+  clipboard
 
 ### Roadmap
 
@@ -53,6 +59,7 @@ Unseen Servant is built around three ideas:
 | ✅     | Checkbox selection (individual + recursive)       |
 | ✅     | Persist folder selections across sessions         |
 | ✅     | ChromaDB integration — index PDFs semantically    |
+| ✅     | Game system tagging for indexed files             |
 | 🔜     | Search UI — query indexed content during sessions |
 | ✅     | Claude AI via MCP — answer questions from library |
 
@@ -85,13 +92,9 @@ config file:
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-**Easiest way:** Run the app with `npm run tauri dev` and call `get_mcp_config` from the
-browser console — it returns a ready-to-paste JSON snippet with the correct absolute paths
-for your machine:
-
-```js
-await window.__TAURI__.invoke('get_mcp_config')
-```
+**Easiest way:** Run the app with `npm run tauri dev` and click the **"Copy MCP Config"** button
+in the UI. This copies a ready-to-paste JSON snippet with the correct absolute paths for your
+machine. Paste it into your Claude Desktop config file.
 
 **Manual setup:** If you prefer to build the config yourself:
 
@@ -299,12 +302,17 @@ User action in Svelte
 
 **Current commands:**
 
-| Command          | Description                                                  |
-|------------------|--------------------------------------------------------------|
-| `select_folder`  | Opens a native OS folder picker dialog, returns chosen path  |
-| `list_files`     | Reads a directory, returns `FileItem[]` (PDFs + subfolders)  |
-| `index_files`    | Sends selected PDF paths to the sidecar for indexing         |
-| `get_mcp_config` | Returns a ready-to-paste MCP config JSON with absolute paths |
+| Command                  | Description                                                   |
+|--------------------------|---------------------------------------------------------------|
+| `select_folder`          | Opens a native OS folder picker dialog, returns chosen path   |
+| `list_files`             | Reads a directory, returns `FileItem[]` (PDFs + subfolders)   |
+| `index_files`            | Sends selected PDF paths to the sidecar for indexing          |
+| `get_index_status`       | Queries sidecar for what needs adding, removing, or updating  |
+| `sync_index`             | Synchronizes the index — adds, removes, and updates as needed |
+| `get_game_systems`       | Retrieves game system tags from indexed files                 |
+| `get_known_game_systems` | Lists all predefined game system options                      |
+| `set_game_system`        | Tags a file with a game system and updates its index chunks   |
+| `get_mcp_config`         | Returns ready-to-paste MCP config JSON with absolute paths    |
 
 ### How Indexing Works
 
