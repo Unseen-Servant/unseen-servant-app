@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, KnownGameSystem } from './types';
 
   export let item: FileItem;
@@ -58,6 +59,15 @@
     showDropdown = false;
   }
 
+  async function openFile() {
+    if (item.is_dir) return;
+    try {
+      await openPath(item.path);
+    } catch (e) {
+      console.error('Failed to open file:', e);
+    }
+  }
+
   function handleClickOutside(event: MouseEvent) {
     showDropdown = false;
   }
@@ -74,7 +84,7 @@
       class="checkbox"
     />
 
-    <button class="row" on:click={toggleExpand}>
+    <button class="row" on:click={toggleExpand} on:dblclick={openFile}>
       {#if item.is_dir}
         <span>{isExpanded ? '📂' : '📁'}</span>
       {:else}
