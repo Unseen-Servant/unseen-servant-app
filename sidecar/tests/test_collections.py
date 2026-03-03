@@ -1,0 +1,261 @@
+"""
+Tests for document collections — CRUD and search filtering.
+
+Collections are named subsets of indexed files that let users scope
+their searches to a specific campaign or session prep context.
+"""
+
+import pytest
+
+
+# ---------------------------------------------------------------------------
+# CRUD tests
+# ---------------------------------------------------------------------------
+
+def test_list_collections_empty(client):
+    """With no collections, the list should be empty."""
+    response = client.get("/api/collections")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["collections"] == {}
+    assert data["count"] == 0
+
+
+def test_create_collection(client):
+    """Creating a collection returns its name and file count."""
+    response = client.post("/api/collections", json={
+        "name": "Curse of Strahd",
+        "file_paths": ["/path/to/strahd.pdf", "/path/to/vgm.pdf"],
+        "description": "Campaign prep for CoS",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Curse of Strahd"
+    assert data["file_count"] == 2
+
+
+def test_create_collection_no_description(client):
+    """Description is optional and defaults to empty string."""
+    response = client.post("/api/collections", json={
+        "name": "Quick Ref",
+        "file_paths": ["/path/to/rules.pdf"],
+    })
+    assert response.status_code == 200
+
+    # Verify the default description
+    list_resp = client.get("/api/collections")
+    col = list_resp.json()["collections"]["Quick Ref"]
+    assert col["description"] == ""
+
+
+def test_create_duplicate_collection(client):
+    """Creating a collection with an existing name returns 409."""
+    client.post("/api/collections", json={
+        "name": "My Campaign",
+        "file_paths": ["/path/to/file.pdf"],
+    })
+    response = client.post("/api/collections", json={
+        "name": "My Campaign",
+        "file_paths": ["/path/to/other.pdf"],
+    })
+    assert response.status_code == 409
+
+
+def test_list_collections_after_create(client):
+    """Created collections appear in the list with correct metadata."""
+    client.post("/api/collections", json={
+        "name": "Session 5 Prep",
+        "file_paths": ["/a.pdf", "/b.pdf", "/c.pdf"],
+        "description": "Three books for tonight",
+    })
+
+    response = client.get("/api/collections")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["count"] == 1
+
+    col = data["collections"]["Session 5 Prep"]
+    assert col["name"] == "Session 5 Prep"
+    assert col["file_count"] == 3
+    assert col["description"] == "Three books for tonight"
+    assert len(col["file_paths"]) == 3
+    assert "created_at" in col
+
+
+def test_update_collection(client):
+    """Updating a collection changes its file list."""
+    client.post("/api/collections", json={
+        "name": "Evolving Set",
+        "file_paths": ["/a.pdf"],
+    })
+
+    response = client.put("/api/collections/Evolving Set", json={
+        "file_paths": ["/a.pdf", "/b.pdf", "/c.pdf"],
+    })
+    assert response.status_code == 200
+    assert response.json()["file_count"] == 3
+
+    # Verify the change persisted
+    col = client.get("/api/collections").json()["collections"]["Evolving Set"]
+    assert len(col["file_paths"]) == 3
+
+
+def test_update_collection_description(client):
+    """Updating description changes it; omitting it keeps the old value."""
+    client.post("/api/collections", json={
+        "name": "Described",
+        "file_paths": ["/a.pdf"],
+        "description": "Original description",
+    })
+
+    # Update with new description
+    client.put("/api/collections/Described", json={
+        "file_paths": ["/a.pdf"],
+        "description": "Updated description",
+    })
+    col = client.get("/api/collections").json()["collections"]["Described"]
+    assert col["description"] == "Updated description"
+
+    # Update without description field — should keep existing
+    client.put("/api/collections/Described", json={
+        "file_paths": ["/a.pdf", "/b.pdf"],
+    })
+    col = client.get("/api/collections").json()["collections"]["Described"]
+    assert col["description"] == "Updated description"
+    assert col["file_count"] == 2
+
+
+def test_update_nonexistent_collection(client):
+    """Updating a collection that doesn't exist returns 404."""
+    response = client.put("/api/collections/Ghost Collection", json={
+        "file_paths": ["/a.pdf"],
+    })
+    assert response.status_code == 404
+
+
+def test_delete_collection(client):
+    """Deleting a collection removes it from the store."""
+    client.post("/api/collections", json={
+        "name": "Doomed",
+        "file_paths": ["/a.pdf"],
+    })
+    response = client.delete("/api/collections/Doomed")
+    assert response.status_code == 200
+
+    # Verify it's gone
+    data = client.get("/api/collections").json()
+    assert "Doomed" not in data["collections"]
+    assert data["count"] == 0
+
+
+def test_delete_nonexistent_collection(client):
+    """Deleting a collection that doesn't exist returns 404."""
+    response = client.delete("/api/collections/Nope")
+    assert response.status_code == 404
+
+
+def test_multiple_collections(client):
+    """Multiple collections can coexist."""
+    client.post("/api/collections", json={
+        "name": "Campaign A",
+        "file_paths": ["/a.pdf"],
+    })
+    client.post("/api/collections", json={
+        "name": "Campaign B",
+        "file_paths": ["/b.pdf", "/c.pdf"],
+    })
+
+    data = client.get("/api/collections").json()
+    assert data["count"] == 2
+    assert "Campaign A" in data["collections"]
+    assert "Campaign B" in data["collections"]
+
+
+# ---------------------------------------------------------------------------
+# Search with collection filter
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def multi_indexed_client(client, sample_pdf_path, large_text_pdf_path):
+    """Client with two PDFs indexed — for testing collection filtering.
+
+    - dragonbane_monsters.pdf: dragon/fire content
+    - core_rules.pdf: dungeon/adventurer content
+    """
+    client.post("/api/index-files", json={
+        "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
+    })
+    return client
+
+
+def test_search_with_collection_filter(
+    multi_indexed_client, sample_pdf_path
+):
+    """Search with a collection filter returns only files in that collection."""
+    # Create a collection containing only the monsters PDF
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Monsters Only",
+        "file_paths": [str(sample_pdf_path)],
+    })
+
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "adventurer dungeon perception",
+        "n_results": 10,
+        "collection": "Monsters Only",
+    })
+
+    data = response.json()
+    for result in data["results"]:
+        assert result["filename"] == "dragonbane_monsters.pdf"
+
+
+def test_search_without_collection_returns_all(
+    multi_indexed_client, sample_pdf_path
+):
+    """Without collection filter, results from all files should appear."""
+    # Create a collection but don't use it in the search
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Unused",
+        "file_paths": [str(sample_pdf_path)],
+    })
+
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon dungeon adventurer",
+        "n_results": 10,
+    })
+
+    data = response.json()
+    filenames = {r["filename"] for r in data["results"]}
+    assert len(filenames) >= 1
+
+
+def test_search_collection_not_found(multi_indexed_client):
+    """Searching with a nonexistent collection returns 404."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "anything",
+        "n_results": 5,
+        "collection": "Does Not Exist",
+    })
+    assert response.status_code == 404
+
+
+def test_search_collection_empty_after_deindex(
+    multi_indexed_client, sample_pdf_path
+):
+    """A collection pointing to non-indexed files returns empty results."""
+    # Create a collection with a path that won't be in the manifest
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Stale Refs",
+        "file_paths": ["/nonexistent/path/to/deleted.pdf"],
+    })
+
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "anything",
+        "n_results": 5,
+        "collection": "Stale Refs",
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["results"] == []
+    assert "no indexed files" in data.get("message", "").lower()

@@ -26,6 +26,7 @@ from mcp_server import (
     read_document,
     list_sources,
     list_game_systems,
+    list_collections,
     library_stats,
     compare_sources,
     random_table,
@@ -33,6 +34,7 @@ from mcp_server import (
     resource_source_content,
     resource_stats,
     resource_game_systems,
+    resource_collections,
     session_prep,
     rule_lookup,
     encounter_builder,
@@ -557,3 +559,124 @@ def test_lore_researcher_with_sources():
     text = result[0].content.text
     assert "monster_manual.pdf" in text
     assert "compare_sources" in text
+
+
+# ---------------------------------------------------------------------------
+# list_collections tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_list_collections_shows_collections(mock_sidecar):
+    mock_sidecar.set_get("/api/collections", {
+        "collections": {
+            "Curse of Strahd": {
+                "name": "Curse of Strahd",
+                "file_paths": ["/a.pdf", "/b.pdf"],
+                "file_count": 2,
+                "created_at": "2026-03-02T00:00:00+00:00",
+                "description": "Campaign prep",
+            },
+        },
+        "count": 1,
+    })
+
+    result = await list_collections()
+    assert "Curse of Strahd" in result
+    assert "2 files" in result
+    assert "Campaign prep" in result
+
+
+@pytest.mark.asyncio
+async def test_list_collections_empty(mock_sidecar):
+    mock_sidecar.set_get("/api/collections", {"collections": {}, "count": 0})
+
+    result = await list_collections()
+    assert "No collections" in result
+
+
+@pytest.mark.asyncio
+async def test_list_collections_no_description(mock_sidecar):
+    mock_sidecar.set_get("/api/collections", {
+        "collections": {
+            "Quick Ref": {
+                "name": "Quick Ref",
+                "file_paths": ["/a.pdf"],
+                "file_count": 1,
+                "created_at": "2026-03-02T00:00:00+00:00",
+                "description": "",
+            },
+        },
+        "count": 1,
+    })
+
+    result = await list_collections()
+    assert "Quick Ref" in result
+    assert "1 files" in result
+    # No description suffix
+    assert " — " not in result
+
+
+# ---------------------------------------------------------------------------
+# search_library with collection parameter
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_search_library_with_collection(mock_sidecar):
+    """collection parameter should be included in the payload."""
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+
+    await search_library("fire drake", collection="Monsters Only")
+    assert captured.get("collection") == "Monsters Only"
+
+
+@pytest.mark.asyncio
+async def test_search_library_without_collection(mock_sidecar):
+    """Without collection, the payload should not include the key."""
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+
+    await search_library("fire drake")
+    assert "collection" not in captured
+
+
+# ---------------------------------------------------------------------------
+# resource_collections tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resource_collections_returns_list(mock_sidecar):
+    mock_sidecar.set_get("/api/collections", {
+        "collections": {
+            "Session 5": {
+                "name": "Session 5",
+                "file_paths": ["/a.pdf"],
+                "file_count": 1,
+                "created_at": "2026-03-02T00:00:00+00:00",
+                "description": "Tonight's prep",
+            },
+        },
+        "count": 1,
+    })
+
+    result = await resource_collections()
+    assert "Session 5" in result
+    assert "1 files" in result
+
+
+@pytest.mark.asyncio
+async def test_resource_collections_empty(mock_sidecar):
+    mock_sidecar.set_get("/api/collections", {"collections": {}, "count": 0})
+
+    result = await resource_collections()
+    assert "No collections" in result

@@ -61,3 +61,21 @@ export interface SyncResult {
   errors: string[];
   total_indexed: number;
 }
+
+export interface CollectionInfo {
+  name: string;
+  file_paths: string[];
+  file_count: number;
+  created_at: string;
+  description: string;
+}
+
+export interface CollectionsResult {
+  collections: Record<string, CollectionInfo>;
+  count: number;
+}
+
+export interface CollectionMutationResult {
+  name: string;
+  file_count: number;
+}
