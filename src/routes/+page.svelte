@@ -98,14 +98,16 @@
 
   async function handleSelectFolder() {
     try {
-      selectedFolder = await invoke<string>('select_folder');
+      const folder = await invoke<string>('select_folder');
+      selectedFolder = folder;
       await loadFiles(selectedFolder);
       error = '';
       await saveState();
     } catch (e) {
-      error = String(e);
-      selectedFolder = '';
-      files = [];
+      // User cancelled the dialog — keep the current folder
+      if (!selectedFolder) {
+        error = String(e);
+      }
     }
   }
 
