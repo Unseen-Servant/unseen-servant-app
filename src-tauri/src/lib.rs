@@ -98,6 +98,32 @@ struct KnownGameSystemsResult {
     systems: Vec<KnownGameSystem>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct CollectionInfo {
+    name: String,
+    file_paths: Vec<String>,
+    file_count: u32,
+    created_at: String,
+    description: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CollectionsResult {
+    collections: std::collections::HashMap<String, CollectionInfo>,
+    count: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CollectionMutationResult {
+    name: String,
+    file_count: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CollectionDeleteResult {
+    message: String,
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — file system
 // ---------------------------------------------------------------------------
@@ -278,6 +304,117 @@ async fn set_game_system(filename: String, game_system: String) -> Result<SetGam
 }
 
 // ---------------------------------------------------------------------------
+// Tauri commands — collections
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_collections() -> Result<CollectionsResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/collections", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: CollectionsResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn create_collection(
+    name: String,
+    file_paths: Vec<String>,
+    description: String,
+) -> Result<CollectionMutationResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/collections", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "name": name,
+            "file_paths": file_paths,
+            "description": description,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: CollectionMutationResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn update_collection(
+    name: String,
+    file_paths: Vec<String>,
+    description: Option<String>,
+) -> Result<CollectionMutationResult, String> {
+    let client = reqwest::Client::new();
+    let mut body = serde_json::json!({
+        "file_paths": file_paths,
+    });
+    if let Some(desc) = description {
+        body["description"] = serde_json::Value::String(desc);
+    }
+
+    let response = client
+        .put(format!("{}/api/collections/{}", SIDECAR_URL, name))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: CollectionMutationResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn delete_collection(name: String) -> Result<CollectionDeleteResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(format!("{}/api/collections/{}", SIDECAR_URL, name))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: CollectionDeleteResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands — MCP config generation
 // ---------------------------------------------------------------------------
 
@@ -371,7 +508,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

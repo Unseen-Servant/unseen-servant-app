@@ -97,11 +97,36 @@ mcp = FastMCP(
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
+async def list_collections() -> str:
+    """List all document collections in the library.
+
+    Collections are curated subsets of indexed PDFs, organized
+    by the user for specific campaigns, sessions, or topics.
+    Use a collection name with search_library's collection parameter
+    to search only within that subset.
+    """
+    data = await sidecar.get("/api/collections")
+    if isinstance(data, str):
+        return data
+
+    collections = data.get("collections", {})
+    if not collections:
+        return "No collections defined yet. Create one in the Unseen Servant desktop app."
+
+    lines = [f"Collections ({data['count']}):\n"]
+    for name, c in collections.items():
+        desc = f" — {c['description']}" if c.get("description") else ""
+        lines.append(f"  - {name} ({c['file_count']} files){desc}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
 async def search_library(
     query: str,
     n_results: int = 5,
     source_filter: str | None = None,
     game_system: str | None = None,
+    collection: str | None = None,
 ) -> str:
     """Search your TTRPG PDF library for relevant content.
 
@@ -116,12 +141,16 @@ async def search_library(
                        to one book (e.g., "dragonbane_core.pdf")
         game_system: Optional game system to filter by
                      (e.g., "D&D 5E", "Dragonbane", "Pathfinder 2E")
+        collection: Optional collection name to search within
+                    (see list_collections for available collections)
     """
     payload = {"query": query, "n_results": n_results}
     if source_filter:
         payload["source_filter"] = source_filter
     if game_system:
         payload["game_system"] = game_system
+    if collection:
+        payload["collection"] = collection
 
     data = await sidecar.post("/api/search", payload)
     if isinstance(data, str):
@@ -410,6 +439,24 @@ async def resource_game_systems() -> str:
     lines = [f"Game systems in library ({data['count']}):\n"]
     for s in systems:
         lines.append(f"  - {s}")
+    return "\n".join(lines)
+
+
+@mcp.resource("library://collections")
+async def resource_collections() -> str:
+    """List of all document collections with their file counts."""
+    data = await sidecar.get("/api/collections")
+    if isinstance(data, str):
+        return data
+
+    collections = data.get("collections", {})
+    if not collections:
+        return "No collections defined yet."
+
+    lines = [f"Collections ({data['count']}):\n"]
+    for name, c in collections.items():
+        desc = f" — {c['description']}" if c.get("description") else ""
+        lines.append(f"  - {name} ({c['file_count']} files){desc}")
     return "\n".join(lines)
 
 

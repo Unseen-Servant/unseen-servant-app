@@ -21,6 +21,7 @@
       "Bash(pip:*)",
       "Bash(cargo:*)",
       "Bash(cd:*)",
+      "Bash(which:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",

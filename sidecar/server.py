@@ -102,10 +102,20 @@ class SearchRequest(BaseModel):
     n_results: int = 5
     source_filter: str | None = None
     game_system: str | None = None
+    collection: str | None = None
 
 class SetGameSystemRequest(BaseModel):
     filename: str
     game_system: str
+
+class CreateCollectionRequest(BaseModel):
+    name: str
+    file_paths: list[str]
+    description: str = ""
+
+class UpdateCollectionRequest(BaseModel):
+    file_paths: list[str]
+    description: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +151,54 @@ def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
     """Write the index manifest to disk."""
     manifest_path = data_dir / MANIFEST_FILENAME
     manifest_path.write_text(manifest.model_dump_json(indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Collections — named subsets of indexed files
+# ---------------------------------------------------------------------------
+
+COLLECTIONS_FILENAME = "collections.json"
+
+
+class Collection(BaseModel):
+    name: str
+    file_paths: list[str]
+    created_at: str
+    description: str = ""
+
+
+class CollectionsStore(BaseModel):
+    version: int = 1
+    collections: dict[str, Collection] = {}
+
+
+def load_collections(data_dir: Path) -> CollectionsStore:
+    """Load collections from disk, or return an empty store."""
+    path = data_dir / COLLECTIONS_FILENAME
+    if path.exists():
+        raw = json.loads(path.read_text())
+        return CollectionsStore(**raw)
+    return CollectionsStore()
+
+
+def save_collections(data_dir: Path, store: CollectionsStore) -> None:
+    """Write collections to disk."""
+    path = data_dir / COLLECTIONS_FILENAME
+    path.write_text(store.model_dump_json(indent=2))
+
+
+def resolve_collection_filenames(
+    coll: Collection, manifest: IndexManifest
+) -> list[str]:
+    """Resolve a collection's file_paths to filenames in the manifest.
+
+    Filters out paths no longer indexed (graceful degradation).
+    """
+    filenames = []
+    for file_path in coll.file_paths:
+        if file_path in manifest.files:
+            filenames.append(manifest.files[file_path].filename)
+    return filenames
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +704,80 @@ def create_app(collection=None, data_dir: Path | None = None):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    # ------------------------------------------------------------------
+    # Collections endpoints
+    # ------------------------------------------------------------------
+
+    @app.get("/api/collections")
+    async def list_collections():
+        """List all document collections."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        return {
+            "collections": {
+                name: {
+                    "name": c.name,
+                    "file_paths": c.file_paths,
+                    "file_count": len(c.file_paths),
+                    "created_at": c.created_at,
+                    "description": c.description,
+                }
+                for name, c in store.collections.items()
+            },
+            "count": len(store.collections),
+        }
+
+    @app.post("/api/collections")
+    async def create_collection(request: CreateCollectionRequest):
+        """Create a named collection of indexed files."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        if request.name in store.collections:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Collection already exists: {request.name}",
+            )
+        store.collections[request.name] = Collection(
+            name=request.name,
+            file_paths=request.file_paths,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            description=request.description,
+        )
+        save_collections(data_dir, store)
+        return {"name": request.name, "file_count": len(request.file_paths)}
+
+    @app.put("/api/collections/{name}")
+    async def update_collection(name: str, request: UpdateCollectionRequest):
+        """Update a collection's files or description."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        if name not in store.collections:
+            raise HTTPException(
+                status_code=404, detail=f"Collection not found: {name}"
+            )
+        store.collections[name].file_paths = request.file_paths
+        if request.description is not None:
+            store.collections[name].description = request.description
+        save_collections(data_dir, store)
+        return {"name": name, "file_count": len(request.file_paths)}
+
+    @app.delete("/api/collections/{name}")
+    async def delete_collection(name: str):
+        """Delete a collection."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        if name not in store.collections:
+            raise HTTPException(
+                status_code=404, detail=f"Collection not found: {name}"
+            )
+        del store.collections[name]
+        save_collections(data_dir, store)
+        return {"message": f"Deleted collection: {name}"}
+
     @app.post("/api/search")
     async def search(request: SearchRequest):
         """Semantic search across indexed documents."""
@@ -656,6 +788,24 @@ def create_app(collection=None, data_dir: Path | None = None):
             }
 
             where_clauses = []
+            if request.collection:
+                if not data_dir:
+                    raise HTTPException(
+                        status_code=500, detail="No data directory configured"
+                    )
+                store = load_collections(data_dir)
+                if request.collection not in store.collections:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Collection not found: {request.collection}",
+                    )
+                manifest = load_manifest(data_dir)
+                filenames = resolve_collection_filenames(
+                    store.collections[request.collection], manifest
+                )
+                if not filenames:
+                    return {"results": [], "message": "Collection has no indexed files."}
+                where_clauses.append({"filename": {"$in": filenames}})
             if request.source_filter:
                 where_clauses.append({"filename": request.source_filter})
             if request.game_system:
@@ -687,6 +837,8 @@ def create_app(collection=None, data_dir: Path | None = None):
                 })
 
             return {"results": formatted}
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
