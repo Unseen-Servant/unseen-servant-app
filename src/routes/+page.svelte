@@ -3,8 +3,9 @@
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
+  import CollectionBar from '../lib/CollectionBar.svelte';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -16,6 +17,15 @@
 
   // Game system tag editing
   let knownSystems: KnownGameSystem[] = [];
+
+  // Collections state
+  let collections: Record<string, CollectionInfo> = {};
+  let editingCollectionName: string | null = null;
+  let isCreatingCollection = false;
+  let collectionEditPaths = new Set<string>();
+  let collectionEditName = '';
+  let collectionEditDescription = '';
+  let highlightedCollection: string | null = null;
 
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
@@ -40,6 +50,7 @@
           await refreshIndexStatus();
         }
       }
+      await loadCollections();
     } catch (e) {
       // No saved state on first run — that's fine
       console.log('No saved state:', e);
@@ -196,6 +207,14 @@
   // Track which files are in the index (so untagged indexed files show the "+" button)
   $: indexedPaths = buildIndexedPaths(indexStatus);
 
+  // Collection mode derived state
+  $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
+  $: treeMode = isCollectionEditMode ? 'collection' as const : 'index' as const;
+  $: highlightPaths = highlightedCollection && collections[highlightedCollection]
+    ? new Set(collections[highlightedCollection].file_paths)
+    : new Set<string>();
+  $: collectionFolders = computeAncestorPaths(collectionEditPaths);
+
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string> {
     const map = new Map<string, string>();
     if (!status) return map;
@@ -237,6 +256,147 @@
     return ancestors;
   }
 
+  // ---------------------------------------------------------------------------
+  // Collections
+  // ---------------------------------------------------------------------------
+
+  async function loadCollections() {
+    try {
+      const result = await invoke<CollectionsResult>('get_collections');
+      collections = result.collections;
+    } catch (e) {
+      console.log('Could not fetch collections:', e);
+    }
+  }
+
+  function startCreateCollection() {
+    collectionEditName = '';
+    collectionEditDescription = '';
+    collectionEditPaths = new Set();
+    isCreatingCollection = true;
+    editingCollectionName = null;
+    highlightedCollection = null;
+  }
+
+  function startEditCollection(name: string) {
+    const col = collections[name];
+    if (!col) return;
+    collectionEditName = col.name;
+    collectionEditDescription = col.description;
+    collectionEditPaths = new Set(col.file_paths);
+    editingCollectionName = name;
+    isCreatingCollection = false;
+    highlightedCollection = null;
+  }
+
+  function cancelCollectionEdit() {
+    editingCollectionName = null;
+    isCreatingCollection = false;
+    collectionEditPaths = new Set();
+    collectionEditName = '';
+    collectionEditDescription = '';
+  }
+
+  async function saveCollection() {
+    const name = collectionEditName.trim();
+    console.log('[saveCollection] called', { name, isCreatingCollection, editingCollectionName, pathCount: collectionEditPaths.size });
+    if (!name) {
+      console.warn('[saveCollection] name is empty, aborting');
+      return;
+    }
+    const filePaths = Array.from(collectionEditPaths);
+
+    try {
+      if (isCreatingCollection) {
+        console.log('[saveCollection] creating', { name, filePaths, description: collectionEditDescription });
+        const result = await invoke<CollectionMutationResult>('create_collection', {
+          name,
+          filePaths,
+          description: collectionEditDescription,
+        });
+        console.log('[saveCollection] created', result);
+      } else if (editingCollectionName) {
+        // If name changed, delete old and create new
+        if (editingCollectionName !== name) {
+          console.log('[saveCollection] renaming', editingCollectionName, '→', name);
+          await invoke('delete_collection', { name: editingCollectionName });
+          const result = await invoke<CollectionMutationResult>('create_collection', {
+            name,
+            filePaths,
+            description: collectionEditDescription,
+          });
+          console.log('[saveCollection] renamed', result);
+        } else {
+          console.log('[saveCollection] updating', { name, filePaths, description: collectionEditDescription });
+          const result = await invoke<CollectionMutationResult>('update_collection', {
+            name,
+            filePaths,
+            description: collectionEditDescription,
+          });
+          console.log('[saveCollection] updated', result);
+        }
+      } else {
+        console.warn('[saveCollection] neither creating nor editing — no-op');
+      }
+      cancelCollectionEdit();
+      await loadCollections();
+      console.log('[saveCollection] done');
+    } catch (e) {
+      console.error('[saveCollection] FAILED:', e);
+    }
+  }
+
+  async function deleteCollection(name: string) {
+    try {
+      await invoke('delete_collection', { name });
+      cancelCollectionEdit();
+      await loadCollections();
+    } catch (e) {
+      console.error('Failed to delete collection:', e);
+    }
+  }
+
+  function handleCollectionToggle(path: string, isDir: boolean, item: FileItem) {
+    if (isDir) {
+      toggleCollectionFolder(item);
+    } else {
+      if (collectionEditPaths.has(path)) {
+        collectionEditPaths.delete(path);
+      } else {
+        collectionEditPaths.add(path);
+      }
+      collectionEditPaths = collectionEditPaths;
+    }
+  }
+
+  function toggleCollectionFolder(folder: FileItem) {
+    if (!folder.children) return;
+    // Check if any indexed children are in the collection
+    const anyIn = collectionFolders.has(folder.path);
+    const shouldAdd = !anyIn;
+    setCollectionFolderRecursive(folder, shouldAdd);
+    collectionEditPaths = collectionEditPaths;
+  }
+
+  function setCollectionFolderRecursive(folder: FileItem, add: boolean) {
+    if (!folder.children) return;
+    for (const child of folder.children) {
+      if (child.is_dir) {
+        setCollectionFolderRecursive(child, add);
+      } else if (indexedPaths.has(child.path)) {
+        if (add) {
+          collectionEditPaths.add(child.path);
+        } else {
+          collectionEditPaths.delete(child.path);
+        }
+      }
+    }
+  }
+
+  function toggleCollectionHighlight(name: string | null) {
+    highlightedCollection = name;
+  }
+
   // Copy MCP config to clipboard
   async function handleCopyMcpConfig() {
     try {
@@ -266,6 +426,7 @@
         ? `Synced: ${parts.join(', ')}.`
         : 'Nothing to sync.';
       await refreshIndexStatus();
+      await loadCollections();
     } catch (e) {
       syncResult = `Sync failed: ${String(e)}`;
     } finally {
@@ -308,9 +469,9 @@
 
     <p>Selected: {selectedPaths.size} items</p>
 
-    {#if isLoadingStatus}
+    {#if !isCollectionEditMode && isLoadingStatus}
       <p class="sync-status">Checking index status...</p>
-    {:else if indexStatus}
+    {:else if !isCollectionEditMode && indexStatus}
       {@const pending = indexStatus.summary.add + indexStatus.summary.remove + indexStatus.summary.update}
       {@const indexEmpty = indexStatus.summary.up_to_date === 0 && indexStatus.summary.remove === 0 && indexStatus.summary.update === 0}
       {#if pending === 0 && indexStatus.summary.up_to_date > 0}
@@ -354,9 +515,25 @@
       {/if}
     {/if}
 
-    {#if syncResult}
+    {#if syncResult && !isCollectionEditMode}
       <p class="sync-result">{syncResult}</p>
     {/if}
+
+    <CollectionBar
+      {collections}
+      editingName={editingCollectionName}
+      isCreating={isCreatingCollection}
+      bind:editName={collectionEditName}
+      bind:editDescription={collectionEditDescription}
+      editFileCount={collectionEditPaths.size}
+      highlightedName={highlightedCollection}
+      onStartCreate={startCreateCollection}
+      onStartEdit={startEditCollection}
+      onSave={saveCollection}
+      onCancel={cancelCollectionEdit}
+      onDelete={deleteCollection}
+      onHighlight={toggleCollectionHighlight}
+    />
 
     <div class="file-tree">
       {#each files as file}
@@ -370,6 +547,11 @@
           {indexedPaths}
           onToggle={toogleSelection}
           onSetGameSystem={handleSetGameSystem}
+          mode={treeMode}
+          collectionPaths={collectionEditPaths}
+          {collectionFolders}
+          {highlightPaths}
+          onCollectionToggle={handleCollectionToggle}
         />
       {/each}
     </div>

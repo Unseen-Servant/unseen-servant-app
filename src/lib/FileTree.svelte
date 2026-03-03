@@ -13,6 +13,13 @@
   export let onToggle: (path: string, isDir: boolean, item: FileItem) => void;
   export let onSetGameSystem: (path: string, filename: string, tag: string) => void = () => {};
 
+  // Collection mode props
+  export let mode: 'index' | 'collection' = 'index';
+  export let collectionPaths: Set<string> = new Set();
+  export let collectionFolders: Set<string> = new Set();
+  export let highlightPaths: Set<string> = new Set();
+  export let onCollectionToggle: (path: string, isDir: boolean, item: FileItem) => void = () => {};
+
   let isExpanded: boolean = false;
   let showDropdown: boolean = false;
 
@@ -20,6 +27,23 @@
   $: isSelected = item.is_dir
     ? foldersWithSelections.has(item.path)
     : selectedPaths.has(item.path);
+
+  // Collection mode: check against collectionPaths instead
+  $: isInCollection = item.is_dir
+    ? collectionFolders.has(item.path)
+    : collectionPaths.has(item.path);
+
+  // Which checked state to show depends on mode
+  $: isChecked = mode === 'collection' ? isInCollection : isSelected;
+
+  // In collection mode, only indexed files get checkboxes
+  $: showCheckbox = mode === 'index' || item.is_dir || indexedPaths.has(item.path);
+
+  // Dimmed in collection mode when file is not indexed
+  $: isDimmed = mode === 'collection' && !item.is_dir && !indexedPaths.has(item.path);
+
+  // Highlighted when previewing a collection
+  $: isHighlighted = mode === 'index' && !item.is_dir && highlightPaths.size > 0 && highlightPaths.has(item.path);
 
   $: hasTag = !item.is_dir && gameSystemMap.has(item.path);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
@@ -41,7 +65,11 @@
   }
 
   function handleCheckboxChange() {
-    onToggle(item.path, item.is_dir, item);
+    if (mode === 'collection') {
+      onCollectionToggle(item.path, item.is_dir, item);
+    } else {
+      onToggle(item.path, item.is_dir, item);
+    }
   }
 
   function toggleDropdown(event: MouseEvent) {
@@ -75,14 +103,19 @@
 
 <svelte:window on:click={handleClickOutside} />
 
-<div class="item" style="padding-left: {level * 1.5}rem;">
+<div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} style="padding-left: {level * 1.5}rem;">
   <div class="row-container">
-    <input
-      type="checkbox"
-      bind:checked={isSelected}
-      on:change={handleCheckboxChange}
-      class="checkbox"
-    />
+    {#if showCheckbox}
+      <input
+        type="checkbox"
+        checked={isChecked}
+        on:change={handleCheckboxChange}
+        class="checkbox"
+        class:collection-checkbox={mode === 'collection'}
+      />
+    {:else}
+      <span class="checkbox-spacer"></span>
+    {/if}
 
     <button class="row" on:click={toggleExpand} on:dblclick={openFile}>
       {#if item.is_dir}
@@ -95,26 +128,30 @@
 
     {#if hasTag}
       <div class="badge-wrapper">
-        <button class="game-system-badge" on:click={toggleDropdown}>
-          {gameSystemMap.get(item.path)}
-        </button>
-        {#if showDropdown}
-          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-          <div class="dropdown" on:click|stopPropagation>
-            {#each knownSystems as sys}
-              <button class="dropdown-item" on:click={() => selectSystem(sys.tag)}>
-                <span class="dropdown-tag">{sys.tag}</span>
-                <span class="dropdown-family">{sys.game_system}</span>
+        {#if mode === 'index'}
+          <button class="game-system-badge" on:click={toggleDropdown}>
+            {gameSystemMap.get(item.path)}
+          </button>
+          {#if showDropdown}
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+            <div class="dropdown" on:click|stopPropagation>
+              {#each knownSystems as sys}
+                <button class="dropdown-item" on:click={() => selectSystem(sys.tag)}>
+                  <span class="dropdown-tag">{sys.tag}</span>
+                  <span class="dropdown-family">{sys.game_system}</span>
+                </button>
+              {/each}
+              <hr class="dropdown-divider" />
+              <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
+                Clear tag
               </button>
-            {/each}
-            <hr class="dropdown-divider" />
-            <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
-              Clear tag
-            </button>
-          </div>
+            </div>
+          {/if}
+        {:else}
+          <span class="game-system-badge readonly">{gameSystemMap.get(item.path)}</span>
         {/if}
       </div>
-    {:else if isIndexed}
+    {:else if isIndexed && mode === 'index'}
       <div class="badge-wrapper">
         <button class="add-tag-btn" on:click={toggleDropdown}>+</button>
         {#if showDropdown}
@@ -144,6 +181,11 @@
         {indexedPaths}
         {onToggle}
         {onSetGameSystem}
+        {mode}
+        {collectionPaths}
+        {collectionFolders}
+        {highlightPaths}
+        {onCollectionToggle}
       />
     {/each}
   {/if}
@@ -160,6 +202,22 @@
   .checkbox {
     margin-right: 0.5rem;
     cursor: pointer;
+  }
+  .checkbox.collection-checkbox {
+    accent-color: #7c4dff;
+  }
+  .checkbox-spacer {
+    display: inline-block;
+    width: 13px;
+    margin-right: 0.5rem;
+  }
+  .dimmed {
+    opacity: 0.4;
+  }
+  .highlighted {
+    background: #f3e5f5;
+    border-left: 3px solid #b39ddb;
+    margin-left: -3px;
   }
   .row {
     display: flex;
@@ -196,6 +254,12 @@
   }
   .game-system-badge:hover {
     border-color: #3949ab;
+  }
+  .game-system-badge.readonly {
+    cursor: default;
+  }
+  .game-system-badge.readonly:hover {
+    border-color: transparent;
   }
   .add-tag-btn {
     display: inline-block;
