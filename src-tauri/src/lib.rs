@@ -491,8 +491,32 @@ fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
 fn stop_sidecar(state: &SidecarState) {
     if let Ok(mut guard) = state.0.lock() {
         if let Some(ref mut child) = *guard {
-            let _ = child.kill();
-            let _ = child.wait();
+            // Send SIGTERM for graceful uvicorn shutdown
+            #[cfg(unix)]
+            {
+                let pid = child.id() as i32;
+                unsafe { libc::kill(pid, libc::SIGTERM); }
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = child.kill();
+            }
+
+            // Wait up to 3 seconds for graceful exit, then force kill
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) if std::time::Instant::now() < deadline => {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                    _ => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -537,10 +561,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { .. } = event {
-                let state = app_handle.state::<SidecarState>();
-                stop_sidecar(state.inner());
-                println!("Sidecar stopped.");
+            match event {
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                    let state = app_handle.state::<SidecarState>();
+                    stop_sidecar(state.inner());
+                    println!("Sidecar stopped.");
+                }
+                _ => {}
             }
         });
 }

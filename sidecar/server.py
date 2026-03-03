@@ -11,6 +11,9 @@ Usage:
 import argparse
 import json
 import os
+import signal
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -846,6 +849,25 @@ def create_app(collection=None, data_dir: Path | None = None):
 
 
 # ---------------------------------------------------------------------------
+# Parent-death watchdog
+# ---------------------------------------------------------------------------
+
+def _watch_parent(parent_pid: int, poll_interval: float = 2.0) -> None:
+    """Background thread: self-terminate when parent process dies.
+
+    On Unix, when a parent process dies, os.getppid() changes (typically
+    to 1/launchd). We detect this and send ourselves SIGTERM so uvicorn
+    can shut down gracefully.
+    """
+    while True:
+        time.sleep(poll_interval)
+        if os.getppid() != parent_pid:
+            print(f"Parent process (PID {parent_pid}) died, shutting down sidecar.")
+            os.kill(os.getpid(), signal.SIGTERM)
+            break
+
+
+# ---------------------------------------------------------------------------
 # Main (only runs when executed directly, NOT when imported by tests)
 # ---------------------------------------------------------------------------
 
@@ -853,5 +875,11 @@ if __name__ == "__main__":
     args = parse_args()
     data_dir = Path(args.data_dir) if args.data_dir else Path(__file__).parent / "chroma_db"
     print(f"Starting sidecar on port {args.port}, data dir: {data_dir}")
+
+    # Start parent-death watchdog (daemon thread — won't block exit)
+    parent_pid = os.getppid()
+    watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
+    watchdog.start()
+
     application = create_app()
     uvicorn.run(application, host="127.0.0.1", port=args.port, log_level="info")
