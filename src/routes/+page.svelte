@@ -8,14 +8,13 @@
   import CollectionBar from '../lib/CollectionBar.svelte';
   import Header from '../lib/Header.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
+  import NotificationBanner from '../lib/NotificationBanner.svelte';
+  import { notification } from '../lib/notificationStore';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
   let selectedPaths = new Set<string>;
   let error = '';
-  let isIndexing = false;
-  let indexResult = '';
-  let mcpCopyStatus = '';
 
   // Game system tag editing
   let knownSystems: KnownGameSystem[] = [];
@@ -33,7 +32,6 @@
   let indexStatus: IndexStatusResult | null = null;
   let isLoadingStatus = false;
   let isSyncing = false;
-  let syncResult = '';
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onMount(async () => {
@@ -75,6 +73,8 @@
           a.tag.toLowerCase().localeCompare(b.tag.toLowerCase())
         );
       }
+
+      showSyncPromptIfNeeded();
     } catch (e) {
       // Sidecar might not be ready yet on startup
       console.log('Could not fetch index status:', e);
@@ -82,6 +82,32 @@
     } finally {
       isLoadingStatus = false;
     }
+  }
+
+  function showSyncPromptIfNeeded() {
+    if (!indexStatus || isCollectionEditMode) return;
+
+    const { add, remove, update, errors } = indexStatus.summary;
+    const pending = add + remove + update;
+
+    if (pending === 0 && errors === 0) {
+      notification.dismiss();
+      return;
+    }
+
+    const parts: string[] = [];
+    if (add > 0) parts.push(`${add} to add`);
+    if (remove > 0) parts.push(`${remove} to remove`);
+    if (update > 0) parts.push(`${update} to update`);
+    if (errors > 0) parts.push(`${errors} error(s)`);
+
+    notification.show({
+      type: 'action',
+      message: parts.join(', '),
+      actionLabel: isSyncing ? 'Syncing...' : 'Sync Now',
+      onAction: isSyncing ? undefined : handleSync,
+      duration: null,
+    });
   }
 
   function scheduleStatusRefresh() {
@@ -239,7 +265,7 @@
     return paths;
   }
 
-  async function handleSetGameSystem(path: string, filename: string, tag: string) {
+  async function handleSetGameSystem(_path: string, filename: string, tag: string) {
     try {
       await invoke('set_game_system', { filename, gameSystem: tag });
       await refreshIndexStatus();
@@ -406,16 +432,24 @@
     try {
       const config = await invoke<string>('get_mcp_config');
       await writeText(config);
-      mcpCopyStatus = 'Copied to clipboard!';
+      notification.show({
+        type: 'success',
+        message: 'MCP config copied to clipboard!',
+        duration: 4000,
+      });
     } catch (e) {
-      mcpCopyStatus = `Failed: ${String(e)}`;
+      notification.show({
+        type: 'error',
+        message: `Copy failed: ${String(e)}`,
+        duration: 5000,
+      });
     }
   }
 
   // Sync index: add new, remove deselected, re-index modified
   async function handleSync() {
     isSyncing = true;
-    syncResult = '';
+    notification.dismiss();
     try {
       const result = await invoke<SyncResult>(
         'sync_index',
@@ -426,52 +460,33 @@
       if (result.removed > 0) parts.push(`${result.removed} removed`);
       if (result.updated > 0) parts.push(`${result.updated} updated`);
       if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
-      syncResult = parts.length > 0
+      const msg = parts.length > 0
         ? `Synced: ${parts.join(', ')}.`
         : 'Nothing to sync.';
+
       await refreshIndexStatus();
       await loadCollections();
+
+      notification.show({
+        type: result.errors.length > 0 ? 'error' : 'success',
+        message: msg,
+        duration: 5000,
+      });
     } catch (e) {
-      syncResult = `Sync failed: ${String(e)}`;
+      const msg = `Sync failed: ${String(e)}`;
+      notification.show({ type: 'error', message: msg, duration: 6000 });
+
     } finally {
       isSyncing = false;
     }
   }
 
-  // Legacy index for backward compatibility (kept but no longer primary)
-  async function handleIndex() {
-    isIndexing = true;
-    indexResult = '';
-    try {
-      const result = await invoke<{ indexed: number; total: number; errors: string[] }>(
-        'index_files',
-        { paths: Array.from(selectedPaths) }
-      );
-      if (result.errors.length > 0) {
-        indexResult = `Indexed ${result.indexed}/${result.total} PDFs. ${result.errors.length} error(s).`;
-      } else {
-        indexResult = `Successfully indexed ${result.indexed} PDFs.`;
-      }
-      await refreshIndexStatus();
-    } catch (e) {
-      indexResult = `Indexing failed: ${String(e)}`;
-    } finally {
-      isIndexing = false;
-    }
-  }
 </script>
 
 <main class="app-layout">
   <Header
     {selectedFolder}
-    {indexStatus}
-    {isLoadingStatus}
-    {isSyncing}
-    {syncResult}
-    {isCollectionEditMode}
-    {mcpCopyStatus}
     onSelectFolder={handleSelectFolder}
-    onSync={handleSync}
     onCopyMcpConfig={handleCopyMcpConfig}
   />
 
@@ -513,6 +528,7 @@
           onCollectionToggle={handleCollectionToggle}
         />
       {/each}
+      <NotificationBanner />
     </div>
   {:else}
     <div class="empty-state">
