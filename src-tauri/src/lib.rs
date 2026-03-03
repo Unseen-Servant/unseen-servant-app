@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use tauri::Manager;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::menu::{Menu, MenuItem};
 use std::process::{Child, Command};
 use std::sync::Mutex;
 
@@ -556,13 +558,86 @@ pub fn run() {
                 }
             }
 
+            // ---------------------------------------------------------------
+            // System tray
+            // ---------------------------------------------------------------
+            let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            TrayIconBuilder::new()
+                .icon(tauri::include_image!("icons/32x32.png"))
+                .icon_as_template(true)
+                .tooltip("Unseen Server")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
             match event {
-                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                tauri::RunEvent::WindowEvent {
+                    label,
+                    event: tauri::WindowEvent::CloseRequested { api, .. },
+                    ..
+                } => {
+                    // Hide window instead of closing — app stays alive in tray
+                    api.prevent_close();
+                    if let Some(window) = app_handle.get_webview_window(&label) {
+                        let _ = window.hide();
+                    }
+                }
+                tauri::RunEvent::ExitRequested { api, code, .. } => {
+                    if code.is_some() {
+                        // Triggered by app.exit() (tray Quit or Cmd+Q) — let it proceed
+                    } else {
+                        // Triggered by last window hiding — keep app alive in tray
+                        api.prevent_exit();
+                    }
+                }
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { .. } => {
+                    // macOS: user clicked dock icon while app is running
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                }
+                tauri::RunEvent::Exit => {
                     let state = app_handle.state::<SidecarState>();
                     stop_sidecar(state.inner());
                     println!("Sidecar stopped.");
