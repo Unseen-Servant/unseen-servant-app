@@ -63,7 +63,7 @@ Related repos: `unseen-app-desktop` (alternate desktop app), `unseen-script` (ut
 
 ### Data flow
 
-```
+```text
 PDF files on disk
   → text extraction (pypdf)
   → chunking (1000 chars, 200 overlap)
