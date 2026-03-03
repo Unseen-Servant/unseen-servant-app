@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { openPath } from '@tauri-apps/plugin-opener';
+  import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
 
   export let item: FileItem;
@@ -119,11 +120,9 @@
 
     <button class="row" on:click={toggleExpand} on:dblclick={openFile}>
       {#if item.is_dir}
-        <span>{isExpanded ? '📂' : '📁'}</span>
-      {:else}
-        <span class="icon">📄</span>
+        <span class="icon folder-icon">{isExpanded ? '\u25BE' : '\u25B8'}</span>
       {/if}
-      <span>{item.name}</span>
+      <span class="name">{item.name}</span>
     </button>
 
     {#if hasTag}
@@ -170,24 +169,26 @@
   </div>
 
   {#if isExpanded && item.children}
-    {#each item.children as child}
-      <svelte:self
-        item={child}
-        level={level + 1}
-        {selectedPaths}
-        {foldersWithSelections}
-        {gameSystemMap}
-        {knownSystems}
-        {indexedPaths}
-        {onToggle}
-        {onSetGameSystem}
-        {mode}
-        {collectionPaths}
-        {collectionFolders}
-        {highlightPaths}
-        {onCollectionToggle}
-      />
-    {/each}
+    <div transition:slide={{ duration: 150 }}>
+      {#each item.children as child}
+        <svelte:self
+          item={child}
+          level={level + 1}
+          {selectedPaths}
+          {foldersWithSelections}
+          {gameSystemMap}
+          {knownSystems}
+          {indexedPaths}
+          {onToggle}
+          {onSetGameSystem}
+          {mode}
+          {collectionPaths}
+          {collectionFolders}
+          {highlightPaths}
+          {onCollectionToggle}
+        />
+      {/each}
+    </div>
   {/if}
 </div>
 
@@ -202,9 +203,10 @@
   .checkbox {
     margin-right: 0.5rem;
     cursor: pointer;
+    accent-color: var(--text-accent);
   }
   .checkbox.collection-checkbox {
-    accent-color: #7c4dff;
+    accent-color: var(--text-active);
   }
   .checkbox-spacer {
     display: inline-block;
@@ -212,29 +214,46 @@
     margin-right: 0.5rem;
   }
   .dimmed {
-    opacity: 0.4;
+    opacity: 0.35;
   }
   .highlighted {
-    background: #f3e5f5;
-    border-left: 3px solid #b39ddb;
+    background: rgba(182, 159, 129, 0.12);
+    border-left: 3px solid var(--text-accent);
     margin-left: -3px;
   }
   .row {
     display: flex;
     align-items: center;
-    padding: 0.25rem;
+    padding: 0.2rem 0.25rem;
     cursor: pointer;
     background: none;
     border: none;
+    border-radius: 3px;
     flex: 1;
     text-align: left;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    transition: background var(--transition-fast);
   }
   .row:hover {
-    background: #f0f0f0;
+    background: var(--bg-focused);
   }
   .icon {
-    margin-right: 0.5rem;
+    margin-right: 0.3rem;
+    flex-shrink: 0;
+  }
+  .folder-icon {
+    color: var(--text-accent);
+    font-size: 0.85rem;
+    width: 1rem;
+    display: inline-block;
+    text-align: center;
+  }
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .badge-wrapper {
     position: relative;
@@ -246,14 +265,16 @@
     margin-left: 0.5rem;
     border-radius: 3px;
     font-size: 0.75rem;
-    background: #e8eaf6;
-    color: #3949ab;
+    font-family: var(--font-body);
+    background: rgba(182, 159, 129, 0.15);
+    color: var(--text-accent);
     white-space: nowrap;
     border: 1px solid transparent;
     cursor: pointer;
+    transition: border-color var(--transition-fast);
   }
   .game-system-badge:hover {
-    border-color: #3949ab;
+    border-color: var(--text-accent);
   }
   .game-system-badge.readonly {
     cursor: default;
@@ -267,26 +288,27 @@
     margin-left: 0.5rem;
     border-radius: 3px;
     font-size: 0.75rem;
-    background: #f5f5f5;
-    color: #999;
-    border: 1px dashed #ccc;
+    background: transparent;
+    color: var(--text-tertiary);
+    border: 1px dashed var(--bg-category);
     cursor: pointer;
     line-height: 1.4;
+    transition: all var(--transition-fast);
   }
   .add-tag-btn:hover {
-    background: #e8eaf6;
-    color: #3949ab;
-    border-color: #3949ab;
+    background: rgba(182, 159, 129, 0.1);
+    color: var(--text-accent);
+    border-color: var(--text-accent);
   }
   .dropdown {
     position: absolute;
     top: 100%;
     right: 0;
     z-index: 100;
-    background: white;
-    border: 1px solid #ccc;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
     border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-dropdown);
     max-height: 300px;
     overflow-y: auto;
     min-width: 220px;
@@ -303,25 +325,29 @@
     cursor: pointer;
     text-align: left;
     font-size: 0.8rem;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    transition: background var(--transition-fast);
   }
   .dropdown-item:hover {
-    background: #f0f0f0;
+    background: var(--bg-container);
   }
   .dropdown-tag {
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--text-accent);
     white-space: nowrap;
   }
   .dropdown-family {
-    color: #888;
+    color: var(--text-secondary);
     font-size: 0.7rem;
     white-space: nowrap;
   }
   .dropdown-divider {
     margin: 0.25rem 0;
     border: none;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--bg-category);
   }
   .dropdown-clear {
-    color: #c62828;
+    color: var(--text-danger);
   }
 </style>

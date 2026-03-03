@@ -6,6 +6,8 @@
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import CollectionBar from '../lib/CollectionBar.svelte';
+  import Header from '../lib/Header.svelte';
+  import StatusBar from '../lib/StatusBar.svelte';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -457,85 +459,40 @@
   }
 </script>
 
-<main>
-  <h1>Unseen Server</h1>
-
-  <button on:click={handleSelectFolder}>
-    Select TTRPG Folder
-  </button>
+<main class="app-layout">
+  <Header
+    {selectedFolder}
+    {indexStatus}
+    {isLoadingStatus}
+    {isSyncing}
+    {syncResult}
+    {isCollectionEditMode}
+    {mcpCopyStatus}
+    onSelectFolder={handleSelectFolder}
+    onSync={handleSync}
+    onCopyMcpConfig={handleCopyMcpConfig}
+  />
 
   {#if selectedFolder}
-    <h2>Folder: {selectedFolder}</h2>
+    <div class="collections-area">
+      <CollectionBar
+        {collections}
+        editingName={editingCollectionName}
+        isCreating={isCreatingCollection}
+        bind:editName={collectionEditName}
+        bind:editDescription={collectionEditDescription}
+        editFileCount={collectionEditPaths.size}
+        highlightedName={highlightedCollection}
+        onStartCreate={startCreateCollection}
+        onStartEdit={startEditCollection}
+        onSave={saveCollection}
+        onCancel={cancelCollectionEdit}
+        onDelete={deleteCollection}
+        onHighlight={toggleCollectionHighlight}
+      />
+    </div>
 
-    <p>Selected: {selectedPaths.size} items</p>
-
-    {#if !isCollectionEditMode && isLoadingStatus}
-      <p class="sync-status">Checking index status...</p>
-    {:else if !isCollectionEditMode && indexStatus}
-      {@const pending = indexStatus.summary.add + indexStatus.summary.remove + indexStatus.summary.update}
-      {@const indexEmpty = indexStatus.summary.up_to_date === 0 && indexStatus.summary.remove === 0 && indexStatus.summary.update === 0}
-      {#if pending === 0 && indexStatus.summary.up_to_date > 0}
-        <p class="sync-status sync-ok">Index up to date ({indexStatus.summary.up_to_date} PDFs)</p>
-      {:else if indexEmpty && indexStatus.summary.add > 0}
-        <div class="sync-status sync-empty">
-          <p>No PDFs indexed yet. {indexStatus.summary.add} selected PDF{indexStatus.summary.add === 1 ? '' : 's'} ready to index.</p>
-          <button
-            on:click={handleSync}
-            disabled={isSyncing}
-          >
-            {isSyncing ? 'Syncing...' : `Index ${indexStatus.summary.add} PDFs`}
-          </button>
-        </div>
-      {:else if pending > 0 || indexStatus.summary.errors > 0}
-        <div class="sync-status sync-pending">
-          <p>
-            {#if indexStatus.summary.add > 0}
-              <span class="sync-badge add">{indexStatus.summary.add} to add</span>
-            {/if}
-            {#if indexStatus.summary.remove > 0}
-              <span class="sync-badge remove">{indexStatus.summary.remove} to remove</span>
-            {/if}
-            {#if indexStatus.summary.update > 0}
-              <span class="sync-badge update">{indexStatus.summary.update} modified</span>
-            {/if}
-            {#if indexStatus.summary.up_to_date > 0}
-              <span class="sync-badge ok">{indexStatus.summary.up_to_date} up to date</span>
-            {/if}
-            {#if indexStatus.summary.errors > 0}
-              <span class="sync-badge error">{indexStatus.summary.errors} not found</span>
-            {/if}
-          </p>
-          <button
-            on:click={handleSync}
-            disabled={isSyncing}
-          >
-            {isSyncing ? 'Syncing...' : 'Sync Index'}
-          </button>
-        </div>
-      {/if}
-    {/if}
-
-    {#if syncResult && !isCollectionEditMode}
-      <p class="sync-result">{syncResult}</p>
-    {/if}
-
-    <CollectionBar
-      {collections}
-      editingName={editingCollectionName}
-      isCreating={isCreatingCollection}
-      bind:editName={collectionEditName}
-      bind:editDescription={collectionEditDescription}
-      editFileCount={collectionEditPaths.size}
-      highlightedName={highlightedCollection}
-      onStartCreate={startCreateCollection}
-      onStartEdit={startEditCollection}
-      onSave={saveCollection}
-      onCancel={cancelCollectionEdit}
-      onDelete={deleteCollection}
-      onHighlight={toggleCollectionHighlight}
-    />
-
-    <div class="file-tree">
+    <div class="file-tree-area">
       {#each files as file}
         <FileTree
           item={file}
@@ -555,70 +512,94 @@
         />
       {/each}
     </div>
+  {:else}
+    <div class="empty-state">
+      <p class="empty-title font-heading">Select a folder to begin</p>
+      <p class="empty-subtitle">Choose your TTRPG library folder to browse and index your collection.</p>
+      <button class="empty-btn" on:click={handleSelectFolder}>
+        Choose Library Folder
+      </button>
+    </div>
   {/if}
 
   {#if error}
-    <p style="color: red;">Error: {error}</p>
+    <div class="error-banner">Error: {error}</div>
   {/if}
 
-  <hr />
-  <button on:click={handleCopyMcpConfig}>
-    Copy MCP Config
-  </button>
-  {#if mcpCopyStatus}
-    <p class="mcp-status">{mcpCopyStatus}</p>
-  {/if}
+  <StatusBar
+    {selectedFolder}
+    selectedCount={selectedPaths.size}
+    indexedCount={indexStatus?.summary?.up_to_date ?? 0}
+  />
 </main>
 
 <style>
-  main {
-    padding: 2rem;
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-app);
   }
-  .file-tree {
-    margin-top: 1rem;
-    border: 1px solid #ccc;
+
+  .collections-area {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-container);
+  }
+
+  .file-tree-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0.75rem;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+  }
+
+  .empty-title {
+    font-size: 1.4rem;
+    color: var(--text-accent);
+    margin: 0;
+  }
+
+  .empty-subtitle {
+    font-size: 0.95rem;
+    margin: 0;
+  }
+
+  .empty-btn {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1.25rem;
     border-radius: 4px;
-    padding: 1rem;
-    background: white;
+    border: 1px solid var(--border-accent);
+    background: transparent;
+    color: var(--text-accent);
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    transition: all var(--transition-fast);
   }
-  .sync-status {
-    margin-top: 0.5rem;
-    padding: 0.5rem;
-    border-radius: 4px;
+  .empty-btn:hover {
+    background: rgba(182, 159, 129, 0.1);
   }
-  .sync-ok {
-    background: #f0fff0;
-    color: #2d7d2d;
+  .empty-btn:active {
+    transform: scale(0.97);
   }
-  .sync-empty {
-    background: #f3f4f6;
-    color: #4b5563;
-  }
-  .sync-pending {
-    background: #fff8f0;
-  }
-  .sync-badge {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 3px;
-    margin-right: 0.4rem;
+
+  .error-banner {
+    padding: 0.4rem 1rem;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--text-danger);
+    border-top: 1px solid rgba(239, 68, 68, 0.3);
     font-size: 0.85rem;
-  }
-  .sync-badge.add { background: #e3f2fd; color: #1565c0; }
-  .sync-badge.remove { background: #fce4ec; color: #c62828; }
-  .sync-badge.update { background: #fff3e0; color: #e65100; }
-  .sync-badge.ok { background: #e8f5e9; color: #2e7d32; }
-  .sync-badge.error { background: #fbe9e7; color: #bf360c; }
-  .sync-result {
-    margin-top: 0.5rem;
-    padding: 0.5rem;
-    background: #f0f7ff;
-    border-radius: 4px;
-  }
-  .mcp-status {
-    margin-top: 0.5rem;
-    padding: 0.5rem;
-    background: #f0f7ff;
-    border-radius: 4px;
+    flex-shrink: 0;
   }
 </style>

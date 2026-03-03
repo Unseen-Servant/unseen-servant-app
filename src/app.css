@@ -1,0 +1,184 @@
+/* ==========================================================================
+   Unseen Servant — Global Design System
+   Dark "old book" theme with serif fonts and warm parchment accents
+   ========================================================================== */
+
+/* --- Font Faces --- */
+
+@font-face {
+  font-family: 'Crimson Text';
+  src: url('/fonts/CrimsonText-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Crimson Text';
+  src: url('/fonts/CrimsonText-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Crimson Text';
+  src: url('/fonts/CrimsonText-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Crimson Text';
+  src: url('/fonts/CrimsonText-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Almendra';
+  src: url('/fonts/Almendra-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Almendra';
+  src: url('/fonts/Almendra-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/fonts/Cinzel-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/fonts/Cinzel-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* --- Design Tokens --- */
+
+:root {
+  /* Fonts */
+  --font-body: 'Crimson Text', Georgia, serif;
+  --font-heading: 'Almendra', serif;
+  --font-display: 'Cinzel', serif;
+
+  /* Background colors */
+  --bg-app: rgb(25, 25, 25);
+  --bg-container: rgb(35, 35, 35);
+  --bg-header: rgb(46, 46, 46);
+  --bg-category: rgb(71, 71, 71);
+  --bg-focused: rgb(50, 50, 50);
+  --bg-active: #485946;
+  --bg-active-focused: #668063;
+  --bg-selected: rgb(182, 159, 129);
+  --bg-selected-focused: rgb(236, 204, 162);
+
+  /* Text colors */
+  --text-primary: #c9d1d9;
+  --text-secondary: #8b949e;
+  --text-tertiary: #6e7681;
+  --text-inverse: #1a1a1a;
+  --text-accent: rgb(182, 159, 129);
+  --text-danger: #ef4444;
+  --text-active: #668063;
+
+  /* Borders & shadows */
+  --border-subtle: rgb(50, 50, 50);
+  --border-accent: rgb(182, 159, 129);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Layout */
+  --header-height: 48px;
+  --statusbar-height: 28px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+}
+
+/* --- Base Reset --- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Scrollbar --- */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-container);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-category);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-header);
+}
+
+/* --- Accessibility --- */
+
+:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 2px;
+}
+
+/* --- Base Elements --- */
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+/* --- Font Utilities --- */
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}

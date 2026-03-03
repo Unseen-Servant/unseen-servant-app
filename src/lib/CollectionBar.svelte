@@ -130,7 +130,7 @@
 
 <style>
   .collection-bar {
-    margin-top: 0.5rem;
+    display: contents;
   }
   .chips-row {
     display: flex;
@@ -140,35 +140,38 @@
   }
   .label {
     font-size: 0.85rem;
-    color: #666;
+    font-family: var(--font-heading);
+    color: var(--text-secondary);
     margin-right: 0.25rem;
   }
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 12px;
     font-size: 0.8rem;
-    background: #ede7f6;
-    color: #5e35b1;
-    border: 1px solid transparent;
+    font-family: var(--font-body);
+    background: var(--bg-focused);
+    color: var(--text-primary);
+    border: 1px solid var(--bg-category);
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: all var(--transition-fast);
   }
   .chip:hover {
-    border-color: #b39ddb;
+    border-color: var(--text-accent);
   }
   .chip.highlighted {
-    border-color: #7c4dff;
-    background: #d1c4e9;
+    border-color: var(--text-accent);
+    background: rgba(182, 159, 129, 0.15);
+    color: var(--text-accent);
   }
   .chip-name {
     font-weight: 500;
   }
   .chip-count {
     font-size: 0.7rem;
-    opacity: 0.7;
+    opacity: 0.6;
   }
   .chip-action {
     display: none;
@@ -188,37 +191,38 @@
     opacity: 1;
   }
   .chip-action.edit {
-    color: #5e35b1;
+    color: var(--text-secondary);
   }
   .chip-action.delete {
-    color: #c62828;
+    color: var(--text-danger);
   }
   .chip-action.delete.confirming {
-    color: #c62828;
+    color: var(--text-danger);
     opacity: 1;
     font-weight: bold;
   }
   .new-chip {
     background: transparent;
-    border: 1px dashed #b39ddb;
-    color: #7c4dff;
+    border: 1px dashed var(--bg-category);
+    color: var(--text-secondary);
   }
   .new-chip:hover {
-    background: #ede7f6;
-    border-color: #7c4dff;
+    border-color: var(--text-accent);
+    color: var(--text-accent);
   }
 
   /* Edit form */
   .edit-form {
-    background: #f5f0ff;
-    border: 1px solid #d1c4e9;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
     border-radius: 6px;
     padding: 0.75rem;
   }
   .edit-header {
     font-weight: 600;
     font-size: 0.9rem;
-    color: #4a148c;
+    font-family: var(--font-heading);
+    color: var(--text-accent);
     margin-bottom: 0.5rem;
   }
   .edit-fields {
@@ -230,19 +234,21 @@
     display: flex;
     flex-direction: column;
     font-size: 0.75rem;
-    color: #666;
+    color: var(--text-secondary);
     flex: 1;
   }
   .edit-input {
     margin-top: 0.2rem;
     padding: 0.3rem 0.5rem;
-    border: 1px solid #d1c4e9;
+    border: 1px solid var(--bg-category);
     border-radius: 4px;
     font-size: 0.85rem;
+    background: var(--bg-container);
+    color: var(--text-primary);
   }
   .edit-input:focus {
     outline: none;
-    border-color: #7c4dff;
+    border-color: var(--text-accent);
   }
   .edit-actions {
     display: flex;
@@ -251,7 +257,7 @@
   }
   .file-count {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-secondary);
     margin-right: auto;
   }
   .btn {
@@ -259,33 +265,38 @@
     border-radius: 4px;
     border: 1px solid transparent;
     font-size: 0.8rem;
+    font-family: var(--font-body);
     cursor: pointer;
+    transition: all var(--transition-fast);
   }
   .btn:disabled {
     opacity: 0.4;
     cursor: default;
   }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
   .btn-save {
-    background: #7c4dff;
-    color: white;
+    background: var(--bg-active);
+    color: var(--text-primary);
   }
   .btn-save:hover:not(:disabled) {
-    background: #651fff;
+    background: var(--bg-active-focused);
   }
   .btn-cancel {
-    background: #f5f5f5;
-    color: #666;
-    border-color: #ccc;
+    background: var(--bg-focused);
+    color: var(--text-secondary);
+    border-color: var(--bg-category);
   }
   .btn-cancel:hover {
-    background: #eee;
+    background: var(--bg-container);
   }
   .btn-delete {
     background: transparent;
-    color: #c62828;
-    border-color: #c62828;
+    color: var(--text-danger);
+    border-color: var(--text-danger);
   }
   .btn-delete:hover {
-    background: #fce4ec;
+    background: rgba(239, 68, 68, 0.1);
   }
 </style>
