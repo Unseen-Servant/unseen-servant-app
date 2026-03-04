@@ -566,7 +566,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
             TrayIconBuilder::new()
-                .icon(tauri::include_image!("icons/32x32.png"))
+                .icon(tauri::include_image!("icons/tray-icon.png"))
                 .icon_as_template(true)
                 .tooltip("Unseen Server")
                 .menu(&menu)
