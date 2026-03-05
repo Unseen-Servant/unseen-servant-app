@@ -11,6 +11,7 @@ Usage:
 import argparse
 import json
 import os
+import random
 import signal
 import threading
 import time
@@ -22,6 +23,7 @@ from chromadb.utils import embedding_functions
 from pypdf import PdfReader
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -257,6 +259,36 @@ def index_single_pdf(
 
     except Exception as e:
         return 0, f"{pdf_path.name}: {str(e)}", "unknown"
+
+
+def prepare_pdf(
+    pdf_path: Path, game_system: str | None = None
+) -> tuple[list[str], str, str | None]:
+    """Extract text and chunk a PDF without upserting.
+
+    Returns (chunks, game_system, error_message).
+    error_message is None on success.
+    """
+    if not pdf_path.exists():
+        return [], "unknown", f"{pdf_path.name}: File not found"
+
+    try:
+        reader = PdfReader(pdf_path)
+        text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+
+        if not text.strip():
+            return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
+
+        resolved_system = game_system or detect_game_system(pdf_path, text)
+        chunks = chunk_text(text)
+        return chunks, resolved_system, None
+
+    except Exception as e:
+        return [], "unknown", f"{pdf_path.name}: {str(e)}"
 
 
 def delete_source_chunks(filename: str, collection) -> int:
@@ -541,6 +573,146 @@ def create_app(collection=None, data_dir: Path | None = None):
             "errors": errors,
             "total_indexed": len(manifest.files),
         }
+
+    @app.post("/api/sync-index-stream")
+    async def sync_index_stream(request: SyncIndexRequest):
+        """Streaming version of sync-index that emits SSE progress events."""
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        def _progress_event(files_done, total_files, chunks_total, current_file, phase):
+            return f"data: {json.dumps({'event': 'progress', 'files_done': files_done, 'total_files': total_files, 'chunks_total': chunks_total, 'current_file': current_file, 'phase': phase})}\n\n"
+
+        def generate():
+            manifest = load_manifest(data_dir)
+            diff = compute_diff(request.selected_paths, manifest)
+
+            total_files = (
+                len(diff["to_remove"])
+                + len(diff["to_add"])
+                + len(diff["to_update"])
+            )
+            files_done = 0
+            chunks_total = 0
+            removed = 0
+            added = 0
+            updated = 0
+            errors = []
+
+            yield f"data: {json.dumps({'event': 'started', 'total_files': total_files})}\n\n"
+
+            # Phase 1: Remove deselected files
+            for entry in diff["to_remove"]:
+                deleted = delete_source_chunks(entry["filename"], collection)
+                del manifest.files[entry["path"]]
+                removed += 1
+                files_done += 1
+                chunks_total += deleted
+                yield _progress_event(files_done, total_files, chunks_total, entry["filename"], "remove")
+
+            # Phase 2: Index new files
+            for entry in diff["to_add"]:
+                pdf_path = Path(entry["path"])
+                override = (
+                    request.game_system_overrides.get(entry["path"])
+                    if request.game_system_overrides else None
+                )
+                chunks, detected_system, error = prepare_pdf(
+                    pdf_path, game_system=override
+                )
+                if error:
+                    errors.append(error)
+                    files_done += 1
+                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
+                else:
+                    batch_idx = 0
+                    while batch_idx < len(chunks):
+                        batch_size = random.randint(80, 120)
+                        batch_chunks = chunks[batch_idx:batch_idx + batch_size]
+                        batch_metadatas = [{
+                            "source": str(pdf_path),
+                            "filename": pdf_path.name,
+                            "chunk": batch_idx + chunk_idx,
+                            "game_system": detected_system,
+                        } for chunk_idx in range(len(batch_chunks))]
+                        batch_ids = [
+                            f"{pdf_path.stem}_{batch_idx + chunk_idx}"
+                            for chunk_idx in range(len(batch_chunks))
+                        ]
+                        collection.upsert(
+                            documents=batch_chunks,
+                            metadatas=batch_metadatas,
+                            ids=batch_ids,
+                        )
+                        chunks_total += len(batch_chunks)
+                        batch_idx += len(batch_chunks)
+                        yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
+                    added += 1
+                    files_done += 1
+                    manifest.files[entry["path"]] = ManifestEntry(
+                        filename=pdf_path.name,
+                        mtime=os.path.getmtime(pdf_path),
+                        chunk_count=len(chunks),
+                        indexed_at=datetime.now(timezone.utc).isoformat(),
+                        game_system=detected_system,
+                    )
+                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
+
+            # Phase 3: Re-index modified files
+            for entry in diff["to_update"]:
+                pdf_path = Path(entry["path"])
+                override = (
+                    request.game_system_overrides.get(entry["path"])
+                    if request.game_system_overrides else None
+                )
+                chunks, detected_system, error = prepare_pdf(
+                    pdf_path, game_system=override
+                )
+                if error:
+                    errors.append(error)
+                    files_done += 1
+                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
+                else:
+                    batch_idx = 0
+                    while batch_idx < len(chunks):
+                        batch_size = random.randint(80, 120)
+                        batch_chunks = chunks[batch_idx:batch_idx + batch_size]
+                        batch_metadatas = [{
+                            "source": str(pdf_path),
+                            "filename": pdf_path.name,
+                            "chunk": batch_idx + chunk_idx,
+                            "game_system": detected_system,
+                        } for chunk_idx in range(len(batch_chunks))]
+                        batch_ids = [
+                            f"{pdf_path.stem}_{batch_idx + chunk_idx}"
+                            for chunk_idx in range(len(batch_chunks))
+                        ]
+                        collection.upsert(
+                            documents=batch_chunks,
+                            metadatas=batch_metadatas,
+                            ids=batch_ids,
+                        )
+                        chunks_total += len(batch_chunks)
+                        batch_idx += len(batch_chunks)
+                        yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
+                    updated += 1
+                    files_done += 1
+                    manifest.files[entry["path"]] = ManifestEntry(
+                        filename=pdf_path.name,
+                        mtime=os.path.getmtime(pdf_path),
+                        chunk_count=len(chunks),
+                        indexed_at=datetime.now(timezone.utc).isoformat(),
+                        game_system=detected_system,
+                    )
+                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
+
+            save_manifest(data_dir, manifest)
+
+            yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total})}\n\n"
+
+        return StreamingResponse(generate(), media_type="text/event-stream")
 
     @app.get("/api/stats")
     async def get_stats():

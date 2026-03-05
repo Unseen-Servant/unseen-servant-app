@@ -10,15 +10,27 @@
     class="notification-banner {n.type}"
     transition:fly={{ y: 20, duration: 200 }}
   >
-    <span class="notification-message">{n.message}</span>
-    {#if n.actionLabel && n.onAction}
-      <button class="notification-action" on:click={n.onAction}>
-        {n.actionLabel}
+    {#if n.type === 'progress'}
+      <span class="notification-spinner">&#9881;</span>
+      <span class="notification-message">
+        Syncing: {n.filesCompleted ?? 0}/{n.filesTotal ?? 0} files
+      </span>
+      {#if (n.chunksProcessed ?? 0) > 0}
+        <span class="notification-detail">
+          &middot; {(n.chunksProcessed ?? 0).toLocaleString()} chunks
+        </span>
+      {/if}
+    {:else}
+      <span class="notification-message">{n.message}</span>
+      {#if n.actionLabel && n.onAction}
+        <button class="notification-action" on:click={n.onAction}>
+          {n.actionLabel}
+        </button>
+      {/if}
+      <button class="notification-dismiss" on:click={() => { n.onDismiss?.(); notification.dismiss(); }}>
+        &times;
       </button>
     {/if}
-    <button class="notification-dismiss" on:click={() => { n.onDismiss?.(); notification.dismiss(); }}>
-      &times;
-    </button>
   </div>
 {/if}
 
@@ -52,6 +64,9 @@
     border-left: 3px solid var(--text-danger);
   }
   .notification-banner.action {
+    border-left: 3px solid var(--text-accent);
+  }
+  .notification-banner.progress {
     border-left: 3px solid var(--text-accent);
   }
 
@@ -89,5 +104,21 @@
   }
   .notification-dismiss:hover {
     color: var(--text-secondary);
+  }
+
+  .notification-detail {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .notification-spinner {
+    display: inline-block;
+    animation: spin 2s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 </style>

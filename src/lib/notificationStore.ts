@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-export type NotificationType = 'success' | 'info' | 'error' | 'action';
+export type NotificationType = 'success' | 'info' | 'error' | 'action' | 'progress';
 
 export interface Notification {
   id: string;
@@ -10,6 +10,9 @@ export interface Notification {
   onAction?: () => void;
   onDismiss?: () => void;
   duration: number | null;
+  filesCompleted?: number;
+  filesTotal?: number;
+  chunksProcessed?: number;
 }
 
 function createNotificationStore() {

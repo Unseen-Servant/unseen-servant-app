@@ -60,6 +60,7 @@ export interface SyncResult {
   updated: number;
   errors: string[];
   total_indexed: number;
+  chunks_total: number;
 }
 
 export interface CollectionInfo {

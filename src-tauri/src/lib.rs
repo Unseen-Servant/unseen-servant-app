@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem};
 use std::process::{Child, Command};
@@ -74,6 +74,16 @@ struct SyncResult {
     updated: u32,
     errors: Vec<String>,
     total_indexed: u32,
+    chunks_total: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+struct SyncProgressPayload {
+    files_done: u32,
+    total_files: u32,
+    chunks_total: u32,
+    current_file: String,
+    phase: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -247,21 +257,77 @@ async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, Strin
 }
 
 #[tauri::command]
-async fn sync_index(paths: Vec<String>) -> Result<SyncResult, String> {
+async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncResult, String> {
+    use futures_util::StreamExt;
+
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/sync-index", SIDECAR_URL))
+        .post(format!("{}/api/sync-index-stream", SIDECAR_URL))
         .json(&serde_json::json!({ "selected_paths": paths }))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
-    let result: SyncResult = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+    let mut final_result: Option<SyncResult> = None;
 
-    Ok(result)
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+        while let Some(pos) = buffer.find("\n\n") {
+            let frame = buffer[..pos].to_string();
+            buffer = buffer[pos + 2..].to_string();
+
+            if let Some(data) = frame.strip_prefix("data: ") {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                    match json.get("event").and_then(|e| e.as_str()) {
+                        Some("started") => {
+                            let payload = SyncProgressPayload {
+                                files_done: 0,
+                                total_files: json["total_files"]
+                                    .as_u64()
+                                    .unwrap_or(0)
+                                    as u32,
+                                chunks_total: 0,
+                                current_file: String::new(),
+                                phase: String::new(),
+                            };
+                            let _ = app.emit("sync-progress", &payload);
+                        }
+                        Some("progress") => {
+                            let payload = SyncProgressPayload {
+                                files_done: json["files_done"].as_u64().unwrap_or(0) as u32,
+                                total_files: json["total_files"].as_u64().unwrap_or(0) as u32,
+                                chunks_total: json["chunks_total"].as_u64().unwrap_or(0) as u32,
+                                current_file: json["current_file"]
+                                    .as_str()
+                                    .unwrap_or("")
+                                    .to_string(),
+                                phase: json["phase"].as_str().unwrap_or("").to_string(),
+                            };
+                            let _ = app.emit("sync-progress", &payload);
+                        }
+                        Some("complete") => {
+                            final_result = serde_json::from_value(serde_json::json!({
+                                "added": json["added"],
+                                "removed": json["removed"],
+                                "updated": json["updated"],
+                                "errors": json["errors"],
+                                "total_indexed": json["total_indexed"],
+                                "chunks_total": json["chunks_total"],
+                            }))
+                            .ok();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    final_result.ok_or_else(|| "Sync completed but no result received".to_string())
 }
 
 // ---------------------------------------------------------------------------

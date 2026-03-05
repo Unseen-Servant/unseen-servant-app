@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
@@ -486,6 +487,34 @@
   async function handleSync() {
     isSyncing = true;
     notification.dismiss();
+
+    notification.show({
+      type: 'progress',
+      message: 'Starting sync...',
+      filesCompleted: 0,
+      filesTotal: 0,
+      chunksProcessed: 0,
+      duration: null,
+    });
+
+    const unlisten = await listen<{
+      files_done: number;
+      total_files: number;
+      chunks_total: number;
+      current_file: string;
+      phase: string;
+    }>('sync-progress', (event) => {
+      const p = event.payload;
+      notification.show({
+        type: 'progress',
+        message: `${p.files_done}/${p.total_files} files`,
+        filesCompleted: p.files_done,
+        filesTotal: p.total_files,
+        chunksProcessed: p.chunks_total,
+        duration: null,
+      });
+    });
+
     try {
       const result = await invoke<SyncResult>(
         'sync_index',
@@ -496,8 +525,11 @@
       if (result.removed > 0) parts.push(`${result.removed} removed`);
       if (result.updated > 0) parts.push(`${result.updated} updated`);
       if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
+      const chunkStr = result.chunks_total > 0
+        ? ` ${result.chunks_total.toLocaleString()} chunks.`
+        : '';
       const msg = parts.length > 0
-        ? `Synced: ${parts.join(', ')}.`
+        ? `Synced: ${parts.join(', ')}.${chunkStr}`
         : 'Nothing to sync.';
 
       // Persist synced selection so uncommitted changes don't survive a restart
@@ -519,6 +551,7 @@
       notification.show({ type: 'error', message: msg, duration: 6000 });
 
     } finally {
+      unlisten();
       isSyncing = false;
     }
   }
