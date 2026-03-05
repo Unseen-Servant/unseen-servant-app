@@ -15,11 +15,9 @@
       <span class="notification-message">
         Syncing: {n.filesCompleted ?? 0}/{n.filesTotal ?? 0} files
       </span>
-      {#if (n.chunksProcessed ?? 0) > 0}
-        <span class="notification-detail">
-          &middot; {(n.chunksProcessed ?? 0).toLocaleString()} chunks
-        </span>
-      {/if}
+      <span class="notification-detail">
+        &middot; {(n.chunksProcessed ?? 0).toLocaleString()} chunks
+      </span>
     {:else}
       <span class="notification-message">{n.message}</span>
       {#if n.actionLabel && n.onAction}
@@ -68,6 +66,7 @@
   }
   .notification-banner.progress {
     border-left: 3px solid var(--text-accent);
+    font-variant-numeric: tabular-nums;
   }
 
   .notification-message {
@@ -110,6 +109,7 @@
     color: var(--text-secondary);
     font-size: 0.8rem;
     white-space: nowrap;
+    min-width: 12ch;
   }
 
   .notification-spinner {
