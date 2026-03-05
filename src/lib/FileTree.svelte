@@ -3,6 +3,7 @@
   import { openPath } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
+  import { areAllDescendantsSelected } from './selectionUtils';
 
   export let item: FileItem;
   export let level: number = 0;
@@ -24,18 +25,34 @@
   let isExpanded: boolean = false;
   let showDropdown: boolean = false;
 
-  // Check if this item is selected — O(1) Set lookup, works even for unloaded folders
+  // Check if this item has any selection — O(1) Set lookup, works even for unloaded folders
   $: isSelected = item.is_dir
     ? foldersWithSelections.has(item.path)
     : selectedPaths.has(item.path);
+
+  // For folders: computed locally from item.children (which has correct data in this component)
+  $: isFullySelected = item.is_dir && item.children !== null &&
+    areAllDescendantsSelected(item, selectedPaths);
 
   // Collection mode: check against collectionPaths instead
   $: isInCollection = item.is_dir
     ? collectionFolders.has(item.path)
     : collectionPaths.has(item.path);
 
+  $: isCollectionFullySelected = item.is_dir && item.children !== null &&
+    areAllDescendantsSelected(item, collectionPaths, indexedPaths);
+
   // Which checked state to show depends on mode
-  $: isChecked = mode === 'collection' ? isInCollection : isSelected;
+  $: isChecked = mode === 'collection'
+    ? (item.is_dir ? isCollectionFullySelected : isInCollection)
+    : (item.is_dir ? isFullySelected : isSelected);
+
+  // Indeterminate: has some selections but not all (folders only)
+  $: isIndeterminate = item.is_dir && (
+    mode === 'collection'
+      ? (isInCollection && !isCollectionFullySelected)
+      : (isSelected && !isFullySelected)
+  );
 
   // In collection mode, only indexed files get checkboxes
   $: showCheckbox = mode === 'index' || item.is_dir || indexedPaths.has(item.path);
@@ -48,6 +65,15 @@
 
   $: hasTag = !item.is_dir && gameSystemMap.has(item.path);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
+
+  function setIndeterminate(node: HTMLInputElement, value: boolean) {
+    node.indeterminate = value;
+    return {
+      update(newValue: boolean) {
+        node.indeterminate = newValue;
+      }
+    };
+  }
 
   async function toggleExpand() {
     if (!item.is_dir) return;
@@ -110,6 +136,7 @@
       <input
         type="checkbox"
         checked={isChecked}
+        use:setIndeterminate={isIndeterminate}
         on:change={handleCheckboxChange}
         class="checkbox"
         class:collection-checkbox={mode === 'collection'}
@@ -170,7 +197,7 @@
 
   {#if isExpanded && item.children}
     <div transition:slide={{ duration: 150 }}>
-      {#each item.children as child}
+      {#each item.children as child (child.path)}
         <svelte:self
           item={child}
           level={level + 1}

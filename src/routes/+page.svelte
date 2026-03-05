@@ -10,6 +10,7 @@
   import StatusBar from '../lib/StatusBar.svelte';
   import NotificationBanner from '../lib/NotificationBanner.svelte';
   import { notification } from '../lib/notificationStore';
+  import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -176,9 +177,9 @@
       }
     }
     
-    // Check if any descendants are currently selected (O(1) lookup)
-    const anySelected = foldersWithSelections.has(folder.path);
-    const shouldSelect = !anySelected;
+    // Deselect only when ALL descendants are selected; otherwise select all
+    const allSelected = areAllDescendantsSelected(folder, selectedPaths);
+    const shouldSelect = !allSelected;
 
     // Recursively add/remove all children
     if (folder.children) {
@@ -274,17 +275,6 @@
     }
   }
 
-  function computeAncestorPaths(paths: Set<string>): Set<string> {
-    const ancestors = new Set<string>();
-    for (const p of paths) {
-      let dir = p;
-      while ((dir = dir.substring(0, dir.lastIndexOf('/'))) !== '') {
-        if (ancestors.has(dir)) break; // Already traced this branch
-        ancestors.add(dir);
-      }
-    }
-    return ancestors;
-  }
 
   // ---------------------------------------------------------------------------
   // Collections
@@ -401,9 +391,9 @@
 
   function toggleCollectionFolder(folder: FileItem) {
     if (!folder.children) return;
-    // Check if any indexed children are in the collection
-    const anyIn = collectionFolders.has(folder.path);
-    const shouldAdd = !anyIn;
+    // Deselect only when ALL indexed descendants are in the collection
+    const allIn = areAllDescendantsSelected(folder, collectionEditPaths, indexedPaths);
+    const shouldAdd = !allIn;
     setCollectionFolderRecursive(folder, shouldAdd);
     collectionEditPaths = collectionEditPaths;
   }
@@ -510,7 +500,7 @@
     </div>
 
     <div class="file-tree-area">
-      {#each files as file}
+      {#each files as file (file.path)}
         <FileTree
           item={file}
           level={0}
