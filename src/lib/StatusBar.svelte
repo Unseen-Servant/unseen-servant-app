@@ -1,17 +1,19 @@
 <script lang="ts">
   export let selectedFolder: string;
+  export let sidecarConnected: boolean;
   export let selectedCount: number;
   export let indexedCount: number;
 </script>
 
 <footer class="statusbar">
   <div class="statusbar-left">
-    {#if indexedCount > 0}
-      <span class="indicator connected" title="Sidecar connected"></span>
-      <span>{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
-    {:else if selectedFolder}
-      <span class="indicator" title="No PDFs indexed yet"></span>
-      <span>{selectedCount} selected</span>
+    {#if selectedFolder}
+      <span class="indicator" class:connected={sidecarConnected} title={sidecarConnected ? 'Sidecar connected' : 'Sidecar disconnected'}></span>
+      {#if indexedCount > 0}
+        <span>{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
+      {:else}
+        <span>{selectedCount} selected</span>
+      {/if}
     {/if}
   </div>
   <div class="statusbar-right">

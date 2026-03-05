@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { load } from '@tauri-apps/plugin-store';
@@ -36,6 +36,10 @@
   let isSyncing = false;
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Sidecar health
+  let sidecarConnected = false;
+  let healthInterval: ReturnType<typeof setInterval> | null = null;
+
   onMount(async () => {
     try {
       const store = await load('settings.json');
@@ -60,7 +64,22 @@
       console.log('No saved state:', e);
     }
 
+    // Poll sidecar health
+    checkSidecarHealth();
+    healthInterval = setInterval(checkSidecarHealth, 10000);
   });
+
+  onDestroy(() => {
+    if (healthInterval) clearInterval(healthInterval);
+  });
+
+  async function checkSidecarHealth() {
+    try {
+      sidecarConnected = await invoke<boolean>('check_sidecar_health');
+    } catch {
+      sidecarConnected = false;
+    }
+  }
 
   async function refreshIndexStatus() {
     isLoadingStatus = true;
@@ -552,6 +571,7 @@
 
   <StatusBar
     {selectedFolder}
+    {sidecarConnected}
     selectedCount={selectedPaths.size}
     indexedCount={indexStatus?.summary?.up_to_date ?? 0}
   />

@@ -189,6 +189,20 @@ fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
 const SIDECAR_URL: &str = "http://localhost:8420";
 
 #[tauri::command]
+async fn check_sidecar_health() -> Result<bool, String> {
+    let client = reqwest::Client::new();
+    match client
+        .get(format!("{}/health", SIDECAR_URL))
+        .timeout(std::time::Duration::from_secs(3))
+        .send()
+        .await
+    {
+        Ok(resp) => Ok(resp.status().is_success()),
+        Err(_) => Ok(false),
+    }
+}
+
+#[tauri::command]
 async fn index_files(paths: Vec<String>) -> Result<IndexResult, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -551,7 +565,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, check_sidecar_health, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
