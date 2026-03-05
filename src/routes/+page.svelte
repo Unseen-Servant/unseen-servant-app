@@ -39,7 +39,8 @@
     try {
       const store = await load('settings.json');
       const savedFolder = await store.get<string>('selectedFolder');
-      const savedPaths = await store.get<string[]>('selectedPaths');
+      const savedPaths = await store.get<string[]>('syncedPaths')
+        ?? await store.get<string[]>('selectedPaths');
 
       if (savedFolder) {
         selectedFolder = savedFolder;
@@ -453,6 +454,11 @@
       const msg = parts.length > 0
         ? `Synced: ${parts.join(', ')}.`
         : 'Nothing to sync.';
+
+      // Persist synced selection so uncommitted changes don't survive a restart
+      const store = await load('settings.json');
+      await store.set('syncedPaths', Array.from(selectedPaths));
+      await store.save();
 
       await refreshIndexStatus();
       await loadCollections();
