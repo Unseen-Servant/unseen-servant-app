@@ -75,6 +75,13 @@ export interface CollectionsResult {
   count: number;
 }
 
+export interface StatsResult {
+  total_chunks: number;
+  total_documents: number;
+  collection_name: string;
+  storage_bytes: number;
+}
+
 export interface CollectionMutationResult {
   name: string;
   file_count: number;

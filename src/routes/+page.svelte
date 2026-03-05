@@ -3,7 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import CollectionBar from '../lib/CollectionBar.svelte';
   import Header from '../lib/Header.svelte';
@@ -35,6 +35,9 @@
   let isLoadingStatus = false;
   let isSyncing = false;
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Sidecar stats
+  let storageBytes = 0;
 
   // Sidecar health
   let sidecarConnected = false;
@@ -96,6 +99,11 @@
           a.tag.toLowerCase().localeCompare(b.tag.toLowerCase())
         );
       }
+
+      // Fetch storage size in parallel (non-blocking)
+      invoke<StatsResult>('get_stats')
+        .then(r => { storageBytes = r.storage_bytes; })
+        .catch(() => { storageBytes = 0; });
 
       showSyncPromptIfNeeded();
     } catch (e) {
@@ -266,6 +274,15 @@
 
   // Track which files are in the index (so untagged indexed files show the "+" button)
   $: indexedPaths = buildIndexedPaths(indexStatus);
+
+  // Count distinct game systems among indexed files
+  $: gameSystemCount = indexStatus
+    ? new Set(
+        indexStatus.up_to_date
+          .map(e => e.game_system)
+          .filter(s => s && s !== 'unknown')
+      ).size
+    : 0;
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
@@ -574,6 +591,8 @@
     {sidecarConnected}
     selectedCount={selectedPaths.size}
     indexedCount={indexStatus?.summary?.up_to_date ?? 0}
+    {gameSystemCount}
+    {storageBytes}
   />
 </main>
 

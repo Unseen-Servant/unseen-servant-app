@@ -10,6 +10,8 @@ def test_stats_empty_db(client):
     data = response.json()
     assert data["total_chunks"] == 0
     assert data["total_documents"] == 0
+    assert "storage_bytes" in data
+    assert isinstance(data["storage_bytes"], int)
 
 
 def test_stats_after_indexing(client, sample_pdf_path):

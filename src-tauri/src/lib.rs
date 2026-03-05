@@ -126,6 +126,14 @@ struct CollectionDeleteResult {
     message: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct StatsResult {
+    total_chunks: u32,
+    total_documents: u32,
+    collection_name: String,
+    storage_bytes: u64,
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — file system
 // ---------------------------------------------------------------------------
@@ -287,6 +295,23 @@ async fn get_known_game_systems() -> Result<KnownGameSystemsResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     let result: KnownGameSystemsResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_stats() -> Result<StatsResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/stats", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: StatsResult = response
         .json()
         .await
         .map_err(|e| format!("Invalid response from indexer: {}", e))?;
@@ -565,7 +590,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, check_sidecar_health, index_files, get_index_status, sync_index, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, get_game_systems, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

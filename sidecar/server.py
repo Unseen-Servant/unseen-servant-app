@@ -552,10 +552,16 @@ def create_app(collection=None, data_dir: Path | None = None):
                 len(set(m.get("filename") for m in results["metadatas"]))
                 if results["metadatas"] else 0
             )
+            storage_bytes = 0
+            if data_dir and data_dir.exists():
+                for dirpath, _dirnames, filenames in os.walk(data_dir):
+                    for f in filenames:
+                        storage_bytes += os.path.getsize(os.path.join(dirpath, f))
             return {
                 "total_chunks": count,
                 "total_documents": unique_sources,
-                "collection_name": collection.name
+                "collection_name": collection.name,
+                "storage_bytes": storage_bytes,
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
