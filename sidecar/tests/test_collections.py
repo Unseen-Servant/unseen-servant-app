@@ -171,6 +171,68 @@ def test_multiple_collections(client):
     assert "Campaign B" in data["collections"]
 
 
+def test_collections_persist_across_restart(test_collection, tmp_path):
+    """Collections created in one server session are available after restart."""
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    # Session 1: create a collection
+    app1 = create_app(collection=test_collection, data_dir=tmp_path)
+    client1 = TestClient(app1)
+
+    client1.post("/api/collections", json={
+        "name": "Curse of Strahd",
+        "file_paths": ["/books/cos.pdf", "/books/vgm.pdf"],
+        "description": "Barovia campaign prep",
+    })
+
+    # Session 2: fresh app, same data_dir
+    app2 = create_app(collection=test_collection, data_dir=tmp_path)
+    client2 = TestClient(app2)
+
+    data = client2.get("/api/collections").json()
+    assert data["count"] == 1
+    col = data["collections"]["Curse of Strahd"]
+    assert col["name"] == "Curse of Strahd"
+    assert col["file_count"] == 2
+    assert col["description"] == "Barovia campaign prep"
+    assert set(col["file_paths"]) == {"/books/cos.pdf", "/books/vgm.pdf"}
+    assert "created_at" in col
+
+
+def test_collections_loaded_from_preexisting_json(test_collection, tmp_path):
+    """A hand-written collections.json is loaded correctly by a fresh server."""
+    import json
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    collections_data = {
+        "version": 1,
+        "collections": {
+            "Session Zero": {
+                "name": "Session Zero",
+                "file_paths": ["/prep/setting.pdf", "/prep/npcs.pdf", "/prep/maps.pdf"],
+                "created_at": "2025-01-15T12:00:00+00:00",
+                "description": "World-building references",
+            }
+        },
+    }
+    (tmp_path / "collections.json").write_text(json.dumps(collections_data, indent=2))
+
+    app = create_app(collection=test_collection, data_dir=tmp_path)
+    client = TestClient(app)
+
+    data = client.get("/api/collections").json()
+    assert data["count"] == 1
+
+    col = data["collections"]["Session Zero"]
+    assert col["name"] == "Session Zero"
+    assert col["file_count"] == 3
+    assert col["description"] == "World-building references"
+    assert col["created_at"] == "2025-01-15T12:00:00+00:00"
+    assert "/prep/setting.pdf" in col["file_paths"]
+
+
 # ---------------------------------------------------------------------------
 # Search with collection filter
 # ---------------------------------------------------------------------------

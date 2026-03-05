@@ -461,6 +461,23 @@ fn get_mcp_config() -> Result<String, String> {
 // Sidecar lifecycle
 // ---------------------------------------------------------------------------
 
+fn wait_for_sidecar() {
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let addr = "127.0.0.1:8420";
+    let timeout = Duration::from_millis(200);
+
+    for attempt in 1..=50 {
+        if TcpStream::connect_timeout(&addr.parse().unwrap(), timeout).is_ok() {
+            println!("Sidecar ready after {} attempts", attempt);
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    eprintln!("Warning: Sidecar did not become ready within 5 seconds");
+}
+
 fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
     // Resolve paths relative to the project root
     let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
@@ -550,6 +567,7 @@ pub fn run() {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));
+                    wait_for_sidecar();
                 }
                 Err(e) => {
                     eprintln!("Warning: Could not start sidecar: {}", e);
