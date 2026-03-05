@@ -15,6 +15,7 @@
   let selectedFolder = '';
   let files: FileItem[] = [];
   let selectedPaths = new Set<string>;
+  let syncedPaths = new Set<string>;
   let error = '';
 
   // Game system tag editing
@@ -48,6 +49,7 @@
       }
       if (savedPaths) {
         selectedPaths = new Set(savedPaths);
+        syncedPaths = new Set(savedPaths);
         if (savedPaths.length > 0) {
           await refreshIndexStatus();
         }
@@ -108,8 +110,15 @@
       message: parts.join(', '),
       actionLabel: isSyncing ? 'Syncing...' : 'Sync Now',
       onAction: isSyncing ? undefined : handleSync,
+      onDismiss: revertToSyncedPaths,
       duration: null,
     });
+  }
+
+  async function revertToSyncedPaths() {
+    selectedPaths = new Set(syncedPaths);
+    await saveState();
+    await refreshIndexStatus();
   }
 
   function scheduleStatusRefresh() {
@@ -456,6 +465,7 @@
         : 'Nothing to sync.';
 
       // Persist synced selection so uncommitted changes don't survive a restart
+      syncedPaths = new Set(selectedPaths);
       const store = await load('settings.json');
       await store.set('syncedPaths', Array.from(selectedPaths));
       await store.save();

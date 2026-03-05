@@ -16,7 +16,7 @@
         {n.actionLabel}
       </button>
     {/if}
-    <button class="notification-dismiss" on:click={() => notification.dismiss()}>
+    <button class="notification-dismiss" on:click={() => { n.onDismiss?.(); notification.dismiss(); }}>
       &times;
     </button>
   </div>
