@@ -32,7 +32,6 @@ from mcp_server import (
     random_table,
     resource_sources,
     resource_source_content,
-    resource_stats,
     resource_game_systems,
     resource_collections,
     session_prep,
@@ -413,7 +412,7 @@ async def test_resource_source_content_not_found(mock_sidecar):
 
 
 # ---------------------------------------------------------------------------
-# resource_stats tests
+# resource_game_systems tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -426,28 +425,6 @@ async def test_resource_game_systems_returns_list(mock_sidecar):
     result = await resource_game_systems()
     assert "D&D 5E" in result
     assert "Dragonbane" in result
-
-
-@pytest.mark.asyncio
-async def test_resource_stats_returns_overview(mock_sidecar):
-    mock_sidecar.set_get("/api/stats", {
-        "total_chunks": 150,
-        "total_documents": 5,
-        "collection_name": "ttrpg_docs",
-    })
-
-    result = await resource_stats()
-    assert "150" in result
-    assert "5" in result
-    assert "ttrpg_docs" in result
-
-
-@pytest.mark.asyncio
-async def test_resource_stats_sidecar_down(mock_sidecar):
-    mock_sidecar.set_get("/api/stats", "Cannot connect to Unseen Servant app.")
-
-    result = await resource_stats()
-    assert "Cannot connect" in result
 
 
 # ---------------------------------------------------------------------------
