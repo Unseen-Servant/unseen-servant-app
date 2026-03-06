@@ -460,23 +460,6 @@ async def resource_collections() -> str:
     return "\n".join(lines)
 
 
-@mcp.resource("library://stats")
-async def resource_stats() -> str:
-    """Collection statistics for the indexed TTRPG library.
-
-    Returns total chunks, total documents, and collection name.
-    """
-    data = await sidecar.get("/api/stats")
-    if isinstance(data, str):
-        return data
-
-    return (
-        f"Library statistics:\n"
-        f"  Total documents: {data['total_documents']}\n"
-        f"  Total chunks: {data['total_chunks']}\n"
-        f"  Collection: {data['collection_name']}"
-    )
-
 
 # ---------------------------------------------------------------------------
 # Prompts
