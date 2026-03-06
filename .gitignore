@@ -18,3 +18,9 @@ __pycache__
 *.pyc
 chroma_db
 .pytest_cache
+sidecar/dist/
+sidecar/build/
+*.spec
+
+# Bundled sidecar binaries (built by scripts/build-sidecar.sh)
+src-tauri/binaries/

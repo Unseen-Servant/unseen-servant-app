@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Python dependencies and PyInstaller
+        run: |
+          cd sidecar
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build sidecar binaries
+        run: |
+          cd sidecar
+          source .venv/bin/activate
+          pyinstaller --onefile --name unseen-sidecar server.py \
+            --collect-all chromadb \
+            --hidden-import uvicorn.logging \
+            --hidden-import uvicorn.protocols.http \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.http.h11_impl \
+            --hidden-import uvicorn.protocols.http.httptools_impl \
+            --hidden-import uvicorn.protocols.websockets \
+            --hidden-import uvicorn.protocols.websockets.auto \
+            --hidden-import uvicorn.protocols.websockets.wsproto_impl \
+            --hidden-import uvicorn.protocols.websockets.websockets_impl \
+            --hidden-import uvicorn.lifespan \
+            --hidden-import uvicorn.lifespan.on \
+            --hidden-import uvicorn.lifespan.off \
+            --noconfirm --clean
+          pyinstaller --onefile --name unseen-mcp mcp_server.py \
+            --hidden-import mcp.server.fastmcp \
+            --noconfirm --clean
+
+      - name: Place sidecar binaries for Tauri
+        run: |
+          TRIPLE=$(rustc -vV | grep host | cut -d' ' -f2)
+          mkdir -p src-tauri/binaries
+          cp sidecar/dist/unseen-sidecar "src-tauri/binaries/unseen-sidecar-${TRIPLE}"
+          cp sidecar/dist/unseen-mcp "src-tauri/binaries/unseen-mcp-${TRIPLE}"
+
+      - name: Build Tauri app
+        run: npm run tauri build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+          generate_release_notes: true
+          draft: true

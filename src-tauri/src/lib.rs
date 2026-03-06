@@ -526,34 +526,50 @@ async fn delete_collection(name: String) -> Result<CollectionDeleteResult, Strin
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn get_mcp_config() -> Result<String, String> {
-    let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
+fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let (command, args) = if cfg!(debug_assertions) {
+        // Dev mode: use source-tree Python
+        let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
 
-    let mcp_server_py = sidecar_dir
-        .join("mcp_server.py")
-        .canonicalize()
-        .map_err(|e| format!("Cannot find mcp_server.py: {}", e))?;
-
-    let venv_python = sidecar_dir.join(".venv/bin/python3");
-    let python_path = if venv_python.exists() {
-        venv_python
+        let mcp_server_py = sidecar_dir
+            .join("mcp_server.py")
             .canonicalize()
-            .map_err(|e| format!("Cannot resolve Python path: {}", e))?
+            .map_err(|e| format!("Cannot find mcp_server.py: {}", e))?
             .to_string_lossy()
-            .into_owned()
+            .into_owned();
+
+        let venv_python = sidecar_dir.join(".venv/bin/python3");
+        let python_path = if venv_python.exists() {
+            venv_python
+                .canonicalize()
+                .map_err(|e| format!("Cannot resolve Python path: {}", e))?
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            "python3".to_string()
+        };
+
+        (python_path, vec![mcp_server_py, "--sidecar-url".to_string(), SIDECAR_URL.to_string()])
     } else {
-        "python3".to_string()
+        // Production: use bundled binary
+        let resource_dir = app_handle
+            .path()
+            .resource_dir()
+            .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
+        let binary = resource_dir
+            .join("binaries")
+            .join("unseen-mcp")
+            .to_string_lossy()
+            .into_owned();
+
+        (binary, vec!["--sidecar-url".to_string(), SIDECAR_URL.to_string()])
     };
 
     let config = serde_json::json!({
         "mcpServers": {
             "unseen-servant": {
-                "command": python_path,
-                "args": [
-                    mcp_server_py.to_string_lossy(),
-                    "--sidecar-url",
-                    SIDECAR_URL,
-                ]
+                "command": command,
+                "args": args,
             }
         }
     });
@@ -583,31 +599,47 @@ fn wait_for_sidecar() {
     eprintln!("Warning: Sidecar did not become ready within 5 seconds");
 }
 
-fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
-    // Resolve paths relative to the project root
-    let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
-    let server_py = sidecar_dir.join("server.py");
+fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child, String> {
+    let (program, base_args): (std::path::PathBuf, Vec<String>) = if cfg!(debug_assertions) {
+        // Dev mode: use source-tree Python
+        let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
+        let server_py = sidecar_dir.join("server.py");
 
-    if !server_py.exists() {
-        return Err(format!("Sidecar not found at: {}", server_py.display()));
-    }
+        if !server_py.exists() {
+            return Err(format!("Sidecar not found at: {}", server_py.display()));
+        }
 
-    // Look for a .venv inside the sidecar directory first, fall back to system python3
-    let venv_python = sidecar_dir.join(".venv/bin/python3");
-    let python = if venv_python.exists() {
-        venv_python
+        let venv_python = sidecar_dir.join(".venv/bin/python3");
+        let python = if venv_python.exists() {
+            venv_python
+        } else {
+            std::path::PathBuf::from("python3")
+        };
+
+        (python, vec![server_py.to_string_lossy().into_owned()])
     } else {
-        std::path::PathBuf::from("python3")
+        // Production: use bundled binary
+        let resource_dir = app_handle
+            .path()
+            .resource_dir()
+            .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
+        let binary = resource_dir.join("binaries").join("unseen-sidecar");
+
+        if !binary.exists() {
+            return Err(format!("Bundled sidecar not found at: {}", binary.display()));
+        }
+
+        (binary, vec![])
     };
 
-    let child = Command::new(&python)
-        .arg(&server_py)
+    let child = Command::new(&program)
+        .args(&base_args)
         .arg("--port")
         .arg("8420")
         .arg("--data-dir")
         .arg(data_dir.to_string_lossy().as_ref())
         .spawn()
-        .map_err(|e| format!("Failed to start sidecar with {}: {}", python.display(), e))?;
+        .map_err(|e| format!("Failed to start sidecar with {}: {}", program.display(), e))?;
 
     Ok(child)
 }
@@ -668,7 +700,7 @@ pub fn run() {
             let chroma_dir = app_data_dir.join("chroma_db");
 
             // Start the Python sidecar
-            match start_sidecar(&chroma_dir) {
+            match start_sidecar(app.handle(), &chroma_dir) {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));

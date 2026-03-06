@@ -9,6 +9,25 @@ you can ask a question during a session and get an answer instantly.
 
 ---
 
+## Installation (End Users)
+
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Unseen-Servant/unseen-server/releases)
+2. Drag **Unseen Server** to your Applications folder
+3. Install [Ollama](https://ollama.com) and pull the embedding model:
+
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+
+4. Launch Unseen Server
+   - **First launch:** Right-click the app → Open (to bypass macOS Gatekeeper for unsigned apps)
+   - The app runs in the menu bar — click the tray icon to show the window
+
+> **Note:** Ollama must be running for indexing and search to work. The app will still launch and
+> let you browse files without it.
+
+---
+
 ## Philosophy
 
 Most TTRPG GMs have enormous digital libraries — hundreds of PDFs scattered across folders, from
@@ -212,11 +231,15 @@ npm run tauri dev
 ## Building for Production
 
 ```bash
+# 1. Build the Python sidecar into standalone binaries
+chmod +x scripts/build-sidecar.sh
+./scripts/build-sidecar.sh
+
+# 2. Build the Tauri app (includes the sidecar binaries in the bundle)
 npm run tauri build
 ```
 
-This compiles the SvelteKit frontend, bundles it into the Rust binary, and produces a native
-installer in `src-tauri/target/release/bundle/`.
+The `.dmg` (macOS) is output to `src-tauri/target/release/bundle/dmg/`.
 
 ---
 
