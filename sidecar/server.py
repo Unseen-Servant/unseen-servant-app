@@ -291,6 +291,26 @@ def prepare_pdf(
         return [], "unknown", f"{pdf_path.name}: {str(e)}"
 
 
+def compact_sqlite(data_dir: Path) -> int:
+    """Run VACUUM on the ChromaDB SQLite database to reclaim disk space.
+
+    Returns bytes reclaimed, or 0 if compaction was skipped.
+    """
+    if not data_dir:
+        return 0
+    sqlite_path = data_dir / "chroma.sqlite3"
+    if not sqlite_path.exists():
+        return 0
+
+    import sqlite3
+
+    size_before = os.path.getsize(sqlite_path)
+    conn = sqlite3.connect(str(sqlite_path))
+    conn.execute("VACUUM")
+    conn.close()
+    return size_before - os.path.getsize(sqlite_path)
+
+
 def delete_source_chunks(filename: str, collection) -> int:
     """Delete all chunks for a given filename from ChromaDB.
 
@@ -564,6 +584,9 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         save_manifest(data_dir, manifest)
 
+        if removed > 0 or updated > 0:
+            compact_sqlite(data_dir)
+
         return {
             "added": added,
             "removed": removed,
@@ -709,6 +732,9 @@ def create_app(collection=None, data_dir: Path | None = None):
 
             save_manifest(data_dir, manifest)
 
+            if removed > 0 or updated > 0:
+                compact_sqlite(data_dir)
+
             yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total})}\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
@@ -751,18 +777,13 @@ def create_app(collection=None, data_dir: Path | None = None):
                 status_code=404, detail="Database file not found"
             )
 
-        import sqlite3
-
         size_before = os.path.getsize(sqlite_path)
-        conn = sqlite3.connect(str(sqlite_path))
-        conn.execute("VACUUM")
-        conn.close()
-        size_after = os.path.getsize(sqlite_path)
+        reclaimed = compact_sqlite(data_dir)
 
         return {
             "size_before": size_before,
-            "size_after": size_after,
-            "reclaimed": size_before - size_after,
+            "size_after": size_before - reclaimed,
+            "reclaimed": reclaimed,
         }
 
     @app.get("/api/sources")
@@ -869,6 +890,8 @@ def create_app(collection=None, data_dir: Path | None = None):
 
             if not deleted:
                 raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
+
+            compact_sqlite(data_dir)
 
             return {"message": f"Deleted {deleted} chunks from {filename}"}
         except HTTPException:
