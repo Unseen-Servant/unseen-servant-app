@@ -296,11 +296,8 @@ def delete_source_chunks(filename: str, collection) -> int:
 
     Returns the number of deleted chunks, or 0 if not found.
     """
-    results = collection.get(include=["metadatas"])
-    ids_to_delete = [
-        id for id, metadata in zip(results["ids"], results["metadatas"])
-        if metadata.get("filename") == filename
-    ]
+    results = collection.get(where={"filename": filename}, include=[])
+    ids_to_delete = results["ids"]
 
     if ids_to_delete:
         collection.delete(ids=ids_to_delete)
@@ -542,8 +539,9 @@ def create_app(collection=None, data_dir: Path | None = None):
                     game_system=detected_system,
                 )
 
-        # Phase 3: Re-index modified files
+        # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
         for entry in diff["to_update"]:
+            delete_source_chunks(entry["filename"], collection)
             pdf_path = Path(entry["path"])
             override = (
                 request.game_system_overrides.get(entry["path"])
@@ -660,8 +658,9 @@ def create_app(collection=None, data_dir: Path | None = None):
                     )
                     yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
 
-            # Phase 3: Re-index modified files
+            # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
             for entry in diff["to_update"]:
+                delete_source_chunks(entry["filename"], collection)
                 pdf_path = Path(entry["path"])
                 override = (
                     request.game_system_overrides.get(entry["path"])
@@ -737,6 +736,34 @@ def create_app(collection=None, data_dir: Path | None = None):
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/compact")
+    async def compact_database():
+        """Compact the ChromaDB database to reclaim disk space."""
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        sqlite_path = data_dir / "chroma.sqlite3"
+        if not sqlite_path.exists():
+            raise HTTPException(
+                status_code=404, detail="Database file not found"
+            )
+
+        import sqlite3
+
+        size_before = os.path.getsize(sqlite_path)
+        conn = sqlite3.connect(str(sqlite_path))
+        conn.execute("VACUUM")
+        conn.close()
+        size_after = os.path.getsize(sqlite_path)
+
+        return {
+            "size_before": size_before,
+            "size_after": size_after,
+            "reclaimed": size_before - size_after,
+        }
 
     @app.get("/api/sources")
     async def get_sources():

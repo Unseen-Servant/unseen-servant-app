@@ -299,6 +299,57 @@ def test_sync_with_game_system_override(
     assert entry["game_system"] == "Call of Cthulhu"
 
 
+def test_sync_update_with_fewer_chunks_removes_orphans(
+    client, test_collection, tmp_path
+):
+    """Re-indexing a file that now produces fewer chunks should not leave orphans."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    # Create a PDF with lots of text (many chunks)
+    pdf_path = tmp_path / "shrinking_book.pdf"
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    long_text = "The adventurer explores the dungeon corridors. " * 100
+    y = 750
+    for i in range(0, len(long_text), 80):
+        c.drawString(72, y, long_text[i:i + 80])
+        y -= 12
+        if y < 72:
+            c.showPage()
+            y = 750
+    c.save()
+
+    # Index it
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(pdf_path)]
+    })
+    count_before = test_collection.count()
+    assert count_before > 2  # Should have multiple chunks
+
+    # Rewrite the PDF with much less text (fewer chunks)
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    c.drawString(72, 750, "Short book now.")
+    c.save()
+
+    # Force mtime mismatch so sync detects a modification
+    manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
+    manifest_raw["files"][str(pdf_path)]["mtime"] = 1.0
+    (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(manifest_raw))
+
+    # Sync again — should re-index with fewer chunks
+    response = client.post("/api/sync-index", json={
+        "selected_paths": [str(pdf_path)]
+    })
+    data = response.json()
+    assert data["updated"] == 1
+
+    # The key assertion: collection count should match the new (smaller) chunk count,
+    # not retain orphaned chunks from the old version
+    count_after = test_collection.count()
+    assert count_after < count_before
+    assert count_after == 1  # "Short book now." = 1 chunk
+
+
 def test_manifest_backward_compat_missing_game_system(tmp_path):
     """Old manifests without game_system should load with 'unknown' default."""
     old_manifest = {
