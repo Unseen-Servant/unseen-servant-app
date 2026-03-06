@@ -533,9 +533,8 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
             .path()
             .resource_dir()
             .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
-        let binary = resource_dir
-            .join("binaries")
-            .join("unseen-mcp")
+        let binaries_dir = resource_dir.join("binaries");
+        let binary = find_bundled_binary(&binaries_dir, "unseen-mcp")?
             .to_string_lossy()
             .into_owned();
 
@@ -556,6 +555,34 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Bundled binary resolution
+// ---------------------------------------------------------------------------
+
+/// Find a bundled binary by name, accounting for target-triple suffix.
+/// Looks for `{name}` first, then `{name}-*` in the given directory.
+fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, String> {
+    // Try exact name first
+    let exact = dir.join(name);
+    if exact.exists() {
+        return Ok(exact);
+    }
+
+    // Look for target-triple suffixed variant (e.g., unseen-sidecar-aarch64-apple-darwin)
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        let prefix = format!("{}-", name);
+        for entry in entries.flatten() {
+            if let Some(fname) = entry.file_name().to_str() {
+                if fname.starts_with(&prefix) {
+                    return Ok(entry.path());
+                }
+            }
+        }
+    }
+
+    Err(format!("Bundled binary '{}' not found in {}", name, dir.display()))
+}
+
+// ---------------------------------------------------------------------------
 // Sidecar lifecycle
 // ---------------------------------------------------------------------------
 
@@ -566,14 +593,17 @@ fn wait_for_sidecar() {
     let addr = "127.0.0.1:8420";
     let timeout = Duration::from_millis(200);
 
-    for attempt in 1..=50 {
+    // PyInstaller --onefile binaries need extra time to extract on first run
+    let max_attempts: u32 = if cfg!(debug_assertions) { 50 } else { 150 };
+
+    for attempt in 1..=max_attempts {
         if TcpStream::connect_timeout(&addr.parse().unwrap(), timeout).is_ok() {
             println!("Sidecar ready after {} attempts", attempt);
             return;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    eprintln!("Warning: Sidecar did not become ready within 5 seconds");
+    eprintln!("Warning: Sidecar did not become ready within timeout");
 }
 
 fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child, String> {
@@ -600,10 +630,21 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
             .path()
             .resource_dir()
             .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
-        let binary = resource_dir.join("binaries").join("unseen-sidecar");
+        let binaries_dir = resource_dir.join("binaries");
 
-        if !binary.exists() {
-            return Err(format!("Bundled sidecar not found at: {}", binary.display()));
+        // Find the sidecar binary (may have target-triple suffix)
+        let binary = find_bundled_binary(&binaries_dir, "unseen-sidecar")?;
+
+        // Ensure the binary is executable (Tauri resources may lose the execute bit)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary)
+                .map_err(|e| format!("Failed to read binary metadata: {}", e))?
+                .permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary, perms)
+                .map_err(|e| format!("Failed to set binary permissions: {}", e))?;
         }
 
         (binary, vec![])
