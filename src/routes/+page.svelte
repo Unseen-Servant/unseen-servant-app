@@ -279,7 +279,7 @@
   // Count distinct game systems among indexed files
   $: gameSystemCount = indexStatus
     ? new Set(
-        indexStatus.up_to_date
+        [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]
           .map(e => e.game_system)
           .filter(s => s && s !== 'unknown')
       ).size
@@ -623,7 +623,7 @@
     {selectedFolder}
     {sidecarConnected}
     selectedCount={selectedPaths.size}
-    indexedCount={indexStatus?.summary?.up_to_date ?? 0}
+    indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
     {storageBytes}
   />
