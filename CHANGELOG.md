@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [1.0.0] - Unreleased
 
 ### Added
+
 - Folder browser with recursive PDF tree, lazy loading, and persistent selection
 - PDF indexing via ChromaDB with Ollama local embeddings (nomic-embed-text)
 - Semantic search across indexed PDF library
