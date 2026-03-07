@@ -1,5 +1,5 @@
 """
-Shared test fixtures for the Unseen Servant sidecar.
+Shared test fixtures for the Legend Lore sidecar.
 
 Key concepts:
 - Fixtures are reusable test setup that pytest injects automatically.

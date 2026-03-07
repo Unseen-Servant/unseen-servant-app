@@ -1,9 +1,9 @@
-# Unseen Servant
+# Legend Lore
 
 > A desktop app for TTRPG Game Masters to browse, index, and search their PDF collection using AI
 > when prepping or running a game.
 
-Named after the classic D&D spell, **Unseen Servant** does the behind-the-scenes work so you can
+Named after the classic D&D spell, **Legend Lore** does the behind-the-scenes work so you can
 focus on running your game — silently indexing your rulebooks, supplements, and homebrew PDFs so
 you can ask a question during a session and get an answer instantly.
 
@@ -11,15 +11,15 @@ you can ask a question during a session and get an answer instantly.
 
 ## Installation (End Users)
 
-1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Unseen-Servant/unseen-server/releases)
-2. Drag **Unseen Server** to your Applications folder
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Unseen-Servant/unseen-legend-lore/releases)
+2. Drag **Legend Lore** to your Applications folder
 3. Install [Ollama](https://ollama.com) and pull the embedding model:
 
    ```bash
    ollama pull nomic-embed-text
    ```
 
-4. Launch Unseen Server
+4. Launch Legend Lore
    - **First launch:** Right-click the app → Open (to bypass macOS Gatekeeper for unsigned apps)
    - The app runs in the menu bar — click the tray icon to show the window
 
@@ -35,7 +35,7 @@ core rulebooks to obscure third-party supplements. Finding a specific rule, crea
 or random table during a live session often means interrupting the game to dig through files
 manually.
 
-Unseen Servant is built around three ideas:
+Legend Lore is built around three ideas:
 
 1. **Your collection, your machine.** Everything runs locally. Your PDFs are never uploaded
    anywhere. The app talks to an AI assistant via MCP (Model Context Protocol), but your files
@@ -120,10 +120,10 @@ machine. Paste it into your Claude Desktop config file.
 ```json
 {
   "mcpServers": {
-    "unseen-servant": {
+    "legend-lore": {
       "command": "/full/path/to/sidecar/.venv/bin/python3",
       "args": [
-        "/full/path/to/unseen-server/sidecar/mcp_server.py",
+        "/full/path/to/legend-lore/sidecar/mcp_server.py",
         "--sidecar-url", "http://localhost:8420"
       ]
     }
@@ -199,8 +199,8 @@ See the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/) for 
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Unseen-Servant/unseen-server.git
-cd unseen-server
+git clone https://github.com/Unseen-Servant/unseen-legend-lore.git
+cd legend-lore
 
 # 2. Install frontend dependencies
 npm install
@@ -265,7 +265,7 @@ python -m pytest tests/ -v             # Run all 39 tests (no Ollama needed)
 ## Project Structure
 
 ```text
-unseen-server/
+legend-lore/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
 │   │   ├── +page.svelte        # Main UI: folder picker, file tree, indexing

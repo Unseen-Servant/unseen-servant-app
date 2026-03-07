@@ -534,7 +534,7 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
             .resource_dir()
             .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
         let binaries_dir = resource_dir.join("binaries");
-        let binary = find_bundled_binary(&binaries_dir, "unseen-mcp")?
+        let binary = find_bundled_binary(&binaries_dir, "legend-lore-mcp")?
             .to_string_lossy()
             .into_owned();
 
@@ -543,7 +543,7 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
 
     let config = serde_json::json!({
         "mcpServers": {
-            "unseen-servant": {
+            "legend-lore": {
                 "command": command,
                 "args": args,
             }
@@ -567,7 +567,7 @@ fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, Str
         return Ok(exact);
     }
 
-    // Look for target-triple suffixed variant (e.g., unseen-sidecar-aarch64-apple-darwin)
+    // Look for target-triple suffixed variant (e.g., legend-lore-sidecar-aarch64-apple-darwin)
     if let Ok(entries) = std::fs::read_dir(dir) {
         let prefix = format!("{}-", name);
         for entry in entries.flatten() {
@@ -633,7 +633,7 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
         let binaries_dir = resource_dir.join("binaries");
 
         // Find the sidecar binary (may have target-triple suffix)
-        let binary = find_bundled_binary(&binaries_dir, "unseen-sidecar")?;
+        let binary = find_bundled_binary(&binaries_dir, "legend-lore-sidecar")?;
 
         // Ensure the binary is executable (Tauri resources may lose the execute bit)
         #[cfg(unix)]
@@ -741,7 +741,7 @@ pub fn run() {
             TrayIconBuilder::new()
                 .icon(tauri::include_image!("icons/tray-icon.png"))
                 .icon_as_template(true)
-                .tooltip("Unseen Server")
+                .tooltip("Legend Lore")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {

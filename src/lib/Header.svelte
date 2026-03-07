@@ -6,7 +6,7 @@
 
 <header class="header">
   <div class="header-left">
-    <span class="app-title">Unseen Server</span>
+    <span class="app-title">Legend Lore</span>
   </div>
 
   <div class="header-center"></div>

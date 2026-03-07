@@ -25,8 +25,8 @@ source .venv/bin/activate
 # Ensure PyInstaller is available
 pip install --quiet pyinstaller
 
-echo "==> Building unseen-sidecar (FastAPI server)..."
-pyinstaller --onefile --name unseen-sidecar server.py \
+echo "==> Building legend-lore-sidecar (FastAPI server)..."
+pyinstaller --onefile --name legend-lore-sidecar server.py \
   --collect-all chromadb \
   --hidden-import uvicorn.logging \
   --hidden-import uvicorn.protocols.http \
@@ -42,15 +42,15 @@ pyinstaller --onefile --name unseen-sidecar server.py \
   --hidden-import uvicorn.lifespan.off \
   --noconfirm --clean
 
-echo "==> Building unseen-mcp (MCP server)..."
-pyinstaller --onefile --name unseen-mcp mcp_server.py \
+echo "==> Building legend-lore-mcp (MCP server)..."
+pyinstaller --onefile --name legend-lore-mcp mcp_server.py \
   --hidden-import mcp.server.fastmcp \
   --noconfirm --clean
 
 echo "==> Placing binaries in src-tauri/binaries/..."
 mkdir -p "$BINARIES_DIR"
-cp "$SIDECAR_DIR/dist/unseen-sidecar" "$BINARIES_DIR/unseen-sidecar-$TARGET_TRIPLE"
-cp "$SIDECAR_DIR/dist/unseen-mcp" "$BINARIES_DIR/unseen-mcp-$TARGET_TRIPLE"
+cp "$SIDECAR_DIR/dist/legend-lore-sidecar" "$BINARIES_DIR/legend-lore-sidecar-$TARGET_TRIPLE"
+cp "$SIDECAR_DIR/dist/legend-lore-mcp" "$BINARIES_DIR/legend-lore-mcp-$TARGET_TRIPLE"
 
 echo "==> Done! Binaries placed at:"
 ls -lh "$BINARIES_DIR/"

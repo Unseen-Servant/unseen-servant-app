@@ -10,7 +10,7 @@ fn main() {
     let target_triple = std::env::var("TAURI_ENV_TARGET_TRIPLE")
         .unwrap_or_else(|_| "aarch64-apple-darwin".to_string());
 
-    for name in &["unseen-sidecar", "unseen-mcp"] {
+    for name in &["legend-lore-sidecar", "legend-lore-mcp"] {
         let path = binaries_dir.join(format!("{}-{}", name, target_triple));
         if !path.exists() {
             std::fs::write(&path, "").ok();

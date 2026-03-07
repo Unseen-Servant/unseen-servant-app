@@ -45,7 +45,7 @@ jobs:
         run: |
           cd sidecar
           source .venv/bin/activate
-          pyinstaller --onefile --name unseen-sidecar server.py \
+          pyinstaller --onefile --name legend-lore-sidecar server.py \
             --collect-all chromadb \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.protocols.http \
@@ -60,7 +60,7 @@ jobs:
             --hidden-import uvicorn.lifespan.on \
             --hidden-import uvicorn.lifespan.off \
             --noconfirm --clean
-          pyinstaller --onefile --name unseen-mcp mcp_server.py \
+          pyinstaller --onefile --name legend-lore-mcp mcp_server.py \
             --hidden-import mcp.server.fastmcp \
             --noconfirm --clean
 
@@ -68,8 +68,8 @@ jobs:
         run: |
           TRIPLE=$(rustc -vV | grep host | cut -d' ' -f2)
           mkdir -p src-tauri/binaries
-          cp sidecar/dist/unseen-sidecar "src-tauri/binaries/unseen-sidecar-${TRIPLE}"
-          cp sidecar/dist/unseen-mcp "src-tauri/binaries/unseen-mcp-${TRIPLE}"
+          cp sidecar/dist/legend-lore-sidecar "src-tauri/binaries/legend-lore-sidecar-${TRIPLE}"
+          cp sidecar/dist/legend-lore-mcp "src-tauri/binaries/legend-lore-mcp-${TRIPLE}"
 
       - name: Build Tauri app
         run: npm run tauri build

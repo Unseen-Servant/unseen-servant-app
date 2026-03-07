@@ -1,5 +1,5 @@
 """
-Unseen Servant — MCP server for TTRPG PDF library.
+Legend Lore — MCP server for TTRPG PDF library.
 
 This is a separate process from the FastAPI sidecar. Claude Desktop
 launches it via stdio, and it calls the sidecar's HTTP API to fulfill
@@ -26,7 +26,7 @@ from mcp.server.fastmcp.prompts.base import UserMessage
 # ---------------------------------------------------------------------------
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Unseen Servant MCP server")
+    parser = argparse.ArgumentParser(description="Legend Lore MCP server")
     parser.add_argument(
         "--sidecar-url",
         type=str,
@@ -58,7 +58,7 @@ class SidecarClient:
                 resp.raise_for_status()
                 return resp.json()
         except httpx.ConnectError:
-            return f"Cannot connect to Unseen Servant app. Make sure the desktop app is running (sidecar at {self.base_url})."
+            return f"Cannot connect to Legend Lore app. Make sure the desktop app is running (sidecar at {self.base_url})."
         except httpx.HTTPStatusError as e:
             return f"Sidecar error: {e.response.status_code} — {e.response.text}"
 
@@ -69,7 +69,7 @@ class SidecarClient:
                 resp.raise_for_status()
                 return resp.json()
         except httpx.ConnectError:
-            return f"Cannot connect to Unseen Servant app. Make sure the desktop app is running (sidecar at {self.base_url})."
+            return f"Cannot connect to Legend Lore app. Make sure the desktop app is running (sidecar at {self.base_url})."
         except httpx.HTTPStatusError as e:
             return f"Sidecar error: {e.response.status_code} — {e.response.text}"
 
@@ -82,7 +82,7 @@ args = parse_args()
 sidecar = SidecarClient(args.sidecar_url)
 
 mcp = FastMCP(
-    name="Unseen Servant",
+    name="Legend Lore",
     instructions=(
         "You have access to the user's indexed TTRPG PDF library. "
         "Use the search and retrieval tools to find rules, lore, "
@@ -111,7 +111,7 @@ async def list_collections() -> str:
 
     collections = data.get("collections", {})
     if not collections:
-        return "No collections defined yet. Create one in the Unseen Servant desktop app."
+        return "No collections defined yet. Create one in the Legend Lore desktop app."
 
     lines = [f"Collections ({data['count']}):\n"]
     for name, c in collections.items():
@@ -228,7 +228,7 @@ async def list_sources() -> str:
 
     sources = data.get("sources", [])
     if not sources:
-        return "No documents indexed yet. Open the Unseen Servant app and index some PDFs first."
+        return "No documents indexed yet. Open the Legend Lore app and index some PDFs first."
 
     lines = [f"Indexed library: {data['count']} document(s)\n"]
     for s in sources:
@@ -687,7 +687,7 @@ def check_sidecar_health(url: str) -> None:
     except (httpx.ConnectError, httpx.TimeoutException):
         print(
             f"Warning: Sidecar not reachable at {url}. "
-            f"Make sure the Unseen Servant app is running.",
+            f"Make sure the Legend Lore app is running.",
             file=sys.stderr,
         )
 

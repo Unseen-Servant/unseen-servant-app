@@ -128,7 +128,7 @@ async def test_search_library_no_results(mock_sidecar):
 
 @pytest.mark.asyncio
 async def test_search_library_sidecar_down(mock_sidecar):
-    mock_sidecar.set_post("/api/search", "Cannot connect to Unseen Servant app.")
+    mock_sidecar.set_post("/api/search", "Cannot connect to Legend Lore app.")
 
     result = await search_library("anything")
     assert "Cannot connect" in result
@@ -376,7 +376,7 @@ async def test_resource_sources_empty(mock_sidecar):
 
 @pytest.mark.asyncio
 async def test_resource_sources_sidecar_down(mock_sidecar):
-    mock_sidecar.set_get("/api/sources", "Cannot connect to Unseen Servant app.")
+    mock_sidecar.set_get("/api/sources", "Cannot connect to Legend Lore app.")
 
     result = await resource_sources()
     assert "Cannot connect" in result

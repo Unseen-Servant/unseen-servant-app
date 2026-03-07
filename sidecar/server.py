@@ -1,5 +1,5 @@
 """
-Unseen Servant — ChromaDB indexing sidecar.
+Legend Lore — ChromaDB indexing sidecar.
 
 Started automatically by the Tauri desktop app.
 Provides HTTP endpoints for indexing PDFs and searching indexed content.
@@ -33,7 +33,7 @@ import uvicorn
 # ---------------------------------------------------------------------------
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Unseen Servant indexing sidecar")
+    parser = argparse.ArgumentParser(description="Legend Lore indexing sidecar")
     parser.add_argument("--port", type=int, default=8420, help="HTTP port")
     parser.add_argument("--data-dir", type=str, default=None,
                         help="Directory for ChromaDB storage (default: ./chroma_db)")
@@ -428,7 +428,7 @@ def create_app(collection=None, data_dir: Path | None = None):
             embedding_function=ollama_ef
         )
 
-    app = FastAPI(title="Unseen Servant Sidecar")
+    app = FastAPI(title="Legend Lore Sidecar")
 
     app.add_middleware(
         CORSMiddleware,
