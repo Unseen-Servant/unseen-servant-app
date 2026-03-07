@@ -1,6 +1,6 @@
 {
   "name": "legend-lore",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Local MCP for TTRPG session prep",
   "type": "module",
   "scripts": {
