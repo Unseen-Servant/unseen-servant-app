@@ -61,26 +61,34 @@ Legend Lore is built around three ideas:
 - **Persistent Selections** — Folder and file selections are saved across sessions
 - **PDF Indexing** — Index selected PDFs into ChromaDB for semantic search via a Python sidecar
   (uses Ollama embeddings locally)
+- **Index Sync** — Detects added, removed, and updated PDFs and syncs the index with real-time
+  progress streaming
 - **Double-click to Open** — Double-click any file in the tree to open it in your system's
   default viewer
 - **Game System Tagging** — Tag indexed files with their game system (D&D 5e, Pathfinder, etc.)
   via clickable badges in the file tree
 - **Copy MCP Config** — One-click button to copy the Claude Desktop MCP configuration to your
   clipboard
+- **System Tray** — Runs in the menu bar with close-to-tray behavior
+- **Status Bar** — Sidecar health indicator, game systems count, and storage size at a glance
+- **Notifications** — Ephemeral banners for sync progress and MCP feedback
+- **Dark Theme** — "Old book" aesthetic with serif fonts
 
 ### Roadmap
 
-| Status | Feature                                           |
-|--------|---------------------------------------------------|
-| ✅     | Select TTRPG folder, display path                 |
-| ✅     | List files in folder                              |
-| ✅     | Recursive tree structure with expand/collapse     |
-| ✅     | Checkbox selection (individual + recursive)       |
-| ✅     | Persist folder selections across sessions         |
-| ✅     | ChromaDB integration — index PDFs semantically    |
-| ✅     | Game system tagging for indexed files             |
-| 🔜     | Search UI — query indexed content during sessions |
-| ✅     | Claude AI via MCP — answer questions from library |
+| Status | Feature                                                     |
+|--------|-------------------------------------------------------------|
+| ✅     | Folder browser with recursive tree and checkbox selection   |
+| ✅     | Persistent folder and file selections across sessions       |
+| ✅     | ChromaDB integration — index and sync PDFs semantically     |
+| ✅     | Game system tagging for indexed files                       |
+| ✅     | Claude AI via MCP — answer questions from library           |
+| ✅     | System tray, status bar, and notification banners           |
+| 🔜     | Search UI — query indexed content during sessions           |
+| 🔜     | Better collections — improved display and filtering         |
+| 🔜     | Intuitive navigation — toolbar controls and view toggles    |
+| 🔜     | Collection-scoped MCP — lock tools to a specific collection |
+| 🔜     | Dynamic game system tagging                                 |
 
 ---
 
@@ -358,6 +366,12 @@ Tauri app launches
         ↓
   Tauri app closes → kills sidecar process
 ```
+
+---
+
+## License
+
+Legend Lore is proprietary software. See [LICENSE](LICENSE) for details.
 
 ---
 
