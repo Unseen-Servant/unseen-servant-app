@@ -10,6 +10,7 @@
   import Header from '../lib/Header.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import NotificationBanner from '../lib/NotificationBanner.svelte';
+  import LicenseModal from '../lib/LicenseModal.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
 
@@ -42,6 +43,7 @@
 
   // Sidecar health
   let sidecarConnected = false;
+  let showLicense = false;
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
   onMount(async () => {
@@ -626,8 +628,11 @@
     indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
     {storageBytes}
+    onShowLicense={() => { showLicense = true; }}
   />
 </main>
+
+<LicenseModal visible={showLicense} onClose={() => { showLicense = false; }} />
 
 <style>
   .app-layout {

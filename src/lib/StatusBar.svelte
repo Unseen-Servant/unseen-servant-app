@@ -5,6 +5,7 @@
   export let indexedCount: number;
   export let gameSystemCount: number;
   export let storageBytes: number;
+  export let onShowLicense: () => void;
 
   function formatSize(bytes: number): string {
     if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
@@ -36,7 +37,9 @@
   <div class="statusbar-right">
     {#if selectedFolder}
       <span class="folder-path" title={selectedFolder}>{selectedFolder}</span>
+      <span class="separator">&middot;</span>
     {/if}
+    <button class="license-link" on:click={onShowLicense}>License</button>
   </div>
 </footer>
 
@@ -63,6 +66,7 @@
   .statusbar-right {
     display: flex;
     align-items: center;
+    gap: 0.4rem;
     min-width: 0;
   }
 
@@ -79,6 +83,20 @@
 
   .separator {
     opacity: 0.5;
+  }
+
+  .license-link {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+  .license-link:hover {
+    color: var(--text-accent);
   }
 
   .folder-path {

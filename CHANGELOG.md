@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.1] - 2026-03-07
+
+### Added
+
+- License viewer accessible from the status bar
+- LICENSE file bundled in the app distribution
+
+### Fixed
+
+- Corrected package.json license field from MIT to proprietary
+
 ## [1.0.0] - Unreleased
 
 ### Added
