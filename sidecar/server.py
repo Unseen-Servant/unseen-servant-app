@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import random
 import signal
 import threading
 import time
@@ -790,8 +791,9 @@ def create_app(collection=None, data_dir: Path | None = None):
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
             else:
-                batch_size = 100
-                for batch_idx in range(0, len(chunks), batch_size):
+                batch_idx = 0
+                while batch_idx < len(chunks):
+                    batch_size = random.randint(80, 120)
                     batch_chunks = chunks[batch_idx:batch_idx + batch_size]
                     batch_metadatas = [{
                         "source": str(pdf_path),
@@ -810,6 +812,7 @@ def create_app(collection=None, data_dir: Path | None = None):
                         ids=batch_ids,
                     )
                     chunks_total += len(batch_chunks)
+                    batch_idx += len(batch_chunks)
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
                 added += 1
                 files_done += 1
@@ -841,8 +844,9 @@ def create_app(collection=None, data_dir: Path | None = None):
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
             else:
-                batch_size = 100
-                for batch_idx in range(0, len(chunks), batch_size):
+                batch_idx = 0
+                while batch_idx < len(chunks):
+                    batch_size = random.randint(80, 120)
                     batch_chunks = chunks[batch_idx:batch_idx + batch_size]
                     batch_metadatas = [{
                         "source": str(pdf_path),
@@ -861,6 +865,7 @@ def create_app(collection=None, data_dir: Path | None = None):
                         ids=batch_ids,
                     )
                     chunks_total += len(batch_chunks)
+                    batch_idx += len(batch_chunks)
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
                 updated += 1
                 files_done += 1
