@@ -12,7 +12,6 @@ import argparse
 import hashlib
 import json
 import os
-import random
 import signal
 import threading
 import time
@@ -165,9 +164,11 @@ def load_manifest(data_dir: Path) -> IndexManifest:
 
 
 def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
-    """Write the index manifest to disk."""
+    """Write the index manifest to disk atomically."""
     manifest_path = data_dir / MANIFEST_FILENAME
-    manifest_path.write_text(manifest.model_dump_json(indent=2))
+    tmp_path = manifest_path.with_suffix(".json.tmp")
+    tmp_path.write_text(manifest.model_dump_json(indent=2))
+    os.replace(tmp_path, manifest_path)
 
 
 # ---------------------------------------------------------------------------
@@ -199,9 +200,11 @@ def load_collections(data_dir: Path) -> CollectionsStore:
 
 
 def save_collections(data_dir: Path, store: CollectionsStore) -> None:
-    """Write collections to disk."""
+    """Write collections to disk atomically."""
     path = data_dir / COLLECTIONS_FILENAME
-    path.write_text(store.model_dump_json(indent=2))
+    tmp_path = path.with_suffix(".json.tmp")
+    tmp_path.write_text(store.model_dump_json(indent=2))
+    os.replace(tmp_path, path)
 
 
 def resolve_collection_filenames(
@@ -221,6 +224,17 @@ def resolve_collection_filenames(
 # ---------------------------------------------------------------------------
 # Reusable indexing / deletion helpers
 # ---------------------------------------------------------------------------
+
+
+def chunk_id_prefix(pdf_path: Path) -> str:
+    """Return a stable, collision-free prefix for chunk IDs.
+
+    Uses an 8-char hex digest of the full path so that two PDFs with the same
+    stem (e.g. ``/5e/Monster Manual.pdf`` and ``/pf2e/Monster Manual.pdf``)
+    never collide.
+    """
+    path_hash = hashlib.sha256(str(pdf_path).encode()).hexdigest()[:8]
+    return f"{path_hash}_{pdf_path.stem}"
 
 def index_single_pdf(
     pdf_path: Path, collection, game_system: str | None = None
@@ -256,8 +270,9 @@ def index_single_pdf(
                 "chunk": batch_idx + chunk_idx,
                 "game_system": resolved_system,
             } for chunk_idx in range(len(batch_chunks))]
+            prefix = chunk_id_prefix(pdf_path)
             batch_ids = [
-                f"{pdf_path.stem}_{batch_idx + chunk_idx}"
+                f"{prefix}_{batch_idx + chunk_idx}"
                 for chunk_idx in range(len(batch_chunks))
             ]
 
@@ -323,12 +338,15 @@ def compact_sqlite(data_dir: Path) -> int:
     return size_before - os.path.getsize(sqlite_path)
 
 
-def delete_source_chunks(filename: str, collection) -> int:
-    """Delete all chunks for a given filename from ChromaDB.
+def delete_source_chunks(source_path: str, collection) -> int:
+    """Delete all chunks for a given source path from ChromaDB.
+
+    Uses the full ``source`` metadata field to avoid collisions when two PDFs
+    share the same filename in different directories.
 
     Returns the number of deleted chunks, or 0 if not found.
     """
-    results = collection.get(where={"filename": filename}, include=[])
+    results = collection.get(where={"source": source_path}, include=[])
     ids_to_delete = results["ids"]
 
     if ids_to_delete:
@@ -568,6 +586,11 @@ def create_app(collection=None, data_dir: Path | None = None):
     )
 
     # ------------------------------------------------------------------
+    # Concurrency guard — prevents two syncs from running simultaneously.
+    # The streaming sync uses a synchronous generator, so we use a
+    # threading.Lock rather than asyncio.Lock.
+    _sync_lock = threading.Lock()
+
     # Endpoints (close over `collection` from the factory)
     # ------------------------------------------------------------------
 
@@ -653,14 +676,33 @@ def create_app(collection=None, data_dir: Path | None = None):
         2. Indexes new and modified files
         3. Updates the manifest
         """
-        if not data_dir:
+        if not _sync_lock.acquire(blocking=False):
             raise HTTPException(
-                status_code=500, detail="No data directory configured"
+                status_code=409, detail="A sync operation is already in progress"
             )
+        try:
+            return _do_sync(request)
+        finally:
+            _sync_lock.release()
 
+    def _sync_core(request: SyncIndexRequest):
+        """Core sync generator shared by both endpoints.
+
+        Yields progress dicts with an ``event`` key (``started``, ``progress``,
+        or ``complete``).  The ``complete`` event contains the full result.
+        """
         manifest = load_manifest(data_dir)
         diff = compute_diff(request.selected_paths, manifest)
 
+        total_files = (
+            len(diff["to_remove"])
+            + len(diff["to_auto_remove"])
+            + len(diff["to_rename"])
+            + len(diff["to_add"])
+            + len(diff["to_update"])
+        )
+        files_done = 0
+        chunks_total = 0
         removed = 0
         auto_removed = 0
         renamed = 0
@@ -668,31 +710,43 @@ def create_app(collection=None, data_dir: Path | None = None):
         updated = 0
         errors = []
 
+        yield {"event": "started", "total_files": total_files}
+
         # Phase 1: Remove deselected files
         for entry in diff["to_remove"]:
-            delete_source_chunks(entry["filename"], collection)
+            deleted = delete_source_chunks(entry["path"], collection)
             del manifest.files[entry["path"]]
+            save_manifest(data_dir, manifest)
             removed += 1
+            files_done += 1
+            chunks_total += deleted
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": entry["filename"], "phase": "remove"}
 
         # Phase 1a: Auto-remove files deleted from disk
         for entry in diff["to_auto_remove"]:
-            delete_source_chunks(entry["filename"], collection)
+            deleted = delete_source_chunks(entry["path"], collection)
             del manifest.files[entry["path"]]
+            save_manifest(data_dir, manifest)
             auto_removed += 1
+            files_done += 1
+            chunks_total += deleted
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": entry["filename"], "phase": "auto_remove"}
 
         # Phase 1.5: Handle renames (transfer chunks without re-embedding)
         for entry in diff["to_rename"]:
-            old_filename = entry["old_filename"]
+            old_path_str = entry["old_path"]
             new_path = Path(entry["new_path"])
 
             results = collection.get(
-                where={"filename": old_filename},
+                where={"source": old_path_str},
                 include=["embeddings", "documents", "metadatas"],
             )
 
+            transferred = 0
             if results["ids"]:
                 collection.delete(ids=results["ids"])
-                new_ids = [f"{new_path.stem}_{i}" for i in range(len(results["ids"]))]
+                prefix = chunk_id_prefix(new_path)
+                new_ids = [f"{prefix}_{i}" for i in range(len(results["ids"]))]
                 new_metadatas = [
                     {**m, "source": str(new_path), "filename": new_path.name}
                     for m in results["metadatas"]
@@ -703,8 +757,9 @@ def create_app(collection=None, data_dir: Path | None = None):
                     embeddings=results["embeddings"],
                     metadatas=new_metadatas,
                 )
+                transferred = len(results["ids"])
 
-            del manifest.files[entry["old_path"]]
+            del manifest.files[old_path_str]
             manifest.files[entry["new_path"]] = ManifestEntry(
                 filename=new_path.name,
                 mtime=os.path.getmtime(new_path),
@@ -714,7 +769,11 @@ def create_app(collection=None, data_dir: Path | None = None):
                 content_hash=entry["content_hash"],
                 file_size=os.path.getsize(new_path),
             )
+            save_manifest(data_dir, manifest)
             renamed += 1
+            files_done += 1
+            chunks_total += transferred
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": new_path.name, "phase": "rename"}
 
         # Phase 2: Index new files
         for entry in diff["to_add"]:
@@ -723,49 +782,99 @@ def create_app(collection=None, data_dir: Path | None = None):
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
             )
-            chunk_count, error, detected_system = index_single_pdf(
-                pdf_path, collection, game_system=override
+            chunks, detected_system, error = prepare_pdf(
+                pdf_path, game_system=override
             )
             if error:
                 errors.append(error)
+                files_done += 1
+                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
             else:
+                batch_size = 100
+                for batch_idx in range(0, len(chunks), batch_size):
+                    batch_chunks = chunks[batch_idx:batch_idx + batch_size]
+                    batch_metadatas = [{
+                        "source": str(pdf_path),
+                        "filename": pdf_path.name,
+                        "chunk": batch_idx + chunk_idx,
+                        "game_system": detected_system,
+                    } for chunk_idx in range(len(batch_chunks))]
+                    prefix = chunk_id_prefix(pdf_path)
+                    batch_ids = [
+                        f"{prefix}_{batch_idx + chunk_idx}"
+                        for chunk_idx in range(len(batch_chunks))
+                    ]
+                    collection.upsert(
+                        documents=batch_chunks,
+                        metadatas=batch_metadatas,
+                        ids=batch_ids,
+                    )
+                    chunks_total += len(batch_chunks)
+                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
                 added += 1
+                files_done += 1
                 manifest.files[entry["path"]] = ManifestEntry(
                     filename=pdf_path.name,
                     mtime=os.path.getmtime(pdf_path),
-                    chunk_count=chunk_count,
+                    chunk_count=len(chunks),
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
                     content_hash=file_content_hash(pdf_path),
                     file_size=os.path.getsize(pdf_path),
                 )
+                save_manifest(data_dir, manifest)
+                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
 
         # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
         for entry in diff["to_update"]:
-            delete_source_chunks(entry["filename"], collection)
+            delete_source_chunks(entry["path"], collection)
             pdf_path = Path(entry["path"])
             override = (
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
             )
-            chunk_count, error, detected_system = index_single_pdf(
-                pdf_path, collection, game_system=override
+            chunks, detected_system, error = prepare_pdf(
+                pdf_path, game_system=override
             )
             if error:
                 errors.append(error)
+                files_done += 1
+                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
             else:
+                batch_size = 100
+                for batch_idx in range(0, len(chunks), batch_size):
+                    batch_chunks = chunks[batch_idx:batch_idx + batch_size]
+                    batch_metadatas = [{
+                        "source": str(pdf_path),
+                        "filename": pdf_path.name,
+                        "chunk": batch_idx + chunk_idx,
+                        "game_system": detected_system,
+                    } for chunk_idx in range(len(batch_chunks))]
+                    prefix = chunk_id_prefix(pdf_path)
+                    batch_ids = [
+                        f"{prefix}_{batch_idx + chunk_idx}"
+                        for chunk_idx in range(len(batch_chunks))
+                    ]
+                    collection.upsert(
+                        documents=batch_chunks,
+                        metadatas=batch_metadatas,
+                        ids=batch_ids,
+                    )
+                    chunks_total += len(batch_chunks)
+                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
                 updated += 1
+                files_done += 1
                 manifest.files[entry["path"]] = ManifestEntry(
                     filename=pdf_path.name,
                     mtime=os.path.getmtime(pdf_path),
-                    chunk_count=chunk_count,
+                    chunk_count=len(chunks),
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
                     content_hash=file_content_hash(pdf_path),
                     file_size=os.path.getsize(pdf_path),
                 )
-
-        save_manifest(data_dir, manifest)
+                save_manifest(data_dir, manifest)
+                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
 
         # Update collections that reference renamed or auto-removed paths
         if renamed > 0 or auto_removed > 0:
@@ -791,10 +900,8 @@ def create_app(collection=None, data_dir: Path | None = None):
             if coll_changed:
                 save_collections(data_dir, coll_store)
 
-        if removed > 0 or updated > 0 or renamed > 0 or auto_removed > 0:
-            compact_sqlite(data_dir)
-
-        return {
+        yield {
+            "event": "complete",
             "added": added,
             "removed": removed,
             "auto_removed": auto_removed,
@@ -802,6 +909,7 @@ def create_app(collection=None, data_dir: Path | None = None):
             "updated": updated,
             "errors": errors,
             "total_indexed": len(manifest.files),
+            "chunks_total": chunks_total,
             "renames": [
                 {"old_path": e["old_path"], "new_path": e["new_path"]}
                 for e in diff["to_rename"]
@@ -810,237 +918,44 @@ def create_app(collection=None, data_dir: Path | None = None):
             "stale_paths": diff["stale_paths"],
         }
 
-    @app.post("/api/sync-index-stream")
-    async def sync_index_stream(request: SyncIndexRequest):
-        """Streaming version of sync-index that emits SSE progress events."""
+    def _do_sync(request: SyncIndexRequest):
+        """Run sync and return the final result dict."""
         if not data_dir:
             raise HTTPException(
                 status_code=500, detail="No data directory configured"
             )
+        result = None
+        for event in _sync_core(request):
+            if event["event"] == "complete":
+                result = event
+        if result:
+            del result["event"]
+        return result
 
-        def _progress_event(files_done, total_files, chunks_total, current_file, phase):
-            return f"data: {json.dumps({'event': 'progress', 'files_done': files_done, 'total_files': total_files, 'chunks_total': chunks_total, 'current_file': current_file, 'phase': phase})}\n\n"
+    @app.post("/api/sync-index-stream")
+    async def sync_index_stream(request: SyncIndexRequest):
+        """Streaming version of sync-index that emits SSE progress events."""
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already in progress"
+            )
+        if not data_dir:
+            _sync_lock.release()
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
 
         def generate():
-            manifest = load_manifest(data_dir)
-            diff = compute_diff(request.selected_paths, manifest)
+            for event in _sync_core(request):
+                yield f"data: {json.dumps(event)}\n\n"
 
-            total_files = (
-                len(diff["to_remove"])
-                + len(diff["to_auto_remove"])
-                + len(diff["to_rename"])
-                + len(diff["to_add"])
-                + len(diff["to_update"])
-            )
-            files_done = 0
-            chunks_total = 0
-            removed = 0
-            auto_removed = 0
-            renamed = 0
-            added = 0
-            updated = 0
-            errors = []
+        def generate_with_lock():
+            try:
+                yield from generate()
+            finally:
+                _sync_lock.release()
 
-            yield f"data: {json.dumps({'event': 'started', 'total_files': total_files})}\n\n"
-
-            # Phase 1: Remove deselected files
-            for entry in diff["to_remove"]:
-                deleted = delete_source_chunks(entry["filename"], collection)
-                del manifest.files[entry["path"]]
-                removed += 1
-                files_done += 1
-                chunks_total += deleted
-                yield _progress_event(files_done, total_files, chunks_total, entry["filename"], "remove")
-
-            # Phase 1a: Auto-remove files deleted from disk
-            for entry in diff["to_auto_remove"]:
-                deleted = delete_source_chunks(entry["filename"], collection)
-                del manifest.files[entry["path"]]
-                auto_removed += 1
-                files_done += 1
-                chunks_total += deleted
-                yield _progress_event(files_done, total_files, chunks_total, entry["filename"], "auto_remove")
-
-            # Phase 1.5: Handle renames (transfer chunks without re-embedding)
-            for entry in diff["to_rename"]:
-                old_filename = entry["old_filename"]
-                new_path = Path(entry["new_path"])
-
-                results = collection.get(
-                    where={"filename": old_filename},
-                    include=["embeddings", "documents", "metadatas"],
-                )
-
-                transferred = 0
-                if results["ids"]:
-                    collection.delete(ids=results["ids"])
-                    new_ids = [f"{new_path.stem}_{i}" for i in range(len(results["ids"]))]
-                    new_metadatas = [
-                        {**m, "source": str(new_path), "filename": new_path.name}
-                        for m in results["metadatas"]
-                    ]
-                    collection.add(
-                        ids=new_ids,
-                        documents=results["documents"],
-                        embeddings=results["embeddings"],
-                        metadatas=new_metadatas,
-                    )
-                    transferred = len(results["ids"])
-
-                del manifest.files[entry["old_path"]]
-                manifest.files[entry["new_path"]] = ManifestEntry(
-                    filename=new_path.name,
-                    mtime=os.path.getmtime(new_path),
-                    chunk_count=entry["chunk_count"],
-                    indexed_at=datetime.now(timezone.utc).isoformat(),
-                    game_system=entry["game_system"],
-                    content_hash=entry["content_hash"],
-                    file_size=os.path.getsize(new_path),
-                )
-                renamed += 1
-                files_done += 1
-                chunks_total += transferred
-                yield _progress_event(files_done, total_files, chunks_total, new_path.name, "rename")
-
-            # Phase 2: Index new files
-            for entry in diff["to_add"]:
-                pdf_path = Path(entry["path"])
-                override = (
-                    request.game_system_overrides.get(entry["path"])
-                    if request.game_system_overrides else None
-                )
-                chunks, detected_system, error = prepare_pdf(
-                    pdf_path, game_system=override
-                )
-                if error:
-                    errors.append(error)
-                    files_done += 1
-                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
-                else:
-                    batch_idx = 0
-                    while batch_idx < len(chunks):
-                        batch_size = random.randint(80, 120)
-                        batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                        batch_metadatas = [{
-                            "source": str(pdf_path),
-                            "filename": pdf_path.name,
-                            "chunk": batch_idx + chunk_idx,
-                            "game_system": detected_system,
-                        } for chunk_idx in range(len(batch_chunks))]
-                        batch_ids = [
-                            f"{pdf_path.stem}_{batch_idx + chunk_idx}"
-                            for chunk_idx in range(len(batch_chunks))
-                        ]
-                        collection.upsert(
-                            documents=batch_chunks,
-                            metadatas=batch_metadatas,
-                            ids=batch_ids,
-                        )
-                        chunks_total += len(batch_chunks)
-                        batch_idx += len(batch_chunks)
-                        yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
-                    added += 1
-                    files_done += 1
-                    manifest.files[entry["path"]] = ManifestEntry(
-                        filename=pdf_path.name,
-                        mtime=os.path.getmtime(pdf_path),
-                        chunk_count=len(chunks),
-                        indexed_at=datetime.now(timezone.utc).isoformat(),
-                        game_system=detected_system,
-                        content_hash=file_content_hash(pdf_path),
-                        file_size=os.path.getsize(pdf_path),
-                    )
-                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
-
-            # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
-            for entry in diff["to_update"]:
-                delete_source_chunks(entry["filename"], collection)
-                pdf_path = Path(entry["path"])
-                override = (
-                    request.game_system_overrides.get(entry["path"])
-                    if request.game_system_overrides else None
-                )
-                chunks, detected_system, error = prepare_pdf(
-                    pdf_path, game_system=override
-                )
-                if error:
-                    errors.append(error)
-                    files_done += 1
-                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
-                else:
-                    batch_idx = 0
-                    while batch_idx < len(chunks):
-                        batch_size = random.randint(80, 120)
-                        batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                        batch_metadatas = [{
-                            "source": str(pdf_path),
-                            "filename": pdf_path.name,
-                            "chunk": batch_idx + chunk_idx,
-                            "game_system": detected_system,
-                        } for chunk_idx in range(len(batch_chunks))]
-                        batch_ids = [
-                            f"{pdf_path.stem}_{batch_idx + chunk_idx}"
-                            for chunk_idx in range(len(batch_chunks))
-                        ]
-                        collection.upsert(
-                            documents=batch_chunks,
-                            metadatas=batch_metadatas,
-                            ids=batch_ids,
-                        )
-                        chunks_total += len(batch_chunks)
-                        batch_idx += len(batch_chunks)
-                        yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
-                    updated += 1
-                    files_done += 1
-                    manifest.files[entry["path"]] = ManifestEntry(
-                        filename=pdf_path.name,
-                        mtime=os.path.getmtime(pdf_path),
-                        chunk_count=len(chunks),
-                        indexed_at=datetime.now(timezone.utc).isoformat(),
-                        game_system=detected_system,
-                        content_hash=file_content_hash(pdf_path),
-                        file_size=os.path.getsize(pdf_path),
-                    )
-                    yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
-
-            # Update collections that reference renamed or auto-removed paths
-            if renamed > 0 or auto_removed > 0:
-                coll_store = load_collections(data_dir)
-                coll_changed = False
-
-                if renamed > 0:
-                    rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
-                    for coll in coll_store.collections.values():
-                        updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
-                        if updated_paths != coll.file_paths:
-                            coll.file_paths = updated_paths
-                            coll_changed = True
-
-                if auto_removed > 0:
-                    removed_paths = {e["path"] for e in diff["to_auto_remove"]}
-                    for coll in coll_store.collections.values():
-                        filtered = [p for p in coll.file_paths if p not in removed_paths]
-                        if len(filtered) != len(coll.file_paths):
-                            coll.file_paths = filtered
-                            coll_changed = True
-
-                if coll_changed:
-                    save_collections(data_dir, coll_store)
-
-            save_manifest(data_dir, manifest)
-
-            if removed > 0 or updated > 0 or renamed > 0 or auto_removed > 0:
-                compact_sqlite(data_dir)
-
-            renames = [
-                {"old_path": e["old_path"], "new_path": e["new_path"]}
-                for e in diff["to_rename"]
-            ]
-            auto_removed_paths = [e["path"] for e in diff["to_auto_remove"]]
-            stale_paths = diff["stale_paths"]
-            yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'auto_removed': auto_removed, 'renamed': renamed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total, 'renames': renames, 'auto_removed_paths': auto_removed_paths, 'stale_paths': stale_paths})}\n\n"
-
-        return StreamingResponse(generate(), media_type="text/event-stream")
+        return StreamingResponse(generate_with_lock(), media_type="text/event-stream")
 
     @app.get("/api/stats")
     async def get_stats():
@@ -1147,8 +1062,23 @@ def create_app(collection=None, data_dir: Path | None = None):
         Changes metadata in ChromaDB and the manifest without re-indexing.
         """
         try:
+            # Look up the full source path from the manifest
+            manifest = load_manifest(data_dir) if data_dir else None
+            source_path = None
+            if manifest:
+                for path_str, entry in manifest.files.items():
+                    if entry.filename == request.filename:
+                        source_path = path_str
+                        break
+
+            if not source_path:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Source not found: {request.filename}",
+                )
+
             results = collection.get(
-                where={"filename": request.filename},
+                where={"source": source_path},
                 include=["metadatas"],
             )
 
@@ -1168,8 +1098,7 @@ def create_app(collection=None, data_dir: Path | None = None):
                 metadatas=updated_metadatas,
             )
 
-            if data_dir:
-                manifest = load_manifest(data_dir)
+            if manifest:
                 for entry in manifest.files.values():
                     if entry.filename == request.filename:
                         entry.game_system = request.game_system
@@ -1189,7 +1118,18 @@ def create_app(collection=None, data_dir: Path | None = None):
     async def delete_source(filename: str):
         """Delete a source and all its chunks."""
         try:
-            deleted = delete_source_chunks(filename, collection)
+            # Look up the full path from the manifest so we can filter by source
+            manifest = load_manifest(data_dir)
+            source_path = None
+            for path_str, entry in manifest.files.items():
+                if entry.filename == filename:
+                    source_path = path_str
+                    break
+
+            if not source_path:
+                raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
+
+            deleted = delete_source_chunks(source_path, collection)
 
             if not deleted:
                 raise HTTPException(status_code=404, detail=f"Source not found: {filename}")

@@ -53,7 +53,10 @@ def test_index_chunk_ids_follow_pattern(client, sample_pdf_path, test_collection
 
     results = test_collection.get()
     for id in results["ids"]:
-        assert id.startswith("dragonbane_monsters_"), f"Unexpected ID format: {id}"
+        # IDs use format: {path_hash}_{stem}_{chunk_idx}
+        parts = id.split("_")
+        assert len(parts[0]) == 8, f"Expected 8-char hash prefix, got: {id}"
+        assert "dragonbane_monsters" in id, f"Expected stem in ID: {id}"
 
 
 def test_index_missing_file(client):
