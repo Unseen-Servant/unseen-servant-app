@@ -66,15 +66,6 @@
   $: hasTag = !item.is_dir && gameSystemMap.has(item.path);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
 
-  function setIndeterminate(node: HTMLInputElement, value: boolean) {
-    node.indeterminate = value;
-    return {
-      update(newValue: boolean) {
-        node.indeterminate = newValue;
-      }
-    };
-  }
-
   async function toggleExpand() {
     if (!item.is_dir) return;
 
@@ -133,14 +124,15 @@
 <div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} style="padding-left: {level * 1.5}rem;">
   <div class="row-container">
     {#if showCheckbox}
-      <input
-        type="checkbox"
-        checked={isChecked}
-        use:setIndeterminate={isIndeterminate}
-        on:change={handleCheckboxChange}
+      <button
         class="checkbox"
-        class:collection-checkbox={mode === 'collection'}
-      />
+        class:checked={isChecked}
+        class:indeterminate={isIndeterminate}
+        class:collection={mode === 'collection'}
+        on:click|stopPropagation={handleCheckboxChange}
+        role="checkbox"
+        aria-checked={isIndeterminate ? 'mixed' : isChecked}
+      ></button>
     {:else}
       <span class="checkbox-spacer"></span>
     {/if}
@@ -228,16 +220,61 @@
     align-items: center;
   }
   .checkbox {
+    width: 14px;
+    height: 14px;
     margin-right: 0.5rem;
+    padding: 0;
     cursor: pointer;
-    accent-color: var(--text-accent);
+    border: 1.5px solid var(--text-tertiary);
+    border-radius: 3px;
+    background: transparent;
+    position: relative;
+    flex-shrink: 0;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
   }
-  .checkbox.collection-checkbox {
-    accent-color: var(--text-active);
+  .checkbox:hover {
+    border-color: var(--text-accent);
+  }
+  .checkbox.checked {
+    background: var(--text-accent);
+    border-color: var(--text-accent);
+  }
+  .checkbox.checked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 0px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--bg-app);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .checkbox.indeterminate {
+    background: var(--text-accent);
+    border-color: var(--text-accent);
+  }
+  .checkbox.indeterminate::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 5px;
+    width: 8px;
+    height: 2px;
+    background: var(--bg-app);
+    border-radius: 1px;
+  }
+  .checkbox.collection.checked,
+  .checkbox.collection.indeterminate {
+    background: var(--text-active);
+    border-color: var(--text-active);
+  }
+  .checkbox.collection:hover {
+    border-color: var(--text-active);
   }
   .checkbox-spacer {
     display: inline-block;
-    width: 13px;
+    width: 14px;
     margin-right: 0.5rem;
   }
   .dimmed {
