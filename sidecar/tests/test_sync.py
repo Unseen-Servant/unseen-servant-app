@@ -101,15 +101,17 @@ def test_index_status_up_to_date(client, sample_pdf_path, tmp_path):
 
 
 def test_index_status_missing_file_on_disk(client, tmp_path):
-    """Selected paths that don't exist on disk should appear in errors."""
+    """Selected paths that don't exist and aren't indexed should be stale."""
     response = client.post("/api/index-status", json={
         "selected_paths": ["/nonexistent/ghost.pdf"]
     })
 
     data = response.json()
-    assert len(data["errors"]) == 1
-    assert "File not found" in data["errors"][0]["error"]
-    assert data["summary"]["errors"] == 1
+    # /nonexistent parent doesn't exist, so this is an error (not stale)
+    assert data["summary"]["errors"] == 0
+    # Non-indexed file with missing parent → stale path
+    assert data["summary"]["stale"] == 1
+    assert "/nonexistent/ghost.pdf" in data["stale_paths"]
 
 
 def test_index_status_empty_selection(client):
@@ -120,8 +122,8 @@ def test_index_status_empty_selection(client):
 
     data = response.json()
     assert data["summary"] == {
-        "add": 0, "remove": 0, "rename": 0, "update": 0,
-        "up_to_date": 0, "errors": 0,
+        "add": 0, "remove": 0, "auto_remove": 0, "rename": 0, "update": 0,
+        "up_to_date": 0, "errors": 0, "stale": 0,
     }
 
 

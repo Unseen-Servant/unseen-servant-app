@@ -40,27 +40,49 @@ export interface FileErrorEntry {
 export interface IndexStatusSummary {
   add: number;
   remove: number;
+  auto_remove: number;
+  rename: number;
   update: number;
   up_to_date: number;
   errors: number;
+  stale: number;
+}
+
+export interface RenameEntry {
+  old_path: string;
+  new_path: string;
+  filename: string;
 }
 
 export interface IndexStatusResult {
   to_add: FileStatusEntry[];
   to_remove: FileStatusEntry[];
+  to_auto_remove: FileStatusEntry[];
+  to_rename: RenameEntry[];
   to_update: FileStatusEntry[];
   up_to_date: FileStatusEntry[];
   errors: FileErrorEntry[];
+  stale_paths: string[];
   summary: IndexStatusSummary;
+}
+
+export interface RenameMapping {
+  old_path: string;
+  new_path: string;
 }
 
 export interface SyncResult {
   added: number;
   removed: number;
+  auto_removed: number;
+  renamed: number;
   updated: number;
   errors: string[];
   total_indexed: number;
   chunks_total: number;
+  renames: RenameMapping[];
+  auto_removed_paths: string[];
+  stale_paths: string[];
 }
 
 export interface CollectionInfo {

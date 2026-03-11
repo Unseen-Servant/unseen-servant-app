@@ -2,11 +2,11 @@
 
 ## Product Vision
 
-Legend Lore is a local-first, AI-augmented toolkit for tabletop RPG Game Masters. It helps GMs browse, index, and semantically search their PDF rulebook collections, and integrates with Claude AI via MCP for mid-session lookups and homebrew creation.
+Legend Lore is a local-first, AI-augmented toolkit for tabletop RPG Gamemasters. It helps GMs browse, index, and semantically search their PDF rulebook collections, and integrates with Claude AI via MCP for mid-session lookups and homebrew creation.
 
 ### Target User
 
-A TTRPG Game Master who:
+A TTRPG Gamemaster who:
 
 - Owns a large PDF library (hundreds to thousands of rulebooks, supplements, and adventures)
 - Needs to find specific rules, tables, or lore quickly during session prep and live play

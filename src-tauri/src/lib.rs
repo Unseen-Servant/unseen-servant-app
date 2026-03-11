@@ -52,18 +52,37 @@ struct FileErrorEntry {
 struct IndexStatusSummary {
     add: u32,
     remove: u32,
+    auto_remove: u32,
+    rename: u32,
     update: u32,
     up_to_date: u32,
     errors: u32,
+    stale: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RenameEntry {
+    old_path: String,
+    new_path: String,
+    filename: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct RenameMapping {
+    old_path: String,
+    new_path: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct IndexStatusResult {
     to_add: Vec<FileStatusEntry>,
     to_remove: Vec<FileStatusEntry>,
+    to_auto_remove: Vec<FileStatusEntry>,
+    to_rename: Vec<RenameEntry>,
     to_update: Vec<FileStatusEntry>,
     up_to_date: Vec<FileStatusEntry>,
     errors: Vec<FileErrorEntry>,
+    stale_paths: Vec<String>,
     summary: IndexStatusSummary,
 }
 
@@ -71,10 +90,15 @@ struct IndexStatusResult {
 struct SyncResult {
     added: u32,
     removed: u32,
+    auto_removed: u32,
+    renamed: u32,
     updated: u32,
     errors: Vec<String>,
     total_indexed: u32,
     chunks_total: u32,
+    renames: Vec<RenameMapping>,
+    auto_removed_paths: Vec<String>,
+    stale_paths: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -307,10 +331,15 @@ async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncRes
                             final_result = serde_json::from_value(serde_json::json!({
                                 "added": json["added"],
                                 "removed": json["removed"],
+                                "auto_removed": json["auto_removed"],
+                                "renamed": json["renamed"],
                                 "updated": json["updated"],
                                 "errors": json["errors"],
                                 "total_indexed": json["total_indexed"],
                                 "chunks_total": json["chunks_total"],
+                                "renames": json["renames"],
+                                "auto_removed_paths": json["auto_removed_paths"],
+                                "stale_paths": json["stale_paths"],
                             }))
                             .ok();
                         }

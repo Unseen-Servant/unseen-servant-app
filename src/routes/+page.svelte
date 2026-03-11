@@ -108,6 +108,13 @@
         .then(r => { storageBytes = r.storage_bytes; })
         .catch(() => { storageBytes = 0; });
 
+      // Auto-sync renames, deletions, and stale paths silently — no user interaction needed
+      const { rename, auto_remove, stale } = indexStatus.summary;
+      if ((rename > 0 || auto_remove > 0 || stale > 0) && !isSyncing) {
+        handleSync();
+        return;
+      }
+
       showSyncPromptIfNeeded();
     } catch (e) {
       // Sidecar might not be ready yet on startup
@@ -122,6 +129,7 @@
     if (!indexStatus || isCollectionEditMode) return;
 
     const { add, remove, update, errors } = indexStatus.summary;
+    // Renames are auto-synced, so exclude them from the manual prompt
     const pending = add + remove + update;
 
     if (pending === 0 && errors === 0) {
@@ -522,9 +530,38 @@
         'sync_index',
         { paths: Array.from(selectedPaths) }
       );
+      // Apply renames to selectedPaths before persisting
+      if (result.renames && result.renames.length > 0) {
+        for (const { old_path, new_path } of result.renames) {
+          selectedPaths.delete(old_path);
+          selectedPaths.add(new_path);
+        }
+      }
+
+      // Remove auto-removed paths (files deleted from disk)
+      if (result.auto_removed_paths && result.auto_removed_paths.length > 0) {
+        for (const path of result.auto_removed_paths) {
+          selectedPaths.delete(path);
+        }
+      }
+
+      // Remove stale paths (orphaned selections — not on disk, never indexed)
+      if (result.stale_paths && result.stale_paths.length > 0) {
+        for (const path of result.stale_paths) {
+          selectedPaths.delete(path);
+        }
+      }
+
+      // Trigger Svelte reactivity if paths changed
+      if ((result.renames?.length > 0) || (result.auto_removed_paths?.length > 0) || (result.stale_paths?.length > 0)) {
+        selectedPaths = selectedPaths;
+      }
+
       const parts = [];
       if (result.added > 0) parts.push(`${result.added} added`);
       if (result.removed > 0) parts.push(`${result.removed} removed`);
+      if (result.auto_removed > 0) parts.push(`${result.auto_removed} removed (deleted from disk)`);
+      if (result.renamed > 0) parts.push(`${result.renamed} renamed`);
       if (result.updated > 0) parts.push(`${result.updated} updated`);
       if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
       const chunkStr = result.chunks_total > 0
@@ -542,6 +579,11 @@
 
       await refreshIndexStatus();
       await loadCollections();
+
+      // Refresh file tree if renames, auto-removals, or stale cleanups occurred
+      if (((result.renames?.length > 0) || (result.auto_removed_paths?.length > 0) || (result.stale_paths?.length > 0)) && selectedFolder) {
+        await loadFiles(selectedFolder);
+      }
 
       notification.show({
         type: result.errors.length > 0 ? 'error' : 'success',

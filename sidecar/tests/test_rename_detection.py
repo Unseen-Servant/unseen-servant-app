@@ -77,6 +77,99 @@ def test_compute_diff_detects_rename(sample_pdf_path, tmp_path):
     assert rename["content_hash"] == content_hash
 
 
+def test_compute_diff_discovers_rename_from_stale_selection(sample_pdf_path, tmp_path):
+    """When selectedPaths still references the old path (file renamed on disk),
+    compute_diff should scan the parent directory and detect the rename."""
+    content_hash = file_content_hash(sample_pdf_path)
+    file_size = os.path.getsize(sample_pdf_path)
+
+    # Copy the file to a tmp dir to simulate original location
+    old_path = tmp_path / "original_name.pdf"
+    shutil.copy2(sample_pdf_path, old_path)
+    old_path_str = str(old_path)
+
+    # Build manifest with the old path
+    manifest = IndexManifest(files={
+        old_path_str: ManifestEntry(
+            filename="original_name.pdf",
+            mtime=os.path.getmtime(old_path),
+            chunk_count=5,
+            indexed_at="2026-01-01T00:00:00Z",
+            content_hash=content_hash,
+            file_size=file_size,
+        )
+    })
+
+    # Simulate rename on disk: delete old, create new in same directory
+    new_path = tmp_path / "renamed_file.pdf"
+    old_path.rename(new_path)
+
+    # Call compute_diff with stale selection (old path that no longer exists)
+    diff = compute_diff([old_path_str], manifest)
+
+    # Should detect as rename, not error
+    assert len(diff["to_rename"]) == 1
+    assert len(diff["errors"]) == 0
+    assert diff["to_rename"][0]["old_path"] == old_path_str
+    assert diff["to_rename"][0]["new_path"] == str(new_path)
+
+
+def test_deleted_file_auto_removed_when_parent_accessible(sample_pdf_path, tmp_path):
+    """When a file is deleted but its parent directory is accessible,
+    it should go to to_auto_remove (not errors)."""
+    content_hash = file_content_hash(sample_pdf_path)
+    file_size = os.path.getsize(sample_pdf_path)
+
+    # Use a separate subdirectory so the original sample_pdf isn't a candidate
+    isolated_dir = tmp_path / "isolated"
+    isolated_dir.mkdir()
+    old_path = isolated_dir / "vanished.pdf"
+    shutil.copy2(sample_pdf_path, old_path)
+    old_path_str = str(old_path)
+
+    manifest = IndexManifest(files={
+        old_path_str: ManifestEntry(
+            filename="vanished.pdf",
+            mtime=os.path.getmtime(old_path),
+            chunk_count=5,
+            indexed_at="2026-01-01T00:00:00Z",
+            content_hash=content_hash,
+            file_size=file_size,
+        )
+    })
+
+    # Delete without creating a replacement — directory is now empty
+    old_path.unlink()
+
+    diff = compute_diff([old_path_str], manifest)
+
+    assert len(diff["to_rename"]) == 0
+    assert len(diff["to_auto_remove"]) == 1
+    assert diff["to_auto_remove"][0]["path"] == old_path_str
+    assert len(diff["errors"]) == 0
+
+
+def test_deleted_file_errors_when_parent_inaccessible():
+    """When the parent directory doesn't exist (e.g. unmounted drive),
+    the missing file should stay in errors."""
+    manifest = IndexManifest(files={
+        "/mnt/external/rpg_books/rulebook.pdf": ManifestEntry(
+            filename="rulebook.pdf",
+            mtime=1000.0,
+            chunk_count=5,
+            indexed_at="2026-01-01T00:00:00Z",
+            content_hash="abc123",
+            file_size=1024,
+        )
+    })
+
+    diff = compute_diff(["/mnt/external/rpg_books/rulebook.pdf"], manifest)
+
+    assert len(diff["to_auto_remove"]) == 0
+    assert len(diff["errors"]) == 1
+    assert diff["errors"][0]["path"] == "/mnt/external/rpg_books/rulebook.pdf"
+
+
 def test_rename_no_match_without_hash(sample_pdf_path):
     """Legacy manifest entries (empty content_hash) should fall back
     to normal add+remove — no rename detection possible."""
@@ -332,6 +425,37 @@ def test_sync_rename_response_includes_count(client, sample_pdf_path, tmp_path):
     assert data["renamed"] == 1
 
 
+def test_sync_rename_from_stale_selection(client, sample_pdf_path, tmp_path):
+    """Full integration: index a file, rename on disk, sync with stale path.
+    The sync should detect the rename and return renames list."""
+    # Step 1: Index
+    response = client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    assert response.status_code == 200
+    assert response.json()["added"] == 1
+
+    # Step 2: "Rename" — copy to new path in same directory
+    new_path = sample_pdf_path.parent / "renamed_bestiary.pdf"
+    shutil.copy2(sample_pdf_path, new_path)
+    sample_pdf_path.unlink()
+
+    # Step 3: Sync with STALE path (the old path that no longer exists)
+    response = client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["renamed"] == 1
+    assert data["added"] == 0
+    assert len(data["renames"]) == 1
+    assert data["renames"][0]["old_path"] == str(sample_pdf_path)
+    assert data["renames"][0]["new_path"] == str(new_path)
+
+    # Cleanup: restore the original file for other tests
+    new_path.rename(sample_pdf_path)
+
+
 def test_index_status_shows_rename(client, sample_pdf_path, tmp_path):
     """The index-status endpoint should report renames in its summary."""
     # Index
@@ -349,3 +473,77 @@ def test_index_status_shows_rename(client, sample_pdf_path, tmp_path):
     data = response.json()
     assert data["summary"]["rename"] == 1
     assert len(data["to_rename"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Auto-remove — files deleted from disk
+# ---------------------------------------------------------------------------
+
+def test_sync_auto_removes_deleted_file(client, sample_pdf_path, tmp_path):
+    """A file deleted from disk should be auto-removed from the index."""
+    # Index
+    response = client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    assert response.status_code == 200
+    assert response.json()["added"] == 1
+
+    # Delete the file
+    sample_pdf_path.unlink()
+
+    # Sync with stale path (file no longer exists)
+    response = client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["auto_removed"] == 1
+    assert str(sample_pdf_path) in data["auto_removed_paths"]
+    assert data["total_indexed"] == 0
+
+
+def test_auto_remove_updates_collections(client, sample_pdf_path, tmp_path):
+    """Collections referencing a deleted file should have the path removed."""
+    # Index
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+
+    # Create collection
+    client.post("/api/collections", json={
+        "name": "test_coll",
+        "file_paths": [str(sample_pdf_path)],
+    })
+
+    # Delete file
+    sample_pdf_path.unlink()
+
+    # Sync
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+
+    # Check collection no longer has the path
+    response = client.get("/api/collections")
+    data = response.json()
+    coll = data["collections"]["test_coll"]
+    assert str(sample_pdf_path) not in coll["file_paths"]
+
+
+def test_index_status_shows_auto_remove(client, sample_pdf_path, tmp_path):
+    """The index-status endpoint should report auto_remove in its summary."""
+    # Index
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+
+    # Delete file
+    sample_pdf_path.unlink()
+
+    # Check status with stale path
+    response = client.post("/api/index-status", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    data = response.json()
+    assert data["summary"]["auto_remove"] == 1
+    assert len(data["to_auto_remove"]) == 1

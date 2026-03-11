@@ -352,20 +352,26 @@ def compute_diff(
     to_update = []
     up_to_date = []
     errors = []
+    missing_indexed: list[tuple[str, ManifestEntry]] = []
+
+    stale_paths: list[str] = []
 
     for path_str in selected:
         path = Path(path_str)
         if path_str not in indexed:
             # New file — not yet indexed
             if not path.exists():
-                errors.append({"path": path_str, "error": "File not found on disk"})
+                # Stale selection — file never indexed and doesn't exist.
+                # Not an error; frontend should drop this path from selections.
+                stale_paths.append(path_str)
             else:
                 to_add.append({"path": path_str, "filename": path.name})
         else:
             # Already indexed — check if modified
             entry = manifest.files[path_str]
             if not path.exists():
-                errors.append({"path": path_str, "error": "File not found on disk"})
+                # Defer — might be a rename; we'll scan the parent dir below
+                missing_indexed.append((path_str, entry))
             else:
                 current_mtime = os.path.getmtime(path_str)
                 if current_mtime != entry.mtime:
@@ -383,8 +389,60 @@ def compute_diff(
                         "game_system": entry.game_system,
                     })
 
+    # --- Resolve missing indexed files ---
+    # For each missing file, check if its parent directory is accessible.
+    # If so, scan for a rename candidate (same content hash). If no rename
+    # is found, the file was genuinely deleted → auto-remove from index.
+    # If the parent is inaccessible (e.g. unmounted drive), keep as error.
+    to_remove: list[dict] = []
+    to_auto_remove: list[dict] = []
+    for path_str, entry in missing_indexed:
+        parent = Path(path_str).parent
+        if not parent.is_dir():
+            # Parent inaccessible — possible unmounted drive, keep as error
+            errors.append({"path": path_str, "error": "File not found on disk"})
+            continue
+
+        # Try rename detection if we have a content hash
+        found_rename = False
+        if entry.content_hash:
+            try:
+                for candidate in parent.iterdir():
+                    if candidate.suffix.lower() != ".pdf":
+                        continue
+                    cand_str = str(candidate)
+                    if cand_str in selected or cand_str in indexed:
+                        continue  # already tracked
+                    try:
+                        if candidate.stat().st_size != entry.file_size:
+                            continue
+                    except OSError:
+                        continue
+                    if file_content_hash(candidate) == entry.content_hash:
+                        # Match! Route through rename detection pipeline.
+                        to_remove.append({
+                            "path": path_str,
+                            "filename": entry.filename,
+                            "chunk_count": entry.chunk_count,
+                            "game_system": entry.game_system,
+                        })
+                        to_add.append({"path": cand_str, "filename": candidate.name})
+                        found_rename = True
+                        break
+            except OSError:
+                pass
+
+        if not found_rename:
+            # Parent accessible, file gone, no rename match → auto-remove
+            to_auto_remove.append({
+                "path": path_str,
+                "filename": entry.filename,
+                "chunk_count": entry.chunk_count,
+                "game_system": entry.game_system,
+            })
+
     # Files in manifest but no longer selected → to_remove
-    to_remove = [
+    to_remove += [
         {
             "path": path_str,
             "filename": manifest.files[path_str].filename,
@@ -454,10 +512,12 @@ def compute_diff(
     return {
         "to_add": to_add,
         "to_remove": to_remove,
+        "to_auto_remove": to_auto_remove,
         "to_rename": to_rename,
         "to_update": to_update,
         "up_to_date": up_to_date,
         "errors": errors,
+        "stale_paths": stale_paths,
     }
 
 
@@ -574,10 +634,12 @@ def create_app(collection=None, data_dir: Path | None = None):
             "summary": {
                 "add": len(diff["to_add"]),
                 "remove": len(diff["to_remove"]),
+                "auto_remove": len(diff["to_auto_remove"]),
                 "rename": len(diff["to_rename"]),
                 "update": len(diff["to_update"]),
                 "up_to_date": len(diff["up_to_date"]),
                 "errors": len(diff["errors"]),
+                "stale": len(diff["stale_paths"]),
             },
         }
 
@@ -600,6 +662,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         diff = compute_diff(request.selected_paths, manifest)
 
         removed = 0
+        auto_removed = 0
         renamed = 0
         added = 0
         updated = 0
@@ -610,6 +673,12 @@ def create_app(collection=None, data_dir: Path | None = None):
             delete_source_chunks(entry["filename"], collection)
             del manifest.files[entry["path"]]
             removed += 1
+
+        # Phase 1a: Auto-remove files deleted from disk
+        for entry in diff["to_auto_remove"]:
+            delete_source_chunks(entry["filename"], collection)
+            del manifest.files[entry["path"]]
+            auto_removed += 1
 
         # Phase 1.5: Handle renames (transfer chunks without re-embedding)
         for entry in diff["to_rename"]:
@@ -698,29 +767,47 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         save_manifest(data_dir, manifest)
 
-        # Update collections that reference renamed paths
-        if renamed > 0:
-            rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
+        # Update collections that reference renamed or auto-removed paths
+        if renamed > 0 or auto_removed > 0:
             coll_store = load_collections(data_dir)
             coll_changed = False
-            for coll in coll_store.collections.values():
-                updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
-                if updated_paths != coll.file_paths:
-                    coll.file_paths = updated_paths
-                    coll_changed = True
+
+            if renamed > 0:
+                rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
+                for coll in coll_store.collections.values():
+                    updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
+                    if updated_paths != coll.file_paths:
+                        coll.file_paths = updated_paths
+                        coll_changed = True
+
+            if auto_removed > 0:
+                removed_paths = {e["path"] for e in diff["to_auto_remove"]}
+                for coll in coll_store.collections.values():
+                    filtered = [p for p in coll.file_paths if p not in removed_paths]
+                    if len(filtered) != len(coll.file_paths):
+                        coll.file_paths = filtered
+                        coll_changed = True
+
             if coll_changed:
                 save_collections(data_dir, coll_store)
 
-        if removed > 0 or updated > 0 or renamed > 0:
+        if removed > 0 or updated > 0 or renamed > 0 or auto_removed > 0:
             compact_sqlite(data_dir)
 
         return {
             "added": added,
             "removed": removed,
+            "auto_removed": auto_removed,
             "renamed": renamed,
             "updated": updated,
             "errors": errors,
             "total_indexed": len(manifest.files),
+            "renames": [
+                {"old_path": e["old_path"], "new_path": e["new_path"]}
+                for e in diff["to_rename"]
+            ],
+            "auto_removed_paths": [e["path"] for e in diff["to_auto_remove"]],
+            "stale_paths": diff["stale_paths"],
         }
 
     @app.post("/api/sync-index-stream")
@@ -740,6 +827,7 @@ def create_app(collection=None, data_dir: Path | None = None):
 
             total_files = (
                 len(diff["to_remove"])
+                + len(diff["to_auto_remove"])
                 + len(diff["to_rename"])
                 + len(diff["to_add"])
                 + len(diff["to_update"])
@@ -747,6 +835,7 @@ def create_app(collection=None, data_dir: Path | None = None):
             files_done = 0
             chunks_total = 0
             removed = 0
+            auto_removed = 0
             renamed = 0
             added = 0
             updated = 0
@@ -762,6 +851,15 @@ def create_app(collection=None, data_dir: Path | None = None):
                 files_done += 1
                 chunks_total += deleted
                 yield _progress_event(files_done, total_files, chunks_total, entry["filename"], "remove")
+
+            # Phase 1a: Auto-remove files deleted from disk
+            for entry in diff["to_auto_remove"]:
+                deleted = delete_source_chunks(entry["filename"], collection)
+                del manifest.files[entry["path"]]
+                auto_removed += 1
+                files_done += 1
+                chunks_total += deleted
+                yield _progress_event(files_done, total_files, chunks_total, entry["filename"], "auto_remove")
 
             # Phase 1.5: Handle renames (transfer chunks without re-embedding)
             for entry in diff["to_rename"]:
@@ -905,25 +1003,42 @@ def create_app(collection=None, data_dir: Path | None = None):
                     )
                     yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
 
-            # Update collections that reference renamed paths
-            if renamed > 0:
-                rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
+            # Update collections that reference renamed or auto-removed paths
+            if renamed > 0 or auto_removed > 0:
                 coll_store = load_collections(data_dir)
                 coll_changed = False
-                for coll in coll_store.collections.values():
-                    updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
-                    if updated_paths != coll.file_paths:
-                        coll.file_paths = updated_paths
-                        coll_changed = True
+
+                if renamed > 0:
+                    rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
+                    for coll in coll_store.collections.values():
+                        updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
+                        if updated_paths != coll.file_paths:
+                            coll.file_paths = updated_paths
+                            coll_changed = True
+
+                if auto_removed > 0:
+                    removed_paths = {e["path"] for e in diff["to_auto_remove"]}
+                    for coll in coll_store.collections.values():
+                        filtered = [p for p in coll.file_paths if p not in removed_paths]
+                        if len(filtered) != len(coll.file_paths):
+                            coll.file_paths = filtered
+                            coll_changed = True
+
                 if coll_changed:
                     save_collections(data_dir, coll_store)
 
             save_manifest(data_dir, manifest)
 
-            if removed > 0 or updated > 0 or renamed > 0:
+            if removed > 0 or updated > 0 or renamed > 0 or auto_removed > 0:
                 compact_sqlite(data_dir)
 
-            yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'renamed': renamed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total})}\n\n"
+            renames = [
+                {"old_path": e["old_path"], "new_path": e["new_path"]}
+                for e in diff["to_rename"]
+            ]
+            auto_removed_paths = [e["path"] for e in diff["to_auto_remove"]]
+            stale_paths = diff["stale_paths"]
+            yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'auto_removed': auto_removed, 'renamed': renamed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total, 'renames': renames, 'auto_removed_paths': auto_removed_paths, 'stale_paths': stale_paths})}\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 
