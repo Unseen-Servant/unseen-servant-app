@@ -120,7 +120,7 @@ def test_index_status_empty_selection(client):
 
     data = response.json()
     assert data["summary"] == {
-        "add": 0, "remove": 0, "update": 0,
+        "add": 0, "remove": 0, "rename": 0, "update": 0,
         "up_to_date": 0, "errors": 0,
     }
 

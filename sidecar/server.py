@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import os
 import random
@@ -87,6 +88,15 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[st
     return chunks
 
 
+def file_content_hash(path: Path) -> str:
+    """Compute SHA-256 hash of file contents. Reads in 64KB chunks for memory efficiency."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # Request/response models
 # ---------------------------------------------------------------------------
@@ -136,6 +146,8 @@ class ManifestEntry(BaseModel):
     chunk_count: int
     indexed_at: str
     game_system: str = "unknown"
+    content_hash: str = ""
+    file_size: int = 0
 
 
 class IndexManifest(BaseModel):
@@ -330,8 +342,8 @@ def compute_diff(
 ) -> dict[str, list[dict]]:
     """Compare selected paths against the manifest to find what changed.
 
-    Returns a dict with keys: to_add, to_remove, to_update, up_to_date, errors.
-    Each value is a list of dicts describing the file.
+    Returns a dict with keys: to_add, to_remove, to_rename, to_update,
+    up_to_date, errors.  Each value is a list of dicts describing the file.
     """
     selected = set(selected_paths)
     indexed = set(manifest.files.keys())
@@ -382,9 +394,67 @@ def compute_diff(
         for path_str in (indexed - selected)
     ]
 
+    # --- Rename detection ---
+    # Match to_add files against to_remove files by content hash.
+    # Uses file_size as a cheap pre-filter before computing SHA-256.
+    to_rename = []
+    if to_add and to_remove:
+        # Build lookup from content_hash → to_remove entry (only entries with a hash)
+        remove_by_hash: dict[str, list[dict]] = {}
+        remove_sizes: dict[int, list[str]] = {}
+        for entry in to_remove:
+            manifest_entry = manifest.files[entry["path"]]
+            if manifest_entry.content_hash:
+                remove_by_hash.setdefault(manifest_entry.content_hash, []).append(entry)
+            if manifest_entry.file_size:
+                remove_sizes.setdefault(manifest_entry.file_size, []).append(
+                    manifest_entry.content_hash
+                )
+
+        if remove_by_hash:
+            matched_add = set()
+            matched_remove = set()
+
+            for i, add_entry in enumerate(to_add):
+                add_path = Path(add_entry["path"])
+                add_size = os.path.getsize(add_path)
+
+                # Cheap pre-filter: skip if no removed file has the same size
+                candidate_hashes = remove_sizes.get(add_size)
+                if not candidate_hashes:
+                    continue
+
+                add_hash = file_content_hash(add_path)
+                candidates = remove_by_hash.get(add_hash)
+                if not candidates:
+                    continue
+
+                # Find the first unmatched candidate
+                for rm_entry in candidates:
+                    if rm_entry["path"] not in matched_remove:
+                        matched_add.add(i)
+                        matched_remove.add(rm_entry["path"])
+                        to_rename.append({
+                            "old_path": rm_entry["path"],
+                            "new_path": add_entry["path"],
+                            "filename": add_entry["filename"],
+                            "old_filename": rm_entry["filename"],
+                            "chunk_count": rm_entry["chunk_count"],
+                            "game_system": rm_entry["game_system"],
+                            "content_hash": add_hash,
+                        })
+                        break
+
+            # Remove matched entries from to_add and to_remove
+            if matched_add:
+                to_add = [e for i, e in enumerate(to_add) if i not in matched_add]
+            if matched_remove:
+                to_remove = [e for e in to_remove if e["path"] not in matched_remove]
+
     return {
         "to_add": to_add,
         "to_remove": to_remove,
+        "to_rename": to_rename,
         "to_update": to_update,
         "up_to_date": up_to_date,
         "errors": errors,
@@ -471,6 +541,8 @@ def create_app(collection=None, data_dir: Path | None = None):
                         chunk_count=chunk_count,
                         indexed_at=datetime.now(timezone.utc).isoformat(),
                         game_system=detected_system,
+                        content_hash=file_content_hash(pdf_path),
+                        file_size=os.path.getsize(pdf_path),
                     )
 
         if manifest and data_dir:
@@ -502,6 +574,7 @@ def create_app(collection=None, data_dir: Path | None = None):
             "summary": {
                 "add": len(diff["to_add"]),
                 "remove": len(diff["to_remove"]),
+                "rename": len(diff["to_rename"]),
                 "update": len(diff["to_update"]),
                 "up_to_date": len(diff["up_to_date"]),
                 "errors": len(diff["errors"]),
@@ -527,6 +600,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         diff = compute_diff(request.selected_paths, manifest)
 
         removed = 0
+        renamed = 0
         added = 0
         updated = 0
         errors = []
@@ -536,6 +610,42 @@ def create_app(collection=None, data_dir: Path | None = None):
             delete_source_chunks(entry["filename"], collection)
             del manifest.files[entry["path"]]
             removed += 1
+
+        # Phase 1.5: Handle renames (transfer chunks without re-embedding)
+        for entry in diff["to_rename"]:
+            old_filename = entry["old_filename"]
+            new_path = Path(entry["new_path"])
+
+            results = collection.get(
+                where={"filename": old_filename},
+                include=["embeddings", "documents", "metadatas"],
+            )
+
+            if results["ids"]:
+                collection.delete(ids=results["ids"])
+                new_ids = [f"{new_path.stem}_{i}" for i in range(len(results["ids"]))]
+                new_metadatas = [
+                    {**m, "source": str(new_path), "filename": new_path.name}
+                    for m in results["metadatas"]
+                ]
+                collection.add(
+                    ids=new_ids,
+                    documents=results["documents"],
+                    embeddings=results["embeddings"],
+                    metadatas=new_metadatas,
+                )
+
+            del manifest.files[entry["old_path"]]
+            manifest.files[entry["new_path"]] = ManifestEntry(
+                filename=new_path.name,
+                mtime=os.path.getmtime(new_path),
+                chunk_count=entry["chunk_count"],
+                indexed_at=datetime.now(timezone.utc).isoformat(),
+                game_system=entry["game_system"],
+                content_hash=entry["content_hash"],
+                file_size=os.path.getsize(new_path),
+            )
+            renamed += 1
 
         # Phase 2: Index new files
         for entry in diff["to_add"]:
@@ -557,6 +667,8 @@ def create_app(collection=None, data_dir: Path | None = None):
                     chunk_count=chunk_count,
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
+                    content_hash=file_content_hash(pdf_path),
+                    file_size=os.path.getsize(pdf_path),
                 )
 
         # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
@@ -580,16 +692,32 @@ def create_app(collection=None, data_dir: Path | None = None):
                     chunk_count=chunk_count,
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
+                    content_hash=file_content_hash(pdf_path),
+                    file_size=os.path.getsize(pdf_path),
                 )
 
         save_manifest(data_dir, manifest)
 
-        if removed > 0 or updated > 0:
+        # Update collections that reference renamed paths
+        if renamed > 0:
+            rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
+            coll_store = load_collections(data_dir)
+            coll_changed = False
+            for coll in coll_store.collections.values():
+                updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
+                if updated_paths != coll.file_paths:
+                    coll.file_paths = updated_paths
+                    coll_changed = True
+            if coll_changed:
+                save_collections(data_dir, coll_store)
+
+        if removed > 0 or updated > 0 or renamed > 0:
             compact_sqlite(data_dir)
 
         return {
             "added": added,
             "removed": removed,
+            "renamed": renamed,
             "updated": updated,
             "errors": errors,
             "total_indexed": len(manifest.files),
@@ -612,12 +740,14 @@ def create_app(collection=None, data_dir: Path | None = None):
 
             total_files = (
                 len(diff["to_remove"])
+                + len(diff["to_rename"])
                 + len(diff["to_add"])
                 + len(diff["to_update"])
             )
             files_done = 0
             chunks_total = 0
             removed = 0
+            renamed = 0
             added = 0
             updated = 0
             errors = []
@@ -632,6 +762,47 @@ def create_app(collection=None, data_dir: Path | None = None):
                 files_done += 1
                 chunks_total += deleted
                 yield _progress_event(files_done, total_files, chunks_total, entry["filename"], "remove")
+
+            # Phase 1.5: Handle renames (transfer chunks without re-embedding)
+            for entry in diff["to_rename"]:
+                old_filename = entry["old_filename"]
+                new_path = Path(entry["new_path"])
+
+                results = collection.get(
+                    where={"filename": old_filename},
+                    include=["embeddings", "documents", "metadatas"],
+                )
+
+                transferred = 0
+                if results["ids"]:
+                    collection.delete(ids=results["ids"])
+                    new_ids = [f"{new_path.stem}_{i}" for i in range(len(results["ids"]))]
+                    new_metadatas = [
+                        {**m, "source": str(new_path), "filename": new_path.name}
+                        for m in results["metadatas"]
+                    ]
+                    collection.add(
+                        ids=new_ids,
+                        documents=results["documents"],
+                        embeddings=results["embeddings"],
+                        metadatas=new_metadatas,
+                    )
+                    transferred = len(results["ids"])
+
+                del manifest.files[entry["old_path"]]
+                manifest.files[entry["new_path"]] = ManifestEntry(
+                    filename=new_path.name,
+                    mtime=os.path.getmtime(new_path),
+                    chunk_count=entry["chunk_count"],
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                    game_system=entry["game_system"],
+                    content_hash=entry["content_hash"],
+                    file_size=os.path.getsize(new_path),
+                )
+                renamed += 1
+                files_done += 1
+                chunks_total += transferred
+                yield _progress_event(files_done, total_files, chunks_total, new_path.name, "rename")
 
             # Phase 2: Index new files
             for entry in diff["to_add"]:
@@ -678,6 +849,8 @@ def create_app(collection=None, data_dir: Path | None = None):
                         chunk_count=len(chunks),
                         indexed_at=datetime.now(timezone.utc).isoformat(),
                         game_system=detected_system,
+                        content_hash=file_content_hash(pdf_path),
+                        file_size=os.path.getsize(pdf_path),
                     )
                     yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "add")
 
@@ -727,15 +900,30 @@ def create_app(collection=None, data_dir: Path | None = None):
                         chunk_count=len(chunks),
                         indexed_at=datetime.now(timezone.utc).isoformat(),
                         game_system=detected_system,
+                        content_hash=file_content_hash(pdf_path),
+                        file_size=os.path.getsize(pdf_path),
                     )
                     yield _progress_event(files_done, total_files, chunks_total, pdf_path.name, "update")
 
+            # Update collections that reference renamed paths
+            if renamed > 0:
+                rename_map = {e["old_path"]: e["new_path"] for e in diff["to_rename"]}
+                coll_store = load_collections(data_dir)
+                coll_changed = False
+                for coll in coll_store.collections.values():
+                    updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
+                    if updated_paths != coll.file_paths:
+                        coll.file_paths = updated_paths
+                        coll_changed = True
+                if coll_changed:
+                    save_collections(data_dir, coll_store)
+
             save_manifest(data_dir, manifest)
 
-            if removed > 0 or updated > 0:
+            if removed > 0 or updated > 0 or renamed > 0:
                 compact_sqlite(data_dir)
 
-            yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total})}\n\n"
+            yield f"data: {json.dumps({'event': 'complete', 'added': added, 'removed': removed, 'renamed': renamed, 'updated': updated, 'errors': errors, 'total_indexed': len(manifest.files), 'chunks_total': chunks_total})}\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 
