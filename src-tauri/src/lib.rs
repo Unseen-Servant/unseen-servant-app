@@ -534,19 +534,29 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
             .resource_dir()
             .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
         let binaries_dir = resource_dir.join("binaries");
-        let binary = find_bundled_binary(&binaries_dir, "legend-lore-mcp")?
-            .to_string_lossy()
-            .into_owned();
+        let binary_path = find_bundled_binary(&binaries_dir, "legend-lore-mcp")?;
+
+        // Ensure the binary is executable (Tauri resources may lose the execute bit)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary_path)
+                .map_err(|e| format!("Failed to read MCP binary metadata: {}", e))?
+                .permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary_path, perms)
+                .map_err(|e| format!("Failed to set MCP binary permissions: {}", e))?;
+        }
+
+        let binary = binary_path.to_string_lossy().into_owned();
 
         (binary, vec!["--sidecar-url".to_string(), SIDECAR_URL.to_string()])
     };
 
     let config = serde_json::json!({
-        "mcpServers": {
-            "legend-lore": {
-                "command": command,
-                "args": args,
-            }
+        "Legend Lore": {
+            "command": command,
+            "args": args,
         }
     });
 
