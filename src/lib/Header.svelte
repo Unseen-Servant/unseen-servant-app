@@ -25,9 +25,11 @@
 
   .app-title {
     font-family: var(--font-heading);
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 700;
-    color: var(--text-accent);
+    color: var(--text-secondary);
     letter-spacing: 0.02em;
+    -webkit-user-select: none;
+    user-select: none;
   }
 </style>

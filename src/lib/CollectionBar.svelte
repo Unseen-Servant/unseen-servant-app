@@ -143,6 +143,8 @@
     font-family: var(--font-heading);
     color: var(--text-secondary);
     margin-right: 0.25rem;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .chip {
     display: inline-flex;
