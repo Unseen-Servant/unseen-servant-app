@@ -160,6 +160,14 @@ struct StatsResult {
     total_documents: u32,
     collection_name: String,
     storage_bytes: u64,
+    reclaimable_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CompactResult {
+    size_before: u64,
+    size_after: u64,
+    reclaimed: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -392,6 +400,23 @@ async fn get_stats() -> Result<StatsResult, String> {
 }
 
 #[tauri::command]
+async fn compact_database() -> Result<CompactResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/compact", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    let result: CompactResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
 async fn set_game_system(filename: String, game_system: String) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -582,15 +607,24 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
         (binary, vec!["--sidecar-url".to_string(), SIDECAR_URL.to_string()])
     };
 
-    let config = serde_json::json!({
-        "Legend Lore": {
-            "command": command,
-            "args": args,
-        }
+    let inner = serde_json::json!({
+        "command": command,
+        "args": args,
     });
 
-    serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))
+    let inner_pretty = serde_json::to_string_pretty(&inner)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    // Wrap as "Legend Lore": { ... } with proper indentation for pasting
+    // into claude_desktop_config.json's mcpServers block
+    let body = inner_pretty
+        .lines()
+        .enumerate()
+        .map(|(i, line)| if i == 0 { line.to_string() } else { format!("  {}", line) })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(format!("\"Legend Lore\": {}", body))
 }
 
 // ---------------------------------------------------------------------------
@@ -745,7 +779,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

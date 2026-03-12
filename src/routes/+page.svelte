@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+  import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
@@ -40,6 +41,8 @@
 
   // Sidecar stats
   let storageBytes = 0;
+  let totalChunks = 0;
+  let reclaimableBytes = 0;
 
   // Sidecar health
   let sidecarConnected = false;
@@ -115,8 +118,8 @@
 
       // Fetch storage size in parallel (non-blocking)
       invoke<StatsResult>('get_stats')
-        .then(r => { storageBytes = r.storage_bytes; })
-        .catch(() => { storageBytes = 0; });
+        .then(r => { storageBytes = r.storage_bytes; totalChunks = r.total_chunks; reclaimableBytes = r.reclaimable_bytes; })
+        .catch(() => { storageBytes = 0; totalChunks = 0; reclaimableBytes = 0; });
 
       // Auto-sync renames, deletions, and stale paths silently — no user interaction needed
       const { rename, auto_remove, stale } = indexStatus.summary;
@@ -297,14 +300,24 @@
   // Track which files are in the index (so untagged indexed files show the "+" button)
   $: indexedPaths = buildIndexedPaths(indexStatus);
 
-  // Count distinct game systems among indexed files
-  $: gameSystemCount = indexStatus
-    ? new Set(
-        [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]
-          .map(e => e.game_system)
-          .filter(s => s && s !== 'unknown')
-      ).size
-    : 0;
+  // Count files per game system, sorted by count descending
+  $: gameSystemStats = (() => {
+    if (!indexStatus) return [];
+    const counts = new Map<string, number>();
+    for (const e of [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]) {
+      if (e.game_system && e.game_system !== 'unknown') {
+        counts.set(e.game_system, (counts.get(e.game_system) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  })();
+  $: gameSystemCount = gameSystemStats.length;
+  $: gameSystemNames = gameSystemStats.map(s => s.name);
+  $: topGameSystem = gameSystemStats.length > 0
+    ? `Top system: ${gameSystemStats[0].name} with ${gameSystemStats[0].count} file${gameSystemStats[0].count === 1 ? '' : 's'}`
+    : '';
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
@@ -504,6 +517,27 @@
     }
   }
 
+  // Compact the database to reclaim unused space
+  async function handleCompact() {
+    try {
+      const result = await invoke<{ reclaimed: number }>('compact_database');
+      const msg = result.reclaimed > 0
+        ? `Reclaimed ${formatSize(result.reclaimed)}`
+        : 'Nothing to reclaim';
+      notification.show({ type: 'success', message: msg, duration: 4000 });
+      await refreshIndexStatus(); // refresh stats to update reclaimable_bytes
+    } catch (e) {
+      notification.show({ type: 'error', message: `Compact failed: ${String(e)}`, duration: 5000 });
+    }
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
+    if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB';
+    if (bytes >= 1_024) return (bytes / 1_024).toFixed(0) + ' KB';
+    return bytes + ' B';
+  }
+
   // Sync index: add new, remove deselected, re-index modified
   async function handleSync() {
     isSyncing = true;
@@ -623,11 +657,7 @@
 </script>
 
 <main class="app-layout">
-  <Header
-    {selectedFolder}
-    onSelectFolder={handleSelectFolder}
-    onCopyMcpConfig={handleCopyMcpConfig}
-  />
+  <Header />
 
   {#if selectedFolder}
     <div class="collections-area">
@@ -689,10 +719,17 @@
     selectedCount={selectedPaths.size}
     indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
+    {topGameSystem}
+    {totalChunks}
     {storageBytes}
+    {reclaimableBytes}
     {isSyncing}
     {lastSyncTime}
     onSync={handleManualSync}
+    onCompact={handleCompact}
+    onCopyMcpConfig={handleCopyMcpConfig}
+    onSelectFolder={handleSelectFolder}
+    onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
   />
 </main>

@@ -79,7 +79,7 @@ For licensing inquiries, contact: guild@unseenservant.com`;
 
 {#if visible}
   <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-  <div class="backdrop" role="dialog" aria-modal="true" aria-label="License" on:click={handleBackdrop} on:keydown={handleKeydown}>
+  <div class="backdrop" role="dialog" aria-modal="true" aria-label="License" tabindex="-1" on:click={handleBackdrop} on:keydown={handleKeydown}>
     <div class="modal">
       <div class="modal-header">
         <span class="modal-title font-heading">License</span>

@@ -977,11 +977,25 @@ def create_app(collection=None, data_dir: Path | None = None):
                 for dirpath, _dirnames, filenames in os.walk(data_dir):
                     for f in filenames:
                         storage_bytes += os.path.getsize(os.path.join(dirpath, f))
+
+            # Calculate reclaimable space from SQLite freelist
+            reclaimable_bytes = 0
+            if data_dir:
+                sqlite_path = data_dir / "chroma.sqlite3"
+                if sqlite_path.exists():
+                    import sqlite3
+                    conn = sqlite3.connect(str(sqlite_path))
+                    page_size = conn.execute("PRAGMA page_size").fetchone()[0]
+                    freelist = conn.execute("PRAGMA freelist_count").fetchone()[0]
+                    conn.close()
+                    reclaimable_bytes = page_size * freelist
+
             return {
                 "total_chunks": count,
                 "total_documents": unique_sources,
                 "collection_name": collection.name,
                 "storage_bytes": storage_bytes,
+                "reclaimable_bytes": reclaimable_bytes,
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
