@@ -15,6 +15,16 @@
   export let onToggle: (path: string, isDir: boolean, item: FileItem) => void;
   export let onSetGameSystem: (path: string, filename: string, tag: string) => void = () => {};
 
+  // Focus & context menu props
+  export let focusedFilePath: string | null = null;
+  export let onFocusFile: (path: string | null) => void = () => {};
+  export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
+
+  // Inline rename props
+  export let renamingFilePath: string | null = null;
+  export let onRenameSubmit: (oldPath: string, newName: string) => void = () => {};
+  export let onRenameCancel: () => void = () => {};
+
   // Collection mode props
   export let mode: 'index' | 'collection' = 'index';
   export let collectionPaths: Set<string> = new Set();
@@ -63,6 +73,9 @@
   // Highlighted when previewing a collection
   $: isHighlighted = mode === 'index' && !item.is_dir && highlightPaths.size > 0 && highlightPaths.has(item.path);
 
+  $: isFocused = !item.is_dir && item.path === focusedFilePath;
+  $: isRenaming = item.path === renamingFilePath;
+
   $: hasTag = !item.is_dir && gameSystemMap.has(item.path);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
 
@@ -105,6 +118,14 @@
     showDropdown = false;
   }
 
+  function handleRowClick() {
+    if (item.is_dir) {
+      toggleExpand();
+    } else {
+      onFocusFile(item.path);
+    }
+  }
+
   async function openFile() {
     if (item.is_dir) return;
     try {
@@ -114,6 +135,29 @@
     }
   }
 
+  function handleMouseDown(event: MouseEvent) {
+    if (event.button === 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      onContextMenu(event, item);
+    }
+  }
+
+  function handleRenameKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      const input = event.currentTarget as HTMLInputElement;
+      const ext = item.name.match(/\.[^.]+$/)?.[0] ?? '';
+      onRenameSubmit(item.path, input.value + ext);
+    } else if (event.key === 'Escape') {
+      onRenameCancel();
+    }
+  }
+
+  function autofocus(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
+
   function handleClickOutside(event: MouseEvent) {
     showDropdown = false;
   }
@@ -121,7 +165,7 @@
 
 <svelte:window on:click={handleClickOutside} />
 
-<div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} style="padding-left: {level * 1.5}rem;">
+<div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} class:focused={isFocused} style="padding-left: {level * 1.5}rem;">
   <div class="row-container">
     {#if showCheckbox}
       <button
@@ -138,11 +182,21 @@
       <span class="checkbox-spacer"></span>
     {/if}
 
-    <button class="row" on:click={toggleExpand} on:dblclick={openFile}>
+    <button class="row" on:click={handleRowClick} on:dblclick={openFile} on:mousedown={handleMouseDown}>
       {#if item.is_dir}
         <span class="icon folder-icon">{isExpanded ? '\u25BE' : '\u25B8'}</span>
       {/if}
-      <span class="name">{item.name}</span>
+      {#if isRenaming}
+        <input
+          class="rename-input"
+          value={item.name.replace(/\.[^.]+$/, '')}
+          on:keydown={handleRenameKeydown}
+          on:blur={onRenameCancel}
+          use:autofocus
+        />
+      {:else}
+        <span class="name">{item.name}</span>
+      {/if}
     </button>
 
     {#if hasTag}
@@ -201,6 +255,12 @@
           {indexedPaths}
           {onToggle}
           {onSetGameSystem}
+          {focusedFilePath}
+          {onFocusFile}
+          {onContextMenu}
+          {renamingFilePath}
+          {onRenameSubmit}
+          {onRenameCancel}
           {mode}
           {collectionPaths}
           {collectionFolders}
@@ -286,6 +346,9 @@
     border-left: 3px solid var(--text-accent);
     margin-left: -3px;
   }
+  .focused > .row-container > .row {
+    background: var(--bg-focused);
+  }
   .row {
     display: flex;
     align-items: center;
@@ -319,6 +382,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .rename-input {
+    background: var(--bg-container);
+    color: var(--text-primary);
+    border: 1px solid var(--text-accent);
+    border-radius: 3px;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.95rem;
+    font-family: var(--font-body);
+    outline: none;
+    width: 100%;
   }
   .badge-wrapper {
     position: relative;

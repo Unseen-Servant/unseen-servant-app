@@ -3,10 +3,12 @@
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-  import { revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
+  import ContextMenu from '../lib/ContextMenu.svelte';
   import CollectionBar from '../lib/CollectionBar.svelte';
   import Header from '../lib/Header.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
@@ -20,6 +22,11 @@
   let selectedPaths = new Set<string>;
   let syncedPaths = new Set<string>;
   let error = '';
+
+  // File focus & context menu
+  let focusedFilePath: string | null = null;
+  let contextMenu: { x: number; y: number; item: FileItem } | null = null;
+  let renamingFilePath: string | null = null;
 
   // Game system tag editing
   let knownSystems: KnownGameSystem[] = [];
@@ -358,6 +365,90 @@
 
 
   // ---------------------------------------------------------------------------
+  // File focus, context menu & file operations
+  // ---------------------------------------------------------------------------
+
+  function handleGlobalKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      if (contextMenu) { contextMenu = null; return; }
+      if (renamingFilePath) { renamingFilePath = null; return; }
+      if (focusedFilePath) { focusedFilePath = null; }
+    }
+  }
+
+  function handleContextMenu(event: MouseEvent, item: FileItem) {
+    focusedFilePath = item.is_dir ? null : item.path;
+    contextMenu = { x: event.clientX, y: event.clientY, item };
+  }
+
+  async function handleContextOpen() {
+    if (contextMenu) {
+      await openPath(contextMenu.item.path);
+      contextMenu = null;
+    }
+  }
+
+  function handleContextReveal() {
+    if (contextMenu) {
+      revealItemInDir(contextMenu.item.path);
+      contextMenu = null;
+    }
+  }
+
+  function handleContextRename() {
+    if (contextMenu) {
+      renamingFilePath = contextMenu.item.path;
+      contextMenu = null;
+    }
+  }
+
+  async function handleContextDelete() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+
+    const confirmed = await confirm(`Move "${item.name}" to Trash?`, { title: 'Delete file', kind: 'warning' });
+    if (!confirmed) return;
+
+    try {
+      await invoke('delete_file', { path: item.path });
+      if (selectedPaths.has(item.path)) {
+        selectedPaths.delete(item.path);
+        selectedPaths = selectedPaths;
+        await saveState();
+      }
+      if (focusedFilePath === item.path) focusedFilePath = null;
+      if (selectedFolder) await loadFiles(selectedFolder);
+      if (selectedPaths.size > 0) scheduleStatusRefresh();
+    } catch (e) {
+      notification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
+    }
+  }
+
+  async function handleRenameSubmit(oldPath: string, newName: string) {
+    try {
+      const newPath = await invoke<string>('rename_file', { oldPath, newName });
+      if (selectedPaths.has(oldPath)) {
+        selectedPaths.delete(oldPath);
+        selectedPaths.add(newPath);
+        selectedPaths = selectedPaths;
+        await saveState();
+      }
+      if (focusedFilePath === oldPath) focusedFilePath = newPath;
+      renamingFilePath = null;
+      if (selectedFolder) await loadFiles(selectedFolder);
+      if (selectedPaths.size > 0) scheduleStatusRefresh();
+    } catch (e) {
+      notification.show({ type: 'error', message: `Rename failed: ${String(e)}`, duration: 5000 });
+      renamingFilePath = null;
+    }
+  }
+
+  function handleRenameCancel() {
+    renamingFilePath = null;
+  }
+
+  // ---------------------------------------------------------------------------
   // Collections
   // ---------------------------------------------------------------------------
 
@@ -656,6 +747,8 @@
 
 </script>
 
+<svelte:window on:keydown={handleGlobalKeydown} on:contextmenu|preventDefault />
+
 <main class="app-layout">
   <Header />
 
@@ -690,6 +783,12 @@
           {indexedPaths}
           onToggle={toogleSelection}
           onSetGameSystem={handleSetGameSystem}
+          {focusedFilePath}
+          onFocusFile={(path) => { focusedFilePath = path; }}
+          onContextMenu={handleContextMenu}
+          {renamingFilePath}
+          onRenameSubmit={handleRenameSubmit}
+          onRenameCancel={handleRenameCancel}
           mode={treeMode}
           collectionPaths={collectionEditPaths}
           {collectionFolders}
@@ -711,6 +810,19 @@
 
   {#if error}
     <div class="error-banner">Error: {error}</div>
+  {/if}
+
+  {#if contextMenu}
+    <ContextMenu
+      x={contextMenu.x}
+      y={contextMenu.y}
+      item={contextMenu.item}
+      onOpen={handleContextOpen}
+      onReveal={handleContextReveal}
+      onRename={handleContextRename}
+      onDelete={handleContextDelete}
+      onClose={() => { contextMenu = null; }}
+    />
   {/if}
 
   <StatusBar
