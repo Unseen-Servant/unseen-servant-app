@@ -43,6 +43,8 @@
 
   // Sidecar health
   let sidecarConnected = false;
+  let lastSyncTime: Date | null = null;
+  let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -73,10 +75,18 @@
     // Poll sidecar health
     checkSidecarHealth();
     healthInterval = setInterval(checkSidecarHealth, 10000);
+
+    // Auto-sync: periodically check for filesystem changes
+    autoSyncInterval = setInterval(() => {
+      if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
+        refreshIndexStatus();
+      }
+    }, 60_000);
   });
 
   onDestroy(() => {
     if (healthInterval) clearInterval(healthInterval);
+    if (autoSyncInterval) clearInterval(autoSyncInterval);
   });
 
   async function checkSidecarHealth() {
@@ -115,6 +125,7 @@
         return;
       }
 
+      lastSyncTime = new Date();
       showSyncPromptIfNeeded();
     } catch (e) {
       // Sidecar might not be ready yet on startup
@@ -571,6 +582,9 @@
         ? `Synced: ${parts.join(', ')}.${chunkStr}`
         : 'Nothing to sync.';
 
+      // Record successful sync time for status bar tooltip
+      lastSyncTime = new Date();
+
       // Persist synced selection so uncommitted changes don't survive a restart
       syncedPaths = new Set(selectedPaths);
       const store = await load('settings.json');
@@ -597,6 +611,12 @@
     } finally {
       unlisten();
       isSyncing = false;
+    }
+  }
+
+  function handleManualSync() {
+    if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
+      refreshIndexStatus();
     }
   }
 
@@ -670,6 +690,9 @@
     indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
     {storageBytes}
+    {isSyncing}
+    {lastSyncTime}
+    onSync={handleManualSync}
     onShowLicense={() => { showLicense = true; }}
   />
 </main>
