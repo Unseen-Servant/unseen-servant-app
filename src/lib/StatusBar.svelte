@@ -7,9 +7,11 @@
   export let topGameSystem: string = '';
   export let totalChunks: number = 0;
   export let storageBytes: number;
+  export let reclaimableBytes: number = 0;
   export let isSyncing: boolean = false;
   export let lastSyncTime: Date | null = null;
   export let onSync: (() => void) | undefined = undefined;
+  export let onCompact: (() => void) | undefined = undefined;
   export let onCopyMcpConfig: () => void;
   export let onSelectFolder: () => void;
   export let onOpenFolder: () => void;
@@ -18,6 +20,10 @@
   $: syncTooltip = lastSyncTime
     ? `Last synced ${lastSyncTime.toLocaleTimeString()}`
     : 'Sync index';
+
+  $: storageTooltip = reclaimableBytes > 0
+    ? `${formatSize(reclaimableBytes)} reclaimable — click to compact`
+    : 'No reclaimable space';
 
   function formatSize(bytes: number): string {
     if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
@@ -44,7 +50,11 @@
         {/if}
         {#if storageBytes > 0}
           <span class="separator">&middot;</span>
-          <span title="{storageBytes.toLocaleString()} bytes">{formatSize(storageBytes)}</span>
+          {#if reclaimableBytes > 0 && onCompact}
+            <button class="compact-btn" on:click={onCompact} title={storageTooltip}>{formatSize(storageBytes)}</button>
+          {:else}
+            <span title={storageTooltip}>{formatSize(storageBytes)}</span>
+          {/if}
         {/if}
       {:else}
         <span>{selectedCount} selected</span>
@@ -183,6 +193,20 @@
     height: 12px;
   }
   .license-link:hover {
+    color: var(--text-accent);
+  }
+
+  .compact-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+  .compact-btn:hover {
     color: var(--text-accent);
   }
 

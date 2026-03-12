@@ -103,6 +103,7 @@ export interface StatsResult {
   total_documents: number;
   collection_name: string;
   storage_bytes: number;
+  reclaimable_bytes: number;
 }
 
 export interface CollectionMutationResult {
