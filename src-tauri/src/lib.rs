@@ -582,15 +582,24 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
         (binary, vec!["--sidecar-url".to_string(), SIDECAR_URL.to_string()])
     };
 
-    let config = serde_json::json!({
-        "Legend Lore": {
-            "command": command,
-            "args": args,
-        }
+    let inner = serde_json::json!({
+        "command": command,
+        "args": args,
     });
 
-    serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))
+    let inner_pretty = serde_json::to_string_pretty(&inner)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    // Wrap as "Legend Lore": { ... } with proper indentation for pasting
+    // into claude_desktop_config.json's mcpServers block
+    let body = inner_pretty
+        .lines()
+        .enumerate()
+        .map(|(i, line)| if i == 0 { line.to_string() } else { format!("  {}", line) })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(format!("\"Legend Lore\": {}", body))
 }
 
 // ---------------------------------------------------------------------------

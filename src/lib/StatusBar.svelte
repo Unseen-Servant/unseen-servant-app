@@ -4,10 +4,15 @@
   export let selectedCount: number;
   export let indexedCount: number;
   export let gameSystemCount: number;
+  export let topGameSystem: string = '';
+  export let totalChunks: number = 0;
   export let storageBytes: number;
   export let isSyncing: boolean = false;
   export let lastSyncTime: Date | null = null;
   export let onSync: (() => void) | undefined = undefined;
+  export let onCopyMcpConfig: () => void;
+  export let onSelectFolder: () => void;
+  export let onOpenFolder: () => void;
   export let onShowLicense: () => void;
 
   $: syncTooltip = lastSyncTime
@@ -25,25 +30,39 @@
 <footer class="statusbar">
   <div class="statusbar-left">
     {#if selectedFolder}
-      <span class="indicator" class:connected={sidecarConnected} title={sidecarConnected ? 'Sidecar connected' : 'Sidecar disconnected'}></span>
+      <span class="indicator" class:connected={sidecarConnected} title={sidecarConnected ? 'Sidecar connected' : 'Sidecar disconnected'}>
+        <!-- Font Awesome "server" icon (static/icons/server-solid-full.svg) -->
+        <svg class="indicator-icon" viewBox="0 0 640 640" fill="currentColor">
+          <path d="M160 96C124.7 96 96 124.7 96 160L96 224C96 259.3 124.7 288 160 288L480 288C515.3 288 544 259.3 544 224L544 160C544 124.7 515.3 96 480 96L160 96zM376 168C389.3 168 400 178.7 400 192C400 205.3 389.3 216 376 216C362.7 216 352 205.3 352 192C352 178.7 362.7 168 376 168zM432 192C432 178.7 442.7 168 456 168C469.3 168 480 178.7 480 192C480 205.3 469.3 216 456 216C442.7 216 432 205.3 432 192zM160 352C124.7 352 96 380.7 96 416L96 480C96 515.3 124.7 544 160 544L480 544C515.3 544 544 515.3 544 480L544 416C544 380.7 515.3 352 480 352L160 352zM376 424C389.3 424 400 434.7 400 448C400 461.3 389.3 472 376 472C362.7 472 352 461.3 352 448C352 434.7 362.7 424 376 424zM432 448C432 434.7 442.7 424 456 424C469.3 424 480 434.7 480 448C480 461.3 469.3 472 456 472C442.7 472 432 461.3 432 448z"/>
+        </svg>
+      </span>
       {#if indexedCount > 0}
-        <span>{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
+        <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
         {#if gameSystemCount > 0}
           <span class="separator">&middot;</span>
-          <span>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
+          <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
         {/if}
         {#if storageBytes > 0}
           <span class="separator">&middot;</span>
-          <span>{formatSize(storageBytes)}</span>
+          <span title="{storageBytes.toLocaleString()} bytes">{formatSize(storageBytes)}</span>
         {/if}
       {:else}
         <span>{selectedCount} selected</span>
       {/if}
       {#if onSync}
+        <span class="separator">&middot;</span>
         <button class="sync-btn" class:spinning={isSyncing} on:click={onSync} title={syncTooltip} disabled={isSyncing}>
           <!-- Font Awesome "arrows-rotate" icon (static/icons/arrows-rotate-solid-full.svg) -->
           <svg class="sync-icon" viewBox="0 0 640 640" fill="currentColor">
             <path d="M129.9 292.5C143.2 199.5 223.3 128 320 128C373 128 421 149.5 455.8 184.2C456 184.4 456.2 184.6 456.4 184.8L464 192L416.1 192C398.4 192 384.1 206.3 384.1 224C384.1 241.7 398.4 256 416.1 256L544.1 256C561.8 256 576.1 241.7 576.1 224L576.1 96C576.1 78.3 561.8 64 544.1 64C526.4 64 512.1 78.3 512.1 96L512.1 149.4L500.8 138.7C454.5 92.6 390.5 64 320 64C191 64 84.3 159.4 66.6 283.5C64.1 301 76.2 317.2 93.7 319.7C111.2 322.2 127.4 310 129.9 292.6zM573.4 356.5C575.9 339 563.7 322.8 546.3 320.3C528.9 317.8 512.6 330 510.1 347.4C496.8 440.4 416.7 511.9 320 511.9C267 511.9 219 490.4 184.2 455.7C184 455.5 183.8 455.3 183.6 455.1L176 447.9L223.9 447.9C241.6 447.9 255.9 433.6 255.9 415.9C255.9 398.2 241.6 383.9 223.9 383.9L96 384C87.5 384 79.3 387.4 73.3 393.5C67.3 399.6 63.9 407.7 64 416.3L65 543.3C65.1 561 79.6 575.2 97.3 575C115 574.8 129.2 560.4 129 542.7L128.6 491.2L139.3 501.3C185.6 547.4 249.5 576 320 576C449 576 555.7 480.6 573.4 356.5z"/>
+          </svg>
+        </button>
+        <button class="sync-btn" on:click={onCopyMcpConfig} title="Copy MCP config">
+          <!-- MCP logo icon (static/icons/mcp.svg) -->
+          <svg class="sync-icon" viewBox="0 0 180 180" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round">
+            <path d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706V16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/>
+            <path d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/>
+            <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
           </svg>
         </button>
       {/if}
@@ -51,10 +70,21 @@
   </div>
   <div class="statusbar-right">
     {#if selectedFolder}
-      <span class="folder-path" title={selectedFolder}>{selectedFolder}</span>
+      <button class="sync-btn" on:click={onSelectFolder} title="Change library folder">
+        <!-- Font Awesome "book" icon (from Header) -->
+        <svg class="sync-icon" viewBox="0 0 640 640" fill="currentColor">
+          <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
+        </svg>
+      </button>
+      <button class="folder-path" on:click={onOpenFolder} title="Reveal in Finder">{selectedFolder}</button>
       <span class="separator">&middot;</span>
     {/if}
-    <button class="license-link" on:click={onShowLicense}>License</button>
+    <button class="license-link" on:click={onShowLicense} title="License">
+      <!-- Font Awesome "scroll" icon (static/icons/scroll-solid-full.svg) -->
+      <svg class="license-icon" viewBox="0 0 640 640" fill="currentColor">
+        <path d="M32 176C32 134.5 63.6 100.4 104 96.4L104 96L384 96C437 96 480 139 480 192L480 368L304 368C264.2 368 232 400.2 232 440L232 500C232 524.3 212.3 544 188 544C163.7 544 144 524.3 144 500L144 272L80 272C53.5 272 32 250.5 32 224L32 176zM268.8 544C275.9 530.9 280 515.9 280 500L280 440C280 426.7 290.7 416 304 416L552 416C565.3 416 576 426.7 576 440L576 464C576 508.2 540.2 544 496 544L268.8 544zM112 144C94.3 144 80 158.3 80 176L80 224L144 224L144 176C144 158.3 129.7 144 112 144z"/>
+      </svg>
+    </button>
   </div>
 </footer>
 
@@ -70,6 +100,8 @@
     flex-shrink: 0;
     font-size: 0.75rem;
     color: var(--text-secondary);
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .statusbar-left {
@@ -86,14 +118,17 @@
   }
 
   .indicator {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--text-tertiary);
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-tertiary);
+    line-height: 0;
   }
   .indicator.connected {
-    background: var(--text-active);
+    color: var(--text-active);
+  }
+  .indicator-icon {
+    width: 12px;
+    height: 12px;
   }
 
   .sync-btn {
@@ -138,18 +173,36 @@
     font-family: inherit;
     padding: 0;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     transition: color var(--transition-fast);
+  }
+  .license-icon {
+    width: 12px;
+    height: 12px;
   }
   .license-link:hover {
     color: var(--text-accent);
   }
 
   .folder-path {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0;
+    cursor: pointer;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     direction: rtl;
     text-align: right;
     max-width: 300px;
+    transition: color var(--transition-fast);
+  }
+  .folder-path:hover {
+    color: var(--text-accent);
   }
 </style>

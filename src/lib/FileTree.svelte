@@ -131,6 +131,7 @@
         class:collection={mode === 'collection'}
         on:click|stopPropagation={handleCheckboxChange}
         role="checkbox"
+        aria-label="Select {item.name}"
         aria-checked={isIndeterminate ? 'mixed' : isChecked}
       ></button>
     {:else}

@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+  import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
@@ -40,6 +41,7 @@
 
   // Sidecar stats
   let storageBytes = 0;
+  let totalChunks = 0;
 
   // Sidecar health
   let sidecarConnected = false;
@@ -115,8 +117,8 @@
 
       // Fetch storage size in parallel (non-blocking)
       invoke<StatsResult>('get_stats')
-        .then(r => { storageBytes = r.storage_bytes; })
-        .catch(() => { storageBytes = 0; });
+        .then(r => { storageBytes = r.storage_bytes; totalChunks = r.total_chunks; })
+        .catch(() => { storageBytes = 0; totalChunks = 0; });
 
       // Auto-sync renames, deletions, and stale paths silently — no user interaction needed
       const { rename, auto_remove, stale } = indexStatus.summary;
@@ -297,14 +299,24 @@
   // Track which files are in the index (so untagged indexed files show the "+" button)
   $: indexedPaths = buildIndexedPaths(indexStatus);
 
-  // Count distinct game systems among indexed files
-  $: gameSystemCount = indexStatus
-    ? new Set(
-        [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]
-          .map(e => e.game_system)
-          .filter(s => s && s !== 'unknown')
-      ).size
-    : 0;
+  // Count files per game system, sorted by count descending
+  $: gameSystemStats = (() => {
+    if (!indexStatus) return [];
+    const counts = new Map<string, number>();
+    for (const e of [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]) {
+      if (e.game_system && e.game_system !== 'unknown') {
+        counts.set(e.game_system, (counts.get(e.game_system) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  })();
+  $: gameSystemCount = gameSystemStats.length;
+  $: gameSystemNames = gameSystemStats.map(s => s.name);
+  $: topGameSystem = gameSystemStats.length > 0
+    ? `Top system: ${gameSystemStats[0].name} with ${gameSystemStats[0].count} file${gameSystemStats[0].count === 1 ? '' : 's'}`
+    : '';
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
@@ -623,11 +635,7 @@
 </script>
 
 <main class="app-layout">
-  <Header
-    {selectedFolder}
-    onSelectFolder={handleSelectFolder}
-    onCopyMcpConfig={handleCopyMcpConfig}
-  />
+  <Header />
 
   {#if selectedFolder}
     <div class="collections-area">
@@ -689,10 +697,15 @@
     selectedCount={selectedPaths.size}
     indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
+    {topGameSystem}
+    {totalChunks}
     {storageBytes}
     {isSyncing}
     {lastSyncTime}
     onSync={handleManualSync}
+    onCopyMcpConfig={handleCopyMcpConfig}
+    onSelectFolder={handleSelectFolder}
+    onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
   />
 </main>
