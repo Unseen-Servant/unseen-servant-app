@@ -251,6 +251,7 @@ npm run tauri build
 ```
 
 Build artifacts are output to `src-tauri/target/release/bundle/`:
+
 - **macOS:** `dmg/*.dmg`
 - **Windows:** `msi/*.msi` and `nsis/*.exe`
 
