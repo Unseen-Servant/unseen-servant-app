@@ -21,6 +21,7 @@
   let files: FileItem[] = [];
   let selectedPaths = new Set<string>;
   let syncedPaths = new Set<string>;
+  let expandedPaths = new Set<string>();
   let error = '';
 
   // File focus & context menu
@@ -196,6 +197,7 @@
     try {
       const folder = await invoke<string>('select_folder');
       selectedFolder = folder;
+      expandedPaths = new Set();
       await loadFiles(selectedFolder);
       error = '';
       await saveState();
@@ -368,6 +370,15 @@
   // File focus, context menu & file operations
   // ---------------------------------------------------------------------------
 
+  function handleToggleExpand(path: string) {
+    if (expandedPaths.has(path)) {
+      expandedPaths.delete(path);
+    } else {
+      expandedPaths.add(path);
+    }
+    expandedPaths = expandedPaths;
+  }
+
   function handleGlobalKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
@@ -412,14 +423,9 @@
 
     try {
       await invoke('delete_file', { path: item.path });
-      if (selectedPaths.has(item.path)) {
-        selectedPaths.delete(item.path);
-        selectedPaths = selectedPaths;
-        await saveState();
-      }
       if (focusedFilePath === item.path) focusedFilePath = null;
       if (selectedFolder) await loadFiles(selectedFolder);
-      if (selectedPaths.size > 0) scheduleStatusRefresh();
+      refreshIndexStatus();
     } catch (e) {
       notification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
     }
@@ -428,16 +434,16 @@
   async function handleRenameSubmit(oldPath: string, newName: string) {
     try {
       const newPath = await invoke<string>('rename_file', { oldPath, newName });
+      if (focusedFilePath === oldPath) focusedFilePath = newPath;
+      // Swap the path in selectedPaths so compute_diff can match old→new by content hash
       if (selectedPaths.has(oldPath)) {
         selectedPaths.delete(oldPath);
         selectedPaths.add(newPath);
         selectedPaths = selectedPaths;
-        await saveState();
       }
-      if (focusedFilePath === oldPath) focusedFilePath = newPath;
       renamingFilePath = null;
       if (selectedFolder) await loadFiles(selectedFolder);
-      if (selectedPaths.size > 0) scheduleStatusRefresh();
+      refreshIndexStatus();
     } catch (e) {
       notification.show({ type: 'error', message: `Rename failed: ${String(e)}`, duration: 5000 });
       renamingFilePath = null;
@@ -783,6 +789,8 @@
           {indexedPaths}
           onToggle={toogleSelection}
           onSetGameSystem={handleSetGameSystem}
+          {expandedPaths}
+          onToggleExpand={handleToggleExpand}
           {focusedFilePath}
           onFocusFile={(path) => { focusedFilePath = path; }}
           onContextMenu={handleContextMenu}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { afterUpdate } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { openPath } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
@@ -25,6 +26,10 @@
   export let onRenameSubmit: (oldPath: string, newName: string) => void = () => {};
   export let onRenameCancel: () => void = () => {};
 
+  // Expand state (lifted to page level)
+  export let expandedPaths: Set<string> = new Set();
+  export let onToggleExpand: (path: string) => void = () => {};
+
   // Collection mode props
   export let mode: 'index' | 'collection' = 'index';
   export let collectionPaths: Set<string> = new Set();
@@ -32,8 +37,19 @@
   export let highlightPaths: Set<string> = new Set();
   export let onCollectionToggle: (path: string, isDir: boolean, item: FileItem) => void = () => {};
 
-  let isExpanded: boolean = false;
+  $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
+  let childrenLoading = false;
+
+  // Auto-fetch children when a folder is expanded but tree data was reloaded
+  afterUpdate(() => {
+    if (isExpanded && item.children === null && !childrenLoading) {
+      childrenLoading = true;
+      invoke<FileItem[]>('list_files', { folderPath: item.path })
+        .then(children => { item = { ...item, children }; childrenLoading = false; })
+        .catch(() => { item = { ...item, children: [] }; childrenLoading = false; });
+    }
+  });
 
   // Check if this item has any selection — O(1) Set lookup, works even for unloaded folders
   $: isSelected = item.is_dir
@@ -82,9 +98,10 @@
   async function toggleExpand() {
     if (!item.is_dir) return;
 
-    isExpanded = !isExpanded;
+    const willExpand = !expandedPaths.has(item.path);
+    onToggleExpand(item.path);
 
-    if (isExpanded && item.children === null) {
+    if (willExpand && item.children === null) {
       try {
         const children = await invoke<FileItem[]>('list_files', { folderPath: item.path });
         item = { ...item, children };
@@ -255,6 +272,8 @@
           {indexedPaths}
           {onToggle}
           {onSetGameSystem}
+          {expandedPaths}
+          {onToggleExpand}
           {focusedFilePath}
           {onFocusFile}
           {onContextMenu}
