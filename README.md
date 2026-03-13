@@ -11,8 +11,12 @@ you can ask a question during a session and get an answer instantly.
 
 ## Installation (End Users)
 
-1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Unseen-Servant/unseen-legend-lore/releases)
-2. Drag **Legend Lore** to your Applications folder
+1. Download the latest installer from [GitHub Releases](https://github.com/Unseen-Servant/unseen-legend-lore/releases):
+   - **macOS (Apple Silicon):** `.dmg`
+   - **Windows:** `.msi` or `.exe`
+2. Install the app:
+   - **macOS:** Drag **Legend Lore** to your Applications folder
+   - **Windows:** Run the installer and follow the prompts
 3. Install [Ollama](https://ollama.com) and pull the embedding model:
 
    ```bash
@@ -20,8 +24,7 @@ you can ask a question during a session and get an answer instantly.
    ```
 
 4. Launch Legend Lore
-   - **First launch:** Right-click the app → Open (to bypass macOS Gatekeeper for unsigned apps)
-   - The app runs in the menu bar — click the tray icon to show the window
+   - The app runs in the menu bar / system tray — click the tray icon to show the window
 
 > **Note:** Ollama must be running for indexing and search to work. The app will still launch and
 > let you browse files without it.
@@ -247,7 +250,9 @@ chmod +x scripts/build-sidecar.sh
 npm run tauri build
 ```
 
-The `.dmg` (macOS) is output to `src-tauri/target/release/bundle/dmg/`.
+Build artifacts are output to `src-tauri/target/release/bundle/`:
+- **macOS:** `dmg/*.dmg`
+- **Windows:** `msi/*.msi` and `nsis/*.exe`
 
 ---
 
