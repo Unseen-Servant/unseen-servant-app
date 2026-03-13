@@ -72,6 +72,13 @@ jobs:
           cp sidecar/dist/legend-lore-mcp "src-tauri/binaries/legend-lore-mcp-${TRIPLE}"
 
       - name: Build Tauri app
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run tauri build
 
       - name: Create GitHub Release
@@ -79,5 +86,86 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
+          generate_release_notes: true
+          draft: true
+
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Python dependencies and PyInstaller
+        shell: pwsh
+        run: |
+          cd sidecar
+          python -m venv .venv
+          .venv\Scripts\Activate.ps1
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build sidecar binaries
+        shell: pwsh
+        run: |
+          cd sidecar
+          .venv\Scripts\Activate.ps1
+          pyinstaller --onefile --name legend-lore-sidecar server.py `
+            --collect-all chromadb `
+            --hidden-import uvicorn.logging `
+            --hidden-import uvicorn.protocols.http `
+            --hidden-import uvicorn.protocols.http.auto `
+            --hidden-import uvicorn.protocols.http.h11_impl `
+            --hidden-import uvicorn.protocols.http.httptools_impl `
+            --hidden-import uvicorn.protocols.websockets `
+            --hidden-import uvicorn.protocols.websockets.auto `
+            --hidden-import uvicorn.protocols.websockets.wsproto_impl `
+            --hidden-import uvicorn.protocols.websockets.websockets_impl `
+            --hidden-import uvicorn.lifespan `
+            --hidden-import uvicorn.lifespan.on `
+            --hidden-import uvicorn.lifespan.off `
+            --noconfirm --clean
+          pyinstaller --onefile --name legend-lore-mcp mcp_server.py `
+            --hidden-import mcp.server.fastmcp `
+            --noconfirm --clean
+
+      - name: Place sidecar binaries for Tauri
+        shell: pwsh
+        run: |
+          $triple = (rustc -vV | Select-String "host:").ToString().Split(" ")[1]
+          New-Item -ItemType Directory -Force -Path src-tauri\binaries
+          Copy-Item sidecar\dist\legend-lore-sidecar.exe "src-tauri\binaries\legend-lore-sidecar-$triple.exe"
+          Copy-Item sidecar\dist\legend-lore-mcp.exe "src-tauri\binaries\legend-lore-mcp-$triple.exe"
+
+      - name: Build Tauri app
+        run: npm run tauri build
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
           generate_release_notes: true
           draft: true
