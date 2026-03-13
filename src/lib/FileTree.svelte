@@ -293,6 +293,7 @@
 
 <style>
   .item {
+    -webkit-user-select: none;
     user-select: none;
   }
   .row-container {
@@ -381,6 +382,8 @@
     font-size: 0.95rem;
     font-family: var(--font-body);
     color: var(--text-primary);
+    -webkit-user-select: none;
+    user-select: none;
     transition: background var(--transition-fast);
   }
   .row:hover {
