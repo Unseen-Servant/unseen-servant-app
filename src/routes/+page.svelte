@@ -14,6 +14,7 @@
   import StatusBar from '../lib/StatusBar.svelte';
   import NotificationBanner from '../lib/NotificationBanner.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
+  import GettingStarted from '../lib/GettingStarted.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
 
@@ -57,7 +58,12 @@
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
+  let showGuide = false;
   let healthInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Ollama health
+  let ollamaRunning = false;
+  let ollamaModelReady = false;
 
   onMount(async () => {
     try {
@@ -83,9 +89,13 @@
       console.log('No saved state:', e);
     }
 
-    // Poll sidecar health
+    // Poll sidecar + Ollama health
     checkSidecarHealth();
-    healthInterval = setInterval(checkSidecarHealth, 10000);
+    checkOllamaHealth();
+    healthInterval = setInterval(() => {
+      checkSidecarHealth();
+      checkOllamaHealth();
+    }, 10000);
 
     // Auto-sync: periodically check for filesystem changes
     autoSyncInterval = setInterval(() => {
@@ -105,6 +115,17 @@
       sidecarConnected = await invoke<boolean>('check_sidecar_health');
     } catch {
       sidecarConnected = false;
+    }
+  }
+
+  async function checkOllamaHealth() {
+    try {
+      const status = await invoke<{ running: boolean; has_model: boolean }>('check_ollama_health');
+      ollamaRunning = status.running;
+      ollamaModelReady = status.has_model;
+    } catch {
+      ollamaRunning = false;
+      ollamaModelReady = false;
     }
   }
 
@@ -840,13 +861,16 @@
       <NotificationBanner />
     </div>
   {:else}
-    <div class="empty-state">
-      <p class="empty-title font-heading">Select a folder to begin</p>
-      <p class="empty-subtitle">Choose your TTRPG library folder to browse and index your collection.</p>
-      <button class="empty-btn" on:click={handleSelectFolder}>
-        Choose Library Folder
-      </button>
-    </div>
+    <GettingStarted
+      mode="page"
+      {ollamaRunning}
+      {ollamaModelReady}
+      folderSelected={false}
+      filesIndexed={false}
+      collectionsCreated={false}
+      onSelectFolder={handleSelectFolder}
+      onCopyMcpConfig={handleCopyMcpConfig}
+    />
   {/if}
 
   {#if error}
@@ -884,10 +908,25 @@
     onSelectFolder={handleSelectFolder}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
+    onShowGuide={() => { showGuide = true; }}
   />
 </main>
 
 <LicenseModal visible={showLicense} onClose={() => { showLicense = false; }} />
+
+{#if showGuide}
+  <GettingStarted
+    mode="modal"
+    onClose={() => { showGuide = false; }}
+    {ollamaRunning}
+    {ollamaModelReady}
+    folderSelected={selectedFolder !== ''}
+    filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
+    collectionsCreated={Object.keys(collections).length > 0}
+    onSelectFolder={handleSelectFolder}
+    onCopyMcpConfig={handleCopyMcpConfig}
+  />
+{/if}
 
 <style>
   .app-layout {
@@ -909,45 +948,6 @@
     flex: 1;
     overflow-y: auto;
     padding: 0.25rem 0.75rem;
-  }
-
-  .empty-state {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    color: var(--text-secondary);
-  }
-
-  .empty-title {
-    font-size: 1.4rem;
-    color: var(--text-accent);
-    margin: 0;
-  }
-
-  .empty-subtitle {
-    font-size: 0.95rem;
-    margin: 0;
-  }
-
-  .empty-btn {
-    margin-top: 0.75rem;
-    padding: 0.5rem 1.25rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-accent);
-    background: transparent;
-    color: var(--text-accent);
-    font-family: var(--font-heading);
-    font-size: 1rem;
-    transition: all var(--transition-fast);
-  }
-  .empty-btn:hover {
-    background: rgba(182, 159, 129, 0.1);
-  }
-  .empty-btn:active {
-    transform: scale(0.97);
   }
 
   .error-banner {

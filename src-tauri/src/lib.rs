@@ -231,6 +231,53 @@ fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
 // ---------------------------------------------------------------------------
 
 const SIDECAR_URL: &str = "http://localhost:8420";
+const OLLAMA_URL: &str = "http://localhost:11434";
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OllamaStatus {
+    running: bool,
+    has_model: bool,
+}
+
+#[derive(Deserialize, Debug)]
+struct OllamaModel {
+    name: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct OllamaTagsResponse {
+    models: Vec<OllamaModel>,
+}
+
+#[tauri::command]
+async fn check_ollama_health() -> Result<OllamaStatus, String> {
+    let client = reqwest::Client::new();
+    match client
+        .get(format!("{}/api/tags", OLLAMA_URL))
+        .timeout(std::time::Duration::from_secs(3))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            let tags: OllamaTagsResponse = resp
+                .json()
+                .await
+                .unwrap_or(OllamaTagsResponse { models: vec![] });
+            let has_model = tags
+                .models
+                .iter()
+                .any(|m| m.name.starts_with("nomic-embed-text"));
+            Ok(OllamaStatus {
+                running: true,
+                has_model,
+            })
+        }
+        _ => Ok(OllamaStatus {
+            running: false,
+            has_model: false,
+        }),
+    }
+}
 
 #[tauri::command]
 async fn check_sidecar_health() -> Result<bool, String> {
@@ -897,7 +944,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
