@@ -84,10 +84,20 @@ sidecar = SidecarClient(args.sidecar_url)
 mcp = FastMCP(
     name="Legend Lore",
     instructions=(
-        "You have access to the user's indexed TTRPG PDF library. "
-        "Use the search and retrieval tools to find rules, lore, "
-        "stat blocks, and other content from their sourcebooks. "
-        "Always cite the source filename when referencing content."
+        "You have access to the user's indexed TTRPG PDF library via Legend Lore. "
+        "Use the search and retrieval tools to find rules, lore, stat blocks, "
+        "spells, monsters, and other content from their sourcebooks.\n\n"
+        "IMPORTANT GUIDELINES:\n"
+        "- At the start of a conversation, call list_game_systems() to see what "
+        "game systems are in the library. Do not assume you know what's available "
+        "from prior conversations.\n"
+        "- NEVER say a game system or sourcebook is unavailable without first "
+        "searching for it using search_library() or list_sources().\n"
+        "- When the user asks about a specific game system, always search the "
+        "library first — even if you haven't seen it mentioned before.\n"
+        "- Always cite the source filename when referencing content.\n"
+        "- If a search returns no results, try alternative terms or broader "
+        "queries before concluding the content isn't indexed."
     ),
 )
 
@@ -130,8 +140,9 @@ async def search_library(
 ) -> str:
     """Search your TTRPG PDF library for relevant content.
 
-    Use this to find rules, lore, stat blocks, spells, monsters,
-    or any content across your indexed sourcebooks.
+    This should be your FIRST action when the user asks about any rules,
+    lore, or game content. Always search before telling the user something
+    isn't available.
 
     Args:
         query: What to search for (e.g., "grappling rules",
@@ -261,9 +272,10 @@ async def library_stats() -> str:
 async def list_game_systems() -> str:
     """List all game systems detected in your indexed library.
 
-    Shows which TTRPG systems are represented in your collection.
-    Use this to see what game_system values are available for filtering
-    searches with search_library.
+    Call this at the start of each conversation to see what's available.
+    Do not rely on memory from prior conversations — the library may
+    have changed. Use the returned values for filtering with
+    search_library's game_system parameter.
     """
     data = await sidecar.get("/api/game-systems")
     if isinstance(data, str):
