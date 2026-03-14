@@ -93,6 +93,7 @@ jobs:
           for binary in src-tauri/binaries/legend-lore-*; do
             codesign --sign "$APPLE_SIGNING_IDENTITY" \
               --options runtime \
+              --entitlements sidecar/entitlements.plist \
               --timestamp \
               --force \
               "$binary"
