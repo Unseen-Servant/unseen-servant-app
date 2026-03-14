@@ -61,7 +61,7 @@
   <div class="backdrop" role="dialog" aria-modal="true" aria-label="Getting Started" tabindex="-1" on:click={handleBackdrop} on:keydown={handleKeydown}>
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title font-display">Getting Started</span>
+        <span class="modal-title font-heading">Getting Started</span>
         <button class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
