@@ -20,7 +20,7 @@
 
   // Clamp position so the menu stays within the viewport
   $: clampedX = Math.min(x, window.innerWidth - 200);
-  $: clampedY = Math.min(y, window.innerHeight - (item.is_dir ? 60 : 160));
+  $: clampedY = Math.min(y, window.innerHeight - (item.is_dir ? 160 : 160));
 </script>
 
 <svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} />
@@ -37,11 +37,9 @@
     <button class="context-item" on:click={onOpen}>Open file</button>
   {/if}
   <button class="context-item" on:click={onReveal}>Reveal in folder</button>
-  {#if !item.is_dir}
-    <hr class="context-divider" />
-    <button class="context-item" on:click={onRename}>Rename file</button>
-    <button class="context-item danger" on:click={onDelete}>Delete file</button>
-  {/if}
+  <hr class="context-divider" />
+  <button class="context-item" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
+  <button class="context-item danger" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
 </div>
 
 <style>

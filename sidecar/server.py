@@ -962,6 +962,157 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         return StreamingResponse(generate_with_lock(), media_type="text/event-stream")
 
+    # ------------------------------------------------------------------
+    # Folder operations — batch rename / delete for all children
+    # ------------------------------------------------------------------
+
+    class FolderRenameRequest(BaseModel):
+        old_prefix: str
+        new_prefix: str
+
+    class FolderDeleteRequest(BaseModel):
+        folder_prefix: str
+
+    @app.post("/api/folder-rename")
+    async def folder_rename(request: FolderRenameRequest):
+        """Batch-rename all indexed files under a folder prefix.
+
+        Transfers ChromaDB chunks without re-embedding, updates the
+        manifest and collections.
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already running"
+            )
+        try:
+            if not data_dir:
+                raise HTTPException(
+                    status_code=500, detail="No data directory configured"
+                )
+
+            manifest = load_manifest(data_dir)
+            old_prefix = request.old_prefix.rstrip("/")
+            new_prefix = request.new_prefix.rstrip("/")
+            child_prefix = old_prefix + "/"
+
+            matched_paths = [
+                p for p in manifest.files
+                if p.startswith(child_prefix)
+            ]
+
+            renamed_files = 0
+            for old_path_str in matched_paths:
+                new_path_str = new_prefix + old_path_str[len(old_prefix):]
+                new_path = Path(new_path_str)
+
+                # Transfer chunks: get → delete → re-add with new IDs/metadata
+                results = collection.get(
+                    where={"source": old_path_str},
+                    include=["embeddings", "documents", "metadatas"],
+                )
+                if results["ids"]:
+                    collection.delete(ids=results["ids"])
+                    prefix = chunk_id_prefix(new_path)
+                    new_ids = [f"{prefix}_{i}" for i in range(len(results["ids"]))]
+                    new_metadatas = [
+                        {**m, "source": new_path_str, "filename": new_path.name}
+                        for m in results["metadatas"]
+                    ]
+                    collection.add(
+                        ids=new_ids,
+                        documents=results["documents"],
+                        embeddings=results["embeddings"],
+                        metadatas=new_metadatas,
+                    )
+
+                # Update manifest
+                old_entry = manifest.files.pop(old_path_str)
+                manifest.files[new_path_str] = ManifestEntry(
+                    filename=new_path.name,
+                    mtime=old_entry.mtime,
+                    chunk_count=old_entry.chunk_count,
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                    game_system=old_entry.game_system,
+                    content_hash=old_entry.content_hash,
+                    file_size=old_entry.file_size,
+                )
+                renamed_files += 1
+
+            save_manifest(data_dir, manifest)
+
+            # Update collections
+            affected_collections = 0
+            coll_store = load_collections(data_dir)
+            for coll in coll_store.collections.values():
+                updated_paths = [
+                    new_prefix + p[len(old_prefix):] if p.startswith(child_prefix) else p
+                    for p in coll.file_paths
+                ]
+                if updated_paths != coll.file_paths:
+                    coll.file_paths = updated_paths
+                    affected_collections += 1
+            if affected_collections:
+                save_collections(data_dir, coll_store)
+
+            return {
+                "renamed_files": renamed_files,
+                "affected_collections": affected_collections,
+            }
+        finally:
+            _sync_lock.release()
+
+    @app.post("/api/folder-delete")
+    async def folder_delete(request: FolderDeleteRequest):
+        """Batch-delete all indexed files under a folder prefix.
+
+        Removes chunks from ChromaDB and cleans up the manifest and
+        collections.
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already running"
+            )
+        try:
+            if not data_dir:
+                raise HTTPException(
+                    status_code=500, detail="No data directory configured"
+                )
+
+            manifest = load_manifest(data_dir)
+            folder_prefix = request.folder_prefix.rstrip("/")
+            child_prefix = folder_prefix + "/"
+
+            matched_paths = [
+                p for p in manifest.files
+                if p.startswith(child_prefix)
+            ]
+
+            deleted_files = 0
+            for path_str in matched_paths:
+                delete_source_chunks(path_str, collection)
+                del manifest.files[path_str]
+                deleted_files += 1
+
+            save_manifest(data_dir, manifest)
+
+            # Update collections
+            affected_collections = 0
+            coll_store = load_collections(data_dir)
+            for coll in coll_store.collections.values():
+                filtered = [p for p in coll.file_paths if not p.startswith(child_prefix)]
+                if len(filtered) != len(coll.file_paths):
+                    coll.file_paths = filtered
+                    affected_collections += 1
+            if affected_collections:
+                save_collections(data_dir, coll_store)
+
+            return {
+                "deleted_files": deleted_files,
+                "affected_collections": affected_collections,
+            }
+        finally:
+            _sync_lock.release()
+
     @app.get("/api/stats")
     async def get_stats():
         """Database statistics."""
