@@ -23,7 +23,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "dmg"],
     "resources": {
       "binaries/legend-lore-*": "binaries/",
       "../LICENSE": "LICENSE"
