@@ -1,6 +1,6 @@
 {
   "name": "legend-lore",
-  "version": "1.1.4-rc1",
+  "version": "1.1.4",
   "description": "Local-first, AI-augmented toolkit for tabletop RPG Gamemasters",
   "author": "Unseen Servant Games <guild@unseenservant.games>",
   "type": "module",
