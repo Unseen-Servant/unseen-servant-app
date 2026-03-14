@@ -23,7 +23,7 @@
 
   // Inline rename props
   export let renamingFilePath: string | null = null;
-  export let onRenameSubmit: (oldPath: string, newName: string) => void = () => {};
+  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => void = () => {};
   export let onRenameCancel: () => void = () => {};
 
   // Expand state (lifted to page level)
@@ -163,8 +163,8 @@
   function handleRenameKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') {
       const input = event.currentTarget as HTMLInputElement;
-      const ext = item.name.match(/\.[^.]+$/)?.[0] ?? '';
-      onRenameSubmit(item.path, input.value + ext);
+      const ext = item.is_dir ? '' : (item.name.match(/\.[^.]+$/)?.[0] ?? '');
+      onRenameSubmit(item.path, input.value + ext, item.is_dir);
     } else if (event.key === 'Escape') {
       onRenameCancel();
     }
@@ -206,7 +206,7 @@
       {#if isRenaming}
         <input
           class="rename-input"
-          value={item.name.replace(/\.[^.]+$/, '')}
+          value={item.is_dir ? item.name : item.name.replace(/\.[^.]+$/, '')}
           on:keydown={handleRenameKeydown}
           on:blur={onRenameCancel}
           use:autofocus

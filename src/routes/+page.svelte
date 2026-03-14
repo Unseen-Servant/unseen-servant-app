@@ -418,12 +418,29 @@
     const item = contextMenu.item;
     contextMenu = null;
 
-    const confirmed = await confirm(`Move "${item.name}" to Trash?`, { title: 'Delete file', kind: 'warning' });
+    const label = item.is_dir ? 'folder' : 'file';
+    const confirmed = await confirm(`Move "${item.name}" to Trash?`, { title: `Delete ${label}`, kind: 'warning' });
     if (!confirmed) return;
 
     try {
-      await invoke('delete_file', { path: item.path });
-      if (focusedFilePath === item.path) focusedFilePath = null;
+      if (item.is_dir) {
+        await invoke('delete_folder', { path: item.path });
+        const prefix = item.path + '/';
+        for (const p of selectedPaths) {
+          if (p.startsWith(prefix)) selectedPaths.delete(p);
+        }
+        selectedPaths = selectedPaths;
+        for (const p of syncedPaths) {
+          if (p.startsWith(prefix)) syncedPaths.delete(p);
+        }
+        for (const p of expandedPaths) {
+          if (p.startsWith(prefix) || p === item.path) expandedPaths.delete(p);
+        }
+        expandedPaths = expandedPaths;
+      } else {
+        await invoke('delete_file', { path: item.path });
+        if (focusedFilePath === item.path) focusedFilePath = null;
+      }
       if (selectedFolder) await loadFiles(selectedFolder);
       refreshIndexStatus();
     } catch (e) {
@@ -431,15 +448,31 @@
     }
   }
 
-  async function handleRenameSubmit(oldPath: string, newName: string) {
+  function updatePathPrefix(paths: Set<string>, oldPrefix: string, newPrefix: string): Set<string> {
+    const childPrefix = oldPrefix + '/';
+    const updated = new Set<string>();
+    for (const p of paths) {
+      updated.add(p.startsWith(childPrefix) ? newPrefix + p.slice(oldPrefix.length) : p);
+    }
+    return updated;
+  }
+
+  async function handleRenameSubmit(oldPath: string, newName: string, isDir: boolean = false) {
     try {
-      const newPath = await invoke<string>('rename_file', { oldPath, newName });
-      if (focusedFilePath === oldPath) focusedFilePath = newPath;
-      // Swap the path in selectedPaths so compute_diff can match old→new by content hash
-      if (selectedPaths.has(oldPath)) {
-        selectedPaths.delete(oldPath);
-        selectedPaths.add(newPath);
-        selectedPaths = selectedPaths;
+      if (isDir) {
+        const newPath = await invoke<string>('rename_folder', { oldPath, newName });
+        selectedPaths = updatePathPrefix(selectedPaths, oldPath, newPath);
+        syncedPaths = updatePathPrefix(syncedPaths, oldPath, newPath);
+        expandedPaths = updatePathPrefix(expandedPaths, oldPath, newPath);
+      } else {
+        const newPath = await invoke<string>('rename_file', { oldPath, newName });
+        if (focusedFilePath === oldPath) focusedFilePath = newPath;
+        // Swap the path in selectedPaths so compute_diff can match old→new by content hash
+        if (selectedPaths.has(oldPath)) {
+          selectedPaths.delete(oldPath);
+          selectedPaths.add(newPath);
+          selectedPaths = selectedPaths;
+        }
       }
       renamingFilePath = null;
       if (selectedFolder) await loadFiles(selectedFolder);
