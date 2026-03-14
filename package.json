@@ -1,7 +1,8 @@
 {
   "name": "legend-lore",
-  "version": "1.1.1",
-  "description": "Local MCP for TTRPG session prep",
+  "version": "1.1.4-rc1",
+  "description": "Local-first, AI-augmented toolkit for tabletop RPG Gamemasters",
+  "author": "Unseen Servant Games <guild@unseenservant.games>",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

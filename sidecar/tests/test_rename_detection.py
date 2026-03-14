@@ -83,8 +83,11 @@ def test_compute_diff_discovers_rename_from_stale_selection(sample_pdf_path, tmp
     content_hash = file_content_hash(sample_pdf_path)
     file_size = os.path.getsize(sample_pdf_path)
 
-    # Copy the file to a tmp dir to simulate original location
-    old_path = tmp_path / "original_name.pdf"
+    # Use an isolated subdirectory so sample_pdf_path doesn't interfere
+    isolated_dir = tmp_path / "rename_test"
+    isolated_dir.mkdir()
+
+    old_path = isolated_dir / "original_name.pdf"
     shutil.copy2(sample_pdf_path, old_path)
     old_path_str = str(old_path)
 
@@ -101,7 +104,7 @@ def test_compute_diff_discovers_rename_from_stale_selection(sample_pdf_path, tmp
     })
 
     # Simulate rename on disk: delete old, create new in same directory
-    new_path = tmp_path / "renamed_file.pdf"
+    new_path = isolated_dir / "renamed_file.pdf"
     old_path.rename(new_path)
 
     # Call compute_diff with stale selection (old path that no longer exists)

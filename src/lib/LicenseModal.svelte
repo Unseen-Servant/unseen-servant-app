@@ -1,72 +1,20 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { getVersion } from '@tauri-apps/api/app';
+  import { openUrl } from '@tauri-apps/plugin-opener';
+
   export let visible = false;
   export let onClose: () => void;
 
-  const licenseText = `Legend Lore - Proprietary Software License
+  let appVersion = '';
 
-Copyright (c) 2026 Jerome Solis. All rights reserved.
-
-1. GRANT OF LICENSE
-
-   You are granted a limited, non-exclusive, non-transferable,
-   revocable license to use Legend Lore (the "Software") for
-   personal, non-commercial purposes, subject to the terms of
-   this license.
-
-2. RESTRICTIONS
-
-   You may NOT, without prior written permission from the
-   copyright holder:
-
-   a. Copy, modify, adapt, or create derivative works of
-      the Software or any part thereof.
-   b. Distribute, sublicense, lease, rent, loan, or otherwise
-      transfer the Software to any third party.
-   c. Reverse engineer, decompile, disassemble, or otherwise
-      attempt to derive the source code of the Software.
-   d. Remove, alter, or obscure any copyright, trademark, or
-      other proprietary notices in the Software.
-   e. Use the Software for any commercial purpose without a
-      separate commercial license.
-
-3. OWNERSHIP
-
-   The Software and all copies thereof are proprietary to and
-   the property of Jerome Solis. All rights in the Software
-   not specifically granted in this license are reserved by
-   the copyright holder.
-
-4. NO WARRANTY
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-   KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-   PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
-   OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
-   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-5. TERMINATION
-
-   This license is effective until terminated. It will terminate
-   automatically without notice if you fail to comply with any
-   term of this license. Upon termination, you must destroy all
-   copies of the Software in your possession.
-
-6. GOVERNING LAW
-
-   This license shall be governed by and construed in accordance
-   with the laws of the Province of Quebec, Canada, without
-   regard to its conflict of law provisions.
-
-7. ENTIRE AGREEMENT
-
-   This license constitutes the entire agreement between you and
-   the copyright holder regarding the Software and supersedes all
-   prior agreements and understandings, whether written or oral.
-
-For licensing inquiries, contact: guild@unseenservant.com`;
+  onMount(async () => {
+    try {
+      appVersion = await getVersion();
+    } catch {
+      appVersion = '';
+    }
+  });
 
   function handleBackdrop(e: MouseEvent) {
     if (e.target === e.currentTarget) onClose();
@@ -75,6 +23,10 @@ For licensing inquiries, contact: guild@unseenservant.com`;
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') onClose();
   }
+
+  function handleLicenseLink() {
+    openUrl('https://unseenservant.games/license');
+  }
 </script>
 
 {#if visible}
@@ -82,11 +34,18 @@ For licensing inquiries, contact: guild@unseenservant.com`;
   <div class="backdrop" role="dialog" aria-modal="true" aria-label="License" tabindex="-1" on:click={handleBackdrop} on:keydown={handleKeydown}>
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title font-heading">License</span>
+        <span class="modal-title font-heading">About</span>
         <button class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
-        <pre class="license-text">{licenseText}</pre>
+        {#if appVersion}
+          <span class="version">Legend Lore v{appVersion}</span>
+        {/if}
+        <p class="license-notice">
+          This software is licensed under the
+          <button class="license-url" on:click={handleLicenseLink}>
+            Unseen Servant Games Software License</button>.
+        </p>
       </div>
     </div>
   </div>
@@ -107,8 +66,7 @@ For licensing inquiries, contact: guild@unseenservant.com`;
     background: var(--bg-container);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
-    width: min(560px, 90vw);
-    max-height: 80vh;
+    width: min(360px, 90vw);
     display: flex;
     flex-direction: column;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -144,16 +102,37 @@ For licensing inquiries, contact: guild@unseenservant.com`;
   }
 
   .modal-body {
-    overflow-y: auto;
     padding: 1rem;
   }
 
-  .license-text {
-    margin: 0;
-    white-space: pre-wrap;
+  .version {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    color: var(--text-accent);
+  }
+
+  .license-notice {
+    margin: 0.5rem 0 0;
     font-family: var(--font-body);
     font-size: 0.85rem;
     line-height: 1.5;
     color: var(--text-primary);
+  }
+
+  .license-url {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    transition: color var(--transition-fast);
+  }
+  .license-url:hover {
+    color: var(--text-accent);
   }
 </style>
