@@ -687,7 +687,7 @@ fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, Str
 // Sidecar lifecycle
 // ---------------------------------------------------------------------------
 
-fn wait_for_sidecar() {
+fn wait_for_sidecar(log_path: &Path) {
     use std::net::TcpStream;
     use std::time::Duration;
 
@@ -705,6 +705,13 @@ fn wait_for_sidecar() {
         std::thread::sleep(Duration::from_millis(100));
     }
     eprintln!("Warning: Sidecar did not become ready within timeout");
+    eprintln!("Check sidecar log for details: {}", log_path.display());
+    if let Ok(log_contents) = std::fs::read_to_string(log_path) {
+        if !log_contents.is_empty() {
+            let tail: String = log_contents.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+            eprintln!("Sidecar log (last 20 lines):\n{}", tail);
+        }
+    }
 }
 
 fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child, String> {
@@ -751,12 +758,22 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
         (binary, vec![])
     };
 
+    // Log sidecar stderr to a file for diagnostics (especially useful in
+    // production builds where there is no terminal to observe output).
+    let log_dir = data_dir.parent().unwrap_or(data_dir);
+    let log_file = std::fs::File::create(log_dir.join("sidecar.log"))
+        .map_err(|e| format!("Failed to create sidecar log file: {}", e))?;
+    let stderr_file = log_file.try_clone()
+        .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
+
     let child = Command::new(&program)
         .args(&base_args)
         .arg("--port")
         .arg("8420")
         .arg("--data-dir")
         .arg(data_dir.to_string_lossy().as_ref())
+        .stdout(std::process::Stdio::from(log_file))
+        .stderr(std::process::Stdio::from(stderr_file))
         .spawn()
         .map_err(|e| format!("Failed to start sidecar with {}: {}", program.display(), e))?;
 
@@ -818,12 +835,14 @@ pub fn run() {
 
             let chroma_dir = app_data_dir.join("chroma_db");
 
+            let sidecar_log = app_data_dir.join("sidecar.log");
+
             // Start the Python sidecar
             match start_sidecar(app.handle(), &chroma_dir) {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));
-                    wait_for_sidecar();
+                    wait_for_sidecar(&sidecar_log);
                 }
                 Err(e) => {
                     eprintln!("Warning: Could not start sidecar: {}", e);
