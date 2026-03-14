@@ -963,6 +963,133 @@ def create_app(collection=None, data_dir: Path | None = None):
         return StreamingResponse(generate_with_lock(), media_type="text/event-stream")
 
     # ------------------------------------------------------------------
+    # File rename — direct index update (no re-embedding)
+    # ------------------------------------------------------------------
+
+    class FileRenameRequest(BaseModel):
+        old_path: str
+        new_path: str
+
+    @app.post("/api/file-rename")
+    async def file_rename(request: FileRenameRequest):
+        """Rename a single file's index entry without re-embedding.
+
+        Transfers ChromaDB chunks to the new path, updates the manifest
+        and collections.
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already running"
+            )
+        try:
+            if not data_dir:
+                raise HTTPException(
+                    status_code=500, detail="No data directory configured"
+                )
+
+            manifest = load_manifest(data_dir)
+            old_path_str = request.old_path
+            new_path_str = request.new_path
+            new_path = Path(new_path_str)
+
+            if old_path_str not in manifest.files:
+                return {"renamed": False, "reason": "not_indexed"}
+
+            # Transfer chunks: get → delete → re-add with new IDs/metadata
+            results = collection.get(
+                where={"source": old_path_str},
+                include=["embeddings", "documents", "metadatas"],
+            )
+            if results["ids"]:
+                collection.delete(ids=results["ids"])
+                prefix = chunk_id_prefix(new_path)
+                new_ids = [f"{prefix}_{i}" for i in range(len(results["ids"]))]
+                new_metadatas = [
+                    {**m, "source": new_path_str, "filename": new_path.name}
+                    for m in results["metadatas"]
+                ]
+                collection.add(
+                    ids=new_ids,
+                    documents=results["documents"],
+                    embeddings=results["embeddings"],
+                    metadatas=new_metadatas,
+                )
+
+            # Update manifest
+            old_entry = manifest.files.pop(old_path_str)
+            manifest.files[new_path_str] = ManifestEntry(
+                filename=new_path.name,
+                mtime=old_entry.mtime,
+                chunk_count=old_entry.chunk_count,
+                indexed_at=datetime.now(timezone.utc).isoformat(),
+                game_system=old_entry.game_system,
+                content_hash=old_entry.content_hash,
+                file_size=old_entry.file_size,
+            )
+            save_manifest(data_dir, manifest)
+
+            # Update collections
+            affected_collections = 0
+            coll_store = load_collections(data_dir)
+            for coll in coll_store.collections.values():
+                if old_path_str in coll.file_paths:
+                    coll.file_paths = [
+                        new_path_str if p == old_path_str else p
+                        for p in coll.file_paths
+                    ]
+                    affected_collections += 1
+            if affected_collections:
+                save_collections(data_dir, coll_store)
+
+            return {"renamed": True, "affected_collections": affected_collections}
+        finally:
+            _sync_lock.release()
+
+    class FileDeleteRequest(BaseModel):
+        path: str
+
+    @app.post("/api/file-delete")
+    async def file_delete(request: FileDeleteRequest):
+        """Remove a single file's index entry immediately.
+
+        Deletes chunks from ChromaDB and cleans up the manifest and
+        collections.
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already running"
+            )
+        try:
+            if not data_dir:
+                raise HTTPException(
+                    status_code=500, detail="No data directory configured"
+                )
+
+            manifest = load_manifest(data_dir)
+            path_str = request.path
+
+            if path_str not in manifest.files:
+                return {"deleted": False, "reason": "not_indexed"}
+
+            delete_source_chunks(path_str, collection)
+            del manifest.files[path_str]
+            save_manifest(data_dir, manifest)
+
+            # Update collections
+            affected_collections = 0
+            coll_store = load_collections(data_dir)
+            for coll in coll_store.collections.values():
+                if path_str in coll.file_paths:
+                    coll.file_paths = [p for p in coll.file_paths if p != path_str]
+                    affected_collections += 1
+            if affected_collections:
+                save_collections(data_dir, coll_store)
+
+            return {"deleted": True, "affected_collections": affected_collections}
+        finally:
+            _sync_lock.release()
+
+    # ------------------------------------------------------------------
     # Folder operations — batch rename / delete for all children
     # ------------------------------------------------------------------
 

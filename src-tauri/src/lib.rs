@@ -557,7 +557,7 @@ async fn delete_collection(name: String) -> Result<CollectionDeleteResult, Strin
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn rename_file(old_path: String, new_name: String) -> Result<String, String> {
+async fn rename_file(old_path: String, new_name: String) -> Result<String, String> {
     let old = Path::new(&old_path);
     if !old.exists() {
         return Err("File not found".to_string());
@@ -568,16 +568,44 @@ fn rename_file(old_path: String, new_name: String) -> Result<String, String> {
         return Err(format!("A file named '{}' already exists", new_name));
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
-    Ok(new_path.to_string_lossy().into_owned())
+
+    let new_path_str = new_path.to_string_lossy().into_owned();
+
+    // Best-effort sidecar update — if it fails, the next auto-sync will handle it
+    let client = reqwest::Client::new();
+    let _ = client
+        .post(format!("{}/api/file-rename", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "old_path": old_path,
+            "new_path": new_path_str,
+        }))
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    Ok(new_path_str)
 }
 
 #[tauri::command]
-fn delete_file(path: String) -> Result<(), String> {
+async fn delete_file(path: String) -> Result<(), String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Err("File not found".to_string());
     }
-    trash::delete(p).map_err(|e| format!("Failed to move to trash: {}", e))
+    trash::delete(p).map_err(|e| format!("Failed to move to trash: {}", e))?;
+
+    // Best-effort sidecar update — if it fails, the next auto-sync will handle it
+    let client = reqwest::Client::new();
+    let _ = client
+        .post(format!("{}/api/file-delete", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "path": path,
+        }))
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    Ok(())
 }
 
 #[tauri::command]
