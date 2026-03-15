@@ -21,7 +21,7 @@ A TTRPG Gamemaster who:
 
 ---
 
-## This Repository: `legend-lore`
+## This Repository: `unseen-legend-lore`
 
 The core desktop application — Tauri v2 shell with SvelteKit frontend and a Python sidecar for PDF indexing and search.
 
