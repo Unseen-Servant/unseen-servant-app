@@ -38,6 +38,7 @@ The core desktop application — Tauri v2 shell with SvelteKit frontend and a Py
 npm run tauri dev          # Development (compiles Rust + starts frontend with HMR)
 npm run tauri build        # Production build
 cd sidecar && pytest -v    # Run sidecar tests
+bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.json, Cargo.toml
 ```
 
 ### Key files
