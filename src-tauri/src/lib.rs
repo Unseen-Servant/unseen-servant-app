@@ -886,15 +886,23 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
     let stderr_file = log_file.try_clone()
         .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
 
-    let child = Command::new(&program)
-        .args(&base_args)
+    let mut cmd = Command::new(&program);
+    cmd.args(&base_args)
         .arg("--port")
         .arg("8420")
         .arg("--data-dir")
         .arg(data_dir.to_string_lossy().as_ref())
         .stdout(std::process::Stdio::from(log_file))
-        .stderr(std::process::Stdio::from(stderr_file))
-        .spawn()
+        .stderr(std::process::Stdio::from(stderr_file));
+
+    // Put sidecar in its own process group so we can kill the entire group on exit
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+
+    let child = cmd.spawn()
         .map_err(|e| format!("Failed to start sidecar with {}: {}", program.display(), e))?;
 
     Ok(child)
@@ -903,11 +911,11 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
 fn stop_sidecar(state: &SidecarState) {
     if let Ok(mut guard) = state.0.lock() {
         if let Some(ref mut child) = *guard {
-            // Send SIGTERM for graceful uvicorn shutdown
+            // Send SIGTERM to the sidecar's process group for graceful shutdown
             #[cfg(unix)]
             {
                 let pid = child.id() as i32;
-                unsafe { libc::kill(pid, libc::SIGTERM); }
+                unsafe { libc::kill(-pid, libc::SIGTERM); }
             }
             #[cfg(not(unix))]
             {
