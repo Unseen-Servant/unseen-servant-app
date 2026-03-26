@@ -15,6 +15,7 @@
   import NotificationBanner from '../lib/NotificationBanner.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStarted from '../lib/GettingStarted.svelte';
+  import SettingsPanel from '../lib/SettingsPanel.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
 
@@ -59,6 +60,7 @@
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
   let showGuide = false;
+  let showSettings = false;
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
   // Ollama health
@@ -139,10 +141,7 @@
 
       // Load known systems for tag editing (retry until loaded)
       if (knownSystems.length === 0) {
-        const result = await invoke<KnownGameSystemsResult>('get_known_game_systems');
-        knownSystems = result.systems.sort((a, b) =>
-          a.tag.toLowerCase().localeCompare(b.tag.toLowerCase())
-        );
+        await refreshKnownSystems();
       }
 
       // Fetch storage size in parallel (non-blocking)
@@ -375,6 +374,17 @@
       paths.add(entry.path);
     }
     return paths;
+  }
+
+  async function refreshKnownSystems() {
+    try {
+      const result = await invoke<KnownGameSystemsResult>('get_known_game_systems');
+      knownSystems = result.systems.sort((a, b) =>
+        a.tag.toLowerCase().localeCompare(b.tag.toLowerCase())
+      );
+    } catch (e) {
+      console.error('Failed to load known systems:', e);
+    }
   }
 
   async function handleSetGameSystem(_path: string, filename: string, tag: string) {
@@ -843,6 +853,7 @@
           {indexedPaths}
           onToggle={toogleSelection}
           onSetGameSystem={handleSetGameSystem}
+          onCustomSystemCreated={refreshKnownSystems}
           {expandedPaths}
           onToggleExpand={handleToggleExpand}
           {focusedFilePath}
@@ -909,10 +920,18 @@
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
     onShowGuide={() => { showGuide = true; }}
+    onOpenSettings={() => { showSettings = true; }}
   />
 </main>
 
 <LicenseModal visible={showLicense} onClose={() => { showLicense = false; }} />
+
+<SettingsPanel
+  visible={showSettings}
+  onClose={() => { showSettings = false; }}
+  {knownSystems}
+  onSystemsChanged={refreshKnownSystems}
+/>
 
 {#if showGuide}
   <GettingStarted

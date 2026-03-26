@@ -15,6 +15,7 @@
   export let indexedPaths: Set<string> = new Set();
   export let onToggle: (path: string, isDir: boolean, item: FileItem) => void;
   export let onSetGameSystem: (path: string, filename: string, tag: string) => void = () => {};
+  export let onCustomSystemCreated: () => void = () => {};
 
   // Focus & context menu props
   export let focusedFilePath: string | null = null;
@@ -40,6 +41,33 @@
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
   let childrenLoading = false;
+  let showAddForm = false;
+  let addTag = '';
+  let addFamily = '';
+  let addKeywords = '';
+  let addError = '';
+
+  async function handleAddCustomSystem() {
+    const tag = addTag.trim();
+    if (!tag) { addError = 'Tag is required'; return; }
+    const family = addFamily.trim() || tag;
+    const keywords = addKeywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
+    try {
+      await invoke('create_custom_game_system', { tag, gameSystem: family, keywords });
+      onSetGameSystem(item.path, item.name, tag);
+      showAddForm = false;
+      showDropdown = false;
+      addTag = ''; addFamily = ''; addKeywords = ''; addError = '';
+      onCustomSystemCreated();
+    } catch (e: any) {
+      addError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to add system';
+    }
+  }
+
+  function cancelAddForm() {
+    showAddForm = false;
+    addTag = ''; addFamily = ''; addKeywords = ''; addError = '';
+  }
 
   // Auto-fetch children when a folder is expanded but tree data was reloaded
   afterUpdate(() => {
@@ -235,6 +263,23 @@
               <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
                 Clear tag
               </button>
+              <hr class="dropdown-divider" />
+              {#if showAddForm}
+                <div class="add-inline-form" on:click|stopPropagation>
+                  <input class="add-inline-input" bind:value={addTag} placeholder="Tag" on:keydown={(e) => e.key === 'Enter' && handleAddCustomSystem()} />
+                  <input class="add-inline-input" bind:value={addFamily} placeholder="Family (optional)" on:keydown={(e) => e.key === 'Enter' && handleAddCustomSystem()} />
+                  <input class="add-inline-input" bind:value={addKeywords} placeholder="Keywords (comma-separated)" on:keydown={(e) => e.key === 'Enter' && handleAddCustomSystem()} />
+                  {#if addError}<div class="add-inline-error">{addError}</div>{/if}
+                  <div class="add-inline-actions">
+                    <button class="add-inline-btn" on:click={handleAddCustomSystem}>Add</button>
+                    <button class="add-inline-btn cancel" on:click={cancelAddForm}>Cancel</button>
+                  </div>
+                </div>
+              {:else}
+                <button class="dropdown-item dropdown-add" on:click={() => { showAddForm = true; }}>
+                  + Add custom system...
+                </button>
+              {/if}
             </div>
           {/if}
         {:else}
@@ -253,6 +298,23 @@
                 <span class="dropdown-family">{sys.game_system}</span>
               </button>
             {/each}
+            <hr class="dropdown-divider" />
+            {#if showAddForm}
+              <div class="add-inline-form" on:click|stopPropagation>
+                <input class="add-inline-input" bind:value={addTag} placeholder="Tag" on:keydown={(e) => e.key === 'Enter' && handleAddCustomSystem()} />
+                <input class="add-inline-input" bind:value={addFamily} placeholder="Family (optional)" on:keydown={(e) => e.key === 'Enter' && handleAddCustomSystem()} />
+                <input class="add-inline-input" bind:value={addKeywords} placeholder="Keywords (comma-separated)" on:keydown={(e) => e.key === 'Enter' && handleAddCustomSystem()} />
+                {#if addError}<div class="add-inline-error">{addError}</div>{/if}
+                <div class="add-inline-actions">
+                  <button class="add-inline-btn" on:click={handleAddCustomSystem}>Add</button>
+                  <button class="add-inline-btn cancel" on:click={cancelAddForm}>Cancel</button>
+                </div>
+              </div>
+            {:else}
+              <button class="dropdown-item dropdown-add" on:click={() => { showAddForm = true; }}>
+                + Add custom system...
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -272,6 +334,7 @@
           {indexedPaths}
           {onToggle}
           {onSetGameSystem}
+          {onCustomSystemCreated}
           {expandedPaths}
           {onToggleExpand}
           {focusedFilePath}
@@ -510,5 +573,60 @@
   }
   .dropdown-clear {
     color: var(--text-danger);
+  }
+  .dropdown-add {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+  .add-inline-form {
+    padding: 0.4rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .add-inline-input {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-primary);
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .add-inline-input:focus {
+    border-color: var(--text-accent);
+  }
+  .add-inline-error {
+    font-size: 0.7rem;
+    color: var(--text-danger);
+  }
+  .add-inline-actions {
+    display: flex;
+    gap: 0.3rem;
+  }
+  .add-inline-btn {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+    background: var(--bg-active);
+    color: var(--text-primary);
+    border: 1px solid var(--bg-active);
+    transition: background var(--transition-fast);
+  }
+  .add-inline-btn:hover {
+    background: var(--bg-active-focused);
+  }
+  .add-inline-btn.cancel {
+    background: none;
+    color: var(--text-secondary);
+    border-color: var(--border-subtle);
+  }
+  .add-inline-btn.cancel:hover {
+    color: var(--text-primary);
   }
 </style>

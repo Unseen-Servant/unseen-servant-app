@@ -122,3 +122,37 @@ def test_detect_osr_from_content():
     path = Path("/unsorted/retro_game.pdf")
     text = "Old School Essentials is a retro-clone of the classic D&D rules."
     assert detect_game_system(path, text) == "OSR"
+
+
+# ---------------------------------------------------------------------------
+# Custom known_systems parameter
+# ---------------------------------------------------------------------------
+
+def test_detect_with_custom_known_systems():
+    """Passing a custom known_systems dict should use those keywords."""
+    custom = {
+        "Mothership": ["mothership", "mothership rpg"],
+        "Cairn": ["cairn"],
+    }
+    path = Path("/RPGs/Mothership/Dead Planet.pdf")
+    assert detect_game_system(path, known_systems=custom) == "Mothership"
+
+
+def test_detect_custom_overrides_builtin():
+    """Custom known_systems replaces built-in — built-in keywords won't match."""
+    # A dict with only one custom system — D&D keywords should NOT match
+    custom = {
+        "Cairn": ["cairn"],
+    }
+    path = Path("/RPGs/D&D 5E/Player's Handbook.pdf")
+    assert detect_game_system(path, known_systems=custom) == "unknown"
+
+
+def test_detect_custom_from_content():
+    """Custom systems should also match via content scan."""
+    custom = {
+        "Cairn": ["cairn"],
+    }
+    path = Path("/unsorted/adventure.pdf")
+    text = "This is a Cairn adventure set in the dark forest."
+    assert detect_game_system(path, text, known_systems=custom) == "Cairn"
