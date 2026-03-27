@@ -15,11 +15,10 @@ from server import detect_game_system
 
 
 def test_game_systems_structure():
-    """Each entry in GAME_SYSTEMS should have tag, game_system, and keywords."""
+    """Each entry in GAME_SYSTEMS should have tag and keywords."""
     assert len(GAME_SYSTEMS) > 0
     for entry in GAME_SYSTEMS:
         assert "tag" in entry, f"Missing 'tag' in {entry}"
-        assert "game_system" in entry, f"Missing 'game_system' in {entry}"
         assert "keywords" in entry, f"Missing 'keywords' in {entry}"
         assert isinstance(entry["keywords"], list)
         assert len(entry["keywords"]) > 0, f"Empty keywords for {entry['tag']}"

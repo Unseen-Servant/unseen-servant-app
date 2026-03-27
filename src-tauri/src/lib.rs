@@ -120,11 +120,12 @@ struct SetGameSystemResult {
 #[derive(Serialize, Deserialize, Debug)]
 struct KnownGameSystem {
     tag: String,
-    game_system: String,
     #[serde(default)]
     keywords: Vec<String>,
     #[serde(default)]
     is_builtin: bool,
+    #[serde(default)]
+    is_customized: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -135,7 +136,6 @@ struct KnownGameSystemsResult {
 #[derive(Serialize, Deserialize, Debug)]
 struct CustomGameSystemResult {
     tag: String,
-    game_system: String,
     keywords: Vec<String>,
 }
 
@@ -515,13 +515,12 @@ async fn set_game_system(filename: String, game_system: String) -> Result<SetGam
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-async fn create_custom_game_system(tag: String, game_system: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
+async fn create_custom_game_system(tag: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/api/custom-game-systems", SIDECAR_URL))
         .json(&serde_json::json!({
             "tag": tag,
-            "game_system": game_system,
             "keywords": keywords,
         }))
         .send()
@@ -543,14 +542,13 @@ async fn create_custom_game_system(tag: String, game_system: String, keywords: V
 }
 
 #[tauri::command]
-async fn update_custom_game_system(original_tag: String, tag: String, game_system: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
+async fn update_custom_game_system(original_tag: String, tag: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let encoded_tag = original_tag.replace("&", "%26").replace(" ", "%20");
     let response = client
         .put(format!("{}/api/custom-game-systems/{}", SIDECAR_URL, encoded_tag))
         .json(&serde_json::json!({
             "tag": tag,
-            "game_system": game_system,
             "keywords": keywords,
         }))
         .send()

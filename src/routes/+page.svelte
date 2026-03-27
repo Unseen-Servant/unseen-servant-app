@@ -853,7 +853,6 @@
           {indexedPaths}
           onToggle={toogleSelection}
           onSetGameSystem={handleSetGameSystem}
-          onCustomSystemCreated={refreshKnownSystems}
           {expandedPaths}
           onToggleExpand={handleToggleExpand}
           {focusedFilePath}

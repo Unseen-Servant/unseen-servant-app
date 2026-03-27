@@ -5,174 +5,167 @@
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
 
-  // Group systems by game_system (family name)
-  $: grouped = groupByFamily(knownSystems);
+  // Sort state
+  let sortDirection: 'asc' | 'desc' = 'asc';
 
-  // "Add custom system" form state
-  let newTag = '';
-  let newFamily = '';
-  let newKeywords = '';
-  let addError = '';
-
-  // Edit state
-  let editingTag: string | null = null;
-  let editTag = '';
-  let editFamily = '';
-  let editKeywords = '';
-  let editError = '';
-
-  function groupByFamily(systems: KnownGameSystem[]): Map<string, KnownGameSystem[]> {
-    const map = new Map<string, KnownGameSystem[]>();
-    for (const sys of systems) {
-      const family = sys.game_system;
-      if (!map.has(family)) map.set(family, []);
-      map.get(family)!.push(sys);
-    }
-    return map;
+  function toggleSort() {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
   }
 
-  async function handleAdd() {
-    const tag = newTag.trim();
-    const family = newFamily.trim() || tag;
-    if (!tag) { addError = 'Tag is required'; return; }
+  $: sorted = [...knownSystems].sort((a, b) => {
+    const cmp = a.tag.localeCompare(b.tag, undefined, { sensitivity: 'base' });
+    return sortDirection === 'desc' ? -cmp : cmp;
+  });
 
-    const keywords = newKeywords
-      .split(',')
-      .map(k => k.trim().toLowerCase())
-      .filter(k => k.length > 0);
+  // Modal state
+  let showModal = false;
+  let modalMode: 'add' | 'edit' = 'add';
+  let modalTag = '';
+  let modalKeywords = '';
+  let modalError = '';
+  let editOriginalTag = '';
+  let editIsBuiltin = false;
+  let editIsCustomized = false;
+
+  function openAddModal() {
+    modalMode = 'add';
+    modalTag = '';
+    modalKeywords = '';
+    modalError = '';
+    editOriginalTag = '';
+    editIsBuiltin = false;
+    editIsCustomized = false;
+    showModal = true;
+  }
+
+  function openEditModal(sys: KnownGameSystem) {
+    modalMode = 'edit';
+    modalTag = sys.tag;
+    modalKeywords = (sys.keywords || []).join(', ');
+    modalError = '';
+    editOriginalTag = sys.tag;
+    editIsBuiltin = sys.is_builtin ?? false;
+    editIsCustomized = sys.is_customized ?? false;
+    showModal = true;
+  }
+
+  function closeModal() {
+    showModal = false;
+    modalError = '';
+  }
+
+  function handleModalKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') closeModal();
+  }
+
+  function handleBackdrop(e: MouseEvent) {
+    if (e.target === e.currentTarget) closeModal();
+  }
+
+  function parseKeywords(raw: string): string[] {
+    return raw.split(',').map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
+  }
+
+  async function handleSave() {
+    const tag = modalTag.trim();
+    if (!tag) { modalError = 'Tag is required'; return; }
+    const keywords = parseKeywords(modalKeywords);
 
     try {
-      await invoke('create_custom_game_system', {
-        tag, gameSystem: family, keywords,
-      });
-      newTag = '';
-      newFamily = '';
-      newKeywords = '';
-      addError = '';
+      if (modalMode === 'add') {
+        await invoke('create_custom_game_system', { tag, keywords });
+      } else {
+        // Edit mode: works for both custom and built-in (backend creates override if needed)
+        await invoke('update_custom_game_system', { originalTag: editOriginalTag, tag, keywords });
+      }
+      closeModal();
       onSystemsChanged();
     } catch (e: any) {
-      addError = e?.toString() || 'Failed to add system';
-    }
-  }
-
-  function startEdit(sys: KnownGameSystem) {
-    editingTag = sys.tag;
-    editTag = sys.tag;
-    editFamily = sys.game_system;
-    editKeywords = (sys.keywords || []).join(', ');
-    editError = '';
-  }
-
-  function cancelEdit() {
-    editingTag = null;
-    editError = '';
-  }
-
-  async function saveEdit() {
-    if (!editingTag) return;
-    const tag = editTag.trim();
-    const family = editFamily.trim() || tag;
-    if (!tag) { editError = 'Tag is required'; return; }
-
-    const keywords = editKeywords
-      .split(',')
-      .map(k => k.trim().toLowerCase())
-      .filter(k => k.length > 0);
-
-    try {
-      await invoke('update_custom_game_system', {
-        originalTag: editingTag, tag, gameSystem: family, keywords,
-      });
-      editingTag = null;
-      editError = '';
-      onSystemsChanged();
-    } catch (e: any) {
-      editError = e?.toString() || 'Failed to update system';
+      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to save';
     }
   }
 
-  async function handleDelete(tag: string) {
+  async function handleDelete() {
     try {
-      await invoke('delete_custom_game_system', { tag });
+      await invoke('delete_custom_game_system', { tag: editOriginalTag });
+      closeModal();
       onSystemsChanged();
     } catch (e: any) {
-      // Silently fail — shouldn't happen for custom systems
+      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to delete';
     }
   }
 
-  async function handleToggle(tag: string, currentlyEnabled: boolean) {
+  async function handleReset() {
     try {
-      await invoke('toggle_builtin_game_system', {
-        tag, disabled: currentlyEnabled,
-      });
+      await invoke('delete_custom_game_system', { tag: editOriginalTag });
+      closeModal();
       onSystemsChanged();
     } catch (e: any) {
-      // Silently fail
+      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to reset';
     }
   }
 </script>
 
 <div class="game-systems-settings">
+  <div class="list-header">
+    <button class="col-header col-tag" on:click={toggleSort}>Tag</button>
+    <span class="col-header col-keywords">Keywords</span>
+    <button class="add-btn" title="Add custom system" on:click={openAddModal}>+</button>
+  </div>
   <div class="systems-list">
-    {#each [...grouped] as [family, systems]}
-      <div class="family-group">
-        <div class="family-header">{family}</div>
-        {#each systems as sys}
-          {#if editingTag === sys.tag}
-            <div class="system-row editing">
-              <div class="edit-form">
-                <div class="edit-fields">
-                  <input class="edit-input" bind:value={editTag} placeholder="Tag" />
-                  <input class="edit-input" bind:value={editFamily} placeholder="Family name" />
-                  <input class="edit-input wide" bind:value={editKeywords} placeholder="Keywords (comma-separated)" />
-                </div>
-                {#if editError}
-                  <div class="error-msg">{editError}</div>
-                {/if}
-                <div class="edit-actions">
-                  <button class="btn btn-save" on:click={saveEdit}>Save</button>
-                  <button class="btn btn-cancel" on:click={cancelEdit}>Cancel</button>
-                </div>
-              </div>
-            </div>
+    {#each sorted as sys}
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+      <div class="system-row" on:click={() => openEditModal(sys)}>
+        <span class="system-tag">{sys.tag}</span>
+        <span class="system-keywords">{(sys.keywords || []).slice(0, 3).join(', ')}{(sys.keywords || []).length > 3 ? '...' : ''}</span>
+        <div class="system-labels">
+          {#if sys.is_builtin}
+            <span class="label builtin-label">{sys.is_customized ? 'customized' : 'built-in'}</span>
           {:else}
-            <div class="system-row">
-              <span class="system-tag">{sys.tag}</span>
-              <span class="system-keywords">{(sys.keywords || []).slice(0, 3).join(', ')}{(sys.keywords || []).length > 3 ? '...' : ''}</span>
-              <div class="system-actions">
-                {#if sys.is_builtin}
-                  <span class="builtin-label">built-in</span>
-                {:else}
-                  <button class="icon-btn" title="Edit" on:click={() => startEdit(sys)}>
-                    <svg viewBox="0 0 512 512" fill="currentColor" width="12" height="12"><path d="M410.3 231l11.3-11.3-33.9-33.9-62.1-62.1L291.7 89.8l-11.3 11.3-22.6 22.6L150.4 230.7l-2 2-1 1.3-.6 1.6-20 57.1c-4.6 13.1 7.5 25.2 20.6 20.6l57.1-20 1.6-.6 1.3-1 2-2L316.3 182.9l22.6-22.6 22.6-22.6 11.3-11.3 11.3-11.3 26.1 26.1zM169.1 349.9l-3.3 .9-4.7 1.6-13.3 4.7-9.3 3.3 3.3-9.3 4.7-13.3 1.6-4.7 .9-3.3 68-68 25 25-68 68-5 5z"/></svg>
-                  </button>
-                  <button class="icon-btn danger" title="Delete" on:click={() => handleDelete(sys.tag)}>
-                    <svg viewBox="0 0 448 512" fill="currentColor" width="12" height="12"><path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64s14.3 32 32 32h384c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32l21.2 339C55.5 487.8 73.8 512 100.8 512h246.4c27 0 45.3-24.2 47.6-45l21.2-339z"/></svg>
-                  </button>
-                {/if}
-              </div>
-            </div>
+            <span class="label custom-label">custom</span>
           {/if}
-        {/each}
+        </div>
       </div>
     {/each}
   </div>
+</div>
 
-  <div class="add-section">
-    <div class="add-header">Add custom system</div>
-    <div class="add-form">
-      <div class="add-row">
-        <input class="add-input" bind:value={newTag} placeholder="Tag (e.g. Cairn)" on:keydown={(e) => e.key === 'Enter' && handleAdd()} />
-        <input class="add-input" bind:value={newFamily} placeholder="Family name (optional)" on:keydown={(e) => e.key === 'Enter' && handleAdd()} />
+{#if showModal}
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="{modalMode === 'add' ? 'Add' : 'Edit'} Game System" tabindex="-1" on:click={handleBackdrop} on:keydown={handleModalKeydown}>
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title font-heading">{modalMode === 'add' ? 'Add Game System' : 'Edit Game System'}</span>
+        <button class="close-btn" on:click={closeModal} aria-label="Close">&times;</button>
       </div>
-      <input class="add-input wide" bind:value={newKeywords} placeholder="Keywords for auto-detection (comma-separated)" on:keydown={(e) => e.key === 'Enter' && handleAdd()} />
-      {#if addError}
-        <div class="error-msg">{addError}</div>
-      {/if}
-      <button class="btn btn-add" on:click={handleAdd}>Add System</button>
+      <div class="modal-body">
+        <label class="field-label" for="sys-tag">Tag</label>
+        <input id="sys-tag" class="field-input" bind:value={modalTag} placeholder="e.g. Cairn" on:keydown={(e) => e.key === 'Enter' && handleSave()} />
+
+        <label class="field-label" for="sys-keywords">Keywords</label>
+        <input id="sys-keywords" class="field-input" bind:value={modalKeywords} placeholder="Comma-separated keywords for auto-detection" on:keydown={(e) => e.key === 'Enter' && handleSave()} />
+
+        {#if modalError}
+          <div class="error-msg">{modalError}</div>
+        {/if}
+      </div>
+      <div class="modal-footer">
+        <div class="footer-left">
+          {#if modalMode === 'edit' && editIsBuiltin && editIsCustomized}
+            <button class="btn btn-reset" on:click={handleReset}>Reset to defaults</button>
+          {/if}
+          {#if modalMode === 'edit' && !editIsBuiltin}
+            <button class="btn btn-delete" on:click={handleDelete}>Delete</button>
+          {/if}
+        </div>
+        <div class="footer-right">
+          <button class="btn btn-cancel" on:click={closeModal}>Cancel</button>
+          <button class="btn btn-save" on:click={handleSave}>{modalMode === 'add' ? 'Add System' : 'Save'}</button>
+        </div>
+      </div>
     </div>
   </div>
-</div>
+{/if}
 
 <style>
   .game-systems-settings {
@@ -181,38 +174,82 @@
     height: 100%;
   }
 
+  .list-header {
+    display: flex;
+    align-items: center;
+    padding: 0.35rem 0.75rem;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .col-header {
+    background: none;
+    border: none;
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: left;
+    padding: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    transition: color var(--transition-fast);
+  }
+
+  button.col-header {
+    cursor: pointer;
+  }
+  button.col-header:hover {
+    color: var(--text-primary);
+  }
+
+  .col-tag {
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+
+  .col-keywords {
+    flex: 1;
+    cursor: default;
+  }
+
+  .add-btn {
+    background: none;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+  }
+  .add-btn:hover {
+    color: var(--text-accent);
+    border-color: var(--text-accent);
+  }
+
   .systems-list {
     flex: 1;
     overflow-y: auto;
-    padding: 0.5rem 0;
-  }
-
-  .family-group {
-    margin-bottom: 0.75rem;
-  }
-
-  .family-header {
-    font-family: var(--font-heading);
-    font-size: 0.8rem;
-    color: var(--text-accent);
-    padding: 0.25rem 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    padding: 0.25rem 0;
   }
 
   .system-row {
     display: flex;
     align-items: center;
-    padding: 0.3rem 0.75rem;
+    padding: 0.35rem 0.75rem;
     gap: 0.5rem;
+    cursor: pointer;
     transition: background var(--transition-fast);
   }
   .system-row:hover {
     background: var(--bg-focused);
-  }
-  .system-row.editing {
-    background: var(--bg-focused);
-    padding: 0.5rem 0.75rem;
   }
 
   .system-tag {
@@ -232,87 +269,136 @@
     white-space: nowrap;
   }
 
-  .system-actions {
+  .system-labels {
     display: flex;
-    align-items: center;
     gap: 0.25rem;
     flex-shrink: 0;
   }
 
-  .builtin-label {
+  .label {
     font-size: 0.65rem;
-    color: var(--text-tertiary);
     padding: 0.1rem 0.3rem;
-    border: 1px solid var(--border-subtle);
     border-radius: 3px;
   }
 
-  .icon-btn {
+  .builtin-label {
+    color: var(--text-tertiary);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .custom-label {
+    color: var(--text-accent);
+    border: 1px solid var(--border-accent);
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 110;
+  }
+
+  .modal {
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    width: min(400px, 85vw);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .modal-title {
+    font-size: 1rem;
+    color: var(--text-accent);
+  }
+
+  .close-btn {
     background: none;
     border: none;
     color: var(--text-secondary);
-    padding: 0.15rem;
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    border-radius: 3px;
     transition: color var(--transition-fast);
   }
-  .icon-btn:hover {
-    color: var(--text-accent);
-  }
-  .icon-btn.danger:hover {
-    color: var(--text-danger);
+  .close-btn:hover {
+    color: var(--text-primary);
   }
 
-  .edit-form {
-    width: 100%;
-  }
-  .edit-fields {
+  .modal-body {
+    padding: 1rem;
     display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-  }
-  .edit-actions {
-    display: flex;
-    gap: 0.4rem;
-    margin-top: 0.4rem;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  .edit-input, .add-input {
+  .field-label {
     font-family: var(--font-body);
-    font-size: 0.8rem;
-    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: -0.25rem;
+  }
+
+  .field-input {
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
     background: var(--bg-app);
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     color: var(--text-primary);
     outline: none;
-    flex: 1;
-    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
-  .edit-input:focus, .add-input:focus {
+  .field-input:focus {
     border-color: var(--text-accent);
-  }
-  .edit-input.wide, .add-input.wide {
-    flex: 1 1 100%;
   }
 
   .error-msg {
     font-size: 0.75rem;
     color: var(--text-danger);
-    margin-top: 0.25rem;
+  }
+
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border-subtle);
+    gap: 0.5rem;
+  }
+
+  .footer-left, .footer-right {
+    display: flex;
+    gap: 0.4rem;
   }
 
   .btn {
     font-family: var(--font-body);
-    font-size: 0.75rem;
-    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.75rem;
     border-radius: 4px;
     cursor: pointer;
     border: 1px solid var(--border-subtle);
     transition: all var(--transition-fast);
   }
+
   .btn-save {
     background: var(--bg-active);
     color: var(--text-primary);
@@ -321,6 +407,7 @@
   .btn-save:hover {
     background: var(--bg-active-focused);
   }
+
   .btn-cancel {
     background: none;
     color: var(--text-secondary);
@@ -328,37 +415,22 @@
   .btn-cancel:hover {
     color: var(--text-primary);
   }
-  .btn-add {
-    background: var(--bg-active);
+
+  .btn-delete {
+    background: none;
+    color: var(--text-danger);
+    border-color: var(--text-danger);
+  }
+  .btn-delete:hover {
+    background: var(--text-danger);
+    color: var(--text-inverse);
+  }
+
+  .btn-reset {
+    background: none;
+    color: var(--text-secondary);
+  }
+  .btn-reset:hover {
     color: var(--text-primary);
-    border-color: var(--bg-active);
-    margin-top: 0.4rem;
-  }
-  .btn-add:hover {
-    background: var(--bg-active-focused);
-  }
-
-  .add-section {
-    border-top: 1px solid var(--border-subtle);
-    padding: 0.75rem;
-    flex-shrink: 0;
-  }
-
-  .add-header {
-    font-family: var(--font-heading);
-    font-size: 0.8rem;
-    color: var(--text-accent);
-    margin-bottom: 0.5rem;
-  }
-
-  .add-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .add-row {
-    display: flex;
-    gap: 0.4rem;
   }
 </style>

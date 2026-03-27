@@ -1,11 +1,11 @@
 """
 Tests for custom game system CRUD and merge logic.
 
-- POST /api/custom-game-systems — create a custom system
-- PUT /api/custom-game-systems/{tag} — update a custom system
-- DELETE /api/custom-game-systems/{tag} — remove a custom system
+- POST /api/custom-game-systems — create a custom system (or override a built-in)
+- PUT /api/custom-game-systems/{tag} — update a custom system (or create built-in override)
+- DELETE /api/custom-game-systems/{tag} — remove a custom system (or reset built-in override)
 - POST /api/custom-game-systems/toggle-builtin — disable/enable a built-in
-- GET /api/known-game-systems — merged list with is_builtin flag
+- GET /api/known-game-systems — merged list with is_builtin, is_customized flags
 """
 
 import json
@@ -21,40 +21,54 @@ def test_create_custom_system(client):
     """Creating a custom system should return the new entry."""
     response = client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
-        "game_system": "Cairn",
         "keywords": ["cairn", "cairn 2e"],
     })
 
     assert response.status_code == 200
     data = response.json()
     assert data["tag"] == "Cairn"
-    assert data["game_system"] == "Cairn"
     assert data["keywords"] == ["cairn", "cairn 2e"]
 
 
-def test_create_duplicate_tag_rejected(client):
-    """Creating a system with an existing tag should return 409."""
-    # "D&D 5E" is a built-in tag
+def test_create_builtin_override(client):
+    """Creating a system with a built-in tag should succeed (creates override)."""
     response = client.post("/api/custom-game-systems", json={
         "tag": "D&D 5E",
-        "game_system": "D&D",
-        "keywords": ["5e"],
+        "keywords": ["5e", "dnd5e", "my custom keywords"],
     })
-    assert response.status_code == 409
+    assert response.status_code == 200
+
+    # Should appear as is_builtin=True, is_customized=True in the known list
+    known = client.get("/api/known-game-systems").json()
+    dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
+    assert dnd["is_builtin"] is True
+    assert dnd["is_customized"] is True
+    assert "my custom keywords" in dnd["keywords"]
 
 
 def test_create_duplicate_custom_tag_rejected(client):
     """Creating two custom systems with the same tag should fail."""
     client.post("/api/custom-game-systems", json={
         "tag": "Mothership",
-        "game_system": "Mothership",
         "keywords": ["mothership"],
     })
 
     response = client.post("/api/custom-game-systems", json={
         "tag": "Mothership",
-        "game_system": "Mothership RPG",
         "keywords": ["mothership rpg"],
+    })
+    assert response.status_code == 409
+
+
+def test_create_builtin_override_twice_rejected(client):
+    """Creating a built-in override twice should fail (custom entry already exists)."""
+    client.post("/api/custom-game-systems", json={
+        "tag": "D&D 5E",
+        "keywords": ["5e custom"],
+    })
+    response = client.post("/api/custom-game-systems", json={
+        "tag": "D&D 5E",
+        "keywords": ["5e custom again"],
     })
     assert response.status_code == 409
 
@@ -63,7 +77,6 @@ def test_create_empty_tag_rejected(client):
     """Tag must not be empty."""
     response = client.post("/api/custom-game-systems", json={
         "tag": "  ",
-        "game_system": "Nothing",
     })
     assert response.status_code == 400
 
@@ -76,7 +89,6 @@ def test_custom_system_in_known_list(client):
     """Custom systems should appear in known-game-systems with is_builtin=False."""
     client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
-        "game_system": "Cairn",
         "keywords": ["cairn"],
     })
 
@@ -85,17 +97,18 @@ def test_custom_system_in_known_list(client):
 
     cairn = next(s for s in data["systems"] if s["tag"] == "Cairn")
     assert cairn["is_builtin"] is False
-    assert cairn["game_system"] == "Cairn"
+    assert cairn["is_customized"] is False
     assert "cairn" in cairn["keywords"]
 
 
 def test_builtins_have_is_builtin_true(client):
-    """Built-in systems should have is_builtin=True."""
+    """Built-in systems should have is_builtin=True and is_customized=False."""
     response = client.get("/api/known-game-systems")
     data = response.json()
 
     dnd = next(s for s in data["systems"] if s["tag"] == "D&D 5E")
     assert dnd["is_builtin"] is True
+    assert dnd["is_customized"] is False
 
 
 def test_known_systems_include_keywords(client):
@@ -116,37 +129,39 @@ def test_update_custom_system(client):
     """Updating a custom system should change its fields."""
     client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
-        "game_system": "Cairn",
         "keywords": ["cairn"],
     })
 
     response = client.put("/api/custom-game-systems/Cairn", json={
-        "tag": "Cairn",
-        "game_system": "Cairn 2E",
+        "tag": "Cairn 2E",
         "keywords": ["cairn", "cairn 2e", "cairn second edition"],
     })
 
     assert response.status_code == 200
     data = response.json()
-    assert data["game_system"] == "Cairn 2E"
+    assert data["tag"] == "Cairn 2E"
     assert "cairn 2e" in data["keywords"]
 
 
-def test_cannot_edit_builtin(client):
-    """Editing a built-in system should return 400."""
+def test_edit_builtin_creates_override(client):
+    """Editing a built-in should create a custom override."""
     response = client.put("/api/custom-game-systems/D%26D%205E", json={
         "tag": "D&D 5E",
-        "game_system": "DnD",
-        "keywords": ["dnd"],
+        "keywords": ["dnd", "5e", "custom kw"],
     })
-    assert response.status_code == 400
+    assert response.status_code == 200
+
+    known = client.get("/api/known-game-systems").json()
+    dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
+    assert dnd["is_builtin"] is True
+    assert dnd["is_customized"] is True
+    assert "custom kw" in dnd["keywords"]
 
 
-def test_update_nonexistent_custom_system(client):
-    """Updating a non-existent custom system should return 404."""
+def test_update_nonexistent_system(client):
+    """Updating a non-existent system (neither custom nor built-in) should return 404."""
     response = client.put("/api/custom-game-systems/Ghost", json={
         "tag": "Ghost",
-        "game_system": "Ghost RPG",
         "keywords": [],
     })
     assert response.status_code == 404
@@ -160,7 +175,6 @@ def test_delete_custom_system(client):
     """Deleting a custom system should remove it from the known list."""
     client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
-        "game_system": "Cairn",
         "keywords": ["cairn"],
     })
 
@@ -174,10 +188,30 @@ def test_delete_custom_system(client):
     assert "Cairn" not in tags
 
 
-def test_cannot_delete_builtin(client):
-    """Deleting a built-in system should return 400."""
+def test_delete_builtin_override_resets_to_defaults(client):
+    """Deleting a built-in override should restore the original built-in."""
+    # Override D&D 5E keywords
+    client.post("/api/custom-game-systems", json={
+        "tag": "D&D 5E",
+        "keywords": ["custom kw only"],
+    })
+
+    # Delete the override
     response = client.delete("/api/custom-game-systems/D%26D%205E")
-    assert response.status_code == 400
+    assert response.status_code == 200
+
+    # Built-in should be restored with original keywords
+    known = client.get("/api/known-game-systems").json()
+    dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
+    assert dnd["is_builtin"] is True
+    assert dnd["is_customized"] is False
+    assert "d&d 5e" in dnd["keywords"]  # Original keyword restored
+
+
+def test_delete_unoverridden_builtin_rejected(client):
+    """Deleting a built-in that has no custom override should return 404."""
+    response = client.delete("/api/custom-game-systems/D%26D%205E")
+    assert response.status_code == 404
 
 
 def test_delete_nonexistent_custom_system(client):
@@ -236,7 +270,6 @@ def test_persist_to_disk(client, tmp_path):
     """Custom systems should be saved to disk as JSON."""
     client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
-        "game_system": "Cairn",
         "keywords": ["cairn"],
     })
 
@@ -271,7 +304,6 @@ def test_custom_keywords_in_detection(client, tmp_path):
     # Create a custom system
     client.post("/api/custom-game-systems", json={
         "tag": "Mothership",
-        "game_system": "Mothership",
         "keywords": ["mothership", "mothership rpg"],
     })
 

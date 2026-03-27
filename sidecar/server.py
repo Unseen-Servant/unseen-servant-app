@@ -136,7 +136,6 @@ class SetGameSystemRequest(BaseModel):
 
 class CustomGameSystemRequest(BaseModel):
     tag: str
-    game_system: str
     keywords: list[str] = []
 
 class ToggleBuiltinRequest(BaseModel):
@@ -237,7 +236,6 @@ CUSTOM_SYSTEMS_FILENAME = "custom_game_systems.json"
 
 class CustomGameSystemEntry(BaseModel):
     tag: str
-    game_system: str
     keywords: list[str] = []
 
 
@@ -270,9 +268,10 @@ def get_merged_systems(
     """Merge built-in GAME_SYSTEMS with custom overrides/additions.
 
     Returns (merged_list, known_systems_dict) where:
-    - merged_list: full entries with tag, game_system, keywords, is_builtin
+    - merged_list: full entries with tag, keywords, is_builtin, is_customized
     - known_systems_dict: tag → keywords mapping for detect_game_system
     """
+    builtin_tags = {entry["tag"] for entry in GAME_SYSTEMS}
     custom_tags = {entry.tag for entry in custom_store.systems}
     disabled = set(custom_store.disabled_builtins)
 
@@ -283,14 +282,15 @@ def get_merged_systems(
         if entry["tag"] in custom_tags:
             # Custom entry overrides built-in with same tag
             continue
-        merged.append({**entry, "is_builtin": True})
+        merged.append({**entry, "is_builtin": True, "is_customized": False})
 
     for entry in custom_store.systems:
+        is_override = entry.tag in builtin_tags
         merged.append({
             "tag": entry.tag,
-            "game_system": entry.game_system,
             "keywords": entry.keywords,
-            "is_builtin": False,
+            "is_builtin": is_override,
+            "is_customized": is_override,
         })
 
     known = {e["tag"]: e["keywords"] for e in merged}
@@ -1461,9 +1461,9 @@ def create_app(collection=None, data_dir: Path | None = None):
             [
                 {
                     "tag": e["tag"],
-                    "game_system": e["game_system"],
                     "keywords": e.get("keywords", []),
                     "is_builtin": e.get("is_builtin", True),
+                    "is_customized": e.get("is_customized", False),
                 }
                 for e in _merged["list"]
             ],
@@ -1536,22 +1536,22 @@ def create_app(collection=None, data_dir: Path | None = None):
 
     @app.post("/api/custom-game-systems")
     async def create_custom_game_system(request: CustomGameSystemRequest):
-        """Add a new custom game system."""
+        """Add a new custom game system (or override a built-in)."""
         if not request.tag.strip():
             raise HTTPException(status_code=400, detail="Tag must not be empty")
 
-        # Check for duplicate tag across merged list
-        existing_tags = {e["tag"] for e in _merged["list"]}
-        if request.tag in existing_tags:
+        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+
+        # Check for duplicate tag among existing custom systems
+        custom_tags = {e.tag for e in store.systems}
+        if request.tag in custom_tags:
             raise HTTPException(
                 status_code=409,
-                detail=f"A game system with tag '{request.tag}' already exists",
+                detail=f"A custom game system with tag '{request.tag}' already exists",
             )
 
-        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
         store.systems.append(CustomGameSystemEntry(
             tag=request.tag,
-            game_system=request.game_system,
             keywords=request.keywords,
         ))
         if data_dir:
@@ -1560,34 +1560,35 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         return {
             "tag": request.tag,
-            "game_system": request.game_system,
             "keywords": request.keywords,
         }
 
     @app.put("/api/custom-game-systems/{tag}")
     async def update_custom_game_system(tag: str, request: CustomGameSystemRequest):
-        """Update an existing custom game system."""
-        # Cannot edit built-ins
-        builtin_tags = {e["tag"] for e in GAME_SYSTEMS}
-        if tag in builtin_tags:
-            raise HTTPException(
-                status_code=400, detail="Cannot edit a built-in game system"
-            )
-
+        """Update a custom game system, or create an override for a built-in."""
         store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+
+        # Try to update an existing custom entry
         found = False
         for entry in store.systems:
             if entry.tag == tag:
                 entry.tag = request.tag
-                entry.game_system = request.game_system
                 entry.keywords = request.keywords
                 found = True
                 break
 
         if not found:
-            raise HTTPException(
-                status_code=404, detail=f"Custom system not found: {tag}"
-            )
+            # If it's a built-in, create a custom override
+            builtin_tags = {e["tag"] for e in GAME_SYSTEMS}
+            if tag in builtin_tags:
+                store.systems.append(CustomGameSystemEntry(
+                    tag=request.tag,
+                    keywords=request.keywords,
+                ))
+            else:
+                raise HTTPException(
+                    status_code=404, detail=f"Game system not found: {tag}"
+                )
 
         if data_dir:
             save_custom_systems(data_dir, store)
@@ -1595,19 +1596,12 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         return {
             "tag": request.tag,
-            "game_system": request.game_system,
             "keywords": request.keywords,
         }
 
     @app.delete("/api/custom-game-systems/{tag}")
     async def delete_custom_game_system(tag: str):
-        """Remove a custom game system."""
-        builtin_tags = {e["tag"] for e in GAME_SYSTEMS}
-        if tag in builtin_tags:
-            raise HTTPException(
-                status_code=400, detail="Cannot delete a built-in game system"
-            )
-
+        """Remove a custom game system or reset a built-in override."""
         store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
         original_count = len(store.systems)
         store.systems = [e for e in store.systems if e.tag != tag]
