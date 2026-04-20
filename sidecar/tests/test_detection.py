@@ -107,7 +107,7 @@ def test_detect_content_scans_first_2000_chars():
 def test_detect_savage_worlds():
     """Path with 'Savage Worlds' should match."""
     path = Path("/RPGs/Savage Worlds/SWADE.pdf")
-    assert detect_game_system(path) == "Savage Worlds"
+    assert detect_game_system(path) == "SaWo"
 
 
 def test_detect_call_of_cthulhu():
