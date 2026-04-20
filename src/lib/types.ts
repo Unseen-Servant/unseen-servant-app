@@ -110,3 +110,17 @@ export interface CollectionMutationResult {
   name: string;
   file_count: number;
 }
+
+export interface SearchResultItem {
+  text: string;
+  filename: string;
+  source: string;
+  chunk: number;
+  game_system: string;
+  relevance: number;
+}
+
+export interface SearchResponse {
+  results: SearchResultItem[];
+  message?: string;
+}

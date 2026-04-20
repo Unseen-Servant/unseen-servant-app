@@ -170,6 +170,24 @@ struct CompactResult {
     reclaimed: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct SearchResultItem {
+    text: String,
+    filename: String,
+    source: String,
+    chunk: u32,
+    game_system: String,
+    relevance: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SearchResponse {
+    #[serde(default)]
+    results: Vec<SearchResultItem>,
+    #[serde(default)]
+    message: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — file system
 // ---------------------------------------------------------------------------
@@ -502,6 +520,42 @@ async fn get_collections() -> Result<CollectionsResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     let result: CollectionsResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn search_index(
+    query: String,
+    n_results: Option<u32>,
+    source_filter: Option<String>,
+    game_system: Option<String>,
+    collection: Option<String>,
+) -> Result<SearchResponse, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/search", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "query": query,
+            "n_results": n_results.unwrap_or(10),
+            "source_filter": source_filter,
+            "game_system": game_system,
+            "collection": collection,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Search failed ({}): {}", status, body));
+    }
+
+    let result: SearchResponse = response
         .json()
         .await
         .map_err(|e| format!("Invalid response from indexer: {}", e))?;
@@ -952,7 +1006,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
