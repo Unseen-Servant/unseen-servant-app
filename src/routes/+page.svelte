@@ -6,11 +6,12 @@
   import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
   import CollectionBar from '../lib/CollectionBar.svelte';
   import Header from '../lib/Header.svelte';
+  import SearchResults from '../lib/SearchResults.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import NotificationBanner from '../lib/NotificationBanner.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
@@ -66,6 +67,106 @@
   // Ollama health
   let ollamaRunning = false;
   let ollamaModelReady = false;
+
+  // In-app search state
+  let searchQuery = '';
+  let committedQuery = '';
+  let searchResults: SearchResultItem[] = [];
+  let isSearching = false;
+  let searchError: string | null = null;
+  let searchSeq = 0;
+  $: searchActive = committedQuery.trim() !== '';
+  $: indexedPathsSet = new Set<string>(
+    (indexStatus?.up_to_date ?? []).map((e) => e.path)
+      .concat((indexStatus?.to_update ?? []).map((e) => e.path))
+  );
+
+  async function runSearch(q: string) {
+    const trimmed = q.trim();
+    if (!trimmed) {
+      searchResults = [];
+      searchError = null;
+      isSearching = false;
+      return;
+    }
+    if (!sidecarConnected) {
+      searchError = 'Indexer not running';
+      searchResults = [];
+      isSearching = false;
+      return;
+    }
+    searchSeq += 1;
+    const seq = searchSeq;
+    isSearching = true;
+    searchError = null;
+    try {
+      const response = await invoke<SearchResponse>('search_index', {
+        query: trimmed,
+        nResults: 10,
+      });
+      if (seq !== searchSeq) return;
+      searchResults = response.results ?? [];
+    } catch (e) {
+      if (seq !== searchSeq) return;
+      searchError = String(e);
+      searchResults = [];
+    } finally {
+      if (seq === searchSeq) {
+        isSearching = false;
+      }
+    }
+  }
+
+  function handleSearchDebounced(q: string) {
+    committedQuery = q.trim();
+    runSearch(q);
+  }
+
+  function handleSearchSubmit(q: string) {
+    committedQuery = q.trim();
+    runSearch(q);
+  }
+
+  function handleSearchClear() {
+    searchQuery = '';
+    committedQuery = '';
+    searchResults = [];
+    searchError = null;
+    isSearching = false;
+    searchSeq += 1;
+  }
+
+  function resolvePathForFilename(filename: string): string | null {
+    const target = filename.toLowerCase();
+    for (const entry of indexStatus?.up_to_date ?? []) {
+      if (entry.filename?.toLowerCase() === target) return entry.path;
+    }
+    for (const entry of indexStatus?.to_update ?? []) {
+      if (entry.filename?.toLowerCase() === target) return entry.path;
+    }
+    return null;
+  }
+
+  async function handleOpenResult(filename: string) {
+    const path = resolvePathForFilename(filename);
+    if (!path) {
+      notification.show({
+        type: 'error',
+        message: `Could not locate "${filename}" on disk.`,
+        duration: 4000,
+      });
+      return;
+    }
+    try {
+      await openPath(path);
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Failed to open ${filename}: ${e}`,
+        duration: 4000,
+      });
+    }
+  }
 
   onMount(async () => {
     try {
@@ -820,7 +921,14 @@
 <svelte:window on:keydown={handleGlobalKeydown} on:contextmenu|preventDefault />
 
 <main class="app-layout">
-  <Header />
+  <Header
+    bind:searchQuery
+    {isSearching}
+    disabled={!selectedFolder || editingCollectionName !== null || isCreatingCollection}
+    onSubmit={handleSearchSubmit}
+    onDebouncedChange={handleSearchDebounced}
+    onClear={handleSearchClear}
+  />
 
   {#if selectedFolder}
     <div class="collections-area">
@@ -842,32 +950,43 @@
     </div>
 
     <div class="file-tree-area">
-      {#each files as file (file.path)}
-        <FileTree
-          item={file}
-          level={0}
-          {selectedPaths}
-          {foldersWithSelections}
-          {gameSystemMap}
-          {knownSystems}
-          {indexedPaths}
-          onToggle={toogleSelection}
-          onSetGameSystem={handleSetGameSystem}
-          {expandedPaths}
-          onToggleExpand={handleToggleExpand}
-          {focusedFilePath}
-          onFocusFile={(path) => { focusedFilePath = path; }}
-          onContextMenu={handleContextMenu}
-          {renamingFilePath}
-          onRenameSubmit={handleRenameSubmit}
-          onRenameCancel={handleRenameCancel}
-          mode={treeMode}
-          collectionPaths={collectionEditPaths}
-          {collectionFolders}
-          {highlightPaths}
-          onCollectionToggle={handleCollectionToggle}
+      {#if searchActive}
+        <SearchResults
+          results={searchResults}
+          isLoading={isSearching}
+          query={committedQuery}
+          error={searchError}
+          indexedFileCount={indexedPathsSet.size}
+          onOpenResult={handleOpenResult}
         />
-      {/each}
+      {:else}
+        {#each files as file (file.path)}
+          <FileTree
+            item={file}
+            level={0}
+            {selectedPaths}
+            {foldersWithSelections}
+            {gameSystemMap}
+            {knownSystems}
+            {indexedPaths}
+            onToggle={toogleSelection}
+            onSetGameSystem={handleSetGameSystem}
+            {expandedPaths}
+            onToggleExpand={handleToggleExpand}
+            {focusedFilePath}
+            onFocusFile={(path) => { focusedFilePath = path; }}
+            onContextMenu={handleContextMenu}
+            {renamingFilePath}
+            onRenameSubmit={handleRenameSubmit}
+            onRenameCancel={handleRenameCancel}
+            mode={treeMode}
+            collectionPaths={collectionEditPaths}
+            {collectionFolders}
+            {highlightPaths}
+            onCollectionToggle={handleCollectionToggle}
+          />
+        {/each}
+      {/if}
       <NotificationBanner />
     </div>
   {:else}
