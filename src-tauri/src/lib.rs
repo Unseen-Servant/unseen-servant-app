@@ -120,12 +120,34 @@ struct SetGameSystemResult {
 #[derive(Serialize, Deserialize, Debug)]
 struct KnownGameSystem {
     tag: String,
-    game_system: String,
+    #[serde(default)]
+    keywords: Vec<String>,
+    #[serde(default)]
+    is_builtin: bool,
+    #[serde(default)]
+    is_customized: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct KnownGameSystemsResult {
     systems: Vec<KnownGameSystem>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CustomGameSystemResult {
+    tag: String,
+    keywords: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ToggleBuiltinResult {
+    tag: String,
+    disabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DeleteCustomSystemResult {
+    deleted: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -499,6 +521,116 @@ async fn set_game_system(filename: String, game_system: String) -> Result<SetGam
     }
 
     let result: SetGameSystemResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands — custom game systems
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn create_custom_game_system(tag: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/custom-game-systems", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "tag": tag,
+            "keywords": keywords,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: CustomGameSystemResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn update_custom_game_system(original_tag: String, tag: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
+    let client = reqwest::Client::new();
+    let encoded_tag = original_tag.replace("&", "%26").replace(" ", "%20");
+    let response = client
+        .put(format!("{}/api/custom-game-systems/{}", SIDECAR_URL, encoded_tag))
+        .json(&serde_json::json!({
+            "tag": tag,
+            "keywords": keywords,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: CustomGameSystemResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn delete_custom_game_system(tag: String) -> Result<DeleteCustomSystemResult, String> {
+    let client = reqwest::Client::new();
+    let encoded_tag = tag.replace("&", "%26").replace(" ", "%20");
+    let response = client
+        .delete(format!("{}/api/custom-game-systems/{}", SIDECAR_URL, encoded_tag))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: DeleteCustomSystemResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn toggle_builtin_game_system(tag: String, disabled: bool) -> Result<ToggleBuiltinResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/custom-game-systems/toggle-builtin", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "tag": tag,
+            "disabled": disabled,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: ToggleBuiltinResult = response
         .json()
         .await
         .map_err(|e| format!("Invalid response from indexer: {}", e))?;
@@ -1006,7 +1138,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

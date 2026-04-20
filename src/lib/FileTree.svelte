@@ -40,7 +40,6 @@
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
   let childrenLoading = false;
-
   // Auto-fetch children when a folder is expanded but tree data was reloaded
   afterUpdate(() => {
     if (isExpanded && item.children === null && !childrenLoading) {
@@ -228,7 +227,6 @@
               {#each knownSystems as sys}
                 <button class="dropdown-item" on:click={() => selectSystem(sys.tag)}>
                   <span class="dropdown-tag">{sys.tag}</span>
-                  <span class="dropdown-family">{sys.game_system}</span>
                 </button>
               {/each}
               <hr class="dropdown-divider" />
@@ -250,7 +248,6 @@
             {#each knownSystems as sys}
               <button class="dropdown-item" on:click={() => selectSystem(sys.tag)}>
                 <span class="dropdown-tag">{sys.tag}</span>
-                <span class="dropdown-family">{sys.game_system}</span>
               </button>
             {/each}
           </div>
@@ -496,11 +493,6 @@
   .dropdown-tag {
     font-weight: 600;
     color: var(--text-accent);
-    white-space: nowrap;
-  }
-  .dropdown-family {
-    color: var(--text-secondary);
-    font-size: 0.7rem;
     white-space: nowrap;
   }
   .dropdown-divider {

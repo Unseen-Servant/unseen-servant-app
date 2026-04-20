@@ -11,6 +11,7 @@ vite.config.ts.timestamp-*
 .vscode
 src-tauri/target/
 src-tauri/gen/schemas
+.claude/
 
 # Python sidecar
 .venv

@@ -48,17 +48,28 @@ def parse_args():
 from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
 
 
-def detect_game_system(pdf_path: Path, text: str | None = None) -> str:
+def detect_game_system(
+    pdf_path: Path,
+    text: str | None = None,
+    known_systems: dict[str, list[str]] | None = None,
+) -> str:
     """Detect the TTRPG game system from folder path or PDF content.
 
     Detection priority:
     1. Folder name match (user's deliberate organization)
     2. Content keyword match (first 2000 chars of extracted text)
     3. Fallback to "unknown"
+
+    Args:
+        known_systems: Optional tag→keywords dict. When None, uses the
+            module-level KNOWN_SYSTEMS (built-in only). Pass a merged dict
+            to include user-defined custom systems in detection.
     """
+    systems = known_systems if known_systems is not None else KNOWN_SYSTEMS
+
     # Check path components (folder names)
     path_lower = str(pdf_path).lower()
-    for system, keywords in KNOWN_SYSTEMS.items():
+    for system, keywords in systems.items():
         for keyword in keywords:
             if keyword in path_lower:
                 return system
@@ -66,7 +77,7 @@ def detect_game_system(pdf_path: Path, text: str | None = None) -> str:
     # Check content if provided
     if text:
         text_sample = text[:2000].lower()
-        for system, keywords in KNOWN_SYSTEMS.items():
+        for system, keywords in systems.items():
             for keyword in keywords:
                 if keyword in text_sample:
                     return system
@@ -122,6 +133,14 @@ class SearchRequest(BaseModel):
 class SetGameSystemRequest(BaseModel):
     filename: str
     game_system: str
+
+class CustomGameSystemRequest(BaseModel):
+    tag: str
+    keywords: list[str] = []
+
+class ToggleBuiltinRequest(BaseModel):
+    tag: str
+    disabled: bool
 
 class CreateCollectionRequest(BaseModel):
     name: str
@@ -208,6 +227,76 @@ def save_collections(data_dir: Path, store: CollectionsStore) -> None:
     os.replace(tmp_path, path)
 
 
+# ---------------------------------------------------------------------------
+# Custom game systems — user-defined systems that merge with built-ins
+# ---------------------------------------------------------------------------
+
+CUSTOM_SYSTEMS_FILENAME = "custom_game_systems.json"
+
+
+class CustomGameSystemEntry(BaseModel):
+    tag: str
+    keywords: list[str] = []
+
+
+class CustomGameSystemsStore(BaseModel):
+    version: int = 1
+    systems: list[CustomGameSystemEntry] = []
+    disabled_builtins: list[str] = []
+
+
+def load_custom_systems(data_dir: Path) -> CustomGameSystemsStore:
+    """Load custom game systems from disk, or return an empty store."""
+    path = data_dir / CUSTOM_SYSTEMS_FILENAME
+    if path.exists():
+        raw = json.loads(path.read_text())
+        return CustomGameSystemsStore(**raw)
+    return CustomGameSystemsStore()
+
+
+def save_custom_systems(data_dir: Path, store: CustomGameSystemsStore) -> None:
+    """Write custom game systems to disk atomically."""
+    path = data_dir / CUSTOM_SYSTEMS_FILENAME
+    tmp_path = path.with_suffix(".json.tmp")
+    tmp_path.write_text(store.model_dump_json(indent=2))
+    os.replace(tmp_path, path)
+
+
+def get_merged_systems(
+    custom_store: CustomGameSystemsStore,
+) -> tuple[list[dict], dict[str, list[str]]]:
+    """Merge built-in GAME_SYSTEMS with custom overrides/additions.
+
+    Returns (merged_list, known_systems_dict) where:
+    - merged_list: full entries with tag, keywords, is_builtin, is_customized
+    - known_systems_dict: tag → keywords mapping for detect_game_system
+    """
+    builtin_tags = {entry["tag"] for entry in GAME_SYSTEMS}
+    custom_tags = {entry.tag for entry in custom_store.systems}
+    disabled = set(custom_store.disabled_builtins)
+
+    merged = []
+    for entry in GAME_SYSTEMS:
+        if entry["tag"] in disabled:
+            continue
+        if entry["tag"] in custom_tags:
+            # Custom entry overrides built-in with same tag
+            continue
+        merged.append({**entry, "is_builtin": True, "is_customized": False})
+
+    for entry in custom_store.systems:
+        is_override = entry.tag in builtin_tags
+        merged.append({
+            "tag": entry.tag,
+            "keywords": entry.keywords,
+            "is_builtin": is_override,
+            "is_customized": is_override,
+        })
+
+    known = {e["tag"]: e["keywords"] for e in merged}
+    return merged, known
+
+
 def resolve_collection_filenames(
     coll: Collection, manifest: IndexManifest
 ) -> list[str]:
@@ -238,7 +327,8 @@ def chunk_id_prefix(pdf_path: Path) -> str:
     return f"{path_hash}_{pdf_path.stem}"
 
 def index_single_pdf(
-    pdf_path: Path, collection, game_system: str | None = None
+    pdf_path: Path, collection, game_system: str | None = None,
+    known_systems: dict[str, list[str]] | None = None,
 ) -> tuple[int, str | None, str]:
     """Extract, chunk, and upsert a single PDF into ChromaDB.
 
@@ -259,7 +349,9 @@ def index_single_pdf(
         if not text.strip():
             return 0, f"{pdf_path.name}: Empty or scanned PDF", "unknown"
 
-        resolved_system = game_system or detect_game_system(pdf_path, text)
+        resolved_system = game_system or detect_game_system(
+            pdf_path, text, known_systems=known_systems
+        )
         chunks = chunk_text(text)
 
         batch_size = 100
@@ -290,7 +382,8 @@ def index_single_pdf(
 
 
 def prepare_pdf(
-    pdf_path: Path, game_system: str | None = None
+    pdf_path: Path, game_system: str | None = None,
+    known_systems: dict[str, list[str]] | None = None,
 ) -> tuple[list[str], str, str | None]:
     """Extract text and chunk a PDF without upserting.
 
@@ -311,7 +404,9 @@ def prepare_pdf(
         if not text.strip():
             return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
 
-        resolved_system = game_system or detect_game_system(pdf_path, text)
+        resolved_system = game_system or detect_game_system(
+            pdf_path, text, known_systems=known_systems
+        )
         chunks = chunk_text(text)
         return chunks, resolved_system, None
 
@@ -592,6 +687,19 @@ def create_app(collection=None, data_dir: Path | None = None):
     # threading.Lock rather than asyncio.Lock.
     _sync_lock = threading.Lock()
 
+    # Merged game systems state — rebuilt when custom systems change.
+    # Mutable container so endpoint closures always see the latest value.
+    _custom_store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+    _merged_list, _merged_known = get_merged_systems(_custom_store)
+    _merged = {"list": _merged_list, "known": _merged_known}
+
+    def _rebuild_merged():
+        """Reload custom systems from disk and rebuild the merged state."""
+        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+        merged_list, merged_known = get_merged_systems(store)
+        _merged["list"] = merged_list
+        _merged["known"] = merged_known
+
     # Endpoints (close over `collection` from the factory)
     # ------------------------------------------------------------------
 
@@ -611,7 +719,8 @@ def create_app(collection=None, data_dir: Path | None = None):
         for pdf_path_str in request.paths:
             pdf_path = Path(pdf_path_str)
             chunk_count, error, detected_system = index_single_pdf(
-                pdf_path, collection, game_system=request.game_system
+                pdf_path, collection, game_system=request.game_system,
+                known_systems=_merged["known"],
             )
 
             if error:
@@ -784,7 +893,8 @@ def create_app(collection=None, data_dir: Path | None = None):
                 if request.game_system_overrides else None
             )
             chunks, detected_system, error = prepare_pdf(
-                pdf_path, game_system=override
+                pdf_path, game_system=override,
+                known_systems=_merged["known"],
             )
             if error:
                 errors.append(error)
@@ -837,7 +947,8 @@ def create_app(collection=None, data_dir: Path | None = None):
                 if request.game_system_overrides else None
             )
             chunks, detected_system, error = prepare_pdf(
-                pdf_path, game_system=override
+                pdf_path, game_system=override,
+                known_systems=_merged["known"],
             )
             if error:
                 errors.append(error)
@@ -1345,9 +1456,17 @@ def create_app(collection=None, data_dir: Path | None = None):
 
     @app.get("/api/known-game-systems")
     async def get_known_game_systems():
-        """Return all predefined game systems from game_systems.py."""
+        """Return all active game systems (built-in + custom, minus disabled)."""
         systems = sorted(
-            [{"tag": e["tag"], "game_system": e["game_system"]} for e in GAME_SYSTEMS],
+            [
+                {
+                    "tag": e["tag"],
+                    "keywords": e.get("keywords", []),
+                    "is_builtin": e.get("is_builtin", True),
+                    "is_customized": e.get("is_customized", False),
+                }
+                for e in _merged["list"]
+            ],
             key=lambda s: s["tag"].lower(),
         )
         return {"systems": systems}
@@ -1410,6 +1529,118 @@ def create_app(collection=None, data_dir: Path | None = None):
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    # ------------------------------------------------------------------
+    # Custom game system CRUD
+    # ------------------------------------------------------------------
+
+    @app.post("/api/custom-game-systems")
+    async def create_custom_game_system(request: CustomGameSystemRequest):
+        """Add a new custom game system (or override a built-in)."""
+        if not request.tag.strip():
+            raise HTTPException(status_code=400, detail="Tag must not be empty")
+
+        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+
+        # Check for duplicate tag among existing custom systems
+        custom_tags = {e.tag for e in store.systems}
+        if request.tag in custom_tags:
+            raise HTTPException(
+                status_code=409,
+                detail=f"A custom game system with tag '{request.tag}' already exists",
+            )
+
+        store.systems.append(CustomGameSystemEntry(
+            tag=request.tag,
+            keywords=request.keywords,
+        ))
+        if data_dir:
+            save_custom_systems(data_dir, store)
+        _rebuild_merged()
+
+        return {
+            "tag": request.tag,
+            "keywords": request.keywords,
+        }
+
+    @app.put("/api/custom-game-systems/{tag}")
+    async def update_custom_game_system(tag: str, request: CustomGameSystemRequest):
+        """Update a custom game system, or create an override for a built-in."""
+        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+
+        # Try to update an existing custom entry
+        found = False
+        for entry in store.systems:
+            if entry.tag == tag:
+                entry.tag = request.tag
+                entry.keywords = request.keywords
+                found = True
+                break
+
+        if not found:
+            # If it's a built-in, create a custom override
+            builtin_tags = {e["tag"] for e in GAME_SYSTEMS}
+            if tag in builtin_tags:
+                store.systems.append(CustomGameSystemEntry(
+                    tag=request.tag,
+                    keywords=request.keywords,
+                ))
+            else:
+                raise HTTPException(
+                    status_code=404, detail=f"Game system not found: {tag}"
+                )
+
+        if data_dir:
+            save_custom_systems(data_dir, store)
+        _rebuild_merged()
+
+        return {
+            "tag": request.tag,
+            "keywords": request.keywords,
+        }
+
+    @app.delete("/api/custom-game-systems/{tag}")
+    async def delete_custom_game_system(tag: str):
+        """Remove a custom game system or reset a built-in override."""
+        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+        original_count = len(store.systems)
+        store.systems = [e for e in store.systems if e.tag != tag]
+
+        if len(store.systems) == original_count:
+            raise HTTPException(
+                status_code=404, detail=f"Custom system not found: {tag}"
+            )
+
+        if data_dir:
+            save_custom_systems(data_dir, store)
+        _rebuild_merged()
+
+        return {"deleted": tag}
+
+    @app.post("/api/custom-game-systems/toggle-builtin")
+    async def toggle_builtin_game_system(request: ToggleBuiltinRequest):
+        """Enable or disable a built-in game system."""
+        builtin_tags = {e["tag"] for e in GAME_SYSTEMS}
+        if request.tag not in builtin_tags:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{request.tag}' is not a built-in game system",
+            )
+
+        store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
+        if request.disabled:
+            if request.tag not in store.disabled_builtins:
+                store.disabled_builtins.append(request.tag)
+        else:
+            store.disabled_builtins = [
+                t for t in store.disabled_builtins if t != request.tag
+            ]
+
+        if data_dir:
+            save_custom_systems(data_dir, store)
+        _rebuild_merged()
+
+        return {"tag": request.tag, "disabled": request.disabled}
 
     @app.delete("/api/source/{filename}")
     async def delete_source(filename: str):

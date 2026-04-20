@@ -15,11 +15,10 @@ from server import detect_game_system
 
 
 def test_game_systems_structure():
-    """Each entry in GAME_SYSTEMS should have tag, game_system, and keywords."""
+    """Each entry in GAME_SYSTEMS should have tag and keywords."""
     assert len(GAME_SYSTEMS) > 0
     for entry in GAME_SYSTEMS:
         assert "tag" in entry, f"Missing 'tag' in {entry}"
-        assert "game_system" in entry, f"Missing 'game_system' in {entry}"
         assert "keywords" in entry, f"Missing 'keywords' in {entry}"
         assert isinstance(entry["keywords"], list)
         assert len(entry["keywords"]) > 0, f"Empty keywords for {entry['tag']}"
@@ -108,7 +107,7 @@ def test_detect_content_scans_first_2000_chars():
 def test_detect_savage_worlds():
     """Path with 'Savage Worlds' should match."""
     path = Path("/RPGs/Savage Worlds/SWADE.pdf")
-    assert detect_game_system(path) == "Savage Worlds"
+    assert detect_game_system(path) == "SaWo"
 
 
 def test_detect_call_of_cthulhu():
@@ -122,3 +121,37 @@ def test_detect_osr_from_content():
     path = Path("/unsorted/retro_game.pdf")
     text = "Old School Essentials is a retro-clone of the classic D&D rules."
     assert detect_game_system(path, text) == "OSR"
+
+
+# ---------------------------------------------------------------------------
+# Custom known_systems parameter
+# ---------------------------------------------------------------------------
+
+def test_detect_with_custom_known_systems():
+    """Passing a custom known_systems dict should use those keywords."""
+    custom = {
+        "Mothership": ["mothership", "mothership rpg"],
+        "Cairn": ["cairn"],
+    }
+    path = Path("/RPGs/Mothership/Dead Planet.pdf")
+    assert detect_game_system(path, known_systems=custom) == "Mothership"
+
+
+def test_detect_custom_overrides_builtin():
+    """Custom known_systems replaces built-in — built-in keywords won't match."""
+    # A dict with only one custom system — D&D keywords should NOT match
+    custom = {
+        "Cairn": ["cairn"],
+    }
+    path = Path("/RPGs/D&D 5E/Player's Handbook.pdf")
+    assert detect_game_system(path, known_systems=custom) == "unknown"
+
+
+def test_detect_custom_from_content():
+    """Custom systems should also match via content scan."""
+    custom = {
+        "Cairn": ["cairn"],
+    }
+    path = Path("/unsorted/adventure.pdf")
+    text = "This is a Cairn adventure set in the dark forest."
+    assert detect_game_system(path, text, known_systems=custom) == "Cairn"
