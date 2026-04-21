@@ -375,6 +375,12 @@ Tauri app launches
 
 ---
 
+## Experiments
+
+Time-boxed research spikes (PDF extraction comparisons, chunking strategies, and similar investigations) live in the sibling repo [Unseen-Servant/unseen-legend-lore-experiments](https://github.com/Unseen-Servant/unseen-legend-lore-experiments). Each spike has its own `FINDINGS.md` documenting the verdict.
+
+---
+
 ## License
 
 Legend Lore is proprietary software. See [LICENSE](LICENSE) for details.
