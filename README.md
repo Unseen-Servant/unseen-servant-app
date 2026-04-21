@@ -364,7 +364,7 @@ Tauri app launches
         ↓
   Rust sends HTTP POST to sidecar with file paths
         ↓
-  Sidecar extracts text (pypdf) → chunks (1000 chars, 200 overlap)
+  Sidecar extracts text (PyMuPDF) → chunks (1000 chars, 200 overlap)
         ↓
   Embeds via Ollama (nomic-embed-text) → stores in ChromaDB
         ↓

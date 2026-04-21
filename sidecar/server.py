@@ -21,7 +21,7 @@ from pathlib import Path
 
 import chromadb
 from chromadb.utils import embedding_functions
-from pypdf import PdfReader
+import pymupdf
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -83,6 +83,16 @@ def detect_game_system(
                     return system
 
     return "unknown"
+
+
+def _extract_pdf_text(pdf_path: Path) -> str:
+    """Extract text from a PDF using PyMuPDF. Pages are concatenated in order."""
+    # PyMuPDF also opens .txt/.epub/.xps/.cbz silently; restrict to PDFs to
+    # match the documented API surface.
+    if pdf_path.suffix.lower() != ".pdf":
+        raise ValueError(f"Not a PDF: {pdf_path.name}")
+    with pymupdf.open(pdf_path) as doc:
+        return "".join(page.get_text() for page in doc)
 
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
@@ -339,12 +349,7 @@ def index_single_pdf(
         return 0, f"{pdf_path.name}: File not found", "unknown"
 
     try:
-        reader = PdfReader(pdf_path)
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text
+        text = _extract_pdf_text(pdf_path)
 
         if not text.strip():
             return 0, f"{pdf_path.name}: Empty or scanned PDF", "unknown"
@@ -394,12 +399,7 @@ def prepare_pdf(
         return [], "unknown", f"{pdf_path.name}: File not found"
 
     try:
-        reader = PdfReader(pdf_path)
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text
+        text = _extract_pdf_text(pdf_path)
 
         if not text.strip():
             return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"

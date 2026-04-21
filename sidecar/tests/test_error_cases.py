@@ -18,7 +18,7 @@ def test_index_non_pdf_file(client, tmp_path):
         "paths": [str(txt_file)]
     })
 
-    # pypdf will raise an error trying to read a .txt as PDF
+    # PyMuPDF will raise an error trying to read a .txt as PDF
     data = response.json()
     assert data["indexed"] == 0
     assert len(data["errors"]) == 1

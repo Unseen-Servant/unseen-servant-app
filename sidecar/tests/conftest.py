@@ -111,9 +111,9 @@ def sample_pdf_path(tmp_path):
 def empty_pdf_path(tmp_path):
     """Create a PDF with no extractable text (simulates a scanned PDF).
 
-    Many TTRPG PDFs are scanned images of old books. pypdf can't
-    extract text from images, so the sidecar should handle this
-    gracefully rather than crashing.
+    Many TTRPG PDFs are scanned images of old books. PyMuPDF can't
+    extract text from images without OCR, so the sidecar should
+    handle this gracefully rather than crashing.
     """
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
