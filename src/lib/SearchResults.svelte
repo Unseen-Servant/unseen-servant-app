@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte';
+  import Markdown from 'svelte-exmarkdown';
   import type { SearchResultItem } from './types';
 
   export let results: SearchResultItem[] = [];
@@ -9,6 +11,46 @@
   export let onOpenResult: (filename: string) => void = () => {};
 
   let expanded = new Set<number>();
+  let snippetEls: (HTMLElement | null)[] = [];
+  let overflowing = new Set<number>();
+  let resizeObserver: ResizeObserver | null = null;
+
+  function checkOverflow() {
+    const next = new Set(overflowing);
+    for (let i = 0; i < snippetEls.length; i++) {
+      const el = snippetEls[i];
+      if (!el) continue;
+      if (!expanded.has(i)) {
+        if (el.scrollHeight > el.clientHeight + 1) next.add(i);
+        else next.delete(i);
+      }
+    }
+    overflowing = next;
+  }
+
+  function reobserve() {
+    if (!resizeObserver) return;
+    resizeObserver.disconnect();
+    for (const el of snippetEls) if (el) resizeObserver.observe(el);
+  }
+
+  onMount(() => {
+    resizeObserver = new ResizeObserver(() => checkOverflow());
+    reobserve();
+    checkOverflow();
+    return () => resizeObserver?.disconnect();
+  });
+
+  $: if (results) {
+    tick().then(() => {
+      reobserve();
+      checkOverflow();
+    });
+  }
+
+  $: if (expanded) {
+    tick().then(checkOverflow);
+  }
 
   function toggleExpand(i: number) {
     if (expanded.has(i)) {
@@ -59,7 +101,18 @@
       >
         <span class="chevron" aria-hidden="true">{expanded.has(i) ? '⌄' : '›'}</span>
         <div class="result-body">
-          <div class="snippet" class:clamped={!expanded.has(i)}>{result.text}</div>
+          <div class="snippet-wrap">
+            <div
+              class="snippet"
+              class:clamped={!expanded.has(i)}
+              bind:this={snippetEls[i]}
+            >
+              <Markdown md={result.text} />
+            </div>
+            {#if !expanded.has(i) && overflowing.has(i)}
+              <span class="more-hint" aria-hidden="true">more…</span>
+            {/if}
+          </div>
           <div class="meta-row">
             <span class="meta-text">
               {result.filename} · {result.game_system} · chunk {result.chunk}
@@ -154,9 +207,48 @@
     font-size: 0.95rem;
     color: var(--text-primary);
     line-height: 1.4;
-    white-space: pre-wrap;
     word-break: break-word;
   }
+
+  .snippet :global(> *:first-child) { margin-top: 0; }
+  .snippet :global(> *:last-child) { margin-bottom: 0; }
+  .snippet :global(p) { margin: 0.35em 0; }
+  .snippet :global(h1),
+  .snippet :global(h2),
+  .snippet :global(h3),
+  .snippet :global(h4),
+  .snippet :global(h5),
+  .snippet :global(h6) {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 0.4em 0 0.2em;
+  }
+  .snippet :global(ul),
+  .snippet :global(ol) { margin: 0.35em 0; padding-left: 1.25em; }
+  .snippet :global(li) { margin: 0.1em 0; }
+  .snippet :global(code) {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.9em;
+    padding: 0 0.25em;
+    background: var(--bg-container);
+    border-radius: 2px;
+  }
+  .snippet :global(pre) {
+    margin: 0.4em 0;
+    padding: 0.4em 0.6em;
+    background: var(--bg-container);
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+  .snippet :global(pre code) { background: transparent; padding: 0; }
+  .snippet :global(blockquote) {
+    margin: 0.4em 0;
+    padding-left: 0.75em;
+    border-left: 2px solid var(--border-subtle);
+    color: var(--text-secondary);
+  }
+  .snippet :global(a) { color: var(--text-accent); }
+  .snippet :global(img) { max-width: 100%; height: auto; }
 
   .snippet.clamped {
     display: -webkit-box;
@@ -164,6 +256,30 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .snippet-wrap {
+    position: relative;
+  }
+
+  .more-hint {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    background: linear-gradient(to right, transparent, var(--bg-focused) 40%);
+    padding: 0 0.15rem 0 2rem;
+    line-height: 1.4;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .result-row:hover .more-hint,
+  .result-row:focus-visible .more-hint {
+    visibility: visible;
   }
 
   .meta-row {
