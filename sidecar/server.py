@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import signal
 import threading
 import time
@@ -22,6 +23,7 @@ from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
 import pymupdf
+import pymupdf4llm
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -85,14 +87,60 @@ def detect_game_system(
     return "unknown"
 
 
+_BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+
+
+def _flatten_br_packed_cells(md: str) -> str:
+    """Expand <br>-packed table rows into separate rows.
+
+    pymupdf4llm preserves visually-stacked cells (common in stat blocks:
+    "Armor Class:" / "Hit Dice:" sharing a label column) by joining rows
+    with <br> inside a single Markdown cell. When the <br> counts in two
+    or more cells of a row match, split the row into one row per pair.
+    Rows with mismatched counts are legitimate multi-line content and
+    pass through unchanged so we never lose data.
+    """
+    out = []
+    for line in md.split("\n"):
+        stripped = line.strip()
+        if not (stripped.startswith("|") and stripped.endswith("|") and len(stripped) >= 2):
+            out.append(line)
+            continue
+        # Strip exactly one leading and trailing "|" so empty edge cells survive.
+        cells = [c.strip() for c in stripped[1:-1].split("|")]
+        counts = [len(_BR_RE.findall(c)) for c in cells]
+        non_zero = [n for n in counts if n > 0]
+        if len(non_zero) >= 2 and len(set(non_zero)) == 1:
+            n = non_zero[0]
+            parts = [_BR_RE.split(c) if cnt else [c] * (n + 1)
+                     for c, cnt in zip(cells, counts)]
+            for row in zip(*parts):
+                out.append("|" + "|".join(p.strip() for p in row) + "|")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def _extract_pdf_text(pdf_path: Path) -> str:
-    """Extract text from a PDF using PyMuPDF. Pages are concatenated in order."""
-    # PyMuPDF also opens .txt/.epub/.xps/.cbz silently; restrict to PDFs to
-    # match the documented API surface.
+    """Extract text from a PDF as Markdown via pymupdf4llm.
+
+    Emits headings, bold runs, bullet lists, and Markdown tables so the
+    search UI can render formatting. Pages are extracted one at a time
+    and concatenated with blank-line separators so block boundaries
+    (headings, tables) survive the join.
+
+    pymupdf (opened via `fitz`/`pymupdf.open`) also accepts
+    .txt/.epub/.xps/.cbz silently; restrict to PDFs to match the
+    documented API surface.
+    """
     if pdf_path.suffix.lower() != ".pdf":
         raise ValueError(f"Not a PDF: {pdf_path.name}")
     with pymupdf.open(pdf_path) as doc:
-        return "".join(page.get_text() for page in doc)
+        pages = [
+            pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False)
+            for i in range(doc.page_count)
+        ]
+    return _flatten_br_packed_cells("\n\n".join(p for p in pages if p))
 
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
