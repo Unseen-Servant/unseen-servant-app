@@ -132,6 +132,7 @@ class IndexStatusRequest(BaseModel):
 class SyncIndexRequest(BaseModel):
     selected_paths: list[str]
     game_system_overrides: dict[str, str] | None = None
+    force: bool = False
 
 class SearchRequest(BaseModel):
     query: str
@@ -452,12 +453,16 @@ def delete_source_chunks(source_path: str, collection) -> int:
 
 
 def compute_diff(
-    selected_paths: list[str], manifest: IndexManifest
+    selected_paths: list[str], manifest: IndexManifest, *, force: bool = False
 ) -> dict[str, list[dict]]:
     """Compare selected paths against the manifest to find what changed.
 
     Returns a dict with keys: to_add, to_remove, to_rename, to_update,
     up_to_date, errors.  Each value is a list of dicts describing the file.
+
+    When ``force`` is True, unchanged-on-disk files are promoted from
+    ``up_to_date`` to ``to_update`` so the reindex pipeline re-extracts and
+    re-embeds them.  Used by the "Reindex all" action.
     """
     selected = set(selected_paths)
     indexed = set(manifest.files.keys())
@@ -488,7 +493,7 @@ def compute_diff(
                 missing_indexed.append((path_str, entry))
             else:
                 current_mtime = os.path.getmtime(path_str)
-                if current_mtime != entry.mtime:
+                if force or current_mtime != entry.mtime:
                     to_update.append({
                         "path": path_str,
                         "filename": path.name,
@@ -802,7 +807,9 @@ def create_app(collection=None, data_dir: Path | None = None):
         or ``complete``).  The ``complete`` event contains the full result.
         """
         manifest = load_manifest(data_dir)
-        diff = compute_diff(request.selected_paths, manifest)
+        diff = compute_diff(
+            request.selected_paths, manifest, force=request.force
+        )
 
         total_files = (
             len(diff["to_remove"])
@@ -1068,6 +1075,40 @@ def create_app(collection=None, data_dir: Path | None = None):
         def generate_with_lock():
             try:
                 yield from generate()
+            finally:
+                _sync_lock.release()
+
+        return StreamingResponse(generate_with_lock(), media_type="text/event-stream")
+
+    @app.post("/api/reindex-all-stream")
+    async def reindex_all_stream():
+        """Force re-extraction and re-embedding of every indexed file.
+
+        Streams the same SSE progress events as ``/api/sync-index-stream``.
+        Reuses the sync pipeline with ``force=True`` over all currently
+        indexed paths, so unchanged-on-disk files are re-processed with the
+        current extractor.
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already in progress"
+            )
+        if not data_dir:
+            _sync_lock.release()
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+
+        manifest = load_manifest(data_dir)
+        request = SyncIndexRequest(
+            selected_paths=list(manifest.files.keys()),
+            force=True,
+        )
+
+        def generate_with_lock():
+            try:
+                for event in _sync_core(request):
+                    yield f"data: {json.dumps(event)}\n\n"
             finally:
                 _sync_lock.release()
 

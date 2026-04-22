@@ -916,6 +916,73 @@
     }
   }
 
+  async function handleReindexAll() {
+    if (isSyncing) return;
+    isSyncing = true;
+    notification.dismiss();
+
+    notification.show({
+      type: 'progress',
+      message: 'Starting reindex...',
+      filesCompleted: 0,
+      filesTotal: 0,
+      chunksProcessed: 0,
+      duration: null,
+    });
+
+    const unlisten = await listen<{
+      files_done: number;
+      total_files: number;
+      chunks_total: number;
+      current_file: string;
+      phase: string;
+    }>('sync-progress', (event) => {
+      const p = event.payload;
+      notification.show({
+        type: 'progress',
+        message: `${p.files_done}/${p.total_files} files`,
+        filesCompleted: p.files_done,
+        filesTotal: p.total_files,
+        chunksProcessed: p.chunks_total,
+        duration: null,
+      });
+    });
+
+    try {
+      const result = await invoke<SyncResult>('reindex_all');
+
+      const parts = [];
+      if (result.updated > 0) parts.push(`${result.updated} reprocessed`);
+      if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
+      const chunkStr = result.chunks_total > 0
+        ? ` ${result.chunks_total.toLocaleString()} chunks.`
+        : '';
+      const msg = parts.length > 0
+        ? `Reindexed: ${parts.join(', ')}.${chunkStr}`
+        : 'Nothing to reindex.';
+
+      lastSyncTime = new Date();
+
+      await refreshIndexStatus();
+      await loadCollections();
+
+      notification.show({
+        type: result.errors.length > 0 ? 'error' : 'success',
+        message: msg,
+        duration: 5000,
+      });
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Reindex failed: ${String(e)}`,
+        duration: 6000,
+      });
+    } finally {
+      unlisten();
+      isSyncing = false;
+    }
+  }
+
 </script>
 
 <svelte:window on:keydown={handleGlobalKeydown} on:contextmenu|preventDefault />
@@ -1049,6 +1116,9 @@
   onClose={() => { showSettings = false; }}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
+  indexedFileCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+  {isSyncing}
+  onReindexAll={handleReindexAll}
 />
 
 {#if showGuide}

@@ -370,3 +370,69 @@ def test_manifest_backward_compat_missing_game_system(tmp_path):
     from server import load_manifest
     manifest = load_manifest(tmp_path)
     assert manifest.files["/old/book.pdf"].game_system == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Force reindex (compute_diff force flag + /api/reindex-all-stream)
+# ---------------------------------------------------------------------------
+
+def test_compute_diff_force_promotes_up_to_date_to_update(sample_pdf_path):
+    """force=True should move matching-mtime files from up_to_date to to_update."""
+    from server import compute_diff
+
+    current_mtime = os.path.getmtime(sample_pdf_path)
+    manifest = IndexManifest(files={
+        str(sample_pdf_path): ManifestEntry(
+            filename="dragonbane_monsters.pdf",
+            mtime=current_mtime,
+            chunk_count=5,
+            indexed_at="2026-01-01T00:00:00Z",
+        )
+    })
+
+    default = compute_diff([str(sample_pdf_path)], manifest)
+    assert len(default["up_to_date"]) == 1
+    assert len(default["to_update"]) == 0
+
+    forced = compute_diff([str(sample_pdf_path)], manifest, force=True)
+    assert len(forced["up_to_date"]) == 0
+    assert len(forced["to_update"]) == 1
+    assert forced["to_update"][0]["filename"] == "dragonbane_monsters.pdf"
+
+
+def test_reindex_all_stream_reprocesses_up_to_date_files(
+    client, sample_pdf_path, test_collection, tmp_path
+):
+    """POST /api/reindex-all-stream should force-update every manifest file."""
+    # Prime the index so the manifest has one up-to-date entry.
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    count_before = test_collection.count()
+    assert count_before > 0
+
+    # A plain sync with the same selection should be a no-op (nothing changed).
+    noop = client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    }).json()
+    assert noop["updated"] == 0
+
+    # Force-reindex via the new endpoint. StreamingResponse → parse SSE.
+    response = client.post("/api/reindex-all-stream")
+    assert response.status_code == 200
+
+    complete = None
+    for line in response.text.splitlines():
+        if not line.startswith("data: "):
+            continue
+        event = json.loads(line[len("data: "):])
+        if event["event"] == "complete":
+            complete = event
+
+    assert complete is not None
+    assert complete["updated"] == 1
+    assert complete["added"] == 0
+    assert complete["total_indexed"] == 1
+
+    # Chunk count is stable (same content, upsert overwrites).
+    assert test_collection.count() == count_before

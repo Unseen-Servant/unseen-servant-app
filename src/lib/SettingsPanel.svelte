@@ -1,16 +1,21 @@
 <script lang="ts">
   import type { KnownGameSystem } from './types';
   import GameSystemsSettings from './GameSystemsSettings.svelte';
+  import LibrarySettings from './LibrarySettings.svelte';
 
   export let visible = false;
   export let onClose: () => void;
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
+  export let indexedFileCount: number = 0;
+  export let isSyncing: boolean = false;
+  export let onReindexAll: () => void = () => {};
 
   let activeTab = 'game-systems';
 
   const tabs = [
     { id: 'game-systems', label: 'Game Systems' },
+    { id: 'library', label: 'Library' },
   ];
 
   function handleBackdrop(e: MouseEvent) {
@@ -45,6 +50,8 @@
         <div class="tab-body">
           {#if activeTab === 'game-systems'}
             <GameSystemsSettings {knownSystems} {onSystemsChanged} />
+          {:else if activeTab === 'library'}
+            <LibrarySettings {indexedFileCount} {isSyncing} {onReindexAll} />
           {/if}
         </div>
       </div>
