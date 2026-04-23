@@ -14,10 +14,14 @@
   export let reclaimableBytes: number = 0;
   export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
+  export let syncMode: 'automatic' | 'prompt' | 'manual' = 'automatic';
+  export let dataDir: string = '';
   export let onSelectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
+  export let onSyncModeChange: (mode: 'automatic' | 'prompt' | 'manual') => void = () => {};
+  export let onOpenDataDir: () => void = () => {};
 
   let activeTab = 'library';
 
@@ -67,10 +71,14 @@
               {reclaimableBytes}
               {gameSystemCount}
               {isSyncing}
+              {syncMode}
+              {dataDir}
               {onSelectFolder}
               {onCompact}
               {onReindexAll}
               {onDeleteIndex}
+              {onSyncModeChange}
+              {onOpenDataDir}
             />
           {/if}
         </div>

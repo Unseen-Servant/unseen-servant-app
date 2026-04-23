@@ -64,6 +64,11 @@
   let showSettings = false;
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
+  // User-configurable behavior
+  type SyncMode = 'automatic' | 'prompt' | 'manual';
+  let syncMode: SyncMode = 'automatic';
+  let dataDir = '';
+
   // Ollama health
   let ollamaRunning = false;
   let ollamaModelReady = false;
@@ -174,6 +179,10 @@
       const savedFolder = await store.get<string>('selectedFolder');
       const savedPaths = await store.get<string[]>('syncedPaths')
         ?? await store.get<string[]>('selectedPaths');
+      const savedMode = await store.get<SyncMode>('syncMode');
+      if (savedMode === 'automatic' || savedMode === 'prompt' || savedMode === 'manual') {
+        syncMode = savedMode;
+      }
 
       if (savedFolder) {
         selectedFolder = savedFolder;
@@ -192,6 +201,12 @@
       console.log('No saved state:', e);
     }
 
+    try {
+      dataDir = await invoke<string>('get_data_dir');
+    } catch (e) {
+      console.log('Could not fetch data dir:', e);
+    }
+
     // Poll sidecar + Ollama health
     checkSidecarHealth();
     checkOllamaHealth();
@@ -200,13 +215,40 @@
       checkOllamaHealth();
     }, 10000);
 
-    // Auto-sync: periodically check for filesystem changes
+    restartAutoSyncInterval();
+  });
+
+  function restartAutoSyncInterval() {
+    if (autoSyncInterval) {
+      clearInterval(autoSyncInterval);
+      autoSyncInterval = null;
+    }
+    if (syncMode === 'manual') return;
     autoSyncInterval = setInterval(() => {
       if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
         refreshIndexStatus();
       }
     }, 60_000);
-  });
+  }
+
+  async function handleSyncModeChange(mode: SyncMode) {
+    syncMode = mode;
+    try {
+      const store = await load('settings.json');
+      await store.set('syncMode', mode);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist sync mode:', e);
+    }
+    restartAutoSyncInterval();
+    if (mode === 'manual') {
+      notification.dismiss();
+    }
+  }
+
+  function handleOpenDataDir() {
+    if (dataDir) openPath(dataDir);
+  }
 
   onDestroy(() => {
     if (healthInterval) clearInterval(healthInterval);
@@ -232,7 +274,7 @@
     }
   }
 
-  async function refreshIndexStatus() {
+  async function refreshIndexStatus(options: { userTriggered?: boolean } = {}) {
     isLoadingStatus = true;
     try {
       indexStatus = await invoke<IndexStatusResult>(
@@ -250,14 +292,25 @@
         .then(r => { storageBytes = r.storage_bytes; totalChunks = r.total_chunks; reclaimableBytes = r.reclaimable_bytes; })
         .catch(() => { storageBytes = 0; totalChunks = 0; reclaimableBytes = 0; });
 
-      // Auto-sync renames, deletions, and stale paths silently — no user interaction needed
-      const { rename, auto_remove, stale } = indexStatus.summary;
-      if ((rename > 0 || auto_remove > 0 || stale > 0) && !isSyncing) {
-        handleSync();
-        return;
+      // Automatic mode: silently apply the cheap operations (renames,
+      // auto-removals, stale paths) without user interaction.
+      if (syncMode === 'automatic') {
+        const { rename, auto_remove, stale } = indexStatus.summary;
+        if ((rename > 0 || auto_remove > 0 || stale > 0) && !isSyncing) {
+          handleSync();
+          return;
+        }
       }
 
       lastSyncTime = new Date();
+
+      // In manual mode, only prompt when the user explicitly asked for a
+      // check (e.g. clicked the status-bar Sync button). Background
+      // fetches (startup, path-toggle debounce) stay silent.
+      if (syncMode === 'manual' && !options.userTriggered) {
+        return;
+      }
+
       showSyncPromptIfNeeded();
     } catch (e) {
       // Sidecar might not be ready yet on startup
@@ -271,9 +324,13 @@
   function showSyncPromptIfNeeded() {
     if (!indexStatus || isCollectionEditMode) return;
 
-    const { add, remove, update, errors } = indexStatus.summary;
-    // Renames are auto-synced, so exclude them from the manual prompt
-    const pending = add + remove + update;
+    const { add, remove, update, errors, rename, auto_remove, stale } = indexStatus.summary;
+    // In automatic mode, renames/removes/stale auto-sync silently and
+    // are excluded from the prompt. Other modes include them so the
+    // user can see everything that's pending.
+    const includeSilent = syncMode !== 'automatic';
+    const silentCount = includeSilent ? rename + auto_remove + stale : 0;
+    const pending = add + remove + update + silentCount;
 
     if (pending === 0 && errors === 0) {
       notification.dismiss();
@@ -284,6 +341,9 @@
     if (add > 0) parts.push(`${add} to add`);
     if (remove > 0) parts.push(`${remove} to remove`);
     if (update > 0) parts.push(`${update} to update`);
+    if (includeSilent && rename > 0) parts.push(`${rename} to rename`);
+    if (includeSilent && auto_remove > 0) parts.push(`${auto_remove} to auto-remove`);
+    if (includeSilent && stale > 0) parts.push(`${stale} stale`);
     if (errors > 0) parts.push(`${errors} error(s)`);
 
     notification.show({
@@ -912,7 +972,7 @@
 
   function handleManualSync() {
     if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
-      refreshIndexStatus();
+      refreshIndexStatus({ userTriggered: true });
     }
   }
 
@@ -1150,10 +1210,14 @@
   {reclaimableBytes}
   {gameSystemCount}
   {isSyncing}
+  {syncMode}
+  {dataDir}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
   onDeleteIndex={handleDeleteIndex}
+  onSyncModeChange={handleSyncModeChange}
+  onOpenDataDir={handleOpenDataDir}
 />
 
 {#if showGuide}

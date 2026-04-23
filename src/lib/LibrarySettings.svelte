@@ -1,4 +1,6 @@
 <script lang="ts">
+  type SyncMode = 'automatic' | 'prompt' | 'manual';
+
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
   export let totalChunks: number = 0;
@@ -6,10 +8,14 @@
   export let reclaimableBytes: number = 0;
   export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
+  export let syncMode: SyncMode = 'automatic';
+  export let dataDir: string = '';
   export let onSelectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
+  export let onSyncModeChange: (mode: SyncMode) => void = () => {};
+  export let onOpenDataDir: () => void = () => {};
 
   let confirmingReindex = false;
   let confirmingDelete = false;
@@ -118,11 +124,97 @@
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title font-heading">Compact database</h3>
+      <h3 class="field-title font-heading">Sync behavior</h3>
       <p class="field-desc">
-        Reclaims disk space left behind by removed or re-indexed chunks. Safe to
-        run at any time.
+        How Legend Lore keeps the index in sync with your library folder.
       </p>
+    </div>
+
+    <div class="radio-group" role="radiogroup" aria-label="Sync behavior">
+      <label class="radio-option">
+        <input
+          type="radio"
+          name="syncMode"
+          value="automatic"
+          checked={syncMode === 'automatic'}
+          on:change={() => onSyncModeChange('automatic')}
+        />
+        <div class="radio-text">
+          <div class="radio-title">Automatic</div>
+          <div class="radio-desc">
+            Checks for changes every minute. Applies renames and removals
+            silently; asks before re-indexing new or modified files.
+          </div>
+        </div>
+      </label>
+
+      <label class="radio-option">
+        <input
+          type="radio"
+          name="syncMode"
+          value="prompt"
+          checked={syncMode === 'prompt'}
+          on:change={() => onSyncModeChange('prompt')}
+        />
+        <div class="radio-text">
+          <div class="radio-title">Ask before every change</div>
+          <div class="radio-desc">
+            Checks for changes every minute. Always notifies you; nothing
+            syncs without your click.
+          </div>
+        </div>
+      </label>
+
+      <label class="radio-option">
+        <input
+          type="radio"
+          name="syncMode"
+          value="manual"
+          checked={syncMode === 'manual'}
+          on:change={() => onSyncModeChange('manual')}
+        />
+        <div class="radio-text">
+          <div class="radio-title">Manual only</div>
+          <div class="radio-desc">
+            No background checks. Use the sync button in the status bar
+            when you want to update the index.
+          </div>
+        </div>
+      </label>
+    </div>
+  </section>
+
+  <section class="field">
+    <div class="field-head">
+      <h3 class="field-title font-heading">Database</h3>
+      <p class="field-desc">
+        Where the index is stored on disk, and maintenance to reclaim space
+        from removed or re-indexed chunks.
+      </p>
+    </div>
+
+    <div class="path-row">
+      <input
+        type="text"
+        class="path-input"
+        readonly
+        value={dataDir}
+        placeholder="Resolving…"
+        title={dataDir}
+      />
+      <button
+        type="button"
+        class="btn-icon"
+        on:click={onOpenDataDir}
+        disabled={!dataDir}
+        title="Open database folder"
+        aria-label="Open database folder"
+      >
+        <!-- Font Awesome "folder-open" icon -->
+        <svg class="btn-icon-svg" viewBox="0 0 576 512" fill="currentColor" aria-hidden="true">
+          <path d="M88.7 223.8L0 375.8L0 96C0 60.7 28.7 32 64 32L181.5 32C198.5 32 214.8 38.7 226.7 50.7L269.3 93.3C281.3 105.3 297.6 112 314.5 112L448 112C483.3 112 512 140.7 512 176L512 208L144 208C121.4 208 100.6 220 88.7 223.8zM144 240L560 240C572.1 240 583.3 246.8 588.9 257.6C594.5 268.4 593.5 281.4 586.4 291.2L501.9 467.2C495.3 480.6 481.6 488 467.2 488L48 488C36 488 24.8 481.2 19.2 470.4C13.6 459.6 14.6 446.6 21.7 436.8L106.2 260.8C112.8 247.4 126.5 240 144 240z"/>
+        </svg>
+      </button>
     </div>
 
     <div class="actions">
@@ -323,6 +415,57 @@
     font-size: 0.8rem;
     color: var(--text-secondary);
     font-style: italic;
+  }
+
+  .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .radio-option {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .radio-option:hover {
+    background: var(--bg-focused);
+  }
+  .radio-option:has(input:checked) {
+    background: var(--bg-focused);
+  }
+
+  .radio-option input[type='radio'] {
+    margin-top: 0.2rem;
+    accent-color: var(--text-accent);
+    cursor: pointer;
+  }
+
+  .radio-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .radio-title {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.85rem;
+    color: var(--text-primary);
+  }
+
+  .radio-option:has(input:checked) .radio-title {
+    color: var(--text-accent);
+  }
+
+  .radio-desc {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
   }
 
   button {
