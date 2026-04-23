@@ -436,3 +436,64 @@ def test_reindex_all_stream_reprocesses_up_to_date_files(
 
     # Chunk count is stable (same content, upsert overwrites).
     assert test_collection.count() == count_before
+
+
+# ---------------------------------------------------------------------------
+# POST /api/delete-index
+# ---------------------------------------------------------------------------
+
+def test_delete_index_clears_manifest_and_chunks(
+    client, sample_pdf_path, test_collection, tmp_path
+):
+    """POST /api/delete-index should purge chunks and empty the manifest."""
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    chunks_before = test_collection.count()
+    assert chunks_before > 0
+
+    manifest_path = tmp_path / MANIFEST_FILENAME
+    assert json.loads(manifest_path.read_text())["files"]
+
+    response = client.post("/api/delete-index")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["removed_files"] == 1
+    assert data["removed_chunks"] == chunks_before
+
+    assert test_collection.count() == 0
+    assert json.loads(manifest_path.read_text())["files"] == {}
+
+
+def test_delete_index_empty_manifest(client, test_collection):
+    """Deleting when nothing is indexed should succeed with zero counts."""
+    assert test_collection.count() == 0
+
+    response = client.post("/api/delete-index")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["removed_files"] == 0
+    assert data["removed_chunks"] == 0
+
+
+def test_delete_index_preserves_collections_shell(
+    client, sample_pdf_path, test_collection, tmp_path
+):
+    """Delete clears collection file_paths but keeps the named collections."""
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+
+    create_resp = client.post("/api/collections", json={
+        "name": "My Books",
+        "file_paths": [str(sample_pdf_path)],
+    })
+    assert create_resp.status_code == 200
+
+    client.post("/api/delete-index")
+
+    list_resp = client.get("/api/collections")
+    assert list_resp.status_code == 200
+    collections = list_resp.json()["collections"]
+    assert "My Books" in collections, "Collection shell should be preserved"
+    assert collections["My Books"]["file_paths"] == []

@@ -11,9 +11,7 @@
   export let isSyncing: boolean = false;
   export let lastSyncTime: Date | null = null;
   export let onSync: (() => void) | undefined = undefined;
-  export let onCompact: (() => void) | undefined = undefined;
   export let onCopyMcpConfig: () => void;
-  export let onSelectFolder: () => void;
   export let onOpenFolder: () => void;
   export let onShowLicense: () => void;
   export let onShowGuide: () => void;
@@ -24,7 +22,7 @@
     : 'Sync index';
 
   $: storageTooltip = reclaimableBytes > 0
-    ? `${formatSize(reclaimableBytes)} reclaimable — click to compact`
+    ? `${formatSize(reclaimableBytes)} reclaimable — compact from Settings → Library`
     : 'No reclaimable space';
 
   function formatSize(bytes: number): string {
@@ -52,11 +50,7 @@
         {/if}
         {#if storageBytes > 0}
           <span class="separator">&middot;</span>
-          {#if reclaimableBytes > 0 && onCompact}
-            <button class="compact-btn" on:click={onCompact} title={storageTooltip}>{formatSize(storageBytes)}</button>
-          {:else}
-            <span title={storageTooltip}>{formatSize(storageBytes)}</span>
-          {/if}
+          <span title={storageTooltip}>{formatSize(storageBytes)}</span>
         {/if}
       {:else}
         <span>{selectedCount} selected</span>
@@ -82,12 +76,6 @@
   </div>
   <div class="statusbar-right">
     {#if selectedFolder}
-      <button class="sync-btn" on:click={onSelectFolder} title="Change library folder">
-        <!-- Font Awesome "book" icon (from Header) -->
-        <svg class="sync-icon" viewBox="0 0 640 640" fill="currentColor">
-          <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
-        </svg>
-      </button>
       <button class="folder-path" on:click={onOpenFolder} title="Reveal library folder">{selectedFolder}</button>
       <span class="separator">&middot;</span>
     {/if}
@@ -207,20 +195,6 @@
     height: 12px;
   }
   .license-link:hover {
-    color: var(--text-accent);
-  }
-
-  .compact-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: inherit;
-    font-family: inherit;
-    padding: 0;
-    cursor: pointer;
-    transition: color var(--transition-fast);
-  }
-  .compact-btn:hover {
     color: var(--text-accent);
   }
 

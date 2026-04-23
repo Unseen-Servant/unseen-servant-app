@@ -983,6 +983,35 @@
     }
   }
 
+  async function handleDeleteIndex() {
+    if (isSyncing) return;
+    isSyncing = true;
+    notification.dismiss();
+
+    try {
+      const result = await invoke<{ removed_files: number; removed_chunks: number }>('delete_index');
+
+      await refreshIndexStatus();
+      await loadCollections();
+
+      const fileWord = result.removed_files === 1 ? 'file' : 'files';
+      const chunkWord = result.removed_chunks === 1 ? 'chunk' : 'chunks';
+      notification.show({
+        type: 'success',
+        message: `Index cleared: ${result.removed_files} ${fileWord}, ${result.removed_chunks.toLocaleString()} ${chunkWord} removed.`,
+        duration: 5000,
+      });
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Delete failed: ${String(e)}`,
+        duration: 6000,
+      });
+    } finally {
+      isSyncing = false;
+    }
+  }
+
 </script>
 
 <svelte:window on:keydown={handleGlobalKeydown} on:contextmenu|preventDefault />
@@ -1099,9 +1128,7 @@
     {isSyncing}
     {lastSyncTime}
     onSync={handleManualSync}
-    onCompact={handleCompact}
     onCopyMcpConfig={handleCopyMcpConfig}
-    onSelectFolder={handleSelectFolder}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
     onShowGuide={() => { showGuide = true; }}
@@ -1116,9 +1143,17 @@
   onClose={() => { showSettings = false; }}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
+  {selectedFolder}
   indexedFileCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+  {totalChunks}
+  {storageBytes}
+  {reclaimableBytes}
+  {gameSystemCount}
   {isSyncing}
+  onSelectFolder={handleSelectFolder}
+  onCompact={handleCompact}
   onReindexAll={handleReindexAll}
+  onDeleteIndex={handleDeleteIndex}
 />
 
 {#if showGuide}

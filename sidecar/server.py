@@ -1114,6 +1114,49 @@ def create_app(collection=None, data_dir: Path | None = None):
 
         return StreamingResponse(generate_with_lock(), media_type="text/event-stream")
 
+    @app.post("/api/delete-index")
+    async def delete_index():
+        """Purge every chunk from ChromaDB and clear the manifest.
+
+        Preserves the selected folder, game systems, and user-curated
+        collections (their file lists are emptied but the named shells
+        remain so the user doesn't lose their organization). The next
+        sync rebuilds the index from scratch.
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already in progress"
+            )
+        try:
+            if not data_dir:
+                raise HTTPException(
+                    status_code=500, detail="No data directory configured"
+                )
+
+            manifest = load_manifest(data_dir)
+            removed_files = len(manifest.files)
+
+            all_results = collection.get(include=[])
+            all_ids = all_results["ids"]
+            if all_ids:
+                collection.delete(ids=all_ids)
+            removed_chunks = len(all_ids)
+
+            save_manifest(data_dir, IndexManifest())
+
+            coll_store = load_collections(data_dir)
+            touched = False
+            for coll in coll_store.collections.values():
+                if coll.file_paths:
+                    coll.file_paths = []
+                    touched = True
+            if touched:
+                save_collections(data_dir, coll_store)
+
+            return {"removed_files": removed_files, "removed_chunks": removed_chunks}
+        finally:
+            _sync_lock.release()
+
     # ------------------------------------------------------------------
     # File rename — direct index update (no re-embedding)
     # ------------------------------------------------------------------

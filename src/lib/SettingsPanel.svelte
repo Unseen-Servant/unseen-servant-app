@@ -7,15 +7,23 @@
   export let onClose: () => void;
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
+  export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
+  export let totalChunks: number = 0;
+  export let storageBytes: number = 0;
+  export let reclaimableBytes: number = 0;
+  export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
+  export let onSelectFolder: () => void = () => {};
+  export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
+  export let onDeleteIndex: () => void = () => {};
 
-  let activeTab = 'game-systems';
+  let activeTab = 'library';
 
   const tabs = [
-    { id: 'game-systems', label: 'Game Systems' },
     { id: 'library', label: 'Library' },
+    { id: 'game-systems', label: 'Game Systems' },
   ];
 
   function handleBackdrop(e: MouseEvent) {
@@ -51,7 +59,19 @@
           {#if activeTab === 'game-systems'}
             <GameSystemsSettings {knownSystems} {onSystemsChanged} />
           {:else if activeTab === 'library'}
-            <LibrarySettings {indexedFileCount} {isSyncing} {onReindexAll} />
+            <LibrarySettings
+              {selectedFolder}
+              {indexedFileCount}
+              {totalChunks}
+              {storageBytes}
+              {reclaimableBytes}
+              {gameSystemCount}
+              {isSyncing}
+              {onSelectFolder}
+              {onCompact}
+              {onReindexAll}
+              {onDeleteIndex}
+            />
           {/if}
         </div>
       </div>
@@ -119,6 +139,7 @@
   .tab-nav {
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
     padding: 0.5rem;
     border-right: 1px solid var(--border-subtle);
     flex-shrink: 0;
