@@ -119,13 +119,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
+    padding: 0.4rem 1rem;
+    background: var(--bg-focused);
     border-bottom: 1px solid var(--border-subtle);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
     flex-shrink: 0;
   }
 
   .panel-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: var(--text-accent);
   }
 
