@@ -502,16 +502,16 @@ def delete_source_chunks(source_path: str, collection) -> int:
 
 
 def compute_diff(
-    selected_paths: list[str], manifest: IndexManifest, *, force: bool = False
+    selected_paths: list[str], manifest: IndexManifest
 ) -> dict[str, list[dict]]:
     """Compare selected paths against the manifest to find what changed.
 
     Returns a dict with keys: to_add, to_remove, to_rename, to_update,
     up_to_date, errors.  Each value is a list of dicts describing the file.
 
-    When ``force`` is True, unchanged-on-disk files are promoted from
-    ``up_to_date`` to ``to_update`` so the reindex pipeline re-extracts and
-    re-embeds them.  Used by the "Reindex all" action.
+    Pure diff — does not factor in user intent like "reindex everything."
+    Callers wanting to force-reprocess unchanged files should promote
+    ``up_to_date`` into ``to_update`` themselves (see ``_sync_core``).
     """
     selected = set(selected_paths)
     indexed = set(manifest.files.keys())
@@ -542,7 +542,7 @@ def compute_diff(
                 missing_indexed.append((path_str, entry))
             else:
                 current_mtime = os.path.getmtime(path_str)
-                if force or current_mtime != entry.mtime:
+                if current_mtime != entry.mtime:
                     to_update.append({
                         "path": path_str,
                         "filename": path.name,
@@ -862,9 +862,11 @@ def create_app(collection=None, data_dir: Path | None = None):
         or ``complete``).  The ``complete`` event contains the full result.
         """
         manifest = load_manifest(data_dir)
-        diff = compute_diff(
-            request.selected_paths, manifest, force=request.force
-        )
+        diff = compute_diff(request.selected_paths, manifest)
+        if request.force:
+            # Reindex-all: treat unchanged files as needing reprocessing.
+            diff["to_update"] = diff["to_update"] + diff["up_to_date"]
+            diff["up_to_date"] = []
 
         total_files = (
             len(diff["to_remove"])

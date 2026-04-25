@@ -373,32 +373,8 @@ def test_manifest_backward_compat_missing_game_system(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Force reindex (compute_diff force flag + /api/reindex-all-stream)
+# Force reindex — end-to-end coverage via /api/reindex-all-stream
 # ---------------------------------------------------------------------------
-
-def test_compute_diff_force_promotes_up_to_date_to_update(sample_pdf_path):
-    """force=True should move matching-mtime files from up_to_date to to_update."""
-    from server import compute_diff
-
-    current_mtime = os.path.getmtime(sample_pdf_path)
-    manifest = IndexManifest(files={
-        str(sample_pdf_path): ManifestEntry(
-            filename="dragonbane_monsters.pdf",
-            mtime=current_mtime,
-            chunk_count=5,
-            indexed_at="2026-01-01T00:00:00Z",
-        )
-    })
-
-    default = compute_diff([str(sample_pdf_path)], manifest)
-    assert len(default["up_to_date"]) == 1
-    assert len(default["to_update"]) == 0
-
-    forced = compute_diff([str(sample_pdf_path)], manifest, force=True)
-    assert len(forced["up_to_date"]) == 0
-    assert len(forced["to_update"]) == 1
-    assert forced["to_update"][0]["filename"] == "dragonbane_monsters.pdf"
-
 
 def test_reindex_all_stream_reprocesses_up_to_date_files(
     client, sample_pdf_path, test_collection, tmp_path
