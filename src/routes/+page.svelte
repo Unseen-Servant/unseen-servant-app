@@ -237,10 +237,12 @@
     }
     const seconds = syncPreferences.backgroundCheckInterval;
     if (seconds <= 0) return;
-    autoSyncInterval = setInterval(() => {
-      if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
-        refreshIndexStatus();
-      }
+    autoSyncInterval = setInterval(async () => {
+      if (!sidecarConnected || isSyncing) return;
+      // Skip during inline rename — re-rendering the tree would wipe the input
+      if (renamingFilePath !== null) return;
+      if (selectedFolder) await loadFiles(selectedFolder);
+      if (selectedPaths.size > 0) refreshIndexStatus();
     }, seconds * 1000);
   }
 
@@ -1008,9 +1010,9 @@
   }
 
   function handleManualSync() {
-    if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
-      refreshIndexStatus({ userTriggered: true });
-    }
+    if (!sidecarConnected || isSyncing) return;
+    if (selectedFolder) loadFiles(selectedFolder);
+    if (selectedPaths.size > 0) refreshIndexStatus({ userTriggered: true });
   }
 
   async function handleReindexAll() {
