@@ -126,3 +126,45 @@ export interface SearchResponse {
   results: SearchResultItem[];
   message?: string;
 }
+
+export type BucketPolicy = 'silent' | 'ask';
+
+// 0 = never check in the background. Other values are seconds.
+export type BackgroundCheckInterval = 0 | 15 | 30 | 60 | 300;
+
+export const BACKGROUND_CHECK_OPTIONS: { value: BackgroundCheckInterval; label: string }[] = [
+  { value: 15, label: 'Every 15 seconds' },
+  { value: 30, label: 'Every 30 seconds' },
+  { value: 60, label: 'Every minute' },
+  { value: 300, label: 'Every 5 minutes' },
+  { value: 0, label: 'Never' },
+];
+
+export interface SyncPreferences {
+  backgroundCheckInterval: BackgroundCheckInterval;
+  diskEventsPolicy: BucketPolicy;
+  selectionPolicy: BucketPolicy;
+  deselectionPolicy: BucketPolicy;
+  modificationPolicy: BucketPolicy;
+}
+
+export const DEFAULT_SYNC_PREFERENCES: SyncPreferences = {
+  backgroundCheckInterval: 60,
+  diskEventsPolicy: 'silent',
+  selectionPolicy: 'ask',
+  deselectionPolicy: 'ask',
+  modificationPolicy: 'ask',
+};
+
+export interface PromptCounts {
+  disk: number;
+  add: number;
+  remove: number;
+  update: number;
+  errors: number;
+}
+
+export type SyncAction =
+  | { kind: 'noop' }
+  | { kind: 'silent' }
+  | { kind: 'prompt'; counts: PromptCounts };

@@ -6,7 +6,8 @@
   import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
+  import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
   import CollectionBar from '../lib/CollectionBar.svelte';
@@ -80,8 +81,7 @@
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
   // User-configurable behavior
-  type SyncMode = 'automatic' | 'prompt' | 'manual';
-  let syncMode: SyncMode = 'automatic';
+  let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
   let dataDir = '';
 
   // Ollama health
@@ -194,10 +194,7 @@
       const savedFolder = await store.get<string>('selectedFolder');
       const savedPaths = await store.get<string[]>('syncedPaths')
         ?? await store.get<string[]>('selectedPaths');
-      const savedMode = await store.get<SyncMode>('syncMode');
-      if (savedMode === 'automatic' || savedMode === 'prompt' || savedMode === 'manual') {
-        syncMode = savedMode;
-      }
+      syncPreferences = await loadSyncPreferences(store);
 
       if (savedFolder) {
         selectedFolder = savedFolder;
@@ -238,25 +235,56 @@
       clearInterval(autoSyncInterval);
       autoSyncInterval = null;
     }
-    if (syncMode === 'manual') return;
+    const seconds = syncPreferences.backgroundCheckInterval;
+    if (seconds <= 0) return;
     autoSyncInterval = setInterval(() => {
       if (selectedPaths.size > 0 && sidecarConnected && !isSyncing) {
         refreshIndexStatus();
       }
-    }, 60_000);
+    }, seconds * 1000);
   }
 
-  async function handleSyncModeChange(mode: SyncMode) {
-    syncMode = mode;
+  async function loadSyncPreferences(store: Awaited<ReturnType<typeof load>>): Promise<SyncPreferences> {
+    const saved = await store.get<Record<string, unknown>>('syncPreferences');
+    if (saved && typeof saved === 'object') {
+      // Migrate prior boolean shape if present
+      const merged: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES, ...(saved as Partial<SyncPreferences>) };
+      if ('backgroundChecks' in saved && !('backgroundCheckInterval' in saved)) {
+        merged.backgroundCheckInterval = saved.backgroundChecks ? 60 : 0;
+      }
+      return merged;
+    }
+    // Migrate legacy syncMode if present, then persist new shape and remove old key
+    const legacy = await store.get<string>('syncMode');
+    let migrated: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
+    if (legacy === 'prompt') {
+      migrated = { ...migrated, diskEventsPolicy: 'ask' };
+    } else if (legacy === 'manual') {
+      migrated = { ...migrated, backgroundCheckInterval: 0 };
+    }
+    if (legacy) {
+      try {
+        await store.set('syncPreferences', migrated);
+        await store.delete('syncMode');
+        await store.save();
+      } catch (e) {
+        console.log('Could not migrate syncMode:', e);
+      }
+    }
+    return migrated;
+  }
+
+  async function handleSyncPreferencesChange(partial: Partial<SyncPreferences>) {
+    syncPreferences = { ...syncPreferences, ...partial };
     try {
       const store = await load('settings.json');
-      await store.set('syncMode', mode);
+      await store.set('syncPreferences', syncPreferences);
       await store.save();
     } catch (e) {
-      console.log('Could not persist sync mode:', e);
+      console.log('Could not persist sync preferences:', e);
     }
     restartAutoSyncInterval();
-    if (mode === 'manual') {
+    if (syncPreferences.backgroundCheckInterval === 0) {
       notification.dismiss();
     }
   }
@@ -289,77 +317,112 @@
     }
   }
 
-  async function refreshIndexStatus(options: { userTriggered?: boolean } = {}) {
+  async function fetchIndexStatus(): Promise<IndexStatusResult | null> {
     isLoadingStatus = true;
     try {
-      indexStatus = await invoke<IndexStatusResult>(
+      const status = await invoke<IndexStatusResult>(
         'get_index_status',
         { paths: Array.from(selectedPaths) }
       );
+      indexStatus = status;
 
-      // Load known systems for tag editing (retry until loaded)
       if (knownSystems.length === 0) {
         await refreshKnownSystems();
       }
 
-      // Fetch storage size in parallel (non-blocking)
       invoke<StatsResult>('get_stats')
         .then(r => { storageBytes = r.storage_bytes; totalChunks = r.total_chunks; reclaimableBytes = r.reclaimable_bytes; })
         .catch(() => { storageBytes = 0; totalChunks = 0; reclaimableBytes = 0; });
 
-      // Automatic mode: silently apply the cheap operations (renames,
-      // auto-removals, stale paths) without user interaction.
-      if (syncMode === 'automatic') {
-        const { rename, auto_remove, stale } = indexStatus.summary;
-        if ((rename > 0 || auto_remove > 0 || stale > 0) && !isSyncing) {
-          handleSync();
-          return;
-        }
-      }
-
       lastSyncTime = new Date();
-
-      // In manual mode, only prompt when the user explicitly asked for a
-      // check (e.g. clicked the status-bar Sync button). Background
-      // fetches (startup, path-toggle debounce) stay silent.
-      if (syncMode === 'manual' && !options.userTriggered) {
-        return;
-      }
-
-      showSyncPromptIfNeeded();
+      return status;
     } catch (e) {
-      // Sidecar might not be ready yet on startup
       console.log('Could not fetch index status:', e);
       indexStatus = null;
+      return null;
     } finally {
       isLoadingStatus = false;
     }
   }
 
-  function showSyncPromptIfNeeded() {
-    if (!indexStatus || isCollectionEditMode) return;
+  function decideSyncAction(
+    status: IndexStatusResult,
+    prefs: SyncPreferences,
+    userTriggered: boolean
+  ): SyncAction {
+    if (prefs.backgroundCheckInterval === 0 && !userTriggered) {
+      return { kind: 'noop' };
+    }
 
-    const { add, remove, update, errors, rename, auto_remove, stale } = indexStatus.summary;
-    // In automatic mode, renames/removes/stale auto-sync silently and
-    // are excluded from the prompt. Other modes include them so the
-    // user can see everything that's pending.
-    const includeSilent = syncMode !== 'automatic';
-    const silentCount = includeSilent ? rename + auto_remove + stale : 0;
-    const pending = add + remove + update + silentCount;
+    const { add, remove, update, errors, rename, auto_remove, stale } = status.summary;
+    const diskTotal = rename + auto_remove + stale;
 
-    if (pending === 0 && errors === 0) {
+    const askDisk = prefs.diskEventsPolicy === 'ask' && diskTotal > 0;
+    const askAdd = prefs.selectionPolicy === 'ask' && add > 0;
+    const askRemove = prefs.deselectionPolicy === 'ask' && remove > 0;
+    const askUpdate = prefs.modificationPolicy === 'ask' && update > 0;
+    const anyAsk = askDisk || askAdd || askRemove || askUpdate;
+
+    const silentDisk = prefs.diskEventsPolicy === 'silent' && diskTotal > 0;
+    const silentAdd = prefs.selectionPolicy === 'silent' && add > 0;
+    const silentRemove = prefs.deselectionPolicy === 'silent' && remove > 0;
+    const silentUpdate = prefs.modificationPolicy === 'silent' && update > 0;
+    const anySilent = silentDisk || silentAdd || silentRemove || silentUpdate;
+
+    if (!anyAsk && !anySilent && errors === 0) {
+      return { kind: 'noop' };
+    }
+
+    if (!anyAsk && errors === 0) {
+      return { kind: 'silent' };
+    }
+
+    return {
+      kind: 'prompt',
+      counts: {
+        disk: askDisk ? diskTotal : 0,
+        add: askAdd ? add : 0,
+        remove: askRemove ? remove : 0,
+        update: askUpdate ? update : 0,
+        errors,
+      },
+    };
+  }
+
+  async function applySyncAction(action: SyncAction) {
+    if (action.kind === 'noop') {
       notification.dismiss();
       return;
     }
+    if (action.kind === 'silent') {
+      if (!isSyncing) handleSync();
+      return;
+    }
+    showSyncPrompt(action.counts);
+  }
+
+  async function refreshIndexStatus(options: { userTriggered?: boolean } = {}) {
+    const status = await fetchIndexStatus();
+    if (!status) return;
+    if (isCollectionEditMode) return;
+    const action = decideSyncAction(status, syncPreferences, options.userTriggered ?? false);
+    await applySyncAction(action);
+  }
+
+  function showSyncPrompt(counts: PromptCounts) {
+    if (!indexStatus || isCollectionEditMode) return;
 
     const parts: string[] = [];
-    if (add > 0) parts.push(`${add} to add`);
-    if (remove > 0) parts.push(`${remove} to remove`);
-    if (update > 0) parts.push(`${update} to update`);
-    if (includeSilent && rename > 0) parts.push(`${rename} to rename`);
-    if (includeSilent && auto_remove > 0) parts.push(`${auto_remove} to auto-remove`);
-    if (includeSilent && stale > 0) parts.push(`${stale} stale`);
-    if (errors > 0) parts.push(`${errors} error(s)`);
+    if (counts.disk > 0) parts.push(`${counts.disk} disk change${counts.disk === 1 ? '' : 's'}`);
+    if (counts.add > 0) parts.push(`${counts.add} to add`);
+    if (counts.remove > 0) parts.push(`${counts.remove} to remove`);
+    if (counts.update > 0) parts.push(`${counts.update} to update`);
+    if (counts.errors > 0) parts.push(`${counts.errors} error${counts.errors === 1 ? '' : 's'}`);
+
+    if (parts.length === 0) {
+      notification.dismiss();
+      return;
+    }
 
     notification.show({
       type: 'action',
@@ -1229,14 +1292,14 @@
   {reclaimableBytes}
   {gameSystemCount}
   {isSyncing}
-  {syncMode}
+  {syncPreferences}
   {dataDir}
   {lastSyncTime}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
   onDeleteIndex={handleDeleteIndex}
-  onSyncModeChange={handleSyncModeChange}
+  onSyncPreferencesChange={handleSyncPreferencesChange}
   onOpenDataDir={handleOpenDataDir}
   onSync={handleManualSync}
 />

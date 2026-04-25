@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { KnownGameSystem } from './types';
+  import type { KnownGameSystem, SyncPreferences } from './types';
+  import { DEFAULT_SYNC_PREFERENCES } from './types';
   import GameSystemsSettings from './GameSystemsSettings.svelte';
   import LibrarySettings from './LibrarySettings.svelte';
 
@@ -15,14 +16,14 @@
   export let reclaimableBytes: number = 0;
   export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
-  export let syncMode: 'automatic' | 'prompt' | 'manual' = 'automatic';
+  export let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
   export let dataDir: string = '';
   export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
-  export let onSyncModeChange: (mode: 'automatic' | 'prompt' | 'manual') => void = () => {};
+  export let onSyncPreferencesChange: (partial: Partial<SyncPreferences>) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
   export let onSync: () => void = () => {};
 
@@ -75,14 +76,14 @@
               {reclaimableBytes}
               {gameSystemCount}
               {isSyncing}
-              {syncMode}
+              {syncPreferences}
               {dataDir}
               {lastSyncTime}
               {onSelectFolder}
               {onCompact}
               {onReindexAll}
               {onDeleteIndex}
-              {onSyncModeChange}
+              {onSyncPreferencesChange}
               {onOpenDataDir}
               {onSync}
             />
