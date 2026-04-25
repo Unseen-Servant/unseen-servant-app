@@ -17,12 +17,14 @@
   export let isSyncing: boolean = false;
   export let syncMode: 'automatic' | 'prompt' | 'manual' = 'automatic';
   export let dataDir: string = '';
+  export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
   export let onSyncModeChange: (mode: 'automatic' | 'prompt' | 'manual') => void = () => {};
   export let onOpenDataDir: () => void = () => {};
+  export let onSync: () => void = () => {};
 
   let activeTab = 'library';
 
@@ -75,12 +77,14 @@
               {isSyncing}
               {syncMode}
               {dataDir}
+              {lastSyncTime}
               {onSelectFolder}
               {onCompact}
               {onReindexAll}
               {onDeleteIndex}
               {onSyncModeChange}
               {onOpenDataDir}
+              {onSync}
             />
           {/if}
         </div>

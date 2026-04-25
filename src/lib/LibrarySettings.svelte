@@ -11,12 +11,14 @@
   export let isSyncing: boolean = false;
   export let syncMode: SyncMode = 'automatic';
   export let dataDir: string = '';
+  export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
   export let onSyncModeChange: (mode: SyncMode) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
+  export let onSync: () => void = () => {};
 
   let confirmingReindex = false;
   let confirmingDelete = false;
@@ -61,6 +63,25 @@
   $: coveragePct = totalFilesFound > 0
     ? Math.min(100, (indexedFileCount / totalFilesFound) * 100)
     : 0;
+
+  function formatRelative(date: Date | null): string {
+    if (!date) return 'Never';
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 30) return 'just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes === 1) return '1 minute ago';
+    if (minutes < 60) return `${minutes} minutes ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours === 1) return '1 hour ago';
+    if (hours < 24) return `${hours} hours ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return '1 day ago';
+    return `${days} days ago`;
+  }
+
+  $: lastSyncRelative = formatRelative(lastSyncTime);
+  $: lastSyncAbsolute = lastSyncTime ? lastSyncTime.toLocaleString() : '';
 </script>
 
 <div class="library-settings">
@@ -184,6 +205,22 @@
           </div>
         </div>
       </label>
+    </div>
+
+    <div class="meta-row">
+      <span class="meta-label">Last sync</span>
+      <span class="meta-value" title={lastSyncAbsolute}>
+        {isSyncing ? 'Syncing…' : lastSyncRelative}
+      </span>
+      <button
+        type="button"
+        class="btn-link"
+        on:click={onSync}
+        disabled={isSyncing}
+        title="Check the library folder for changes"
+      >
+        Sync now
+      </button>
     </div>
   </section>
 

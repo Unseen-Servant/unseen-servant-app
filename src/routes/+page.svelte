@@ -1231,12 +1231,14 @@
   {isSyncing}
   {syncMode}
   {dataDir}
+  {lastSyncTime}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
   onDeleteIndex={handleDeleteIndex}
   onSyncModeChange={handleSyncModeChange}
   onOpenDataDir={handleOpenDataDir}
+  onSync={handleManualSync}
 />
 
 {#if showGuide}
