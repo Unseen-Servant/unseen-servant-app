@@ -17,6 +17,7 @@ import re
 import signal
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -740,6 +741,26 @@ def create_app(collection=None, data_dir: Path | None = None):
     # threading.Lock rather than asyncio.Lock.
     _sync_lock = threading.Lock()
 
+    def acquire_sync_lock_or_409():
+        """Acquire the sync lock non-blockingly. 409 if already held.
+
+        Manual form for streaming endpoints, where the lock needs to span
+        the SSE generator's iteration (which outlives the handler).
+        """
+        if not _sync_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=409, detail="A sync operation is already in progress"
+            )
+
+    @contextmanager
+    def sync_lock_or_409():
+        """Acquire-or-409, then release on exit. For non-streaming endpoints."""
+        acquire_sync_lock_or_409()
+        try:
+            yield
+        finally:
+            _sync_lock.release()
+
     # Merged game systems state — rebuilt when custom systems change.
     # Mutable container so endpoint closures always see the latest value.
     _custom_store = load_custom_systems(data_dir) if data_dir else CustomGameSystemsStore()
@@ -763,7 +784,11 @@ def create_app(collection=None, data_dir: Path | None = None):
 
     @app.post("/api/index-files")
     async def index_files(request: IndexFilesRequest):
-        """Index specific PDF files by path."""
+        """Index specific PDF files by path.
+
+        Synchronous convenience endpoint, primarily used by the test
+        suite. Production code uses ``/api/sync-index-stream``.
+        """
         total = len(request.paths)
         indexed = 0
         errors = []
@@ -829,24 +854,6 @@ def create_app(collection=None, data_dir: Path | None = None):
             },
         }
 
-    @app.post("/api/sync-index")
-    async def sync_index(request: SyncIndexRequest):
-        """Apply index changes: add new, remove deselected, re-index modified.
-
-        This is the main reconciliation endpoint. It computes the diff
-        between selected paths and the manifest, then:
-        1. Deletes chunks for deselected files
-        2. Indexes new and modified files
-        3. Updates the manifest
-        """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already in progress"
-            )
-        try:
-            return _do_sync(request)
-        finally:
-            _sync_lock.release()
 
     def _sync_core(request: SyncIndexRequest):
         """Core sync generator shared by both endpoints.
@@ -1090,7 +1097,11 @@ def create_app(collection=None, data_dir: Path | None = None):
         }
 
     def _do_sync(request: SyncIndexRequest):
-        """Run sync and return the final result dict."""
+        """Run sync and return the final result dict.
+
+        Synchronous helper used by ``/api/sync-index`` (test convenience
+        endpoint). Production callers use the streaming variant below.
+        """
         if not data_dir:
             raise HTTPException(
                 status_code=500, detail="No data directory configured"
@@ -1103,26 +1114,29 @@ def create_app(collection=None, data_dir: Path | None = None):
             del result["event"]
         return result
 
+    @app.post("/api/sync-index")
+    async def sync_index(request: SyncIndexRequest):
+        """Apply index changes synchronously (test convenience endpoint).
+
+        Production code uses ``/api/sync-index-stream`` for SSE progress.
+        """
+        with sync_lock_or_409():
+            return _do_sync(request)
+
     @app.post("/api/sync-index-stream")
     async def sync_index_stream(request: SyncIndexRequest):
         """Streaming version of sync-index that emits SSE progress events."""
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already in progress"
-            )
+        acquire_sync_lock_or_409()
         if not data_dir:
             _sync_lock.release()
             raise HTTPException(
                 status_code=500, detail="No data directory configured"
             )
 
-        def generate():
-            for event in _sync_core(request):
-                yield f"data: {json.dumps(event)}\n\n"
-
         def generate_with_lock():
             try:
-                yield from generate()
+                for event in _sync_core(request):
+                    yield f"data: {json.dumps(event)}\n\n"
             finally:
                 _sync_lock.release()
 
@@ -1137,10 +1151,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         indexed paths, so unchanged-on-disk files are re-processed with the
         current extractor.
         """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already in progress"
-            )
+        acquire_sync_lock_or_409()
         if not data_dir:
             _sync_lock.release()
             raise HTTPException(
@@ -1171,11 +1182,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         IDs — those paths are still valid on disk and will resolve
         again after the next sync re-creates their chunks).
         """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already in progress"
-            )
-        try:
+        with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
@@ -1193,8 +1200,6 @@ def create_app(collection=None, data_dir: Path | None = None):
             save_manifest(data_dir, IndexManifest())
 
             return {"removed_files": removed_files, "removed_chunks": removed_chunks}
-        finally:
-            _sync_lock.release()
 
     # ------------------------------------------------------------------
     # File rename — direct index update (no re-embedding)
@@ -1211,11 +1216,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         Transfers ChromaDB chunks to the new path, updates the manifest
         and collections.
         """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already running"
-            )
-        try:
+        with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
@@ -1276,8 +1277,6 @@ def create_app(collection=None, data_dir: Path | None = None):
                 save_collections(data_dir, coll_store)
 
             return {"renamed": True, "affected_collections": affected_collections}
-        finally:
-            _sync_lock.release()
 
     class FileDeleteRequest(BaseModel):
         path: str
@@ -1289,11 +1288,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         Deletes chunks from ChromaDB and cleans up the manifest and
         collections.
         """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already running"
-            )
-        try:
+        with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
@@ -1320,8 +1315,6 @@ def create_app(collection=None, data_dir: Path | None = None):
                 save_collections(data_dir, coll_store)
 
             return {"deleted": True, "affected_collections": affected_collections}
-        finally:
-            _sync_lock.release()
 
     # ------------------------------------------------------------------
     # Folder operations — batch rename / delete for all children
@@ -1341,11 +1334,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         Transfers ChromaDB chunks without re-embedding, updates the
         manifest and collections.
         """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already running"
-            )
-        try:
+        with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
@@ -1419,8 +1408,6 @@ def create_app(collection=None, data_dir: Path | None = None):
                 "renamed_files": renamed_files,
                 "affected_collections": affected_collections,
             }
-        finally:
-            _sync_lock.release()
 
     @app.post("/api/folder-delete")
     async def folder_delete(request: FolderDeleteRequest):
@@ -1429,11 +1416,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         Removes chunks from ChromaDB and cleans up the manifest and
         collections.
         """
-        if not _sync_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=409, detail="A sync operation is already running"
-            )
-        try:
+        with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
@@ -1471,8 +1454,6 @@ def create_app(collection=None, data_dir: Path | None = None):
                 "deleted_files": deleted_files,
                 "affected_collections": affected_collections,
             }
-        finally:
-            _sync_lock.release()
 
     @app.get("/api/stats")
     async def get_stats():
