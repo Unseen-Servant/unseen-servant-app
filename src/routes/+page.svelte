@@ -27,6 +27,21 @@
   let expandedPaths = new Set<string>();
   let error = '';
 
+  let totalFilesFound = 0;
+
+  async function refreshTotalFilesFound() {
+    if (!selectedFolder) {
+      totalFilesFound = 0;
+      return;
+    }
+    try {
+      totalFilesFound = await invoke<number>('count_pdfs_recursive', { folderPath: selectedFolder });
+    } catch (e) {
+      console.log('Could not count PDFs:', e);
+      totalFilesFound = 0;
+    }
+  }
+
   // File focus & context menu
   let focusedFilePath: string | null = null;
   let contextMenu: { x: number; y: number; item: FileItem } | null = null;
@@ -394,9 +409,11 @@
     try {
       files = await invoke<FileItem[]>('list_files', { folderPath: path });
       error = '';
+      refreshTotalFilesFound();
     } catch (e) {
       error = String(e);
       files = [];
+      totalFilesFound = 0;
     }
   }
 
@@ -949,6 +966,7 @@
 
       await refreshIndexStatus();
       await loadCollections();
+      refreshTotalFilesFound();
 
       // Refresh file tree if renames, auto-removals, or stale cleanups occurred
       if (((result.renames?.length > 0) || (result.auto_removed_paths?.length > 0) || (result.stale_paths?.length > 0)) && selectedFolder) {
@@ -1205,6 +1223,7 @@
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
   indexedFileCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+  {totalFilesFound}
   {totalChunks}
   {storageBytes}
   {reclaimableBytes}

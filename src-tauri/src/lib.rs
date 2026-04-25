@@ -235,6 +235,38 @@ async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+fn count_pdfs_in_dir(folder: &Path) -> u64 {
+    let mut count: u64 = 0;
+    let entries = match fs::read_dir(folder) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+    for entry in entries.flatten() {
+        let file_type = match entry.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if file_type.is_dir() {
+            count += count_pdfs_in_dir(&entry.path());
+        } else if file_type.is_file() {
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            if name.ends_with(".pdf") {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+#[tauri::command]
+fn count_pdfs_recursive(folder_path: String) -> Result<u64, String> {
+    let folder = Path::new(&folder_path);
+    if !folder.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+    Ok(count_pdfs_in_dir(folder))
+}
+
 #[tauri::command]
 fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
     let mut items = Vec::new();
@@ -1193,7 +1225,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, reindex_all, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, reindex_all, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

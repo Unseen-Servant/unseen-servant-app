@@ -3,6 +3,7 @@
 
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
+  export let totalFilesFound: number = 0;
   export let totalChunks: number = 0;
   export let storageBytes: number = 0;
   export let reclaimableBytes: number = 0;
@@ -56,6 +57,10 @@
     if (bytes >= 1_024) return (bytes / 1_024).toFixed(0) + ' KB';
     return bytes + ' B';
   }
+
+  $: coveragePct = totalFilesFound > 0
+    ? Math.min(100, (indexedFileCount / totalFilesFound) * 100)
+    : 0;
 </script>
 
 <div class="library-settings">
@@ -64,19 +69,17 @@
       <h3 class="field-title font-heading">Library stats</h3>
     </div>
 
-    {#if indexedFileCount > 0}
+    {#if indexedFileCount > 0 || totalFilesFound > 0}
       <div class="stat-block" role="group" aria-label="Library stats">
         <div class="stat-cell">
-          <div class="stat-label">FILES</div>
-          <div class="stat-value">{indexedFileCount.toLocaleString()}</div>
+          <div class="stat-label">INDEXED</div>
+          <div class="stat-value">
+            {indexedFileCount.toLocaleString()}{#if totalFilesFound > 0}&nbsp;<span class="stat-muted">/&nbsp;{totalFilesFound.toLocaleString()}</span>&nbsp;<span class="stat-pct">{coveragePct.toFixed(1)}%</span>{/if}
+          </div>
         </div>
         <div class="stat-cell">
           <div class="stat-label">CHUNKS</div>
           <div class="stat-value">{totalChunks.toLocaleString()}</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-label">SIZE</div>
-          <div class="stat-value">{storageBytes > 0 ? formatSize(storageBytes) : '—'}</div>
         </div>
         <div class="stat-cell">
           <div class="stat-label">SYS</div>
@@ -217,17 +220,24 @@
       </button>
     </div>
 
-    <div class="actions">
-      <button
-        type="button"
-        class="btn-primary"
-        on:click={onCompact}
-        disabled={isSyncing || reclaimableBytes === 0}
-      >
-        Compact database{reclaimableBytes > 0 ? ` (${formatSize(reclaimableBytes)} reclaimable)` : ''}
-      </button>
-      {#if reclaimableBytes === 0}
-        <span class="hint">Nothing to reclaim.</span>
+    <div class="meta-row">
+      <span class="meta-label">Storage</span>
+      <span class="meta-value">
+        {storageBytes > 0 ? formatSize(storageBytes) : '—'}
+        {#if reclaimableBytes > 0}
+          <span class="meta-muted"> · {formatSize(reclaimableBytes)} reclaimable</span>
+        {/if}
+      </span>
+      {#if reclaimableBytes > 0}
+        <button
+          type="button"
+          class="btn-link"
+          on:click={onCompact}
+          disabled={isSyncing}
+          title="Reclaim {formatSize(reclaimableBytes)}"
+        >
+          Compact
+        </button>
       {/if}
     </div>
   </section>
@@ -357,7 +367,7 @@
     flex: 1;
     min-width: 0;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     padding: 0.4rem 0.6rem;
     background: var(--bg-focused);
     color: var(--text-primary);
@@ -375,7 +385,7 @@
 
   .stat-block {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.5rem;
     padding: 0.5rem 0.25rem;
     border-top: 1px solid var(--border-subtle);
@@ -399,22 +409,98 @@
 
   .stat-value {
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
 
-  .actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
+  .stat-muted {
+    color: var(--text-secondary);
   }
 
-  .hint {
-    font-family: var(--font-body);
-    font-size: 0.8rem;
+  .stat-pct {
+    color: var(--text-accent);
+  }
+  .stat-pct::before,
+  .stat-pct::after {
     color: var(--text-secondary);
-    font-style: italic;
+  }
+  .stat-pct::before {
+    content: '[';
+    margin-right: 0.15rem;
+  }
+  .stat-pct::after {
+    content: ']';
+    margin-left: 0.15rem;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.15rem 0.1rem;
+  }
+
+  .meta-label {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .meta-value {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+  }
+
+  .meta-muted {
+    color: var(--text-secondary);
+  }
+
+  /*
+   * Compact action — Option B: bracketed terminal-style affordance.
+   * Brackets in muted color, label in accent. Hover brightens the
+   * brackets so the whole token feels reactive.
+   */
+  .btn-link {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    color: var(--text-accent);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: filter var(--transition-fast);
+  }
+  .btn-link::before,
+  .btn-link::after {
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+  }
+  .btn-link::before {
+    content: '[';
+    margin-right: 0.15rem;
+  }
+  .btn-link::after {
+    content: ']';
+    margin-left: 0.15rem;
+  }
+  .btn-link:hover:not(:disabled) {
+    filter: brightness(1.25);
+  }
+  .btn-link:hover:not(:disabled)::before,
+  .btn-link:hover:not(:disabled)::after {
+    color: var(--text-accent);
+  }
+  .btn-link:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .radio-group {
@@ -480,16 +566,6 @@
   button:disabled {
     cursor: not-allowed;
     opacity: 0.5;
-  }
-
-  .btn-primary {
-    background: var(--bg-focused);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-  }
-  .btn-primary:hover:not(:disabled) {
-    color: var(--text-accent);
-    border-color: var(--text-accent);
   }
 
   .btn-danger-outline {

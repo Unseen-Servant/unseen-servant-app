@@ -9,6 +9,7 @@
   export let onSystemsChanged: () => void = () => {};
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
+  export let totalFilesFound: number = 0;
   export let totalChunks: number = 0;
   export let storageBytes: number = 0;
   export let reclaimableBytes: number = 0;
@@ -66,6 +67,7 @@
             <LibrarySettings
               {selectedFolder}
               {indexedFileCount}
+              {totalFilesFound}
               {totalChunks}
               {storageBytes}
               {reclaimableBytes}
