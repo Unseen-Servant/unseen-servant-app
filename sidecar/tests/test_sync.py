@@ -476,10 +476,15 @@ def test_delete_index_empty_manifest(client, test_collection):
     assert data["removed_chunks"] == 0
 
 
-def test_delete_index_preserves_collections_shell(
+def test_delete_index_preserves_collections(
     client, sample_pdf_path, test_collection, tmp_path
 ):
-    """Delete clears collection file_paths but keeps the named collections."""
+    """Delete keeps collections fully intact — names AND file paths.
+
+    Collections store file paths, not chunk IDs. Those paths are still
+    valid on disk after the index is cleared, and will resolve again
+    once the next sync re-creates their chunks.
+    """
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]
     })
@@ -495,5 +500,6 @@ def test_delete_index_preserves_collections_shell(
     list_resp = client.get("/api/collections")
     assert list_resp.status_code == 200
     collections = list_resp.json()["collections"]
-    assert "My Books" in collections, "Collection shell should be preserved"
-    assert collections["My Books"]["file_paths"] == []
+    assert "My Books" in collections, "Collection should be preserved"
+    assert collections["My Books"]["file_paths"] == [str(sample_pdf_path)], \
+        "Collection file paths should be preserved across index deletion"

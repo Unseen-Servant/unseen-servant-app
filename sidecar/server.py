@@ -1119,9 +1119,9 @@ def create_app(collection=None, data_dir: Path | None = None):
         """Purge every chunk from ChromaDB and clear the manifest.
 
         Preserves the selected folder, game systems, and user-curated
-        collections (their file lists are emptied but the named shells
-        remain so the user doesn't lose their organization). The next
-        sync rebuilds the index from scratch.
+        collections in full (collections store file paths, not chunk
+        IDs — those paths are still valid on disk and will resolve
+        again after the next sync re-creates their chunks).
         """
         if not _sync_lock.acquire(blocking=False):
             raise HTTPException(
@@ -1143,15 +1143,6 @@ def create_app(collection=None, data_dir: Path | None = None):
             removed_chunks = len(all_ids)
 
             save_manifest(data_dir, IndexManifest())
-
-            coll_store = load_collections(data_dir)
-            touched = False
-            for coll in coll_store.collections.values():
-                if coll.file_paths:
-                    coll.file_paths = []
-                    touched = True
-            if touched:
-                save_collections(data_dir, coll_store)
 
             return {"removed_files": removed_files, "removed_chunks": removed_chunks}
         finally:
