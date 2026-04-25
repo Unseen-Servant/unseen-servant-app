@@ -15,8 +15,9 @@
   import StatusBar from '../lib/StatusBar.svelte';
   import NotificationBanner from '../lib/NotificationBanner.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
-  import GettingStarted from '../lib/GettingStarted.svelte';
-  import SettingsPanel from '../lib/SettingsPanel.svelte';
+  import GettingStartedModal from '../lib/GettingStartedModal.svelte';
+  import GettingStartedPage from '../lib/GettingStartedPage.svelte';
+  import SettingsModal from '../lib/SettingsModal.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -1140,8 +1141,7 @@
       <NotificationBanner />
     </div>
   {:else}
-    <GettingStarted
-      mode="page"
+    <GettingStartedPage
       {ollamaRunning}
       {ollamaModelReady}
       folderSelected={false}
@@ -1192,7 +1192,7 @@
 
 <LicenseModal visible={showLicense} onClose={() => { showLicense = false; }} />
 
-<SettingsPanel
+<SettingsModal
   visible={showSettings}
   onClose={() => { showSettings = false; }}
   {knownSystems}
@@ -1217,19 +1217,17 @@
   onSync={handleManualSync}
 />
 
-{#if showGuide}
-  <GettingStarted
-    mode="modal"
-    onClose={() => { showGuide = false; }}
-    {ollamaRunning}
-    {ollamaModelReady}
-    folderSelected={selectedFolder !== ''}
-    filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
-    collectionsCreated={Object.keys(collections).length > 0}
-    onSelectFolder={handleSelectFolder}
-    onCopyMcpConfig={handleCopyMcpConfig}
-  />
-{/if}
+<GettingStartedModal
+  visible={showGuide}
+  onClose={() => { showGuide = false; }}
+  {ollamaRunning}
+  {ollamaModelReady}
+  folderSelected={selectedFolder !== ''}
+  filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
+  collectionsCreated={Object.keys(collections).length > 0}
+  onSelectFolder={handleSelectFolder}
+  onCopyMcpConfig={handleCopyMcpConfig}
+/>
 
 <style>
   .app-layout {
