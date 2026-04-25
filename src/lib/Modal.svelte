@@ -11,13 +11,16 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onClose();
+    if (visible && e.key === 'Escape') onClose();
   }
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
+
 {#if visible}
   <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-  <div class="backdrop" role="dialog" aria-modal="true" aria-label={title} tabindex="-1" on:click={handleBackdrop} on:keydown={handleKeydown}>
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="backdrop" role="dialog" aria-modal="true" aria-label={title} tabindex="-1" on:click={handleBackdrop}>
     <div class="modal" style:width style:height style:max-height={maxHeight}>
       <div class="modal-header">
         <span class="modal-title font-heading">{title}</span>
