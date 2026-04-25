@@ -193,6 +193,12 @@ struct CompactResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct DeleteIndexResult {
+    removed_files: u64,
+    removed_chunks: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct SearchResultItem {
     text: String,
     filename: String,
@@ -227,6 +233,38 @@ async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
         Some(path) => Ok(path.to_string()),
         None => Err("No folder selected".to_string()),
     }
+}
+
+fn count_pdfs_in_dir(folder: &Path) -> u64 {
+    let mut count: u64 = 0;
+    let entries = match fs::read_dir(folder) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+    for entry in entries.flatten() {
+        let file_type = match entry.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if file_type.is_dir() {
+            count += count_pdfs_in_dir(&entry.path());
+        } else if file_type.is_file() {
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            if name.ends_with(".pdf") {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+#[tauri::command]
+fn count_pdfs_recursive(folder_path: String) -> Result<u64, String> {
+    let folder = Path::new(&folder_path);
+    if !folder.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+    Ok(count_pdfs_in_dir(folder))
 }
 
 #[tauri::command]
@@ -369,17 +407,11 @@ async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, Strin
     Ok(result)
 }
 
-#[tauri::command]
-async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncResult, String> {
+async fn consume_sync_stream(
+    app: tauri::AppHandle,
+    response: reqwest::Response,
+) -> Result<SyncResult, String> {
     use futures_util::StreamExt;
-
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{}/api/sync-index-stream", SIDECAR_URL))
-        .json(&serde_json::json!({ "selected_paths": paths }))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
@@ -448,6 +480,31 @@ async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncRes
     final_result.ok_or_else(|| "Sync completed but no result received".to_string())
 }
 
+#[tauri::command]
+async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/sync-index-stream", SIDECAR_URL))
+        .json(&serde_json::json!({ "selected_paths": paths }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    consume_sync_stream(app, response).await
+}
+
+#[tauri::command]
+async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/reindex-all-stream", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    consume_sync_stream(app, response).await
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — game system management
 // ---------------------------------------------------------------------------
@@ -496,6 +553,36 @@ async fn compact_database() -> Result<CompactResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     let result: CompactResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+fn get_data_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+async fn delete_index() -> Result<DeleteIndexResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/delete-index", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Sidecar error: {}", response.status()));
+    }
+
+    let result: DeleteIndexResult = response
         .json()
         .await
         .map_err(|e| format!("Invalid response from indexer: {}", e))?;
@@ -1138,7 +1225,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, get_stats, compact_database, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, index_files, get_index_status, sync_index, reindex_all, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

@@ -1,15 +1,35 @@
 <script lang="ts">
   import type { KnownGameSystem } from './types';
   import GameSystemsSettings from './GameSystemsSettings.svelte';
+  import LibrarySettings from './LibrarySettings.svelte';
 
   export let visible = false;
   export let onClose: () => void;
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
+  export let selectedFolder: string = '';
+  export let indexedFileCount: number = 0;
+  export let totalFilesFound: number = 0;
+  export let totalChunks: number = 0;
+  export let storageBytes: number = 0;
+  export let reclaimableBytes: number = 0;
+  export let gameSystemCount: number = 0;
+  export let isSyncing: boolean = false;
+  export let syncMode: 'automatic' | 'prompt' | 'manual' = 'automatic';
+  export let dataDir: string = '';
+  export let lastSyncTime: Date | null = null;
+  export let onSelectFolder: () => void = () => {};
+  export let onCompact: () => void = () => {};
+  export let onReindexAll: () => void = () => {};
+  export let onDeleteIndex: () => void = () => {};
+  export let onSyncModeChange: (mode: 'automatic' | 'prompt' | 'manual') => void = () => {};
+  export let onOpenDataDir: () => void = () => {};
+  export let onSync: () => void = () => {};
 
-  let activeTab = 'game-systems';
+  let activeTab = 'library';
 
   const tabs = [
+    { id: 'library', label: 'Library' },
     { id: 'game-systems', label: 'Game Systems' },
   ];
 
@@ -45,6 +65,27 @@
         <div class="tab-body">
           {#if activeTab === 'game-systems'}
             <GameSystemsSettings {knownSystems} {onSystemsChanged} />
+          {:else if activeTab === 'library'}
+            <LibrarySettings
+              {selectedFolder}
+              {indexedFileCount}
+              {totalFilesFound}
+              {totalChunks}
+              {storageBytes}
+              {reclaimableBytes}
+              {gameSystemCount}
+              {isSyncing}
+              {syncMode}
+              {dataDir}
+              {lastSyncTime}
+              {onSelectFolder}
+              {onCompact}
+              {onReindexAll}
+              {onDeleteIndex}
+              {onSyncModeChange}
+              {onOpenDataDir}
+              {onSync}
+            />
           {/if}
         </div>
       </div>
@@ -78,13 +119,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
+    padding: 0.4rem 1rem;
+    background: var(--bg-focused);
     border-bottom: 1px solid var(--border-subtle);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
     flex-shrink: 0;
   }
 
   .panel-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: var(--text-accent);
   }
 
@@ -112,6 +156,7 @@
   .tab-nav {
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
     padding: 0.5rem;
     border-right: 1px solid var(--border-subtle);
     flex-shrink: 0;
