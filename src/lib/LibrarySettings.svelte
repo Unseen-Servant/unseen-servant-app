@@ -1,5 +1,6 @@
 <script lang="ts">
-  type SyncMode = 'automatic' | 'prompt' | 'manual';
+  import type { BackgroundCheckInterval, BucketPolicy, SyncPreferences } from './types';
+  import { BACKGROUND_CHECK_OPTIONS, DEFAULT_SYNC_PREFERENCES } from './types';
 
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
@@ -9,16 +10,52 @@
   export let reclaimableBytes: number = 0;
   export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
-  export let syncMode: SyncMode = 'automatic';
+  export let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
   export let dataDir: string = '';
   export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
-  export let onSyncModeChange: (mode: SyncMode) => void = () => {};
+  export let onSyncPreferencesChange: (partial: Partial<SyncPreferences>) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
   export let onSync: () => void = () => {};
+
+  type PolicyKey = 'diskEventsPolicy' | 'selectionPolicy' | 'deselectionPolicy' | 'modificationPolicy';
+  const policyGroups: Array<{
+    key: PolicyKey;
+    title: string;
+    desc: string;
+  }> = [
+    {
+      key: 'diskEventsPolicy',
+      title: 'Renames, missing files, and stale selections',
+      desc: 'Same content, but the filename or location changed — or the file is no longer there.',
+    },
+    {
+      key: 'selectionPolicy',
+      title: 'New files you select',
+      desc: 'Embedding work; defaults to asking so you can batch.',
+    },
+    {
+      key: 'deselectionPolicy',
+      title: 'Files you deselect',
+      desc: 'Drops chunks. Re-selecting later requires re-embedding.',
+    },
+    {
+      key: 'modificationPolicy',
+      title: 'Files modified on disk',
+      desc: 'Same filename, but the contents are different — needs reindexing.',
+    },
+  ];
+
+  function setPolicy(key: PolicyKey, value: BucketPolicy) {
+    onSyncPreferencesChange({ [key]: value } as Partial<SyncPreferences>);
+  }
+
+  function setCheckInterval(value: BackgroundCheckInterval) {
+    onSyncPreferencesChange({ backgroundCheckInterval: value });
+  }
 
   let confirmingReindex = false;
   let confirmingDelete = false;
@@ -154,58 +191,45 @@
       </p>
     </div>
 
-    <div class="radio-group" role="radiogroup" aria-label="Sync behavior">
-      <label class="radio-option">
-        <input
-          type="radio"
-          name="syncMode"
-          value="automatic"
-          checked={syncMode === 'automatic'}
-          on:change={() => onSyncModeChange('automatic')}
-        />
-        <div class="radio-text">
-          <div class="radio-title">Automatic</div>
-          <div class="radio-desc">
-            Checks for changes every minute. Applies renames and removals
-            silently; asks before re-indexing new or modified files.
-          </div>
+    <div class="setting-row">
+      <div class="setting-row-head">
+        <div class="setting-row-title">Check for changes</div>
+        <div class="setting-row-desc">
+          How often to scan the library folder. "Never" means the index only
+          updates when you click Sync.
         </div>
-      </label>
-
-      <label class="radio-option">
-        <input
-          type="radio"
-          name="syncMode"
-          value="prompt"
-          checked={syncMode === 'prompt'}
-          on:change={() => onSyncModeChange('prompt')}
-        />
-        <div class="radio-text">
-          <div class="radio-title">Ask before every change</div>
-          <div class="radio-desc">
-            Checks for changes every minute. Always notifies you; nothing
-            syncs without your click.
-          </div>
-        </div>
-      </label>
-
-      <label class="radio-option">
-        <input
-          type="radio"
-          name="syncMode"
-          value="manual"
-          checked={syncMode === 'manual'}
-          on:change={() => onSyncModeChange('manual')}
-        />
-        <div class="radio-text">
-          <div class="radio-title">Manual only</div>
-          <div class="radio-desc">
-            No background checks. Use the sync button in the status bar
-            when you want to update the index.
-          </div>
-        </div>
-      </label>
+      </div>
+      <select
+        class="setting-select"
+        value={syncPreferences.backgroundCheckInterval}
+        on:change={(e) => setCheckInterval(Number(e.currentTarget.value) as BackgroundCheckInterval)}
+      >
+        {#each BACKGROUND_CHECK_OPTIONS as opt}
+          <option value={opt.value}>{opt.label}</option>
+        {/each}
+      </select>
     </div>
+
+    <fieldset class="policy-group" disabled={syncPreferences.backgroundCheckInterval === 0}>
+      <legend class="policy-legend">When changes are detected</legend>
+
+      {#each policyGroups as group}
+        <div class="setting-row">
+          <div class="setting-row-head">
+            <div class="setting-row-title">{group.title}</div>
+            <div class="setting-row-desc">{group.desc}</div>
+          </div>
+          <select
+            class="setting-select"
+            value={syncPreferences[group.key]}
+            on:change={(e) => setPolicy(group.key, e.currentTarget.value as BucketPolicy)}
+          >
+            <option value="silent">Apply silently</option>
+            <option value="ask">Show a notification</option>
+          </select>
+        </div>
+      {/each}
+    </fieldset>
 
     <div class="meta-row">
       <span class="meta-label">Last sync</span>
@@ -540,55 +564,80 @@
     cursor: not-allowed;
   }
 
-  .radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+  .setting-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.4rem 0.1rem;
   }
 
-  .radio-option {
-    display: flex;
-    gap: 0.6rem;
-    padding: 0.5rem 0.6rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background var(--transition-fast);
-  }
-  .radio-option:hover {
-    background: var(--bg-focused);
-  }
-  .radio-option:has(input:checked) {
-    background: var(--bg-focused);
-  }
-
-  .radio-option input[type='radio'] {
-    margin-top: 0.2rem;
-    accent-color: var(--text-accent);
-    cursor: pointer;
-  }
-
-  .radio-text {
+  .setting-row-head {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
     min-width: 0;
   }
 
-  .radio-title {
+  .setting-row-title {
     font-family: var(--font-heading, var(--font-body));
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-primary);
   }
 
-  .radio-option:has(input:checked) .radio-title {
-    color: var(--text-accent);
+  .setting-row-desc {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
   }
 
-  .radio-desc {
+  .setting-select {
     font-family: var(--font-body);
     font-size: 0.8rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--bg-focused);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    cursor: pointer;
+    min-width: 11rem;
+  }
+  .setting-select:focus {
+    outline: 1px solid var(--text-accent);
+    outline-offset: -1px;
+  }
+  .setting-select:disabled {
+    cursor: not-allowed;
+  }
+
+  .policy-group {
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem 0.6rem;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    transition: opacity var(--transition-fast);
+  }
+  .policy-group:disabled {
+    opacity: 0.45;
+  }
+  .policy-group .setting-row + .setting-row {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .policy-legend {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
     color: var(--text-secondary);
-    line-height: 1.4;
+    text-transform: uppercase;
+    padding: 0 0.3rem;
   }
 
   button {
