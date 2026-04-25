@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { confirm } from '@tauri-apps/plugin-dialog';
@@ -20,6 +19,7 @@
   import SettingsPanel from '../lib/SettingsPanel.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
+  import { runSyncJob } from '../lib/syncJob';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -940,113 +940,69 @@
     return bytes + ' B';
   }
 
+  async function refreshIndexAndCollections() {
+    await refreshIndexStatus();
+    await loadCollections();
+  }
+
+  function buildSyncResultMessage(result: SyncResult): { message: string; isError: boolean } {
+    const parts: string[] = [];
+    if (result.added > 0) parts.push(`${result.added} added`);
+    if (result.removed > 0) parts.push(`${result.removed} removed`);
+    if (result.auto_removed > 0) parts.push(`${result.auto_removed} removed (deleted from disk)`);
+    if (result.renamed > 0) parts.push(`${result.renamed} renamed`);
+    if (result.updated > 0) parts.push(`${result.updated} updated`);
+    if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
+    const chunkStr = result.chunks_total > 0
+      ? ` ${result.chunks_total.toLocaleString()} chunks.`
+      : '';
+    const message = parts.length > 0
+      ? `Synced: ${parts.join(', ')}.${chunkStr}`
+      : 'Nothing to sync.';
+    return { message, isError: result.errors.length > 0 };
+  }
+
   // Sync index: add new, remove deselected, re-index modified
   async function handleSync() {
+    if (isSyncing) return;
     isSyncing = true;
-    notification.dismiss();
-
-    notification.show({
-      type: 'progress',
-      message: 'Starting sync...',
-      filesCompleted: 0,
-      filesTotal: 0,
-      chunksProcessed: 0,
-      duration: null,
-    });
-
-    const unlisten = await listen<{
-      files_done: number;
-      total_files: number;
-      chunks_total: number;
-      current_file: string;
-      phase: string;
-    }>('sync-progress', (event) => {
-      const p = event.payload;
-      notification.show({
-        type: 'progress',
-        message: `${p.files_done}/${p.total_files} files`,
-        filesCompleted: p.files_done,
-        filesTotal: p.total_files,
-        chunksProcessed: p.chunks_total,
-        duration: null,
-      });
-    });
-
     try {
-      const result = await invoke<SyncResult>(
-        'sync_index',
-        { paths: Array.from(selectedPaths) }
-      );
-      // Apply renames to selectedPaths before persisting
-      if (result.renames && result.renames.length > 0) {
-        for (const { old_path, new_path } of result.renames) {
-          selectedPaths.delete(old_path);
-          selectedPaths.add(new_path);
+      const result = await runSyncJob<SyncResult>({
+        command: 'sync_index',
+        args: { paths: Array.from(selectedPaths) },
+        startMessage: 'Starting sync...',
+        errorPrefix: 'Sync failed',
+        streamsProgress: true,
+        buildResultMessage: buildSyncResultMessage,
+        onComplete: async (r) => {
+          // Reconcile selectedPaths with renames / auto-removals / stale paths
+          for (const { old_path, new_path } of r.renames ?? []) {
+            selectedPaths.delete(old_path);
+            selectedPaths.add(new_path);
+          }
+          for (const path of r.auto_removed_paths ?? []) selectedPaths.delete(path);
+          for (const path of r.stale_paths ?? []) selectedPaths.delete(path);
+          if ((r.renames?.length || 0) + (r.auto_removed_paths?.length || 0) + (r.stale_paths?.length || 0) > 0) {
+            selectedPaths = selectedPaths;
+          }
+
+          // Persist synced selection so uncommitted changes don't survive a restart
+          syncedPaths = new Set(selectedPaths);
+          const store = await load('settings.json');
+          await store.set('syncedPaths', Array.from(selectedPaths));
+          await store.save();
+        },
+      }, refreshIndexAndCollections);
+
+      if (result) {
+        lastSyncTime = new Date();
+        refreshTotalFilesFound();
+        // Refresh file tree if renames, auto-removals, or stale cleanups occurred
+        if (((result.renames?.length || 0) + (result.auto_removed_paths?.length || 0) + (result.stale_paths?.length || 0) > 0) && selectedFolder) {
+          await loadFiles(selectedFolder);
         }
       }
-
-      // Remove auto-removed paths (files deleted from disk)
-      if (result.auto_removed_paths && result.auto_removed_paths.length > 0) {
-        for (const path of result.auto_removed_paths) {
-          selectedPaths.delete(path);
-        }
-      }
-
-      // Remove stale paths (orphaned selections — not on disk, never indexed)
-      if (result.stale_paths && result.stale_paths.length > 0) {
-        for (const path of result.stale_paths) {
-          selectedPaths.delete(path);
-        }
-      }
-
-      // Trigger Svelte reactivity if paths changed
-      if ((result.renames?.length > 0) || (result.auto_removed_paths?.length > 0) || (result.stale_paths?.length > 0)) {
-        selectedPaths = selectedPaths;
-      }
-
-      const parts = [];
-      if (result.added > 0) parts.push(`${result.added} added`);
-      if (result.removed > 0) parts.push(`${result.removed} removed`);
-      if (result.auto_removed > 0) parts.push(`${result.auto_removed} removed (deleted from disk)`);
-      if (result.renamed > 0) parts.push(`${result.renamed} renamed`);
-      if (result.updated > 0) parts.push(`${result.updated} updated`);
-      if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
-      const chunkStr = result.chunks_total > 0
-        ? ` ${result.chunks_total.toLocaleString()} chunks.`
-        : '';
-      const msg = parts.length > 0
-        ? `Synced: ${parts.join(', ')}.${chunkStr}`
-        : 'Nothing to sync.';
-
-      // Record successful sync time for status bar tooltip
-      lastSyncTime = new Date();
-
-      // Persist synced selection so uncommitted changes don't survive a restart
-      syncedPaths = new Set(selectedPaths);
-      const store = await load('settings.json');
-      await store.set('syncedPaths', Array.from(selectedPaths));
-      await store.save();
-
-      await refreshIndexStatus();
-      await loadCollections();
-      refreshTotalFilesFound();
-
-      // Refresh file tree if renames, auto-removals, or stale cleanups occurred
-      if (((result.renames?.length > 0) || (result.auto_removed_paths?.length > 0) || (result.stale_paths?.length > 0)) && selectedFolder) {
-        await loadFiles(selectedFolder);
-      }
-
-      notification.show({
-        type: result.errors.length > 0 ? 'error' : 'success',
-        message: msg,
-        duration: 5000,
-      });
-    } catch (e) {
-      const msg = `Sync failed: ${String(e)}`;
-      notification.show({ type: 'error', message: msg, duration: 6000 });
-
     } finally {
-      unlisten();
       isSyncing = false;
     }
   }
@@ -1060,66 +1016,27 @@
   async function handleReindexAll() {
     if (isSyncing) return;
     isSyncing = true;
-    notification.dismiss();
-
-    notification.show({
-      type: 'progress',
-      message: 'Starting reindex...',
-      filesCompleted: 0,
-      filesTotal: 0,
-      chunksProcessed: 0,
-      duration: null,
-    });
-
-    const unlisten = await listen<{
-      files_done: number;
-      total_files: number;
-      chunks_total: number;
-      current_file: string;
-      phase: string;
-    }>('sync-progress', (event) => {
-      const p = event.payload;
-      notification.show({
-        type: 'progress',
-        message: `${p.files_done}/${p.total_files} files`,
-        filesCompleted: p.files_done,
-        filesTotal: p.total_files,
-        chunksProcessed: p.chunks_total,
-        duration: null,
-      });
-    });
-
     try {
-      const result = await invoke<SyncResult>('reindex_all');
-
-      const parts = [];
-      if (result.updated > 0) parts.push(`${result.updated} reprocessed`);
-      if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
-      const chunkStr = result.chunks_total > 0
-        ? ` ${result.chunks_total.toLocaleString()} chunks.`
-        : '';
-      const msg = parts.length > 0
-        ? `Reindexed: ${parts.join(', ')}.${chunkStr}`
-        : 'Nothing to reindex.';
-
-      lastSyncTime = new Date();
-
-      await refreshIndexStatus();
-      await loadCollections();
-
-      notification.show({
-        type: result.errors.length > 0 ? 'error' : 'success',
-        message: msg,
-        duration: 5000,
-      });
-    } catch (e) {
-      notification.show({
-        type: 'error',
-        message: `Reindex failed: ${String(e)}`,
-        duration: 6000,
-      });
+      const result = await runSyncJob<SyncResult>({
+        command: 'reindex_all',
+        startMessage: 'Starting reindex...',
+        errorPrefix: 'Reindex failed',
+        streamsProgress: true,
+        buildResultMessage: (r) => {
+          const parts: string[] = [];
+          if (r.updated > 0) parts.push(`${r.updated} reprocessed`);
+          if (r.errors.length > 0) parts.push(`${r.errors.length} error(s)`);
+          const chunkStr = r.chunks_total > 0
+            ? ` ${r.chunks_total.toLocaleString()} chunks.`
+            : '';
+          const message = parts.length > 0
+            ? `Reindexed: ${parts.join(', ')}.${chunkStr}`
+            : 'Nothing to reindex.';
+          return { message, isError: r.errors.length > 0 };
+        },
+      }, refreshIndexAndCollections);
+      if (result) lastSyncTime = new Date();
     } finally {
-      unlisten();
       isSyncing = false;
     }
   }
@@ -1127,27 +1044,21 @@
   async function handleDeleteIndex() {
     if (isSyncing) return;
     isSyncing = true;
-    notification.dismiss();
-
     try {
-      const result = await invoke<{ removed_files: number; removed_chunks: number }>('delete_index');
-
-      await refreshIndexStatus();
-      await loadCollections();
-
-      const fileWord = result.removed_files === 1 ? 'file' : 'files';
-      const chunkWord = result.removed_chunks === 1 ? 'chunk' : 'chunks';
-      notification.show({
-        type: 'success',
-        message: `Index cleared: ${result.removed_files} ${fileWord}, ${result.removed_chunks.toLocaleString()} ${chunkWord} removed.`,
-        duration: 5000,
-      });
-    } catch (e) {
-      notification.show({
-        type: 'error',
-        message: `Delete failed: ${String(e)}`,
-        duration: 6000,
-      });
+      await runSyncJob<{ removed_files: number; removed_chunks: number }>({
+        command: 'delete_index',
+        startMessage: 'Deleting index...',
+        errorPrefix: 'Delete failed',
+        streamsProgress: false,
+        buildResultMessage: (r) => {
+          const fileWord = r.removed_files === 1 ? 'file' : 'files';
+          const chunkWord = r.removed_chunks === 1 ? 'chunk' : 'chunks';
+          return {
+            message: `Index cleared: ${r.removed_files} ${fileWord}, ${r.removed_chunks.toLocaleString()} ${chunkWord} removed.`,
+            isError: false,
+          };
+        },
+      }, refreshIndexAndCollections);
     } finally {
       isSyncing = false;
     }
