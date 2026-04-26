@@ -55,7 +55,7 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 
 ## Infrastructure
 
-- **Ollama** with `nomic-embed-text` for local embeddings (no API keys)
+- **Ollama** with `bge-m3` for local embeddings (no API keys; needs `OLLAMA_CONTEXT_LENGTH=8192`)
 - **ChromaDB** for vector storage and semantic search
 - **MCP (Model Context Protocol)** for Claude Desktop integration
 - **PyMuPDF** for PDF text extraction
@@ -66,7 +66,7 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 PDF files on disk
   → text extraction (PyMuPDF)
   → chunking (1000 chars, 200 overlap)
-  → embedding (Ollama nomic-embed-text)
+  → embedding (Ollama bge-m3, 1024-dim)
   → storage (ChromaDB)
   → semantic search (query → embed → nearest neighbors)
   → results to UI or Claude via MCP
