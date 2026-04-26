@@ -23,30 +23,41 @@ from server import create_app
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def test_collection():
+def test_chroma_client():
+    """Fresh in-RAM ChromaDB client for each test.
+
+    Split out from ``test_collection`` so tests can exercise endpoints
+    that recreate the collection (e.g. delete-index).
+    """
+    return chromadb.EphemeralClient()
+
+
+@pytest.fixture
+def test_embedding_function():
+    """ChromaDB's built-in ONNX (MiniLM) embedding function.
+
+    Real embeddings, no Ollama needed. Used for both the test collection
+    and any collection recreated by the endpoints under test.
+    """
+    return DefaultEmbeddingFunction()
+
+
+@pytest.fixture
+def test_collection(test_chroma_client, test_embedding_function):
     """Fresh in-memory ChromaDB collection for each test.
 
-    EphemeralClient = lives entirely in RAM, no temp dirs to clean up.
-    DefaultEmbeddingFunction = ChromaDB's built-in ONNX model (MiniLM).
-    Real embeddings, no Ollama needed.
-
-    Important: EphemeralClient instances share state within a process,
-    so we delete the collection first to ensure each test starts clean.
+    EphemeralClient instances share state within a process, so delete
+    the collection first to ensure each test starts clean.
     """
-    chroma_client = chromadb.EphemeralClient()
-    ef = DefaultEmbeddingFunction()
-
-    # Delete if it exists from a previous test — ensures clean state.
     try:
-        chroma_client.delete_collection("ttrpg_docs_test")
+        test_chroma_client.delete_collection("ttrpg_docs_test")
     except Exception:
         pass
 
-    collection = chroma_client.get_or_create_collection(
+    return test_chroma_client.get_or_create_collection(
         name="ttrpg_docs_test",
-        embedding_function=ef,
+        embedding_function=test_embedding_function,
     )
-    return collection
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +65,7 @@ def test_collection():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def client(test_collection, tmp_path):
+def client(test_collection, test_chroma_client, test_embedding_function, tmp_path):
     """HTTP test client wired to an in-memory ChromaDB.
 
     FastAPI's TestClient lets us make HTTP requests without
@@ -62,8 +73,15 @@ def client(test_collection, tmp_path):
     internally, so our test code stays synchronous and simple.
 
     tmp_path is used as data_dir for manifest storage during tests.
+    The chroma_client and embedding_function are passed through so
+    delete-index exercises the full production drop+recreate path.
     """
-    app = create_app(collection=test_collection, data_dir=tmp_path)
+    app = create_app(
+        collection=test_collection,
+        data_dir=tmp_path,
+        chroma_client=test_chroma_client,
+        embedding_function=test_embedding_function,
+    )
     return TestClient(app)
 
 
