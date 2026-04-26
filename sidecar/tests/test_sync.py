@@ -431,12 +431,19 @@ def test_reindex_all_stream_reprocesses_up_to_date_files(
 # ---------------------------------------------------------------------------
 
 def test_delete_index_clears_manifest_and_chunks(
-    client, sample_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, test_collection, test_chroma_client, tmp_path
 ):
-    """POST /api/delete-index should purge chunks and empty the manifest."""
+    """POST /api/delete-index should purge chunks and empty the manifest.
+
+    Note: delete-index drops and recreates the underlying collection (so
+    the dim binding resets after an embedding-model swap), which means the
+    original ``test_collection`` reference is dead after the call. Refetch
+    via the client.
+    """
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]
     })
+    collection_name = test_collection.name
     chunks_before = test_collection.count()
     assert chunks_before > 0
 
@@ -449,7 +456,8 @@ def test_delete_index_clears_manifest_and_chunks(
     assert data["removed_files"] == 1
     assert data["removed_chunks"] == chunks_before
 
-    assert test_collection.count() == 0
+    fresh_collection = test_chroma_client.get_collection(name=collection_name)
+    assert fresh_collection.count() == 0
     assert json.loads(manifest_path.read_text())["files"] == {}
 
 
@@ -462,6 +470,44 @@ def test_delete_index_empty_manifest(client, test_collection):
     data = response.json()
     assert data["removed_files"] == 0
     assert data["removed_chunks"] == 0
+
+
+def test_delete_index_resets_collection_dim_binding(
+    client, sample_pdf_path, test_collection, test_chroma_client
+):
+    """After delete-index, the recreated collection should accept embeddings
+    of a different dim than the original.
+
+    Chroma locks a collection's vector dim to the first inserted embedding;
+    a row-only delete preserves that lock, which is exactly the failure mode
+    that broke search after the bge-m3 swap. This test would fail under the
+    old "delete rows only" implementation.
+    """
+    import chromadb
+
+    collection_name = test_collection.name
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    assert test_collection.count() > 0
+
+    client.post("/api/delete-index")
+
+    # The original handle is dead; the recreated collection must accept
+    # vectors of a different dim. Add a manual embedding with a dim the
+    # original ONNX model does NOT produce — this would raise on the
+    # original collection.
+    fresh = test_chroma_client.get_collection(
+        name=collection_name,
+        embedding_function=chromadb.utils.embedding_functions.DefaultEmbeddingFunction(),
+    )
+    assert fresh.count() == 0
+    fresh.add(
+        ids=["dim-probe-0"],
+        documents=["any document"],
+        embeddings=[[0.0] * 4242],  # arbitrary dim, would be rejected if dim was locked
+    )
+    assert fresh.count() == 1
 
 
 def test_delete_index_preserves_collections(

@@ -699,21 +699,32 @@ def compute_diff(
 # App factory
 # ---------------------------------------------------------------------------
 
-def create_app(collection=None, data_dir: Path | None = None):
+def create_app(
+    collection=None,
+    data_dir: Path | None = None,
+    chroma_client=None,
+    embedding_function=None,
+):
     """Create the FastAPI app, optionally with a pre-configured collection.
 
     In production: called with no arguments — sets up Ollama + PersistentClient.
     In tests: called with a test collection (EphemeralClient + ONNX embeddings).
 
-    This pattern is called "dependency injection." The endpoints don't care
-    HOW the collection was created — they just use it. This lets tests swap
-    in a lightweight in-memory collection without needing Ollama running.
+    Tests that need to exercise endpoints that recreate the collection
+    (e.g. delete-index, which drops the collection to reset its vector-dim
+    binding after an embedding-model change) can pass `chroma_client` and
+    `embedding_function` so the recreate path has the dependencies it needs.
 
     Args:
         collection: ChromaDB collection (None = production auto-setup).
         data_dir: Directory for ChromaDB and manifest storage.
                   In production, resolved from --data-dir CLI arg.
                   In tests, pass tmp_path.
+        chroma_client: ChromaDB client owning ``collection``. Required for
+                  the delete-index recreate path; ``None`` falls back to
+                  row-by-row delete (sufficient when dim never changes).
+        embedding_function: Embedding function for collection recreate.
+                  Paired with ``chroma_client``.
     """
     if collection is None:
         # Production path: same setup as before, but now only runs
@@ -723,13 +734,13 @@ def create_app(collection=None, data_dir: Path | None = None):
         data_dir.mkdir(parents=True, exist_ok=True)
 
         chroma_client = chromadb.PersistentClient(path=str(data_dir))
-        ollama_ef = embedding_functions.OllamaEmbeddingFunction(
+        embedding_function = embedding_functions.OllamaEmbeddingFunction(
             url="http://localhost:11434/api/embeddings",
             model_name="bge-m3"
         )
         collection = chroma_client.get_or_create_collection(
             name="ttrpg_docs",
-            embedding_function=ollama_ef
+            embedding_function=embedding_function,
         )
 
     app = FastAPI(title="Legend Lore Sidecar")
@@ -1165,11 +1176,20 @@ def create_app(collection=None, data_dir: Path | None = None):
     async def delete_index():
         """Purge every chunk from ChromaDB and clear the manifest.
 
+        Drops and recreates the underlying Chroma collection rather than
+        only deleting rows. Chroma locks a collection's vector dim to the
+        first inserted embedding; deleting rows preserves that lock, so
+        an embedding-model change (e.g. nomic 768 → bge-m3 1024) leaves
+        the collection unable to accept new vectors. Recreating resets
+        the dim binding so the next re-index works against the current
+        embedding function.
+
         Preserves the selected folder, game systems, and user-curated
         collections in full (collections store file paths, not chunk
         IDs — those paths are still valid on disk and will resolve
         again after the next sync re-creates their chunks).
         """
+        nonlocal collection
         with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
@@ -1179,11 +1199,20 @@ def create_app(collection=None, data_dir: Path | None = None):
             manifest = load_manifest(data_dir)
             removed_files = len(manifest.files)
 
-            all_results = collection.get(include=[])
-            all_ids = all_results["ids"]
-            if all_ids:
-                collection.delete(ids=all_ids)
-            removed_chunks = len(all_ids)
+            removed_chunks = len(collection.get(include=[])["ids"])
+
+            if chroma_client is not None:
+                collection_name = collection.name
+                chroma_client.delete_collection(name=collection_name)
+                collection = chroma_client.get_or_create_collection(
+                    name=collection_name,
+                    embedding_function=embedding_function,
+                )
+            elif removed_chunks:
+                # Test path without an injected chroma_client — the dim is
+                # fixed by the fixture and never changes, so row-delete is
+                # sufficient.
+                collection.delete(ids=collection.get(include=[])["ids"])
 
             save_manifest(data_dir, IndexManifest())
 
