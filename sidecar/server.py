@@ -31,6 +31,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
+from chunker import (
+    CHUNKER_VERSION,
+    EMBEDDING_MODEL,
+    Chunk,
+    PageMarkdown,
+    structure_aware,
+)
+
 
 # ---------------------------------------------------------------------------
 # CLI arguments
@@ -122,13 +130,12 @@ def _flatten_br_packed_cells(md: str) -> str:
     return "\n".join(out)
 
 
-def _extract_pdf_text(pdf_path: Path) -> str:
-    """Extract text from a PDF as Markdown via pymupdf4llm.
+def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
+    """Extract a PDF page-by-page as Markdown via pymupdf4llm.
 
-    Emits headings, bold runs, bullet lists, and Markdown tables so the
-    search UI can render formatting. Pages are extracted one at a time
-    and concatenated with blank-line separators so block boundaries
-    (headings, tables) survive the join.
+    Emits headings, bold runs, bullet lists, and Markdown tables. Apply
+    `_flatten_br_packed_cells` per-page so the structure-aware chunker
+    sees clean tables for its atomic-table preservation.
 
     pymupdf (opened via `fitz`/`pymupdf.open`) also accepts
     .txt/.epub/.xps/.cbz silently; restrict to PDFs to match the
@@ -136,26 +143,21 @@ def _extract_pdf_text(pdf_path: Path) -> str:
     """
     if pdf_path.suffix.lower() != ".pdf":
         raise ValueError(f"Not a PDF: {pdf_path.name}")
+    pages: list[PageMarkdown] = []
     with pymupdf.open(pdf_path) as doc:
-        pages = [
-            pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False)
-            for i in range(doc.page_count)
-        ]
-    return _flatten_br_packed_cells("\n\n".join(p for p in pages if p))
+        for i in range(doc.page_count):
+            md = pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False)
+            if md:
+                pages.append(PageMarkdown(
+                    page_number=i + 1,
+                    markdown=_flatten_br_packed_cells(md),
+                ))
+    return pages
 
 
-def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
-    """Split text into overlapping chunks.
-
-    Why overlapping? If a sentence spans two chunks, the overlap ensures
-    it appears fully in at least one chunk, improving search quality.
-    """
-    chunks = []
-    for i in range(0, len(text), chunk_size - overlap):
-        chunk = text[i:i + chunk_size]
-        if chunk.strip():
-            chunks.append(chunk)
-    return chunks
+def _extract_pdf_text(pdf_path: Path) -> str:
+    """Flat-string view of the PDF — used by game-system detection."""
+    return "\n\n".join(p.markdown for p in _extract_pdf_pages(pdf_path))
 
 
 def file_content_hash(path: Path) -> str:
@@ -386,6 +388,48 @@ def chunk_id_prefix(pdf_path: Path) -> str:
     path_hash = hashlib.sha256(str(pdf_path).encode()).hexdigest()[:8]
     return f"{path_hash}_{pdf_path.stem}"
 
+
+def _chunk_metadata(pdf_path: Path, chunk: Chunk, game_system: str) -> dict:
+    return {
+        "source": str(pdf_path),
+        "filename": pdf_path.name,
+        "chunk": chunk.ordinal,
+        "game_system": game_system,
+        "chunk_type": chunk.chunk_type,
+        "section_heading": chunk.section_heading or "",
+        "page_start": chunk.page_start,
+        "page_end": chunk.page_end,
+        "chunker_version": CHUNKER_VERSION,
+        "embedding_model": EMBEDDING_MODEL,
+    }
+
+
+def _extract_and_chunk(
+    pdf_path: Path, game_system: str | None,
+    known_systems: dict[str, list[str]] | None,
+) -> tuple[list[Chunk], str, str | None]:
+    """Shared preamble: extract pages, detect system, run structure_aware.
+
+    Returns (chunks, resolved_system, error_message).
+    """
+    if not pdf_path.exists():
+        return [], "unknown", f"{pdf_path.name}: File not found"
+    try:
+        pages = _extract_pdf_pages(pdf_path)
+        if not pages:
+            return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
+        flat_text = "\n\n".join(p.markdown for p in pages)
+        if not flat_text.strip():
+            return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
+        resolved_system = game_system or detect_game_system(
+            pdf_path, flat_text, known_systems=known_systems
+        )
+        chunks = structure_aware(pages, source_pdf=pdf_path.name)
+        return chunks, resolved_system, None
+    except Exception as e:
+        return [], "unknown", f"{pdf_path.name}: {str(e)}"
+
+
 def index_single_pdf(
     pdf_path: Path, collection, game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
@@ -395,73 +439,35 @@ def index_single_pdf(
     Returns (chunk_count, error_message, game_system).
     error_message is None on success.
     """
-    if not pdf_path.exists():
-        return 0, f"{pdf_path.name}: File not found", "unknown"
+    chunks, resolved_system, error = _extract_and_chunk(
+        pdf_path, game_system, known_systems
+    )
+    if error:
+        return 0, error, resolved_system
 
-    try:
-        text = _extract_pdf_text(pdf_path)
-
-        if not text.strip():
-            return 0, f"{pdf_path.name}: Empty or scanned PDF", "unknown"
-
-        resolved_system = game_system or detect_game_system(
-            pdf_path, text, known_systems=known_systems
+    prefix = chunk_id_prefix(pdf_path)
+    batch_size = 100
+    for batch_idx in range(0, len(chunks), batch_size):
+        batch = chunks[batch_idx:batch_idx + batch_size]
+        collection.upsert(
+            documents=[c.text for c in batch],
+            metadatas=[_chunk_metadata(pdf_path, c, resolved_system) for c in batch],
+            ids=[f"{prefix}_{c.ordinal}" for c in batch],
         )
-        chunks = chunk_text(text)
 
-        batch_size = 100
-        for batch_idx in range(0, len(chunks), batch_size):
-            batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-            batch_metadatas = [{
-                "source": str(pdf_path),
-                "filename": pdf_path.name,
-                "chunk": batch_idx + chunk_idx,
-                "game_system": resolved_system,
-            } for chunk_idx in range(len(batch_chunks))]
-            prefix = chunk_id_prefix(pdf_path)
-            batch_ids = [
-                f"{prefix}_{batch_idx + chunk_idx}"
-                for chunk_idx in range(len(batch_chunks))
-            ]
-
-            collection.upsert(
-                documents=batch_chunks,
-                metadatas=batch_metadatas,
-                ids=batch_ids
-            )
-
-        return len(chunks), None, resolved_system
-
-    except Exception as e:
-        return 0, f"{pdf_path.name}: {str(e)}", "unknown"
+    return len(chunks), None, resolved_system
 
 
 def prepare_pdf(
     pdf_path: Path, game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
-) -> tuple[list[str], str, str | None]:
+) -> tuple[list[Chunk], str, str | None]:
     """Extract text and chunk a PDF without upserting.
 
     Returns (chunks, game_system, error_message).
     error_message is None on success.
     """
-    if not pdf_path.exists():
-        return [], "unknown", f"{pdf_path.name}: File not found"
-
-    try:
-        text = _extract_pdf_text(pdf_path)
-
-        if not text.strip():
-            return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
-
-        resolved_system = game_system or detect_game_system(
-            pdf_path, text, known_systems=known_systems
-        )
-        chunks = chunk_text(text)
-        return chunks, resolved_system, None
-
-    except Exception as e:
-        return [], "unknown", f"{pdf_path.name}: {str(e)}"
+    return _extract_and_chunk(pdf_path, game_system, known_systems)
 
 
 def compact_sqlite(data_dir: Path) -> int:
@@ -965,25 +971,15 @@ def create_app(collection=None, data_dir: Path | None = None):
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
             else:
+                prefix = chunk_id_prefix(pdf_path)
                 batch_idx = 0
                 while batch_idx < len(chunks):
                     batch_size = random.randint(80, 120)
                     batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    batch_metadatas = [{
-                        "source": str(pdf_path),
-                        "filename": pdf_path.name,
-                        "chunk": batch_idx + chunk_idx,
-                        "game_system": detected_system,
-                    } for chunk_idx in range(len(batch_chunks))]
-                    prefix = chunk_id_prefix(pdf_path)
-                    batch_ids = [
-                        f"{prefix}_{batch_idx + chunk_idx}"
-                        for chunk_idx in range(len(batch_chunks))
-                    ]
                     collection.upsert(
-                        documents=batch_chunks,
-                        metadatas=batch_metadatas,
-                        ids=batch_ids,
+                        documents=[c.text for c in batch_chunks],
+                        metadatas=[_chunk_metadata(pdf_path, c, detected_system) for c in batch_chunks],
+                        ids=[f"{prefix}_{c.ordinal}" for c in batch_chunks],
                     )
                     chunks_total += len(batch_chunks)
                     batch_idx += len(batch_chunks)
@@ -1019,25 +1015,15 @@ def create_app(collection=None, data_dir: Path | None = None):
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
             else:
+                prefix = chunk_id_prefix(pdf_path)
                 batch_idx = 0
                 while batch_idx < len(chunks):
                     batch_size = random.randint(80, 120)
                     batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    batch_metadatas = [{
-                        "source": str(pdf_path),
-                        "filename": pdf_path.name,
-                        "chunk": batch_idx + chunk_idx,
-                        "game_system": detected_system,
-                    } for chunk_idx in range(len(batch_chunks))]
-                    prefix = chunk_id_prefix(pdf_path)
-                    batch_ids = [
-                        f"{prefix}_{batch_idx + chunk_idx}"
-                        for chunk_idx in range(len(batch_chunks))
-                    ]
                     collection.upsert(
-                        documents=batch_chunks,
-                        metadatas=batch_metadatas,
-                        ids=batch_ids,
+                        documents=[c.text for c in batch_chunks],
+                        metadatas=[_chunk_metadata(pdf_path, c, detected_system) for c in batch_chunks],
+                        ids=[f"{prefix}_{c.ordinal}" for c in batch_chunks],
                     )
                     chunks_total += len(batch_chunks)
                     batch_idx += len(batch_chunks)

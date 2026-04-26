@@ -126,10 +126,11 @@ def empty_pdf_path(tmp_path):
 
 @pytest.fixture
 def large_text_pdf_path(tmp_path):
-    """Create a PDF with enough text to produce multiple chunks.
+    """Create a PDF with enough text and structure to produce multiple chunks.
 
-    Chunking uses 1000 chars with 200 overlap (step = 800).
-    ~3000 chars should produce ~4 chunks.
+    The structure-aware chunker splits at paragraph (`\\n\\n`) boundaries
+    within a heading section, so the fixture writes several distinct
+    paragraphs with vertical gaps that pymupdf4llm reads as paragraph breaks.
     """
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
@@ -137,17 +138,24 @@ def large_text_pdf_path(tmp_path):
     pdf_path = tmp_path / "core_rules.pdf"
     c = canvas.Canvas(str(pdf_path), pagesize=letter)
 
-    paragraph = (
-        "The adventurer enters the dungeon. "
-        "Torchlight flickers against damp stone walls. "
-        "A perception check reveals hidden runes on the floor. "
-    ) * 30  # ~3000+ chars
+    paragraphs = [
+        "The adventurer enters the dungeon. " * 20,
+        "Combat begins when initiative is rolled and acted upon. " * 20,
+        "Spellcasters must concentrate to maintain magical effects. " * 20,
+        "Treasure rolls determine loot the party generously gathers. " * 20,
+    ]
 
     y = 750
-    for i in range(0, len(paragraph), 80):
-        line = paragraph[i:i + 80]
-        c.drawString(72, y, line)
-        y -= 12
+    for paragraph in paragraphs:
+        for i in range(0, len(paragraph), 80):
+            line = paragraph[i:i + 80]
+            c.drawString(72, y, line)
+            y -= 12
+            if y < 72:
+                c.showPage()
+                y = 750
+        # Vertical gap between paragraphs so pymupdf4llm emits a blank line.
+        y -= 24
         if y < 72:
             c.showPage()
             y = 750

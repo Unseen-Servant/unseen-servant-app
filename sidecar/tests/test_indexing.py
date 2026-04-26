@@ -27,17 +27,31 @@ def test_index_single_pdf(client, sample_pdf_path, test_collection):
 
 
 def test_index_stores_correct_metadata(client, sample_pdf_path, test_collection):
-    """Each chunk should have source, filename, and chunk index metadata."""
+    """Each chunk should carry the full metadata set: provenance, structural
+    classification, page range, and chunker/embedder version stamps."""
     client.post("/api/index-files", json={
         "paths": [str(sample_pdf_path)]
     })
 
     results = test_collection.get(include=["metadatas"])
+    assert results["metadatas"], "Expected at least one chunk"
     for metadata in results["metadatas"]:
+        # Provenance + system tagging
         assert "source" in metadata
         assert "filename" in metadata
         assert "chunk" in metadata
+        assert "game_system" in metadata
         assert metadata["filename"] == "dragonbane_monsters.pdf"
+        # Structural metadata from the structure-aware chunker
+        assert metadata["chunk_type"] in {"prose", "table", "heading", "list", "mixed"}
+        assert "section_heading" in metadata  # may be "" if before any heading
+        assert isinstance(metadata["page_start"], int)
+        assert isinstance(metadata["page_end"], int)
+        assert metadata["page_start"] >= 1
+        assert metadata["page_end"] >= metadata["page_start"]
+        # Version stamps for the diagnostics tab (#147)
+        assert metadata["chunker_version"] == "structure_aware-v1"
+        assert metadata["embedding_model"]
 
 
 def test_index_chunk_ids_follow_pattern(client, sample_pdf_path, test_collection):

@@ -308,14 +308,26 @@ def test_sync_update_with_fewer_chunks_removes_orphans(
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
 
-    # Create a PDF with lots of text (many chunks)
+    # Create a PDF with lots of text (many chunks).
+    # Multiple paragraphs separated by vertical gaps so pymupdf4llm emits
+    # `\n\n` blank lines and the structure-aware chunker can split there.
     pdf_path = tmp_path / "shrinking_book.pdf"
     c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    long_text = "The adventurer explores the dungeon corridors. " * 100
+    paragraphs = [
+        "The adventurer explores the dungeon corridors. " * 25,
+        "Spell components hide in the wizard's bottomless pouch. " * 25,
+        "The thief picks the lock with practiced fingers. " * 25,
+        "Dragons hoard their treasure for centuries on end. " * 25,
+    ]
     y = 750
-    for i in range(0, len(long_text), 80):
-        c.drawString(72, y, long_text[i:i + 80])
-        y -= 12
+    for paragraph in paragraphs:
+        for i in range(0, len(paragraph), 80):
+            c.drawString(72, y, paragraph[i:i + 80])
+            y -= 12
+            if y < 72:
+                c.showPage()
+                y = 750
+        y -= 24
         if y < 72:
             c.showPage()
             y = 750
