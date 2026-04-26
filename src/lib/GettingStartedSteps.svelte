@@ -61,7 +61,7 @@
               <span class="status-ok">Ready</span>
             {:else if ollamaRunning}
               <span class="status-partial">Ollama running — pull the embedding model:</span>
-              <code class="command">ollama pull nomic-embed-text</code>
+              <code class="command">ollama pull bge-m3</code>
             {:else}
               <span class="status-pending">Not detected — download from <strong>ollama.com</strong></span>
             {/if}
