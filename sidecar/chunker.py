@@ -16,7 +16,7 @@ from typing import Literal
 
 
 CHUNKER_VERSION = "structure_aware-v1"
-EMBEDDING_MODEL = "nomic-embed-text"
+EMBEDDING_MODEL = "bge-m3"
 SOFT_CAP = 1000
 HARD_CAP = 20000
 

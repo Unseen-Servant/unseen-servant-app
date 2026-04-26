@@ -17,11 +17,16 @@ you can ask a question during a session and get an answer instantly.
 2. Install the app:
    - **macOS:** Drag **Legend Lore** to your Applications folder
    - **Windows:** Run the installer and follow the prompts
-3. Install [Ollama](https://ollama.com) and pull the embedding model:
+3. Install [Ollama](https://ollama.com), pull the embedding model, and start
+   Ollama with the 8K context window the embedder needs:
 
    ```bash
-   ollama pull nomic-embed-text
+   ollama pull bge-m3
+   OLLAMA_CONTEXT_LENGTH=8192 ollama serve
    ```
+
+   `OLLAMA_CONTEXT_LENGTH` is required for the embedder to ingest full chunks —
+   without it Ollama silently truncates at 2048 tokens.
 
 4. Launch Legend Lore
    - The app runs in the menu bar / system tray — click the tray icon to show the window
@@ -171,7 +176,7 @@ machine. Paste it into your Claude Desktop config file.
 | Backend                 | Rust                                               | Ships with Tauri; safe filesystem access         |
 | Indexing sidecar        | Python + [FastAPI](https://fastapi.tiangolo.com)   | Mature PDF/ML ecosystem, managed by Tauri        |
 | Vector DB               | [ChromaDB](https://www.trychroma.com)              | Semantic search for PDF content                  |
-| Embeddings              | [Ollama](https://ollama.com) (nomic-embed-text)    | Local embeddings, no API keys needed             |
+| Embeddings              | [Ollama](https://ollama.com) (bge-m3)              | Local embeddings, no API keys needed             |
 | AI integration          | Claude via [MCP](https://modelcontextprotocol.io)  | Query your library in natural language           |
 
 ---
@@ -183,8 +188,8 @@ machine. Paste it into your Claude Desktop config file.
 - [Rust](https://www.rust-lang.org/tools/install)
 - Node.js 18+ (via [nvm](https://github.com/nvm-sh/nvm) or your preferred manager)
 - Python 3.10+ (via [pyenv](https://github.com/pyenv/pyenv) or system install)
-- [Ollama](https://ollama.com) with the `nomic-embed-text` model:
-  `ollama pull nomic-embed-text`
+- [Ollama](https://ollama.com) with the `bge-m3` model and an 8K context window:
+  `ollama pull bge-m3 && OLLAMA_CONTEXT_LENGTH=8192 ollama serve`
 
 ### macOS
 
@@ -223,8 +228,11 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cd ..
 
-# 4. Make sure Ollama is running with the embedding model
-ollama pull nomic-embed-text
+# 4. Make sure Ollama is running with the embedding model and an 8K context.
+#    OLLAMA_CONTEXT_LENGTH is required — without it Ollama silently
+#    truncates embeddings at 2048 tokens.
+ollama pull bge-m3
+OLLAMA_CONTEXT_LENGTH=8192 ollama serve
 
 # 5. Run in development mode (compiles Rust + starts frontend with HMR)
 npm run tauri dev
@@ -366,7 +374,7 @@ Tauri app launches
         ↓
   Sidecar extracts text (PyMuPDF) → chunks (1000 chars, 200 overlap)
         ↓
-  Embeds via Ollama (nomic-embed-text) → stores in ChromaDB
+  Embeds via Ollama (bge-m3) → stores in ChromaDB
         ↓
   Returns { indexed, total, errors } to Rust → Svelte
         ↓

@@ -337,7 +337,7 @@ async fn check_ollama_health() -> Result<OllamaStatus, String> {
             let has_model = tags
                 .models
                 .iter()
-                .any(|m| m.name.starts_with("nomic-embed-text"));
+                .any(|m| m.name.starts_with("bge-m3"));
             Ok(OllamaStatus {
                 running: true,
                 has_model,

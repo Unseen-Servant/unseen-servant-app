@@ -725,7 +725,7 @@ def create_app(collection=None, data_dir: Path | None = None):
         chroma_client = chromadb.PersistentClient(path=str(data_dir))
         ollama_ef = embedding_functions.OllamaEmbeddingFunction(
             url="http://localhost:11434/api/embeddings",
-            model_name="nomic-embed-text"
+            model_name="bge-m3"
         )
         collection = chroma_client.get_or_create_collection(
             name="ttrpg_docs",
