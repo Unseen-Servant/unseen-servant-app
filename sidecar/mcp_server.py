@@ -15,11 +15,25 @@ Usage:
 
 import argparse
 import random
+import re
 import sys
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts.base import UserMessage
+
+
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _strip_bold(s: str) -> str:
+    """Remove **...** wrapping from breadcrumb text for display.
+
+    pymupdf4llm captures headings as ``## **Goblin**`` so section_heading
+    carries bold markup. The embed pipeline keeps it intact (matches the
+    spike's measured baseline); display formatters strip it.
+    """
+    return _BOLD_RE.sub(r"\1", s)
 
 # ---------------------------------------------------------------------------
 # CLI arguments
@@ -176,7 +190,7 @@ async def search_library(
         lines.append(f"--- Result {i} (relevance: {r['relevance']}) ---")
         system_tag = r.get('game_system', 'unknown')
         lines.append(f"Source: {r['filename']} [{system_tag}]")
-        heading = r.get("section_heading") or "(no section)"
+        heading = _strip_bold(r.get("section_heading") or "") or "(no section)"
         page_start = r.get("page_start")
         page_end = r.get("page_end")
         if page_start and page_end:
