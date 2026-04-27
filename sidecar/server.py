@@ -413,6 +413,37 @@ def _chunk_metadata(pdf_path: Path, chunk: Chunk, game_system: str) -> dict:
     }
 
 
+def _embed_text(chunk: Chunk) -> str:
+    """Heading-prepended text for embedding (storage of chunk.text unchanged).
+
+    hybrid_retrieval_spike measured +0.184 MRR@5 / +0.150 recall@5 from this
+    one change: embedding sees the section_heading breadcrumb as topical
+    context for the chunk body. The stored document remains chunk.text so
+    search results return content as-is — section_heading is already in
+    metadata for callers that want to display it.
+    """
+    if chunk.section_heading:
+        return f"{chunk.section_heading}\n\n{chunk.text}"
+    return chunk.text
+
+
+def _upsert_batch(
+    collection,
+    batch: list[Chunk],
+    pdf_path: Path,
+    game_system: str,
+    prefix: str,
+) -> None:
+    """Pre-compute heading-prepended embeddings then upsert with stored text."""
+    embeddings = collection._embedding_function([_embed_text(c) for c in batch])
+    collection.upsert(
+        embeddings=embeddings,
+        documents=[c.text for c in batch],
+        metadatas=[_chunk_metadata(pdf_path, c, game_system) for c in batch],
+        ids=[f"{prefix}_{c.ordinal}" for c in batch],
+    )
+
+
 def _extract_and_chunk(
     pdf_path: Path, game_system: str | None,
     known_systems: dict[str, list[str]] | None,
@@ -458,11 +489,7 @@ def index_single_pdf(
     batch_size = 100
     for batch_idx in range(0, len(chunks), batch_size):
         batch = chunks[batch_idx:batch_idx + batch_size]
-        collection.upsert(
-            documents=[c.text for c in batch],
-            metadatas=[_chunk_metadata(pdf_path, c, resolved_system) for c in batch],
-            ids=[f"{prefix}_{c.ordinal}" for c in batch],
-        )
+        _upsert_batch(collection, batch, pdf_path, resolved_system, prefix)
 
     return len(chunks), None, resolved_system
 
@@ -996,11 +1023,7 @@ def create_app(
                 while batch_idx < len(chunks):
                     batch_size = random.randint(80, 120)
                     batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    collection.upsert(
-                        documents=[c.text for c in batch_chunks],
-                        metadatas=[_chunk_metadata(pdf_path, c, detected_system) for c in batch_chunks],
-                        ids=[f"{prefix}_{c.ordinal}" for c in batch_chunks],
-                    )
+                    _upsert_batch(collection, batch_chunks, pdf_path, detected_system, prefix)
                     chunks_total += len(batch_chunks)
                     batch_idx += len(batch_chunks)
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
@@ -1040,11 +1063,7 @@ def create_app(
                 while batch_idx < len(chunks):
                     batch_size = random.randint(80, 120)
                     batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    collection.upsert(
-                        documents=[c.text for c in batch_chunks],
-                        metadatas=[_chunk_metadata(pdf_path, c, detected_system) for c in batch_chunks],
-                        ids=[f"{prefix}_{c.ordinal}" for c in batch_chunks],
-                    )
+                    _upsert_batch(collection, batch_chunks, pdf_path, detected_system, prefix)
                     chunks_total += len(batch_chunks)
                     batch_idx += len(batch_chunks)
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
