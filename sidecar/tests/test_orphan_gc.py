@@ -10,11 +10,14 @@ from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from fastapi.testclient import TestClient
 import pytest
 
+from granularity import ParentDoc
+from parents_store import upsert_parents, clear_all_parents
 from server import (
     _UUID_DIR_RE,
     _live_segment_ids,
     _segment_ids_for_collection,
     _remove_segment_dir,
+    compact_sqlite,
     create_app,
     gc_orphan_segments,
 )
@@ -186,6 +189,43 @@ def test_delete_index_removes_old_segment_dir(persistent_setup):
     surviving = {d.name for d in _uuid_dirs(data_dir)}
     leaked = surviving & old_segment_dirs
     assert not leaked, f"Delete-index leaked segment dirs: {leaked}"
+
+
+def test_compact_sqlite_vacuums_parents_store(tmp_path):
+    """compact_sqlite should reclaim tombstoned pages from parents.sqlite3
+    too — not just chroma.sqlite3. clear_all_parents leaves the file sized
+    by its previous high-water mark until VACUUM runs.
+    """
+    parents = [
+        ParentDoc(
+            parent_id=f"p_{i}",
+            text="x" * 4000,
+            section_heading=f"Section {i}",
+            chunk_type="prose",
+            source_pdf="big.pdf",
+            page_start=i,
+            page_end=i,
+        )
+        for i in range(500)
+    ]
+    upsert_parents(tmp_path, "/path/to/big.pdf", parents)
+    bloated = (tmp_path / "parents.sqlite3").stat().st_size
+    clear_all_parents(tmp_path)
+    after_clear = (tmp_path / "parents.sqlite3").stat().st_size
+    # Without VACUUM, deleted rows leave the file at its high-water mark.
+    assert after_clear >= bloated * 0.5, (
+        "Sanity check: clear_all_parents alone should NOT shrink the file"
+    )
+
+    reclaimed = compact_sqlite(tmp_path)
+    after_compact = (tmp_path / "parents.sqlite3").stat().st_size
+    assert reclaimed > 0
+    assert after_compact < after_clear
+
+
+def test_compact_sqlite_handles_missing_files(tmp_path):
+    # No databases yet — should be a no-op without raising.
+    assert compact_sqlite(tmp_path) == 0
 
 
 def test_compact_endpoint_runs_orphan_gc(persistent_setup):

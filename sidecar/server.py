@@ -607,23 +607,29 @@ def prepare_pdf(
 
 
 def compact_sqlite(data_dir: Path) -> int:
-    """Run VACUUM on the ChromaDB SQLite database to reclaim disk space.
+    """VACUUM the ChromaDB and parents SQLite databases.
 
-    Returns bytes reclaimed, or 0 if compaction was skipped.
+    Both stores accumulate tombstoned pages on every delete-index or
+    re-index cycle; SQLite doesn't reclaim that space without VACUUM.
+
+    Returns total bytes reclaimed across both files (0 if neither exists).
     """
     if not data_dir:
         return 0
-    sqlite_path = data_dir / "chroma.sqlite3"
-    if not sqlite_path.exists():
-        return 0
-
     import sqlite3
-
-    size_before = os.path.getsize(sqlite_path)
-    conn = sqlite3.connect(str(sqlite_path))
-    conn.execute("VACUUM")
-    conn.close()
-    return size_before - os.path.getsize(sqlite_path)
+    reclaimed = 0
+    for name in ("chroma.sqlite3", "parents.sqlite3"):
+        path = data_dir / name
+        if not path.exists():
+            continue
+        size_before = os.path.getsize(path)
+        conn = sqlite3.connect(str(path))
+        try:
+            conn.execute("VACUUM")
+        finally:
+            conn.close()
+        reclaimed += size_before - os.path.getsize(path)
+    return reclaimed
 
 
 # UUID-named segment directories created by Chroma's HNSW persistence.
@@ -1775,7 +1781,7 @@ def create_app(
 
         return {
             "size_before": size_before,
-            "size_after": size_before - sqlite_reclaimed,
+            "size_after": os.path.getsize(sqlite_path),
             "reclaimed": sqlite_reclaimed + orphan_reclaimed,
         }
 
