@@ -626,6 +626,92 @@ def compact_sqlite(data_dir: Path) -> int:
     return size_before - os.path.getsize(sqlite_path)
 
 
+# UUID-named segment directories created by Chroma's HNSW persistence.
+_UUID_DIR_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _live_segment_ids(data_dir: Path) -> set[str]:
+    """Read live segment UUIDs from chroma.sqlite3.
+
+    Returns an empty set if the database doesn't exist (fresh install).
+    """
+    sqlite_path = data_dir / "chroma.sqlite3"
+    if not sqlite_path.exists():
+        return set()
+    import sqlite3
+    conn = sqlite3.connect(str(sqlite_path))
+    try:
+        rows = conn.execute("SELECT id FROM segments").fetchall()
+    finally:
+        conn.close()
+    return {r[0] for r in rows}
+
+
+def _segment_ids_for_collection(data_dir: Path, collection_name: str) -> list[str]:
+    """Return segment UUIDs belonging to a named Chroma collection."""
+    sqlite_path = data_dir / "chroma.sqlite3"
+    if not sqlite_path.exists():
+        return []
+    import sqlite3
+    conn = sqlite3.connect(str(sqlite_path))
+    try:
+        rows = conn.execute(
+            "SELECT s.id FROM segments s "
+            "JOIN collections c ON s.collection = c.id "
+            "WHERE c.name = ?",
+            (collection_name,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [r[0] for r in rows]
+
+
+def _remove_segment_dir(data_dir: Path, segment_id: str) -> int:
+    """Remove a single segment directory if it exists. Returns bytes freed.
+
+    UUID-pattern check guards against rmtree on unrelated paths if Chroma's
+    segment id format ever drifts.
+    """
+    if not _UUID_DIR_RE.match(segment_id):
+        return 0
+    seg_dir = data_dir / segment_id
+    if not seg_dir.is_dir():
+        return 0
+    import shutil
+    size = sum(p.stat().st_size for p in seg_dir.rglob("*") if p.is_file())
+    shutil.rmtree(seg_dir, ignore_errors=True)
+    return size
+
+
+def gc_orphan_segments(data_dir: Path) -> int:
+    """Remove UUID-named segment directories not referenced by any live segment.
+
+    Chroma's ``delete_collection`` only removes metadata rows from
+    ``chroma.sqlite3``; the on-disk segment directories are left behind.
+    Each call to ``/api/delete-index`` therefore leaks ~250 MB on a typical
+    library. This helper walks ``data_dir`` for UUID-named directories and
+    removes any whose UUID is not in ``segments.id``.
+
+    Returns bytes reclaimed.
+    """
+    if not data_dir or not data_dir.is_dir():
+        return 0
+    live = _live_segment_ids(data_dir)
+    reclaimed = 0
+    for entry in data_dir.iterdir():
+        if not entry.is_dir():
+            continue
+        if not _UUID_DIR_RE.match(entry.name):
+            continue
+        if entry.name in live:
+            continue
+        reclaimed += _remove_segment_dir(data_dir, entry.name)
+    return reclaimed
+
+
 def delete_source_chunks(
     source_path: str, collection, data_dir: Path | None = None
 ) -> int:
@@ -876,6 +962,9 @@ def create_app(
         data_dir.mkdir(parents=True, exist_ok=True)
 
         chroma_client = chromadb.PersistentClient(path=str(data_dir))
+        reclaimed = gc_orphan_segments(data_dir)
+        if reclaimed > 0:
+            print(f"[gc] removed orphan segment dirs: {reclaimed:,} bytes reclaimed")
         embedding_function = embedding_functions.OllamaEmbeddingFunction(
             url="http://localhost:11434/api/embeddings",
             model_name="bge-m3"
@@ -1343,11 +1432,21 @@ def create_app(
 
             if chroma_client is not None:
                 collection_name = collection.name
+                # Capture segment dir UUIDs before delete_collection wipes them
+                # from sqlite — Chroma only removes metadata rows, not the
+                # on-disk dirs, so we have to rmtree them ourselves.
+                old_segment_ids = (
+                    _segment_ids_for_collection(data_dir, collection_name)
+                    if data_dir else []
+                )
                 chroma_client.delete_collection(name=collection_name)
                 collection = chroma_client.get_or_create_collection(
                     name=collection_name,
                     embedding_function=embedding_function,
                 )
+                if data_dir:
+                    for sid in old_segment_ids:
+                        _remove_segment_dir(data_dir, sid)
             elif removed_chunks:
                 # Test path without an injected chroma_client — the dim is
                 # fixed by the fixture and never changes, so row-delete is
@@ -1653,7 +1752,12 @@ def create_app(
 
     @app.post("/api/compact")
     async def compact_database():
-        """Compact the ChromaDB database to reclaim disk space."""
+        """Compact the ChromaDB database to reclaim disk space.
+
+        VACUUMs ``chroma.sqlite3`` and removes any orphan segment dirs left
+        behind by previous ``delete_collection`` calls (Chroma's behavior:
+        metadata rows are removed but on-disk dirs are not).
+        """
         if not data_dir:
             raise HTTPException(
                 status_code=500, detail="No data directory configured"
@@ -1666,12 +1770,13 @@ def create_app(
             )
 
         size_before = os.path.getsize(sqlite_path)
-        reclaimed = compact_sqlite(data_dir)
+        sqlite_reclaimed = compact_sqlite(data_dir)
+        orphan_reclaimed = gc_orphan_segments(data_dir)
 
         return {
             "size_before": size_before,
-            "size_after": size_before - reclaimed,
-            "reclaimed": reclaimed,
+            "size_after": size_before - sqlite_reclaimed,
+            "reclaimed": sqlite_reclaimed + orphan_reclaimed,
         }
 
     @app.get("/api/sources")
