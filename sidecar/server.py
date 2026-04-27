@@ -150,13 +150,19 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     pymupdf (opened via `fitz`/`pymupdf.open`) also accepts
     .txt/.epub/.xps/.cbz silently; restrict to PDFs to match the
     documented API surface.
+
+    OCR is disabled (`use_ocr=False`): pymupdf4llm otherwise runs Tesseract
+    on any page whose text layer it deems unreliable, which dominates
+    extraction time on large PDFs. TTRPG rulebooks are overwhelmingly
+    digital-native, so the cost rarely buys anything. Scanned or
+    OCR-needing PDFs will index with empty/sparse text on those pages.
     """
     if pdf_path.suffix.lower() != ".pdf":
         raise ValueError(f"Not a PDF: {pdf_path.name}")
     raw_pages: list[tuple[int, str]] = []
     with pymupdf.open(pdf_path) as doc:
         for i in range(doc.page_count):
-            md = pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False)
+            md = pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False, use_ocr=False)
             if md:
                 raw_pages.append((i + 1, md))
     if not raw_pages:
