@@ -14,8 +14,11 @@ from granularity import ParentDoc
 from parents_store import upsert_parents, clear_all_parents
 from server import (
     _UUID_DIR_RE,
+    _compute_reclaimable_bytes,
     _live_segment_ids,
+    _orphan_segment_bytes,
     _segment_ids_for_collection,
+    _sqlite_freelist_bytes,
     _remove_segment_dir,
     compact_sqlite,
     create_app,
@@ -226,6 +229,84 @@ def test_compact_sqlite_vacuums_parents_store(tmp_path):
 def test_compact_sqlite_handles_missing_files(tmp_path):
     # No databases yet — should be a no-op without raising.
     assert compact_sqlite(tmp_path) == 0
+
+
+def test_reclaimable_bytes_sums_all_sources(tmp_path):
+    """``/api/stats`` should report freelist from BOTH sqlite stores plus any
+    orphan segment dirs — that's the set of bytes a Compact would actually
+    recover. Pre-fix, only chroma.sqlite3 was counted, so the UI hid the
+    Compact button whenever the user only had parents-store churn or
+    orphan dirs.
+    """
+    parents = [
+        ParentDoc(
+            parent_id=f"p_{i}",
+            text="x" * 4000,
+            section_heading=f"S{i}",
+            chunk_type="prose",
+            source_pdf="big.pdf",
+            page_start=i,
+            page_end=i,
+        )
+        for i in range(500)
+    ]
+    upsert_parents(tmp_path, "/path/to/big.pdf", parents)
+    clear_all_parents(tmp_path)
+    parents_freelist = _sqlite_freelist_bytes(tmp_path / "parents.sqlite3")
+    assert parents_freelist > 0, "Setup should leave reclaimable pages"
+
+    fake = tmp_path / FAKE_UUID
+    fake.mkdir()
+    (fake / "data_level0.bin").write_bytes(b"q" * 12_345)
+
+    reclaimable = _compute_reclaimable_bytes(tmp_path)
+    assert reclaimable >= parents_freelist + 12_345
+
+
+def test_reclaimable_bytes_zero_when_clean(tmp_path):
+    assert _compute_reclaimable_bytes(tmp_path) == 0
+
+
+def test_orphan_segment_bytes_only_counts_orphans(persistent_setup):
+    data_dir, _, _, _ = persistent_setup
+    assert _orphan_segment_bytes(data_dir) == 0  # only live segments
+    fake = data_dir / FAKE_UUID
+    fake.mkdir()
+    (fake / "data_level0.bin").write_bytes(b"r" * 9_000)
+    assert _orphan_segment_bytes(data_dir) >= 9_000
+
+
+def test_stats_endpoint_reports_combined_reclaimable(tmp_path):
+    """End-to-end: /api/stats reflects the sum across all sources."""
+    client = chromadb.PersistentClient(path=str(tmp_path))
+    embed_fn = DefaultEmbeddingFunction()
+    collection = client.get_or_create_collection(
+        name="ttrpg_docs", embedding_function=embed_fn
+    )
+    collection.add(
+        ids=["seed-0"],
+        documents=["seed"],
+        metadatas=[{"filename": "x.pdf"}],
+    )
+
+    parents = [
+        ParentDoc(
+            parent_id=f"p_{i}", text="y" * 4000, section_heading=None,
+            chunk_type="prose", source_pdf="x.pdf", page_start=i, page_end=i,
+        )
+        for i in range(200)
+    ]
+    upsert_parents(tmp_path, "/x.pdf", parents)
+    clear_all_parents(tmp_path)
+
+    app = create_app(
+        collection=collection, data_dir=tmp_path,
+        chroma_client=client, embedding_function=embed_fn,
+    )
+    test_client = TestClient(app)
+    body = test_client.get("/api/stats").json()
+    assert body["reclaimable_bytes"] >= _sqlite_freelist_bytes(tmp_path / "parents.sqlite3")
+    assert body["reclaimable_bytes"] > 0
 
 
 def test_compact_endpoint_runs_orphan_gc(persistent_setup):

@@ -692,6 +692,53 @@ def _remove_segment_dir(data_dir: Path, segment_id: str) -> int:
     return size
 
 
+def _sqlite_freelist_bytes(sqlite_path: Path) -> int:
+    """Return bytes that ``VACUUM`` would reclaim from a SQLite database."""
+    if not sqlite_path.exists():
+        return 0
+    import sqlite3
+    conn = sqlite3.connect(str(sqlite_path))
+    try:
+        page_size = conn.execute("PRAGMA page_size").fetchone()[0]
+        freelist = conn.execute("PRAGMA freelist_count").fetchone()[0]
+    finally:
+        conn.close()
+    return page_size * freelist
+
+
+def _orphan_segment_bytes(data_dir: Path) -> int:
+    """Return total bytes in UUID-named segment dirs not referenced by any
+    live segment. Read-only counterpart of ``gc_orphan_segments``.
+    """
+    if not data_dir or not data_dir.is_dir():
+        return 0
+    live = _live_segment_ids(data_dir)
+    total = 0
+    for entry in data_dir.iterdir():
+        if not entry.is_dir() or not _UUID_DIR_RE.match(entry.name):
+            continue
+        if entry.name in live:
+            continue
+        total += sum(p.stat().st_size for p in entry.rglob("*") if p.is_file())
+    return total
+
+
+def _compute_reclaimable_bytes(data_dir: Path | None) -> int:
+    """Bytes that ``/api/compact`` would reclaim if invoked right now.
+
+    Sum of: chroma.sqlite3 freelist + parents.sqlite3 freelist + orphan
+    segment dir bytes. Powers the UI's gating on whether to surface the
+    Compact button.
+    """
+    if not data_dir:
+        return 0
+    return (
+        _sqlite_freelist_bytes(data_dir / "chroma.sqlite3")
+        + _sqlite_freelist_bytes(data_dir / "parents.sqlite3")
+        + _orphan_segment_bytes(data_dir)
+    )
+
+
 def gc_orphan_segments(data_dir: Path) -> int:
     """Remove UUID-named segment directories not referenced by any live segment.
 
@@ -1734,17 +1781,11 @@ def create_app(
                     for f in filenames:
                         storage_bytes += os.path.getsize(os.path.join(dirpath, f))
 
-            # Calculate reclaimable space from SQLite freelist
-            reclaimable_bytes = 0
-            if data_dir:
-                sqlite_path = data_dir / "chroma.sqlite3"
-                if sqlite_path.exists():
-                    import sqlite3
-                    conn = sqlite3.connect(str(sqlite_path))
-                    page_size = conn.execute("PRAGMA page_size").fetchone()[0]
-                    freelist = conn.execute("PRAGMA freelist_count").fetchone()[0]
-                    conn.close()
-                    reclaimable_bytes = page_size * freelist
+            # Calculate reclaimable space: SQLite freelist pages across both
+            # stores + bytes locked up in orphan segment dirs. Mirrors what
+            # `/api/compact` actually reclaims, so the UI's "Compact" button
+            # only appears when there's something to recover.
+            reclaimable_bytes = _compute_reclaimable_bytes(data_dir)
 
             return {
                 "total_chunks": count,
