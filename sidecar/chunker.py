@@ -26,39 +26,6 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
 _PAGE_MARKER_RE = re.compile(r"^<!--\s*page\s+(\d+)\s*-->\s*$")
 
-# Stat-block sub-section labels that pymupdf4llm renders as `##` headings
-# (often `## **ACTIONS**` on Black-Flag, `## Actions` on SRD). They are
-# semantically *part of* the monster they describe, not siblings of it,
-# so they must not pop the parent heading or split the chunk — otherwise
-# searching "Goblin attack bonus" returns the Actions block detached
-# from its monster context.
-#
-# Detection is on normalized text (lowercased, **bold** stripped, trimmed)
-# so it matches both `## Actions` and `## **ACTIONS**`. New publishers
-# may need additions; the default set covers the WotC SRD / Black-Flag /
-# common 5E stat-block conventions.
-_NON_BREAKING_HEADINGS: frozenset[str] = frozenset({
-    "actions",
-    "bonus actions",
-    "reactions",
-    "legendary actions",
-    "lair actions",
-    "mythic actions",
-    "villain actions",
-    "traits",
-    "special traits",
-    "spellcasting",
-    "innate spellcasting",
-    "equipment",
-})
-
-_BOLD_STRIP_RE = re.compile(r"\*\*(.+?)\*\*")
-
-
-def _is_non_breaking_heading(text: str) -> bool:
-    normalized = _BOLD_STRIP_RE.sub(r"\1", text).strip().lower()
-    return normalized in _NON_BREAKING_HEADINGS
-
 
 @dataclass(frozen=True)
 class PageMarkdown:
@@ -212,17 +179,6 @@ def structure_aware(
             if hm:
                 level = len(hm.group(1))
                 text = hm.group(2).strip()
-                # Stat-block sub-sections (Actions, Reactions, Spellcasting,
-                # …) are semantically part of the parent monster — keep
-                # them as inline body so the chunk and breadcrumb stay
-                # anchored to the monster.
-                if _is_non_breaking_heading(text):
-                    if buffer_page_start is None:
-                        buffer_page_start = current_page
-                    buffer_page_end = current_page
-                    buffer_lines.append(line)
-                    i += 1
-                    continue
                 flush_prose()
                 while heading_stack and heading_stack[-1][0] >= level:
                     heading_stack.pop()

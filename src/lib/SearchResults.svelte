@@ -82,11 +82,17 @@
   }
 
   // pymupdf4llm captures headings as `## **Goblin**`, so the breadcrumb
-  // text carries the bold markup. Strip for the meta-row display only —
-  // the embedding pipeline keeps the original (the +0.184 MRR uplift
+  // text carries the bold markup. Strip for display only — the
+  // embedding pipeline keeps the original (the +0.184 MRR uplift
   // from heading-prepend was measured with the asterisks present).
   function stripBold(s: string): string {
     return s.replace(/\*\*(.+?)\*\*/g, '$1');
+  }
+
+  // Chunker breadcrumbs join ancestors with " > ". Split for per-segment
+  // styling and clean wrapping at separators.
+  function breadcrumbSegments(s: string): string[] {
+    return s.split(' > ').map(stripBold).filter(Boolean);
   }
 </script>
 
@@ -115,6 +121,17 @@
       >
         <span class="chevron" aria-hidden="true">{expanded.has(i) ? '⌄' : '›'}</span>
         <div class="result-body">
+          {#if result.section_heading}
+            {@const segments = breadcrumbSegments(result.section_heading)}
+            {#if segments.length > 0}
+              <div class="breadcrumb" aria-label="Section path">
+                {#each segments as segment, idx (idx)}
+                  {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
+                  <span class="bc-segment">{segment}</span>
+                {/each}
+              </div>
+            {/if}
+          {/if}
           <div class="snippet-wrap">
             <div
               class="snippet"
@@ -129,7 +146,7 @@
           </div>
           <div class="meta-row">
             <span class="meta-text">
-              {result.filename} · {result.game_system}{result.section_heading ? ` · ${stripBold(result.section_heading)}` : ''}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
+              {result.filename} · {result.game_system}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
             </span>
           </div>
         </div>
@@ -270,6 +287,33 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .breadcrumb {
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.3rem;
+    line-height: 1.35;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.3rem;
+    row-gap: 0.1rem;
+  }
+
+  .bc-segment {
+    word-break: break-word;
+  }
+
+  .bc-segment:last-child {
+    color: var(--text-primary);
+  }
+
+  .bc-sep {
+    color: var(--border-subtle);
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .snippet-wrap {

@@ -1,15 +1,21 @@
 """Post-extraction cleanup rules for pymupdf4llm Markdown.
 
-Three rules, validated by the extraction_quality_spike (sibling repo
-unseen-legend-lore-experiments) and applied between
-``pymupdf4llm.to_markdown()`` and the chunker:
+Four rules, applied between ``pymupdf4llm.to_markdown()`` (with
+heading-hierarchy promotion) and the chunker:
 
   R1 — rejoin per-word fragments separated by bare ``\\r`` (narrow
        two-column layouts; SRD).
   R2 — strip running headers/footers detected by zone-anchored
-       frequency rule plus a tail-zone structural backstop.
+       paragraph-frequency rule plus a tail-zone structural backstop.
   R3 — strip pymupdf4llm's literal image placeholders and unwrap
        picture-text marker pairs.
+  R4 — strip cross-page recurring head/tail-zone heading lines
+       (e.g. ``## BASIC FANTASY RPG`` chrome that pymupdf4llm emits
+       as a heading rather than a paragraph; R2 skips heading lines
+       so this rule is its mirror for ``^#+\\s+`` chrome).
+
+R1, R2, R3 validated by the extraction_quality_spike. R4 added in
+issue #157 alongside heading-hierarchy promotion adoption.
 
 Cleanup operates on Markdown content only. Page provenance
 (``page_start`` / ``page_end``) is set per-page during extraction and
@@ -212,6 +218,110 @@ def strip_running_elements(
     return out_pages, stripped
 
 
+# ─────────────────────────── R4 ───────────────────────────
+
+_HEADING_LINE_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+_HEAD_LINES_ZONE = 5
+_TAIL_LINES_ZONE = 5
+
+
+@dataclass(frozen=True)
+class RunningHeading:
+    zone: str
+    normalized: str
+    pages_seen: int
+
+
+def _heading_zoned_candidates(md: str) -> list[tuple[str, int, str]]:
+    """Yield (zone, line_index, heading_text) for head/tail heading lines.
+
+    Inspects the first ``_HEAD_LINES_ZONE`` and last ``_TAIL_LINES_ZONE``
+    non-blank lines for ``^#+\\s+...$`` patterns. Line-scoped (not
+    paragraph-scoped) because pymupdf4llm's heading-as-chrome leaks
+    appear as standalone heading lines, not embedded in paragraphs.
+    """
+    lines = md.split("\n")
+    out: list[tuple[str, int, str]] = []
+    head_seen = 0
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+        m = _HEADING_LINE_RE.match(line)
+        if m:
+            out.append(("head", i, m.group(1).strip()))
+        head_seen += 1
+        if head_seen >= _HEAD_LINES_ZONE:
+            break
+    tail_seen = 0
+    for i in range(len(lines) - 1, -1, -1):
+        if not lines[i].strip():
+            continue
+        m = _HEADING_LINE_RE.match(lines[i])
+        if m:
+            out.append(("tail", i, m.group(1).strip()))
+        tail_seen += 1
+        if tail_seen >= _TAIL_LINES_ZONE:
+            break
+    return out
+
+
+def detect_running_headings(
+    pages_markdown: list[str],
+    threshold: float = _DEFAULT_THRESHOLD,
+) -> list[RunningHeading]:
+    """Detect normalized heading text repeating in the same head/tail
+    zone across ``>= threshold`` of pages. Pure detection — does not
+    modify input. Reuses R2's ``_normalize`` for digit-substitution.
+    """
+    counts: Counter[tuple[str, str]] = Counter()
+    page_count = len(pages_markdown)
+    if page_count == 0:
+        return []
+    for md in pages_markdown:
+        seen_in_page: set[tuple[str, str]] = set()
+        for zone, _idx, text in _heading_zoned_candidates(md):
+            key = (zone, _normalize(text))
+            if key in seen_in_page:
+                continue
+            seen_in_page.add(key)
+            counts[key] += 1
+    cutoff = max(2, int(page_count * threshold))
+    return [
+        RunningHeading(zone=zone, normalized=norm, pages_seen=n)
+        for (zone, norm), n in counts.items()
+        if n >= cutoff
+    ]
+
+
+def strip_running_headings(
+    pages_markdown: list[str],
+    running: list[RunningHeading],
+) -> tuple[list[str], int]:
+    """Drop matching head/tail-zone heading lines per page.
+
+    Returns ``(cleaned_pages, total_lines_stripped)``. Pages re-join
+    with ``\\n`` (line-scoped operation, unlike R2's paragraph rejoin).
+    """
+    by_zone: dict[str, set[str]] = {}
+    for elt in running:
+        by_zone.setdefault(elt.zone, set()).add(elt.normalized)
+    out_pages: list[str] = []
+    stripped = 0
+    for md in pages_markdown:
+        drop_indices: set[int] = set()
+        for zone, idx, text in _heading_zoned_candidates(md):
+            if _normalize(text) in by_zone.get(zone, set()):
+                drop_indices.add(idx)
+        if not drop_indices:
+            out_pages.append(md)
+            continue
+        lines = md.split("\n")
+        kept = [l for i, l in enumerate(lines) if i not in drop_indices]
+        stripped += len(drop_indices)
+        out_pages.append("\n".join(kept))
+    return out_pages, stripped
+
+
 # ─────────────────────────── orchestration ───────────────────────────
 
 
@@ -219,19 +329,26 @@ def strip_running_elements(
 class CleanupReport:
     cr_substitutions: int = 0
     paragraphs_stripped: int = 0
+    headings_stripped: int = 0
     images_omitted_stripped: int = 0
     picture_text_unwrapped: int = 0
     running_elements: tuple[RunningElement, ...] = field(default_factory=tuple)
+    running_headings: tuple[RunningHeading, ...] = field(default_factory=tuple)
 
     def summary(self) -> str:
         elts = ", ".join(
             f"{e.zone}:{e.normalized!r}({e.pages_seen})"
             for e in sorted(self.running_elements, key=lambda r: -r.pages_seen)
         )
+        head_elts = ", ".join(
+            f"{h.zone}:{h.normalized!r}({h.pages_seen})"
+            for h in sorted(self.running_headings, key=lambda r: -r.pages_seen)
+        )
         return (
             f"R1 cr_subs={self.cr_substitutions} | "
             f"R2 stripped={self.paragraphs_stripped} elts=[{elts}] | "
-            f"R3 omitted={self.images_omitted_stripped} unwrapped={self.picture_text_unwrapped}"
+            f"R3 omitted={self.images_omitted_stripped} unwrapped={self.picture_text_unwrapped} | "
+            f"R4 stripped={self.headings_stripped} elts=[{head_elts}]"
         )
 
 
@@ -239,12 +356,14 @@ def clean_pages(
     pages_markdown: list[str],
     threshold: float = _DEFAULT_THRESHOLD,
 ) -> tuple[list[str], CleanupReport]:
-    """Run R1 → R3 → R2 in order on a per-page Markdown list.
+    """Run R1 → R3 → R4 → R2 in order on a per-page Markdown list.
 
     Order is load-bearing: R1 first because CR-fragmented content
-    would otherwise interrupt R3's literal patterns; R3 before R2
-    because stripping image-placeholder paragraphs yields cleaner
-    head/tail-zone candidates for R2.
+    would otherwise interrupt R3's literal patterns; R3 before the
+    cross-page passes because stripping image-placeholder paragraphs
+    yields cleaner head/tail-zone candidates. R4 before R2 keeps the
+    two cross-page passes adjacent (same zone semantics, different
+    element types).
     """
     cr_total = 0
     omitted_total = 0
@@ -257,13 +376,17 @@ def clean_pages(
         omitted_total += n_omit
         unwrapped_total += n_unwrap
         after_r1r3.append(md)
-    running = detect_running_elements(after_r1r3, threshold=threshold)
-    cleaned, stripped = strip_running_elements(after_r1r3, running)
+    running_headings = detect_running_headings(after_r1r3, threshold=threshold)
+    after_r4, headings_stripped = strip_running_headings(after_r1r3, running_headings)
+    running = detect_running_elements(after_r4, threshold=threshold)
+    cleaned, stripped = strip_running_elements(after_r4, running)
     report = CleanupReport(
         cr_substitutions=cr_total,
         paragraphs_stripped=stripped,
+        headings_stripped=headings_stripped,
         images_omitted_stripped=omitted_total,
         picture_text_unwrapped=unwrapped_total,
         running_elements=tuple(running),
+        running_headings=tuple(running_headings),
     )
     return cleaned, report

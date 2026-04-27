@@ -12,6 +12,7 @@ from chunker import (
     PageMarkdown,
     structure_aware,
 )
+from promote_headings import promote_markdown
 
 
 def _page(n: int, md: str) -> PageMarkdown:
@@ -180,76 +181,68 @@ def test_chunks_before_first_heading_have_no_breadcrumb():
     assert chunks[0].section_heading is None
 
 
-# ─────────────────── stat-block sub-section exemptions ───────────────────
+# ─────────────────── promotion → chunker integration ───────────────────
 
 
-def test_actions_subheading_does_not_break_monster_chunk():
-    """`## Actions` after `## Goblin` must stay anchored to the Goblin
-    breadcrumb so searches for "Goblin attack bonus" surface a parent
-    that contains both the description and the attack list."""
+def test_promotion_anchors_stat_block_subsection_to_parent():
+    """Stat-block sub-sections (Actions, Legendary Actions, …) lose
+    their parent monster breadcrumb when emitted as flat ``##``. With
+    heading-hierarchy promotion (issue #157), a font-size hierarchy
+    on the page promotes the parent monster to ``##`` and the
+    sub-section to ``###``, so the chunker's heading stack keeps the
+    monster in scope.
+
+    This test replaces the PR #155 hardcoded-exemption mechanism
+    tests: behavior preserved (sub-section anchored to parent)
+    via a different, scaling mechanism (font-cluster promotion).
+
+    Fixture mirrors a multi-monster stat-block page: one chapter-
+    title heading at the largest font, multiple monster-name
+    headings at the modal font (so they constitute the modal
+    cluster), and per-monster sub-section headings at the smaller
+    font.
+    """
     md = (
-        "## Goblin\n\nA cowardly humanoid raider.\n\n"
-        "## Actions\n\n"
-        "Scimitar. Melee Weapon Attack: +4 to hit.\n\n"
-        "Shortbow. Ranged Weapon Attack: +4 to hit."
+        "## Monsters\n\nThe creatures of the world.\n\n"
+        "## Solar\n\nA solar is a celestial of unmatched might.\n\n"
+        "## Legendary Actions\n\n"
+        "The solar can take 3 legendary actions per round.\n\n"
+        "## Kraken\n\nA kraken is a sea behemoth.\n\n"
+        "## Legendary Actions\n\nThe kraken can submerge.\n\n"
+        "## Lich\n\nA lich is an undead spellcaster."
     )
-    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
-    assert all(c.section_heading == "Goblin" for c in chunks)
-    body = "\n\n".join(c.text for c in chunks)
-    assert "cowardly humanoid raider" in body
-    assert "Scimitar" in body
-    assert "Shortbow" in body
-
-
-def test_bold_wrapped_actions_heading_also_exempt():
-    """Black-Flag's pymupdf4llm output renders the heading as
-    `## **ACTIONS**` — the same exemption applies after stripping
-    bold + lowercasing."""
-    md = (
-        "## Goblin\n\nThe goblin.\n\n"
-        "## **ACTIONS**\n\nAttack details."
+    pages = [{"page_number": 1, "markdown": md}]
+    spans_pages = [{
+        "page_number": 1,
+        "spans": [
+            # Monsters at the largest font → level 1 (chapter title)
+            {"text": "Monsters", "size": 24.0, "bold": True},
+            # Three monster names at the modal font (count = 3) → level 2
+            {"text": "Solar", "size": 18.0, "bold": True},
+            {"text": "Kraken", "size": 18.0, "bold": True},
+            {"text": "Lich", "size": 18.0, "bold": True},
+            # Two sub-section labels at smaller font (count = 2) → level 3
+            {"text": "Legendary Actions", "size": 12.0, "bold": True},
+            {"text": "Legendary Actions", "size": 12.0, "bold": True},
+        ],
+    }]
+    toc = {"entries": []}
+    promoted, _report = promote_markdown(
+        pages, spans_pages, toc, strategy="toc_then_font"
     )
-    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
-    assert all(c.section_heading == "Goblin" for c in chunks)
-
-
-def test_each_exempt_label_is_non_breaking():
-    """Spot-check the full default set so a future maintainer who
-    adds/removes a label sees a clear failure if behavior shifts."""
-    for label in [
-        "Actions", "Bonus Actions", "Reactions", "Legendary Actions",
-        "Lair Actions", "Mythic Actions", "Villain Actions",
-        "Traits", "Special Traits", "Spellcasting", "Innate Spellcasting",
-        "Equipment",
-    ]:
-        md = f"## Monster\n\nDescription.\n\n## {label}\n\nDetails."
-        chunks = structure_aware([_page(1, md)], source_pdf=f"{label}.pdf")
-        assert all(c.section_heading == "Monster" for c in chunks), (
-            f"`## {label}` unexpectedly broke the parent chunk"
-        )
-
-
-def test_real_heading_after_exempt_subsection_still_breaks():
-    """An exemption keeps the parent breadcrumb but the next real
-    heading must still pop and start a new chunk normally."""
-    md = (
-        "## Goblin\n\nDesc.\n\n"
-        "## Actions\n\nAttack.\n\n"
-        "## Hobgoblin\n\nNext monster."
+    chunks = structure_aware(
+        [PageMarkdown(page_number=1, markdown=promoted[0]["markdown"])],
+        source_pdf="srd.pdf",
     )
-    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
-    breadcrumbs = {c.section_heading for c in chunks}
-    assert "Goblin" in breadcrumbs
-    assert "Hobgoblin" in breadcrumbs
-    # "Actions" itself must NOT appear as a breadcrumb.
-    assert "Actions" not in breadcrumbs
-
-
-def test_non_exempt_heading_still_breaks_normally():
-    """Sanity: a heading that's NOT in the exemption set must still
-    cause a chunk break (regression guard for the exemption logic)."""
-    md = "## Combat\n\nIntro.\n\n## Damage\n\nDamage rules."
-    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
-    breadcrumbs = [c.section_heading for c in chunks]
-    assert "Combat" in breadcrumbs
-    assert "Damage" in breadcrumbs
+    solar_la_chunk = next(
+        c for c in chunks if "3 legendary actions per round" in c.text
+    )
+    assert solar_la_chunk.section_heading is not None
+    assert "Monsters" in solar_la_chunk.section_heading
+    assert "Solar" in solar_la_chunk.section_heading
+    # Sanity: the Kraken sub-section should anchor to Kraken, not Solar.
+    kraken_la_chunk = next(
+        c for c in chunks if "kraken can submerge" in c.text
+    )
+    assert "Kraken" in kraken_la_chunk.section_heading
+    assert "Solar" not in kraken_la_chunk.section_heading
