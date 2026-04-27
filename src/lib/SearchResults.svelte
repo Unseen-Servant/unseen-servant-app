@@ -74,6 +74,20 @@
     if (r <= 0) return 0;
     return Math.max(1, Math.min(5, Math.ceil(r * 5)));
   }
+
+  function pageSpan(start: number, end: number): string {
+    if (!start) return '';
+    if (start === end) return `p.${start}`;
+    return `pp.${start}–${end}`;
+  }
+
+  // pymupdf4llm captures headings as `## **Goblin**`, so the breadcrumb
+  // text carries the bold markup. Strip for the meta-row display only —
+  // the embedding pipeline keeps the original (the +0.184 MRR uplift
+  // from heading-prepend was measured with the asterisks present).
+  function stripBold(s: string): string {
+    return s.replace(/\*\*(.+?)\*\*/g, '$1');
+  }
 </script>
 
 <div class="search-results">
@@ -115,7 +129,7 @@
           </div>
           <div class="meta-row">
             <span class="meta-text">
-              {result.filename} · {result.game_system} · chunk {result.chunk}
+              {result.filename} · {result.game_system}{result.section_heading ? ` · ${stripBold(result.section_heading)}` : ''}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
             </span>
           </div>
         </div>

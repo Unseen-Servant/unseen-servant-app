@@ -196,7 +196,9 @@ struct SearchResultItem {
     text: String,
     filename: String,
     source: String,
-    chunk: u32,
+    section_heading: String,
+    page_start: u32,
+    page_end: u32,
     game_system: String,
     relevance: f64,
 }

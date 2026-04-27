@@ -37,7 +37,9 @@ def test_search_returns_results(indexed_client):
 
 
 def test_search_result_shape(indexed_client):
-    """Each result should have text, filename, source, chunk, relevance."""
+    """Parent-document retrieval response contract: each result carries
+    text, source provenance, the section breadcrumb, page span, and
+    relevance score."""
     response = indexed_client.post("/api/search", json={
         "query": "armor class",
         "n_results": 1
@@ -47,7 +49,9 @@ def test_search_result_shape(indexed_client):
     assert "text" in result
     assert "filename" in result
     assert "source" in result
-    assert "chunk" in result
+    assert "section_heading" in result
+    assert "page_start" in result
+    assert "page_end" in result
     assert "relevance" in result
     assert isinstance(result["relevance"], float)
 
