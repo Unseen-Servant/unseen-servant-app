@@ -178,3 +178,78 @@ def test_chunks_before_first_heading_have_no_breadcrumb():
     chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
     assert len(chunks) == 1
     assert chunks[0].section_heading is None
+
+
+# ─────────────────── stat-block sub-section exemptions ───────────────────
+
+
+def test_actions_subheading_does_not_break_monster_chunk():
+    """`## Actions` after `## Goblin` must stay anchored to the Goblin
+    breadcrumb so searches for "Goblin attack bonus" surface a parent
+    that contains both the description and the attack list."""
+    md = (
+        "## Goblin\n\nA cowardly humanoid raider.\n\n"
+        "## Actions\n\n"
+        "Scimitar. Melee Weapon Attack: +4 to hit.\n\n"
+        "Shortbow. Ranged Weapon Attack: +4 to hit."
+    )
+    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
+    assert all(c.section_heading == "Goblin" for c in chunks)
+    body = "\n\n".join(c.text for c in chunks)
+    assert "cowardly humanoid raider" in body
+    assert "Scimitar" in body
+    assert "Shortbow" in body
+
+
+def test_bold_wrapped_actions_heading_also_exempt():
+    """Black-Flag's pymupdf4llm output renders the heading as
+    `## **ACTIONS**` — the same exemption applies after stripping
+    bold + lowercasing."""
+    md = (
+        "## Goblin\n\nThe goblin.\n\n"
+        "## **ACTIONS**\n\nAttack details."
+    )
+    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
+    assert all(c.section_heading == "Goblin" for c in chunks)
+
+
+def test_each_exempt_label_is_non_breaking():
+    """Spot-check the full default set so a future maintainer who
+    adds/removes a label sees a clear failure if behavior shifts."""
+    for label in [
+        "Actions", "Bonus Actions", "Reactions", "Legendary Actions",
+        "Lair Actions", "Mythic Actions", "Villain Actions",
+        "Traits", "Special Traits", "Spellcasting", "Innate Spellcasting",
+        "Equipment",
+    ]:
+        md = f"## Monster\n\nDescription.\n\n## {label}\n\nDetails."
+        chunks = structure_aware([_page(1, md)], source_pdf=f"{label}.pdf")
+        assert all(c.section_heading == "Monster" for c in chunks), (
+            f"`## {label}` unexpectedly broke the parent chunk"
+        )
+
+
+def test_real_heading_after_exempt_subsection_still_breaks():
+    """An exemption keeps the parent breadcrumb but the next real
+    heading must still pop and start a new chunk normally."""
+    md = (
+        "## Goblin\n\nDesc.\n\n"
+        "## Actions\n\nAttack.\n\n"
+        "## Hobgoblin\n\nNext monster."
+    )
+    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
+    breadcrumbs = {c.section_heading for c in chunks}
+    assert "Goblin" in breadcrumbs
+    assert "Hobgoblin" in breadcrumbs
+    # "Actions" itself must NOT appear as a breadcrumb.
+    assert "Actions" not in breadcrumbs
+
+
+def test_non_exempt_heading_still_breaks_normally():
+    """Sanity: a heading that's NOT in the exemption set must still
+    cause a chunk break (regression guard for the exemption logic)."""
+    md = "## Combat\n\nIntro.\n\n## Damage\n\nDamage rules."
+    chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
+    breadcrumbs = [c.section_heading for c in chunks]
+    assert "Combat" in breadcrumbs
+    assert "Damage" in breadcrumbs
