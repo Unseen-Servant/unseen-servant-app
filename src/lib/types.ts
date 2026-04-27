@@ -117,7 +117,9 @@ export interface SearchResultItem {
   text: string;
   filename: string;
   source: string;
-  chunk: number;
+  section_heading: string;
+  page_start: number;
+  page_end: number;
   game_system: string;
   relevance: number;
 }

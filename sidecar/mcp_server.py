@@ -176,7 +176,14 @@ async def search_library(
         lines.append(f"--- Result {i} (relevance: {r['relevance']}) ---")
         system_tag = r.get('game_system', 'unknown')
         lines.append(f"Source: {r['filename']} [{system_tag}]")
-        lines.append(f"Chunk: {r['chunk']}")
+        heading = r.get("section_heading") or "(no section)"
+        page_start = r.get("page_start")
+        page_end = r.get("page_end")
+        if page_start and page_end:
+            page_span = f"p.{page_start}" if page_start == page_end else f"pp.{page_start}–{page_end}"
+            lines.append(f"Section: {heading} ({page_span})")
+        else:
+            lines.append(f"Section: {heading}")
         lines.append(r["text"])
         lines.append("")
 

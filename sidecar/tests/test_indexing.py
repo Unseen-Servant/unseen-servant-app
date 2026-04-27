@@ -49,8 +49,11 @@ def test_index_stores_correct_metadata(client, sample_pdf_path, test_collection)
         assert isinstance(metadata["page_end"], int)
         assert metadata["page_start"] >= 1
         assert metadata["page_end"] >= metadata["page_start"]
+        # Parent-document retrieval (#146): every embed unit points at a parent
+        assert "parent_id" in metadata
+        assert metadata["parent_id"].startswith("p_")
         # Version stamps for the diagnostics tab (#147)
-        assert metadata["chunker_version"] == "structure_aware-v1"
+        assert metadata["chunker_version"] == "structure_aware-v2"
         assert metadata["embedding_model"]
 
 

@@ -39,6 +39,11 @@ from chunker import (
     structure_aware,
 )
 from cleanup import clean_pages
+from granularity import EmbedUnit, ParentDoc, build as build_granularity
+from parents_store import (
+    upsert_parents, fetch_parents, delete_parents_for_source,
+    clear_all_parents,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -398,50 +403,77 @@ def chunk_id_prefix(pdf_path: Path) -> str:
     return f"{path_hash}_{pdf_path.stem}"
 
 
-def _chunk_metadata(pdf_path: Path, chunk: Chunk, game_system: str) -> dict:
+def _embed_unit_metadata(pdf_path: Path, eu: EmbedUnit, game_system: str) -> dict:
     return {
         "source": str(pdf_path),
         "filename": pdf_path.name,
-        "chunk": chunk.ordinal,
+        "chunk": eu.ordinal,
         "game_system": game_system,
-        "chunk_type": chunk.chunk_type,
-        "section_heading": chunk.section_heading or "",
-        "page_start": chunk.page_start,
-        "page_end": chunk.page_end,
+        "chunk_type": eu.chunk_type,
+        "section_heading": eu.section_heading or "",
+        "page_start": eu.page_start,
+        "page_end": eu.page_end,
+        "parent_id": eu.parent_id,
         "chunker_version": CHUNKER_VERSION,
         "embedding_model": EMBEDDING_MODEL,
     }
 
 
-def _embed_text(chunk: Chunk) -> str:
-    """Heading-prepended text for embedding (storage of chunk.text unchanged).
+def _embed_text(eu: EmbedUnit) -> str:
+    """Heading-prepended text for embedding (storage of eu.text unchanged).
 
     hybrid_retrieval_spike measured +0.184 MRR@5 / +0.150 recall@5 from this
     one change: embedding sees the section_heading breadcrumb as topical
-    context for the chunk body. The stored document remains chunk.text so
-    search results return content as-is — section_heading is already in
-    metadata for callers that want to display it.
+    context for the embed unit body.
     """
-    if chunk.section_heading:
-        return f"{chunk.section_heading}\n\n{chunk.text}"
-    return chunk.text
+    if eu.section_heading:
+        return f"{eu.section_heading}\n\n{eu.text}"
+    return eu.text
 
 
 def _upsert_batch(
     collection,
-    batch: list[Chunk],
+    batch: list[EmbedUnit],
     pdf_path: Path,
     game_system: str,
     prefix: str,
 ) -> None:
     """Pre-compute heading-prepended embeddings then upsert with stored text."""
-    embeddings = collection._embedding_function([_embed_text(c) for c in batch])
+    embeddings = collection._embedding_function([_embed_text(eu) for eu in batch])
     collection.upsert(
         embeddings=embeddings,
-        documents=[c.text for c in batch],
-        metadatas=[_chunk_metadata(pdf_path, c, game_system) for c in batch],
-        ids=[f"{prefix}_{c.ordinal}" for c in batch],
+        documents=[eu.text for eu in batch],
+        metadatas=[_embed_unit_metadata(pdf_path, eu, game_system) for eu in batch],
+        ids=[f"{prefix}_{eu.ordinal}" for eu in batch],
     )
+
+
+def _index_chunks(
+    chunks: list[Chunk],
+    pdf_path: Path,
+    game_system: str,
+    collection,
+    data_dir: Path | None,
+    batch_size: int = 100,
+) -> int:
+    """Run the granularity step and persist embed units + parents.
+
+    Splits chunks into ~400-char embed units (tables atomic) and contiguous
+    same-breadcrumb parents (capped at 6,000 chars). Embed units go to
+    ChromaDB with parent_id in metadata; parents go to the SQLite store.
+
+    Returns the number of embed units upserted.
+    """
+    if not chunks:
+        return 0
+    embed_units, parents = build_granularity(chunks)
+    if data_dir:
+        upsert_parents(data_dir, str(pdf_path), parents)
+    prefix = chunk_id_prefix(pdf_path)
+    for batch_idx in range(0, len(embed_units), batch_size):
+        batch = embed_units[batch_idx:batch_idx + batch_size]
+        _upsert_batch(collection, batch, pdf_path, game_system, prefix)
+    return len(embed_units)
 
 
 def _extract_and_chunk(
@@ -473,10 +505,11 @@ def _extract_and_chunk(
 def index_single_pdf(
     pdf_path: Path, collection, game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
+    data_dir: Path | None = None,
 ) -> tuple[int, str | None, str]:
-    """Extract, chunk, and upsert a single PDF into ChromaDB.
+    """Extract, chunk, and upsert a single PDF into ChromaDB + parents store.
 
-    Returns (chunk_count, error_message, game_system).
+    Returns (embed_unit_count, error_message, game_system).
     error_message is None on success.
     """
     chunks, resolved_system, error = _extract_and_chunk(
@@ -484,14 +517,8 @@ def index_single_pdf(
     )
     if error:
         return 0, error, resolved_system
-
-    prefix = chunk_id_prefix(pdf_path)
-    batch_size = 100
-    for batch_idx in range(0, len(chunks), batch_size):
-        batch = chunks[batch_idx:batch_idx + batch_size]
-        _upsert_batch(collection, batch, pdf_path, resolved_system, prefix)
-
-    return len(chunks), None, resolved_system
+    count = _index_chunks(chunks, pdf_path, resolved_system, collection, data_dir)
+    return count, None, resolved_system
 
 
 def prepare_pdf(
@@ -526,11 +553,14 @@ def compact_sqlite(data_dir: Path) -> int:
     return size_before - os.path.getsize(sqlite_path)
 
 
-def delete_source_chunks(source_path: str, collection) -> int:
+def delete_source_chunks(
+    source_path: str, collection, data_dir: Path | None = None
+) -> int:
     """Delete all chunks for a given source path from ChromaDB.
 
     Uses the full ``source`` metadata field to avoid collisions when two PDFs
-    share the same filename in different directories.
+    share the same filename in different directories. Also drops the source's
+    parent rows from the parents store so re-indexes don't accumulate orphans.
 
     Returns the number of deleted chunks, or 0 if not found.
     """
@@ -539,6 +569,9 @@ def delete_source_chunks(source_path: str, collection) -> int:
 
     if ids_to_delete:
         collection.delete(ids=ids_to_delete)
+
+    if data_dir:
+        delete_parents_for_source(data_dir, source_path)
 
     return len(ids_to_delete)
 
@@ -851,7 +884,7 @@ def create_app(
             pdf_path = Path(pdf_path_str)
             chunk_count, error, detected_system = index_single_pdf(
                 pdf_path, collection, game_system=request.game_system,
-                known_systems=_merged["known"],
+                known_systems=_merged["known"], data_dir=data_dir,
             )
 
             if error:
@@ -941,7 +974,7 @@ def create_app(
 
         # Phase 1: Remove deselected files
         for entry in diff["to_remove"]:
-            deleted = delete_source_chunks(entry["path"], collection)
+            deleted = delete_source_chunks(entry["path"], collection, data_dir=data_dir)
             del manifest.files[entry["path"]]
             save_manifest(data_dir, manifest)
             removed += 1
@@ -951,7 +984,7 @@ def create_app(
 
         # Phase 1a: Auto-remove files deleted from disk
         for entry in diff["to_auto_remove"]:
-            deleted = delete_source_chunks(entry["path"], collection)
+            deleted = delete_source_chunks(entry["path"], collection, data_dir=data_dir)
             del manifest.files[entry["path"]]
             save_manifest(data_dir, manifest)
             auto_removed += 1
@@ -1018,21 +1051,24 @@ def create_app(
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
             else:
+                embed_units, parents = build_granularity(chunks)
+                if data_dir:
+                    upsert_parents(data_dir, str(pdf_path), parents)
                 prefix = chunk_id_prefix(pdf_path)
                 batch_idx = 0
-                while batch_idx < len(chunks):
+                while batch_idx < len(embed_units):
                     batch_size = random.randint(80, 120)
-                    batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    _upsert_batch(collection, batch_chunks, pdf_path, detected_system, prefix)
-                    chunks_total += len(batch_chunks)
-                    batch_idx += len(batch_chunks)
+                    batch = embed_units[batch_idx:batch_idx + batch_size]
+                    _upsert_batch(collection, batch, pdf_path, detected_system, prefix)
+                    chunks_total += len(batch)
+                    batch_idx += len(batch)
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
                 added += 1
                 files_done += 1
                 manifest.files[entry["path"]] = ManifestEntry(
                     filename=pdf_path.name,
                     mtime=os.path.getmtime(pdf_path),
-                    chunk_count=len(chunks),
+                    chunk_count=len(embed_units),
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
                     content_hash=file_content_hash(pdf_path),
@@ -1043,7 +1079,7 @@ def create_app(
 
         # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
         for entry in diff["to_update"]:
-            delete_source_chunks(entry["path"], collection)
+            delete_source_chunks(entry["path"], collection, data_dir=data_dir)
             pdf_path = Path(entry["path"])
             override = (
                 request.game_system_overrides.get(entry["path"])
@@ -1058,21 +1094,24 @@ def create_app(
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
             else:
+                embed_units, parents = build_granularity(chunks)
+                if data_dir:
+                    upsert_parents(data_dir, str(pdf_path), parents)
                 prefix = chunk_id_prefix(pdf_path)
                 batch_idx = 0
-                while batch_idx < len(chunks):
+                while batch_idx < len(embed_units):
                     batch_size = random.randint(80, 120)
-                    batch_chunks = chunks[batch_idx:batch_idx + batch_size]
-                    _upsert_batch(collection, batch_chunks, pdf_path, detected_system, prefix)
-                    chunks_total += len(batch_chunks)
-                    batch_idx += len(batch_chunks)
+                    batch = embed_units[batch_idx:batch_idx + batch_size]
+                    _upsert_batch(collection, batch, pdf_path, detected_system, prefix)
+                    chunks_total += len(batch)
+                    batch_idx += len(batch)
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
                 updated += 1
                 files_done += 1
                 manifest.files[entry["path"]] = ManifestEntry(
                     filename=pdf_path.name,
                     mtime=os.path.getmtime(pdf_path),
-                    chunk_count=len(chunks),
+                    chunk_count=len(embed_units),
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
                     content_hash=file_content_hash(pdf_path),
@@ -1242,6 +1281,7 @@ def create_app(
                 # sufficient.
                 collection.delete(ids=collection.get(include=[])["ids"])
 
+            clear_all_parents(data_dir)
             save_manifest(data_dir, IndexManifest())
 
             return {"removed_files": removed_files, "removed_chunks": removed_chunks}
@@ -1345,7 +1385,7 @@ def create_app(
             if path_str not in manifest.files:
                 return {"deleted": False, "reason": "not_indexed"}
 
-            delete_source_chunks(path_str, collection)
+            delete_source_chunks(path_str, collection, data_dir=data_dir)
             del manifest.files[path_str]
             save_manifest(data_dir, manifest)
 
@@ -1478,7 +1518,7 @@ def create_app(
 
             deleted_files = 0
             for path_str in matched_paths:
-                delete_source_chunks(path_str, collection)
+                delete_source_chunks(path_str, collection, data_dir=data_dir)
                 del manifest.files[path_str]
                 deleted_files += 1
 
@@ -1806,7 +1846,7 @@ def create_app(
             if not source_path:
                 raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
 
-            deleted = delete_source_chunks(source_path, collection)
+            deleted = delete_source_chunks(source_path, collection, data_dir=data_dir)
 
             if not deleted:
                 raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
@@ -1931,11 +1971,19 @@ def create_app(
 
     @app.post("/api/search")
     async def search(request: SearchRequest):
-        """Semantic search across indexed documents."""
+        """Parent-document semantic search.
+
+        Over-fetches small embed units, dedupes by parent_id (keeping the
+        highest-similarity hit per parent), then returns the corresponding
+        parent text from the SQLite parents store. Per chunk_granularity_spike,
+        dedupe-by-parent is a load-bearing part of the retrieval semantics —
+        without it the user sees the same section repeated multiple times.
+        """
         try:
+            # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
             query_kwargs = {
                 "query_texts": [request.query],
-                "n_results": request.n_results,
+                "n_results": request.n_results * 10,
             }
 
             where_clauses = []
@@ -1972,19 +2020,44 @@ def create_app(
             if not results["documents"][0]:
                 return {"results": [], "message": "No results found."}
 
-            formatted = []
-            for doc, metadata, distance in zip(
-                results["documents"][0],
+            # Dedupe by parent_id, keeping the first hit per parent (Chroma
+            # returns results in similarity order, so first = highest).
+            seen: set[str] = set()
+            picked: list[tuple[dict, float]] = []   # (metadata, distance)
+            for metadata, distance in zip(
                 results["metadatas"][0],
-                results["distances"][0]
+                results["distances"][0],
             ):
+                pid = metadata.get("parent_id")
+                if not pid or pid in seen:
+                    continue
+                seen.add(pid)
+                picked.append((metadata, distance))
+                if len(picked) >= request.n_results:
+                    break
+
+            parent_docs = fetch_parents(data_dir, [m["parent_id"] for m, _ in picked]) if data_dir else {}
+
+            formatted = []
+            for metadata, distance in picked:
+                pid = metadata["parent_id"]
+                parent = parent_docs.get(pid)
+                # Fall back to the embed unit text if the parent row is
+                # missing (shouldn't happen post-reindex; defensive).
+                text = parent.text if parent else next(
+                    (d for d, m in zip(results["documents"][0], results["metadatas"][0])
+                     if m.get("parent_id") == pid),
+                    "",
+                )
                 formatted.append({
-                    "text": doc,
+                    "text": text,
                     "filename": metadata["filename"],
                     "source": metadata.get("source", ""),
-                    "chunk": metadata.get("chunk", 0),
+                    "section_heading": metadata.get("section_heading", "") or (parent.section_heading if parent else ""),
+                    "page_start": parent.page_start if parent else metadata.get("page_start", 0),
+                    "page_end": parent.page_end if parent else metadata.get("page_end", 0),
                     "game_system": metadata.get("game_system", "unknown"),
-                    "relevance": round(1 - distance, 3)
+                    "relevance": round(1 - distance, 3),
                 })
 
             return {"results": formatted}

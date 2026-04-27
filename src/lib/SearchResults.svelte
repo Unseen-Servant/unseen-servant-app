@@ -74,6 +74,12 @@
     if (r <= 0) return 0;
     return Math.max(1, Math.min(5, Math.ceil(r * 5)));
   }
+
+  function pageSpan(start: number, end: number): string {
+    if (!start) return '';
+    if (start === end) return `p.${start}`;
+    return `pp.${start}–${end}`;
+  }
 </script>
 
 <div class="search-results">
@@ -115,7 +121,7 @@
           </div>
           <div class="meta-row">
             <span class="meta-text">
-              {result.filename} · {result.game_system} · chunk {result.chunk}
+              {result.filename} · {result.game_system}{result.section_heading ? ` · ${result.section_heading}` : ''}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
             </span>
           </div>
         </div>
