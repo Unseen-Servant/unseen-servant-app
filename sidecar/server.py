@@ -39,6 +39,7 @@ from chunker import (
     structure_aware,
 )
 from cleanup import clean_pages
+from promote_headings import promote_markdown
 from granularity import EmbedUnit, ParentDoc, build as build_granularity
 from parents_store import (
     upsert_parents, fetch_parents, delete_parents_for_source,
@@ -136,14 +137,60 @@ def _flatten_br_packed_cells(md: str) -> str:
     return "\n".join(out)
 
 
+def _extract_spans(page: pymupdf.Page) -> list[dict]:
+    """Per-page font-span side-channel for heading-hierarchy promotion.
+
+    pymupdf flag bits used: 16 = bold, 2 = italic. Sizes rounded to
+    2 decimals (matches the spike's signature granularity).
+    """
+    raw = page.get_text("dict")
+    spans: list[dict] = []
+    for block in raw.get("blocks", []):
+        if block.get("type", 0) != 0:
+            continue
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                text = (span.get("text") or "").strip()
+                if not text:
+                    continue
+                flags = int(span.get("flags", 0))
+                spans.append({
+                    "text": text,
+                    "size": round(float(span.get("size", 0.0)), 2),
+                    "bold": bool(flags & 16),
+                    "italic": bool(flags & 2),
+                })
+    return spans
+
+
+def _extract_toc(doc: pymupdf.Document) -> dict:
+    """Document outline (bookmark tree) for TOC-based heading promotion.
+
+    Returns ``{"n_entries", "max_depth", "entries"}`` where ``entries``
+    is ``[[level, title, page1], ...]`` per ``Document.get_toc(simple=True)``.
+    Empty entries=[] when the PDF has no outline; promotion falls back
+    to font_cluster cleanly in that case.
+    """
+    toc = doc.get_toc(simple=True)
+    if not toc:
+        return {"n_entries": 0, "max_depth": 0, "entries": []}
+    return {
+        "n_entries": len(toc),
+        "max_depth": max(entry[0] for entry in toc),
+        "entries": toc,
+    }
+
+
 def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     """Extract a PDF page-by-page as Markdown via pymupdf4llm.
 
-    Pipeline per spike #115/extraction_quality_spike:
-      pymupdf4llm.to_markdown
+    Pipeline (issue #157 — heading-hierarchy promotion adoption):
+      pymupdf4llm.to_markdown  +  font-span side-channel  +  TOC
+        → promote_headings (toc_then_font; TOC capped at depth 1)
         → R1 (rejoin CR fragments)
         → R3 (strip image-placeholder chrome)
-        → R2 (strip running headers/footers, cross-page detection)
+        → R4 (strip running-heading chrome — cross-page detection)
+        → R2 (strip running paragraph headers/footers — cross-page)
         → _flatten_br_packed_cells (atomic-table preservation for the
           structure-aware chunker)
 
@@ -160,14 +207,34 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     if pdf_path.suffix.lower() != ".pdf":
         raise ValueError(f"Not a PDF: {pdf_path.name}")
     raw_pages: list[tuple[int, str]] = []
+    spans_pages: list[dict] = []
     with pymupdf.open(pdf_path) as doc:
+        toc = _extract_toc(doc)
         for i in range(doc.page_count):
             md = pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False, use_ocr=False)
             if md:
-                raw_pages.append((i + 1, md))
+                page_no = i + 1
+                raw_pages.append((page_no, md))
+                spans_pages.append({
+                    "page_number": page_no,
+                    "spans": _extract_spans(doc.load_page(i)),
+                })
     if not raw_pages:
         return []
-    cleaned, report = clean_pages([md for _, md in raw_pages])
+    pages_dict = [{"page_number": pn, "markdown": md} for pn, md in raw_pages]
+    promoted, promo_report = promote_markdown(
+        pages_dict, spans_pages, toc, strategy="toc_then_font"
+    )
+    print(
+        f"[promote] {pdf_path.name}: "
+        f"strategy={promo_report['strategy']} "
+        f"n_headings={promo_report['n_headings']} "
+        f"toc_used={promo_report['toc_used']} "
+        f"font_used={promo_report['font_used']} "
+        f"fallback={promo_report['fallback_count']} "
+        f"distribution={promo_report['promoted_level_distribution']}"
+    )
+    cleaned, report = clean_pages([p["markdown"] for p in promoted])
     print(f"[cleanup] {pdf_path.name}: {report.summary()}")
     return [
         PageMarkdown(page_number=pn, markdown=_flatten_br_packed_cells(md))

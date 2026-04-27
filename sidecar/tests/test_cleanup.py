@@ -12,11 +12,14 @@ changes can't silently break it.
 from cleanup import (
     CleanupReport,
     RunningElement,
+    RunningHeading,
     clean_pages,
     detect_running_elements,
+    detect_running_headings,
     rejoin_cr_fragments,
     strip_image_placeholders,
     strip_running_elements,
+    strip_running_headings,
 )
 
 
@@ -346,6 +349,142 @@ def test_clean_pages_single_page_does_not_crash():
     cleaned, report = clean_pages(pages)
     assert len(cleaned) == 1
     assert report.paragraphs_stripped == 0
+
+
+# ─────────────────────────── flattener compatibility ───────────────────────────
+
+
+# ─────────────────────────── R4 ───────────────────────────
+
+
+def test_r4_empty_input():
+    assert detect_running_headings([]) == []
+    assert strip_running_headings([], []) == ([], 0)
+
+
+def _page_with_chrome_and_body(chrome_heading: str, body_lines: int = 10) -> str:
+    """Build a page where the chrome heading is at the top and the
+    page has enough body content that head and tail zones don't
+    overlap. Mirrors real-PDF page structure."""
+    body = "\n\n".join(f"Body paragraph {i}." for i in range(body_lines))
+    return f"{chrome_heading}\n\n{body}"
+
+
+def test_r4_detects_basic_running_heading():
+    """`## BASIC FANTASY RPG` recurring as the first heading on most
+    pages is the canonical R4 leak — pymupdf4llm emits running header
+    chrome as a heading, R2 ignores headings, the chunker propagates
+    it through the heading stack."""
+    pages = [_page_with_chrome_and_body("## BASIC FANTASY RPG")] * 8 + [
+        "No chrome here.\n\nJust body."
+    ] * 2
+    running = detect_running_headings(pages)
+    assert any("BASIC" in r.normalized for r in running if r.zone == "head")
+    cleaned, stripped = strip_running_headings(pages, running)
+    assert stripped >= 8
+    assert all("BASIC FANTASY RPG" not in p for p in cleaned[:8])
+
+
+def test_r4_threshold_floor_two_pages():
+    """Cutoff is `max(2, int(N * threshold))`. Default 0.40 on 5 pages
+    gives `max(2, 2) = 2` — the chrome appearing on exactly 2 pages
+    still strips."""
+    pages = [
+        _page_with_chrome_and_body("## BOOK TITLE"),
+        _page_with_chrome_and_body("## BOOK TITLE"),
+        "Plain page.\n\nMore body.",
+        "Plain page.\n\nMore body.",
+        "Plain page.\n\nMore body.",
+    ]
+    running = detect_running_headings(pages)
+    head_running = [r for r in running if r.zone == "head"]
+    assert len(head_running) == 1
+    cleaned, stripped = strip_running_headings(pages, running)
+    assert stripped == 2
+
+
+def test_r4_high_threshold_does_not_strip():
+    """At a 0.60 threshold, 2-of-5 falls below the cutoff and the
+    heading is preserved as legitimate body content."""
+    pages = [
+        _page_with_chrome_and_body("## BOOK TITLE"),
+        _page_with_chrome_and_body("## BOOK TITLE"),
+        "Plain page.\n\nMore body.",
+        "Plain page.\n\nMore body.",
+        "Plain page.\n\nMore body.",
+    ]
+    running = detect_running_headings(pages, threshold=0.60)
+    assert running == []
+
+
+def test_r4_zone_discrimination_keeps_body_headings():
+    """A heading appearing as the *first* heading on every page is
+    chrome; the same heading text appearing in the *body* of every
+    page (line 20+) is legitimate content. Zone restriction prevents
+    stripping body chapter titles that happen to recur."""
+    body_buffer = "\n\n".join([f"Paragraph {i}." for i in range(15)])
+    pages = [f"{body_buffer}\n\n## CHAPTER X"] * 6
+    running = detect_running_headings(pages)
+    # Even though the heading appears on every page, it's in the tail
+    # zone (last 5 non-blank lines). It will be detected as a tail-
+    # running heading. Verify head detection does NOT pick it up.
+    head_running = [r for r in running if r.zone == "head"]
+    assert head_running == []
+
+
+def test_r4_normalization_handles_page_numbers():
+    """`## Page 5: BASIC FANTASY RPG` and `## Page 12: BASIC FANTASY RPG`
+    must normalize to the same key (R2's `_normalize` substitutes
+    digits with `#`, which R4 reuses)."""
+    pages = [
+        _page_with_chrome_and_body(f"## Page {i}: BASIC FANTASY RPG")
+        for i in range(1, 9)
+    ]
+    pages += ["No chrome.\n\nMore body."] * 2
+    running = detect_running_headings(pages)
+    head_running = [r for r in running if r.zone == "head"]
+    assert len(head_running) == 1
+    assert head_running[0].pages_seen == 8
+
+
+def test_r4_does_not_touch_non_heading_lines():
+    """A `**150 Spellcasting**` body bold (R2's structural-footer
+    pattern) is not a heading — R4 must leave it alone."""
+    pages = ["**150 Spellcasting**\n\nThe spellcaster casts."] * 8
+    running = detect_running_headings(pages)
+    assert running == []
+
+
+def test_r4_strips_alongside_r2_in_clean_pages():
+    """Both rules wired into clean_pages run on the same input
+    without interference. Builds a fixture with running paragraph
+    chrome (head/tail paragraphs) AND running heading chrome on the
+    same pages.
+    """
+    pages = []
+    for i in range(8):
+        pages.append(
+            f"## BASIC FANTASY RPG\n\n"
+            f"Page {i + 1}\n\n"
+            f"Body content for page {i + 1}.\n\n"
+            f"More body for page {i + 1}.\n\n"
+            f"Even more body for page {i + 1}.\n\n"
+            f"Footer line that repeats."
+        )
+    cleaned, report = clean_pages(pages)
+    assert report.headings_stripped >= 8
+    assert report.paragraphs_stripped > 0
+    assert all("BASIC FANTASY RPG" not in p for p in cleaned)
+
+
+def test_r4_report_populates_headings_stripped_and_running_headings():
+    pages = [_page_with_chrome_and_body("## CHROME")] * 8
+    cleaned, report = clean_pages(pages)
+    assert report.headings_stripped >= 8
+    head_running = [r for r in report.running_headings if r.zone == "head"]
+    assert len(head_running) == 1
+    assert isinstance(head_running[0], RunningHeading)
+    assert "R4 stripped=" in report.summary()
 
 
 # ─────────────────────────── flattener compatibility ───────────────────────────
