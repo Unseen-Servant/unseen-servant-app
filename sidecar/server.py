@@ -38,6 +38,7 @@ from chunker import (
     PageMarkdown,
     structure_aware,
 )
+from cleanup import clean_pages
 
 
 # ---------------------------------------------------------------------------
@@ -133,9 +134,13 @@ def _flatten_br_packed_cells(md: str) -> str:
 def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     """Extract a PDF page-by-page as Markdown via pymupdf4llm.
 
-    Emits headings, bold runs, bullet lists, and Markdown tables. Apply
-    `_flatten_br_packed_cells` per-page so the structure-aware chunker
-    sees clean tables for its atomic-table preservation.
+    Pipeline per spike #115/extraction_quality_spike:
+      pymupdf4llm.to_markdown
+        → R1 (rejoin CR fragments)
+        → R3 (strip image-placeholder chrome)
+        → R2 (strip running headers/footers, cross-page detection)
+        → _flatten_br_packed_cells (atomic-table preservation for the
+          structure-aware chunker)
 
     pymupdf (opened via `fitz`/`pymupdf.open`) also accepts
     .txt/.epub/.xps/.cbz silently; restrict to PDFs to match the
@@ -143,16 +148,20 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     """
     if pdf_path.suffix.lower() != ".pdf":
         raise ValueError(f"Not a PDF: {pdf_path.name}")
-    pages: list[PageMarkdown] = []
+    raw_pages: list[tuple[int, str]] = []
     with pymupdf.open(pdf_path) as doc:
         for i in range(doc.page_count):
             md = pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False)
             if md:
-                pages.append(PageMarkdown(
-                    page_number=i + 1,
-                    markdown=_flatten_br_packed_cells(md),
-                ))
-    return pages
+                raw_pages.append((i + 1, md))
+    if not raw_pages:
+        return []
+    cleaned, report = clean_pages([md for _, md in raw_pages])
+    print(f"[cleanup] {pdf_path.name}: {report.summary()}")
+    return [
+        PageMarkdown(page_number=pn, markdown=_flatten_br_packed_cells(md))
+        for (pn, _), md in zip(raw_pages, cleaned)
+    ]
 
 
 def _extract_pdf_text(pdf_path: Path) -> str:
