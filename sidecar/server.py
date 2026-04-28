@@ -12,11 +12,11 @@ import argparse
 import hashlib
 import json
 import os
-import random
 import re
 import signal
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -504,15 +504,30 @@ def _embed_text(eu: EmbedUnit) -> str:
     return eu.text
 
 
+# Embed batching tunables (issue #158).
+# 256 was chosen over the previous 100 to amortize Ollama per-call overhead;
+# bge-m3 embeds each input independently so the 8192 ctx applies per input,
+# not per batch (mean embed-text size ~400 chars / ~100 tokens). Concurrency=3
+# fires up to N embed batches at Ollama in parallel; upserts to Chroma stay
+# serial because its SQLite is not concurrent-write friendly.
+EMBED_BATCH_SIZE = 256
+EMBED_CONCURRENCY = 3
+
+
+def _embed_batch(collection, batch: list[EmbedUnit]) -> list[list[float]]:
+    """Heading-prepended embeddings for a batch (no DB writes)."""
+    return collection._embedding_function([_embed_text(eu) for eu in batch])
+
+
 def _upsert_batch(
     collection,
     batch: list[EmbedUnit],
+    embeddings: list[list[float]],
     pdf_path: Path,
     game_system: str,
     prefix: str,
 ) -> None:
-    """Pre-compute heading-prepended embeddings then upsert with stored text."""
-    embeddings = collection._embedding_function([_embed_text(eu) for eu in batch])
+    """Upsert a pre-embedded batch with stored text and metadata."""
     collection.upsert(
         embeddings=embeddings,
         documents=[eu.text for eu in batch],
@@ -521,13 +536,43 @@ def _upsert_batch(
     )
 
 
+def _embed_and_upsert_units(
+    collection,
+    embed_units: list[EmbedUnit],
+    pdf_path: Path,
+    game_system: str,
+    prefix: str,
+    batch_size: int = EMBED_BATCH_SIZE,
+    concurrency: int = EMBED_CONCURRENCY,
+):
+    """Embed batches concurrently, upsert serially in submission order.
+
+    Generator that yields each batch's unit count after it's been written to
+    Chroma. Callers that don't need progress can `sum(...)` to get the total.
+    Submission-order draining keeps chunk ordinals deterministic in the DB
+    and progress events monotonic for streaming callers.
+    """
+    if not embed_units:
+        return
+    batches = [
+        embed_units[i:i + batch_size]
+        for i in range(0, len(embed_units), batch_size)
+    ]
+    with ThreadPoolExecutor(max_workers=concurrency) as ex:
+        futures = [ex.submit(_embed_batch, collection, b) for b in batches]
+        for batch, fut in zip(batches, futures):
+            embeddings = fut.result()
+            _upsert_batch(collection, batch, embeddings, pdf_path, game_system, prefix)
+            yield len(batch)
+
+
 def _index_chunks(
     chunks: list[Chunk],
     pdf_path: Path,
     game_system: str,
     collection,
     data_dir: Path | None,
-    batch_size: int = 100,
+    batch_size: int = EMBED_BATCH_SIZE,
 ) -> int:
     """Run the granularity step and persist embed units + parents.
 
@@ -543,10 +588,10 @@ def _index_chunks(
     if data_dir:
         upsert_parents(data_dir, str(pdf_path), parents)
     prefix = chunk_id_prefix(pdf_path)
-    for batch_idx in range(0, len(embed_units), batch_size):
-        batch = embed_units[batch_idx:batch_idx + batch_size]
-        _upsert_batch(collection, batch, pdf_path, game_system, prefix)
-    return len(embed_units)
+    return sum(_embed_and_upsert_units(
+        collection, embed_units, pdf_path, game_system, prefix,
+        batch_size=batch_size,
+    ))
 
 
 def _extract_and_chunk(
@@ -1270,13 +1315,10 @@ def create_app(
                 if data_dir:
                     upsert_parents(data_dir, str(pdf_path), parents)
                 prefix = chunk_id_prefix(pdf_path)
-                batch_idx = 0
-                while batch_idx < len(embed_units):
-                    batch_size = random.randint(80, 120)
-                    batch = embed_units[batch_idx:batch_idx + batch_size]
-                    _upsert_batch(collection, batch, pdf_path, detected_system, prefix)
-                    chunks_total += len(batch)
-                    batch_idx += len(batch)
+                for n in _embed_and_upsert_units(
+                    collection, embed_units, pdf_path, detected_system, prefix,
+                ):
+                    chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
                 added += 1
                 files_done += 1
@@ -1313,13 +1355,10 @@ def create_app(
                 if data_dir:
                     upsert_parents(data_dir, str(pdf_path), parents)
                 prefix = chunk_id_prefix(pdf_path)
-                batch_idx = 0
-                while batch_idx < len(embed_units):
-                    batch_size = random.randint(80, 120)
-                    batch = embed_units[batch_idx:batch_idx + batch_size]
-                    _upsert_batch(collection, batch, pdf_path, detected_system, prefix)
-                    chunks_total += len(batch)
-                    batch_idx += len(batch)
+                for n in _embed_and_upsert_units(
+                    collection, embed_units, pdf_path, detected_system, prefix,
+                ):
+                    chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
                 updated += 1
                 files_done += 1
