@@ -153,17 +153,42 @@ def test_build_emits_embed_units_and_parents():
     assert all(eu.parent_id == parent.parent_id for eu in embed_units)
 
 
-def test_build_tables_atomic():
-    """Table chunks must NOT be sub-split — emitted verbatim as their own
-    embed unit."""
+def test_build_tables_linearized_to_rows():
+    """Table chunks emit one embed unit per row (#144), all sharing the
+    same parent_id and carrying chunk_type='table'."""
     table = "|a|b|c|\n|---|---|---|\n" + "\n".join(
         f"|{i}|{i*2}|{i*3}|" for i in range(20)
     )
     chunks = [_chunk(table, "Stats", 0, chunk_type="table")]
+    embed_units, parents = build(chunks)
+    assert len(embed_units) == 20
+    assert all(eu.chunk_type == "table" for eu in embed_units)
+    assert all(eu.parent_id == parents[0].parent_id for eu in embed_units)
+    # Row sentence shape: "a: 0; b: 0; c: 0", "a: 1; b: 2; c: 3", ...
+    assert embed_units[0].text == "a: 0; b: 0; c: 0"
+    assert embed_units[1].text == "a: 1; b: 2; c: 3"
+
+
+def test_build_table_fallback_when_unparseable():
+    """A chunk tagged as 'table' but with no pipe characters falls back
+    to a single atomic embed unit carrying the original text."""
+    not_a_table = "Just some prose that got mis-tagged as a table."
+    chunks = [_chunk(not_a_table, "Section", 0, chunk_type="table")]
     embed_units, _ = build(chunks)
     assert len(embed_units) == 1
-    assert embed_units[0].text == table
+    assert embed_units[0].text == not_a_table
     assert embed_units[0].chunk_type == "table"
+
+
+def test_build_table_parent_text_preserved():
+    """Load-bearing invariant: the original markdown table is in parent.text
+    so the LLM still receives the full atomic table at retrieval, even
+    though embed units are per-row."""
+    table = "|a|b|c|\n|---|---|---|\n|1|2|3|\n|4|5|6|"
+    chunks = [_chunk(table, "Stats", 0, chunk_type="table")]
+    _, parents = build(chunks)
+    assert len(parents) == 1
+    assert table in parents[0].text
 
 
 def test_build_prose_sub_split():

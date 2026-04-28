@@ -53,7 +53,7 @@ def test_index_stores_correct_metadata(client, sample_pdf_path, test_collection)
         assert "parent_id" in metadata
         assert metadata["parent_id"].startswith("p_")
         # Version stamps for the diagnostics tab (#147)
-        assert metadata["chunker_version"] == "structure_aware-v2"
+        assert metadata["chunker_version"] == "structure_aware-v3"
         assert metadata["embedding_model"]
 
 

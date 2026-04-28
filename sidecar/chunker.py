@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-CHUNKER_VERSION = "structure_aware-v2"
+CHUNKER_VERSION = "structure_aware-v3"
 EMBEDDING_MODEL = "bge-m3"
 SOFT_CAP = 1000
 HARD_CAP = 20000

@@ -21,9 +21,13 @@ Why the 6,000-char parent cap: even with contiguous-run grouping, a
 runaway breadcrumb can produce a multi-section parent. The cap bounds
 generation context per result.
 
-Tables atomic: a pipe-table is one embed unit; its parent_id points at
-the heading-section that contains it, so the parent text returns the
-table inline with surrounding prose — the natural reader unit.
+Tables linearized into per-row sentences for embed (issue #144,
+table_retrieval_spike). Parent text still contains the atomic markdown
+table — linearization is purely an embed-side augmentation. Each row
+embed_unit shares the parent_id of the source table, so dedupe-by-parent
+collapses row collisions at retrieval. If the linearizer can't parse a
+table chunk (non-pipe content tagged as table), we fall back to one
+atomic embed_unit.
 """
 from __future__ import annotations
 
@@ -32,6 +36,7 @@ import re
 from dataclasses import dataclass
 
 from chunker import Chunk
+from table_linearizer import linearize_table
 
 
 SMALL_TARGET = 400
@@ -195,18 +200,37 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
     for c in chunks:
         pid = chunk_to_pid[c.ordinal]
         if c.chunk_type == "table":
-            embed_units.append(EmbedUnit(
-                chunk_id=f"{embed_ordinal}",
-                text=c.text,
-                parent_id=pid,
-                chunk_type="table",
-                section_heading=c.section_heading,
-                source_pdf=c.source_pdf,
-                page_start=c.page_start,
-                page_end=c.page_end,
-                ordinal=embed_ordinal,
-            ))
-            embed_ordinal += 1
+            # Per-row linearization (#144). A future captioning branch
+            # (#143) would replace this fork — keep one branch per
+            # table-indexing strategy.
+            _, rows = linearize_table(c.text)
+            if rows:
+                for row_text in rows:
+                    embed_units.append(EmbedUnit(
+                        chunk_id=f"{embed_ordinal}",
+                        text=row_text,
+                        parent_id=pid,
+                        chunk_type="table",
+                        section_heading=c.section_heading,
+                        source_pdf=c.source_pdf,
+                        page_start=c.page_start,
+                        page_end=c.page_end,
+                        ordinal=embed_ordinal,
+                    ))
+                    embed_ordinal += 1
+            else:
+                embed_units.append(EmbedUnit(
+                    chunk_id=f"{embed_ordinal}",
+                    text=c.text,
+                    parent_id=pid,
+                    chunk_type="table",
+                    section_heading=c.section_heading,
+                    source_pdf=c.source_pdf,
+                    page_start=c.page_start,
+                    page_end=c.page_end,
+                    ordinal=embed_ordinal,
+                ))
+                embed_ordinal += 1
             continue
         for sub in _split_prose(c.text):
             embed_units.append(EmbedUnit(
