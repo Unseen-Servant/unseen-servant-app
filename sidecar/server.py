@@ -24,7 +24,7 @@ from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
 import pymupdf
-import pymupdf4llm
+from pymupdf4llm.helpers.document_layout import parse_document
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -137,30 +137,31 @@ def _flatten_br_packed_cells(md: str) -> str:
     return "\n".join(out)
 
 
-def _extract_spans(page: pymupdf.Page) -> list[dict]:
-    """Per-page font-span side-channel for heading-hierarchy promotion.
+def _spans_from_parsed(parsed) -> list[dict]:
+    """Per-page font-span side-channel from a pymupdf4llm ParsedDocument.
 
-    pymupdf flag bits used: 16 = bold, 2 = italic. Sizes rounded to
-    2 decimals (matches the spike's signature granularity).
+    pymupdf4llm has already walked the page during parse_document(); we
+    surface the spans it computed instead of doing a second get_text("dict")
+    pass (issue #159). Schema mirrors the prior _extract_spans helper so
+    promote_headings stays unchanged: pymupdf flag bits 16=bold, 2=italic;
+    sizes rounded to 2 decimals to match the spike's signature granularity.
     """
-    raw = page.get_text("dict")
-    spans: list[dict] = []
-    for block in raw.get("blocks", []):
-        if block.get("type", 0) != 0:
-            continue
-        for line in block.get("lines", []):
-            for span in line.get("spans", []):
-                text = (span.get("text") or "").strip()
-                if not text:
-                    continue
-                flags = int(span.get("flags", 0))
-                spans.append({
-                    "text": text,
-                    "size": round(float(span.get("size", 0.0)), 2),
-                    "bold": bool(flags & 16),
-                    "italic": bool(flags & 2),
-                })
-    return spans
+    out: list[dict] = []
+    for page in parsed.pages:
+        for box in page.boxes:
+            for line in (box.textlines or []):
+                for span in line.get("spans", []):
+                    text = (span.get("text") or "").strip()
+                    if not text:
+                        continue
+                    flags = int(span.get("flags", 0))
+                    out.append({
+                        "text": text,
+                        "size": round(float(span.get("size", 0.0)), 2),
+                        "bold": bool(flags & 16),
+                        "italic": bool(flags & 2),
+                    })
+    return out
 
 
 def _extract_toc(doc: pymupdf.Document) -> dict:
@@ -211,13 +212,17 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     with pymupdf.open(pdf_path) as doc:
         toc = _extract_toc(doc)
         for i in range(doc.page_count):
-            md = pymupdf4llm.to_markdown(doc, pages=[i], show_progress=False, use_ocr=False)
+            # Single parse pass per page: pymupdf4llm walks the page once,
+            # we read both markdown and font spans off the parsed object
+            # (issue #159 — eliminates the prior get_text("dict") rewalk).
+            parsed = parse_document(doc, pages=[i], show_progress=False, use_ocr=False)
+            md = parsed.to_markdown()
             if md:
                 page_no = i + 1
                 raw_pages.append((page_no, md))
                 spans_pages.append({
                     "page_number": page_no,
-                    "spans": _extract_spans(doc.load_page(i)),
+                    "spans": _spans_from_parsed(parsed),
                 })
     if not raw_pages:
         return []
