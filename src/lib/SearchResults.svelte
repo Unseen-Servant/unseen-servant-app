@@ -2,13 +2,14 @@
   import { onMount, tick } from 'svelte';
   import Markdown from 'svelte-exmarkdown';
   import type { SearchResultItem } from './types';
+  import { pageHint } from './pdfUrl';
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
   export let query: string = '';
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
-  export let onOpenResult: (filename: string) => void = () => {};
+  export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
 
   let expanded = new Set<number>();
   let snippetEls: (HTMLElement | null)[] = [];
@@ -61,9 +62,9 @@
     expanded = expanded;
   }
 
-  function handleOpenClick(e: MouseEvent, filename: string) {
+  function handleOpenClick(e: MouseEvent, filename: string, page?: number | null) {
     e.stopPropagation();
-    onOpenResult(filename);
+    onOpenResult(filename, page);
   }
 
   function relevancePercent(r: number): number {
@@ -76,9 +77,7 @@
   }
 
   function pageSpan(start: number, end: number): string {
-    if (!start) return '';
-    if (start === end) return `p.${start}`;
-    return `pp.${start}–${end}`;
+    return pageHint(start, end);
   }
 
   // pymupdf4llm captures headings as `## **Goblin**`, so the breadcrumb
@@ -111,6 +110,9 @@
     {#each results as result, i (i)}
       {@const pct = relevancePercent(result.relevance)}
       {@const cells = relevanceCells(result.relevance)}
+      {@const openLabel = result.page_start
+        ? `Open PDF at ${pageHint(result.page_start, result.page_end)}`
+        : 'Open PDF'}
       <div
         class="result-row"
         class:expanded={expanded.has(i)}
@@ -154,9 +156,9 @@
           <button
             type="button"
             class="open-icon-btn"
-            title="Open PDF"
-            aria-label="Open PDF"
-            on:click={(e) => handleOpenClick(e, result.filename)}
+            title={openLabel}
+            aria-label={openLabel}
+            on:click={(e) => handleOpenClick(e, result.filename, result.page_start)}
             on:keydown|stopPropagation
           >
             <!-- Font Awesome "arrow-up-right-from-square" icon (static/icons/arrow-up-right-from-square-solid-full.svg) -->

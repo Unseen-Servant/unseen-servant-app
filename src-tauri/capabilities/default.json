@@ -12,6 +12,10 @@
       "identifier": "opener:allow-open-path",
       "allow": [{ "path": "$HOME/**" }]
     },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "file://**" }]
+    },
     "opener:allow-reveal-item-in-dir",
     "clipboard-manager:allow-write-text",
     "dialog:default",

@@ -2,7 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-  import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { pdfFileUrl } from '../lib/pdfUrl';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
@@ -168,7 +169,7 @@
     return null;
   }
 
-  async function handleOpenResult(filename: string) {
+  async function handleOpenResult(filename: string, page?: number | null) {
     const path = resolvePathForFilename(filename);
     if (!path) {
       notification.show({
@@ -179,7 +180,15 @@
       return;
     }
     try {
-      await openPath(path);
+      // With a page anchor, open via file:// URL so PDF viewers honouring
+      // the standard `#page=N` fragment land on the right page (#113).
+      // Viewers that ignore the fragment (notably macOS Preview) silently
+      // open at page 1 — page 1 is also the openPath fallback below.
+      if (page && page > 0) {
+        await openUrl(pdfFileUrl(path, page));
+      } else {
+        await openPath(path);
+      }
     } catch (e) {
       notification.show({
         type: 'error',
