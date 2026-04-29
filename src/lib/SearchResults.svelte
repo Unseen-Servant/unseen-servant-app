@@ -281,6 +281,49 @@
   .snippet :global(a) { color: var(--text-accent); }
   .snippet :global(img) { max-width: 100%; height: auto; }
 
+  /* Tables — pymupdf4llm pipe-table output. Old-school grid look:
+     subtle borders matching the dark/parchment aesthetic, compact dense
+     layout for reference data, horizontal scroll for wide tables (some
+     OSRIC saving-throw tables hit 20+ columns). `display: block` is the
+     standard responsive-table trick — keeps the table renderable inside
+     the snippet box while letting overflow scroll horizontally. */
+  .snippet :global(table) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    margin: 0.4em 0;
+    font-size: 0.88em;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-container);
+  }
+  .snippet :global(thead) {
+    background: var(--bg-header);
+  }
+  .snippet :global(th),
+  .snippet :global(td) {
+    border: 1px solid var(--border-subtle);
+    padding: 0.25em 0.5em;
+    vertical-align: top;
+    text-align: left;
+    white-space: normal;
+  }
+  .snippet :global(th) {
+    font-weight: 600;
+    color: var(--text-accent);
+  }
+  /* Empty cells are common in pymupdf4llm output (multi-row PDF headers
+     and continuation rows produce `||` patterns). Render them as
+     intentional gaps rather than invisible whitespace so the table
+     structure stays legible. */
+  .snippet :global(td:empty),
+  .snippet :global(th:empty) {
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .snippet :global(tbody tr:nth-child(even) td) {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
   .snippet.clamped {
     display: -webkit-box;
     -webkit-line-clamp: 2;
