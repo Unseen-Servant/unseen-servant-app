@@ -19,6 +19,7 @@
   import GettingStartedModal from '../lib/GettingStartedModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
+  import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -47,8 +48,9 @@
 
   // File focus & context menu
   let focusedFilePath: string | null = null;
-  let contextMenu: { x: number; y: number; item: FileItem } | null = null;
+  let contextMenu: { x: number; y: number; item: FileItem; isIndexed: boolean } | null = null;
   let renamingFilePath: string | null = null;
+  let statsModalPath: string | null = null;
 
   // Game system tag editing
   let knownSystems: KnownGameSystem[] = [];
@@ -579,8 +581,18 @@
   // Build a map of file path → game system from index status data
   $: gameSystemMap = buildGameSystemMap(indexStatus);
 
-  // Track which files are in the index (so untagged indexed files show the "+" button)
-  $: indexedPaths = buildIndexedPaths(indexStatus);
+  // Track which files are in the index (so untagged indexed files show the "+" button).
+  // Stabilize identity: a refresh that returns the same content keeps the same Set
+  // reference, so FileTree (which receives indexedPaths as a prop) doesn't re-render
+  // every node on no-op refreshes.
+  let indexedPaths = new Set<string>();
+  $: indexedPaths = reuseIfSame(indexedPaths, buildIndexedPaths(indexStatus));
+
+  function reuseIfSame(prev: Set<string>, next: Set<string>): Set<string> {
+    if (prev.size !== next.size) return next;
+    for (const p of next) if (!prev.has(p)) return next;
+    return prev;
+  }
 
   // Count files per game system, sorted by count descending
   $: gameSystemStats = (() => {
@@ -673,7 +685,14 @@
 
   function handleContextMenu(event: MouseEvent, item: FileItem) {
     focusedFilePath = item.is_dir ? null : item.path;
-    contextMenu = { x: event.clientX, y: event.clientY, item };
+    // Snapshot isIndexed at click time so the open menu doesn't keep a live
+    // reactive dependency on indexedPaths.
+    contextMenu = {
+      x: event.clientX,
+      y: event.clientY,
+      item,
+      isIndexed: indexedPaths.has(item.path),
+    };
   }
 
   async function handleContextOpen() {
@@ -695,6 +714,27 @@
       renamingFilePath = contextMenu.item.path;
       contextMenu = null;
     }
+  }
+
+  async function handleContextReindex() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    const confirmed = await confirm(`Re-index "${item.name}"? This rebuilds its chunks.`, { title: 'Re-index file' });
+    if (!confirmed) return;
+    try {
+      await invoke('reindex_file', { path: item.path });
+      await refreshIndexStatus();
+      notification.show({ type: 'success', message: `Re-indexed ${item.name}`, duration: 3000 });
+    } catch (e) {
+      notification.show({ type: 'error', message: `Re-index failed: ${String(e)}`, duration: 5000 });
+    }
+  }
+
+  function handleContextShowStats() {
+    if (!contextMenu) return;
+    statsModalPath = contextMenu.item.path;
+    contextMenu = null;
   }
 
   async function handleContextDelete() {
@@ -1170,11 +1210,21 @@
       x={contextMenu.x}
       y={contextMenu.y}
       item={contextMenu.item}
+      isIndexed={contextMenu.isIndexed}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}
       onDelete={handleContextDelete}
+      onReindex={handleContextReindex}
+      onShowStats={handleContextShowStats}
       onClose={() => { contextMenu = null; }}
+    />
+  {/if}
+
+  {#if statsModalPath}
+    <DocumentStatsModal
+      path={statsModalPath}
+      onClose={() => { statsModalPath = null; }}
     />
   {/if}
 

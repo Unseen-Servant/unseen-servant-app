@@ -81,3 +81,23 @@ def test_delete_one_preserves_others(
     filenames = [s["filename"] for s in response.json()["sources"]]
     assert "core_rules.pdf" in filenames
     assert "dragonbane_monsters.pdf" not in filenames
+
+
+def test_sources_includes_per_file_stats(client, sample_pdf_path):
+    """/api/sources should expose pages, indexed_at, and file_size_bytes."""
+    client.post("/api/index-files", json={
+        "paths": [str(sample_pdf_path)]
+    })
+
+    response = client.get("/api/sources")
+    source = response.json()["sources"][0]
+
+    assert source["pages"] >= 1
+    assert source["indexed_at"] is not None
+    # ISO 8601 with timezone — sanity check, full parse not needed
+    assert "T" in source["indexed_at"]
+    assert source["file_size_bytes"] is not None
+    assert source["file_size_bytes"] > 0
+    # Pre-existing fields stay
+    assert source["chunks"] > 0
+    assert source["filename"] == "dragonbane_monsters.pdf"

@@ -4,10 +4,13 @@
   export let x: number;
   export let y: number;
   export let item: FileItem;
+  export let isIndexed: boolean = false;
   export let onOpen: () => void = () => {};
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
   export let onDelete: () => void = () => {};
+  export let onReindex: () => void = () => {};
+  export let onShowStats: () => void = () => {};
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
@@ -37,6 +40,11 @@
     <button class="context-item" on:click={onOpen}>Open file</button>
   {/if}
   <button class="context-item" on:click={onReveal}>Reveal in folder</button>
+  {#if !item.is_dir && isIndexed}
+    <hr class="context-divider" />
+    <button class="context-item" on:click={onReindex}>Re-index file</button>
+    <button class="context-item" on:click={onShowStats}>Get info</button>
+  {/if}
   <hr class="context-divider" />
   <button class="context-item" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
   <button class="context-item danger" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
