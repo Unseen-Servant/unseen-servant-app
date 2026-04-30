@@ -48,7 +48,7 @@
 
   // File focus & context menu
   let focusedFilePath: string | null = null;
-  let contextMenu: { x: number; y: number; item: FileItem } | null = null;
+  let contextMenu: { x: number; y: number; item: FileItem; isIndexed: boolean } | null = null;
   let renamingFilePath: string | null = null;
   let statsModalPath: string | null = null;
 
@@ -581,8 +581,18 @@
   // Build a map of file path → game system from index status data
   $: gameSystemMap = buildGameSystemMap(indexStatus);
 
-  // Track which files are in the index (so untagged indexed files show the "+" button)
-  $: indexedPaths = buildIndexedPaths(indexStatus);
+  // Track which files are in the index (so untagged indexed files show the "+" button).
+  // Stabilize identity: a refresh that returns the same content keeps the same Set
+  // reference, so FileTree (which receives indexedPaths as a prop) doesn't re-render
+  // every node on no-op refreshes.
+  let indexedPaths = new Set<string>();
+  $: indexedPaths = reuseIfSame(indexedPaths, buildIndexedPaths(indexStatus));
+
+  function reuseIfSame(prev: Set<string>, next: Set<string>): Set<string> {
+    if (prev.size !== next.size) return next;
+    for (const p of next) if (!prev.has(p)) return next;
+    return prev;
+  }
 
   // Count files per game system, sorted by count descending
   $: gameSystemStats = (() => {
@@ -675,7 +685,14 @@
 
   function handleContextMenu(event: MouseEvent, item: FileItem) {
     focusedFilePath = item.is_dir ? null : item.path;
-    contextMenu = { x: event.clientX, y: event.clientY, item };
+    // Snapshot isIndexed at click time so the open menu doesn't keep a live
+    // reactive dependency on indexedPaths.
+    contextMenu = {
+      x: event.clientX,
+      y: event.clientY,
+      item,
+      isIndexed: indexedPaths.has(item.path),
+    };
   }
 
   async function handleContextOpen() {
@@ -1193,7 +1210,7 @@
       x={contextMenu.x}
       y={contextMenu.y}
       item={contextMenu.item}
-      isIndexed={indexedPaths.has(contextMenu.item.path)}
+      isIndexed={contextMenu.isIndexed}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}
