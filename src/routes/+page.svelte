@@ -699,30 +699,6 @@
     }
   }
 
-  async function handleContextAddToIndex() {
-    if (!contextMenu) return;
-    const item = contextMenu.item;
-    contextMenu = null;
-    try {
-      await invoke('index_file', { path: item.path });
-      // get_index_status only reports on paths in selectedPaths, so the file
-      // we just indexed has to be added there for the checkbox to tick. Mirror
-      // it into syncedPaths since the file is now in sync with the index.
-      selectedPaths.add(item.path);
-      selectedPaths = selectedPaths;
-      syncedPaths.add(item.path);
-      syncedPaths = syncedPaths;
-      await saveState();
-      const store = await load('settings.json');
-      await store.set('syncedPaths', Array.from(syncedPaths));
-      await store.save();
-      await refreshIndexStatus();
-      notification.show({ type: 'success', message: `Indexed ${item.name}`, duration: 3000 });
-    } catch (e) {
-      notification.show({ type: 'error', message: `Index failed: ${String(e)}`, duration: 5000 });
-    }
-  }
-
   async function handleContextReindex() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -1222,7 +1198,6 @@
       onReveal={handleContextReveal}
       onRename={handleContextRename}
       onDelete={handleContextDelete}
-      onAddToIndex={handleContextAddToIndex}
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
       onClose={() => { contextMenu = null; }}

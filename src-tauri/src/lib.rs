@@ -179,13 +179,6 @@ struct StatsResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct IndexFileResult {
-    indexed: u32,
-    total: u32,
-    errors: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 struct ReindexFileResult {
     chunks: u32,
     game_system: String,
@@ -511,26 +504,6 @@ async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     consume_sync_stream(app, response).await
-}
-
-#[tauri::command]
-async fn index_file(path: String) -> Result<IndexFileResult, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{}/api/index-files", SIDECAR_URL))
-        .json(&serde_json::json!({ "paths": [path] }))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Sidecar error: {}", response.status()));
-    }
-
-    response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))
 }
 
 #[tauri::command]
@@ -1294,7 +1267,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, index_file, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

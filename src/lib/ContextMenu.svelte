@@ -9,7 +9,6 @@
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
   export let onDelete: () => void = () => {};
-  export let onAddToIndex: () => void = () => {};
   export let onReindex: () => void = () => {};
   export let onShowStats: () => void = () => {};
   export let onClose: () => void = () => {};
@@ -41,14 +40,10 @@
     <button class="context-item" on:click={onOpen}>Open file</button>
   {/if}
   <button class="context-item" on:click={onReveal}>Reveal in folder</button>
-  {#if !item.is_dir}
+  {#if !item.is_dir && isIndexed}
     <hr class="context-divider" />
-    {#if isIndexed}
-      <button class="context-item" on:click={onReindex}>Re-index file</button>
-      <button class="context-item" on:click={onShowStats}>Get info</button>
-    {:else}
-      <button class="context-item" on:click={onAddToIndex}>Add to index</button>
-    {/if}
+    <button class="context-item" on:click={onReindex}>Re-index file</button>
+    <button class="context-item" on:click={onShowStats}>Get info</button>
   {/if}
   <hr class="context-divider" />
   <button class="context-item" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
