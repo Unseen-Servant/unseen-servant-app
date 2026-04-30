@@ -15,9 +15,9 @@ A TTRPG Gamemaster who:
 
 ### Core Philosophy
 
-1. **Local-first.** No accounts, no cloud, no data leaves the machine.
-2. **AI-augmented, not AI-dependent.** The app is fully functional without AI — search still works, files still browse.
-3. **Markdown for collaboration.** Configuration, notes, and homebrew content should be readable and editable by both humans and AI tools.
+1. **Local-first**: All content and inference work are done locally on a machine, which means dealing with all the limitation and tradeoffs that it brings. No PDFs leave the GM's machine.
+2. **No platform or format lock-in**: All the content that GMs are building remains accessible and readable on their machines after they are done using Unseen Servant. Obsidian is the obvious inspiration here.
+3. **Enabler for improvisation**: Many design elements take inspiration from DAWs and other tool used by musicians for live session. I see many similarity with a GM's role and responsibilities during prep and live play.
 
 ---
 
@@ -30,7 +30,7 @@ The core desktop application — Tauri v2 shell with SvelteKit frontend and a Py
 - **Tauri + Rust:** Native desktop window, filesystem access, sidecar lifecycle management
 - **SvelteKit + TypeScript:** File browser UI with recursive tree, lazy loading, persistent selection
 - **Python sidecar (FastAPI):** PDF text extraction, ChromaDB indexing, semantic search API (port 8420)
-- **MCP server:** 7 tools for Claude Desktop integration (search, compare, random tables, etc.)
+- **MCP server:** Tools for agentic integration (search, compare, random tables, etc.)
 
 ### Quick reference
 
@@ -58,7 +58,7 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 - **Ollama** with `bge-m3` for local embeddings (no API keys; needs `OLLAMA_CONTEXT_LENGTH=8192`)
 - **ChromaDB** for vector storage and semantic search
 - **MCP (Model Context Protocol)** for Claude Desktop integration
-- **PyMuPDF** for PDF text extraction
+- **PyMuPDF4LLM** for PDF text extraction
 
 ### Data flow
 
@@ -72,8 +72,72 @@ PDF files on disk
   → results to UI or Claude via MCP
 ```
 
+### Related repositories
+
+- **unseen-legend-lore-experiments** ('~/code/unseen-legend-lore-experiments') - Research spikes for Legend Lore. *Relationship:* FINDINGS inform key architectural decision in Legend Lore
+- **unseen-servant-site** ('~/code/unseen-servant-site') - Landing page of Unseen Servant. *Relationship:* legend lore is distribution through the landing page. Product description needs to match actual code and features.
+
 ---
 
-## Testing
+## Guidelines
 
-Python sidecar tests use in-memory ChromaDB and do not require Ollama.
+### 1. Think Before Coding
+
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+Before implementing:
+
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+Minimum code that solves the problem. Nothing speculative.
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
