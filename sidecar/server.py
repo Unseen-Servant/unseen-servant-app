@@ -1133,11 +1133,13 @@ def create_app(
         return {"status": "ok"}
 
     @app.post("/api/index-files")
-    async def index_files(request: IndexFilesRequest):
+    def index_files(request: IndexFilesRequest):
         """Index specific PDF files by path.
 
-        Synchronous convenience endpoint, primarily used by the test
-        suite. Production code uses ``/api/sync-index-stream``.
+        Declared as plain ``def`` (not ``async def``) so FastAPI runs the
+        body in a worker thread. Indexing does heavy synchronous work
+        (PyMuPDF + Ollama + Chroma); putting it on the event loop would
+        block ``/health`` polls and other concurrent requests.
         """
         total = len(request.paths)
         indexed = 0
@@ -1176,12 +1178,15 @@ def create_app(
         }
 
     @app.post("/api/reindex-file")
-    async def reindex_file(request: ReindexFileRequest):
+    def reindex_file(request: ReindexFileRequest):
         """Force re-index a single file: drop existing chunks, then re-add.
 
         Unlike sync_index, runs even when mtime/hash are unchanged — used by
         the right-click "Re-index file" action when the user wants to rebuild
         chunks regardless of file state (e.g. after a chunker change).
+
+        Declared as plain ``def`` so the heavy synchronous work runs in a
+        worker thread and doesn't block the event loop.
         """
         with sync_lock_or_409():
             pdf_path = Path(request.path)
