@@ -264,6 +264,10 @@ class IndexFilesRequest(BaseModel):
     paths: list[str]
     game_system: str | None = None
 
+class ReindexFileRequest(BaseModel):
+    path: str
+    game_system: str | None = None
+
 class IndexStatusRequest(BaseModel):
     selected_paths: list[str]
 
@@ -1171,6 +1175,50 @@ def create_app(
             "errors": errors
         }
 
+    @app.post("/api/reindex-file")
+    async def reindex_file(request: ReindexFileRequest):
+        """Force re-index a single file: drop existing chunks, then re-add.
+
+        Unlike sync_index, runs even when mtime/hash are unchanged — used by
+        the right-click "Re-index file" action when the user wants to rebuild
+        chunks regardless of file state (e.g. after a chunker change).
+        """
+        with sync_lock_or_409():
+            pdf_path = Path(request.path)
+            if not pdf_path.exists():
+                raise HTTPException(
+                    status_code=404, detail=f"File not found: {request.path}"
+                )
+
+            delete_source_chunks(request.path, collection, data_dir)
+
+            chunk_count, error, detected_system = index_single_pdf(
+                pdf_path, collection, game_system=request.game_system,
+                known_systems=_merged["known"], data_dir=data_dir,
+            )
+
+            if error:
+                return {"chunks": 0, "game_system": detected_system, "error": error}
+
+            if data_dir:
+                manifest = load_manifest(data_dir)
+                manifest.files[request.path] = ManifestEntry(
+                    filename=pdf_path.name,
+                    mtime=os.path.getmtime(pdf_path),
+                    chunk_count=chunk_count,
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                    game_system=detected_system,
+                    content_hash=file_content_hash(pdf_path),
+                    file_size=os.path.getsize(pdf_path),
+                )
+                save_manifest(data_dir, manifest)
+
+            return {
+                "chunks": chunk_count,
+                "game_system": detected_system,
+                "error": None,
+            }
+
     @app.post("/api/index-status")
     async def index_status(request: IndexStatusRequest):
         """Compare selected files against the current index.
@@ -1867,23 +1915,33 @@ def create_app(
 
     @app.get("/api/sources")
     async def get_sources():
-        """List all indexed PDFs with chunk counts."""
+        """List all indexed PDFs with per-source stats."""
         try:
             results = collection.get(include=["metadatas"])
             if not results["metadatas"]:
                 return {"sources": [], "count": 0}
 
+            manifest = load_manifest(data_dir) if data_dir else IndexManifest()
+
             sources_info = {}
             for metadata in results["metadatas"]:
                 filename = metadata["filename"]
                 if filename not in sources_info:
+                    source_path = metadata.get("source", "")
+                    entry = manifest.files.get(source_path)
                     sources_info[filename] = {
                         "filename": filename,
-                        "source": metadata.get("source", ""),
+                        "source": source_path,
                         "chunks": 0,
                         "game_system": metadata.get("game_system", "unknown"),
+                        "pages": 0,
+                        "indexed_at": entry.indexed_at if entry else None,
+                        "file_size_bytes": entry.file_size if entry else None,
                     }
                 sources_info[filename]["chunks"] += 1
+                page_end = metadata.get("page_end")
+                if isinstance(page_end, int) and page_end > sources_info[filename]["pages"]:
+                    sources_info[filename]["pages"] = page_end
 
             sources_list = sorted(sources_info.values(), key=lambda x: x["filename"])
             return {"sources": sources_list, "count": len(sources_list)}

@@ -19,6 +19,7 @@
   import GettingStartedModal from '../lib/GettingStartedModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
+  import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -49,6 +50,7 @@
   let focusedFilePath: string | null = null;
   let contextMenu: { x: number; y: number; item: FileItem } | null = null;
   let renamingFilePath: string | null = null;
+  let statsModalPath: string | null = null;
 
   // Game system tag editing
   let knownSystems: KnownGameSystem[] = [];
@@ -697,6 +699,40 @@
     }
   }
 
+  async function handleContextAddToIndex() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    try {
+      await invoke('index_file', { path: item.path });
+      await refreshIndexStatus();
+      notification.show({ type: 'success', message: `Indexed ${item.name}`, duration: 3000 });
+    } catch (e) {
+      notification.show({ type: 'error', message: `Index failed: ${String(e)}`, duration: 5000 });
+    }
+  }
+
+  async function handleContextReindex() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    const confirmed = await confirm(`Re-index "${item.name}"? This rebuilds its chunks.`, { title: 'Re-index file' });
+    if (!confirmed) return;
+    try {
+      await invoke('reindex_file', { path: item.path });
+      await refreshIndexStatus();
+      notification.show({ type: 'success', message: `Re-indexed ${item.name}`, duration: 3000 });
+    } catch (e) {
+      notification.show({ type: 'error', message: `Re-index failed: ${String(e)}`, duration: 5000 });
+    }
+  }
+
+  function handleContextShowStats() {
+    if (!contextMenu) return;
+    statsModalPath = contextMenu.item.path;
+    contextMenu = null;
+  }
+
   async function handleContextDelete() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -1170,11 +1206,22 @@
       x={contextMenu.x}
       y={contextMenu.y}
       item={contextMenu.item}
+      isIndexed={indexedPaths.has(contextMenu.item.path)}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}
       onDelete={handleContextDelete}
+      onAddToIndex={handleContextAddToIndex}
+      onReindex={handleContextReindex}
+      onShowStats={handleContextShowStats}
       onClose={() => { contextMenu = null; }}
+    />
+  {/if}
+
+  {#if statsModalPath}
+    <DocumentStatsModal
+      path={statsModalPath}
+      onClose={() => { statsModalPath = null; }}
     />
   {/if}
 
