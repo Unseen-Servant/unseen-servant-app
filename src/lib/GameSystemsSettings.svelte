@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import type { KnownGameSystem } from './types';
+  import ActionButton from './ActionButton.svelte';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
@@ -159,8 +160,8 @@
           {/if}
         </div>
         <div class="footer-right">
-          <button class="btn btn-cancel" on:click={closeModal}>Cancel</button>
-          <button class="btn btn-save" on:click={handleSave}>{modalMode === 'add' ? 'Add System' : 'Save'}</button>
+          <ActionButton kind="discard" label="Cancel" onClick={closeModal} />
+          <ActionButton kind="confirm" label={modalMode === 'add' ? 'Add System' : 'Save'} onClick={handleSave} />
         </div>
       </div>
     </div>
@@ -397,23 +398,6 @@
     cursor: pointer;
     border: 1px solid var(--border-subtle);
     transition: all var(--transition-fast);
-  }
-
-  .btn-save {
-    background: var(--bg-active);
-    color: var(--text-primary);
-    border-color: var(--bg-active);
-  }
-  .btn-save:hover {
-    background: var(--bg-active-focused);
-  }
-
-  .btn-cancel {
-    background: none;
-    color: var(--text-secondary);
-  }
-  .btn-cancel:hover {
-    color: var(--text-primary);
   }
 
   .btn-delete {

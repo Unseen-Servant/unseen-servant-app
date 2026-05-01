@@ -4,10 +4,12 @@
   export let disabled: boolean = false;
   export let panelOpen: boolean = false;
   export let panelToggleVisible: boolean = true;
+  export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
+  export let onClearScope: () => void = () => {};
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +74,21 @@
   {/if}
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
+    {#if scopeChip}
+      <span
+        class="scope-chip"
+        title={scopeChip.tooltip ?? `${scopeChip.kind}: ${scopeChip.label}`}
+      >
+        <span class="scope-kind">in {scopeChip.kind}:</span>
+        <span class="scope-label">{scopeChip.label}</span>
+        <button
+          type="button"
+          class="scope-clear"
+          on:click|stopPropagation={onClearScope}
+          aria-label="Clear search scope"
+        >✕</button>
+      </span>
+    {/if}
     <input
       bind:this={inputEl}
       bind:value={searchQuery}
@@ -212,5 +229,47 @@
 
   .clear-btn:hover {
     color: var(--text-primary);
+  }
+
+  .scope-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    max-width: 240px;
+    padding: 0.1rem 0.25rem 0.1rem 0.4rem;
+    margin-right: 0.4rem;
+    background: rgba(146, 92, 203, 0.12);
+    border: 1px solid var(--text-active);
+    border-radius: 3px;
+    color: var(--text-active);
+    font-size: 0.75rem;
+    line-height: 1.2;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+  .scope-kind {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+  .scope-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    font-weight: 600;
+  }
+  .scope-clear {
+    background: none;
+    border: none;
+    color: var(--text-active);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0 0.15rem;
+    line-height: 1;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .scope-clear:hover {
+    background: rgba(146, 92, 203, 0.2);
   }
 </style>

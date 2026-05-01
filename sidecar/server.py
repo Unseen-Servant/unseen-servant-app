@@ -283,6 +283,7 @@ class SearchRequest(BaseModel):
     source_filter: str | None = None
     game_system: str | None = None
     collection: str | None = None
+    source_paths: list[str] | None = None
     search_all: bool = False
 
 class SetGameSystemRequest(BaseModel):
@@ -2440,11 +2441,16 @@ def create_app(
             effective_collection = request.collection
             auto_scoped = False
 
+            # An explicit path scope (file/folder right-click) overrides the
+            # collection auto-scope so the user gets exactly what they asked for.
+            path_scoped = bool(request.source_paths)
+
             # Fall back to active context if the caller didn't pick one
             # and didn't ask to bypass it.
             if (
                 effective_collection is None
                 and not request.search_all
+                and not path_scoped
                 and data_dir
             ):
                 store_peek = load_collections(data_dir)
@@ -2475,6 +2481,8 @@ def create_app(
                         "auto_scoped": auto_scoped,
                     }
                 where_clauses.append({"filename": {"$in": filenames}})
+            if request.source_paths:
+                where_clauses.append({"source": {"$in": request.source_paths}})
             if request.source_filter:
                 where_clauses.append({"filename": request.source_filter})
             if request.game_system:
