@@ -99,6 +99,7 @@
         {#if !collapsed.has(group.tag)}
           <ul class="group-files">
             {#each group.entries as entry (entry.path)}
+              {@const relParent = relativeParent(entry.path)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
@@ -114,7 +115,6 @@
                   </svg>
                 </span>
                 <span class="file-name">{entry.filename}</span>
-                {@const relParent = relativeParent(entry.path)}
                 {#if relParent}
                   <span class="file-sep" aria-hidden="true">·</span>
                   <span class="file-path" title={entry.path}>{relParent}</span>
