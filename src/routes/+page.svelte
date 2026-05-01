@@ -827,6 +827,13 @@
     startCreateCollectionFromFolder(item);
   }
 
+  function handleContextAddToNewCollection() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    startCreateCollectionWithItem(item);
+  }
+
   async function handleContextDelete() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -1147,6 +1154,26 @@
       return;
     }
     collectionEditName = folder.name;
+    collectionEditDescription = '';
+    collectionEditPaths = new Set(candidates);
+    isCreatingCollection = true;
+    editingCollectionName = null;
+    highlightedCollection = null;
+  }
+
+  function startCreateCollectionWithItem(item: FileItem) {
+    const candidates = item.is_dir
+      ? indexedPdfsUnderPath(item.path)
+      : [item.path];
+    if (candidates.length === 0) {
+      notification.show({
+        type: 'info',
+        message: `No indexed PDFs under "${item.name}"`,
+        duration: 4000,
+      });
+      return;
+    }
+    collectionEditName = '';
     collectionEditDescription = '';
     collectionEditPaths = new Set(candidates);
     isCreatingCollection = true;
@@ -1487,6 +1514,7 @@
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
       onAddToCollection={handleContextAddToCollection}
+      onAddToNewCollection={handleContextAddToNewCollection}
       onRemoveFromCollection={handleContextRemoveFromCollection}
       onCreateCollectionFromFolder={handleContextCreateCollectionFromFolder}
       onClose={() => { contextMenu = null; }}

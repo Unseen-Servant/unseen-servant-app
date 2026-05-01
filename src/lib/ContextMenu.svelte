@@ -15,6 +15,7 @@
   export let onReindex: () => void = () => {};
   export let onShowStats: () => void = () => {};
   export let onAddToCollection: (name: string) => void = () => {};
+  export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
   export let onCreateCollectionFromFolder: () => void = () => {};
   export let onClose: () => void = () => {};
@@ -57,37 +58,42 @@
     <button class="context-item" on:click={onShowStats}>Get info</button>
   {/if}
 
-  {#if canAddToCollection && (hasCollections || item.is_dir)}
+  {#if canAddToCollection}
     <hr class="context-divider" />
     {#if item.is_dir}
       <button class="context-item" on:click={onCreateCollectionFromFolder}>
         Create collection from folder
       </button>
     {/if}
-    {#if hasCollections}
-      <!-- svelte-ignore a11y-mouse-events-have-key-events -->
-      <div
-        class="context-item submenu-trigger"
-        class:open={openSubmenu === 'add'}
-        on:mouseenter={() => { openSubmenu = 'add'; }}
-        on:mouseleave={() => { openSubmenu = null; }}
-      >
-        <span>Add to collection&hellip;</span>
-        <span class="submenu-caret">&#9656;</span>
-        {#if openSubmenu === 'add'}
-          <div class="submenu">
-            {#each collectionList as col}
-              <button
-                class="context-item"
-                on:click={() => onAddToCollection(col.name)}
-              >
-                {col.name}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
+    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
+    <div
+      class="context-item submenu-trigger"
+      class:open={openSubmenu === 'add'}
+      on:mouseenter={() => { openSubmenu = 'add'; }}
+      on:mouseleave={() => { openSubmenu = null; }}
+    >
+      <span>Add to collection&hellip;</span>
+      <span class="submenu-caret">&#9656;</span>
+      {#if openSubmenu === 'add'}
+        <div class="submenu">
+          {#each collectionList as col}
+            <button
+              class="context-item"
+              on:click={() => onAddToCollection(col.name)}
+            >
+              {col.name}
+            </button>
+          {/each}
+          {#if hasCollections}
+            <hr class="context-divider" />
+          {/if}
+          <button class="context-item" on:click={onAddToNewCollection}>
+            + New collection&hellip;
+          </button>
+        </div>
+      {/if}
+    </div>
+
     {#if hasContainingCollections}
       <!-- svelte-ignore a11y-mouse-events-have-key-events -->
       <div
