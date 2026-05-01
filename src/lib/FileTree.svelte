@@ -13,7 +13,7 @@
   export let gameSystemMap: Map<string, string> = new Map();
   export let knownSystems: KnownGameSystem[] = [];
   export let indexedPaths: Set<string> = new Set();
-  export let onToggle: (path: string, isDir: boolean, item: FileItem) => void;
+  export let onToggle: (path: string, isDir: boolean, item: FileItem, shiftKey: boolean) => void;
   export let onSetGameSystem: (path: string, filename: string, tag: string) => void = () => {};
 
   // Focus & context menu props
@@ -35,7 +35,7 @@
   export let collectionPaths: Set<string> = new Set();
   export let collectionFolders: Set<string> = new Set();
   export let highlightPaths: Set<string> = new Set();
-  export let onCollectionToggle: (path: string, isDir: boolean, item: FileItem) => void = () => {};
+  export let onCollectionToggle: (path: string, isDir: boolean, item: FileItem, shiftKey: boolean) => void = () => {};
 
   // Active-context filter — when set, only paths in this Set render.
   // Includes ancestor folders of every shown file so the tree structure
@@ -117,11 +117,12 @@
     }
   }
 
-  function handleCheckboxChange() {
+  function handleCheckboxChange(event: MouseEvent | KeyboardEvent) {
+    const shiftKey = event.shiftKey;
     if (mode === 'collection') {
-      onCollectionToggle(item.path, item.is_dir, item);
+      onCollectionToggle(item.path, item.is_dir, item, shiftKey);
     } else {
-      onToggle(item.path, item.is_dir, item);
+      onToggle(item.path, item.is_dir, item, shiftKey);
     }
   }
 

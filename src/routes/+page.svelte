@@ -20,6 +20,7 @@
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
+  import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -495,7 +496,60 @@
     }
   }
 
-  async function toogleSelection(path: string, isDir: boolean, item: FileItem) {
+  let lastIndexClickedPath: string | null = null;
+  let lastCollectionClickedPath: string | null = null;
+
+  function flattenVisibleFilePaths(items: FileItem[]): string[] {
+    const out: string[] = [];
+    function walk(list: FileItem[]) {
+      for (const item of list) {
+        if (item.is_dir) {
+          if (expandedPaths.has(item.path) && item.children) {
+            walk(item.children);
+          }
+        } else {
+          out.push(item.path);
+        }
+      }
+    }
+    walk(items);
+    return out;
+  }
+
+  function applyRangeToggle(
+    target: Set<string>,
+    anchor: string,
+    current: string,
+    requireIndexed: boolean,
+  ): boolean {
+    const flat = flattenVisibleFilePaths(files);
+    const a = flat.indexOf(anchor);
+    const b = flat.indexOf(current);
+    if (a === -1 || b === -1) return false;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const shouldSelect = !target.has(current);
+    for (let i = lo; i <= hi; i++) {
+      const p = flat[i];
+      if (requireIndexed && !indexedPaths.has(p)) continue;
+      if (shouldSelect) target.add(p);
+      else target.delete(p);
+    }
+    return true;
+  }
+
+  async function toogleSelection(path: string, isDir: boolean, item: FileItem, shiftKey: boolean = false) {
+    if (shiftKey && !isDir && lastIndexClickedPath) {
+      const ok = applyRangeToggle(selectedPaths, lastIndexClickedPath, path, false);
+      if (ok) {
+        selectedPaths = selectedPaths;
+        lastIndexClickedPath = path;
+        await saveState();
+        scheduleStatusRefresh();
+        return;
+      }
+    }
+
     if (isDir) {
       // Toggle folder: recursively add/remove all PDFs
       await toggleFolderRecursive(item);
@@ -507,6 +561,7 @@
         selectedPaths.add(path);
       }
       selectedPaths = selectedPaths; // Trigger reactivity
+      lastIndexClickedPath = path;
       await saveState();
       scheduleStatusRefresh();
     }
@@ -751,6 +806,27 @@
     contextMenu = null;
   }
 
+  function handleContextAddToCollection(name: string) {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    addToCollection(name, item);
+  }
+
+  function handleContextRemoveFromCollection(name: string) {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    removeFromCollection(name, item);
+  }
+
+  function handleContextCreateCollectionFromFolder() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    startCreateCollectionFromFolder(item);
+  }
+
   async function handleContextDelete() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -914,64 +990,179 @@
 
   async function saveCollection() {
     const name = collectionEditName.trim();
-    console.log('[saveCollection] called', { name, isCreatingCollection, editingCollectionName, pathCount: collectionEditPaths.size });
-    if (!name) {
-      console.warn('[saveCollection] name is empty, aborting');
-      return;
-    }
+    if (!name) return;
     const filePaths = Array.from(collectionEditPaths);
 
     try {
       if (isCreatingCollection) {
-        console.log('[saveCollection] creating', { name, filePaths, description: collectionEditDescription });
-        const result = await invoke<CollectionMutationResult>('create_collection', {
+        await invoke<CollectionMutationResult>('create_collection', {
           name,
           filePaths,
           description: collectionEditDescription,
         });
-        console.log('[saveCollection] created', result);
+        notification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
       } else if (editingCollectionName) {
-        // If name changed, delete old and create new
         if (editingCollectionName !== name) {
-          console.log('[saveCollection] renaming', editingCollectionName, '→', name);
           await invoke('delete_collection', { name: editingCollectionName });
-          const result = await invoke<CollectionMutationResult>('create_collection', {
+          await invoke<CollectionMutationResult>('create_collection', {
             name,
             filePaths,
             description: collectionEditDescription,
           });
-          console.log('[saveCollection] renamed', result);
+          notification.show({ type: 'success', message: `Renamed to "${name}"`, duration: 4000 });
         } else {
-          console.log('[saveCollection] updating', { name, filePaths, description: collectionEditDescription });
-          const result = await invoke<CollectionMutationResult>('update_collection', {
+          await invoke<CollectionMutationResult>('update_collection', {
             name,
             filePaths,
             description: collectionEditDescription,
           });
-          console.log('[saveCollection] updated', result);
+          notification.show({ type: 'success', message: `Updated "${name}"`, duration: 4000 });
         }
-      } else {
-        console.warn('[saveCollection] neither creating nor editing — no-op');
       }
       cancelCollectionEdit();
       await loadCollections();
-      console.log('[saveCollection] done');
     } catch (e) {
-      console.error('[saveCollection] FAILED:', e);
+      notification.show({ type: 'error', message: `Save failed: ${String(e)}`, duration: 5000 });
     }
   }
 
-  async function deleteCollection(name: string) {
+  let pendingDeleteCollection: string | null = null;
+
+  function requestDeleteCollection(name: string) {
+    pendingDeleteCollection = name;
+  }
+
+  async function confirmDeleteCollection() {
+    if (!pendingDeleteCollection) return;
+    const name = pendingDeleteCollection;
+    pendingDeleteCollection = null;
     try {
       await invoke('delete_collection', { name });
       cancelCollectionEdit();
       await loadCollections();
+      notification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
     } catch (e) {
-      console.error('Failed to delete collection:', e);
+      notification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
     }
   }
 
-  function handleCollectionToggle(path: string, isDir: boolean, item: FileItem) {
+  // ---------------------------------------------------------------------------
+  // Bulk collection actions (right-click menu)
+  // ---------------------------------------------------------------------------
+
+  function indexedPdfsUnderPath(target: string): string[] {
+    if (indexedPaths.has(target)) return [target];
+    const prefix = target + '/';
+    return [...indexedPaths].filter(p => p.startsWith(prefix));
+  }
+
+  function collectionsContaining(target: string, isDir: boolean): string[] {
+    const targets = isDir ? new Set(indexedPdfsUnderPath(target)) : new Set([target]);
+    if (targets.size === 0) return [];
+    return Object.values(collections)
+      .filter(c => c.file_paths.some(p => targets.has(p)))
+      .map(c => c.name);
+  }
+
+  async function addToCollection(name: string, item: FileItem) {
+    const col = collections[name];
+    if (!col) return;
+    const candidates = item.is_dir ? indexedPdfsUnderPath(item.path) : [item.path];
+    if (candidates.length === 0) {
+      notification.show({
+        type: 'info',
+        message: `No indexed PDFs under "${item.name}"`,
+        duration: 4000,
+      });
+      return;
+    }
+    const before = col.file_paths.length;
+    const merged = Array.from(new Set([...col.file_paths, ...candidates]));
+    const added = merged.length - before;
+    if (added === 0) {
+      notification.show({
+        type: 'info',
+        message: `Already in "${name}"`,
+        duration: 3000,
+      });
+      return;
+    }
+    try {
+      await invoke<CollectionMutationResult>('update_collection', {
+        name,
+        filePaths: merged,
+        description: col.description,
+      });
+      await loadCollections();
+      notification.show({
+        type: 'success',
+        message: `Added ${added} file${added === 1 ? '' : 's'} to "${name}"`,
+        duration: 4000,
+      });
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Could not add to "${name}": ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  async function removeFromCollection(name: string, item: FileItem) {
+    const col = collections[name];
+    if (!col) return;
+    const targets = new Set(item.is_dir ? indexedPdfsUnderPath(item.path) : [item.path]);
+    const remaining = col.file_paths.filter(p => !targets.has(p));
+    const removed = col.file_paths.length - remaining.length;
+    if (removed === 0) return;
+    try {
+      await invoke<CollectionMutationResult>('update_collection', {
+        name,
+        filePaths: remaining,
+        description: col.description,
+      });
+      await loadCollections();
+      notification.show({
+        type: 'success',
+        message: `Removed ${removed} file${removed === 1 ? '' : 's'} from "${name}"`,
+        duration: 4000,
+      });
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Could not remove from "${name}": ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  function startCreateCollectionFromFolder(folder: FileItem) {
+    const candidates = indexedPdfsUnderPath(folder.path);
+    if (candidates.length === 0) {
+      notification.show({
+        type: 'info',
+        message: `No indexed PDFs under "${folder.name}"`,
+        duration: 4000,
+      });
+      return;
+    }
+    collectionEditName = folder.name;
+    collectionEditDescription = '';
+    collectionEditPaths = new Set(candidates);
+    isCreatingCollection = true;
+    editingCollectionName = null;
+    highlightedCollection = null;
+  }
+
+  function handleCollectionToggle(path: string, isDir: boolean, item: FileItem, shiftKey: boolean = false) {
+    if (shiftKey && !isDir && lastCollectionClickedPath) {
+      const ok = applyRangeToggle(collectionEditPaths, lastCollectionClickedPath, path, true);
+      if (ok) {
+        collectionEditPaths = collectionEditPaths;
+        lastCollectionClickedPath = path;
+        return;
+      }
+    }
     if (isDir) {
       toggleCollectionFolder(item);
     } else {
@@ -981,6 +1172,7 @@
         collectionEditPaths.add(path);
       }
       collectionEditPaths = collectionEditPaths;
+      lastCollectionClickedPath = path;
     }
   }
 
@@ -1205,7 +1397,7 @@
         onStartEdit={startEditCollection}
         onSave={saveCollection}
         onCancel={cancelCollectionEdit}
-        onDelete={deleteCollection}
+        onDelete={requestDeleteCollection}
         onHighlight={toggleCollectionHighlight}
         onToggleActive={toggleActiveContext}
       />
@@ -1283,12 +1475,20 @@
       y={contextMenu.y}
       item={contextMenu.item}
       isIndexed={contextMenu.isIndexed}
+      {collections}
+      canAddToCollection={contextMenu.item.is_dir
+        ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
+        : indexedPaths.has(contextMenu.item.path)}
+      containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}
       onDelete={handleContextDelete}
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
+      onAddToCollection={handleContextAddToCollection}
+      onRemoveFromCollection={handleContextRemoveFromCollection}
+      onCreateCollectionFromFolder={handleContextCreateCollectionFromFolder}
       onClose={() => { contextMenu = null; }}
     />
   {/if}
@@ -1297,6 +1497,17 @@
     <DocumentStatsModal
       path={statsModalPath}
       onClose={() => { statsModalPath = null; }}
+    />
+  {/if}
+
+  {#if pendingDeleteCollection}
+    <ConfirmDialog
+      title="Delete collection"
+      message={`Delete "${pendingDeleteCollection}"? Files in your library are not affected.`}
+      confirmLabel="Delete"
+      danger
+      onConfirm={confirmDeleteCollection}
+      onCancel={() => { pendingDeleteCollection = null; }}
     />
   {/if}
 
