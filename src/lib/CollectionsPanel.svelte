@@ -198,6 +198,17 @@
           <div class="row-actions">
             <button
               class="row-btn"
+              on:click|stopPropagation={() => onEdit(col.name)}
+              title="Edit info"
+              aria-label="Edit info"
+            >
+              <!-- Font Awesome "pen-to-square" -->
+              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
+              </svg>
+            </button>
+            <button
+              class="row-btn"
               on:click|stopPropagation={() => onEditFiles(col.name)}
               title="Edit files"
               aria-label="Edit files"
@@ -205,17 +216,6 @@
               <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
               <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
                 <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onEdit(col.name)}
-              title="Edit metadata"
-              aria-label="Edit metadata"
-            >
-              <!-- Font Awesome "pen-to-square" -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
               </svg>
             </button>
             <button
@@ -293,11 +293,9 @@
   }
   .header-btn:hover {
     color: var(--text-primary);
-    background: var(--bg-container);
   }
   .header-btn.on {
     color: var(--text-accent);
-    background: var(--bg-container);
   }
 
   .sort-wrapper {
@@ -451,7 +449,6 @@
     transition: all var(--transition-fast);
   }
   .row-btn:hover {
-    background: var(--bg-focused);
     color: var(--text-primary);
   }
   .row-btn.danger:hover { color: var(--text-danger); }

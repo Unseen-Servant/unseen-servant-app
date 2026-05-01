@@ -126,11 +126,9 @@
   }
   .panel-toggle:hover {
     color: var(--text-primary);
-    background: var(--bg-container);
   }
   .panel-toggle.active {
     color: var(--text-accent);
-    background: var(--bg-container);
   }
   .toggle-icon {
     width: 14px;
