@@ -172,15 +172,17 @@
     color: #668063;
   }
   .indicator.mcp.connected {
-    color: var(--text-active);
+    color: #668063;
   }
   .indicator.mcp.active {
-    color: var(--text-active);
-    animation: mcp-pulse 0.8s ease-in-out;
+    animation: mcp-pulse 0.9s ease-in-out;
   }
+  /* Resting state is health-green like the sidecar LED. Activity pulses
+     briefly toward the active-purple — green = lamp on, purple = agent
+     querying right now. */
   @keyframes mcp-pulse {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.6); }
+    0%, 100% { color: #668063; filter: brightness(1); }
+    50% { color: var(--text-active); filter: brightness(1.3); }
   }
   .indicator-icon {
     width: 12px;
