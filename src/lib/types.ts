@@ -110,6 +110,39 @@ export interface ActiveContextResult {
   active_context: string | null;
 }
 
+export interface OrphanFile {
+  path: string;
+  filename: string;
+  game_system: string;
+  size_bytes: number;
+}
+
+export interface AnchorFile {
+  path: string;
+  filename: string;
+  count: number;
+  collections: string[];
+}
+
+export interface OverlapPair {
+  a: string;
+  b: string;
+  count: number;
+}
+
+export interface StaleCollection {
+  name: string;
+  last_used_at: string | null;
+  file_count: number;
+}
+
+export interface LibraryHealthResult {
+  orphans: OrphanFile[];
+  anchors: AnchorFile[];
+  overlap: OverlapPair[];
+  stale: StaleCollection[];
+}
+
 export interface StatsResult {
   total_chunks: number;
   total_documents: number;

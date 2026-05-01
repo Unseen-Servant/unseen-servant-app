@@ -2419,6 +2419,102 @@ def create_app(
         save_collections(data_dir, store)
         return {"active_context": None}
 
+    # ------------------------------------------------------------------
+    # Library health — derived audit of orphans / anchors / overlap / stale
+    # ------------------------------------------------------------------
+
+    @app.get("/api/library-health")
+    async def library_health():
+        """Audit aggregations across the manifest and collection store.
+
+        Pure read; no precompute. All four sections derive from current
+        state — manifest entries plus collection metadata.
+        """
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        manifest = load_manifest(data_dir)
+        store = load_collections(data_dir)
+
+        # Orphan detection considers archived collections too — archive
+        # is "hidden" not "removed", so files there aren't orphans.
+        in_any: set[str] = set()
+        for c in store.collections.values():
+            in_any.update(c.file_paths)
+        orphans = []
+        for path, entry in manifest.files.items():
+            if path in in_any:
+                continue
+            orphans.append({
+                "path": path,
+                "filename": entry.filename,
+                "game_system": entry.game_system,
+                "size_bytes": entry.file_size,
+            })
+        orphans.sort(key=lambda o: o["filename"].lower())
+
+        # Anchors and overlap exclude archived collections — archived is
+        # stale by definition and would inflate "high-value" signal.
+        active_collections = [
+            c for c in store.collections.values() if not c.archived
+        ]
+
+        membership: dict[str, list[str]] = {}
+        for c in active_collections:
+            for p in c.file_paths:
+                membership.setdefault(p, []).append(c.name)
+        anchors = []
+        for path, names in membership.items():
+            if len(names) < 3:
+                continue
+            entry = manifest.files.get(path)
+            anchors.append({
+                "path": path,
+                "filename": entry.filename if entry else path.split("/")[-1],
+                "count": len(names),
+                "collections": sorted(names),
+            })
+        anchors.sort(key=lambda a: (-a["count"], a["filename"].lower()))
+
+        overlap = []
+        for i in range(len(active_collections)):
+            a = active_collections[i]
+            a_set = set(a.file_paths)
+            if not a_set:
+                continue
+            for j in range(i + 1, len(active_collections)):
+                b = active_collections[j]
+                shared = a_set.intersection(b.file_paths)
+                if not shared:
+                    continue
+                overlap.append({
+                    "a": a.name,
+                    "b": b.name,
+                    "count": len(shared),
+                })
+        overlap.sort(key=lambda o: (-o["count"], o["a"].lower(), o["b"].lower()))
+
+        # Stale returns ALL non-archived collections sorted by last_used_at
+        # ascending (nulls first). The client picks a threshold and
+        # decides how to surface "never used" entries.
+        stale = []
+        for c in active_collections:
+            stale.append({
+                "name": c.name,
+                "last_used_at": c.last_used_at,
+                "file_count": len(c.file_paths),
+            })
+        stale.sort(key=lambda s: (
+            0 if s["last_used_at"] is None else 1,
+            s["last_used_at"] or "",
+        ))
+
+        return {
+            "orphans": orphans,
+            "anchors": anchors,
+            "overlap": overlap,
+            "stale": stale,
+        }
+
     @app.post("/api/search")
     async def search(request: SearchRequest):
         """Parent-document semantic search.

@@ -181,6 +181,44 @@ struct ActiveContextResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct OrphanFile {
+    path: String,
+    filename: String,
+    game_system: String,
+    size_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct AnchorFile {
+    path: String,
+    filename: String,
+    count: u32,
+    collections: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct OverlapPair {
+    a: String,
+    b: String,
+    count: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct StaleCollection {
+    name: String,
+    last_used_at: Option<String>,
+    file_count: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct LibraryHealthResult {
+    orphans: Vec<OrphanFile>,
+    anchors: Vec<AnchorFile>,
+    overlap: Vec<OverlapPair>,
+    stale: Vec<StaleCollection>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct StatsResult {
     total_chunks: u32,
     total_documents: u32,
@@ -987,6 +1025,29 @@ async fn set_active_context(name: String) -> Result<ActiveContextResult, String>
 }
 
 #[tauri::command]
+async fn get_library_health() -> Result<LibraryHealthResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/library-health", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: LibraryHealthResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
 async fn clear_active_context() -> Result<ActiveContextResult, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -1362,7 +1423,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, get_library_health, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

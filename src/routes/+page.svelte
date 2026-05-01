@@ -6,7 +6,7 @@
   import { pdfFileUrl } from '../lib/pdfUrl';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, LibraryHealthResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
@@ -22,6 +22,7 @@
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
+  import LibraryHealth from '../lib/LibraryHealth.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -68,6 +69,8 @@
   let activeContextName: string | null = null;
   let collectionsPanelOpen = true;
   let editingMetadataFor: string | null = null;
+  let libraryHealthData: LibraryHealthResult | null = null;
+  let libraryHealthLoading = false;
 
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
@@ -1298,6 +1301,66 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Library health
+  // ---------------------------------------------------------------------------
+
+  async function openLibraryHealth() {
+    libraryHealthLoading = true;
+    try {
+      libraryHealthData = await invoke<LibraryHealthResult>('get_library_health');
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Could not load library health: ${String(e)}`,
+        duration: 5000,
+      });
+      libraryHealthData = null;
+    } finally {
+      libraryHealthLoading = false;
+    }
+  }
+
+  async function refreshLibraryHealth() {
+    if (!libraryHealthData) return;
+    try {
+      libraryHealthData = await invoke<LibraryHealthResult>('get_library_health');
+    } catch {
+      // Silent — old data stays on screen
+    }
+  }
+
+  async function addOrphanToCollection(path: string, collectionName: string) {
+    const col = collections[collectionName];
+    if (!col) return;
+    if (col.file_paths.includes(path)) return;
+    try {
+      await invoke<CollectionMutationResult>('update_collection', {
+        name: collectionName,
+        filePaths: [...col.file_paths, path],
+        description: col.description,
+      });
+      notification.show({
+        type: 'success',
+        message: `Added to "${collectionName}"`,
+        duration: 3000,
+      });
+      await loadCollections();
+      await refreshLibraryHealth();
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Could not add: ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  async function archiveStaleCollection(name: string) {
+    await toggleArchived(name, true);
+    await refreshLibraryHealth();
+  }
+
   function startCreateCollectionWithItem(item: FileItem) {
     const candidates = item.is_dir
       ? indexedPdfsUnderPath(item.path)
@@ -1689,6 +1752,16 @@
     />
   {/if}
 
+  {#if libraryHealthData}
+    <LibraryHealth
+      data={libraryHealthData}
+      {collections}
+      onClose={() => { libraryHealthData = null; }}
+      onAddOrphanToCollection={addOrphanToCollection}
+      onArchiveStale={archiveStaleCollection}
+    />
+  {/if}
+
   <StatusBar
     {selectedFolder}
     {sidecarConnected}
@@ -1707,6 +1780,7 @@
     onShowLicense={() => { showLicense = true; }}
     onShowGuide={() => { showGuide = true; }}
     onOpenSettings={() => { showSettings = true; }}
+    onOpenLibraryHealth={openLibraryHealth}
   />
 </main>
 
