@@ -67,6 +67,7 @@
   let activeContextName: string | null = null;
   let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
+  let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
   // Index sync state
@@ -274,6 +275,10 @@
       if (typeof savedPanelOpen === 'boolean') {
         collectionsPanelOpen = savedPanelOpen;
       }
+      const savedHideSetup = await store.get<boolean>('hideSetupButton');
+      if (typeof savedHideSetup === 'boolean') {
+        hideSetupButton = savedHideSetup;
+      }
       await loadCollections();
     } catch (e) {
       // No saved state on first run — that's fine
@@ -378,6 +383,17 @@
       sidecarConnected = await invoke<boolean>('check_sidecar_health');
     } catch {
       sidecarConnected = false;
+    }
+  }
+
+  async function setHideSetupButton(value: boolean) {
+    hideSetupButton = value;
+    try {
+      const store = await load('settings.json');
+      await store.set('hideSetupButton', value);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist hideSetupButton:', e);
     }
   }
 
@@ -1799,6 +1815,7 @@
     onShowLicense={() => { showLicense = true; }}
     onShowGuide={() => { settingsInitialTab = 'setup'; showSettings = true; }}
     onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
+    showGuideButton={!hideSetupButton}
   />
 </main>
 
@@ -1826,6 +1843,8 @@
   filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
   collectionsCreated={Object.keys(collections).length > 0}
   {mcpConnected}
+  {hideSetupButton}
+  onHideSetupButtonChange={setHideSetupButton}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}

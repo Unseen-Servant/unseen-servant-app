@@ -34,6 +34,8 @@
   export let filesIndexed: boolean = false;
   export let collectionsCreated: boolean = false;
   export let mcpConnected: boolean = false;
+  export let hideSetupButton: boolean = false;
+  export let onHideSetupButtonChange: (value: boolean) => void = () => {};
   export let initialTab: 'library' | 'game-systems' | 'setup' = 'library';
 
   let activeTab: 'library' | 'game-systems' | 'setup' = initialTab;
@@ -85,6 +87,20 @@
         />
       {:else if activeTab === 'setup'}
         <div class="setup-pane">
+          <label class="setup-toggle">
+            <span class="setup-toggle-text">
+              <span class="setup-toggle-title">Hide setup shortcut in the status bar</span>
+              <span class="setup-toggle-hint">
+                You can still reopen this tab from the gear icon.
+              </span>
+            </span>
+            <input
+              class="app-checkbox"
+              type="checkbox"
+              checked={hideSetupButton}
+              on:change={(e) => onHideSetupButtonChange(e.currentTarget.checked)}
+            />
+          </label>
           <GettingStartedSteps
             {ollamaRunning}
             {ollamaModelReady}
@@ -150,5 +166,34 @@
   .setup-pane {
     overflow-y: auto;
     padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .setup-toggle {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+  }
+  .setup-toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+  .setup-toggle-title {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.85rem;
+    color: var(--text-primary);
+  }
+  .setup-toggle-hint {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
   }
 </style>
