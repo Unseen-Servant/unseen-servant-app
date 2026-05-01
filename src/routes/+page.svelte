@@ -763,11 +763,18 @@
     : new Set<string>();
   $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
-  // Active context filter — narrows the tree to one collection's files plus
-  // ancestor folders. Disabled while editing a collection (so the user can
-  // still see the full tree to manage membership).
+  // Filter for what the file tree shows.
+  // - In collection-edit mode: only indexed files (the only ones that can be
+  //   added to a collection) plus their ancestor folders. Mirrors the active-
+  //   context shape so both modes feel consistent.
+  // - With an active collection: that collection's files plus ancestor folders.
+  // - Otherwise: null (show everything).
   $: displayPaths = (() => {
-    if (isCollectionEditMode) return null;
+    if (isCollectionEditMode) {
+      if (indexedPaths.size === 0) return new Set<string>();
+      const ancestors = computeAncestorPaths(indexedPaths);
+      return new Set<string>([...indexedPaths, ...ancestors]);
+    }
     if (!activeContextName) return null;
     const col = collections[activeContextName];
     if (!col) return null;
@@ -1885,7 +1892,9 @@
     gap: 0.5rem;
     padding: 0.4rem 0.6rem;
     margin: 0 0 0.5rem 0;
-    background: rgba(182, 159, 129, 0.18);
+    /* Opaque background so file rows scrolling under the sticky strip
+       don't bleed through. Keeps the warm tan accent on the border + text. */
+    background: var(--bg-focused);
     border: 1px solid var(--text-accent);
     border-radius: 4px;
     font-size: 0.8rem;
@@ -1893,6 +1902,7 @@
     position: sticky;
     top: 0;
     z-index: 5;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
   }
   .ef-label { color: var(--text-secondary); }
   .ef-name { font-weight: 600; }
