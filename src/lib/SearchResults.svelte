@@ -99,12 +99,12 @@
   {#if isLoading}
     <div class="state-msg">Searching…</div>
   {:else if error}
-    <div class="state-msg state-error">Search failed: {error}</div>
+    <div class="state-msg state-error">{error}</div>
   {:else if results.length === 0 && query}
     {#if indexedFileCount === 0}
-      <div class="state-msg">Index some files to enable search.</div>
+      <div class="state-msg">No indexed files.</div>
     {:else}
-      <div class="state-msg">No results for "{query}".</div>
+      <div class="state-msg">0 results for &ldquo;{query}&rdquo;</div>
     {/if}
   {:else}
     {#each results as result, i (i)}
@@ -190,16 +190,14 @@
   }
 
   .state-msg {
-    padding: 2rem 1rem;
-    text-align: center;
+    padding: 0.6rem 0.75rem;
     color: var(--text-secondary);
     font-family: var(--font-body);
-    font-style: italic;
+    font-size: 0.85rem;
   }
 
   .state-error {
     color: var(--text-danger);
-    font-style: normal;
   }
 
   .result-row {
