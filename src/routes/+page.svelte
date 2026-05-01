@@ -224,6 +224,10 @@
           await refreshIndexStatus();
         }
       }
+      const savedPanelOpen = await store.get<boolean>('collectionsPanelOpen');
+      if (typeof savedPanelOpen === 'boolean') {
+        collectionsPanelOpen = savedPanelOpen;
+      }
       await loadCollections();
     } catch (e) {
       // No saved state on first run — that's fine
@@ -1168,8 +1172,15 @@
   // Collections panel + metadata dialog
   // ---------------------------------------------------------------------------
 
-  function togglePanel() {
+  async function togglePanel() {
     collectionsPanelOpen = !collectionsPanelOpen;
+    try {
+      const store = await load('settings.json');
+      await store.set('collectionsPanelOpen', collectionsPanelOpen);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist panel state:', e);
+    }
   }
 
   async function inlineCreateCollection(name: string) {
