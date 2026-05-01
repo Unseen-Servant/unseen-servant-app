@@ -1,15 +1,29 @@
 <script lang="ts">
+  import FilterMenu from './FilterMenu.svelte';
+
   export let searchQuery: string = '';
   export let isSearching: boolean = false;
   export let disabled: boolean = false;
   export let panelOpen: boolean = false;
   export let panelToggleVisible: boolean = true;
   export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
+  export let filterVisible: boolean = false;
+  export let indexedOnly: boolean = false;
+  export let excludedSystems: Set<string> = new Set();
+  export let availableSystems: { name: string; count: number }[] = [];
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
   export let onClearScope: () => void = () => {};
+  export let onIndexedOnlyChange: (value: boolean) => void = () => {};
+  export let onToggleSystemFilter: (system: string) => void = () => {};
+  export let onClearSystemFilter: () => void = () => {};
+
+  let filterOpen = false;
+  let filterBtn: HTMLButtonElement | undefined;
+
+  $: filterActive = indexedOnly || excludedSystems.size > 0;
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,6 +85,38 @@
         <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
       </svg>
     </button>
+  {/if}
+  {#if filterVisible}
+    <div class="filter-anchor">
+      <button
+        class="panel-toggle filter-btn"
+        class:active={filterOpen}
+        class:has-filter={filterActive}
+        on:click|stopPropagation={() => { filterOpen = !filterOpen; }}
+        bind:this={filterBtn}
+        title="Filter library"
+        aria-label="Filter library"
+        aria-haspopup="menu"
+        aria-expanded={filterOpen}
+      >
+        <!-- Font Awesome "filter" -->
+        <svg viewBox="0 0 512 512" fill="currentColor" class="toggle-icon">
+          <path d="M3.9 22.9C10.5 8.9 24.5 0 40 0L472 0c15.5 0 29.5 8.9 36.1 22.9s4.6 30.5-5.2 42.5L320 290.7 320 448c0 12.1-6.8 23.2-17.7 28.6s-23.8 4.3-33.5-3l-64-48c-8.1-6-12.8-15.5-12.8-25.6l0-109.3L9 65.4C-.7 53.4-2.8 36.8 3.9 22.9z"/>
+        </svg>
+        {#if filterActive}<span class="filter-dot" aria-hidden="true"></span>{/if}
+      </button>
+      <FilterMenu
+        open={filterOpen}
+        anchorEl={filterBtn}
+        {indexedOnly}
+        {excludedSystems}
+        systems={availableSystems}
+        {onIndexedOnlyChange}
+        onToggleSystem={onToggleSystemFilter}
+        onClearSystems={onClearSystemFilter}
+        onClose={() => { filterOpen = false; }}
+      />
+    </div>
   {/if}
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
@@ -151,6 +197,26 @@
     width: 14px;
     height: 14px;
     display: block;
+  }
+
+  .filter-anchor {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .filter-btn {
+    position: relative;
+  }
+  .filter-btn.has-filter {
+    color: var(--text-accent);
+  }
+  .filter-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-active);
   }
 
   .search-wrapper {

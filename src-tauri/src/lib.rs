@@ -830,6 +830,7 @@ async fn search_index(
     n_results: Option<u32>,
     source_filter: Option<String>,
     game_system: Option<String>,
+    game_systems: Option<Vec<String>>,
     collection: Option<String>,
     source_paths: Option<Vec<String>>,
 ) -> Result<SearchResponse, String> {
@@ -841,6 +842,7 @@ async fn search_index(
             "n_results": n_results.unwrap_or(10),
             "source_filter": source_filter,
             "game_system": game_system,
+            "game_systems": game_systems,
             "collection": collection,
             "source_paths": source_paths,
         }))
