@@ -73,9 +73,6 @@
           class:active={activeName === col.name}
           on:click={() => handleChipClick(col.name)}
         >
-          {#if activeName === col.name}
-            <span class="chip-pin-active" title="Active context">&#9733;</span>
-          {/if}
           <span class="chip-name">{col.name}</span>
           <span class="chip-count">{col.file_count}</span>
           <button
@@ -195,11 +192,6 @@
     background: rgba(182, 159, 129, 0.2);
     color: var(--text-accent);
     font-weight: 600;
-  }
-  .chip-pin-active {
-    color: var(--text-accent);
-    font-size: 0.75rem;
-    line-height: 1;
   }
   .chip-name {
     font-weight: 500;
