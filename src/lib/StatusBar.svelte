@@ -136,7 +136,7 @@
     line-height: 0;
   }
   .indicator.connected {
-    color: var(--text-active);
+    color: #668063;
   }
   .indicator-icon {
     width: 12px;

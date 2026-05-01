@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
+  import Modal from './Modal.svelte';
+  import ActionButton from './ActionButton.svelte';
 
   export let collection: CollectionInfo;
   export let onSave: (changes: {
@@ -27,6 +29,10 @@
   ];
 
   let nameInput: HTMLInputElement;
+  let colorBtn: HTMLButtonElement;
+  let colorMenuEl: HTMLDivElement;
+  let colorMenuOpen = false;
+
   $: if (nameInput) nameInput.focus();
 
   $: dirty =
@@ -37,10 +43,21 @@
   $: canSave = name.trim().length > 0 && dirty;
 
   function handleKey(event: KeyboardEvent) {
-    if (event.key === 'Escape') onCancel();
-    else if (event.key === 'Enter' && canSave && (event.metaKey || event.ctrlKey)) {
+    if (event.key === 'Escape' && colorMenuOpen) {
+      colorMenuOpen = false;
+      return;
+    }
+    if (event.key === 'Enter' && canSave && (event.metaKey || event.ctrlKey)) {
       submit();
     }
+  }
+
+  function handleWindowClick(event: MouseEvent) {
+    if (!colorMenuOpen) return;
+    const target = event.target as Node;
+    if (colorBtn && (colorBtn === target || colorBtn.contains(target))) return;
+    if (colorMenuEl && colorMenuEl.contains(target)) return;
+    colorMenuOpen = false;
   }
 
   function submit() {
@@ -54,27 +71,85 @@
   }
 
   function pickColor(c: string) {
-    color = color === c ? '' : c;
+    color = c;
+    colorMenuOpen = false;
   }
 </script>
 
-<svelte:window on:keydown={handleKey} />
+<svelte:window on:keydown={handleKey} on:click={handleWindowClick} />
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="backdrop" on:click={onCancel}>
-  <div class="dialog" on:click|stopPropagation>
-    <div class="title">Edit collection</div>
-
-    <label class="field">
+<Modal visible={true} onClose={onCancel} title="Edit collection" width="min(440px, 90vw)">
+  <div class="body">
+    <div class="field">
       <span class="label">Name</span>
-      <input
-        type="text"
-        bind:value={name}
-        bind:this={nameInput}
-        class="input"
-        placeholder="Collection name"
-      />
-    </label>
+      <div class="name-row">
+        <input
+          type="text"
+          bind:value={name}
+          bind:this={nameInput}
+          class="input"
+          placeholder="Collection name"
+        />
+        <div class="color-wrapper">
+          <button
+            type="button"
+            class="color-trigger"
+            class:open={colorMenuOpen}
+            on:click|stopPropagation={() => { colorMenuOpen = !colorMenuOpen; }}
+            bind:this={colorBtn}
+            title={color || 'No color'}
+            aria-label="Collection color"
+            aria-haspopup="menu"
+            aria-expanded={colorMenuOpen}
+          >
+            <span
+              class="color-icon"
+              class:none={!color}
+              style={color ? `color: ${color}` : ''}
+              aria-hidden="true"
+            >
+              <!-- Font Awesome "book" -->
+              <svg viewBox="0 0 640 640" fill="currentColor">
+                <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
+              </svg>
+            </span>
+          </button>
+          {#if colorMenuOpen}
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+            <div
+              class="color-menu"
+              bind:this={colorMenuEl}
+              on:click|stopPropagation
+            >
+              <button
+                type="button"
+                class="swatch none"
+                class:selected={!color}
+                on:click={() => pickColor('')}
+                title="No color"
+                aria-label="No color"
+              >&times;</button>
+              {#each PALETTE as c}
+                <button
+                  type="button"
+                  class="swatch"
+                  class:selected={color === c}
+                  style="color: {c}"
+                  on:click={() => pickColor(c)}
+                  title={c}
+                  aria-label={`Color ${c}`}
+                >
+                  <!-- Font Awesome "book" -->
+                  <svg viewBox="0 0 640 640" fill="currentColor">
+                    <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
+                  </svg>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
 
     <label class="field">
       <span class="label">Description</span>
@@ -86,72 +161,25 @@
       />
     </label>
 
-    <div class="field">
-      <span class="label">Color</span>
-      <div class="palette">
-        <button
-          class="swatch none"
-          class:selected={!color}
-          on:click={() => { color = ''; }}
-          title="No color"
-          aria-label="No color"
-        >
-          &times;
-        </button>
-        {#each PALETTE as c}
-          <button
-            class="swatch"
-            class:selected={color === c}
-            style="background: {c}"
-            on:click={() => pickColor(c)}
-            title={c}
-            aria-label={`Color ${c}`}
-          ></button>
-        {/each}
-      </div>
-    </div>
-
     <label class="field row">
-      <input type="checkbox" bind:checked={archived} />
       <span class="row-label">
         <span class="label inline">Archived</span>
         <span class="hint">Hidden from the chip bar; visible in the panel via "Show archived"</span>
       </span>
+      <input class="app-checkbox" type="checkbox" bind:checked={archived} />
     </label>
 
     <div class="actions">
-      <button class="btn cancel" on:click={onCancel}>Cancel</button>
-      <button class="btn save" on:click={submit} disabled={!canSave}>Save</button>
+      <ActionButton kind="discard" label="Discard" onClick={onCancel} />
+      <ActionButton kind="confirm" label="Save" onClick={submit} disabled={!canSave} />
     </div>
   </div>
-</div>
+</Modal>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 310;
-  }
-  .dialog {
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
-    border-radius: 6px;
-    box-shadow: var(--shadow-dropdown);
-    padding: 1rem 1.25rem;
-    min-width: 380px;
-    max-width: 480px;
+  .body {
+    padding: 0.85rem 1rem 1rem;
     font-family: var(--font-body);
-  }
-  .title {
-    font-family: var(--font-heading);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-accent);
-    margin-bottom: 0.75rem;
   }
   .field {
     display: flex;
@@ -162,65 +190,141 @@
   .field.row {
     flex-direction: row;
     align-items: flex-start;
-    gap: 0.5rem;
+    justify-content: space-between;
+    gap: 0.75rem;
     cursor: pointer;
   }
   .row-label {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
   }
   .label {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--text-secondary);
-    font-size: 0.75rem;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.3rem;
   }
   .label.inline {
-    font-size: 0.85rem;
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.8rem;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--text-primary);
     margin-bottom: 0;
   }
   .hint {
+    font-family: var(--font-body);
     font-size: 0.75rem;
     color: var(--text-secondary);
+    line-height: 1.35;
   }
   .input {
-    padding: 0.4rem 0.55rem;
-    border: 1px solid var(--bg-category);
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-subtle);
     border-radius: 4px;
-    font-size: 0.9rem;
-    background: var(--bg-container);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    background: var(--bg-focused);
     color: var(--text-primary);
   }
   .input:focus {
-    outline: none;
-    border-color: var(--text-accent);
+    outline: 1px solid var(--text-accent);
+    outline-offset: -1px;
+    border-color: var(--border-subtle);
   }
-  .palette {
+
+  .name-row {
     display: flex;
-    flex-wrap: wrap;
+    align-items: stretch;
     gap: 0.4rem;
   }
+  .name-row .input {
+    flex: 1;
+    min-width: 0;
+  }
+  .color-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .color-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 100%;
+    padding: 0;
+    background: var(--bg-focused);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color var(--transition-fast);
+  }
+  .color-trigger:hover,
+  .color-trigger.open {
+    border-color: var(--text-accent);
+  }
+  .color-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+  }
+  .color-icon.none {
+    color: var(--text-tertiary);
+  }
+  .color-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+  }
+  .color-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
+    border-radius: 4px;
+    box-shadow: var(--shadow-dropdown);
+    padding: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 0.4rem;
+    z-index: 50;
+  }
+
   .swatch {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
     cursor: pointer;
     padding: 0;
-    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
   }
   .swatch:hover {
-    transform: scale(1.1);
+    transform: scale(1.08);
   }
   .swatch.selected {
     border-color: var(--text-primary);
   }
+  .swatch svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
   .swatch.none {
-    background: transparent;
-    border: 1px dashed var(--text-secondary);
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    border: 1px dashed var(--text-secondary);
+    font-size: 1rem;
     line-height: 1;
   }
   .swatch.none.selected {
@@ -230,38 +334,7 @@
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: 0.4rem;
     margin-top: 0.5rem;
-  }
-  .btn {
-    padding: 0.4rem 0.9rem;
-    border-radius: 4px;
-    border: 1px solid transparent;
-    font-size: 0.85rem;
-    font-family: var(--font-body);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-  .btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .btn:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-  .cancel {
-    background: var(--bg-focused);
-    color: var(--text-secondary);
-    border-color: var(--bg-category);
-  }
-  .cancel:hover {
-    background: var(--bg-container);
-  }
-  .save {
-    background: var(--bg-active);
-    color: var(--text-primary);
-  }
-  .save:hover:not(:disabled) {
-    background: var(--bg-active-focused);
   }
 </style>

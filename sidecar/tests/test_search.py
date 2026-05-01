@@ -250,3 +250,35 @@ def test_search_result_includes_game_system(indexed_client):
 
     result = response.json()["results"][0]
     assert "game_system" in result
+
+
+# ---------------------------------------------------------------------------
+# Path-scoped search tests (source_paths)
+# ---------------------------------------------------------------------------
+
+def test_search_source_paths_restricts_to_given_files(
+    multi_indexed_client, sample_pdf_path
+):
+    """source_paths should restrict results to the listed full paths."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon dungeon adventurer",
+        "n_results": 10,
+        "source_paths": [str(sample_pdf_path)],
+    })
+
+    data = response.json()
+    assert len(data["results"]) > 0
+    for result in data["results"]:
+        assert result["source"] == str(sample_pdf_path)
+
+
+def test_search_source_paths_unknown_path_returns_empty(multi_indexed_client):
+    """A path that isn't indexed yields no results, not an error."""
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon",
+        "n_results": 5,
+        "source_paths": ["/nope/never/indexed.pdf"],
+    })
+
+    assert response.status_code == 200
+    assert response.json()["results"] == []

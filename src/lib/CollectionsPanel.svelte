@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
+  import ActionButton from './ActionButton.svelte';
 
   export let collections: Record<string, CollectionInfo> = {};
   export let activeName: string | null = null;
@@ -127,6 +128,7 @@
         {#if sortMenuOpen}
           <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
           <div class="sort-menu" on:click|stopPropagation>
+            <div class="sort-section-label">Sort by</div>
             {#each SORT_OPTIONS as opt}
               <button
                 class="sort-item"
@@ -134,6 +136,13 @@
                 on:click={() => pickSort(opt.value)}
               >{opt.label}</button>
             {/each}
+            {#if archivedCount > 0}
+              <hr class="sort-divider" />
+              <label class="sort-toggle">
+                <span>Show archived</span>
+                <input class="app-checkbox" type="checkbox" bind:checked={showArchived} />
+              </label>
+            {/if}
           </div>
         {/if}
       </div>
@@ -150,16 +159,9 @@
         placeholder="Collection name"
         on:keydown={handleNewKeydown}
       />
-      <button class="new-confirm" on:click={commitCreate} disabled={!newName.trim()} title="Create">&#10003;</button>
-      <button class="new-cancel" on:click={cancelCreate} title="Cancel">&times;</button>
+      <ActionButton kind="confirm" compact title="Create" onClick={commitCreate} disabled={!newName.trim()} />
+      <ActionButton kind="discard" compact title="Cancel" onClick={cancelCreate} />
     </div>
-  {/if}
-
-  {#if archivedCount > 0}
-    <label class="archived-toggle">
-      <input type="checkbox" bind:checked={showArchived} />
-      <span>Show archived ({archivedCount})</span>
-    </label>
   {/if}
 
   {#if hasNone}
@@ -186,27 +188,22 @@
           on:click={() => handleRowClick(col.name)}
         >
           <span
-            class="row-color"
+            class="row-icon"
             class:none={!col.color}
-            style={col.color ? `background: ${col.color}` : ''}
-          ></span>
+            style={col.color ? `color: ${col.color}` : ''}
+            aria-hidden="true"
+          >
+            <!-- Font Awesome "book" (static/icons/book-solid-full.svg) -->
+            <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+              <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
+            </svg>
+          </span>
           <span class="row-name">{col.name}</span>
           {#if activeName === col.name}
             <span class="row-marker" title="Active">&#9733;</span>
           {/if}
           <span class="row-count">{col.file_count}</span>
           <div class="row-actions">
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onEdit(col.name)}
-              title="Edit info"
-              aria-label="Edit info"
-            >
-              <!-- Font Awesome "pen-to-square" -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
-              </svg>
-            </button>
             <button
               class="row-btn"
               on:click|stopPropagation={() => onEditFiles(col.name)}
@@ -216,6 +213,17 @@
               <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
               <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
                 <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
+              </svg>
+            </button>
+            <button
+              class="row-btn"
+              on:click|stopPropagation={() => onEdit(col.name)}
+              title="Edit info"
+              aria-label="Edit info"
+            >
+              <!-- Font Awesome "pen-to-square" -->
+              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
               </svg>
             </button>
             <button
@@ -333,6 +341,37 @@
     color: var(--text-accent);
     font-weight: 600;
   }
+  .sort-section-label {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 0.3rem 0.6rem 0.15rem;
+  }
+  .sort-divider {
+    margin: 0.25rem 0;
+    border: none;
+    border-top: 1px solid var(--bg-category);
+  }
+  .sort-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .sort-toggle:hover {
+    background: var(--bg-category);
+  }
+  .sort-toggle input {
+    cursor: pointer;
+    margin: 0;
+  }
 
   .create-row {
     display: flex;
@@ -352,35 +391,6 @@
     font-size: 0.8rem;
     outline: none;
   }
-  .new-confirm,
-  .new-cancel {
-    padding: 0.2rem 0.4rem;
-    border: 1px solid var(--bg-category);
-    background: var(--bg-app);
-    color: var(--text-secondary);
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    line-height: 1;
-  }
-  .new-confirm:hover:not(:disabled) {
-    background: var(--bg-active);
-    color: var(--text-primary);
-    border-color: transparent;
-  }
-  .new-confirm:disabled { opacity: 0.4; cursor: default; }
-  .new-cancel:hover { color: var(--text-primary); }
-
-  .archived-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--bg-category);
-  }
-
   .rows {
     list-style: none;
     margin: 0;
@@ -391,7 +401,7 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.55rem;
     padding: 0.3rem 0.75rem;
     border-bottom: 1px solid var(--bg-container);
     cursor: pointer;
@@ -402,14 +412,20 @@
   .row.active { background: rgba(182, 159, 129, 0.15); }
   .row.editing { background: rgba(182, 159, 129, 0.25); }
   .row.archived { opacity: 0.55; }
-  .row-color {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+  .row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    color: var(--text-accent);
+    margin-right: 0.15rem;
   }
-  .row-color.none {
-    background: var(--bg-category);
+  .row-icon.none {
+    color: var(--text-tertiary);
+  }
+  .row-icon .icon {
+    width: 13px;
+    height: 13px;
   }
   .row-name {
     flex: 1;

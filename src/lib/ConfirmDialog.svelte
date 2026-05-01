@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ActionButton from './ActionButton.svelte';
+
   export let title: string = 'Confirm';
   export let message: string = '';
   export let confirmLabel: string = 'Confirm';
@@ -7,7 +9,7 @@
   export let onConfirm: () => void = () => {};
   export let onCancel: () => void = () => {};
 
-  let confirmBtn: HTMLButtonElement;
+  let confirmBtn: HTMLButtonElement | undefined;
 
   function handleKey(event: KeyboardEvent) {
     if (event.key === 'Escape') onCancel();
@@ -27,15 +29,14 @@
       <div class="message">{message}</div>
     {/if}
     <div class="actions">
-      <button class="btn cancel" on:click={onCancel}>{cancelLabel}</button>
-      <button
-        class="btn confirm"
-        class:danger
-        bind:this={confirmBtn}
-        on:click={onConfirm}
-      >
-        {confirmLabel}
-      </button>
+      <ActionButton kind="discard" label={cancelLabel} onClick={onCancel} />
+      <ActionButton
+        kind="confirm"
+        {danger}
+        label={confirmLabel}
+        onClick={onConfirm}
+        bind:buttonRef={confirmBtn}
+      />
     </div>
   </div>
 </div>
@@ -76,41 +77,6 @@
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
-  }
-  .btn {
-    padding: 0.4rem 0.9rem;
-    border-radius: 4px;
-    border: 1px solid transparent;
-    font-size: 0.85rem;
-    font-family: var(--font-body);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-  .btn:active {
-    transform: scale(0.97);
-  }
-  .cancel {
-    background: var(--bg-focused);
-    color: var(--text-secondary);
-    border-color: var(--bg-category);
-  }
-  .cancel:hover {
-    background: var(--bg-container);
-  }
-  .confirm {
-    background: var(--bg-active);
-    color: var(--text-primary);
-  }
-  .confirm:hover {
-    background: var(--bg-active-focused);
-  }
-  .confirm.danger {
-    background: transparent;
-    color: var(--text-danger);
-    border-color: var(--text-danger);
-  }
-  .confirm.danger:hover {
-    background: rgba(239, 68, 68, 0.1);
+    gap: 0.4rem;
   }
 </style>

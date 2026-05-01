@@ -8,12 +8,14 @@
   export let collections: Record<string, CollectionInfo> = {};
   export let containingCollections: string[] = [];
   export let canAddToCollection: boolean = true;
+  export let canScopeSearch: boolean = false;
   export let onOpen: () => void = () => {};
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
   export let onDelete: () => void = () => {};
   export let onReindex: () => void = () => {};
   export let onShowStats: () => void = () => {};
+  export let onSearchInScope: () => void = () => {};
   export let onAddToCollection: (name: string) => void = () => {};
   export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
@@ -52,6 +54,12 @@
     <button class="context-item" on:click={onOpen}>Open file</button>
   {/if}
   <button class="context-item" on:click={onReveal}>Reveal in folder</button>
+  {#if canScopeSearch}
+    <hr class="context-divider" />
+    <button class="context-item" on:click={onSearchInScope}>
+      Search in this {item.is_dir ? 'folder' : 'file'}
+    </button>
+  {/if}
   {#if !item.is_dir && isIndexed}
     <hr class="context-divider" />
     <button class="context-item" on:click={onReindex}>Re-index file</button>

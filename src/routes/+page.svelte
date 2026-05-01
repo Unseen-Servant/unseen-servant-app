@@ -22,6 +22,7 @@
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
+  import ActionButton from '../lib/ActionButton.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -66,6 +67,7 @@
   let collectionEditDescription = '';
   let highlightedCollection: string | null = null;
   let activeContextName: string | null = null;
+  let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
   let editingMetadataFor: string | null = null;
 
@@ -105,6 +107,31 @@
   let searchError: string | null = null;
   let searchSeq = 0;
   $: searchActive = committedQuery.trim() !== '';
+  $: scopeChip = (() => {
+    if (isCollectionEditMode) return null;
+    if (pathScope) {
+      return {
+        kind: pathScope.kind,
+        label: pathScope.label,
+        tooltip: pathScope.path,
+      } as const;
+    }
+    if (activeContextName) {
+      return {
+        kind: 'collection' as const,
+        label: activeContextName,
+        tooltip: `Collection: ${activeContextName}`,
+      };
+    }
+    return null;
+  })();
+  function handleClearScope() {
+    if (pathScope) {
+      clearPathScope();
+    } else if (activeContextName) {
+      clearActiveContext();
+    }
+  }
   $: indexedPathsSet = new Set<string>(
     (indexStatus?.up_to_date ?? []).map((e) => e.path)
       .concat((indexStatus?.to_update ?? []).map((e) => e.path))
@@ -124,6 +151,23 @@
       isSearching = false;
       return;
     }
+
+    let sourcePaths: string[] | null = null;
+    if (pathScope) {
+      const paths = pathScope.kind === 'file'
+        ? (indexedPaths.has(pathScope.path) ? [pathScope.path] : [])
+        : indexedPdfsUnderPath(pathScope.path);
+      if (paths.length === 0) {
+        searchError = pathScope.kind === 'folder'
+          ? 'No indexed files in this folder.'
+          : 'This file is not indexed.';
+        searchResults = [];
+        isSearching = false;
+        return;
+      }
+      sourcePaths = paths;
+    }
+
     searchSeq += 1;
     const seq = searchSeq;
     isSearching = true;
@@ -132,6 +176,7 @@
       const response = await invoke<SearchResponse>('search_index', {
         query: trimmed,
         nResults: 10,
+        sourcePaths,
       });
       if (seq !== searchSeq) return;
       searchResults = response.results ?? [];
@@ -834,6 +879,13 @@
     startCreateCollectionFromFolder(item);
   }
 
+  function handleContextSearchInScope() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    setPathScope(item);
+  }
+
   function handleContextAddToNewCollection() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -933,12 +985,14 @@
     try {
       const result = await invoke<ActiveContextResult>('set_active_context', { name });
       activeContextName = result.active_context;
+      pathScope = null;
       notification.show({
         type: 'info',
         message: `Active context: ${name}`,
         duration: 3000,
       });
       await loadCollections();
+      if (committedQuery) runSearch(committedQuery);
     } catch (e) {
       notification.show({
         type: 'error',
@@ -957,6 +1011,7 @@
         message: 'Active context cleared',
         duration: 3000,
       });
+      if (committedQuery) runSearch(committedQuery);
     } catch (e) {
       notification.show({
         type: 'error',
@@ -972,6 +1027,26 @@
     } else {
       setActiveContext(name);
     }
+  }
+
+  function setPathScope(item: FileItem) {
+    pathScope = {
+      kind: item.is_dir ? 'folder' : 'file',
+      path: item.path,
+      label: item.name,
+    };
+    if (activeContextName) {
+      // Mutually exclusive with collection scope.
+      invoke<ActiveContextResult>('clear_active_context')
+        .then(() => { activeContextName = null; })
+        .catch(() => {});
+    }
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  function clearPathScope() {
+    pathScope = null;
+    if (committedQuery) runSearch(committedQuery);
   }
 
   function startCreateCollection() {
@@ -1539,10 +1614,12 @@
     disabled={!selectedFolder || editingCollectionName !== null || isCreatingCollection}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
+    {scopeChip}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
     onTogglePanel={togglePanel}
+    onClearScope={handleClearScope}
   />
 
   {#if selectedFolder}
@@ -1569,16 +1646,8 @@
             <span class="ef-name">{editingCollectionName ?? collectionEditName ?? 'New collection'}</span>
             <span class="ef-count">{collectionEditPaths.size} file{collectionEditPaths.size === 1 ? '' : 's'}</span>
             <div class="ef-spacer"></div>
-            <button class="ef-btn cancel" on:click={cancelCollectionEdit}>Cancel</button>
-            <button class="ef-btn save" on:click={saveCollection}>Save</button>
-          </div>
-        {:else if activeContextName}
-          <div class="active-context-strip">
-            <span class="ac-label">Active context:</span>
-            <span class="ac-name">{activeContextName}</span>
-            <button class="ac-clear" on:click={clearActiveContext} title="Clear active context">
-              &#10005;
-            </button>
+            <ActionButton kind="discard" label="Cancel" onClick={cancelCollectionEdit} />
+            <ActionButton kind="confirm" label="Save" onClick={saveCollection} />
           </div>
         {/if}
         {#if searchActive}
@@ -1648,6 +1717,9 @@
       canAddToCollection={contextMenu.item.is_dir
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
+      canScopeSearch={contextMenu.item.is_dir
+        ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
+        : indexedPaths.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
@@ -1655,6 +1727,7 @@
       onDelete={handleContextDelete}
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
+      onSearchInScope={handleContextSearchInScope}
       onAddToCollection={handleContextAddToCollection}
       onAddToNewCollection={handleContextAddToNewCollection}
       onRemoveFromCollection={handleContextRemoveFromCollection}
@@ -1792,62 +1865,6 @@
   .ef-name { font-weight: 600; }
   .ef-count { color: var(--text-secondary); font-size: 0.75rem; }
   .ef-spacer { flex: 1; }
-  .ef-btn {
-    padding: 0.25rem 0.6rem;
-    border-radius: 3px;
-    border: 1px solid transparent;
-    font-size: 0.75rem;
-    cursor: pointer;
-    font-family: var(--font-body);
-  }
-  .ef-btn.cancel {
-    background: var(--bg-focused);
-    color: var(--text-secondary);
-    border-color: var(--bg-category);
-  }
-  .ef-btn.cancel:hover { background: var(--bg-container); }
-  .ef-btn.save {
-    background: var(--bg-active);
-    color: var(--text-primary);
-  }
-  .ef-btn.save:hover { background: var(--bg-active-focused); }
-
-  .active-context-strip {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    margin: 0 0 0.5rem 0;
-    background: rgba(182, 159, 129, 0.12);
-    border: 1px solid var(--text-accent);
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: var(--text-accent);
-    position: sticky;
-    top: 0;
-    z-index: 5;
-  }
-  .ac-label {
-    color: var(--text-secondary);
-  }
-  .ac-name {
-    font-weight: 600;
-    flex: 1;
-  }
-  .ac-clear {
-    background: none;
-    border: none;
-    color: var(--text-accent);
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0.1rem 0.4rem;
-    border-radius: 3px;
-    line-height: 1;
-  }
-  .ac-clear:hover {
-    background: rgba(182, 159, 129, 0.2);
-  }
-
   .error-banner {
     padding: 0.4rem 1rem;
     background: rgba(239, 68, 68, 0.1);

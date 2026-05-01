@@ -806,6 +806,7 @@ async fn search_index(
     source_filter: Option<String>,
     game_system: Option<String>,
     collection: Option<String>,
+    source_paths: Option<Vec<String>>,
 ) -> Result<SearchResponse, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -816,6 +817,7 @@ async fn search_index(
             "source_filter": source_filter,
             "game_system": game_system,
             "collection": collection,
+            "source_paths": source_paths,
         }))
         .send()
         .await

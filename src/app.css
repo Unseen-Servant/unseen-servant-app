@@ -83,8 +83,8 @@
   --bg-header: rgb(46, 46, 46);
   --bg-category: rgb(71, 71, 71);
   --bg-focused: rgb(50, 50, 50);
-  --bg-active: #485946;
-  --bg-active-focused: #668063;
+  --bg-active: #6e42a8;
+  --bg-active-focused: #925ccb;
   --bg-selected: rgb(182, 159, 129);
   --bg-selected-focused: rgb(236, 204, 162);
 
@@ -95,7 +95,7 @@
   --text-inverse: #1a1a1a;
   --text-accent: rgb(182, 159, 129);
   --text-danger: #ef4444;
-  --text-active: #668063;
+  --text-active: #925ccb;
 
   /* Borders & shadows */
   --border-subtle: rgb(50, 50, 50);
@@ -167,6 +167,97 @@ button {
 
 input {
   font-family: inherit;
+}
+
+/* --- Action buttons (Confirm / Discard) --- */
+
+/* Quiet at rest, color on intent. Confirm carries the active accent (purple)
+   when enabled; Discard stays neutral and tints danger on hover. The danger
+   modifier on a Confirm swaps active for danger, used for irreversible
+   confirmations (e.g. Delete). Compact variant is icon-only. */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0.3rem 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+.action-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
+}
+.action-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.action-btn:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+.action-btn.discard:hover:not(:disabled) {
+  color: var(--text-danger);
+}
+.action-btn.confirm {
+  color: var(--text-active);
+}
+.action-btn.confirm.danger {
+  color: var(--text-danger);
+}
+.action-btn.confirm:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+.action-btn.confirm:disabled {
+  color: var(--text-tertiary);
+  filter: none;
+}
+.action-btn.compact {
+  padding: 0.2rem 0.35rem;
+}
+.action-btn.compact svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* --- Form Controls --- */
+
+/* Themed checkbox matching the file-tree look (parchment border, accent fill,
+   dark checkmark). Replace the native checkbox by adding this class. */
+.app-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--text-tertiary);
+  border-radius: 3px;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 10px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.app-checkbox:hover {
+  border-color: var(--text-accent);
+}
+.app-checkbox:checked {
+  background-color: var(--text-accent);
+  border-color: var(--text-accent);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%23191919' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M3 8 L7 12 L13 4'/></svg>");
+}
+.app-checkbox:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 2px;
 }
 
 /* --- Font Utilities --- */
