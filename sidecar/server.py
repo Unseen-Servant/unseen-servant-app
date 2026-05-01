@@ -16,6 +16,7 @@ import re
 import signal
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -299,10 +300,14 @@ class CreateCollectionRequest(BaseModel):
     name: str
     file_paths: list[str]
     description: str = ""
+    color: str | None = None
 
 class UpdateCollectionRequest(BaseModel):
-    file_paths: list[str]
+    file_paths: list[str] | None = None
     description: str | None = None
+    color: str | None = None
+    archived: bool | None = None
+    last_used_at: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -349,33 +354,65 @@ def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
 # ---------------------------------------------------------------------------
 
 COLLECTIONS_FILENAME = "collections.json"
+COLLECTIONS_STORE_VERSION = 2
 
 
 class Collection(BaseModel):
+    id: str
     name: str
     file_paths: list[str]
     created_at: str
+    updated_at: str
+    last_used_at: str | None = None
     description: str = ""
+    color: str | None = None
+    archived: bool = False
 
 
 class CollectionsStore(BaseModel):
-    version: int = 1
+    version: int = COLLECTIONS_STORE_VERSION
     collections: dict[str, Collection] = {}
 
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _migrate_collection_record(name: str, raw: dict) -> dict:
+    """Fill in v2 fields for an on-disk record. v1 records get sensible defaults."""
+    created_at = raw.get("created_at") or _now_iso()
+    return {
+        "id": raw.get("id") or str(uuid.uuid4()),
+        "name": raw.get("name") or name,
+        "file_paths": raw.get("file_paths", []),
+        "created_at": created_at,
+        "updated_at": raw.get("updated_at") or created_at,
+        "last_used_at": raw.get("last_used_at"),
+        "description": raw.get("description", ""),
+        "color": raw.get("color"),
+        "archived": raw.get("archived", False),
+    }
+
+
 def load_collections(data_dir: Path) -> CollectionsStore:
-    """Load collections from disk, or return an empty store."""
+    """Load collections from disk, migrating legacy records to the current schema."""
     path = data_dir / COLLECTIONS_FILENAME
-    if path.exists():
-        raw = json.loads(path.read_text())
-        return CollectionsStore(**raw)
-    return CollectionsStore()
+    if not path.exists():
+        return CollectionsStore()
+    raw = json.loads(path.read_text())
+    raw_collections = raw.get("collections", {})
+    migrated = {
+        name: _migrate_collection_record(name, c)
+        for name, c in raw_collections.items()
+    }
+    return CollectionsStore(version=COLLECTIONS_STORE_VERSION, collections=migrated)
 
 
 def save_collections(data_dir: Path, store: CollectionsStore) -> None:
     """Write collections to disk atomically."""
     path = data_dir / COLLECTIONS_FILENAME
     tmp_path = path.with_suffix(".json.tmp")
+    store.version = COLLECTIONS_STORE_VERSION
     tmp_path.write_text(store.model_dump_json(indent=2))
     os.replace(tmp_path, path)
 
@@ -1438,6 +1475,7 @@ def create_app(
                     updated_paths = [rename_map.get(p, p) for p in coll.file_paths]
                     if updated_paths != coll.file_paths:
                         coll.file_paths = updated_paths
+                        coll.updated_at = _now_iso()
                         coll_changed = True
 
             if auto_removed > 0:
@@ -1446,6 +1484,7 @@ def create_app(
                     filtered = [p for p in coll.file_paths if p not in removed_paths]
                     if len(filtered) != len(coll.file_paths):
                         coll.file_paths = filtered
+                        coll.updated_at = _now_iso()
                         coll_changed = True
 
             if coll_changed:
@@ -1674,6 +1713,7 @@ def create_app(
                         new_path_str if p == old_path_str else p
                         for p in coll.file_paths
                     ]
+                    coll.updated_at = _now_iso()
                     affected_collections += 1
             if affected_collections:
                 save_collections(data_dir, coll_store)
@@ -1712,6 +1752,7 @@ def create_app(
             for coll in coll_store.collections.values():
                 if path_str in coll.file_paths:
                     coll.file_paths = [p for p in coll.file_paths if p != path_str]
+                    coll.updated_at = _now_iso()
                     affected_collections += 1
             if affected_collections:
                 save_collections(data_dir, coll_store)
@@ -1802,6 +1843,7 @@ def create_app(
                 ]
                 if updated_paths != coll.file_paths:
                     coll.file_paths = updated_paths
+                    coll.updated_at = _now_iso()
                     affected_collections += 1
             if affected_collections:
                 save_collections(data_dir, coll_store)
@@ -1848,6 +1890,7 @@ def create_app(
                 filtered = [p for p in coll.file_paths if not p.startswith(child_prefix)]
                 if len(filtered) != len(coll.file_paths):
                     coll.file_paths = filtered
+                    coll.updated_at = _now_iso()
                     affected_collections += 1
             if affected_collections:
                 save_collections(data_dir, coll_store)
@@ -2235,11 +2278,16 @@ def create_app(
         return {
             "collections": {
                 name: {
+                    "id": c.id,
                     "name": c.name,
                     "file_paths": c.file_paths,
                     "file_count": len(c.file_paths),
                     "created_at": c.created_at,
+                    "updated_at": c.updated_at,
+                    "last_used_at": c.last_used_at,
                     "description": c.description,
+                    "color": c.color,
+                    "archived": c.archived,
                 }
                 for name, c in store.collections.items()
             },
@@ -2257,18 +2305,22 @@ def create_app(
                 status_code=409,
                 detail=f"Collection already exists: {request.name}",
             )
+        now = _now_iso()
         store.collections[request.name] = Collection(
+            id=str(uuid.uuid4()),
             name=request.name,
             file_paths=request.file_paths,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=now,
+            updated_at=now,
             description=request.description,
+            color=request.color,
         )
         save_collections(data_dir, store)
         return {"name": request.name, "file_count": len(request.file_paths)}
 
     @app.put("/api/collections/{name}")
     async def update_collection(name: str, request: UpdateCollectionRequest):
-        """Update a collection's files or description."""
+        """Update a collection. All fields optional — only provided fields change."""
         if not data_dir:
             raise HTTPException(status_code=500, detail="No data directory configured")
         store = load_collections(data_dir)
@@ -2276,11 +2328,27 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"Collection not found: {name}"
             )
-        store.collections[name].file_paths = request.file_paths
+        coll = store.collections[name]
+        changed = False
+        if request.file_paths is not None:
+            coll.file_paths = request.file_paths
+            changed = True
         if request.description is not None:
-            store.collections[name].description = request.description
+            coll.description = request.description
+            changed = True
+        if request.color is not None:
+            coll.color = request.color
+            changed = True
+        if request.archived is not None:
+            coll.archived = request.archived
+            changed = True
+        if request.last_used_at is not None:
+            coll.last_used_at = request.last_used_at
+            changed = True
+        if changed:
+            coll.updated_at = _now_iso()
         save_collections(data_dir, store)
-        return {"name": name, "file_count": len(request.file_paths)}
+        return {"name": name, "file_count": len(coll.file_paths)}
 
     @app.delete("/api/collections/{name}")
     async def delete_collection(name: str):

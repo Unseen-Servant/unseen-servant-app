@@ -145,11 +145,16 @@ struct DeleteCustomSystemResult {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CollectionInfo {
+    id: String,
     name: String,
     file_paths: Vec<String>,
     file_count: u32,
     created_at: String,
+    updated_at: String,
+    last_used_at: Option<String>,
     description: String,
+    color: Option<String>,
+    archived: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

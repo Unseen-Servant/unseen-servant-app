@@ -234,6 +234,160 @@ def test_collections_loaded_from_preexisting_json(test_collection, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Metadata schema (id, updated_at, last_used_at, color, archived)
+# ---------------------------------------------------------------------------
+
+def test_create_returns_metadata_fields(client):
+    """A newly created collection exposes the full v2 metadata shape."""
+    client.post("/api/collections", json={
+        "name": "Strahd",
+        "file_paths": ["/cos.pdf"],
+        "description": "Barovia",
+        "color": "#8B0000",
+    })
+    col = client.get("/api/collections").json()["collections"]["Strahd"]
+    assert col["id"]
+    assert col["name"] == "Strahd"
+    assert col["created_at"]
+    assert col["updated_at"] == col["created_at"]
+    assert col["last_used_at"] is None
+    assert col["color"] == "#8B0000"
+    assert col["archived"] is False
+
+
+def test_create_without_color_defaults_to_null(client):
+    """color is optional and serializes as null when omitted."""
+    client.post("/api/collections", json={
+        "name": "Plain",
+        "file_paths": ["/a.pdf"],
+    })
+    col = client.get("/api/collections").json()["collections"]["Plain"]
+    assert col["color"] is None
+
+
+def test_collection_ids_are_unique(client):
+    """Each create gets a fresh id."""
+    client.post("/api/collections", json={"name": "A", "file_paths": []})
+    client.post("/api/collections", json={"name": "B", "file_paths": []})
+    cols = client.get("/api/collections").json()["collections"]
+    assert cols["A"]["id"] != cols["B"]["id"]
+
+
+def test_update_bumps_updated_at(client):
+    """Any successful mutation moves updated_at forward."""
+    import time
+    client.post("/api/collections", json={"name": "Stamps", "file_paths": ["/a.pdf"]})
+    before = client.get("/api/collections").json()["collections"]["Stamps"]["updated_at"]
+
+    time.sleep(0.01)
+    client.put("/api/collections/Stamps", json={"description": "now with notes"})
+    after = client.get("/api/collections").json()["collections"]["Stamps"]["updated_at"]
+
+    assert after > before
+
+
+def test_update_writes_archived(client):
+    """archived flag persists across a PUT."""
+    client.post("/api/collections", json={"name": "Old Campaign", "file_paths": []})
+    client.put("/api/collections/Old Campaign", json={"archived": True})
+    col = client.get("/api/collections").json()["collections"]["Old Campaign"]
+    assert col["archived"] is True
+
+
+def test_update_writes_color(client):
+    """color is settable via PUT."""
+    client.post("/api/collections", json={"name": "Tinted", "file_paths": []})
+    client.put("/api/collections/Tinted", json={"color": "#336699"})
+    col = client.get("/api/collections").json()["collections"]["Tinted"]
+    assert col["color"] == "#336699"
+
+
+def test_update_writes_last_used_at(client):
+    """last_used_at can be written through the existing update endpoint."""
+    client.post("/api/collections", json={"name": "Touched", "file_paths": []})
+    stamp = "2026-04-30T12:34:56+00:00"
+    client.put("/api/collections/Touched", json={"last_used_at": stamp})
+    col = client.get("/api/collections").json()["collections"]["Touched"]
+    assert col["last_used_at"] == stamp
+
+
+def test_update_without_file_paths_keeps_existing(client):
+    """Omitting file_paths in a PUT leaves the file list untouched."""
+    client.post("/api/collections", json={
+        "name": "Sticky",
+        "file_paths": ["/a.pdf", "/b.pdf"],
+    })
+    client.put("/api/collections/Sticky", json={"description": "metadata only"})
+    col = client.get("/api/collections").json()["collections"]["Sticky"]
+    assert col["file_count"] == 2
+    assert col["description"] == "metadata only"
+
+
+def test_v1_collections_migrate_on_load(test_collection, tmp_path):
+    """Legacy v1 records gain v2 fields with sensible defaults."""
+    import json
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    legacy = {
+        "version": 1,
+        "collections": {
+            "Old": {
+                "name": "Old",
+                "file_paths": ["/old.pdf"],
+                "created_at": "2025-01-15T12:00:00+00:00",
+                "description": "from v1",
+            }
+        },
+    }
+    (tmp_path / "collections.json").write_text(json.dumps(legacy))
+
+    app = create_app(collection=test_collection, data_dir=tmp_path)
+    client = TestClient(app)
+
+    col = client.get("/api/collections").json()["collections"]["Old"]
+    assert col["id"]  # generated
+    assert col["created_at"] == "2025-01-15T12:00:00+00:00"
+    assert col["updated_at"] == "2025-01-15T12:00:00+00:00"
+    assert col["last_used_at"] is None
+    assert col["color"] is None
+    assert col["archived"] is False
+
+
+def test_v1_disk_migrates_to_v2_on_save(test_collection, tmp_path):
+    """After a write, the on-disk file is in v2 shape."""
+    import json
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    legacy = {
+        "version": 1,
+        "collections": {
+            "Old": {
+                "name": "Old",
+                "file_paths": [],
+                "created_at": "2025-01-15T12:00:00+00:00",
+                "description": "",
+            }
+        },
+    }
+    (tmp_path / "collections.json").write_text(json.dumps(legacy))
+
+    app = create_app(collection=test_collection, data_dir=tmp_path)
+    client = TestClient(app)
+    client.post("/api/collections", json={"name": "New", "file_paths": []})
+
+    on_disk = json.loads((tmp_path / "collections.json").read_text())
+    assert on_disk["version"] == 2
+    old = on_disk["collections"]["Old"]
+    assert "id" in old and old["id"]
+    assert old["updated_at"] == "2025-01-15T12:00:00+00:00"
+    assert old["archived"] is False
+    new = on_disk["collections"]["New"]
+    assert new["id"] != old["id"]
+
+
+# ---------------------------------------------------------------------------
 # Search with collection filter
 # ---------------------------------------------------------------------------
 
