@@ -13,9 +13,7 @@
   import Header from '../lib/Header.svelte';
   import SearchResults from '../lib/SearchResults.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
-  import NotificationBanner from '../lib/NotificationBanner.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
-  import GettingStartedModal from '../lib/GettingStartedModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
@@ -69,6 +67,7 @@
   let activeContextName: string | null = null;
   let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
+  let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
   // Index sync state
@@ -84,12 +83,15 @@
 
   // Sidecar health
   let sidecarConnected = false;
+  let mcpConnected = false;
+  let mcpActive = false;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
-  let showGuide = false;
   let showSettings = false;
+  let settingsInitialTab: 'library' | 'game-systems' | 'setup' = 'library';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
+  let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
 
   // User-configurable behavior
   let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
@@ -273,6 +275,10 @@
       if (typeof savedPanelOpen === 'boolean') {
         collectionsPanelOpen = savedPanelOpen;
       }
+      const savedHideSetup = await store.get<boolean>('hideSetupButton');
+      if (typeof savedHideSetup === 'boolean') {
+        hideSetupButton = savedHideSetup;
+      }
       await loadCollections();
     } catch (e) {
       // No saved state on first run — that's fine
@@ -292,6 +298,11 @@
       checkSidecarHealth();
       checkOllamaHealth();
     }, 10000);
+
+    // Poll MCP status more frequently so the active-query pulse is
+    // caught (backend keeps the active flag for 5s after a query).
+    checkMcpStatus();
+    mcpStatusInterval = setInterval(checkMcpStatus, 5000);
 
     restartAutoSyncInterval();
   });
@@ -363,6 +374,7 @@
 
   onDestroy(() => {
     if (healthInterval) clearInterval(healthInterval);
+    if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
   });
 
@@ -371,6 +383,28 @@
       sidecarConnected = await invoke<boolean>('check_sidecar_health');
     } catch {
       sidecarConnected = false;
+    }
+  }
+
+  async function setHideSetupButton(value: boolean) {
+    hideSetupButton = value;
+    try {
+      const store = await load('settings.json');
+      await store.set('hideSetupButton', value);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist hideSetupButton:', e);
+    }
+  }
+
+  async function checkMcpStatus() {
+    try {
+      const status = await invoke<{ connected: boolean; active: boolean }>('check_mcp_status');
+      mcpConnected = status.connected;
+      mcpActive = status.active;
+    } catch {
+      mcpConnected = false;
+      mcpActive = false;
     }
   }
 
@@ -1688,7 +1722,6 @@
             />
           {/each}
         {/if}
-        <NotificationBanner />
       </div>
     </div>
   {:else}
@@ -1698,6 +1731,7 @@
       folderSelected={false}
       filesIndexed={false}
       collectionsCreated={false}
+      {mcpConnected}
       onSelectFolder={handleSelectFolder}
       onCopyMcpConfig={handleCopyMcpConfig}
     />
@@ -1765,6 +1799,8 @@
   <StatusBar
     {selectedFolder}
     {sidecarConnected}
+    {mcpConnected}
+    {mcpActive}
     selectedCount={selectedPaths.size}
     indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
@@ -1775,11 +1811,11 @@
     {isSyncing}
     {lastSyncTime}
     onSync={handleManualSync}
-    onCopyMcpConfig={handleCopyMcpConfig}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
-    onShowGuide={() => { showGuide = true; }}
-    onOpenSettings={() => { showSettings = true; }}
+    onShowGuide={() => { settingsInitialTab = 'setup'; showSettings = true; }}
+    onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
+    showGuideButton={!hideSetupButton}
   />
 </main>
 
@@ -1788,6 +1824,7 @@
 <SettingsModal
   visible={showSettings}
   onClose={() => { showSettings = false; }}
+  initialTab={settingsInitialTab}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
@@ -1801,6 +1838,13 @@
   {syncPreferences}
   {dataDir}
   {lastSyncTime}
+  {ollamaRunning}
+  {ollamaModelReady}
+  filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
+  collectionsCreated={Object.keys(collections).length > 0}
+  {mcpConnected}
+  {hideSetupButton}
+  onHideSetupButtonChange={setHideSetupButton}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
@@ -1808,17 +1852,6 @@
   onSyncPreferencesChange={handleSyncPreferencesChange}
   onOpenDataDir={handleOpenDataDir}
   onSync={handleManualSync}
-/>
-
-<GettingStartedModal
-  visible={showGuide}
-  onClose={() => { showGuide = false; }}
-  {ollamaRunning}
-  {ollamaModelReady}
-  folderSelected={selectedFolder !== ''}
-  filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
-  collectionsCreated={Object.keys(collections).length > 0}
-  onSelectFolder={handleSelectFolder}
   onCopyMcpConfig={handleCopyMcpConfig}
 />
 

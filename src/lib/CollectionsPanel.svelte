@@ -166,14 +166,11 @@
 
   {#if hasNone}
     <div class="empty">
-      <p class="empty-body">
-        Collections group sourcebooks for fast access. Try
-        <strong>Create collection from folder</strong> from a folder's right-click menu, or use the <strong>+</strong> above.
-      </p>
+      <span class="empty-label">No collections yet</span>
     </div>
   {:else if rows.length === 0}
     <div class="empty">
-      <p class="empty-body">All collections are archived.</p>
+      <span class="empty-label">All archived</span>
     </div>
   {:else}
     <ul class="rows">
@@ -476,12 +473,13 @@
   }
 
   .empty {
-    padding: 1rem 0.75rem;
-    color: var(--text-secondary);
-    text-align: center;
+    padding: 0.6rem 0.75rem;
   }
-  .empty-body {
-    font-size: 0.8rem;
-    line-height: 1.4;
+  .empty-label {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
   }
 </style>

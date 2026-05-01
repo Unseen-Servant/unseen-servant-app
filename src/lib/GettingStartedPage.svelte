@@ -6,45 +6,50 @@
   export let folderSelected: boolean = false;
   export let filesIndexed: boolean = false;
   export let collectionsCreated: boolean = false;
+  export let mcpConnected: boolean = false;
   export let onSelectFolder: () => void;
   export let onCopyMcpConfig: () => void;
 </script>
 
-<div class="getting-started-page">
-  <h1 class="page-title font-display">Getting Started</h1>
-  <p class="page-subtitle">Set up Legend Lore to browse, index, and search your TTRPG library.</p>
-  <GettingStartedSteps
-    {ollamaRunning}
-    {ollamaModelReady}
-    {folderSelected}
-    {filesIndexed}
-    {collectionsCreated}
-    {onSelectFolder}
-    {onCopyMcpConfig}
-  />
+<div class="page">
+  <div class="page-inner">
+    <span class="label">Initial setup</span>
+    <GettingStartedSteps
+      {ollamaRunning}
+      {ollamaModelReady}
+      {folderSelected}
+      {filesIndexed}
+      {collectionsCreated}
+      {mcpConnected}
+      {onSelectFolder}
+      {onCopyMcpConfig}
+    />
+  </div>
 </div>
 
 <style>
-  .getting-started-page {
+  .page {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    gap: 0.25rem;
+    padding: 2.5rem 2rem;
+    overflow-y: auto;
   }
 
-  .page-title {
-    font-size: 1.6rem;
-    color: var(--text-accent);
-    margin: 0;
-    letter-spacing: 0.04em;
+  .page-inner {
+    width: 100%;
+    max-width: 540px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
   }
 
-  .page-subtitle {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    margin: 0 0 1rem;
+  .label {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
   }
 </style>
