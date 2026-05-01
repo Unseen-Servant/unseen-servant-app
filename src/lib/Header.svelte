@@ -2,9 +2,12 @@
   export let searchQuery: string = '';
   export let isSearching: boolean = false;
   export let disabled: boolean = false;
+  export let panelOpen: boolean = false;
+  export let panelToggleVisible: boolean = true;
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
+  export let onTogglePanel: () => void = () => {};
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -52,6 +55,21 @@
 </script>
 
 <header class="header">
+  {#if panelToggleVisible}
+    <button
+      class="panel-toggle"
+      class:active={panelOpen}
+      on:click={onTogglePanel}
+      title={panelOpen ? 'Hide collections panel' : 'Show collections panel'}
+      aria-label="Toggle collections panel"
+      aria-pressed={panelOpen}
+    >
+      <!-- Font Awesome "table-columns" icon (static/icons/table-columns-solid-full.svg) -->
+      <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+        <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
+      </svg>
+    </button>
+  {/if}
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
     <input
@@ -83,11 +101,41 @@
   .header {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
     height: var(--header-height);
     padding: 0 1rem;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
+  }
+
+  .panel-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+  .panel-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-container);
+  }
+  .panel-toggle.active {
+    color: var(--text-accent);
+    background: var(--bg-container);
+  }
+  .toggle-icon {
+    width: 14px;
+    height: 14px;
+    display: block;
   }
 
   .search-wrapper {

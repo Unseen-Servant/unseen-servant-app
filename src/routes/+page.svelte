@@ -10,7 +10,6 @@
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
-  import CollectionBar from '../lib/CollectionBar.svelte';
   import Header from '../lib/Header.svelte';
   import SearchResults from '../lib/SearchResults.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
@@ -67,7 +66,7 @@
   let collectionEditDescription = '';
   let highlightedCollection: string | null = null;
   let activeContextName: string | null = null;
-  let collectionsPanelOpen = false;
+  let collectionsPanelOpen = true;
   let editingMetadataFor: string | null = null;
 
   // Index sync state
@@ -1039,14 +1038,6 @@
 
   let pendingDeleteCollection: string | null = null;
 
-  $: chipBarCollections = (() => {
-    const visible: Record<string, CollectionInfo> = {};
-    for (const [k, v] of Object.entries(collections)) {
-      if (!v.archived) visible[k] = v;
-    }
-    return visible;
-  })();
-
   function requestDeleteCollection(name: string) {
     pendingDeleteCollection = name;
   }
@@ -1177,8 +1168,32 @@
   // Collections panel + metadata dialog
   // ---------------------------------------------------------------------------
 
-  function openCollectionsPanel() {
-    collectionsPanelOpen = true;
+  function togglePanel() {
+    collectionsPanelOpen = !collectionsPanelOpen;
+  }
+
+  async function inlineCreateCollection(name: string) {
+    try {
+      await invoke<CollectionMutationResult>('create_collection', {
+        name,
+        filePaths: [],
+        description: '',
+      });
+      notification.show({
+        type: 'success',
+        message: `Created "${name}"`,
+        duration: 3000,
+      });
+      await loadCollections();
+      // Drop straight into edit-files mode for the new collection.
+      startEditCollection(name);
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Could not create: ${String(e)}`,
+        duration: 5000,
+      });
+    }
   }
 
   function startEditMetadata(name: string) {
@@ -1336,10 +1351,6 @@
         }
       }
     }
-  }
-
-  function toggleCollectionHighlight(name: string | null) {
-    highlightedCollection = name;
   }
 
   // Copy MCP config to clipboard
@@ -1515,82 +1526,90 @@
     bind:searchQuery
     {isSearching}
     disabled={!selectedFolder || editingCollectionName !== null || isCreatingCollection}
+    panelOpen={collectionsPanelOpen}
+    panelToggleVisible={!!selectedFolder}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
+    onTogglePanel={togglePanel}
   />
 
   {#if selectedFolder}
-    <div class="collections-area">
-      <CollectionBar
-        collections={chipBarCollections}
-        editingName={editingCollectionName}
-        isCreating={isCreatingCollection}
-        bind:editName={collectionEditName}
-        bind:editDescription={collectionEditDescription}
-        editFileCount={collectionEditPaths.size}
-        highlightedName={highlightedCollection}
-        activeName={activeContextName}
-        onStartCreate={startCreateCollection}
-        onStartEdit={startEditCollection}
-        onSave={saveCollection}
-        onCancel={cancelCollectionEdit}
-        onDelete={requestDeleteCollection}
-        onHighlight={toggleCollectionHighlight}
-        onToggleActive={toggleActiveContext}
-        onOpenPanel={openCollectionsPanel}
-      />
-    </div>
-
-    <div class="file-tree-area">
-      {#if activeContextName && !isCollectionEditMode}
-        <div class="active-context-strip">
-          <span class="ac-label">Active context:</span>
-          <span class="ac-name">{activeContextName}</span>
-          <button class="ac-clear" on:click={clearActiveContext} title="Clear active context">
-            &#10005;
-          </button>
-        </div>
-      {/if}
-      {#if searchActive}
-        <SearchResults
-          results={searchResults}
-          isLoading={isSearching}
-          query={committedQuery}
-          error={searchError}
-          indexedFileCount={indexedPathsSet.size}
-          onOpenResult={handleOpenResult}
+    <div class="workspace">
+      {#if collectionsPanelOpen}
+        <CollectionsPanel
+          {collections}
+          activeName={activeContextName}
+          editingName={editingCollectionName}
+          onSetActive={setActiveContext}
+          onClearActive={clearActiveContext}
+          onEdit={startEditMetadata}
+          onEditFiles={startEditCollection}
+          onDelete={requestDeleteCollection}
+          onToggleArchived={toggleArchived}
+          onCreate={inlineCreateCollection}
         />
-      {:else}
-        {#each files as file (file.path)}
-          <FileTree
-            item={file}
-            level={0}
-            {selectedPaths}
-            {foldersWithSelections}
-            {gameSystemMap}
-            {knownSystems}
-            {indexedPaths}
-            onToggle={toogleSelection}
-            onSetGameSystem={handleSetGameSystem}
-            {expandedPaths}
-            onToggleExpand={handleToggleExpand}
-            {focusedFilePath}
-            onFocusFile={(path) => { focusedFilePath = path; }}
-            onContextMenu={handleContextMenu}
-            {renamingFilePath}
-            onRenameSubmit={handleRenameSubmit}
-            onRenameCancel={handleRenameCancel}
-            mode={treeMode}
-            collectionPaths={collectionEditPaths}
-            {collectionFolders}
-            {highlightPaths}
-            {displayPaths}
-            onCollectionToggle={handleCollectionToggle}
-          />
-        {/each}
       {/if}
-      <NotificationBanner />
+
+      <div class="file-tree-area">
+        {#if isCollectionEditMode}
+          <div class="edit-files-strip">
+            <span class="ef-label">Editing files:</span>
+            <span class="ef-name">{editingCollectionName ?? collectionEditName ?? 'New collection'}</span>
+            <span class="ef-count">{collectionEditPaths.size} file{collectionEditPaths.size === 1 ? '' : 's'}</span>
+            <div class="ef-spacer"></div>
+            <button class="ef-btn cancel" on:click={cancelCollectionEdit}>Cancel</button>
+            <button class="ef-btn save" on:click={saveCollection}>Save</button>
+          </div>
+        {:else if activeContextName}
+          <div class="active-context-strip">
+            <span class="ac-label">Active context:</span>
+            <span class="ac-name">{activeContextName}</span>
+            <button class="ac-clear" on:click={clearActiveContext} title="Clear active context">
+              &#10005;
+            </button>
+          </div>
+        {/if}
+        {#if searchActive}
+          <SearchResults
+            results={searchResults}
+            isLoading={isSearching}
+            query={committedQuery}
+            error={searchError}
+            indexedFileCount={indexedPathsSet.size}
+            onOpenResult={handleOpenResult}
+          />
+        {:else}
+          {#each files as file (file.path)}
+            <FileTree
+              item={file}
+              level={0}
+              {selectedPaths}
+              {foldersWithSelections}
+              {gameSystemMap}
+              {knownSystems}
+              {indexedPaths}
+              onToggle={toogleSelection}
+              onSetGameSystem={handleSetGameSystem}
+              {expandedPaths}
+              onToggleExpand={handleToggleExpand}
+              {focusedFilePath}
+              onFocusFile={(path) => { focusedFilePath = path; }}
+              onContextMenu={handleContextMenu}
+              {renamingFilePath}
+              onRenameSubmit={handleRenameSubmit}
+              onRenameCancel={handleRenameCancel}
+              mode={treeMode}
+              collectionPaths={collectionEditPaths}
+              {collectionFolders}
+              {highlightPaths}
+              {displayPaths}
+              onCollectionToggle={handleCollectionToggle}
+            />
+          {/each}
+        {/if}
+        <NotificationBanner />
+      </div>
     </div>
   {:else}
     <GettingStartedPage
@@ -1648,20 +1667,6 @@
       danger
       onConfirm={confirmDeleteCollection}
       onCancel={() => { pendingDeleteCollection = null; }}
-    />
-  {/if}
-
-  {#if collectionsPanelOpen}
-    <CollectionsPanel
-      {collections}
-      activeName={activeContextName}
-      onClose={() => { collectionsPanelOpen = false; }}
-      onSetActive={setActiveContext}
-      onClearActive={clearActiveContext}
-      onEdit={startEditMetadata}
-      onDelete={requestDeleteCollection}
-      onToggleArchived={toggleArchived}
-      onStartCreate={() => { collectionsPanelOpen = false; startCreateCollection(); }}
     />
   {/if}
 
@@ -1742,18 +1747,59 @@
     background: var(--bg-app);
   }
 
-  .collections-area {
-    flex-shrink: 0;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--bg-container);
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
   }
 
   .file-tree-area {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     padding: 0.25rem 0.75rem;
   }
+
+  .edit-files-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    margin: 0 0 0.5rem 0;
+    background: rgba(182, 159, 129, 0.18);
+    border: 1px solid var(--text-accent);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-accent);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .ef-label { color: var(--text-secondary); }
+  .ef-name { font-weight: 600; }
+  .ef-count { color: var(--text-secondary); font-size: 0.75rem; }
+  .ef-spacer { flex: 1; }
+  .ef-btn {
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .ef-btn.cancel {
+    background: var(--bg-focused);
+    color: var(--text-secondary);
+    border-color: var(--bg-category);
+  }
+  .ef-btn.cancel:hover { background: var(--bg-container); }
+  .ef-btn.save {
+    background: var(--bg-active);
+    color: var(--text-primary);
+  }
+  .ef-btn.save:hover { background: var(--bg-active-focused); }
 
   .active-context-strip {
     display: flex;
