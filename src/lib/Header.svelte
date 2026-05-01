@@ -19,6 +19,8 @@
   export let onIndexedOnlyChange: (value: boolean) => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
+  export let collapseAllVisible: boolean = false;
+  export let onCollapseAll: () => void = () => {};
 
   let filterOpen = false;
   let filterBtn: HTMLButtonElement | undefined;
@@ -118,6 +120,20 @@
         onClose={() => { filterOpen = false; }}
       />
     </div>
+  {/if}
+  {#if collapseAllVisible}
+    <button
+      class="panel-toggle"
+      on:click={onCollapseAll}
+      title="Collapse all folders"
+      aria-label="Collapse all folders"
+    >
+      <!-- Double chevron up — collapse all -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+        <polyline points="17 11 12 6 7 11" />
+        <polyline points="17 18 12 13 7 18" />
+      </svg>
+    </button>
   {/if}
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>

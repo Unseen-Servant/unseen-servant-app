@@ -1755,6 +1755,8 @@
     onIndexedOnlyChange={setIndexedOnly}
     onToggleSystemFilter={toggleSystemFilter}
     onClearSystemFilter={clearSystemFilter}
+    collapseAllVisible={!!selectedFolder && !searchActive && expandedPaths.size > 0}
+    onCollapseAll={collapseAll}
   />
 
   {#if selectedFolder}
@@ -1783,21 +1785,6 @@
             <div class="ef-spacer"></div>
             <ActionButton kind="discard" label="Cancel" onClick={cancelCollectionEdit} />
             <ActionButton kind="confirm" label="Save" onClick={saveCollection} />
-          </div>
-        {/if}
-        {#if !searchActive && expandedPaths.size > 0}
-          <div class="tree-toolbar">
-            <button
-              class="collapse-all"
-              on:click={collapseAll}
-              title="Collapse all folders"
-              aria-label="Collapse all folders"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="17 11 12 6 7 11" />
-                <polyline points="17 18 12 13 7 18" />
-              </svg>
-            </button>
           </div>
         {/if}
         {#if searchActive}
@@ -1995,42 +1982,6 @@
     padding: 0.25rem 0.75rem;
   }
 
-  /* Sticky toolbar for tree controls. Lets clicks pass through to file rows
-     beneath; only the button itself is interactive. Renders only when at
-     least one folder is expanded — empty state hides the row entirely. */
-  .tree-toolbar {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    display: flex;
-    justify-content: flex-end;
-    pointer-events: none;
-    margin-bottom: 0.15rem;
-  }
-  .collapse-all {
-    pointer-events: auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    background: var(--bg-container);
-    border: 1px solid var(--border-subtle);
-    border-radius: 3px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: color var(--transition-fast), border-color var(--transition-fast);
-  }
-  .collapse-all:hover {
-    color: var(--text-primary);
-    border-color: var(--text-accent);
-  }
-  .collapse-all svg {
-    width: 12px;
-    height: 12px;
-    display: block;
-  }
 
   .edit-files-strip {
     display: flex;
