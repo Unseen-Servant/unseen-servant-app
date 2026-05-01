@@ -840,15 +840,20 @@ async fn create_collection(
     name: String,
     file_paths: Vec<String>,
     description: String,
+    color: Option<String>,
 ) -> Result<CollectionMutationResult, String> {
     let client = reqwest::Client::new();
+    let mut body = serde_json::json!({
+        "name": name,
+        "file_paths": file_paths,
+        "description": description,
+    });
+    if let Some(c) = color {
+        body["color"] = serde_json::Value::String(c);
+    }
     let response = client
         .post(format!("{}/api/collections", SIDECAR_URL))
-        .json(&serde_json::json!({
-            "name": name,
-            "file_paths": file_paths,
-            "description": description,
-        }))
+        .json(&body)
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -870,15 +875,24 @@ async fn create_collection(
 #[tauri::command]
 async fn update_collection(
     name: String,
-    file_paths: Vec<String>,
+    file_paths: Option<Vec<String>>,
     description: Option<String>,
+    color: Option<String>,
+    archived: Option<bool>,
 ) -> Result<CollectionMutationResult, String> {
     let client = reqwest::Client::new();
-    let mut body = serde_json::json!({
-        "file_paths": file_paths,
-    });
+    let mut body = serde_json::Map::new();
+    if let Some(paths) = file_paths {
+        body.insert("file_paths".to_string(), serde_json::json!(paths));
+    }
     if let Some(desc) = description {
-        body["description"] = serde_json::Value::String(desc);
+        body.insert("description".to_string(), serde_json::Value::String(desc));
+    }
+    if let Some(col) = color {
+        body.insert("color".to_string(), serde_json::Value::String(col));
+    }
+    if let Some(a) = archived {
+        body.insert("archived".to_string(), serde_json::Value::Bool(a));
     }
 
     let response = client

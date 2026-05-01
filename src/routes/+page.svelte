@@ -21,6 +21,8 @@
   import SettingsModal from '../lib/SettingsModal.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
+  import CollectionsPanel from '../lib/CollectionsPanel.svelte';
+  import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -65,6 +67,8 @@
   let collectionEditDescription = '';
   let highlightedCollection: string | null = null;
   let activeContextName: string | null = null;
+  let collectionsPanelOpen = false;
+  let editingMetadataFor: string | null = null;
 
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
@@ -1035,6 +1039,14 @@
 
   let pendingDeleteCollection: string | null = null;
 
+  $: chipBarCollections = (() => {
+    const visible: Record<string, CollectionInfo> = {};
+    for (const [k, v] of Object.entries(collections)) {
+      if (!v.archived) visible[k] = v;
+    }
+    return visible;
+  })();
+
   function requestDeleteCollection(name: string) {
     pendingDeleteCollection = name;
   }
@@ -1159,6 +1171,105 @@
     isCreatingCollection = true;
     editingCollectionName = null;
     highlightedCollection = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Collections panel + metadata dialog
+  // ---------------------------------------------------------------------------
+
+  function openCollectionsPanel() {
+    collectionsPanelOpen = true;
+  }
+
+  function startEditMetadata(name: string) {
+    editingMetadataFor = name;
+  }
+
+  async function saveMetadata(changes: {
+    name: string;
+    description: string;
+    color: string;
+    archived: boolean;
+  }) {
+    const original = editingMetadataFor;
+    if (!original) return;
+    const col = collections[original];
+    if (!col) {
+      editingMetadataFor = null;
+      return;
+    }
+    editingMetadataFor = null;
+
+    const renaming = changes.name !== original;
+
+    try {
+      if (renaming) {
+        // Rename = delete + create with all metadata + paths
+        await invoke('delete_collection', { name: original });
+        await invoke<CollectionMutationResult>('create_collection', {
+          name: changes.name,
+          filePaths: col.file_paths,
+          description: changes.description,
+          color: changes.color || null,
+        });
+        // create can't set archived; PUT it in if needed
+        if (changes.archived !== col.archived) {
+          await invoke('update_collection', {
+            name: changes.name,
+            archived: changes.archived,
+          });
+        }
+        notification.show({
+          type: 'success',
+          message: `Renamed to "${changes.name}"`,
+          duration: 4000,
+        });
+      } else {
+        await invoke('update_collection', {
+          name: changes.name,
+          description: changes.description,
+          color: changes.color,
+          archived: changes.archived,
+        });
+        notification.show({
+          type: 'success',
+          message: `Updated "${changes.name}"`,
+          duration: 4000,
+        });
+      }
+      // If the user archived the active context, clear it.
+      if (changes.archived && activeContextName === original) {
+        await invoke('clear_active_context');
+      }
+      await loadCollections();
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Save failed: ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  async function toggleArchived(name: string, archived: boolean) {
+    try {
+      await invoke('update_collection', { name, archived });
+      if (archived && activeContextName === name) {
+        await invoke('clear_active_context');
+      }
+      await loadCollections();
+      notification.show({
+        type: 'success',
+        message: archived ? `Archived "${name}"` : `Unarchived "${name}"`,
+        duration: 3000,
+      });
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Could not ${archived ? 'archive' : 'unarchive'} "${name}": ${String(e)}`,
+        duration: 5000,
+      });
+    }
   }
 
   function startCreateCollectionWithItem(item: FileItem) {
@@ -1412,7 +1523,7 @@
   {#if selectedFolder}
     <div class="collections-area">
       <CollectionBar
-        {collections}
+        collections={chipBarCollections}
         editingName={editingCollectionName}
         isCreating={isCreatingCollection}
         bind:editName={collectionEditName}
@@ -1427,6 +1538,7 @@
         onDelete={requestDeleteCollection}
         onHighlight={toggleCollectionHighlight}
         onToggleActive={toggleActiveContext}
+        onOpenPanel={openCollectionsPanel}
       />
     </div>
 
@@ -1536,6 +1648,28 @@
       danger
       onConfirm={confirmDeleteCollection}
       onCancel={() => { pendingDeleteCollection = null; }}
+    />
+  {/if}
+
+  {#if collectionsPanelOpen}
+    <CollectionsPanel
+      {collections}
+      activeName={activeContextName}
+      onClose={() => { collectionsPanelOpen = false; }}
+      onSetActive={setActiveContext}
+      onClearActive={clearActiveContext}
+      onEdit={startEditMetadata}
+      onDelete={requestDeleteCollection}
+      onToggleArchived={toggleArchived}
+      onStartCreate={() => { collectionsPanelOpen = false; startCreateCollection(); }}
+    />
+  {/if}
+
+  {#if editingMetadataFor && collections[editingMetadataFor]}
+    <CollectionEditDialog
+      collection={collections[editingMetadataFor]}
+      onSave={saveMetadata}
+      onCancel={() => { editingMetadataFor = null; }}
     />
   {/if}
 

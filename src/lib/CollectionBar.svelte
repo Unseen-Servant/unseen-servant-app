@@ -17,6 +17,7 @@
   export let onDelete: (name: string) => void = () => {};
   export let onHighlight: (name: string | null) => void = () => {};
   export let onToggleActive: (name: string) => void = () => {};
+  export let onOpenPanel: () => void = () => {};
 
   $: isEditMode = editingName !== null || isCreating;
   $: collectionList = Object.values(collections);
@@ -60,6 +61,9 @@
           class:active={activeName === col.name}
           on:click={() => handleChipClick(col.name)}
         >
+          {#if col.color}
+            <span class="chip-color" style="background: {col.color}"></span>
+          {/if}
           <span class="chip-name">{col.name}</span>
           <span class="chip-count">{col.file_count}</span>
           <button
@@ -87,6 +91,9 @@
       {/each}
       <button class="chip new-chip" on:click={onStartCreate}>
         + New Collection
+      </button>
+      <button class="chip manage-chip" on:click={onOpenPanel} title="Manage collections">
+        Manage&hellip;
       </button>
     </div>
   {:else}
@@ -181,6 +188,12 @@
     color: var(--text-accent);
     font-weight: 600;
   }
+  .chip-color {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
   .chip-name {
     font-weight: 500;
   }
@@ -224,12 +237,14 @@
   .chip-action.delete {
     color: var(--text-danger);
   }
-  .new-chip {
+  .new-chip,
+  .manage-chip {
     background: transparent;
     border: 1px dashed var(--bg-category);
     color: var(--text-secondary);
   }
-  .new-chip:hover {
+  .new-chip:hover,
+  .manage-chip:hover {
     border-color: var(--text-accent);
     color: var(--text-accent);
   }
