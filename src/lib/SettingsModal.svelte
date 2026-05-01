@@ -4,6 +4,7 @@
   import Modal from './Modal.svelte';
   import GameSystemsSettings from './GameSystemsSettings.svelte';
   import LibrarySettings from './LibrarySettings.svelte';
+  import GettingStartedSteps from './GettingStartedSteps.svelte';
 
   export let visible = false;
   export let onClose: () => void;
@@ -27,12 +28,20 @@
   export let onSyncPreferencesChange: (partial: Partial<SyncPreferences>) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
   export let onSync: () => void = () => {};
+  export let onCopyMcpConfig: () => void = () => {};
+  export let ollamaRunning: boolean = false;
+  export let ollamaModelReady: boolean = false;
+  export let filesIndexed: boolean = false;
+  export let collectionsCreated: boolean = false;
+  export let initialTab: 'library' | 'game-systems' | 'setup' = 'library';
 
-  let activeTab = 'library';
+  let activeTab: 'library' | 'game-systems' | 'setup' = initialTab;
+  $: if (visible) activeTab = initialTab;
 
   const tabs = [
-    { id: 'library', label: 'Library' },
-    { id: 'game-systems', label: 'Game Systems' },
+    { id: 'library' as const, label: 'Library' },
+    { id: 'game-systems' as const, label: 'Game Systems' },
+    { id: 'setup' as const, label: 'Setup' },
   ];
 </script>
 
@@ -73,6 +82,18 @@
           {onOpenDataDir}
           {onSync}
         />
+      {:else if activeTab === 'setup'}
+        <div class="setup-pane">
+          <GettingStartedSteps
+            {ollamaRunning}
+            {ollamaModelReady}
+            folderSelected={!!selectedFolder}
+            {filesIndexed}
+            {collectionsCreated}
+            {onSelectFolder}
+            {onCopyMcpConfig}
+          />
+        </div>
       {/if}
     </div>
   </div>
@@ -122,5 +143,10 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  .setup-pane {
+    overflow-y: auto;
+    padding: 1rem;
   }
 </style>

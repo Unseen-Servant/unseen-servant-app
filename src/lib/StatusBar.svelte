@@ -13,7 +13,6 @@
   export let isSyncing: boolean = false;
   export let lastSyncTime: Date | null = null;
   export let onSync: (() => void) | undefined = undefined;
-  export let onCopyMcpConfig: () => void;
   export let onOpenFolder: () => void;
   export let onShowLicense: () => void;
   export let onShowGuide: () => void;
@@ -64,20 +63,18 @@
       {:else}
         <span>{selectedCount} selected</span>
       {/if}
+      <span class="separator">&middot;</span>
+      <button class="sync-btn folder-btn" on:click={onOpenFolder} title="Reveal library folder">
+        <!-- Font Awesome "folder-open" icon -->
+        <svg class="sync-icon" viewBox="0 0 576 512" fill="currentColor">
+          <path d="M88.7 223.8L0 375.8L0 96C0 60.7 28.7 32 64 32L181.5 32C198.5 32 214.8 38.7 226.7 50.7L269.3 93.3C281.3 105.3 297.6 112 314.5 112L448 112C483.3 112 512 140.7 512 176L512 208L144 208C121.4 208 100.6 220 88.7 223.8zM144 240L560 240C572.1 240 583.3 246.8 588.9 257.6C594.5 268.4 593.5 281.4 586.4 291.2L501.9 467.2C495.3 480.6 481.6 488 467.2 488L48 488C36 488 24.8 481.2 19.2 470.4C13.6 459.6 14.6 446.6 21.7 436.8L106.2 260.8C112.8 247.4 126.5 240 144 240z"/>
+        </svg>
+      </button>
       {#if onSync}
-        <span class="separator">&middot;</span>
         <button class="sync-btn" class:spinning={isSyncing} on:click={onSync} title={syncTooltip} disabled={isSyncing}>
           <!-- Font Awesome "arrows-rotate" icon (static/icons/arrows-rotate-solid-full.svg) -->
           <svg class="sync-icon" viewBox="0 0 640 640" fill="currentColor">
             <path d="M129.9 292.5C143.2 199.5 223.3 128 320 128C373 128 421 149.5 455.8 184.2C456 184.4 456.2 184.6 456.4 184.8L464 192L416.1 192C398.4 192 384.1 206.3 384.1 224C384.1 241.7 398.4 256 416.1 256L544.1 256C561.8 256 576.1 241.7 576.1 224L576.1 96C576.1 78.3 561.8 64 544.1 64C526.4 64 512.1 78.3 512.1 96L512.1 149.4L500.8 138.7C454.5 92.6 390.5 64 320 64C191 64 84.3 159.4 66.6 283.5C64.1 301 76.2 317.2 93.7 319.7C111.2 322.2 127.4 310 129.9 292.6zM573.4 356.5C575.9 339 563.7 322.8 546.3 320.3C528.9 317.8 512.6 330 510.1 347.4C496.8 440.4 416.7 511.9 320 511.9C267 511.9 219 490.4 184.2 455.7C184 455.5 183.8 455.3 183.6 455.1L176 447.9L223.9 447.9C241.6 447.9 255.9 433.6 255.9 415.9C255.9 398.2 241.6 383.9 223.9 383.9L96 384C87.5 384 79.3 387.4 73.3 393.5C67.3 399.6 63.9 407.7 64 416.3L65 543.3C65.1 561 79.6 575.2 97.3 575C115 574.8 129.2 560.4 129 542.7L128.6 491.2L139.3 501.3C185.6 547.4 249.5 576 320 576C449 576 555.7 480.6 573.4 356.5z"/>
-          </svg>
-        </button>
-        <button class="sync-btn" on:click={onCopyMcpConfig} title="Copy MCP config">
-          <!-- MCP logo icon (static/icons/mcp.svg) -->
-          <svg class="sync-icon" viewBox="0 0 180 180" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round">
-            <path d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706V16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/>
-            <path d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/>
-            <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
           </svg>
         </button>
       {/if}
@@ -100,10 +97,6 @@
     {/if}
   </div>
   <div class="statusbar-right">
-    {#if selectedFolder}
-      <button class="folder-path" on:click={onOpenFolder} title="Reveal library folder">{selectedFolder}</button>
-      <span class="separator">&middot;</span>
-    {/if}
     <button class="license-link" on:click={onOpenSettings} title="Settings">
       <!-- Font Awesome "gear" icon -->
       <svg class="license-icon" viewBox="0 0 512 512" fill="currentColor">
@@ -237,6 +230,9 @@
     transition: color var(--transition-fast);
     line-height: 0;
   }
+  .folder-btn {
+    margin-left: 0.2rem;
+  }
   .sync-btn:hover:not(:disabled) {
     color: var(--text-accent);
   }
@@ -281,23 +277,4 @@
     color: var(--text-accent);
   }
 
-  .folder-path {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: inherit;
-    font-family: inherit;
-    padding: 0;
-    cursor: pointer;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    direction: rtl;
-    text-align: right;
-    max-width: 300px;
-    transition: color var(--transition-fast);
-  }
-  .folder-path:hover {
-    color: var(--text-accent);
-  }
 </style>

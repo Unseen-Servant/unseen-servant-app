@@ -14,7 +14,6 @@
   import SearchResults from '../lib/SearchResults.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
-  import GettingStartedModal from '../lib/GettingStartedModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
@@ -86,8 +85,8 @@
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
-  let showGuide = false;
   let showSettings = false;
+  let settingsInitialTab: 'library' | 'game-systems' | 'setup' = 'library';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
   // User-configurable behavior
@@ -1773,11 +1772,10 @@
     {isSyncing}
     {lastSyncTime}
     onSync={handleManualSync}
-    onCopyMcpConfig={handleCopyMcpConfig}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
-    onShowGuide={() => { showGuide = true; }}
-    onOpenSettings={() => { showSettings = true; }}
+    onShowGuide={() => { settingsInitialTab = 'setup'; showSettings = true; }}
+    onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
   />
 </main>
 
@@ -1786,6 +1784,7 @@
 <SettingsModal
   visible={showSettings}
   onClose={() => { showSettings = false; }}
+  initialTab={settingsInitialTab}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
@@ -1799,6 +1798,10 @@
   {syncPreferences}
   {dataDir}
   {lastSyncTime}
+  {ollamaRunning}
+  {ollamaModelReady}
+  filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
+  collectionsCreated={Object.keys(collections).length > 0}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
@@ -1806,17 +1809,6 @@
   onSyncPreferencesChange={handleSyncPreferencesChange}
   onOpenDataDir={handleOpenDataDir}
   onSync={handleManualSync}
-/>
-
-<GettingStartedModal
-  visible={showGuide}
-  onClose={() => { showGuide = false; }}
-  {ollamaRunning}
-  {ollamaModelReady}
-  folderSelected={selectedFolder !== ''}
-  filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
-  collectionsCreated={Object.keys(collections).length > 0}
-  onSelectFolder={handleSelectFolder}
   onCopyMcpConfig={handleCopyMcpConfig}
 />
 
