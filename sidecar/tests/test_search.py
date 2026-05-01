@@ -282,3 +282,34 @@ def test_search_source_paths_unknown_path_returns_empty(multi_indexed_client):
 
     assert response.status_code == 200
     assert response.json()["results"] == []
+
+
+# ---------------------------------------------------------------------------
+# Multi-system filter (game_systems list)
+# ---------------------------------------------------------------------------
+
+def test_search_game_systems_list_includes_only_listed(multi_system_client):
+    """game_systems list should restrict results to systems in the list."""
+    response = multi_system_client.post("/api/search", json={
+        "query": "adventure rules",
+        "n_results": 10,
+        "game_systems": ["D&D 5E"],
+    })
+
+    data = response.json()
+    assert len(data["results"]) > 0
+    for result in data["results"]:
+        assert result["game_system"] == "D&D 5E"
+
+
+def test_search_game_systems_list_multiple(multi_system_client):
+    """A list with multiple systems should accept any of them."""
+    response = multi_system_client.post("/api/search", json={
+        "query": "adventure",
+        "n_results": 10,
+        "game_systems": ["D&D 5E", "Dragonbane"],
+    })
+
+    data = response.json()
+    systems = {r["game_system"] for r in data["results"]}
+    assert systems.issubset({"D&D 5E", "Dragonbane"})

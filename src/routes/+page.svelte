@@ -70,6 +70,12 @@
   let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
+  // Library filter (next to the search bar). Empty/false = no filter.
+  // Composes with active scope (collection / path) — scope picks the file
+  // pool, filter narrows it further.
+  let filterIndexedOnly = false;
+  let filterExcludedSystems = new Set<string>();
+
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
   let isLoadingStatus = false;
@@ -170,6 +176,21 @@
       sourcePaths = paths;
     }
 
+    // Library filter: convert "excluded systems" to the include-list the
+    // backend expects via game_systems. Empty included list (everything
+    // excluded) short-circuits to no results.
+    let gameSystems: string[] | null = null;
+    if (filterExcludedSystems.size > 0) {
+      const all = gameSystemStats.map((s) => s.name);
+      gameSystems = all.filter((s) => !filterExcludedSystems.has(s));
+      if (gameSystems.length === 0) {
+        searchError = 'All game systems are filtered out.';
+        searchResults = [];
+        isSearching = false;
+        return;
+      }
+    }
+
     searchSeq += 1;
     const seq = searchSeq;
     isSearching = true;
@@ -179,6 +200,7 @@
         query: trimmed,
         nResults: 10,
         sourcePaths,
+        gameSystems,
       });
       if (seq !== searchSeq) return;
       searchResults = response.results ?? [];
@@ -278,6 +300,15 @@
       const savedHideSetup = await store.get<boolean>('hideSetupButton');
       if (typeof savedHideSetup === 'boolean') {
         hideSetupButton = savedHideSetup;
+      }
+      const savedFilter = await store.get<{ indexedOnly?: boolean; excludedSystems?: string[] }>('libraryFilter');
+      if (savedFilter && typeof savedFilter === 'object') {
+        if (typeof savedFilter.indexedOnly === 'boolean') {
+          filterIndexedOnly = savedFilter.indexedOnly;
+        }
+        if (Array.isArray(savedFilter.excludedSystems)) {
+          filterExcludedSystems = new Set(savedFilter.excludedSystems);
+        }
       }
       await loadCollections();
     } catch (e) {
@@ -384,6 +415,39 @@
     } catch {
       sidecarConnected = false;
     }
+  }
+
+  async function persistFilter() {
+    try {
+      const store = await load('settings.json');
+      await store.set('libraryFilter', {
+        indexedOnly: filterIndexedOnly,
+        excludedSystems: Array.from(filterExcludedSystems),
+      });
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist libraryFilter:', e);
+    }
+  }
+
+  function setIndexedOnly(value: boolean) {
+    filterIndexedOnly = value;
+    persistFilter();
+  }
+
+  function toggleSystemFilter(system: string) {
+    if (filterExcludedSystems.has(system)) {
+      filterExcludedSystems.delete(system);
+    } else {
+      filterExcludedSystems.add(system);
+    }
+    filterExcludedSystems = filterExcludedSystems;
+    persistFilter();
+  }
+
+  function clearSystemFilter() {
+    filterExcludedSystems = new Set();
+    persistFilter();
   }
 
   async function setHideSetupButton(value: boolean) {
@@ -763,24 +827,43 @@
     : new Set<string>();
   $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
-  // Filter for what the file tree shows.
-  // - In collection-edit mode: only indexed files (the only ones that can be
-  //   added to a collection) plus their ancestor folders. Mirrors the active-
-  //   context shape so both modes feel consistent.
-  // - With an active collection: that collection's files plus ancestor folders.
-  // - Otherwise: null (show everything).
+  // Filter for what the file tree shows. Composes scope + library filter:
+  // 1. Scope picks the base file pool (collection / edit-mode-indexed / all).
+  // 2. Library filter narrows: indexedOnly hides unindexed; excludedSystems
+  //    hides indexed files in those systems. A game-system filter implies
+  //    indexed-only (only indexed files have system tags).
+  // 3. Add ancestor folders so the tree structure stays intact.
+  // Returns null = show everything, no narrowing.
   $: displayPaths = (() => {
+    const effectiveIndexedOnly = filterIndexedOnly || filterExcludedSystems.size > 0;
+
+    let baseFiles: Set<string> | null;
     if (isCollectionEditMode) {
-      if (indexedPaths.size === 0) return new Set<string>();
-      const ancestors = computeAncestorPaths(indexedPaths);
-      return new Set<string>([...indexedPaths, ...ancestors]);
+      baseFiles = new Set(indexedPaths);
+    } else if (activeContextName) {
+      const col = collections[activeContextName];
+      baseFiles = col ? new Set(col.file_paths) : null;
+    } else if (effectiveIndexedOnly) {
+      baseFiles = new Set(indexedPaths);
+    } else {
+      return null;
     }
-    if (!activeContextName) return null;
-    const col = collections[activeContextName];
-    if (!col) return null;
-    const filePaths = new Set(col.file_paths);
-    const ancestors = computeAncestorPaths(filePaths);
-    return new Set<string>([...filePaths, ...ancestors]);
+
+    if (!baseFiles) return null;
+
+    let visible = baseFiles;
+    if (effectiveIndexedOnly) {
+      visible = new Set([...visible].filter(p => indexedPaths.has(p)));
+    }
+    if (filterExcludedSystems.size > 0) {
+      visible = new Set([...visible].filter(p => {
+        const sys = gameSystemMap.get(p) ?? 'unknown';
+        return !filterExcludedSystems.has(sys);
+      }));
+    }
+
+    if (visible.size === 0) return new Set<string>();
+    return new Set<string>([...visible, ...computeAncestorPaths(visible)]);
   })();
 
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string> {
@@ -1656,11 +1739,18 @@
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
     {scopeChip}
+    filterVisible={!!selectedFolder}
+    indexedOnly={filterIndexedOnly}
+    excludedSystems={filterExcludedSystems}
+    availableSystems={gameSystemStats}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
     onTogglePanel={togglePanel}
     onClearScope={handleClearScope}
+    onIndexedOnlyChange={setIndexedOnly}
+    onToggleSystemFilter={toggleSystemFilter}
+    onClearSystemFilter={clearSystemFilter}
   />
 
   {#if selectedFolder}

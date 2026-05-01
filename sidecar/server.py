@@ -282,6 +282,7 @@ class SearchRequest(BaseModel):
     n_results: int = 5
     source_filter: str | None = None
     game_system: str | None = None
+    game_systems: list[str] | None = None
     collection: str | None = None
     source_paths: list[str] | None = None
     search_all: bool = False
@@ -2519,6 +2520,8 @@ def create_app(
                 where_clauses.append({"filename": request.source_filter})
             if request.game_system:
                 where_clauses.append({"game_system": request.game_system})
+            if request.game_systems:
+                where_clauses.append({"game_system": {"$in": request.game_systems}})
 
             if len(where_clauses) == 1:
                 query_kwargs["where"] = where_clauses[0]
