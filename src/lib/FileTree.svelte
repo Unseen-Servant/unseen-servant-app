@@ -311,6 +311,7 @@
     width: 14px;
     height: 14px;
     margin-right: 0.5rem;
+    margin-left: 0.2rem;
     padding: 0;
     cursor: pointer;
     border: 1.5px solid var(--text-tertiary);
