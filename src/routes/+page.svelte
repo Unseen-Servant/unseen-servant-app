@@ -920,6 +920,10 @@
     expandedPaths = expandedPaths;
   }
 
+  function collapseAll() {
+    expandedPaths = new Set();
+  }
+
   function handleGlobalKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
@@ -1751,6 +1755,8 @@
     onIndexedOnlyChange={setIndexedOnly}
     onToggleSystemFilter={toggleSystemFilter}
     onClearSystemFilter={clearSystemFilter}
+    collapseAllVisible={!!selectedFolder && !searchActive && expandedPaths.size > 0}
+    onCollapseAll={collapseAll}
   />
 
   {#if selectedFolder}
@@ -1975,6 +1981,7 @@
     overflow-y: auto;
     padding: 0.25rem 0.75rem;
   }
+
 
   .edit-files-strip {
     display: flex;
