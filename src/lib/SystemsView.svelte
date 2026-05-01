@@ -83,6 +83,24 @@
     }
     return parent;
   }
+
+  // Compact "how long ago" formatter for the catalog metadata slot.
+  // Drops the trailing "ago" since the column header carries that context.
+  function formatRelativeShort(iso: string | undefined): string {
+    if (!iso) return '';
+    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (seconds < 60) return 'now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo`;
+    const years = Math.floor(days / 365);
+    return `${years}y`;
+  }
 </script>
 
 {#if groups.length === 0}
@@ -119,9 +137,12 @@
                   <span class="file-sep" aria-hidden="true">·</span>
                   <span class="file-path" title={entry.path}>{relParent}</span>
                 {/if}
-                {#if entry.chunk_count !== undefined && entry.chunk_count > 0}
-                  <span class="file-meta" title="Indexed chunks">
-                    {entry.chunk_count.toLocaleString()}<span class="file-meta-unit">ch</span>
+                {#if entry.indexed_at}
+                  <span
+                    class="file-meta"
+                    title={`Indexed ${new Date(entry.indexed_at).toLocaleString()}`}
+                  >
+                    {formatRelativeShort(entry.indexed_at)}
                   </span>
                 {/if}
               </li>
@@ -246,10 +267,6 @@
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
     margin-left: auto;
-  }
-  .file-meta-unit {
-    color: var(--text-tertiary);
-    margin-left: 0.15rem;
   }
 
   .empty {
