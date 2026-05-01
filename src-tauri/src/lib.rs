@@ -1151,23 +1151,28 @@ async fn delete_folder(path: String) -> Result<(), String> {
 #[tauri::command]
 fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
     let (command, args) = if cfg!(debug_assertions) {
-        // Dev mode: use source-tree Python
-        let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
+        // Dev mode: use source-tree Python.
+        //
+        // Canonicalize the sidecar directory (resolves `..` and gives us an
+        // absolute path) BUT NOT the venv python binary itself: that binary
+        // is a symlink to the system Python, and following the symlink
+        // breaks venv activation. CPython locates pyvenv.cfg by walking up
+        // from sys.executable; if sys.executable is the canonicalized
+        // homebrew path it never finds the venv, so installed packages
+        // (httpx, mcp, …) aren't on sys.path.
+        let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sidecar")
+            .canonicalize()
+            .map_err(|e| format!("Cannot find sidecar dir: {}", e))?;
 
         let mcp_server_py = sidecar_dir
             .join("mcp_server.py")
-            .canonicalize()
-            .map_err(|e| format!("Cannot find mcp_server.py: {}", e))?
             .to_string_lossy()
             .into_owned();
 
         let venv_python = sidecar_dir.join(".venv/bin/python3");
         let python_path = if venv_python.exists() {
-            venv_python
-                .canonicalize()
-                .map_err(|e| format!("Cannot resolve Python path: {}", e))?
-                .to_string_lossy()
-                .into_owned()
+            venv_python.to_string_lossy().into_owned()
         } else {
             "python3".to_string()
         };
