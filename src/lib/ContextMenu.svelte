@@ -126,17 +126,18 @@
     border-radius: 4px;
     box-shadow: var(--shadow-dropdown);
     min-width: 200px;
-    padding: 0.25rem 0;
+    padding: 0.15rem 0;
   }
   .context-item {
     display: block;
     width: 100%;
-    padding: 0.4rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border: none;
     background: none;
     cursor: pointer;
     text-align: left;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    line-height: 1.3;
     font-family: var(--font-body);
     color: var(--text-primary);
     transition: background var(--transition-fast);
@@ -148,7 +149,7 @@
     color: var(--text-danger);
   }
   .context-divider {
-    margin: 0.25rem 0;
+    margin: 0.15rem 0;
     border: none;
     border-top: 1px solid var(--bg-category);
   }
@@ -171,7 +172,7 @@
   .submenu {
     position: absolute;
     left: 100%;
-    top: -0.25rem;
+    top: -0.15rem;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
     border-radius: 4px;
@@ -179,7 +180,7 @@
     min-width: 180px;
     max-height: 320px;
     overflow-y: auto;
-    padding: 0.25rem 0;
+    padding: 0.15rem 0;
     z-index: 201;
   }
 </style>
