@@ -8,7 +8,6 @@
   export let panelToggleVisible: boolean = true;
   export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let filterVisible: boolean = false;
-  export let indexedOnly: boolean = false;
   export let excludedSystems: Set<string> = new Set();
   export let availableSystems: { name: string; count: number }[] = [];
   export let onSubmit: (q: string) => void = () => {};
@@ -16,7 +15,6 @@
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
   export let onClearScope: () => void = () => {};
-  export let onIndexedOnlyChange: (value: boolean) => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
   export let collapseAllVisible: boolean = false;
@@ -28,7 +26,7 @@
   let filterOpen = false;
   let filterBtn: HTMLButtonElement | undefined;
 
-  $: filterActive = indexedOnly || excludedSystems.size > 0;
+  $: filterActive = excludedSystems.size > 0;
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -115,10 +113,8 @@
         <FilterMenu
           open={filterOpen}
           anchorEl={filterBtn}
-          {indexedOnly}
           {excludedSystems}
           systems={availableSystems}
-          {onIndexedOnlyChange}
           onToggleSystem={onToggleSystemFilter}
           onClearSystems={onClearSystemFilter}
           onClose={() => { filterOpen = false; }}

@@ -71,10 +71,10 @@
   let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
-  // Library filter (next to the search bar). Empty/false = no filter.
-  // Composes with active scope (collection / path) — scope picks the file
-  // pool, filter narrows it further.
-  let filterIndexedOnly = false;
+  // Library filter (next to the search bar). Empty = no filter. Composes
+  // with active scope (collection / path) — scope picks the file pool, the
+  // filter narrows it further. Implies indexed-only since only indexed
+  // files carry system tags.
   let filterExcludedSystems = new Set<string>();
 
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
@@ -307,14 +307,9 @@
       if (typeof savedHideSetup === 'boolean') {
         hideSetupButton = savedHideSetup;
       }
-      const savedFilter = await store.get<{ indexedOnly?: boolean; excludedSystems?: string[] }>('libraryFilter');
-      if (savedFilter && typeof savedFilter === 'object') {
-        if (typeof savedFilter.indexedOnly === 'boolean') {
-          filterIndexedOnly = savedFilter.indexedOnly;
-        }
-        if (Array.isArray(savedFilter.excludedSystems)) {
-          filterExcludedSystems = new Set(savedFilter.excludedSystems);
-        }
+      const savedFilter = await store.get<{ excludedSystems?: string[] }>('libraryFilter');
+      if (savedFilter && typeof savedFilter === 'object' && Array.isArray(savedFilter.excludedSystems)) {
+        filterExcludedSystems = new Set(savedFilter.excludedSystems);
       }
       const savedViewMode = await store.get<string>('viewMode');
       if (savedViewMode === 'tree' || savedViewMode === 'systems') {
@@ -452,18 +447,12 @@
     try {
       const store = await load('settings.json');
       await store.set('libraryFilter', {
-        indexedOnly: filterIndexedOnly,
         excludedSystems: Array.from(filterExcludedSystems),
       });
       await store.save();
     } catch (e) {
       console.log('Could not persist libraryFilter:', e);
     }
-  }
-
-  function setIndexedOnly(value: boolean) {
-    filterIndexedOnly = value;
-    persistFilter();
   }
 
   function toggleSystemFilter(system: string) {
@@ -860,13 +849,13 @@
 
   // Filter for what the file tree shows. Composes scope + library filter:
   // 1. Scope picks the base file pool (collection / edit-mode-indexed / all).
-  // 2. Library filter narrows: indexedOnly hides unindexed; excludedSystems
-  //    hides indexed files in those systems. A game-system filter implies
-  //    indexed-only (only indexed files have system tags).
+  // 2. Library filter (excludedSystems) narrows to indexed files whose
+  //    system isn't excluded — implies indexed-only since only indexed
+  //    files carry system tags.
   // 3. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
   $: displayPaths = (() => {
-    const effectiveIndexedOnly = filterIndexedOnly || filterExcludedSystems.size > 0;
+    const filterActive = filterExcludedSystems.size > 0;
 
     let baseFiles: Set<string> | null;
     if (isCollectionEditMode) {
@@ -874,7 +863,7 @@
     } else if (activeContextName) {
       const col = collections[activeContextName];
       baseFiles = col ? new Set(col.file_paths) : null;
-    } else if (effectiveIndexedOnly) {
+    } else if (filterActive) {
       baseFiles = new Set(indexedPaths);
     } else {
       return null;
@@ -883,11 +872,9 @@
     if (!baseFiles) return null;
 
     let visible = baseFiles;
-    if (effectiveIndexedOnly) {
-      visible = new Set([...visible].filter(p => indexedPaths.has(p)));
-    }
-    if (filterExcludedSystems.size > 0) {
-      visible = new Set([...visible].filter(p => {
+    if (filterActive) {
+      visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
+      visible = new Set([...visible].filter((p) => {
         const sys = gameSystemMap.get(p) ?? 'unknown';
         return !filterExcludedSystems.has(sys);
       }));
@@ -1779,7 +1766,6 @@
     panelToggleVisible={!!selectedFolder}
     {scopeChip}
     filterVisible={!!selectedFolder}
-    indexedOnly={filterIndexedOnly}
     excludedSystems={filterExcludedSystems}
     availableSystems={gameSystemStats}
     onSubmit={handleSearchSubmit}
@@ -1787,7 +1773,6 @@
     onClear={handleSearchClear}
     onTogglePanel={togglePanel}
     onClearScope={handleClearScope}
-    onIndexedOnlyChange={setIndexedOnly}
     onToggleSystemFilter={toggleSystemFilter}
     onClearSystemFilter={clearSystemFilter}
     collapseAllVisible={!!selectedFolder && !searchActive && effectiveViewMode === 'tree' && expandedPaths.size > 0}
