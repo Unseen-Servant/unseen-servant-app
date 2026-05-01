@@ -6,7 +6,7 @@
   import { pdfFileUrl } from '../lib/pdfUrl';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
+  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
@@ -63,6 +63,7 @@
   let collectionEditName = '';
   let collectionEditDescription = '';
   let highlightedCollection: string | null = null;
+  let activeContextName: string | null = null;
 
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
@@ -621,6 +622,19 @@
     : new Set<string>();
   $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
+  // Active context filter — narrows the tree to one collection's files plus
+  // ancestor folders. Disabled while editing a collection (so the user can
+  // still see the full tree to manage membership).
+  $: displayPaths = (() => {
+    if (isCollectionEditMode) return null;
+    if (!activeContextName) return null;
+    const col = collections[activeContextName];
+    if (!col) return null;
+    const filePaths = new Set(col.file_paths);
+    const ancestors = computeAncestorPaths(filePaths);
+    return new Set<string>([...filePaths, ...ancestors]);
+  })();
+
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string> {
     const map = new Map<string, string>();
     if (!status) return map;
@@ -819,8 +833,54 @@
     try {
       const result = await invoke<CollectionsResult>('get_collections');
       collections = result.collections;
+      activeContextName = result.active_context;
     } catch (e) {
       console.log('Could not fetch collections:', e);
+    }
+  }
+
+  async function setActiveContext(name: string) {
+    try {
+      const result = await invoke<ActiveContextResult>('set_active_context', { name });
+      activeContextName = result.active_context;
+      notification.show({
+        type: 'info',
+        message: `Active context: ${name}`,
+        duration: 3000,
+      });
+      await loadCollections();
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Couldn't set active context: ${e}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  async function clearActiveContext() {
+    try {
+      await invoke<ActiveContextResult>('clear_active_context');
+      activeContextName = null;
+      notification.show({
+        type: 'info',
+        message: 'Active context cleared',
+        duration: 3000,
+      });
+    } catch (e) {
+      notification.show({
+        type: 'error',
+        message: `Couldn't clear active context: ${e}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  function toggleActiveContext(name: string) {
+    if (activeContextName === name) {
+      clearActiveContext();
+    } else {
+      setActiveContext(name);
     }
   }
 
@@ -1140,16 +1200,27 @@
         bind:editDescription={collectionEditDescription}
         editFileCount={collectionEditPaths.size}
         highlightedName={highlightedCollection}
+        activeName={activeContextName}
         onStartCreate={startCreateCollection}
         onStartEdit={startEditCollection}
         onSave={saveCollection}
         onCancel={cancelCollectionEdit}
         onDelete={deleteCollection}
         onHighlight={toggleCollectionHighlight}
+        onToggleActive={toggleActiveContext}
       />
     </div>
 
     <div class="file-tree-area">
+      {#if activeContextName && !isCollectionEditMode}
+        <div class="active-context-strip">
+          <span class="ac-label">Active context:</span>
+          <span class="ac-name">{activeContextName}</span>
+          <button class="ac-clear" on:click={clearActiveContext} title="Clear active context">
+            &#10005;
+          </button>
+        </div>
+      {/if}
       {#if searchActive}
         <SearchResults
           results={searchResults}
@@ -1183,6 +1254,7 @@
             collectionPaths={collectionEditPaths}
             {collectionFolders}
             {highlightPaths}
+            {displayPaths}
             onCollectionToggle={handleCollectionToggle}
           />
         {/each}
@@ -1308,6 +1380,42 @@
     flex: 1;
     overflow-y: auto;
     padding: 0.25rem 0.75rem;
+  }
+
+  .active-context-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    margin: 0 0 0.5rem 0;
+    background: rgba(182, 159, 129, 0.12);
+    border: 1px solid var(--text-accent);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-accent);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .ac-label {
+    color: var(--text-secondary);
+  }
+  .ac-name {
+    font-weight: 600;
+    flex: 1;
+  }
+  .ac-clear {
+    background: none;
+    border: none;
+    color: var(--text-accent);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    line-height: 1;
+  }
+  .ac-clear:hover {
+    background: rgba(182, 159, 129, 0.2);
   }
 
   .error-banner {

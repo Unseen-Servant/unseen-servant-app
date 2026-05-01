@@ -161,6 +161,7 @@ struct CollectionInfo {
 struct CollectionsResult {
     collections: std::collections::HashMap<String, CollectionInfo>,
     count: u32,
+    active_context: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -172,6 +173,11 @@ struct CollectionMutationResult {
 #[derive(Serialize, Deserialize, Debug)]
 struct CollectionDeleteResult {
     message: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ActiveContextResult {
+    active_context: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -919,6 +925,76 @@ async fn delete_collection(name: String) -> Result<CollectionDeleteResult, Strin
     Ok(result)
 }
 
+#[tauri::command]
+async fn get_active_context() -> Result<ActiveContextResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/active-context", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: ActiveContextResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn set_active_context(name: String) -> Result<ActiveContextResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/active-context", SIDECAR_URL))
+        .json(&serde_json::json!({ "name": name }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: ActiveContextResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn clear_active_context() -> Result<ActiveContextResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(format!("{}/api/active-context", SIDECAR_URL))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: ActiveContextResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — file management
 // ---------------------------------------------------------------------------
@@ -1272,7 +1348,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

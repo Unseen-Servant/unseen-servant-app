@@ -8,6 +8,7 @@
   export let editDescription: string = '';
   export let editFileCount: number = 0;
   export let highlightedName: string | null = null;
+  export let activeName: string | null = null;
 
   export let onStartCreate: () => void = () => {};
   export let onStartEdit: (name: string) => void = () => {};
@@ -15,6 +16,7 @@
   export let onCancel: () => void = () => {};
   export let onDelete: (name: string) => void = () => {};
   export let onHighlight: (name: string | null) => void = () => {};
+  export let onToggleActive: (name: string) => void = () => {};
 
   let confirmingDelete: string | null = null;
 
@@ -30,6 +32,12 @@
     event.stopPropagation();
     confirmingDelete = null;
     onStartEdit(name);
+  }
+
+  function handlePin(event: MouseEvent, name: string) {
+    event.stopPropagation();
+    confirmingDelete = null;
+    onToggleActive(name);
   }
 
   function handleDeleteClick(event: MouseEvent, name: string) {
@@ -62,10 +70,22 @@
         <div
           class="chip"
           class:highlighted={highlightedName === col.name}
+          class:active={activeName === col.name}
           on:click={() => handleChipClick(col.name)}
         >
+          {#if activeName === col.name}
+            <span class="chip-pin-active" title="Active context">&#9733;</span>
+          {/if}
           <span class="chip-name">{col.name}</span>
           <span class="chip-count">{col.file_count}</span>
+          <button
+            class="chip-action pin"
+            class:on={activeName === col.name}
+            on:click={(e) => handlePin(e, col.name)}
+            title={activeName === col.name ? 'Clear active context' : 'Set as active context'}
+          >
+            &#9733;
+          </button>
           <button class="chip-action edit" on:click={(e) => handleEdit(e, col.name)} title="Edit">
             &#9998;
           </button>
@@ -168,6 +188,19 @@
     background: rgba(182, 159, 129, 0.15);
     color: var(--text-accent);
   }
+  .chip.active {
+    border-color: var(--text-accent);
+    border-width: 2px;
+    padding: calc(0.2rem - 1px) calc(0.6rem - 1px);
+    background: rgba(182, 159, 129, 0.2);
+    color: var(--text-accent);
+    font-weight: 600;
+  }
+  .chip-pin-active {
+    color: var(--text-accent);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
   .chip-name {
     font-weight: 500;
   }
@@ -191,6 +224,14 @@
   }
   .chip-action:hover {
     opacity: 1;
+  }
+  .chip-action.pin {
+    color: var(--text-secondary);
+  }
+  .chip-action.pin.on {
+    display: inline;
+    opacity: 1;
+    color: var(--text-accent);
   }
   .chip-action.edit {
     color: var(--text-secondary);

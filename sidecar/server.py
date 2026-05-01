@@ -283,6 +283,7 @@ class SearchRequest(BaseModel):
     source_filter: str | None = None
     game_system: str | None = None
     collection: str | None = None
+    search_all: bool = False
 
 class SetGameSystemRequest(BaseModel):
     filename: str
@@ -308,6 +309,9 @@ class UpdateCollectionRequest(BaseModel):
     color: str | None = None
     archived: bool | None = None
     last_used_at: str | None = None
+
+class SetActiveContextRequest(BaseModel):
+    name: str
 
 
 # ---------------------------------------------------------------------------
@@ -372,6 +376,7 @@ class Collection(BaseModel):
 class CollectionsStore(BaseModel):
     version: int = COLLECTIONS_STORE_VERSION
     collections: dict[str, Collection] = {}
+    active_context: str | None = None
 
 
 def _now_iso() -> str:
@@ -405,7 +410,14 @@ def load_collections(data_dir: Path) -> CollectionsStore:
         name: _migrate_collection_record(name, c)
         for name, c in raw_collections.items()
     }
-    return CollectionsStore(version=COLLECTIONS_STORE_VERSION, collections=migrated)
+    active_context = raw.get("active_context")
+    if active_context not in migrated:
+        active_context = None
+    return CollectionsStore(
+        version=COLLECTIONS_STORE_VERSION,
+        collections=migrated,
+        active_context=active_context,
+    )
 
 
 def save_collections(data_dir: Path, store: CollectionsStore) -> None:
@@ -2292,6 +2304,7 @@ def create_app(
                 for name, c in store.collections.items()
             },
             "count": len(store.collections),
+            "active_context": store.active_context,
         }
 
     @app.post("/api/collections")
@@ -2352,7 +2365,7 @@ def create_app(
 
     @app.delete("/api/collections/{name}")
     async def delete_collection(name: str):
-        """Delete a collection."""
+        """Delete a collection. Clears the active context if it points here."""
         if not data_dir:
             raise HTTPException(status_code=500, detail="No data directory configured")
         store = load_collections(data_dir)
@@ -2361,8 +2374,50 @@ def create_app(
                 status_code=404, detail=f"Collection not found: {name}"
             )
         del store.collections[name]
+        if store.active_context == name:
+            store.active_context = None
         save_collections(data_dir, store)
         return {"message": f"Deleted collection: {name}"}
+
+    # ------------------------------------------------------------------
+    # Active context — currently-scoped collection for tree filter + MCP
+    # ------------------------------------------------------------------
+
+    @app.get("/api/active-context")
+    async def get_active_context():
+        """Return the name of the currently active collection, or null."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        return {"active_context": store.active_context}
+
+    @app.post("/api/active-context")
+    async def set_active_context(request: SetActiveContextRequest):
+        """Set the active context to a collection. Touches last_used_at."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        if request.name not in store.collections:
+            raise HTTPException(
+                status_code=404, detail=f"Collection not found: {request.name}"
+            )
+        store.active_context = request.name
+        now = _now_iso()
+        coll = store.collections[request.name]
+        coll.last_used_at = now
+        coll.updated_at = now
+        save_collections(data_dir, store)
+        return {"active_context": store.active_context}
+
+    @app.delete("/api/active-context")
+    async def clear_active_context():
+        """Clear the active context."""
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        store = load_collections(data_dir)
+        store.active_context = None
+        save_collections(data_dir, store)
+        return {"active_context": None}
 
     @app.post("/api/search")
     async def search(request: SearchRequest):
@@ -2382,23 +2437,43 @@ def create_app(
             }
 
             where_clauses = []
-            if request.collection:
+            effective_collection = request.collection
+            auto_scoped = False
+
+            # Fall back to active context if the caller didn't pick one
+            # and didn't ask to bypass it.
+            if (
+                effective_collection is None
+                and not request.search_all
+                and data_dir
+            ):
+                store_peek = load_collections(data_dir)
+                if store_peek.active_context in store_peek.collections:
+                    effective_collection = store_peek.active_context
+                    auto_scoped = True
+
+            if effective_collection:
                 if not data_dir:
                     raise HTTPException(
                         status_code=500, detail="No data directory configured"
                     )
                 store = load_collections(data_dir)
-                if request.collection not in store.collections:
+                if effective_collection not in store.collections:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"Collection not found: {request.collection}",
+                        detail=f"Collection not found: {effective_collection}",
                     )
                 manifest = load_manifest(data_dir)
                 filenames = resolve_collection_filenames(
-                    store.collections[request.collection], manifest
+                    store.collections[effective_collection], manifest
                 )
                 if not filenames:
-                    return {"results": [], "message": "Collection has no indexed files."}
+                    return {
+                        "results": [],
+                        "message": "Collection has no indexed files.",
+                        "effective_collection": effective_collection,
+                        "auto_scoped": auto_scoped,
+                    }
                 where_clauses.append({"filename": {"$in": filenames}})
             if request.source_filter:
                 where_clauses.append({"filename": request.source_filter})
@@ -2413,7 +2488,12 @@ def create_app(
             results = collection.query(**query_kwargs)
 
             if not results["documents"][0]:
-                return {"results": [], "message": "No results found."}
+                return {
+                    "results": [],
+                    "message": "No results found.",
+                    "effective_collection": effective_collection,
+                    "auto_scoped": auto_scoped,
+                }
 
             # Dedupe by parent_id, keeping the first hit per parent (Chroma
             # returns results in similarity order, so first = highest).
@@ -2455,7 +2535,11 @@ def create_app(
                     "relevance": round(1 - distance, 3),
                 })
 
-            return {"results": formatted}
+            return {
+                "results": formatted,
+                "effective_collection": effective_collection,
+                "auto_scoped": auto_scoped,
+            }
         except HTTPException:
             raise
         except Exception as e:

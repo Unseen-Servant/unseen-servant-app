@@ -37,6 +37,12 @@
   export let highlightPaths: Set<string> = new Set();
   export let onCollectionToggle: (path: string, isDir: boolean, item: FileItem) => void = () => {};
 
+  // Active-context filter — when set, only paths in this Set render.
+  // Includes ancestor folders of every shown file so the tree structure
+  // remains intact.
+  export let displayPaths: Set<string> | null = null;
+  $: hidden = displayPaths !== null && !displayPaths.has(item.path);
+
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
   let childrenLoading = false;
@@ -181,6 +187,7 @@
 
 <svelte:window on:click={handleClickOutside} />
 
+{#if !hidden}
 <div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} class:focused={isFocused} style="padding-left: {level * 1.5}rem;">
   <div class="row-container">
     {#if showCheckbox}
@@ -281,12 +288,14 @@
           {collectionPaths}
           {collectionFolders}
           {highlightPaths}
+          {displayPaths}
           {onCollectionToggle}
         />
       {/each}
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   .item {

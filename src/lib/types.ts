@@ -103,6 +103,11 @@ export interface CollectionInfo {
 export interface CollectionsResult {
   collections: Record<string, CollectionInfo>;
   count: number;
+  active_context: string | null;
+}
+
+export interface ActiveContextResult {
+  active_context: string | null;
 }
 
 export interface StatsResult {
