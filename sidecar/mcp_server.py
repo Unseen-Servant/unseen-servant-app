@@ -14,7 +14,6 @@ Usage:
 """
 
 import argparse
-import random
 import re
 import sys
 import threading
@@ -160,9 +159,9 @@ async def list_collections() -> str:
 async def get_active_context() -> str:
     """Show the currently active collection scope, if any.
 
-    The active context auto-scopes search_library, random_table, and
-    list_sources to a single collection. The user sets this in the
-    Legend Lore desktop app for session prep or live play.
+    The active context auto-scopes search_library and list_sources to
+    a single collection. The user sets this in the Legend Lore desktop
+    app for session prep or live play.
     """
     data = await sidecar.get("/api/active-context")
     if isinstance(data, str):
@@ -246,26 +245,6 @@ async def search_library(
 
 
 @mcp.tool()
-async def search_in_document(
-    filename: str,
-    query: str,
-    n_results: int = 5,
-) -> str:
-    """Search within a specific sourcebook.
-
-    Use this when the user wants to find something in a particular
-    book, e.g., "find the spell list in the Player's Handbook."
-
-    Args:
-        filename: The PDF filename to search within
-                  (e.g., "dragonbane_core.pdf")
-        query: What to search for within that book
-        n_results: How many results to return (default 5)
-    """
-    return await search_library(query, n_results, source_filter=filename)
-
-
-@mcp.tool()
 async def read_document(filename: str) -> str:
     """Read the full text content of an indexed sourcebook.
 
@@ -329,25 +308,6 @@ async def list_sources(show_all: bool = False) -> str:
         lines.append(f"  - {s['filename']} ({s['chunks']} chunks){system_tag}")
 
     return "\n".join(lines)
-
-
-@mcp.tool()
-async def library_stats() -> str:
-    """Get an overview of your indexed TTRPG library.
-
-    Returns total chunks, total documents, and collection info.
-    Useful for understanding how much content is available for search.
-    """
-    data = await sidecar.get("/api/stats")
-    if isinstance(data, str):
-        return data
-
-    return (
-        f"Library statistics:\n"
-        f"  Total documents: {data['total_documents']}\n"
-        f"  Total chunks: {data['total_chunks']}\n"
-        f"  Collection: {data['collection_name']}"
-    )
 
 
 @mcp.tool()
@@ -421,75 +381,6 @@ async def compare_sources(
 
     header = f"Comparing \"{query}\" across {len(filenames)} sources:\n\n"
     return header + "\n".join(sections)
-
-
-@mcp.tool()
-async def random_table(
-    query: str,
-    n_results: int = 3,
-    search_all: bool = False,
-) -> str:
-    """Find and roll on a random table from your sourcebooks.
-
-    Searches for table-like content (random encounters, loot,
-    NPC traits, weather, etc.) and picks a random entry. Auto-scopes
-    to the active context unless `search_all=True`.
-
-    Args:
-        query: What kind of table to find (e.g., "random encounter
-               forest", "loot table", "NPC personality traits")
-        n_results: How many table candidates to search for (default 3)
-        search_all: Set to True to bypass the active context.
-    """
-    payload = {
-        "query": f"table {query}",
-        "n_results": n_results,
-        "search_all": search_all,
-    }
-    data = await sidecar.post("/api/search", payload)
-    if isinstance(data, str):
-        return data
-
-    notice = ""
-    if data.get("auto_scoped") and data.get("effective_collection"):
-        notice = f"[Active context: {data['effective_collection']}]\n\n"
-
-    results = data.get("results", [])
-    if not results:
-        return f"{notice}No tables found for: {query}"
-
-    # Pick the most relevant result as the table
-    best = results[0]
-
-    # Try to extract numbered/bulleted lines as table entries
-    lines = best["text"].strip().split("\n")
-    entries = [
-        line.strip() for line in lines
-        if line.strip() and any(
-            line.strip().startswith(prefix)
-            for prefix in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "•", "*")
-        )
-    ]
-
-    output = []
-    if notice:
-        output.append(notice.rstrip())
-    output.extend([
-        f"Table found in: {best['filename']}",
-        f"(relevance: {best['relevance']})\n",
-        best["text"],
-    ])
-
-    if entries:
-        roll = random.choice(entries)
-        output.append(f"\n🎲 Random roll: {roll}")
-    else:
-        output.append(
-            "\n(No numbered/bulleted entries detected — "
-            "showing the raw text above for you to roll manually.)"
-        )
-
-    return "\n".join(output)
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +485,7 @@ def session_prep(session_topic: str, sources: str | None = None) -> list[UserMes
         source_names = [s.strip() for s in sources.split(",")]
         source_instruction = (
             f"\n\nFocus your search on these sourcebooks: {', '.join(source_names)}. "
-            f"Use the search_in_document tool for each one."
+            f"Pass each filename as the source_filter argument to search_library."
         )
 
     return [
@@ -648,99 +539,6 @@ def rule_lookup(question: str, game_system: str | None = None) -> list[UserMessa
             f"4. **Related Rules** — any connected mechanics worth knowing\n\n"
             f"If the rule is ambiguous or differs between sources, "
             f"use compare_sources to show the differences."
-        ),
-    ]
-
-
-@mcp.prompt(name="Encounter Builder")
-def encounter_builder(
-    party_level: str,
-    theme: str | None = None,
-    game_system: str | None = None,
-) -> list[UserMessage]:
-    """Build a combat or social encounter from indexed sourcebooks.
-
-    Searches the library for appropriate monsters, NPCs, and
-    encounter setups based on party level and theme.
-
-    Args:
-        party_level: Party level or power tier (e.g., "level 3",
-                     "4 players level 5", "beginning adventurers")
-        theme: Optional encounter theme (e.g., "undead ambush",
-               "forest exploration", "tavern brawl")
-        game_system: Optional game system (e.g., "Dragonbane", "D&D 5E")
-    """
-    theme_instruction = ""
-    if theme:
-        theme_instruction = f" The encounter theme is: {theme}."
-
-    system_instruction = ""
-    if game_system:
-        system_instruction = (
-            f" Use {game_system} rules and sourcebooks. "
-            f"Filter searches with game_system=\"{game_system}\"."
-        )
-
-    return [
-        UserMessage(
-            f"Build an encounter for: {party_level}.{theme_instruction}{system_instruction}\n\n"
-            f"Use the search_library tool to find appropriate monsters, "
-            f"NPCs, and encounter elements from my indexed sourcebooks. "
-            f"Use random_table to find relevant random encounter tables.\n\n"
-            f"Provide:\n"
-            f"1. **Encounter Setup** — the scene description and hook\n"
-            f"2. **Enemies/NPCs** — stat blocks or references with source citations\n"
-            f"3. **Tactics** — how the enemies behave in combat\n"
-            f"4. **Treasure/Rewards** — loot or story rewards\n"
-            f"5. **Scaling Notes** — how to adjust difficulty up or down\n\n"
-            f"Cite the source filename for every stat block or rule referenced."
-        ),
-    ]
-
-
-@mcp.prompt(name="NPC Generator")
-def npc_generator(
-    role: str,
-    game_system: str | None = None,
-    npc_context: str | None = None,
-) -> list[UserMessage]:
-    """Generate an NPC using content from indexed sourcebooks.
-
-    Creates a detailed NPC by pulling relevant material from the
-    library — stat blocks, personality traits, backgrounds, and lore.
-
-    Args:
-        role: The NPC's role (e.g., "blacksmith", "tavern keeper",
-              "villain's lieutenant", "quest giver")
-        game_system: Optional game system (e.g., "Dragonbane", "D&D 5E")
-        npc_context: Optional story context (e.g., "in a mining town
-                     under siege", "works for the thieves' guild")
-    """
-    system_instruction = ""
-    if game_system:
-        system_instruction = (
-            f" Use {game_system} rules for any stat blocks. "
-            f"Filter searches with game_system=\"{game_system}\"."
-        )
-
-    context_instruction = ""
-    if npc_context:
-        context_instruction = f" Story context: {npc_context}."
-
-    return [
-        UserMessage(
-            f"Create an NPC with the role: {role}.{system_instruction}{context_instruction}\n\n"
-            f"Use the search_library tool to find relevant NPC templates, "
-            f"stat blocks, personality traits, and background tables from my "
-            f"indexed sourcebooks. Use random_table to roll on any trait or "
-            f"background tables you find.\n\n"
-            f"Provide:\n"
-            f"1. **Name & Appearance** — a fitting name and physical description\n"
-            f"2. **Personality** — traits, mannerisms, and motivations\n"
-            f"3. **Background** — how they got to where they are\n"
-            f"4. **Stats** — relevant game statistics (if applicable)\n"
-            f"5. **Hooks** — plot hooks or quest ideas connected to this NPC\n\n"
-            f"Ground the NPC in source material — cite which books inspired each element."
         ),
     ]
 

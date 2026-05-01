@@ -22,23 +22,18 @@ sys.argv = ["mcp_server.py"]
 
 from mcp_server import (
     search_library,
-    search_in_document,
     read_document,
     list_sources,
     list_game_systems,
     list_collections,
     get_active_context,
-    library_stats,
     compare_sources,
-    random_table,
     resource_sources,
     resource_source_content,
     resource_game_systems,
     resource_collections,
     session_prep,
     rule_lookup,
-    encounter_builder,
-    npc_generator,
     lore_researcher,
     sidecar,
 )
@@ -238,30 +233,6 @@ async def test_list_collections_marks_active(mock_sidecar):
 
 
 # ---------------------------------------------------------------------------
-# search_in_document tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_search_in_document_delegates_to_search_library(mock_sidecar):
-    """search_in_document is a convenience wrapper around search_library."""
-    mock_sidecar.set_post("/api/search", {
-        "results": [
-            {
-                "text": "Grappling rules text here.",
-                "filename": "dragonbane_core.pdf",
-                "source": "/path/to/dragonbane_core.pdf",
-                "chunk": 5,
-                "relevance": 0.9,
-            }
-        ]
-    })
-
-    result = await search_in_document("dragonbane_core.pdf", "grappling")
-    assert "Grappling" in result
-    assert "dragonbane_core.pdf" in result
-
-
-# ---------------------------------------------------------------------------
 # read_document tests
 # ---------------------------------------------------------------------------
 
@@ -318,24 +289,6 @@ async def test_list_sources_empty(mock_sidecar):
 
     result = await list_sources()
     assert "No documents indexed" in result
-
-
-# ---------------------------------------------------------------------------
-# library_stats tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_library_stats_returns_overview(mock_sidecar):
-    mock_sidecar.set_get("/api/stats", {
-        "total_chunks": 150,
-        "total_documents": 5,
-        "collection_name": "ttrpg_docs",
-    })
-
-    result = await library_stats()
-    assert "150" in result
-    assert "5" in result
-    assert "ttrpg_docs" in result
 
 
 # ---------------------------------------------------------------------------
@@ -400,38 +353,6 @@ async def test_compare_sources_shows_side_by_side(mock_sidecar):
 async def test_compare_sources_needs_two_files(mock_sidecar):
     result = await compare_sources("grappling", ["only_one.pdf"])
     assert "at least 2" in result
-
-
-# ---------------------------------------------------------------------------
-# random_table tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_random_table_finds_table(mock_sidecar):
-    mock_sidecar.set_post("/api/search", {
-        "results": [
-            {
-                "text": "1. Goblin ambush\n2. Wandering merchant\n3. Storm",
-                "filename": "random_encounters.pdf",
-                "source": "/path/random_encounters.pdf",
-                "chunk": 0,
-                "relevance": 0.75,
-            }
-        ]
-    })
-
-    result = await random_table("forest encounters")
-    assert "random_encounters.pdf" in result
-    # Should pick a random entry
-    assert "Random roll" in result
-
-
-@pytest.mark.asyncio
-async def test_random_table_no_results(mock_sidecar):
-    mock_sidecar.set_post("/api/search", {"results": []})
-
-    result = await random_table("something obscure")
-    assert "No tables found" in result
 
 
 # ---------------------------------------------------------------------------
@@ -533,7 +454,7 @@ def test_session_prep_with_sources():
     text = result[0].content.text
     assert "core.pdf" in text
     assert "monsters.pdf" in text
-    assert "search_in_document" in text
+    assert "source_filter" in text
 
 
 # ---------------------------------------------------------------------------
@@ -553,54 +474,6 @@ def test_rule_lookup_with_game_system():
     result = rule_lookup("initiative rules", game_system="Dragonbane")
     text = result[0].content.text
     assert "Dragonbane" in text
-    assert 'game_system="Dragonbane"' in text
-
-
-# ---------------------------------------------------------------------------
-# encounter_builder tests
-# ---------------------------------------------------------------------------
-
-def test_encounter_builder_basic():
-    result = encounter_builder("level 3")
-    assert isinstance(result, list)
-    text = result[0].content.text
-    assert "level 3" in text
-    assert "search_library" in text
-    assert "Encounter Setup" in text
-
-
-def test_encounter_builder_with_options():
-    result = encounter_builder(
-        "level 5", theme="undead ambush", game_system="D&D 5E"
-    )
-    text = result[0].content.text
-    assert "undead ambush" in text
-    assert "D&D 5E" in text
-    assert 'game_system="D&D 5E"' in text
-
-
-# ---------------------------------------------------------------------------
-# npc_generator tests
-# ---------------------------------------------------------------------------
-
-def test_npc_generator_basic():
-    result = npc_generator("tavern keeper")
-    assert isinstance(result, list)
-    text = result[0].content.text
-    assert "tavern keeper" in text
-    assert "search_library" in text
-    assert "Personality" in text
-
-
-def test_npc_generator_with_context():
-    result = npc_generator(
-        "blacksmith",
-        game_system="Dragonbane",
-        npc_context="in a mining town under siege",
-    )
-    text = result[0].content.text
-    assert "Dragonbane" in text
-    assert "mining town" in text
     assert 'game_system="Dragonbane"' in text
 
 
