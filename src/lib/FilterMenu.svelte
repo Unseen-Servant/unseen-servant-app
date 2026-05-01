@@ -48,7 +48,7 @@
     <div class="section">
       <div class="section-label">Index</div>
       <label class="row">
-        <span>Indexed only</span>
+        <span class="row-name">Indexed only</span>
         <input
           class="app-checkbox"
           type="checkbox"
