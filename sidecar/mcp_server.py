@@ -137,11 +137,32 @@ async def list_collections() -> str:
     if not collections:
         return "No collections defined yet. Create one in the Legend Lore desktop app."
 
+    active = data.get("active_context")
     lines = [f"Collections ({data['count']}):\n"]
     for name, c in collections.items():
         desc = f" — {c['description']}" if c.get("description") else ""
-        lines.append(f"  - {name} ({c['file_count']} files){desc}")
+        marker = "  ★ " if name == active else "  - "
+        lines.append(f"{marker}{name} ({c['file_count']} files){desc}")
+    if active:
+        lines.append(f"\nActive context: {active} (★)")
     return "\n".join(lines)
+
+
+@mcp.tool()
+async def get_active_context() -> str:
+    """Show the currently active collection scope, if any.
+
+    The active context auto-scopes search_library, random_table, and
+    list_sources to a single collection. The user sets this in the
+    Legend Lore desktop app for session prep or live play.
+    """
+    data = await sidecar.get("/api/active-context")
+    if isinstance(data, str):
+        return data
+    active = data.get("active_context")
+    if not active:
+        return "No active context set. Searches cover the whole library."
+    return f"Active context: {active}"
 
 
 @mcp.tool()
@@ -151,12 +172,17 @@ async def search_library(
     source_filter: str | None = None,
     game_system: str | None = None,
     collection: str | None = None,
+    search_all: bool = False,
 ) -> str:
     """Search your TTRPG PDF library for relevant content.
 
     This should be your FIRST action when the user asks about any rules,
     lore, or game content. Always search before telling the user something
     isn't available.
+
+    If the user has set an active context in the desktop app, this tool
+    auto-scopes to that collection unless `collection` is passed explicitly
+    or `search_all=True`.
 
     Args:
         query: What to search for (e.g., "grappling rules",
@@ -167,9 +193,12 @@ async def search_library(
         game_system: Optional game system to filter by
                      (e.g., "D&D 5E", "Dragonbane", "Pathfinder 2E")
         collection: Optional collection name to search within
-                    (see list_collections for available collections)
+                    (see list_collections for available collections).
+                    Overrides any active context.
+        search_all: Set to True to bypass the active context and
+                    search the entire library.
     """
-    payload = {"query": query, "n_results": n_results}
+    payload = {"query": query, "n_results": n_results, "search_all": search_all}
     if source_filter:
         payload["source_filter"] = source_filter
     if game_system:
@@ -181,11 +210,15 @@ async def search_library(
     if isinstance(data, str):
         return data  # Error message
 
+    notice = ""
+    if data.get("auto_scoped") and data.get("effective_collection"):
+        notice = f"[Active context: {data['effective_collection']}]\n\n"
+
     results = data.get("results", [])
     if not results:
-        return f"No results found for: {query}"
+        return f"{notice}No results found for: {query}"
 
-    lines = [f"Found {len(results)} result(s) for \"{query}\":\n"]
+    lines = [f"{notice}Found {len(results)} result(s) for \"{query}\":\n"]
     for i, r in enumerate(results, 1):
         lines.append(f"--- Result {i} (relevance: {r['relevance']}) ---")
         system_tag = r.get('game_system', 'unknown')
@@ -247,12 +280,19 @@ async def read_document(filename: str) -> str:
 
 
 @mcp.tool()
-async def list_sources() -> str:
+async def list_sources(show_all: bool = False) -> str:
     """List all indexed TTRPG sourcebooks in the library.
 
     Shows every PDF that has been indexed, along with how many
     text chunks each one contains. Use this to see what's available
     before searching.
+
+    If the user has set an active context, output is scoped to that
+    collection's files unless `show_all=True`.
+
+    Args:
+        show_all: Set to True to bypass the active context and
+                  list every indexed source.
     """
     data = await sidecar.get("/api/sources")
     if isinstance(data, str):
@@ -262,7 +302,20 @@ async def list_sources() -> str:
     if not sources:
         return "No documents indexed yet. Open the Legend Lore app and index some PDFs first."
 
-    lines = [f"Indexed library: {data['count']} document(s)\n"]
+    notice = ""
+    if not show_all:
+        cdata = await sidecar.get("/api/collections")
+        if isinstance(cdata, dict):
+            active = cdata.get("active_context")
+            if active and active in cdata.get("collections", {}):
+                allowed_paths = set(cdata["collections"][active].get("file_paths", []))
+                sources = [s for s in sources if s.get("source") in allowed_paths]
+                notice = f"[Active context: {active}]\n\n"
+
+    if not sources:
+        return f"{notice}No sources match the active context."
+
+    lines = [f"{notice}Indexed library: {len(sources)} document(s)\n"]
     for s in sources:
         system_tag = f" [{s['game_system']}]" if s.get('game_system') else ""
         lines.append(f"  - {s['filename']} ({s['chunks']} chunks){system_tag}")
@@ -363,25 +416,39 @@ async def compare_sources(
 
 
 @mcp.tool()
-async def random_table(query: str, n_results: int = 3) -> str:
+async def random_table(
+    query: str,
+    n_results: int = 3,
+    search_all: bool = False,
+) -> str:
     """Find and roll on a random table from your sourcebooks.
 
     Searches for table-like content (random encounters, loot,
-    NPC traits, weather, etc.) and picks a random entry.
+    NPC traits, weather, etc.) and picks a random entry. Auto-scopes
+    to the active context unless `search_all=True`.
 
     Args:
         query: What kind of table to find (e.g., "random encounter
                forest", "loot table", "NPC personality traits")
         n_results: How many table candidates to search for (default 3)
+        search_all: Set to True to bypass the active context.
     """
-    payload = {"query": f"table {query}", "n_results": n_results}
+    payload = {
+        "query": f"table {query}",
+        "n_results": n_results,
+        "search_all": search_all,
+    }
     data = await sidecar.post("/api/search", payload)
     if isinstance(data, str):
         return data
 
+    notice = ""
+    if data.get("auto_scoped") and data.get("effective_collection"):
+        notice = f"[Active context: {data['effective_collection']}]\n\n"
+
     results = data.get("results", [])
     if not results:
-        return f"No tables found for: {query}"
+        return f"{notice}No tables found for: {query}"
 
     # Pick the most relevant result as the table
     best = results[0]
@@ -396,11 +463,14 @@ async def random_table(query: str, n_results: int = 3) -> str:
         )
     ]
 
-    output = [
+    output = []
+    if notice:
+        output.append(notice.rstrip())
+    output.extend([
         f"Table found in: {best['filename']}",
         f"(relevance: {best['relevance']})\n",
         best["text"],
-    ]
+    ])
 
     if entries:
         roll = random.choice(entries)

@@ -354,6 +354,171 @@ def test_v1_collections_migrate_on_load(test_collection, tmp_path):
     assert col["archived"] is False
 
 
+# ---------------------------------------------------------------------------
+# Active context — unified scope for tree filter + MCP
+# ---------------------------------------------------------------------------
+
+def test_get_active_context_default_null(client):
+    """A fresh store has no active context."""
+    resp = client.get("/api/active-context")
+    assert resp.status_code == 200
+    assert resp.json() == {"active_context": None}
+
+
+def test_set_active_context(client):
+    """Setting a context records it on disk and exposes it via GET."""
+    client.post("/api/collections", json={"name": "Strahd", "file_paths": []})
+    resp = client.post("/api/active-context", json={"name": "Strahd"})
+    assert resp.status_code == 200
+    assert resp.json() == {"active_context": "Strahd"}
+    assert client.get("/api/active-context").json()["active_context"] == "Strahd"
+
+
+def test_set_active_context_updates_last_used_at(client):
+    """Setting the active context bumps last_used_at on the collection."""
+    client.post("/api/collections", json={"name": "Touched", "file_paths": []})
+    before = client.get("/api/collections").json()["collections"]["Touched"]
+    assert before["last_used_at"] is None
+
+    client.post("/api/active-context", json={"name": "Touched"})
+    after = client.get("/api/collections").json()["collections"]["Touched"]
+    assert after["last_used_at"] is not None
+
+
+def test_set_active_context_unknown_collection_returns_404(client):
+    resp = client.post("/api/active-context", json={"name": "Nope"})
+    assert resp.status_code == 404
+
+
+def test_clear_active_context(client):
+    """DELETE /api/active-context unsets it."""
+    client.post("/api/collections", json={"name": "Strahd", "file_paths": []})
+    client.post("/api/active-context", json={"name": "Strahd"})
+    client.delete("/api/active-context")
+    assert client.get("/api/active-context").json()["active_context"] is None
+
+
+def test_set_replaces_previous_context(client):
+    """Setting a different collection replaces the previous active context."""
+    client.post("/api/collections", json={"name": "A", "file_paths": []})
+    client.post("/api/collections", json={"name": "B", "file_paths": []})
+    client.post("/api/active-context", json={"name": "A"})
+    client.post("/api/active-context", json={"name": "B"})
+    assert client.get("/api/active-context").json()["active_context"] == "B"
+
+
+def test_deleting_active_collection_clears_context(client):
+    """Deleting the collection that's currently active clears the context."""
+    client.post("/api/collections", json={"name": "Doomed", "file_paths": []})
+    client.post("/api/active-context", json={"name": "Doomed"})
+    client.delete("/api/collections/Doomed")
+    assert client.get("/api/active-context").json()["active_context"] is None
+
+
+def test_deleting_other_collection_keeps_context(client):
+    """Deleting an unrelated collection does not affect the active context."""
+    client.post("/api/collections", json={"name": "Keep", "file_paths": []})
+    client.post("/api/collections", json={"name": "Drop", "file_paths": []})
+    client.post("/api/active-context", json={"name": "Keep"})
+    client.delete("/api/collections/Drop")
+    assert client.get("/api/active-context").json()["active_context"] == "Keep"
+
+
+def test_list_collections_includes_active_context(client):
+    """GET /api/collections exposes the active context for hydration."""
+    client.post("/api/collections", json={"name": "X", "file_paths": []})
+    client.post("/api/active-context", json={"name": "X"})
+    data = client.get("/api/collections").json()
+    assert data["active_context"] == "X"
+
+
+def test_active_context_persists_across_restart(test_collection, tmp_path):
+    """Active context survives a sidecar restart."""
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    app1 = create_app(collection=test_collection, data_dir=tmp_path)
+    c1 = TestClient(app1)
+    c1.post("/api/collections", json={"name": "Sticky", "file_paths": []})
+    c1.post("/api/active-context", json={"name": "Sticky"})
+
+    app2 = create_app(collection=test_collection, data_dir=tmp_path)
+    c2 = TestClient(app2)
+    assert c2.get("/api/active-context").json()["active_context"] == "Sticky"
+
+
+def test_search_auto_scopes_to_active_context(
+    multi_indexed_client, sample_pdf_path
+):
+    """Without an explicit collection, search uses the active context."""
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Monsters",
+        "file_paths": [str(sample_pdf_path)],
+    })
+    multi_indexed_client.post("/api/active-context", json={"name": "Monsters"})
+
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "adventurer dungeon perception",
+        "n_results": 10,
+    })
+
+    data = response.json()
+    assert data.get("auto_scoped") is True
+    assert data.get("effective_collection") == "Monsters"
+    for r in data["results"]:
+        assert r["filename"] == "dragonbane_monsters.pdf"
+
+
+def test_explicit_collection_overrides_active_context(
+    multi_indexed_client, sample_pdf_path, large_text_pdf_path
+):
+    """Passing collection explicitly takes precedence over the active context."""
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Monsters",
+        "file_paths": [str(sample_pdf_path)],
+    })
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Core",
+        "file_paths": [str(large_text_pdf_path)],
+    })
+    multi_indexed_client.post("/api/active-context", json={"name": "Monsters"})
+
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dungeon adventurer perception",
+        "n_results": 10,
+        "collection": "Core",
+    })
+
+    data = response.json()
+    assert data.get("auto_scoped") is False
+    assert data.get("effective_collection") == "Core"
+    for r in data["results"]:
+        assert r["filename"] == "core_rules.pdf"
+
+
+def test_search_all_bypasses_active_context(
+    multi_indexed_client, sample_pdf_path
+):
+    """search_all=True ignores the active context entirely."""
+    multi_indexed_client.post("/api/collections", json={
+        "name": "Monsters",
+        "file_paths": [str(sample_pdf_path)],
+    })
+    multi_indexed_client.post("/api/active-context", json={"name": "Monsters"})
+
+    response = multi_indexed_client.post("/api/search", json={
+        "query": "dragon dungeon adventurer",
+        "n_results": 10,
+        "search_all": True,
+    })
+
+    data = response.json()
+    assert data.get("auto_scoped") is False
+    assert data.get("effective_collection") is None
+    filenames = {r["filename"] for r in data["results"]}
+    assert len(filenames) >= 1
+
+
 def test_v1_disk_migrates_to_v2_on_save(test_collection, tmp_path):
     """After a write, the on-disk file is in v2 shape."""
     import json

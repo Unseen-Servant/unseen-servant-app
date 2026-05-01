@@ -27,6 +27,7 @@ from mcp_server import (
     list_sources,
     list_game_systems,
     list_collections,
+    get_active_context,
     library_stats,
     compare_sources,
     random_table,
@@ -147,6 +148,93 @@ async def test_search_library_with_game_system(mock_sidecar):
 
     await search_library("initiative", game_system="D&D 5E")
     assert captured.get("game_system") == "D&D 5E"
+
+
+@pytest.mark.asyncio
+async def test_search_library_prepends_notice_when_auto_scoped(mock_sidecar):
+    """When sidecar reports auto_scoped=true, the result starts with the notice."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [{
+            "text": "Strahd is a vampire lord.",
+            "filename": "cos.pdf",
+            "source": "/cos.pdf",
+            "game_system": "D&D 5E",
+            "relevance": 0.9,
+        }],
+        "effective_collection": "Curse of Strahd",
+        "auto_scoped": True,
+    })
+    result = await search_library("strahd")
+    assert result.startswith("[Active context: Curse of Strahd]")
+
+
+@pytest.mark.asyncio
+async def test_search_library_no_notice_when_explicit_collection(mock_sidecar):
+    """No notice when the caller passed an explicit collection."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [{
+            "text": "x",
+            "filename": "x.pdf",
+            "source": "/x.pdf",
+            "game_system": "D&D 5E",
+            "relevance": 0.5,
+        }],
+        "effective_collection": "Strahd",
+        "auto_scoped": False,
+    })
+    result = await search_library("anything", collection="Strahd")
+    assert "Active context" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_passes_search_all(mock_sidecar):
+    """search_all=True is forwarded to the sidecar."""
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+    await search_library("anything", search_all=True)
+    assert captured.get("search_all") is True
+
+
+# ---------------------------------------------------------------------------
+# get_active_context tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_active_context_when_set(mock_sidecar):
+    mock_sidecar.set_get("/api/active-context", {"active_context": "Strahd"})
+    result = await get_active_context()
+    assert "Strahd" in result
+
+
+@pytest.mark.asyncio
+async def test_get_active_context_when_unset(mock_sidecar):
+    mock_sidecar.set_get("/api/active-context", {"active_context": None})
+    result = await get_active_context()
+    assert "No active context" in result
+
+
+# ---------------------------------------------------------------------------
+# list_collections — active context marker
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_list_collections_marks_active(mock_sidecar):
+    mock_sidecar.set_get("/api/collections", {
+        "collections": {
+            "Strahd": {"name": "Strahd", "file_count": 3, "description": ""},
+            "Pathfinder": {"name": "Pathfinder", "file_count": 5, "description": ""},
+        },
+        "count": 2,
+        "active_context": "Strahd",
+    })
+    result = await list_collections()
+    assert "★" in result
+    assert "Active context: Strahd" in result
 
 
 # ---------------------------------------------------------------------------

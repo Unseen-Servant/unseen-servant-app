@@ -8,6 +8,7 @@
   export let editDescription: string = '';
   export let editFileCount: number = 0;
   export let highlightedName: string | null = null;
+  export let activeName: string | null = null;
 
   export let onStartCreate: () => void = () => {};
   export let onStartEdit: (name: string) => void = () => {};
@@ -15,6 +16,7 @@
   export let onCancel: () => void = () => {};
   export let onDelete: (name: string) => void = () => {};
   export let onHighlight: (name: string | null) => void = () => {};
+  export let onToggleActive: (name: string) => void = () => {};
 
   let confirmingDelete: string | null = null;
 
@@ -30,6 +32,12 @@
     event.stopPropagation();
     confirmingDelete = null;
     onStartEdit(name);
+  }
+
+  function handlePin(event: MouseEvent, name: string) {
+    event.stopPropagation();
+    confirmingDelete = null;
+    onToggleActive(name);
   }
 
   function handleDeleteClick(event: MouseEvent, name: string) {
@@ -62,12 +70,24 @@
         <div
           class="chip"
           class:highlighted={highlightedName === col.name}
+          class:active={activeName === col.name}
           on:click={() => handleChipClick(col.name)}
         >
           <span class="chip-name">{col.name}</span>
           <span class="chip-count">{col.file_count}</span>
+          <button
+            class="chip-action pin"
+            class:on={activeName === col.name}
+            on:click={(e) => handlePin(e, col.name)}
+            title={activeName === col.name ? 'Clear active context' : 'Set as active context'}
+          >
+            &#9733;
+          </button>
           <button class="chip-action edit" on:click={(e) => handleEdit(e, col.name)} title="Edit">
-            &#9998;
+            <!-- Font Awesome "pen-to-square" icon (static/icons/pen-to-square-solid-full.svg) -->
+            <svg class="action-icon" viewBox="0 0 640 640" fill="currentColor">
+              <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
+            </svg>
           </button>
           <button
             class="chip-action delete"
@@ -168,6 +188,14 @@
     background: rgba(182, 159, 129, 0.15);
     color: var(--text-accent);
   }
+  .chip.active {
+    border-color: var(--text-accent);
+    border-width: 2px;
+    padding: calc(0.2rem - 1px) calc(0.6rem - 1px);
+    background: rgba(182, 159, 129, 0.2);
+    color: var(--text-accent);
+    font-weight: 600;
+  }
   .chip-name {
     font-weight: 500;
   }
@@ -186,11 +214,24 @@
     line-height: 1;
     opacity: 0.5;
   }
+  .action-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    display: block;
+  }
   .chip:hover .chip-action {
     display: inline;
   }
   .chip-action:hover {
     opacity: 1;
+  }
+  .chip-action.pin {
+    color: var(--text-secondary);
+  }
+  .chip-action.pin.on {
+    display: inline;
+    opacity: 1;
+    color: var(--text-accent);
   }
   .chip-action.edit {
     color: var(--text-secondary);
