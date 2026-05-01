@@ -26,7 +26,7 @@ import chromadb
 from chromadb.utils import embedding_functions
 import pymupdf
 import pymupdf4llm
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -1135,6 +1135,11 @@ def create_app(
         allow_headers=["*"],
     )
 
+    # MCP connection tracking — heartbeat + activity timestamps. Tracked
+    # in-memory; any agent reconnect resends a heartbeat within 30s.
+    app.state.mcp_last_heartbeat = None
+    app.state.mcp_last_query = None
+
     # ------------------------------------------------------------------
     # Concurrency guard — prevents two syncs from running simultaneously.
     # The streaming sync uses a synchronous generator, so we use a
@@ -1181,6 +1186,31 @@ def create_app(
     async def health():
         """Health check for startup detection."""
         return {"status": "ok"}
+
+    @app.post("/api/mcp-heartbeat")
+    async def mcp_heartbeat():
+        """Heartbeat ping from the MCP server (sent every ~30s).
+
+        Used by the desktop UI to render a "MCP connected" indicator.
+        Connection is considered live if the last heartbeat is within 60s.
+        """
+        app.state.mcp_last_heartbeat = datetime.now(timezone.utc)
+        return {"ok": True}
+
+    @app.get("/api/mcp-status")
+    async def mcp_status():
+        """Current MCP connection state, derived from heartbeat + activity."""
+        now = datetime.now(timezone.utc)
+        hb = app.state.mcp_last_heartbeat
+        lq = app.state.mcp_last_query
+        connected = bool(hb and (now - hb).total_seconds() <= 60)
+        active = bool(lq and (now - lq).total_seconds() <= 5)
+        return {
+            "connected": connected,
+            "active": active,
+            "last_heartbeat_at": hb.isoformat() if hb else None,
+            "last_query_at": lq.isoformat() if lq else None,
+        }
 
     @app.post("/api/index-files")
     def index_files(request: IndexFilesRequest):
@@ -2421,7 +2451,7 @@ def create_app(
         return {"active_context": None}
 
     @app.post("/api/search")
-    async def search(request: SearchRequest):
+    async def search(request: SearchRequest, http_req: Request):
         """Parent-document semantic search.
 
         Over-fetches small embed units, dedupes by parent_id (keeping the
@@ -2430,6 +2460,8 @@ def create_app(
         dedupe-by-parent is a load-bearing part of the retrieval semantics —
         without it the user sees the same section repeated multiple times.
         """
+        if http_req.headers.get("X-Source") == "mcp":
+            app.state.mcp_last_query = datetime.now(timezone.utc)
         try:
             # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
             query_kwargs = {

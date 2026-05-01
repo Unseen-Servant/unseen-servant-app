@@ -401,6 +401,31 @@ async fn check_sidecar_health() -> Result<bool, String> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct McpStatus {
+    connected: bool,
+    active: bool,
+}
+
+#[tauri::command]
+async fn check_mcp_status() -> Result<McpStatus, String> {
+    let client = reqwest::Client::new();
+    match client
+        .get(format!("{}/api/mcp-status", SIDECAR_URL))
+        .timeout(std::time::Duration::from_secs(3))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            resp.json::<McpStatus>().await.map_err(|e| e.to_string())
+        }
+        _ => Ok(McpStatus {
+            connected: false,
+            active: false,
+        }),
+    }
+}
+
 #[tauri::command]
 async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, String> {
     let client = reqwest::Client::new();
@@ -1364,7 +1389,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

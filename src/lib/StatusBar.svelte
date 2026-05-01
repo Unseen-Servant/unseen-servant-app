@@ -3,6 +3,8 @@
 
   export let selectedFolder: string;
   export let sidecarConnected: boolean;
+  export let mcpConnected: boolean = false;
+  export let mcpActive: boolean = false;
   export let selectedCount: number;
   export let indexedCount: number;
   export let gameSystemCount: number;
@@ -50,6 +52,19 @@
           <path d="M160 96C124.7 96 96 124.7 96 160L96 224C96 259.3 124.7 288 160 288L480 288C515.3 288 544 259.3 544 224L544 160C544 124.7 515.3 96 480 96L160 96zM376 168C389.3 168 400 178.7 400 192C400 205.3 389.3 216 376 216C362.7 216 352 205.3 352 192C352 178.7 362.7 168 376 168zM432 192C432 178.7 442.7 168 456 168C469.3 168 480 178.7 480 192C480 205.3 469.3 216 456 216C442.7 216 432 205.3 432 192zM160 352C124.7 352 96 380.7 96 416L96 480C96 515.3 124.7 544 160 544L480 544C515.3 544 544 515.3 544 480L544 416C544 380.7 515.3 352 480 352L160 352zM376 424C389.3 424 400 434.7 400 448C400 461.3 389.3 472 376 472C362.7 472 352 461.3 352 448C352 434.7 362.7 424 376 424zM432 448C432 434.7 442.7 424 456 424C469.3 424 480 434.7 480 448C480 461.3 469.3 472 456 472C442.7 472 432 461.3 432 448z"/>
         </svg>
       </span>
+      <span
+        class="indicator mcp"
+        class:connected={mcpConnected}
+        class:active={mcpActive}
+        title={mcpActive ? 'MCP active — agent querying' : mcpConnected ? 'MCP connected' : 'MCP not detected'}
+      >
+        <!-- MCP logo (static/icons/mcp.svg) -->
+        <svg class="indicator-icon" viewBox="0 0 180 180" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round">
+          <path d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706V16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/>
+          <path d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/>
+          <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
+        </svg>
+      </span>
       {#if indexedCount > 0}
         <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
         {#if gameSystemCount > 0}
@@ -64,7 +79,7 @@
         <span>{selectedCount} selected</span>
       {/if}
       <span class="separator">&middot;</span>
-      <button class="sync-btn folder-btn" on:click={onOpenFolder} title="Reveal library folder">
+      <button class="sync-btn" on:click={onOpenFolder} title="Reveal library folder">
         <!-- Font Awesome "folder-open" icon -->
         <svg class="sync-icon" viewBox="0 0 576 512" fill="currentColor">
           <path d="M88.7 223.8L0 375.8L0 96C0 60.7 28.7 32 64 32L181.5 32C198.5 32 214.8 38.7 226.7 50.7L269.3 93.3C281.3 105.3 297.6 112 314.5 112L448 112C483.3 112 512 140.7 512 176L512 208L144 208C121.4 208 100.6 220 88.7 223.8zM144 240L560 240C572.1 240 583.3 246.8 588.9 257.6C594.5 268.4 593.5 281.4 586.4 291.2L501.9 467.2C495.3 480.6 481.6 488 467.2 488L48 488C36 488 24.8 481.2 19.2 470.4C13.6 459.6 14.6 446.6 21.7 436.8L106.2 260.8C112.8 247.4 126.5 240 144 240z"/>
@@ -124,7 +139,7 @@
     align-items: center;
     justify-content: space-between;
     height: var(--statusbar-height);
-    padding: 0 1rem;
+    padding: 0 0.75rem;
     background: var(--bg-container);
     border-top: 1px solid var(--border-subtle);
     flex-shrink: 0;
@@ -155,6 +170,17 @@
   }
   .indicator.connected {
     color: #668063;
+  }
+  .indicator.mcp.connected {
+    color: var(--text-active);
+  }
+  .indicator.mcp.active {
+    color: var(--text-active);
+    animation: mcp-pulse 0.8s ease-in-out;
+  }
+  @keyframes mcp-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.6); }
   }
   .indicator-icon {
     width: 12px;
@@ -229,9 +255,6 @@
     align-items: center;
     transition: color var(--transition-fast);
     line-height: 0;
-  }
-  .folder-btn {
-    margin-left: 0.2rem;
   }
   .sync-btn:hover:not(:disabled) {
     color: var(--text-accent);

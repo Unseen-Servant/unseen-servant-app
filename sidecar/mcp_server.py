@@ -17,10 +17,18 @@ import argparse
 import random
 import re
 import sys
+import threading
+import time
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts.base import UserMessage
+
+
+# Tag every sidecar request from this process so the sidecar can track
+# MCP-originated activity separately from desktop UI calls.
+MCP_HEADERS = {"X-Source": "mcp"}
+HEARTBEAT_INTERVAL_SECONDS = 30
 
 
 _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
@@ -67,7 +75,7 @@ class SidecarClient:
 
     async def get(self, path: str) -> dict | str:
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(headers=MCP_HEADERS) as client:
                 resp = await client.get(f"{self.base_url}{path}")
                 resp.raise_for_status()
                 return resp.json()
@@ -78,7 +86,7 @@ class SidecarClient:
 
     async def post(self, path: str, json: dict) -> dict | str:
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(headers=MCP_HEADERS) as client:
                 resp = await client.post(f"{self.base_url}{path}", json=json)
                 resp.raise_for_status()
                 return resp.json()
@@ -795,6 +803,23 @@ def check_sidecar_health(url: str) -> None:
         )
 
 
+def heartbeat_loop(url: str) -> None:
+    """Tell the sidecar we're alive every HEARTBEAT_INTERVAL_SECONDS so the
+    desktop UI can show an "MCP connected" indicator. Failures are silently
+    ignored — the sidecar may be unreachable temporarily."""
+    while True:
+        try:
+            httpx.post(f"{url}/api/mcp-heartbeat", timeout=2.0)
+        except Exception:
+            pass
+        time.sleep(HEARTBEAT_INTERVAL_SECONDS)
+
+
 if __name__ == "__main__":
     check_sidecar_health(args.sidecar_url)
+    threading.Thread(
+        target=heartbeat_loop,
+        args=(args.sidecar_url,),
+        daemon=True,
+    ).start()
     mcp.run(transport="stdio")

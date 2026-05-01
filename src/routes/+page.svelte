@@ -82,12 +82,15 @@
 
   // Sidecar health
   let sidecarConnected = false;
+  let mcpConnected = false;
+  let mcpActive = false;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
   let showSettings = false;
   let settingsInitialTab: 'library' | 'game-systems' | 'setup' = 'library';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
+  let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
 
   // User-configurable behavior
   let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
@@ -291,6 +294,11 @@
       checkOllamaHealth();
     }, 10000);
 
+    // Poll MCP status more frequently so the active-query pulse is
+    // caught (backend keeps the active flag for 5s after a query).
+    checkMcpStatus();
+    mcpStatusInterval = setInterval(checkMcpStatus, 5000);
+
     restartAutoSyncInterval();
   });
 
@@ -361,6 +369,7 @@
 
   onDestroy(() => {
     if (healthInterval) clearInterval(healthInterval);
+    if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
   });
 
@@ -369,6 +378,17 @@
       sidecarConnected = await invoke<boolean>('check_sidecar_health');
     } catch {
       sidecarConnected = false;
+    }
+  }
+
+  async function checkMcpStatus() {
+    try {
+      const status = await invoke<{ connected: boolean; active: boolean }>('check_mcp_status');
+      mcpConnected = status.connected;
+      mcpActive = status.active;
+    } catch {
+      mcpConnected = false;
+      mcpActive = false;
     }
   }
 
@@ -1762,6 +1782,8 @@
   <StatusBar
     {selectedFolder}
     {sidecarConnected}
+    {mcpConnected}
+    {mcpActive}
     selectedCount={selectedPaths.size}
     indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
     {gameSystemCount}
