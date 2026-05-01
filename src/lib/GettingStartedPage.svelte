@@ -12,17 +12,19 @@
 </script>
 
 <div class="page">
-  <span class="label">Initial setup</span>
-  <GettingStartedSteps
-    {ollamaRunning}
-    {ollamaModelReady}
-    {folderSelected}
-    {filesIndexed}
-    {collectionsCreated}
-    {mcpConnected}
-    {onSelectFolder}
-    {onCopyMcpConfig}
-  />
+  <div class="page-inner">
+    <span class="label">Initial setup</span>
+    <GettingStartedSteps
+      {ollamaRunning}
+      {ollamaModelReady}
+      {folderSelected}
+      {filesIndexed}
+      {collectionsCreated}
+      {mcpConnected}
+      {onSelectFolder}
+      {onCopyMcpConfig}
+    />
+  </div>
 </div>
 
 <style>
@@ -32,8 +34,15 @@
     flex-direction: column;
     align-items: center;
     padding: 2.5rem 2rem;
-    gap: 0.8rem;
     overflow-y: auto;
+  }
+
+  .page-inner {
+    width: 100%;
+    max-width: 540px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
   }
 
   .label {
@@ -42,7 +51,5 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-tertiary);
-    width: 100%;
-    max-width: 540px;
   }
 </style>

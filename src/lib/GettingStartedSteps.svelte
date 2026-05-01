@@ -20,42 +20,42 @@
 
 <div class="manual">
   <!-- 1. Ollama -->
-  <section class="entry" class:done={ollamaReady}>
-    <header class="entry-head">
-      <span class="led" class:on={ollamaReady} aria-hidden="true"></span>
-      <span class="num">1.</span>
-      <h3 class="title">Ollama — local AI engine</h3>
-      <span class="state">
-        {#if ollamaReady}ready
-        {:else if ollamaRunning}model pending
-        {:else}not detected
-        {/if}
-      </span>
-    </header>
-    <p class="prose">
-      Legend Lore runs entirely on your machine. Ollama is the local
-      model server that turns your PDFs into vectors — numerical
-      fingerprints so search can find passages by meaning, not just
-      keywords. It's free, open-source, and your library never leaves
-      your disk.
-    </p>
+  <section class="field">
+    <div class="field-head">
+      <div class="field-title-row">
+        <h3 class="field-title font-heading">Ollama — local AI engine</h3>
+        <span
+          class="field-status"
+          class:ok={ollamaReady}
+          class:partial={ollamaRunning && !ollamaModelReady}
+        >
+          {#if ollamaReady}Ready
+          {:else if ollamaRunning}Model pending
+          {:else}Not detected{/if}
+        </span>
+      </div>
+      <p class="field-desc">
+        Legend Lore runs entirely on your machine. Ollama is the local
+        model server that turns your PDFs into vectors — numerical
+        fingerprints so search can find passages by meaning, not just
+        keywords. It's free, open-source, and your library never leaves
+        your disk.
+      </p>
+    </div>
     {#if !ollamaRunning}
-      <p class="action">
+      <p class="field-desc">
         Download from <strong>ollama.com</strong>, install, and launch
         the app.
       </p>
     {:else if !ollamaModelReady}
-      <p class="action">
-        Ollama is running, but the embedding model isn't pulled yet.
-        Run this once:
-      </p>
+      <p class="field-desc">Pull the embedding model (one-time):</p>
       <code class="command">ollama pull bge-m3</code>
     {/if}
     <button class="expander" on:click={() => toggleExpand(0)}>
       {expanded.has(0) ? '▾' : '▸'} Why bge-m3?
     </button>
     {#if expanded.has(0)}
-      <p class="prose detail">
+      <p class="field-desc detail">
         bge-m3 is a multilingual embedding model that performs well on
         passage retrieval — about 1 GB on disk, runs on CPU, outputs
         1,024-dimensional vectors. It handles game-system jargon and
@@ -67,52 +67,56 @@
   </section>
 
   <!-- 2. Library -->
-  <section class="entry" class:done={folderSelected}>
-    <header class="entry-head">
-      <span class="led" class:on={folderSelected} aria-hidden="true"></span>
-      <span class="num">2.</span>
-      <h3 class="title">Library — your PDF folder</h3>
-      <span class="state">{folderSelected ? 'selected' : 'unset'}</span>
-    </header>
-    <p class="prose">
-      Pick a folder containing your TTRPG PDFs. Legend Lore reads from
-      disk in place — no upload, no copying, no cloud sync. Subfolders
-      are fine; the file tree mirrors your folder layout. Move, rename,
-      or delete files anytime; the index follows along.
-    </p>
+  <section class="field">
+    <div class="field-head">
+      <div class="field-title-row">
+        <h3 class="field-title font-heading">Library — your PDF folder</h3>
+        <span class="field-status" class:ok={folderSelected}>
+          {folderSelected ? 'Selected' : 'Unset'}
+        </span>
+      </div>
+      <p class="field-desc">
+        Pick a folder containing your TTRPG PDFs. Legend Lore reads from
+        disk in place — no upload, no copying, no cloud sync. Subfolders
+        are fine; the file tree mirrors your folder layout. Move,
+        rename, or delete files anytime; the index follows along.
+      </p>
+    </div>
     {#if !folderSelected}
-      <button class="link" on:click={onSelectFolder}>Choose folder</button>
+      <button class="btn-link" on:click={onSelectFolder}>Choose folder</button>
     {/if}
     <button class="expander" on:click={() => toggleExpand(1)}>
       {expanded.has(1) ? '▾' : '▸'} Where does my data live?
     </button>
     {#if expanded.has(1)}
-      <p class="prose detail">
+      <p class="field-desc detail">
         Your PDFs stay in the folder you pick. Legend Lore stores only
         the index — extracted text, chunk boundaries, and embeddings —
         in a local ChromaDB instance under the app's data directory
-        (visible from <em>Settings → Library</em>). Delete the index
-        anytime; the PDFs are untouched.
+        (visible from <em>Settings → Library → Database</em>). Delete
+        the index anytime; the PDFs are untouched.
       </p>
     {/if}
   </section>
 
   <!-- 3. Index -->
-  <section class="entry" class:done={filesIndexed}>
-    <header class="entry-head">
-      <span class="led" class:on={filesIndexed} aria-hidden="true"></span>
-      <span class="num">3.</span>
-      <h3 class="title">Index — embed your books</h3>
-      <span class="state">{filesIndexed ? 'indexed' : 'none yet'}</span>
-    </header>
-    <p class="prose">
-      Indexing reads each PDF, splits it at heading boundaries into
-      ~1,000-character chunks, and embeds each one via Ollama. The
-      result lives locally in ChromaDB. First-time indexing takes
-      roughly a minute per book; afterwards only changed PDFs are
-      re-embedded.
-    </p>
-    <p class="action">
+  <section class="field">
+    <div class="field-head">
+      <div class="field-title-row">
+        <h3 class="field-title font-heading">Index — embed your books</h3>
+        <span class="field-status" class:ok={filesIndexed}>
+          {filesIndexed ? 'Indexed' : 'None yet'}
+        </span>
+      </div>
+      <p class="field-desc">
+        Indexing reads each PDF, splits it at heading boundaries into
+        ~1,000-character chunks, and embeds each one via Ollama. The
+        result lives locally in ChromaDB. First-time indexing takes
+        roughly a minute per book; afterwards only changed PDFs are
+        re-embedded.
+      </p>
+    </div>
+    <p class="field-desc">
       Tick the boxes next to PDFs in the file tree, then hit the sync
       button in the status bar.
     </p>
@@ -120,7 +124,7 @@
       {expanded.has(2) ? '▾' : '▸'} Why chunks instead of whole PDFs?
     </button>
     {#if expanded.has(2)}
-      <p class="prose detail">
+      <p class="field-desc detail">
         Embedding models have a context window. Feeding a whole rulebook
         at once would dilute the signal — every chunk would smell like
         every other chunk. Splitting at heading boundaries keeps
@@ -133,22 +137,24 @@
   </section>
 
   <!-- 4. Collections -->
-  <section class="entry" class:done={collectionsCreated}>
-    <header class="entry-head">
-      <span class="led" class:on={collectionsCreated} aria-hidden="true"></span>
-      <span class="num">4.</span>
-      <h3 class="title">Collections — scope your searches</h3>
-      <span class="state">{collectionsCreated ? 'created' : 'none yet'}</span>
-    </header>
-    <p class="prose">
-      Collections group indexed PDFs for fast scoping. A "Curse of
-      Strahd" collection might be just the campaign book; "D&amp;D
-      Bestiary" might pull in three monster manuals. Activate a
-      collection and every search — yours and your agent's — narrows to
-      it. Right-click any folder or file in the tree for one-shot
-      scoping.
-    </p>
-    <p class="action">
+  <section class="field">
+    <div class="field-head">
+      <div class="field-title-row">
+        <h3 class="field-title font-heading">Collections — scope your searches</h3>
+        <span class="field-status" class:ok={collectionsCreated}>
+          {collectionsCreated ? 'Created' : 'None yet'}
+        </span>
+      </div>
+      <p class="field-desc">
+        Collections group indexed PDFs for fast scoping. A "Curse of
+        Strahd" collection might be just the campaign book; "D&amp;D
+        Bestiary" might pull in three monster manuals. Activate a
+        collection and every search — yours and your agent's — narrows
+        to it. Right-click any folder or file in the tree for one-shot
+        scoping.
+      </p>
+    </div>
+    <p class="field-desc">
       Use the <strong>+</strong> in the collections panel to create
       one, or right-click a folder and choose
       <em>Create collection from folder</em>.
@@ -156,26 +162,31 @@
   </section>
 
   <!-- 5. MCP -->
-  <section class="entry optional" class:done={mcpConnected}>
-    <header class="entry-head">
-      <span class="led" class:on={mcpConnected} aria-hidden="true"></span>
-      <span class="num">5.</span>
-      <h3 class="title">MCP — wire up an AI agent <span class="opt">(optional)</span></h3>
-      <span class="state">{mcpConnected ? 'connected' : 'not detected'}</span>
-    </header>
-    <p class="prose">
-      MCP (Model Context Protocol) is the bridge between Legend Lore
-      and your AI agent — Claude Desktop, Claude Code, or anything else
-      that speaks MCP. Once configured, your agent can search your
-      library mid-session: stat blocks, spell descriptions, random
-      tables, lore. Skip this if you're using Legend Lore standalone.
-    </p>
-    <button class="link" on:click={onCopyMcpConfig}>Copy MCP config</button>
+  <section class="field">
+    <div class="field-head">
+      <div class="field-title-row">
+        <h3 class="field-title font-heading">
+          MCP — wire up an AI agent <span class="opt">(optional)</span>
+        </h3>
+        <span class="field-status" class:ok={mcpConnected}>
+          {mcpConnected ? 'Connected' : 'Not detected'}
+        </span>
+      </div>
+      <p class="field-desc">
+        MCP (Model Context Protocol) is the bridge between Legend Lore
+        and your AI agent — Claude Desktop, Claude Code, or anything
+        else that speaks MCP. Once configured, your agent can search
+        your library mid-session: stat blocks, spell descriptions,
+        random tables, lore. Skip this if you're using Legend Lore
+        standalone.
+      </p>
+    </div>
+    <button class="btn-link" on:click={onCopyMcpConfig}>Copy MCP config</button>
     <button class="expander" on:click={() => toggleExpand(4)}>
       {expanded.has(4) ? '▾' : '▸'} How is this still local?
     </button>
     {#if expanded.has(4)}
-      <p class="prose detail">
+      <p class="field-desc detail">
         Paste the config into your agent's MCP settings. The agent
         spawns <code class="inline-code">mcp_server.py</code> as a
         subprocess and talks to it over stdio. The MCP server then
@@ -190,128 +201,97 @@
 </div>
 
 <style>
+  /* Shape mirrors LibrarySettings: stacked .field sections at 1.25rem
+     gap, .field-title in Almendra at 0.95rem, .field-desc in body at
+     0.85rem. The Setup-specific bits — right-aligned status badge,
+     expanders, command box — extend that vocabulary rather than
+     replace it. */
   .manual {
     display: flex;
     flex-direction: column;
-    gap: 1.6rem;
+    gap: 1.25rem;
     width: 100%;
-    max-width: 540px;
     font-family: var(--font-body);
   }
 
-  .entry {
+  .field {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
-  }
-  .entry.done {
-    opacity: 0.85;
+    gap: 0.6rem;
   }
 
-  .entry-head {
-    display: grid;
-    grid-template-columns: auto auto 1fr auto;
+  .field-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .field-title-row {
+    display: flex;
     align-items: baseline;
-    column-gap: 0.5rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--border-subtle);
+    gap: 0.75rem;
   }
 
-  .led {
-    align-self: center;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    border: 1.5px solid var(--text-tertiary);
-    background: transparent;
-  }
-  .led.on {
-    background: var(--text-active);
-    border-color: var(--text-active);
-  }
-
-  .num {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.85rem;
-    color: var(--text-tertiary);
-    letter-spacing: 0.08em;
-  }
-
-  .title {
-    margin: 0;
-    font-family: var(--font-heading, var(--font-body));
+  .field-title {
+    flex: 1;
+    min-width: 0;
     font-size: 0.95rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     color: var(--text-primary);
-    font-weight: 600;
-  }
-  .entry.done .title {
-    color: var(--text-secondary);
+    margin: 0;
   }
 
   .opt {
     font-family: var(--font-body);
-    font-size: 0.75rem;
-    letter-spacing: 0;
-    text-transform: none;
+    font-size: 0.78rem;
     color: var(--text-tertiary);
     font-weight: normal;
-    margin-left: 0.4rem;
+    margin-left: 0.3rem;
   }
 
-  .state {
+  .field-status {
+    flex-shrink: 0;
     font-family: var(--font-heading, var(--font-body));
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-tertiary);
-    white-space: nowrap;
   }
-  .entry.done .state {
+  .field-status.ok {
     color: var(--text-active);
   }
-
-  .prose {
-    margin: 0;
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    line-height: 1.55;
-  }
-  .prose em {
-    color: var(--text-secondary);
-    font-style: italic;
-  }
-  .prose.detail {
-    color: var(--text-tertiary);
-    border-left: 2px solid var(--border-subtle);
-    padding-left: 0.75rem;
-    margin-left: 0.1rem;
+  .field-status.partial {
+    color: var(--text-accent);
   }
 
-  .action {
-    margin: 0;
+  .field-desc {
+    font-family: var(--font-body);
     font-size: 0.85rem;
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: 1.45;
+    margin: 0;
   }
-  .action strong {
+  .field-desc strong {
     color: var(--text-primary);
     font-weight: 600;
   }
-  .action em {
-    color: var(--text-accent);
-    font-style: normal;
+  .field-desc em {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  .field-desc.detail {
+    color: var(--text-tertiary);
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--border-subtle);
   }
 
   .command {
     display: inline-block;
-    padding: 0.25rem 0.55rem;
-    background: var(--bg-app);
+    padding: 0.3rem 0.55rem;
+    background: var(--bg-focused);
     border: 1px solid var(--border-subtle);
-    border-radius: 3px;
+    border-radius: 4px;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-primary);
     user-select: all;
     -webkit-user-select: all;
@@ -321,51 +301,58 @@
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: 0.85em;
     padding: 0 0.25em;
-    background: var(--bg-app);
+    background: var(--bg-focused);
     border-radius: 2px;
     color: var(--text-primary);
   }
 
-  .link {
+  /* Bracket-link action — same pattern as LibrarySettings .btn-link.
+     Mono 0.7rem, accent text, [bracketed] in secondary, hover brightens. */
+  .btn-link {
     align-self: flex-start;
-    background: none;
+    background: transparent;
     border: none;
-    color: var(--text-active);
-    font-family: var(--font-body);
-    font-size: 0.88rem;
     padding: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    color: var(--text-accent);
     cursor: pointer;
     transition: filter var(--transition-fast);
   }
-  .link::before {
+  .btn-link::before,
+  .btn-link::after {
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+  }
+  .btn-link::before {
     content: '[';
-    color: var(--text-secondary);
-    margin-right: 0.2rem;
+    margin-right: 0.15rem;
   }
-  .link::after {
+  .btn-link::after {
     content: ']';
-    color: var(--text-secondary);
-    margin-left: 0.2rem;
+    margin-left: 0.15rem;
   }
-  .link:hover {
-    filter: brightness(1.2);
+  .btn-link:hover {
+    filter: brightness(1.25);
   }
-  .link:hover::before,
-  .link:hover::after {
+  .btn-link:hover::before,
+  .btn-link:hover::after {
     color: var(--text-accent);
   }
 
+  /* Expander — disclosure widget, distinct from .btn-link. No brackets,
+     just an arrow and tertiary text. Sits below the description, marks
+     the optional "deep dive" content. */
   .expander {
     align-self: flex-start;
     background: none;
     border: none;
     color: var(--text-tertiary);
     font-family: var(--font-body);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     padding: 0;
     cursor: pointer;
     transition: color var(--transition-fast);
-    margin-top: 0.1rem;
   }
   .expander:hover {
     color: var(--text-secondary);
