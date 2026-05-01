@@ -249,7 +249,7 @@
 
 <style>
   .panel {
-    width: 280px;
+    width: 240px;
     flex-shrink: 0;
     background: var(--bg-container);
     border-right: 1px solid var(--bg-category);
@@ -428,6 +428,7 @@
   .row-count {
     font-size: 0.7rem;
     color: var(--text-secondary);
+    margin-right: 0.25rem;
     flex-shrink: 0;
   }
   .row-actions {
