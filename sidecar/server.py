@@ -935,6 +935,7 @@ def compute_diff(
                         "filename": path.name,
                         "chunk_count": entry.chunk_count,
                         "game_system": entry.game_system,
+                        "indexed_at": entry.indexed_at,
                     })
                 else:
                     up_to_date.append({
@@ -942,6 +943,7 @@ def compute_diff(
                         "filename": path.name,
                         "chunk_count": entry.chunk_count,
                         "game_system": entry.game_system,
+                        "indexed_at": entry.indexed_at,
                     })
 
     # --- Resolve missing indexed files ---

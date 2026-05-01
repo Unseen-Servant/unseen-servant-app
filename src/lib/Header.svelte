@@ -8,7 +8,6 @@
   export let panelToggleVisible: boolean = true;
   export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let filterVisible: boolean = false;
-  export let indexedOnly: boolean = false;
   export let excludedSystems: Set<string> = new Set();
   export let availableSystems: { name: string; count: number }[] = [];
   export let onSubmit: (q: string) => void = () => {};
@@ -16,16 +15,18 @@
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
   export let onClearScope: () => void = () => {};
-  export let onIndexedOnlyChange: (value: boolean) => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
   export let collapseAllVisible: boolean = false;
   export let onCollapseAll: () => void = () => {};
+  export let viewToggleVisible: boolean = false;
+  export let viewMode: 'tree' | 'systems' = 'tree';
+  export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
 
   let filterOpen = false;
   let filterBtn: HTMLButtonElement | undefined;
 
-  $: filterActive = indexedOnly || excludedSystems.size > 0;
+  $: filterActive = excludedSystems.size > 0;
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -112,10 +113,8 @@
         <FilterMenu
           open={filterOpen}
           anchorEl={filterBtn}
-          {indexedOnly}
           {excludedSystems}
           systems={availableSystems}
-          {onIndexedOnlyChange}
           onToggleSystem={onToggleSystemFilter}
           onClearSystems={onClearSystemFilter}
           onClose={() => { filterOpen = false; }}
@@ -133,6 +132,23 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
           <polyline points="17 11 12 6 7 11" />
           <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </button>
+    {/if}
+    {#if viewToggleVisible}
+      <button
+        class="panel-toggle"
+        class:active={viewMode === 'systems'}
+        on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
+        title={viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system'}
+        aria-label="Toggle view mode"
+        aria-pressed={viewMode === 'systems'}
+      >
+        <!-- Layered stack — group by tag -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+          <path d="M12 2 L22 7 L12 12 L2 7 Z" />
+          <path d="M2 12 L12 17 L22 12" />
+          <path d="M2 17 L12 22 L22 17" />
         </svg>
       </button>
     {/if}
@@ -253,10 +269,10 @@
     align-items: center;
     flex: 1;
     height: calc(var(--header-height) - 10px);
-    padding: 0 0.5rem;
+    padding: 0 0.7rem;
     background: var(--bg-container);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: 8px;
     transition: border-color var(--transition-fast);
   }
 

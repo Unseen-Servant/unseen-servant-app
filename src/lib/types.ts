@@ -10,6 +10,7 @@ export interface FileStatusEntry {
   filename: string;
   chunk_count?: number;
   game_system?: string;
+  indexed_at?: string;
 }
 
 export interface GameSystemsResult {

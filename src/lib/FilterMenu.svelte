@@ -1,13 +1,9 @@
 <script lang="ts">
-  // Two-section filter popover. Same anchor pattern as the sort menu in
-  // CollectionsPanel: outside-click and Escape close it.
+  // Filter popover. Same anchor pattern as the sort menu in CollectionsPanel:
+  // outside-click and Escape close it.
 
   export let open: boolean = false;
   export let anchorEl: HTMLElement | undefined = undefined;
-
-  // "indexed only" means hide PDFs that haven't been indexed.
-  export let indexedOnly: boolean = false;
-  export let onIndexedOnlyChange: (value: boolean) => void = () => {};
 
   // Game systems to EXCLUDE. Empty = show all. Persisting "excluded" rather
   // than "selected" means newly-detected systems show up automatically.
@@ -45,21 +41,7 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div class="filter-menu" bind:this={menuEl} on:click|stopPropagation>
-    <div class="section">
-      <div class="section-label">Index</div>
-      <label class="row">
-        <span class="row-name">Indexed only</span>
-        <input
-          class="app-checkbox"
-          type="checkbox"
-          checked={indexedOnly}
-          on:change={(e) => onIndexedOnlyChange(e.currentTarget.checked)}
-        />
-      </label>
-    </div>
-
     {#if systems.length > 0}
-      <hr class="divider" />
       <div class="section">
         <div class="section-head">
           <span class="section-label">Game systems</span>
@@ -82,6 +64,8 @@
           {/each}
         </div>
       </div>
+    {:else}
+      <div class="empty">No game systems detected yet. Index some files first.</div>
     {/if}
   </div>
 {/if}
@@ -140,12 +124,6 @@
     color: var(--text-secondary);
   }
 
-  .divider {
-    margin: 0.25rem 0;
-    border: none;
-    border-top: 1px solid var(--bg-category);
-  }
-
   .systems {
     max-height: 12rem;
     overflow-y: auto;
@@ -175,5 +153,11 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     flex-shrink: 0;
+  }
+
+  .empty {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
   }
 </style>
