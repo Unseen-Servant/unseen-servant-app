@@ -21,6 +21,7 @@
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
   import ActionButton from '../lib/ActionButton.svelte';
+  import SystemsView from '../lib/SystemsView.svelte';
   import { notification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
@@ -75,6 +76,11 @@
   // pool, filter narrows it further.
   let filterIndexedOnly = false;
   let filterExcludedSystems = new Set<string>();
+
+  // View mode for the file tree area. 'tree' = directory hierarchy (default),
+  // 'systems' = flat list grouped by game system. Forced to 'tree' in
+  // collection-edit mode (selection requires the directory tree).
+  let viewMode: 'tree' | 'systems' = 'tree';
 
   // Index sync state
   let indexStatus: IndexStatusResult | null = null;
@@ -310,6 +316,10 @@
           filterExcludedSystems = new Set(savedFilter.excludedSystems);
         }
       }
+      const savedViewMode = await store.get<string>('viewMode');
+      if (savedViewMode === 'tree' || savedViewMode === 'systems') {
+        viewMode = savedViewMode;
+      }
       await loadCollections();
     } catch (e) {
       // No saved state on first run — that's fine
@@ -416,6 +426,27 @@
       sidecarConnected = false;
     }
   }
+
+  async function setViewMode(mode: 'tree' | 'systems') {
+    viewMode = mode;
+    try {
+      const store = await load('settings.json');
+      await store.set('viewMode', mode);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist viewMode:', e);
+    }
+  }
+
+  // Effective view mode — collection-edit always falls back to tree.
+  $: effectiveViewMode = isCollectionEditMode ? 'tree' : viewMode;
+
+  // Indexed entries with metadata (path, filename, game_system) for the
+  // systems view. Excludes pending removals and the to-add bucket.
+  $: indexedEntries = (() => {
+    if (!indexStatus) return [];
+    return [...indexStatus.up_to_date, ...indexStatus.to_update];
+  })();
 
   async function persistFilter() {
     try {
@@ -1755,8 +1786,11 @@
     onIndexedOnlyChange={setIndexedOnly}
     onToggleSystemFilter={toggleSystemFilter}
     onClearSystemFilter={clearSystemFilter}
-    collapseAllVisible={!!selectedFolder && !searchActive && expandedPaths.size > 0}
+    collapseAllVisible={!!selectedFolder && !searchActive && effectiveViewMode === 'tree' && expandedPaths.size > 0}
     onCollapseAll={collapseAll}
+    viewToggleVisible={!!selectedFolder && !searchActive && !isCollectionEditMode}
+    viewMode={effectiveViewMode}
+    onSetViewMode={setViewMode}
   />
 
   {#if selectedFolder}
@@ -1795,6 +1829,14 @@
             error={searchError}
             indexedFileCount={indexedPathsSet.size}
             onOpenResult={handleOpenResult}
+          />
+        {:else if effectiveViewMode === 'systems'}
+          <SystemsView
+            entries={indexedEntries}
+            {displayPaths}
+            {focusedFilePath}
+            onFocusFile={(path) => { focusedFilePath = path; }}
+            onContextMenu={handleContextMenu}
           />
         {:else}
           {#each files as file (file.path)}

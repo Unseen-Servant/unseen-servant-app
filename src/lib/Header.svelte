@@ -21,6 +21,9 @@
   export let onClearSystemFilter: () => void = () => {};
   export let collapseAllVisible: boolean = false;
   export let onCollapseAll: () => void = () => {};
+  export let viewToggleVisible: boolean = false;
+  export let viewMode: 'tree' | 'systems' = 'tree';
+  export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
 
   let filterOpen = false;
   let filterBtn: HTMLButtonElement | undefined;
@@ -133,6 +136,23 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
           <polyline points="17 11 12 6 7 11" />
           <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </button>
+    {/if}
+    {#if viewToggleVisible}
+      <button
+        class="panel-toggle"
+        class:active={viewMode === 'systems'}
+        on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
+        title={viewMode === 'systems' ? 'Switch to tree view' : 'Group by game system'}
+        aria-label="Toggle view mode"
+        aria-pressed={viewMode === 'systems'}
+      >
+        <!-- Layered stack — group by tag -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+          <path d="M12 2 L22 7 L12 12 L2 7 Z" />
+          <path d="M2 12 L12 17 L22 12" />
+          <path d="M2 17 L12 22 L22 17" />
         </svg>
       </button>
     {/if}
