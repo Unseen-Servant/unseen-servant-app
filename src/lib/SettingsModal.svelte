@@ -33,6 +33,7 @@
   export let ollamaModelReady: boolean = false;
   export let filesIndexed: boolean = false;
   export let collectionsCreated: boolean = false;
+  export let mcpConnected: boolean = false;
   export let initialTab: 'library' | 'game-systems' | 'setup' = 'library';
 
   let activeTab: 'library' | 'game-systems' | 'setup' = initialTab;
@@ -90,6 +91,7 @@
             folderSelected={!!selectedFolder}
             {filesIndexed}
             {collectionsCreated}
+            {mcpConnected}
             {onSelectFolder}
             {onCopyMcpConfig}
           />

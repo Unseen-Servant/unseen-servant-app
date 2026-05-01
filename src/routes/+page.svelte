@@ -1715,6 +1715,7 @@
       folderSelected={false}
       filesIndexed={false}
       collectionsCreated={false}
+      {mcpConnected}
       onSelectFolder={handleSelectFolder}
       onCopyMcpConfig={handleCopyMcpConfig}
     />
@@ -1824,6 +1825,7 @@
   {ollamaModelReady}
   filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
   collectionsCreated={Object.keys(collections).length > 0}
+  {mcpConnected}
   onSelectFolder={handleSelectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
