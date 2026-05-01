@@ -99,8 +99,9 @@
         aria-haspopup="menu"
         aria-expanded={filterOpen}
       >
-        <!-- Font Awesome "filter" -->
-        <svg viewBox="0 0 512 512" fill="currentColor" class="toggle-icon">
+        <!-- Font Awesome "filter" — viewBox padded so the glyph density
+             matches the 640-viewBox panel-toggle icon next to it. -->
+        <svg viewBox="-64 -64 640 640" fill="currentColor" class="toggle-icon">
           <path d="M3.9 22.9C10.5 8.9 24.5 0 40 0L472 0c15.5 0 29.5 8.9 36.1 22.9s4.6 30.5-5.2 42.5L320 290.7 320 448c0 12.1-6.8 23.2-17.7 28.6s-23.8 4.3-33.5-3l-64-48c-8.1-6-12.8-15.5-12.8-25.6l0-109.3L9 65.4C-.7 53.4-2.8 36.8 3.9 22.9z"/>
         </svg>
         {#if filterActive}<span class="filter-dot" aria-hidden="true"></span>{/if}
