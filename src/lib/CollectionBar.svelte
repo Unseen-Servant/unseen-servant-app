@@ -18,8 +18,6 @@
   export let onHighlight: (name: string | null) => void = () => {};
   export let onToggleActive: (name: string) => void = () => {};
 
-  let confirmingDelete: string | null = null;
-
   $: isEditMode = editingName !== null || isCreating;
   $: collectionList = Object.values(collections);
 
@@ -30,28 +28,17 @@
 
   function handleEdit(event: MouseEvent, name: string) {
     event.stopPropagation();
-    confirmingDelete = null;
     onStartEdit(name);
   }
 
   function handlePin(event: MouseEvent, name: string) {
     event.stopPropagation();
-    confirmingDelete = null;
     onToggleActive(name);
   }
 
   function handleDeleteClick(event: MouseEvent, name: string) {
     event.stopPropagation();
-    if (confirmingDelete === name) {
-      onDelete(name);
-      confirmingDelete = null;
-    } else {
-      confirmingDelete = name;
-    }
-  }
-
-  function handleDeleteBlur() {
-    confirmingDelete = null;
+    onDelete(name);
   }
 
   let nameInput: HTMLInputElement;
@@ -91,12 +78,10 @@
           </button>
           <button
             class="chip-action delete"
-            class:confirming={confirmingDelete === col.name}
             on:click={(e) => handleDeleteClick(e, col.name)}
-            on:blur={handleDeleteBlur}
-            title={confirmingDelete === col.name ? 'Click again to confirm' : 'Delete'}
+            title="Delete"
           >
-            {confirmingDelete === col.name ? '?' : '\u00d7'}
+            &times;
           </button>
         </div>
       {/each}
@@ -138,7 +123,7 @@
         <span class="file-count">{editFileCount} file{editFileCount === 1 ? '' : 's'} selected</span>
         {#if editingName}
           <button class="btn btn-delete" on:click={(e) => handleDeleteClick(e, editingName ?? '')}>
-            {confirmingDelete === editingName ? 'Confirm Delete' : 'Delete'}
+            Delete
           </button>
         {/if}
         <button class="btn btn-cancel" on:click={onCancel}>Cancel</button>
@@ -238,11 +223,6 @@
   }
   .chip-action.delete {
     color: var(--text-danger);
-  }
-  .chip-action.delete.confirming {
-    color: var(--text-danger);
-    opacity: 1;
-    font-weight: bold;
   }
   .new-chip {
     background: transparent;
