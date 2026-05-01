@@ -70,11 +70,12 @@
         class="context-item submenu-trigger"
         class:open={openSubmenu === 'add'}
         on:mouseenter={() => { openSubmenu = 'add'; }}
+        on:mouseleave={() => { openSubmenu = null; }}
       >
         <span>Add to collection&hellip;</span>
         <span class="submenu-caret">&#9656;</span>
         {#if openSubmenu === 'add'}
-          <div class="submenu" on:mouseleave={() => { openSubmenu = null; }}>
+          <div class="submenu">
             {#each collectionList as col}
               <button
                 class="context-item"
@@ -93,11 +94,12 @@
         class="context-item submenu-trigger"
         class:open={openSubmenu === 'remove'}
         on:mouseenter={() => { openSubmenu = 'remove'; }}
+        on:mouseleave={() => { openSubmenu = null; }}
       >
         <span>Remove from collection&hellip;</span>
         <span class="submenu-caret">&#9656;</span>
         {#if openSubmenu === 'remove'}
-          <div class="submenu" on:mouseleave={() => { openSubmenu = null; }}>
+          <div class="submenu">
             {#each containingCollections as name}
               <button
                 class="context-item"
