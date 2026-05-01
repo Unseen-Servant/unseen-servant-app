@@ -140,7 +140,7 @@
         class="panel-toggle"
         class:active={viewMode === 'systems'}
         on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
-        title={viewMode === 'systems' ? 'Switch to tree view' : 'Group by game system'}
+        title={viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system'}
         aria-label="Toggle view mode"
         aria-pressed={viewMode === 'systems'}
       >
