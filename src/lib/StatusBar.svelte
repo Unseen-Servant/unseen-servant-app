@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { notification } from './notificationStore';
+
   export let selectedFolder: string;
   export let sidecarConnected: boolean;
   export let selectedCount: number;
@@ -16,6 +18,13 @@
   export let onShowLicense: () => void;
   export let onShowGuide: () => void;
   export let onOpenSettings: () => void;
+
+  $: note = $notification;
+
+  function handleNoteDismiss() {
+    note?.onDismiss?.();
+    notification.dismiss();
+  }
 
   $: syncTooltip = lastSyncTime
     ? `Last synced ${lastSyncTime.toLocaleTimeString()}`
@@ -72,6 +81,22 @@
           </svg>
         </button>
       {/if}
+    {/if}
+    {#if note}
+      {#if selectedFolder}<span class="separator">&middot;</span>{/if}
+      <div class="status-note" class:status-error={note.type === 'error'}>
+        {#if note.type === 'progress'}
+          <span class="status-note-msg">
+            {note.filesCompleted ?? 0}/{note.filesTotal ?? 0} files &middot; {(note.chunksProcessed ?? 0).toLocaleString()} chunks
+          </span>
+        {:else}
+          <span class="status-note-msg">{note.message}</span>
+          {#if note.actionLabel && note.onAction}
+            <button class="note-action" on:click={note.onAction}>{note.actionLabel}</button>
+          {/if}
+        {/if}
+        <button class="note-dismiss" on:click={handleNoteDismiss} aria-label="Dismiss">&times;</button>
+      </div>
     {/if}
   </div>
   <div class="statusbar-right">
@@ -141,6 +166,64 @@
   .indicator-icon {
     width: 12px;
     height: 12px;
+  }
+
+  .status-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+  }
+  .status-note.status-error {
+    color: var(--text-danger);
+  }
+  .status-note-msg {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60ch;
+  }
+  .note-action {
+    background: none;
+    border: none;
+    color: var(--text-active);
+    font-family: var(--font-body);
+    font-size: inherit;
+    padding: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter var(--transition-fast);
+  }
+  .note-action::before {
+    content: '[';
+    color: var(--text-secondary);
+    margin-right: 0.15rem;
+  }
+  .note-action::after {
+    content: ']';
+    color: var(--text-secondary);
+    margin-left: 0.15rem;
+  }
+  .note-action:hover {
+    filter: brightness(1.25);
+  }
+  .note-action:hover::before,
+  .note-action:hover::after {
+    color: var(--text-accent);
+  }
+  .note-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0 0.15rem;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+  .note-dismiss:hover {
+    color: var(--text-secondary);
   }
 
   .sync-btn {

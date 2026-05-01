@@ -13,7 +13,6 @@
   import Header from '../lib/Header.svelte';
   import SearchResults from '../lib/SearchResults.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
-  import NotificationBanner from '../lib/NotificationBanner.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStartedModal from '../lib/GettingStartedModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
@@ -1688,7 +1687,6 @@
             />
           {/each}
         {/if}
-        <NotificationBanner />
       </div>
     </div>
   {:else}
