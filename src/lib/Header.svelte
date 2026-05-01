@@ -73,68 +73,70 @@
 </script>
 
 <header class="header">
-  {#if panelToggleVisible}
-    <button
-      class="panel-toggle"
-      class:active={panelOpen}
-      on:click={onTogglePanel}
-      title={panelOpen ? 'Hide collections panel' : 'Show collections panel'}
-      aria-label="Toggle collections panel"
-      aria-pressed={panelOpen}
-    >
-      <!-- Font Awesome "table-columns" icon (static/icons/table-columns-solid-full.svg) -->
-      <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
-        <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
-      </svg>
-    </button>
-  {/if}
-  {#if filterVisible}
-    <div class="filter-anchor">
+  <div class="header-controls">
+    {#if panelToggleVisible}
       <button
-        class="panel-toggle filter-btn"
-        class:active={filterOpen}
-        class:has-filter={filterActive}
-        on:click|stopPropagation={() => { filterOpen = !filterOpen; }}
-        bind:this={filterBtn}
-        title="Filter library"
-        aria-label="Filter library"
-        aria-haspopup="menu"
-        aria-expanded={filterOpen}
+        class="panel-toggle"
+        class:active={panelOpen}
+        on:click={onTogglePanel}
+        title={panelOpen ? 'Hide collections panel' : 'Show collections panel'}
+        aria-label="Toggle collections panel"
+        aria-pressed={panelOpen}
       >
-        <!-- Font Awesome "filter" — viewBox padded so the glyph density
-             matches the 640-viewBox panel-toggle icon next to it. -->
-        <svg viewBox="-64 -64 640 640" fill="currentColor" class="toggle-icon">
-          <path d="M3.9 22.9C10.5 8.9 24.5 0 40 0L472 0c15.5 0 29.5 8.9 36.1 22.9s4.6 30.5-5.2 42.5L320 290.7 320 448c0 12.1-6.8 23.2-17.7 28.6s-23.8 4.3-33.5-3l-64-48c-8.1-6-12.8-15.5-12.8-25.6l0-109.3L9 65.4C-.7 53.4-2.8 36.8 3.9 22.9z"/>
+        <!-- Font Awesome "table-columns" icon (static/icons/table-columns-solid-full.svg) -->
+        <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+          <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
         </svg>
-        {#if filterActive}<span class="filter-dot" aria-hidden="true"></span>{/if}
       </button>
-      <FilterMenu
-        open={filterOpen}
-        anchorEl={filterBtn}
-        {indexedOnly}
-        {excludedSystems}
-        systems={availableSystems}
-        {onIndexedOnlyChange}
-        onToggleSystem={onToggleSystemFilter}
-        onClearSystems={onClearSystemFilter}
-        onClose={() => { filterOpen = false; }}
-      />
-    </div>
-  {/if}
-  {#if collapseAllVisible}
-    <button
-      class="panel-toggle"
-      on:click={onCollapseAll}
-      title="Collapse all folders"
-      aria-label="Collapse all folders"
-    >
-      <!-- Double chevron up — collapse all -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-        <polyline points="17 11 12 6 7 11" />
-        <polyline points="17 18 12 13 7 18" />
-      </svg>
-    </button>
-  {/if}
+    {/if}
+    {#if filterVisible}
+      <div class="filter-anchor">
+        <button
+          class="panel-toggle filter-btn"
+          class:active={filterOpen}
+          class:has-filter={filterActive}
+          on:click|stopPropagation={() => { filterOpen = !filterOpen; }}
+          bind:this={filterBtn}
+          title="Filter library"
+          aria-label="Filter library"
+          aria-haspopup="menu"
+          aria-expanded={filterOpen}
+        >
+          <!-- Font Awesome "filter" — viewBox padded so the glyph density
+               matches the 640-viewBox panel-toggle icon next to it. -->
+          <svg viewBox="-64 -64 640 640" fill="currentColor" class="toggle-icon">
+            <path d="M3.9 22.9C10.5 8.9 24.5 0 40 0L472 0c15.5 0 29.5 8.9 36.1 22.9s4.6 30.5-5.2 42.5L320 290.7 320 448c0 12.1-6.8 23.2-17.7 28.6s-23.8 4.3-33.5-3l-64-48c-8.1-6-12.8-15.5-12.8-25.6l0-109.3L9 65.4C-.7 53.4-2.8 36.8 3.9 22.9z"/>
+          </svg>
+          {#if filterActive}<span class="filter-dot" aria-hidden="true"></span>{/if}
+        </button>
+        <FilterMenu
+          open={filterOpen}
+          anchorEl={filterBtn}
+          {indexedOnly}
+          {excludedSystems}
+          systems={availableSystems}
+          {onIndexedOnlyChange}
+          onToggleSystem={onToggleSystemFilter}
+          onClearSystems={onClearSystemFilter}
+          onClose={() => { filterOpen = false; }}
+        />
+      </div>
+    {/if}
+    {#if collapseAllVisible}
+      <button
+        class="panel-toggle"
+        on:click={onCollapseAll}
+        title="Collapse all folders"
+        aria-label="Collapse all folders"
+      >
+        <!-- Double chevron up — collapse all -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+          <polyline points="17 11 12 6 7 11" />
+          <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </button>
+    {/if}
+  </div>
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
     {#if scopeChip}
@@ -186,6 +188,16 @@
     padding: 0 0.5rem;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  /* Tighter cluster for icon-button siblings — keeps the panel toggle,
+     filter, and collapse-all close while preserving header gap to the
+     search wrapper. */
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
     flex-shrink: 0;
   }
 
