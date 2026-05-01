@@ -269,10 +269,10 @@
     align-items: center;
     flex: 1;
     height: calc(var(--header-height) - 10px);
-    padding: 0 0.5rem;
+    padding: 0 0.7rem;
     background: var(--bg-container);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: 8px;
     transition: border-color var(--transition-fast);
   }
 
