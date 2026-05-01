@@ -113,10 +113,12 @@
                     <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
                   </svg>
                 </span>
-                <div class="file-text">
-                  <span class="file-name">{entry.filename}</span>
-                  <span class="file-path" title={entry.path}>{relativeParent(entry.path)}</span>
-                </div>
+                <span class="file-name">{entry.filename}</span>
+                {@const relParent = relativeParent(entry.path)}
+                {#if relParent}
+                  <span class="file-sep" aria-hidden="true">·</span>
+                  <span class="file-path" title={entry.path}>{relParent}</span>
+                {/if}
                 {#if entry.chunk_count !== undefined && entry.chunk_count > 0}
                   <span class="file-meta" title="Indexed chunks">
                     {entry.chunk_count.toLocaleString()}<span class="file-meta-unit">ch</span>
@@ -187,9 +189,9 @@
 
   .file {
     display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.4rem 0.75rem 0.4rem 1.5rem;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.25rem 0.75rem 0.25rem 1.5rem;
     cursor: pointer;
     transition: background var(--transition-fast);
     -webkit-user-select: none;
@@ -207,18 +209,12 @@
     justify-content: center;
     color: var(--text-accent);
     flex-shrink: 0;
+    align-self: center;
   }
   .file-icon svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
     display: block;
-  }
-  .file-text {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
   }
   .file-name {
     font-size: 0.85rem;
@@ -226,13 +222,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .file-sep {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    flex-shrink: 0;
   }
   .file-path {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-tertiary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
   }
   .file-meta {
     flex-shrink: 0;
@@ -240,6 +245,7 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
+    margin-left: auto;
   }
   .file-meta-unit {
     color: var(--text-tertiary);
