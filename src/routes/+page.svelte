@@ -1145,6 +1145,10 @@
       const result = await invoke<ActiveContextResult>('set_active_context', { name });
       activeContextName = result.active_context;
       pathScope = null;
+      // Activating a collection feels best in systems view: a curated
+      // subset reads as a list, not a directory tree. The user can still
+      // flip back to tree via the toggle if they prefer.
+      setViewMode('systems');
       notification.show({
         type: 'info',
         message: `Active context: ${name}`,
