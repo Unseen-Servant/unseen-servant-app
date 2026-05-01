@@ -1838,6 +1838,7 @@
           <SystemsView
             entries={indexedEntries}
             {displayPaths}
+            libraryRoot={selectedFolder}
             {focusedFilePath}
             onFocusFile={(path) => { focusedFilePath = path; }}
             onContextMenu={handleContextMenu}
