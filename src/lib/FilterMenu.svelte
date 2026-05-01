@@ -124,12 +124,6 @@
     color: var(--text-secondary);
   }
 
-  .divider {
-    margin: 0.25rem 0;
-    border: none;
-    border-top: 1px solid var(--bg-category);
-  }
-
   .systems {
     max-height: 12rem;
     overflow-y: auto;
