@@ -155,15 +155,12 @@ machine. Paste it into your Claude Desktop config file.
 
 ### Available tools
 
-| Tool                 | Description                                           |
-|----------------------|-------------------------------------------------------|
-| `search_library`     | Semantic search across all indexed PDFs               |
-| `search_in_document` | Search within a specific sourcebook                   |
-| `read_document`      | Read the full text of an indexed PDF                  |
-| `list_sources`       | List all indexed documents                            |
-| `library_stats`      | Overview of indexed library size                      |
-| `compare_sources`    | Compare how different books cover the same topic      |
-| `random_table`       | Find and roll on a random table from your sourcebooks |
+| Tool                 | Description                                                      |
+|----------------------|------------------------------------------------------------------|
+| `search_library`     | Semantic search across indexed PDFs (scopes by source/system/collection) |
+| `list_sources`       | List indexed documents (auto-scoped to active context)           |
+| `list_collections`   | List curated collections; marks the active one                   |
+| `list_game_systems`  | List game systems detected in the library                        |
 
 ---
 
