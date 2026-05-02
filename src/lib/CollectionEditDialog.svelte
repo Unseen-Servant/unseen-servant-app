@@ -102,17 +102,11 @@
             aria-haspopup="menu"
             aria-expanded={colorMenuOpen}
           >
-            <span
-              class="color-icon"
-              class:none={!color}
-              style={color ? `color: ${color}` : ''}
-              aria-hidden="true"
-            >
-              <!-- "books" — collection-of-books glyph -->
-              <svg viewBox="0 0 640 640" fill="currentColor">
-                <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
-              </svg>
-            </span>
+            {#if color}
+              <span class="color-swatch" style="background: {color}" aria-hidden="true"></span>
+            {:else}
+              <span class="color-swatch none" aria-hidden="true">&times;</span>
+            {/if}
           </button>
           {#if colorMenuOpen}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -134,16 +128,11 @@
                   type="button"
                   class="swatch"
                   class:selected={color === c}
-                  style="color: {c}"
+                  style="background: {c}"
                   on:click={() => pickColor(c)}
                   title={c}
                   aria-label={`Color ${c}`}
-                >
-                  <!-- "books" — collection-of-books glyph -->
-                  <svg viewBox="0 0 640 640" fill="currentColor">
-                    <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
-                  </svg>
-                </button>
+                ></button>
               {/each}
             </div>
           {/if}
@@ -268,19 +257,20 @@
   .color-trigger.open {
     border-color: var(--text-accent);
   }
-  .color-icon {
+  .color-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-accent);
   }
-  .color-icon.none {
+  .color-swatch.none {
+    background: transparent;
+    border: 1px dashed var(--text-tertiary);
     color: var(--text-tertiary);
-  }
-  .color-icon svg {
-    width: 14px;
-    height: 14px;
-    display: block;
+    font-size: 0.85rem;
+    line-height: 1;
   }
   .color-menu {
     position: absolute;
@@ -298,16 +288,12 @@
   }
 
   .swatch {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: transparent;
-    border: 1px solid transparent;
+    width: 22px;
+    height: 22px;
     border-radius: 4px;
     cursor: pointer;
     padding: 0;
+    border: 1px solid transparent;
     transition: transform var(--transition-fast), border-color var(--transition-fast);
   }
   .swatch:hover {
@@ -316,20 +302,20 @@
   .swatch.selected {
     border-color: var(--text-primary);
   }
-  .swatch svg {
-    width: 18px;
-    height: 18px;
-    display: block;
-  }
   .swatch.none {
-    color: var(--text-secondary);
+    background: transparent;
     border: 1px dashed var(--text-secondary);
+    color: var(--text-secondary);
     font-size: 1rem;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .swatch.none.selected {
     border-color: var(--text-primary);
     border-style: solid;
+    color: var(--text-primary);
   }
   .actions {
     display: flex;

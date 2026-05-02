@@ -324,3 +324,75 @@ def test_custom_keywords_in_detection(client, tmp_path):
     data = response.json()
     assert len(data["sources"]) == 1
     assert data["sources"][0]["game_system"] == "Mothership"
+
+
+# ---------------------------------------------------------------------------
+# Color (issue #198)
+# ---------------------------------------------------------------------------
+
+def test_known_systems_include_default_colors(client):
+    """Built-ins ship with a default color in /api/known-game-systems."""
+    known = client.get("/api/known-game-systems").json()
+    dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
+    pf = next(s for s in known["systems"] if s["tag"] == "PF2E")
+    assert dnd["color"] == "#c75450"
+    assert pf["color"] == "#5fb068"
+
+
+def test_create_custom_with_color(client, tmp_path):
+    """Custom system stores the chosen color and surfaces it via known-systems."""
+    response = client.post("/api/custom-game-systems", json={
+        "tag": "Cairn",
+        "keywords": ["cairn"],
+        "color": "#4fa896",
+    })
+    assert response.status_code == 200
+    assert response.json()["color"] == "#4fa896"
+
+    known = client.get("/api/known-game-systems").json()
+    cairn = next(s for s in known["systems"] if s["tag"] == "Cairn")
+    assert cairn["color"] == "#4fa896"
+
+
+def test_create_custom_without_color_stays_unset(client):
+    """A custom system without a color reports color=None so the UI can render
+    the 'no color' state explicitly."""
+    client.post("/api/custom-game-systems", json={
+        "tag": "Mothership",
+        "keywords": ["mothership"],
+    })
+
+    known = client.get("/api/known-game-systems").json()
+    moth = next(s for s in known["systems"] if s["tag"] == "Mothership")
+    assert moth["color"] is None
+
+
+def test_update_custom_changes_color(client):
+    """Updating a custom system replaces the stored color."""
+    client.post("/api/custom-game-systems", json={
+        "tag": "Cairn",
+        "keywords": ["cairn"],
+        "color": "#4fa896",
+    })
+    response = client.put("/api/custom-game-systems/Cairn", json={
+        "tag": "Cairn",
+        "keywords": ["cairn"],
+        "color": "#9b6cb6",
+    })
+    assert response.status_code == 200
+    assert response.json()["color"] == "#9b6cb6"
+
+
+def test_builtin_override_inherits_color_when_unset(client):
+    """Customizing a built-in without picking a color preserves the built-in default."""
+    # Built-in D&D 5E ships as red.
+    client.post("/api/custom-game-systems", json={
+        "tag": "D&D 5E",
+        "keywords": ["dnd5e", "my own keyword"],
+        # color omitted on purpose
+    })
+
+    known = client.get("/api/known-game-systems").json()
+    dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
+    assert dnd["color"] == "#c75450"
+    assert dnd["is_customized"] is True

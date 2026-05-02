@@ -1,6 +1,6 @@
 <script lang="ts">
   import { openPath } from '@tauri-apps/plugin-opener';
-  import type { FileItem, FileStatusEntry } from './types';
+  import type { FileItem, FileStatusEntry, KnownGameSystem } from './types';
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -15,9 +15,23 @@
   // absolute. Empty string falls back to absolute paths.
   export let libraryRoot: string = '';
 
+  // Known systems — used to look up each tag's accent color for group headers.
+  export let knownSystems: KnownGameSystem[] = [];
+
   export let focusedFilePath: string | null = null;
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
+
+  $: tagColors = (() => {
+    const m = new Map<string, string>();
+    for (const sys of knownSystems) {
+      if (sys.color) m.set(sys.tag, sys.color);
+    }
+    return m;
+  })();
+  function colorFor(tag: string): string | null {
+    return tagColors.get(tag) ?? null;
+  }
 
   // Section collapse state — transient (not persisted).
   let collapsed = new Set<string>();
@@ -113,9 +127,22 @@
 {:else}
   <div class="systems-view">
     {#each groups as group (group.tag)}
+      {@const groupColor = colorFor(group.tag)}
       <section class="group">
-        <button class="group-head" on:click={() => toggleSection(group.tag)}>
+        <button
+          class="group-head"
+          style={groupColor ? `--group-color: ${groupColor}` : ''}
+          on:click={() => toggleSection(group.tag)}
+        >
           <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
+          {#if group.tag !== 'Untagged'}
+            <span class="group-icon" class:unset={!groupColor} aria-hidden="true">
+              <!-- Font Awesome "dice-d6" -->
+              <svg viewBox="0 0 640 640" fill="currentColor">
+                <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+              </svg>
+            </span>
+          {/if}
           <span class="group-name">{group.tag}</span>
           <span class="group-count">{group.entries.length}</span>
         </button>
@@ -173,6 +200,7 @@
   }
 
   .group-head {
+    --group-color: var(--text-accent);
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
@@ -182,8 +210,8 @@
     cursor: pointer;
     text-align: left;
     font-family: var(--font-heading, var(--font-body));
-    color: var(--text-accent);
-    border-bottom: 1px solid var(--border-subtle);
+    color: var(--group-color);
+    border-bottom: 1px solid color-mix(in srgb, var(--group-color) 35%, var(--border-subtle));
     transition: color var(--transition-fast);
   }
   .group-head:hover {
@@ -194,6 +222,22 @@
     color: var(--text-secondary);
     font-size: 0.7rem;
     flex-shrink: 0;
+  }
+  .group-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--group-color);
+    align-self: center;
+  }
+  .group-icon.unset {
+    color: var(--text-tertiary);
+  }
+  .group-icon svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    display: block;
   }
   .group-name {
     flex: 1;

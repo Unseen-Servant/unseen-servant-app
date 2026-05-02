@@ -1872,6 +1872,7 @@
             entries={indexedEntries}
             {displayPaths}
             libraryRoot={selectedFolder}
+            {knownSystems}
             {focusedFilePath}
             onFocusFile={(path) => { focusedFilePath = path; }}
             onContextMenu={handleContextMenu}

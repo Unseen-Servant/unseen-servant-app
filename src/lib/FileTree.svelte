@@ -107,6 +107,18 @@
   $: hiddenTagCount = Math.max(0, tags.length - visibleTags.length);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
 
+  // Tag → color lookup, derived from knownSystems on each render.
+  $: tagColors = (() => {
+    const m = new Map<string, string>();
+    for (const sys of knownSystems) {
+      if (sys.color) m.set(sys.tag, sys.color);
+    }
+    return m;
+  })();
+  function colorFor(tag: string): string | null {
+    return tagColors.get(tag) ?? null;
+  }
+
   async function toggleExpand() {
     if (!item.is_dir) return;
 
@@ -253,7 +265,8 @@
         {#if mode === 'index'}
           <button class="badge-cluster" on:click={toggleDropdown} aria-label="Edit game system tags">
             {#each visibleTags as tag}
-              <span class="game-system-badge">{tag}</span>
+              {@const c = colorFor(tag)}
+              <span class="game-system-badge" style={c ? `--badge-color: ${c}` : ''}>{tag}</span>
             {/each}
             {#if hiddenTagCount > 0}
               <span class="game-system-badge overflow">+{hiddenTagCount}</span>
@@ -262,7 +275,8 @@
         {:else}
           <span class="badge-cluster readonly">
             {#each visibleTags as tag}
-              <span class="game-system-badge readonly">{tag}</span>
+              {@const c = colorFor(tag)}
+              <span class="game-system-badge readonly" style={c ? `--badge-color: ${c}` : ''}>{tag}</span>
             {/each}
             {#if hiddenTagCount > 0}
               <span class="game-system-badge readonly overflow">+{hiddenTagCount}</span>
@@ -480,19 +494,20 @@
     cursor: default;
   }
   .game-system-badge {
+    --badge-color: var(--text-accent);
     display: inline-block;
     padding: 0.1rem 0.4rem;
     border-radius: 3px;
     font-size: 0.75rem;
     font-family: var(--font-body);
-    background: rgba(182, 159, 129, 0.15);
-    color: var(--text-accent);
+    background: color-mix(in srgb, var(--badge-color) 18%, transparent);
+    color: var(--badge-color);
     white-space: nowrap;
     border: 1px solid transparent;
     transition: border-color var(--transition-fast);
   }
   .badge-cluster:hover .game-system-badge {
-    border-color: var(--text-accent);
+    border-color: var(--badge-color);
   }
   .game-system-badge.overflow {
     color: var(--text-secondary);

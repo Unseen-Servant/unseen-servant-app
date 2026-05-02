@@ -107,7 +107,7 @@ def test_detect_content_scans_first_2000_chars():
 def test_detect_savage_worlds():
     """Path with 'Savage Worlds' should match."""
     path = Path("/RPGs/Savage Worlds/SWADE.pdf")
-    assert detect_game_system(path) == "SaWo"
+    assert detect_game_system(path) == "SWADE"
 
 
 def test_detect_call_of_cthulhu():
@@ -180,3 +180,39 @@ def test_detect_systems_dedupes_within_tag():
     path = Path("/RPGs/D&D 5E/5e srd reference.pdf")
     result = detect_game_systems(path)
     assert result.count("D&D 5E") == 1
+
+
+# ---------------------------------------------------------------------------
+# Normalization (case, punctuation, whitespace, accents)
+# ---------------------------------------------------------------------------
+
+def test_detect_normalizes_punctuation_dnd_vs_d_and_d():
+    """``DnD-5e`` should match the same keyword as ``d&d 5e``."""
+    assert detect_game_system(Path("/RPGs/DnD-5e/phb.pdf")) == "D&D 5E"
+
+
+def test_detect_normalizes_underscores_and_spaces():
+    """Spaces, underscores, and missing separators all collapse."""
+    assert detect_game_system(Path("/RPGs/dnd_5e/phb.pdf")) == "D&D 5E"
+    assert detect_game_system(Path("/RPGs/dnd5e/phb.pdf")) == "D&D 5E"
+    assert detect_game_system(Path("/RPGs/D & D 5E/phb.pdf")) == "D&D 5E"
+
+
+def test_detect_normalizes_accents():
+    """``Mörk Borg`` matches the ``mork borg`` keyword via NFKD."""
+    assert detect_game_system(Path("/RPGs/Mörk Borg/Feretory.pdf")) == "MORK BORG"
+
+
+def test_detect_normalizes_ampersand_to_n():
+    """``c&c`` and ``cnc`` both match the same C&C keyword."""
+    assert detect_game_system(Path("/RPGs/cnc/players_handbook.pdf")) == "C&C"
+    assert detect_game_system(Path("/RPGs/C&C/players_handbook.pdf")) == "C&C"
+
+
+def test_detect_dropped_short_osr_keywords_no_longer_false_positive():
+    """The catalog removed ``sw`` / ``ose`` / ``b/x``; unrelated paths
+    containing those letters should not match OSR anymore."""
+    # Folder named "Software" contains "sw" — used to match OSR.
+    assert detect_game_system(Path("/Software/manuals/foo.pdf")) == "unknown"
+    # "prose" contains "ose".
+    assert detect_game_system(Path("/Documents/prose archive/foo.pdf")) == "unknown"

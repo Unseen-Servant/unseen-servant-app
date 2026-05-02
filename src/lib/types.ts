@@ -29,6 +29,7 @@ export interface SetGameSystemResult {
 export interface KnownGameSystem {
   tag: string;
   keywords?: string[];
+  color?: string | null;
   is_builtin?: boolean;
   is_customized?: boolean;
 }

@@ -1,10 +1,24 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import type { KnownGameSystem } from './types';
+  import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
+
+  // Mirrors the collection palette in CollectionEditDialog so users get the
+  // same eight choices across the app.
+  const PALETTE: string[] = [
+    '#c75450', // red
+    '#d49449', // orange
+    '#caa84b', // amber
+    '#5fb068', // green
+    '#4fa896', // teal
+    '#5a8dc4', // blue
+    '#9b6cb6', // purple
+    '#b69f81', // tan (matches accent)
+  ];
 
   // Sort state
   let sortDirection: 'asc' | 'desc' = 'asc';
@@ -23,19 +37,44 @@
   let modalMode: 'add' | 'edit' = 'add';
   let modalTag = '';
   let modalKeywords = '';
+  let modalColor: string | null = null;
   let modalError = '';
   let editOriginalTag = '';
+  let editOriginalKeywords = '';
+  let editOriginalColor: string | null = null;
   let editIsBuiltin = false;
   let editIsCustomized = false;
+
+  let tagInput: HTMLInputElement;
+  let colorBtn: HTMLButtonElement;
+  let colorMenuEl: HTMLDivElement;
+  let colorMenuOpen = false;
+
+  // Auto-focus the first input when the modal opens.
+  $: if (showModal && tagInput) tagInput.focus();
+
+  // Save is enabled only when there is a tag and either we're adding
+  // or the user actually changed something — same convention as the
+  // Collection modal.
+  $: dirty = modalMode === 'add' || (
+    modalTag.trim() !== editOriginalTag ||
+    modalKeywords !== editOriginalKeywords ||
+    (modalColor ?? null) !== (editOriginalColor ?? null)
+  );
+  $: canSave = modalTag.trim().length > 0 && dirty;
 
   function openAddModal() {
     modalMode = 'add';
     modalTag = '';
     modalKeywords = '';
+    modalColor = null;
     modalError = '';
     editOriginalTag = '';
+    editOriginalKeywords = '';
+    editOriginalColor = null;
     editIsBuiltin = false;
     editIsCustomized = false;
+    colorMenuOpen = false;
     showModal = true;
   }
 
@@ -43,24 +82,45 @@
     modalMode = 'edit';
     modalTag = sys.tag;
     modalKeywords = (sys.keywords || []).join(', ');
+    modalColor = sys.color ?? null;
     modalError = '';
     editOriginalTag = sys.tag;
+    editOriginalKeywords = modalKeywords;
+    editOriginalColor = sys.color ?? null;
     editIsBuiltin = sys.is_builtin ?? false;
     editIsCustomized = sys.is_customized ?? false;
+    colorMenuOpen = false;
     showModal = true;
   }
 
   function closeModal() {
     showModal = false;
+    colorMenuOpen = false;
     modalError = '';
   }
 
-  function handleModalKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') closeModal();
+  function handleColorPick(c: string | null) {
+    modalColor = c;
+    colorMenuOpen = false;
   }
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) closeModal();
+  function handleWindowClick(event: MouseEvent) {
+    if (!colorMenuOpen) return;
+    const target = event.target as Node;
+    if (colorBtn && (colorBtn === target || colorBtn.contains(target))) return;
+    if (colorMenuEl && colorMenuEl.contains(target)) return;
+    colorMenuOpen = false;
+  }
+
+  function handleWindowKey(event: KeyboardEvent) {
+    if (!showModal) return;
+    if (event.key === 'Escape' && colorMenuOpen) {
+      colorMenuOpen = false;
+      return;
+    }
+    if (event.key === 'Enter' && canSave && (event.metaKey || event.ctrlKey)) {
+      handleSave();
+    }
   }
 
   function parseKeywords(raw: string): string[] {
@@ -71,13 +131,14 @@
     const tag = modalTag.trim();
     if (!tag) { modalError = 'Tag is required'; return; }
     const keywords = parseKeywords(modalKeywords);
+    const color = modalColor || null;
 
     try {
       if (modalMode === 'add') {
-        await invoke('create_custom_game_system', { tag, keywords });
+        await invoke('create_custom_game_system', { tag, keywords, color });
       } else {
         // Edit mode: works for both custom and built-in (backend creates override if needed)
-        await invoke('update_custom_game_system', { originalTag: editOriginalTag, tag, keywords });
+        await invoke('update_custom_game_system', { originalTag: editOriginalTag, tag, keywords, color });
       }
       closeModal();
       onSystemsChanged();
@@ -107,6 +168,8 @@
   }
 </script>
 
+<svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
+
 <div class="game-systems-settings">
   <div class="list-header">
     <button class="col-header col-tag" on:click={toggleSort}>Tag</button>
@@ -117,6 +180,12 @@
     {#each sorted as sys}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
       <div class="system-row" on:click={() => openEditModal(sys)}>
+        <span class="system-icon" style={sys.color ? `color: ${sys.color}` : ''} class:unset={!sys.color} aria-hidden="true">
+          <!-- Font Awesome "dice-d6" -->
+          <svg viewBox="0 0 640 640" fill="currentColor">
+            <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+          </svg>
+        </span>
         <span class="system-tag">{sys.tag}</span>
         <span class="system-keywords">{(sys.keywords || []).slice(0, 3).join(', ')}{(sys.keywords || []).length > 3 ? '...' : ''}</span>
         <div class="system-labels">
@@ -131,42 +200,113 @@
   </div>
 </div>
 
-{#if showModal}
-  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="{modalMode === 'add' ? 'Add' : 'Edit'} Game System" tabindex="-1" on:click={handleBackdrop} on:keydown={handleModalKeydown}>
-    <div class="modal">
-      <div class="modal-header">
-        <span class="modal-title font-heading">{modalMode === 'add' ? 'Add Game System' : 'Edit Game System'}</span>
-        <button class="close-btn" on:click={closeModal} aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <label class="field-label" for="sys-tag">Tag</label>
-        <input id="sys-tag" class="field-input" bind:value={modalTag} placeholder="e.g. Cairn" on:keydown={(e) => e.key === 'Enter' && handleSave()} />
-
-        <label class="field-label" for="sys-keywords">Keywords</label>
-        <input id="sys-keywords" class="field-input" bind:value={modalKeywords} placeholder="Comma-separated keywords for auto-detection" on:keydown={(e) => e.key === 'Enter' && handleSave()} />
-
-        {#if modalError}
-          <div class="error-msg">{modalError}</div>
-        {/if}
-      </div>
-      <div class="modal-footer">
-        <div class="footer-left">
-          {#if modalMode === 'edit' && editIsBuiltin && editIsCustomized}
-            <button class="btn btn-reset" on:click={handleReset}>Reset to defaults</button>
+<Modal
+  visible={showModal}
+  onClose={closeModal}
+  title={modalMode === 'add' ? 'Add game system' : 'Edit game system'}
+  width="min(440px, 90vw)"
+>
+  <div class="body">
+    <div class="field">
+      <span class="label">Tag</span>
+      <div class="name-row">
+        <input
+          id="sys-tag"
+          type="text"
+          class="input"
+          bind:value={modalTag}
+          bind:this={tagInput}
+          placeholder="e.g. Cairn"
+        />
+        <div class="color-wrapper">
+          <button
+            type="button"
+            class="color-trigger"
+            class:open={colorMenuOpen}
+            on:click|stopPropagation={() => { colorMenuOpen = !colorMenuOpen; }}
+            bind:this={colorBtn}
+            title={modalColor || 'No color'}
+            aria-label="Game system color"
+            aria-haspopup="menu"
+            aria-expanded={colorMenuOpen}
+          >
+            {#if modalColor}
+              <span class="color-swatch" style="background: {modalColor}" aria-hidden="true"></span>
+            {:else}
+              <span class="color-swatch none" aria-hidden="true">&times;</span>
+            {/if}
+          </button>
+          {#if colorMenuOpen}
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+            <div class="color-menu" bind:this={colorMenuEl} on:click|stopPropagation>
+              <button
+                type="button"
+                class="swatch none"
+                class:selected={!modalColor}
+                on:click={() => handleColorPick(null)}
+                title="No color"
+                aria-label="No color"
+              >&times;</button>
+              {#each PALETTE as c}
+                <button
+                  type="button"
+                  class="swatch"
+                  class:selected={modalColor === c}
+                  style="background: {c}"
+                  on:click={() => handleColorPick(c)}
+                  title={c}
+                  aria-label={`Color ${c}`}
+                ></button>
+              {/each}
+            </div>
           {/if}
-          {#if modalMode === 'edit' && !editIsBuiltin}
-            <button class="btn btn-delete" on:click={handleDelete}>Delete</button>
-          {/if}
-        </div>
-        <div class="footer-right">
-          <ActionButton kind="discard" label="Cancel" onClick={closeModal} />
-          <ActionButton kind="confirm" label={modalMode === 'add' ? 'Add System' : 'Save'} onClick={handleSave} />
         </div>
       </div>
     </div>
+
+    <div class="field">
+      <span class="label">Keywords</span>
+      <input
+        id="sys-keywords"
+        type="text"
+        class="input"
+        bind:value={modalKeywords}
+        placeholder="e.g. cairn, cairn rpg"
+      />
+      <p class="hint">
+        Comma-separated. Detection checks the file's <strong>folder path</strong> first,
+        then scans the <strong>first 2000 characters</strong> of the PDF. Path tokens
+        like &ldquo;<em>{modalTag.trim() || 'Cairn'}</em>&rdquo; or its abbreviation
+        match best — a folder named that way wins over content.
+      </p>
+      <p class="hint">
+        Matching ignores case, spaces, punctuation, and accents — so
+        <em>d&amp;d 5e</em>, <em>dnd-5e</em>, and <em>DnD 5E</em> all match the same
+        keyword. Avoid very short keywords (e.g. two-letter abbreviations) since
+        they false-positive on unrelated paths.
+      </p>
+    </div>
+
+    {#if modalError}
+      <div class="error-msg">{modalError}</div>
+    {/if}
+
+    <div class="footer">
+      <div class="footer-left">
+        {#if modalMode === 'edit' && editIsBuiltin && editIsCustomized}
+          <button class="btn btn-reset" on:click={handleReset}>Reset to defaults</button>
+        {/if}
+        {#if modalMode === 'edit' && !editIsBuiltin}
+          <button class="btn btn-delete" on:click={handleDelete}>Delete</button>
+        {/if}
+      </div>
+      <div class="footer-right">
+        <ActionButton kind="discard" label="Discard" onClick={closeModal} />
+        <ActionButton kind="confirm" label={modalMode === 'add' ? 'Add' : 'Save'} onClick={handleSave} disabled={!canSave} />
+      </div>
+    </div>
   </div>
-{/if}
+</Modal>
 
 <style>
   .game-systems-settings {
@@ -208,6 +348,8 @@
   .col-tag {
     min-width: 80px;
     flex-shrink: 0;
+    /* Push the tag-column header past the icon column on each row. */
+    padding-left: 1rem;
   }
 
   .col-keywords {
@@ -253,6 +395,21 @@
     background: var(--bg-focused);
   }
 
+  .system-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .system-icon.unset {
+    color: var(--text-tertiary);
+  }
+  .system-icon svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    display: block;
+  }
+
   .system-tag {
     font-size: 0.8rem;
     color: var(--text-primary);
@@ -292,100 +449,162 @@
     border: 1px solid var(--border-accent);
   }
 
-  /* Modal */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+  /* Modal body */
+  .body {
+    padding: 0.85rem 1rem 1rem;
+    font-family: var(--font-body);
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+  }
+  .label {
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.3rem;
+  }
+  .input {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    background: var(--bg-focused);
+    color: var(--text-primary);
+  }
+  .input:focus {
+    outline: 1px solid var(--text-accent);
+    outline-offset: -1px;
+    border-color: var(--border-subtle);
+  }
+
+  .name-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+  .name-row .input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .color-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .color-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 110;
-  }
-
-  .modal {
-    background: var(--bg-container);
+    width: 32px;
+    height: 100%;
+    padding: 0;
+    background: var(--bg-focused);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    width: min(400px, 85vw);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .modal-title {
-    font-size: 1rem;
-    color: var(--text-accent);
-  }
-
-  .close-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 1.4rem;
-    line-height: 1;
-    padding: 0.1rem 0.4rem;
     border-radius: 4px;
     cursor: pointer;
-    transition: color var(--transition-fast);
+    transition: border-color var(--transition-fast);
   }
-  .close-btn:hover {
+  .color-trigger:hover,
+  .color-trigger.open {
+    border-color: var(--text-accent);
+  }
+  .color-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .color-swatch.none {
+    background: transparent;
+    border: 1px dashed var(--text-tertiary);
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+  .color-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
+    border-radius: 4px;
+    box-shadow: var(--shadow-dropdown);
+    padding: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 0.4rem;
+    z-index: 50;
+  }
+  .swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    border: 1px solid transparent;
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+  }
+  .swatch:hover {
+    transform: scale(1.08);
+  }
+  .swatch.selected {
+    border-color: var(--text-primary);
+  }
+  .swatch.none {
+    background: transparent;
+    border: 1px dashed var(--text-secondary);
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .swatch.none.selected {
+    border-color: var(--text-primary);
+    border-style: solid;
     color: var(--text-primary);
   }
 
-  .modal-body {
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .field-label {
+  .hint {
+    margin: 0.4rem 0 0;
     font-family: var(--font-body);
     font-size: 0.75rem;
     color: var(--text-secondary);
-    margin-bottom: -0.25rem;
+    line-height: 1.4;
   }
-
-  .field-input {
-    font-family: var(--font-body);
-    font-size: 0.85rem;
-    padding: 0.4rem 0.6rem;
-    background: var(--bg-app);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+  .hint strong {
     color: var(--text-primary);
-    outline: none;
-    width: 100%;
-    box-sizing: border-box;
+    font-weight: 600;
   }
-  .field-input:focus {
-    border-color: var(--text-accent);
+  .hint em {
+    font-style: normal;
+    color: var(--text-accent);
   }
 
   .error-msg {
     font-size: 0.75rem;
     color: var(--text-danger);
+    margin-bottom: 0.5rem;
   }
 
-  .modal-footer {
+  .footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border-subtle);
+    margin-top: 0.5rem;
     gap: 0.5rem;
   }
-
-  .footer-left, .footer-right {
+  .footer-left,
+  .footer-right {
     display: flex;
     gap: 0.4rem;
   }
@@ -397,11 +616,10 @@
     border-radius: 4px;
     cursor: pointer;
     border: 1px solid var(--border-subtle);
+    background: none;
     transition: all var(--transition-fast);
   }
-
   .btn-delete {
-    background: none;
     color: var(--text-danger);
     border-color: var(--text-danger);
   }
@@ -409,9 +627,7 @@
     background: var(--text-danger);
     color: var(--text-inverse);
   }
-
   .btn-reset {
-    background: none;
     color: var(--text-secondary);
   }
   .btn-reset:hover {

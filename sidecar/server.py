@@ -66,6 +66,24 @@ def parse_args():
 
 from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
 
+import unicodedata
+
+
+def _normalize_for_match(s: str) -> str:
+    """Lowercase, decompose accents, fold ``&`` to ``n``, drop non-alphanum.
+
+    The goal is that a keyword like ``"d&d 5e"`` matches paths or content
+    written as ``"D&D 5E"``, ``"DnD 5e"``, ``"d&d-5e"``, ``"dnd_5e"``, or
+    ``"Mörk Borg"`` all the same. Both the haystack and the needle go
+    through this helper before substring matching.
+    """
+    # NFKD splits ``ö`` into ``o`` + combining diaeresis; the combining
+    # codepoint is then dropped along with all other non-alphanum below.
+    s = unicodedata.normalize("NFKD", s).lower()
+    # ``d&d`` and ``dnd`` collide cleanly when ``&`` becomes ``n``.
+    s = s.replace("&", "n")
+    return "".join(ch for ch in s if ch.isalnum())
+
 
 def detect_game_systems(
     pdf_path: Path,
@@ -78,6 +96,11 @@ def detect_game_systems(
     1. Folder name match (user's deliberate organization)
     2. Content keyword match (first 2000 chars of extracted text)
     3. Empty list when nothing matches.
+
+    Both haystack (path/text) and keywords are normalized via
+    ``_normalize_for_match`` before substring matching, so case,
+    whitespace, punctuation (``&``, ``-``, ``_``, ``.``), and accents
+    are ignored.
 
     Returns matches in ``KNOWN_SYSTEMS`` insertion order, deduped. Path
     matches take precedence over content matches: a path hit blocks the
@@ -93,19 +116,19 @@ def detect_game_systems(
     hits: list[str] = []
     seen: set[str] = set()
 
-    path_lower = str(pdf_path).lower()
+    path_norm = _normalize_for_match(str(pdf_path))
     for system, keywords in systems.items():
-        if any(keyword in path_lower for keyword in keywords):
+        if any(_normalize_for_match(k) in path_norm for k in keywords if k):
             if system not in seen:
                 hits.append(system)
                 seen.add(system)
 
     if text:
-        text_sample = text[:2000].lower()
+        text_norm = _normalize_for_match(text[:2000])
         for system, keywords in systems.items():
             if system in seen:
                 continue
-            if any(keyword in text_sample for keyword in keywords):
+            if any(_normalize_for_match(k) in text_norm for k in keywords if k):
                 hits.append(system)
                 seen.add(system)
 
@@ -316,6 +339,7 @@ class SetGameSystemsRequest(BaseModel):
 class CustomGameSystemRequest(BaseModel):
     tag: str
     keywords: list[str] = []
+    color: str | None = None
 
 class ToggleBuiltinRequest(BaseModel):
     tag: str
@@ -469,6 +493,7 @@ CUSTOM_SYSTEMS_FILENAME = "custom_game_systems.json"
 class CustomGameSystemEntry(BaseModel):
     tag: str
     keywords: list[str] = []
+    color: str | None = None
 
 
 class CustomGameSystemsStore(BaseModel):
@@ -500,10 +525,13 @@ def get_merged_systems(
     """Merge built-in GAME_SYSTEMS with custom overrides/additions.
 
     Returns (merged_list, known_systems_dict) where:
-    - merged_list: full entries with tag, keywords, is_builtin, is_customized
+    - merged_list: full entries with tag, keywords, color, is_builtin,
+      is_customized. ``color`` is ``None`` when the user opted out;
+      built-in overrides without a custom color inherit the built-in's
+      default. The frontend renders a neutral fallback for ``None``.
     - known_systems_dict: tag → keywords mapping for detect_game_system
     """
-    builtin_tags = {entry["tag"] for entry in GAME_SYSTEMS}
+    builtin_by_tag = {entry["tag"]: entry for entry in GAME_SYSTEMS}
     custom_tags = {entry.tag for entry in custom_store.systems}
     disabled = set(custom_store.disabled_builtins)
 
@@ -517,10 +545,20 @@ def get_merged_systems(
         merged.append({**entry, "is_builtin": True, "is_customized": False})
 
     for entry in custom_store.systems:
-        is_override = entry.tag in builtin_tags
+        is_override = entry.tag in builtin_by_tag
+        # Override inherits the built-in color when the user didn't pick one;
+        # pure-custom entries with no color stay None so the UI can render
+        # an explicit "no color" state.
+        if entry.color is not None:
+            color = entry.color
+        elif is_override:
+            color = builtin_by_tag[entry.tag].get("color")
+        else:
+            color = None
         merged.append({
             "tag": entry.tag,
             "keywords": entry.keywords,
+            "color": color,
             "is_builtin": is_override,
             "is_customized": is_override,
         })
@@ -2125,6 +2163,7 @@ def create_app(
                 {
                     "tag": e["tag"],
                     "keywords": e.get("keywords", []),
+                    "color": e.get("color"),
                     "is_builtin": e.get("is_builtin", True),
                     "is_customized": e.get("is_customized", False),
                 }
@@ -2245,6 +2284,7 @@ def create_app(
         store.systems.append(CustomGameSystemEntry(
             tag=request.tag,
             keywords=request.keywords,
+            color=request.color,
         ))
         if data_dir:
             save_custom_systems(data_dir, store)
@@ -2253,6 +2293,7 @@ def create_app(
         return {
             "tag": request.tag,
             "keywords": request.keywords,
+            "color": request.color,
         }
 
     @app.put("/api/custom-game-systems/{tag}")
@@ -2266,6 +2307,7 @@ def create_app(
             if entry.tag == tag:
                 entry.tag = request.tag
                 entry.keywords = request.keywords
+                entry.color = request.color
                 found = True
                 break
 
@@ -2276,6 +2318,7 @@ def create_app(
                 store.systems.append(CustomGameSystemEntry(
                     tag=request.tag,
                     keywords=request.keywords,
+                    color=request.color,
                 ))
             else:
                 raise HTTPException(
@@ -2289,6 +2332,7 @@ def create_app(
         return {
             "tag": request.tag,
             "keywords": request.keywords,
+            "color": request.color,
         }
 
     @app.delete("/api/custom-game-systems/{tag}")
