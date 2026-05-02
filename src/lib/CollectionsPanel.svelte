@@ -9,8 +9,12 @@
   export let hiddenCountByCollection: Record<string, number> = {};
   export let activeName: string | null = null;
   export let editingName: string | null = null;
-  // Live count of paths currently selected in the in-progress edit. Shown
-  // in place of the persisted file_count on the row being edited.
+  // Proposed name of an in-progress draft (new collection that hasn't been
+  // saved yet). When set, the panel renders a synthetic top row carrying
+  // the inline Save/Cancel controls just like an editing row.
+  export let draftName: string | null = null;
+  // Live count of paths currently selected in the in-progress edit/draft.
+  // Shown in place of the persisted file_count on the row being edited.
   export let editFileCount: number = 0;
   export let onSetActive: (name: string) => void = () => {};
   export let onClearActive: () => void = () => {};
@@ -173,16 +177,32 @@
     </div>
   {/if}
 
-  {#if hasNone}
+  {#if hasNone && !draftName}
     <div class="empty">
       <span class="empty-label">No collections yet</span>
     </div>
-  {:else if rows.length === 0}
+  {:else if rows.length === 0 && !draftName}
     <div class="empty">
       <span class="empty-label">All archived</span>
     </div>
   {:else}
     <ul class="rows">
+      {#if draftName}
+        <li class="row editing draft" title="New collection (unsaved)">
+          <span class="row-icon none" aria-hidden="true">
+            <!-- "books" — three rounded spines, collection of books -->
+            <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+              <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
+            </svg>
+          </span>
+          <span class="row-name">{draftName}</span>
+          <span class="row-count editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
+          <div class="row-actions">
+            <ActionButton kind="discard" compact title="Discard draft" onClick={onCancelFiles} />
+            <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
+          </div>
+        </li>
+      {/if}
       {#each rows as col (col.name)}
         {@const isEditing = editingName === col.name}
         {@const displayCount = isEditing ? editFileCount : col.file_count}
@@ -437,6 +457,13 @@
   .row.editing {
     background: rgba(182, 159, 129, 0.25);
     border-left-color: var(--text-active, var(--text-accent));
+  }
+  /* Draft row — same armed treatment, italic name to telegraph "unsaved". */
+  .row.draft {
+    cursor: default;
+  }
+  .row.draft .row-name {
+    font-style: italic;
   }
   .row.archived { opacity: 0.55; }
   .row-icon {

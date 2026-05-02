@@ -69,6 +69,10 @@
   // Collections state
   let collections: Record<string, CollectionInfo> = {};
   let editingCollectionName: string | null = null;
+  // Proposed name of an in-progress new collection that hasn't been saved
+  // yet. Mutually exclusive with editingCollectionName: either we're
+  // editing an existing row or shaping a draft, never both.
+  let draftName: string | null = null;
   let collectionEditPaths = new Set<string>();
   let collectionEditName = '';
   let collectionEditDescription = '';
@@ -937,7 +941,7 @@
     : '';
 
   // Collection mode derived state
-  $: isCollectionEditMode = editingCollectionName !== null;
+  $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
   $: highlightPaths = highlightedCollection && collections[highlightedCollection]
     ? new Set(collections[highlightedCollection].file_paths)
     : new Set<string>();
@@ -1340,6 +1344,7 @@
     collectionEditDescription = col.description;
     collectionEditPaths = new Set(col.file_paths);
     editingCollectionName = name;
+    draftName = null;
     highlightedCollection = null;
     setViewMode('systems');
     // The Save/Cancel controls now live inline on the panel row, so the
@@ -1347,23 +1352,47 @@
     collectionsPanelOpen = true;
   }
 
+  // Open a draft for a new (unsaved) collection. The draft renders as a
+  // synthetic top row in the panel; nothing hits the database until Save.
+  function startDraftCollection(name: string, paths: Iterable<string> = []) {
+    collectionEditName = name;
+    collectionEditDescription = '';
+    collectionEditPaths = new Set(paths);
+    draftName = name;
+    editingCollectionName = null;
+    highlightedCollection = null;
+    setViewMode('systems');
+    collectionsPanelOpen = true;
+  }
+
   function cancelCollectionEdit() {
     editingCollectionName = null;
+    draftName = null;
     collectionEditPaths = new Set();
     collectionEditName = '';
     collectionEditDescription = '';
   }
 
   async function saveCollection() {
-    if (!editingCollectionName) return;
     const filePaths = Array.from(collectionEditPaths);
     try {
-      await invoke<CollectionMutationResult>('update_collection', {
-        name: editingCollectionName,
-        filePaths,
-        description: collectionEditDescription,
-      });
-      jobNotification.show({ type: 'success', message: `Updated "${editingCollectionName}"`, duration: 4000 });
+      if (draftName) {
+        await invoke<CollectionMutationResult>('create_collection', {
+          name: draftName,
+          filePaths,
+          description: collectionEditDescription,
+        });
+        jobNotification.show({ type: 'success', message: `Created "${draftName}"`, duration: 4000 });
+      } else if (editingCollectionName) {
+        await invoke<CollectionMutationResult>('update_collection', {
+          name: editingCollectionName,
+          filePaths,
+          description: collectionEditDescription,
+        });
+        jobNotification.show({ type: 'success', message: `Updated "${editingCollectionName}"`, duration: 4000 });
+      } else {
+        return;
+      }
       cancelCollectionEdit();
       await loadCollections();
     } catch (e) {
@@ -1489,12 +1518,10 @@
     return `${base} ${suffix}`;
   }
 
-  // Create a collection seeded with the indexed PDFs under `item` and drop
-  // straight into edit mode for it. Saves immediately so there's always a
-  // panel row carrying the inline Save/Cancel controls; if the user
-  // cancels the edit, the seeded collection persists (matching the panel
-  // "+" flow).
-  async function createCollectionFromItem(item: FileItem) {
+  // Open a draft seeded with the indexed PDFs under `item`. The draft
+  // appears as a synthetic top row in the panel and doesn't hit the
+  // database until Save.
+  function createCollectionFromItem(item: FileItem) {
     const candidates = item.is_dir
       ? indexedPdfsUnderPath(item.path)
       : [item.path];
@@ -1507,22 +1534,7 @@
       return;
     }
     const baseName = item.is_dir ? item.name : item.name.replace(/\.pdf$/i, '');
-    const name = uniqueCollectionName(baseName);
-    try {
-      await invoke<CollectionMutationResult>('create_collection', {
-        name,
-        filePaths: candidates,
-        description: '',
-      });
-      await loadCollections();
-      startEditCollection(name);
-    } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Could not create: ${String(e)}`,
-        duration: 5000,
-      });
-    }
+    startDraftCollection(uniqueCollectionName(baseName), candidates);
   }
 
   // ---------------------------------------------------------------------------
@@ -1540,28 +1552,18 @@
     }
   }
 
-  async function inlineCreateCollection(name: string) {
-    try {
-      await invoke<CollectionMutationResult>('create_collection', {
-        name,
-        filePaths: [],
-        description: '',
-      });
-      jobNotification.show({
-        type: 'success',
-        message: `Created "${name}"`,
-        duration: 3000,
-      });
-      await loadCollections();
-      // Drop straight into edit-files mode for the new collection.
-      startEditCollection(name);
-    } catch (e) {
+  // Panel "+" handler — accepts the typed name and opens a draft. The
+  // collection isn't persisted until the user hits Save on the draft row.
+  function inlineCreateCollection(name: string) {
+    if (collections[name]) {
       jobNotification.show({
         type: 'error',
-        message: `Could not create: ${String(e)}`,
-        duration: 5000,
+        message: `A collection named "${name}" already exists`,
+        duration: 4000,
       });
+      return;
     }
+    startDraftCollection(name);
   }
 
   function startEditMetadata(name: string) {
@@ -1877,6 +1879,7 @@
           {hiddenCountByCollection}
           activeName={activeContextName}
           editingName={editingCollectionName}
+          {draftName}
           editFileCount={collectionEditPaths.size}
           onSetActive={setActiveContext}
           onClearActive={clearActiveContext}
