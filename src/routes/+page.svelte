@@ -1355,6 +1355,9 @@
     isCreatingCollection = false;
     highlightedCollection = null;
     setViewMode('systems');
+    // The Save/Cancel controls now live inline on the panel row, so the
+    // panel must be visible while editing.
+    collectionsPanelOpen = true;
   }
 
   function cancelCollectionEdit() {
@@ -1904,6 +1907,7 @@
           {hiddenCountByCollection}
           activeName={activeContextName}
           editingName={editingCollectionName}
+          editFileCount={collectionEditPaths.size}
           onSetActive={setActiveContext}
           onClearActive={clearActiveContext}
           onEdit={startEditMetadata}
@@ -1911,14 +1915,20 @@
           onDelete={requestDeleteCollection}
           onToggleArchived={toggleArchived}
           onCreate={inlineCreateCollection}
+          onSaveFiles={saveCollection}
+          onCancelFiles={cancelCollectionEdit}
         />
       {/if}
 
       <div class="file-tree-area">
-        {#if isCollectionEditMode}
+        {#if isCollectionEditMode && !editingCollectionName}
+          <!-- Fallback strip for in-progress create flows that don't yet have
+               a row in the panel (right-click "Create collection from
+               folder"). Established edits are controlled inline on the
+               panel row. -->
           <div class="edit-files-strip">
-            <span class="ef-label">Editing files:</span>
-            <span class="ef-name">{editingCollectionName ?? collectionEditName ?? 'New collection'}</span>
+            <span class="ef-label">Creating collection:</span>
+            <span class="ef-name">{collectionEditName || 'New collection'}</span>
             <span class="ef-count">{collectionEditPaths.size} file{collectionEditPaths.size === 1 ? '' : 's'}</span>
             <div class="ef-spacer"></div>
             <ActionButton kind="discard" label="Cancel" onClick={cancelCollectionEdit} />

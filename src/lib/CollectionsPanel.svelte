@@ -9,6 +9,9 @@
   export let hiddenCountByCollection: Record<string, number> = {};
   export let activeName: string | null = null;
   export let editingName: string | null = null;
+  // Live count of paths currently selected in the in-progress edit. Shown
+  // in place of the persisted file_count on the row being edited.
+  export let editFileCount: number = 0;
   export let onSetActive: (name: string) => void = () => {};
   export let onClearActive: () => void = () => {};
   export let onEdit: (name: string) => void = () => {};
@@ -16,6 +19,8 @@
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: (name: string) => void = () => {};
+  export let onSaveFiles: () => void = () => {};
+  export let onCancelFiles: () => void = () => {};
 
   type SortKey = 'last_used' | 'name' | 'size';
   const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -179,11 +184,13 @@
   {:else}
     <ul class="rows">
       {#each rows as col (col.name)}
+        {@const isEditing = editingName === col.name}
+        {@const displayCount = isEditing ? editFileCount : col.file_count}
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <li
           class="row"
           class:active={activeName === col.name}
-          class:editing={editingName === col.name}
+          class:editing={isEditing}
           class:archived={col.archived}
           title={col.description || col.name}
           on:click={() => handleRowClick(col.name)}
@@ -205,57 +212,63 @@
           {/if}
           <span
             class="row-count"
-            title={hiddenCountByCollection[col.name]
+            class:editing-count={isEditing}
+            title={hiddenCountByCollection[col.name] && !isEditing
               ? `${col.file_count} file${col.file_count === 1 ? '' : 's'} (${hiddenCountByCollection[col.name]} hidden in the tree)`
-              : `${col.file_count} file${col.file_count === 1 ? '' : 's'}`}
+              : `${displayCount} file${displayCount === 1 ? '' : 's'}`}
           >
-            {col.file_count}{#if hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
+            {displayCount}{#if !isEditing && hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
           </span>
           <div class="row-actions">
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onEditFiles(col.name)}
-              title="Edit files"
-              aria-label="Edit files"
-            >
-              <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onEdit(col.name)}
-              title="Edit info"
-              aria-label="Edit info"
-            >
-              <!-- Font Awesome "pen-to-square" -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onToggleArchived(col.name, !col.archived)}
-              title={col.archived ? 'Unarchive' : 'Archive'}
-              aria-label={col.archived ? 'Unarchive' : 'Archive'}
-            >
-              <!-- Font Awesome "box-archive" (static/icons/box-archive-solid-full.svg) -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn danger"
-              on:click|stopPropagation={() => onDelete(col.name)}
-              title="Delete"
-              aria-label="Delete"
-            >
-              <!-- Font Awesome "trash" (static/icons/trash-solid-full.svg) -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
-              </svg>
-            </button>
+            {#if isEditing}
+              <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
+              <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
+            {:else}
+              <button
+                class="row-btn"
+                on:click|stopPropagation={() => onEditFiles(col.name)}
+                title="Edit files"
+                aria-label="Edit files"
+              >
+                <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
+                </svg>
+              </button>
+              <button
+                class="row-btn"
+                on:click|stopPropagation={() => onEdit(col.name)}
+                title="Edit info"
+                aria-label="Edit info"
+              >
+                <!-- Font Awesome "pen-to-square" -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
+                </svg>
+              </button>
+              <button
+                class="row-btn"
+                on:click|stopPropagation={() => onToggleArchived(col.name, !col.archived)}
+                title={col.archived ? 'Unarchive' : 'Archive'}
+                aria-label={col.archived ? 'Unarchive' : 'Archive'}
+              >
+                <!-- Font Awesome "box-archive" (static/icons/box-archive-solid-full.svg) -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
+                </svg>
+              </button>
+              <button
+                class="row-btn danger"
+                on:click|stopPropagation={() => onDelete(col.name)}
+                title="Delete"
+                aria-label="Delete"
+              >
+                <!-- Font Awesome "trash" (static/icons/trash-solid-full.svg) -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
+                </svg>
+              </button>
+            {/if}
           </div>
         </li>
       {/each}
@@ -412,13 +425,19 @@
     gap: 0.55rem;
     padding: 0.3rem 0.75rem;
     border-bottom: 1px solid var(--bg-container);
+    border-left: 2px solid transparent;
     cursor: pointer;
     transition: background var(--transition-fast);
     min-height: 28px;
   }
   .row:hover { background: var(--bg-focused); }
   .row.active { background: rgba(182, 159, 129, 0.15); }
-  .row.editing { background: rgba(182, 159, 129, 0.25); }
+  /* Armed-for-edit state: warmer background + accent stripe on the leading
+     edge — DAW-style "this track is record-armed" affordance. */
+  .row.editing {
+    background: rgba(182, 159, 129, 0.25);
+    border-left-color: var(--text-active, var(--text-accent));
+  }
   .row.archived { opacity: 0.55; }
   .row-icon {
     display: inline-flex;
@@ -454,6 +473,11 @@
     color: var(--text-secondary);
     margin-right: 0.25rem;
     flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .row-count.editing-count {
+    color: var(--text-active, var(--text-accent));
+    font-weight: 600;
   }
   .row-hidden-count {
     color: var(--text-tertiary);
