@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { notification } from './notificationStore';
+  import { jobNotification, pendingNotification } from './notificationStore';
 
   export let selectedFolder: string;
   export let sidecarConnected: boolean;
@@ -21,11 +21,12 @@
   export let onOpenSettings: () => void;
   export let showGuideButton: boolean = true;
 
-  $: note = $notification;
+  $: jobNote = $jobNotification;
+  $: pendingNote = $pendingNotification;
 
-  function handleNoteDismiss() {
-    note?.onDismiss?.();
-    notification.dismiss();
+  function handlePendingDismiss() {
+    pendingNote?.onDismiss?.();
+    pendingNotification.dismiss();
   }
 
   $: syncTooltip = lastSyncTime
@@ -95,20 +96,32 @@
         </button>
       {/if}
     {/if}
-    {#if note}
+    {#if jobNote}
       {#if selectedFolder}<span class="separator">&middot;</span>{/if}
-      <div class="status-note" class:status-error={note.type === 'error'}>
-        {#if note.type === 'progress'}
+      <div class="status-note" class:status-error={jobNote.type === 'error'}>
+        {#if jobNote.type === 'progress'}
           <span class="status-note-msg">
-            {note.filesCompleted ?? 0}/{note.filesTotal ?? 0} files &middot; {(note.chunksProcessed ?? 0).toLocaleString()} chunks
+            {jobNote.filesCompleted ?? 0}/{jobNote.filesTotal ?? 0} files &middot; {(jobNote.chunksProcessed ?? 0).toLocaleString()} chunks
           </span>
         {:else}
-          <span class="status-note-msg">{note.message}</span>
-          {#if note.actionLabel && note.onAction}
-            <button class="note-action" on:click={note.onAction}>{note.actionLabel}</button>
-          {/if}
+          <span class="status-note-msg">{jobNote.message}</span>
         {/if}
-        <button class="note-dismiss" on:click={handleNoteDismiss} aria-label="Dismiss">&times;</button>
+      </div>
+    {/if}
+    {#if pendingNote}
+      {#if selectedFolder || jobNote}<span class="separator">&middot;</span>{/if}
+      <div class="status-note">
+        <span class="status-note-msg">{pendingNote.message}</span>
+        {#if pendingNote.actionLabel}
+          <button
+            class="note-action"
+            on:click={pendingNote.onAction}
+            disabled={pendingNote.actionDisabled || !pendingNote.onAction}
+          >{pendingNote.actionLabel}</button>
+        {/if}
+        {#if pendingNote.onDismiss}
+          <button class="note-dismiss" on:click={handlePendingDismiss} aria-label="Dismiss">&times;</button>
+        {/if}
       </div>
     {/if}
   </div>
@@ -207,7 +220,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 60ch;
+    max-width: 40ch;
   }
   .note-action {
     background: none;
@@ -230,12 +243,16 @@
     color: var(--text-secondary);
     margin-left: 0.15rem;
   }
-  .note-action:hover {
+  .note-action:hover:not(:disabled) {
     filter: brightness(1.25);
   }
-  .note-action:hover::before,
-  .note-action:hover::after {
+  .note-action:hover:not(:disabled)::before,
+  .note-action:hover:not(:disabled)::after {
     color: var(--text-accent);
+  }
+  .note-action:disabled {
+    cursor: default;
+    color: var(--text-tertiary);
   }
   .note-dismiss {
     background: none;

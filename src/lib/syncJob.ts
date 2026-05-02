@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { notification } from './notificationStore';
+import { jobNotification } from './notificationStore';
 
 export interface SyncProgressPayload {
   files_done: number;
@@ -24,9 +24,9 @@ export async function runSyncJob<TResult>(
   opts: RunSyncJobOptions<TResult>,
   refreshAfter: () => Promise<void>,
 ): Promise<TResult | null> {
-  notification.dismiss();
+  jobNotification.dismiss();
 
-  notification.show({
+  jobNotification.show({
     type: 'progress',
     message: opts.startMessage,
     filesCompleted: 0,
@@ -39,7 +39,7 @@ export async function runSyncJob<TResult>(
   if (opts.streamsProgress) {
     unlisten = await listen<SyncProgressPayload>('sync-progress', (event) => {
       const p = event.payload;
-      notification.show({
+      jobNotification.show({
         type: 'progress',
         message: `${p.files_done}/${p.total_files} files`,
         filesCompleted: p.files_done,
@@ -55,18 +55,27 @@ export async function runSyncJob<TResult>(
     if (opts.onComplete) await opts.onComplete(result);
     await refreshAfter();
     const { message, isError } = opts.buildResultMessage(result);
-    notification.show({
+    jobNotification.show({
       type: isError ? 'error' : 'success',
       message,
       duration: 5000,
     });
     return result;
   } catch (e) {
-    notification.show({
-      type: 'error',
-      message: `${opts.errorPrefix}: ${String(e)}`,
-      duration: 6000,
-    });
+    const msg = String(e);
+    if (msg.includes('sync-busy:')) {
+      jobNotification.show({
+        type: 'info',
+        message: 'Another sync is already running.',
+        duration: 4000,
+      });
+    } else {
+      jobNotification.show({
+        type: 'error',
+        message: `${opts.errorPrefix}: ${msg}`,
+        duration: 6000,
+      });
+    }
     return null;
   } finally {
     if (unlisten) unlisten();

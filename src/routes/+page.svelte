@@ -22,7 +22,7 @@
   import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
   import ActionButton from '../lib/ActionButton.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
-  import { notification } from '../lib/notificationStore';
+  import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
 
@@ -254,7 +254,7 @@
   async function handleOpenResult(filename: string, page?: number | null) {
     const path = resolvePathForFilename(filename);
     if (!path) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Could not locate "${filename}" on disk.`,
         duration: 4000,
@@ -272,7 +272,7 @@
         await openPath(path);
       }
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Failed to open ${filename}: ${e}`,
         duration: 4000,
@@ -400,7 +400,7 @@
     }
     restartAutoSyncInterval();
     if (syncPreferences.backgroundCheckInterval === 0) {
-      notification.dismiss();
+      pendingNotification.dismiss();
     }
   }
 
@@ -577,7 +577,7 @@
 
   async function applySyncAction(action: SyncAction) {
     if (action.kind === 'noop') {
-      notification.dismiss();
+      pendingNotification.dismiss();
       return;
     }
     if (action.kind === 'silent') {
@@ -606,14 +606,15 @@
     if (counts.errors > 0) parts.push(`${counts.errors} error${counts.errors === 1 ? '' : 's'}`);
 
     if (parts.length === 0) {
-      notification.dismiss();
+      pendingNotification.dismiss();
       return;
     }
 
-    notification.show({
+    pendingNotification.show({
       type: 'action',
       message: parts.join(', '),
-      actionLabel: isSyncing ? 'Syncing...' : 'Sync Now',
+      actionLabel: isSyncing ? 'Sync queued' : 'Sync Now',
+      actionDisabled: isSyncing,
       onAction: isSyncing ? undefined : handleSync,
       onDismiss: revertToSyncedPaths,
       duration: null,
@@ -992,9 +993,9 @@
     try {
       await invoke('reindex_file', { path: item.path });
       await refreshIndexStatus();
-      notification.show({ type: 'success', message: `Re-indexed ${item.name}`, duration: 3000 });
+      jobNotification.show({ type: 'success', message: `Re-indexed ${item.name}`, duration: 3000 });
     } catch (e) {
-      notification.show({ type: 'error', message: `Re-index failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: `Re-index failed: ${String(e)}`, duration: 5000 });
     }
   }
 
@@ -1070,7 +1071,7 @@
       if (selectedFolder) await loadFiles(selectedFolder);
       refreshIndexStatus();
     } catch (e) {
-      notification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
     }
   }
 
@@ -1104,7 +1105,7 @@
       if (selectedFolder) await loadFiles(selectedFolder);
       refreshIndexStatus();
     } catch (e) {
-      notification.show({ type: 'error', message: `Rename failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: `Rename failed: ${String(e)}`, duration: 5000 });
       renamingFilePath = null;
     }
   }
@@ -1136,7 +1137,7 @@
       // subset reads as a list, not a directory tree. The user can still
       // flip back to tree via the toggle if they prefer.
       setViewMode('systems');
-      notification.show({
+      jobNotification.show({
         type: 'info',
         message: `Active context: ${name}`,
         duration: 3000,
@@ -1144,7 +1145,7 @@
       await loadCollections();
       if (committedQuery) runSearch(committedQuery);
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Couldn't set active context: ${e}`,
         duration: 5000,
@@ -1156,14 +1157,14 @@
     try {
       await invoke<ActiveContextResult>('clear_active_context');
       activeContextName = null;
-      notification.show({
+      jobNotification.show({
         type: 'info',
         message: 'Active context cleared',
         duration: 3000,
       });
       if (committedQuery) runSearch(committedQuery);
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Couldn't clear active context: ${e}`,
         duration: 5000,
@@ -1239,7 +1240,7 @@
           filePaths,
           description: collectionEditDescription,
         });
-        notification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
+        jobNotification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
       } else if (editingCollectionName) {
         if (editingCollectionName !== name) {
           await invoke('delete_collection', { name: editingCollectionName });
@@ -1248,20 +1249,20 @@
             filePaths,
             description: collectionEditDescription,
           });
-          notification.show({ type: 'success', message: `Renamed to "${name}"`, duration: 4000 });
+          jobNotification.show({ type: 'success', message: `Renamed to "${name}"`, duration: 4000 });
         } else {
           await invoke<CollectionMutationResult>('update_collection', {
             name,
             filePaths,
             description: collectionEditDescription,
           });
-          notification.show({ type: 'success', message: `Updated "${name}"`, duration: 4000 });
+          jobNotification.show({ type: 'success', message: `Updated "${name}"`, duration: 4000 });
         }
       }
       cancelCollectionEdit();
       await loadCollections();
     } catch (e) {
-      notification.show({ type: 'error', message: `Save failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: `Save failed: ${String(e)}`, duration: 5000 });
     }
   }
 
@@ -1279,9 +1280,9 @@
       await invoke('delete_collection', { name });
       cancelCollectionEdit();
       await loadCollections();
-      notification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
+      jobNotification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
     } catch (e) {
-      notification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
     }
   }
 
@@ -1308,7 +1309,7 @@
     if (!col) return;
     const candidates = item.is_dir ? indexedPdfsUnderPath(item.path) : [item.path];
     if (candidates.length === 0) {
-      notification.show({
+      jobNotification.show({
         type: 'info',
         message: `No indexed PDFs under "${item.name}"`,
         duration: 4000,
@@ -1319,7 +1320,7 @@
     const merged = Array.from(new Set([...col.file_paths, ...candidates]));
     const added = merged.length - before;
     if (added === 0) {
-      notification.show({
+      jobNotification.show({
         type: 'info',
         message: `Already in "${name}"`,
         duration: 3000,
@@ -1333,13 +1334,13 @@
         description: col.description,
       });
       await loadCollections();
-      notification.show({
+      jobNotification.show({
         type: 'success',
         message: `Added ${added} file${added === 1 ? '' : 's'} to "${name}"`,
         duration: 4000,
       });
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Could not add to "${name}": ${String(e)}`,
         duration: 5000,
@@ -1361,13 +1362,13 @@
         description: col.description,
       });
       await loadCollections();
-      notification.show({
+      jobNotification.show({
         type: 'success',
         message: `Removed ${removed} file${removed === 1 ? '' : 's'} from "${name}"`,
         duration: 4000,
       });
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Could not remove from "${name}": ${String(e)}`,
         duration: 5000,
@@ -1378,7 +1379,7 @@
   function startCreateCollectionFromFolder(folder: FileItem) {
     const candidates = indexedPdfsUnderPath(folder.path);
     if (candidates.length === 0) {
-      notification.show({
+      jobNotification.show({
         type: 'info',
         message: `No indexed PDFs under "${folder.name}"`,
         duration: 4000,
@@ -1415,7 +1416,7 @@
         filePaths: [],
         description: '',
       });
-      notification.show({
+      jobNotification.show({
         type: 'success',
         message: `Created "${name}"`,
         duration: 3000,
@@ -1424,7 +1425,7 @@
       // Drop straight into edit-files mode for the new collection.
       startEditCollection(name);
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Could not create: ${String(e)}`,
         duration: 5000,
@@ -1470,7 +1471,7 @@
             archived: changes.archived,
           });
         }
-        notification.show({
+        jobNotification.show({
           type: 'success',
           message: `Renamed to "${changes.name}"`,
           duration: 4000,
@@ -1482,7 +1483,7 @@
           color: changes.color,
           archived: changes.archived,
         });
-        notification.show({
+        jobNotification.show({
           type: 'success',
           message: `Updated "${changes.name}"`,
           duration: 4000,
@@ -1494,7 +1495,7 @@
       }
       await loadCollections();
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Save failed: ${String(e)}`,
         duration: 5000,
@@ -1509,13 +1510,13 @@
         await invoke('clear_active_context');
       }
       await loadCollections();
-      notification.show({
+      jobNotification.show({
         type: 'success',
         message: archived ? `Archived "${name}"` : `Unarchived "${name}"`,
         duration: 3000,
       });
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Could not ${archived ? 'archive' : 'unarchive'} "${name}": ${String(e)}`,
         duration: 5000,
@@ -1528,7 +1529,7 @@
       ? indexedPdfsUnderPath(item.path)
       : [item.path];
     if (candidates.length === 0) {
-      notification.show({
+      jobNotification.show({
         type: 'info',
         message: `No indexed PDFs under "${item.name}"`,
         duration: 4000,
@@ -1594,13 +1595,13 @@
     try {
       const config = await invoke<string>('get_mcp_config');
       await writeText(config);
-      notification.show({
+      jobNotification.show({
         type: 'success',
         message: 'MCP config copied to clipboard!',
         duration: 4000,
       });
     } catch (e) {
-      notification.show({
+      jobNotification.show({
         type: 'error',
         message: `Copy failed: ${String(e)}`,
         duration: 5000,
@@ -1615,10 +1616,10 @@
       const msg = result.reclaimed > 0
         ? `Reclaimed ${formatSize(result.reclaimed)}`
         : 'Nothing to reclaim';
-      notification.show({ type: 'success', message: msg, duration: 4000 });
+      jobNotification.show({ type: 'success', message: msg, duration: 4000 });
       await refreshIndexStatus(); // refresh stats to update reclaimable_bytes
     } catch (e) {
-      notification.show({ type: 'error', message: `Compact failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: `Compact failed: ${String(e)}`, duration: 5000 });
     }
   }
 
@@ -1655,6 +1656,7 @@
   async function handleSync() {
     if (isSyncing) return;
     isSyncing = true;
+    pendingNotification.dismiss();
     try {
       const result = await runSyncJob<SyncResult>({
         command: 'sync_index',
@@ -1693,6 +1695,7 @@
       }
     } finally {
       isSyncing = false;
+      refreshIndexStatus();
     }
   }
 
@@ -1705,6 +1708,7 @@
   async function handleReindexAll() {
     if (isSyncing) return;
     isSyncing = true;
+    pendingNotification.dismiss();
     try {
       const result = await runSyncJob<SyncResult>({
         command: 'reindex_all',
@@ -1727,12 +1731,14 @@
       if (result) lastSyncTime = new Date();
     } finally {
       isSyncing = false;
+      refreshIndexStatus();
     }
   }
 
   async function handleDeleteIndex() {
     if (isSyncing) return;
     isSyncing = true;
+    pendingNotification.dismiss();
     try {
       await runSyncJob<{ removed_files: number; removed_chunks: number }>({
         command: 'delete_index',
@@ -1750,6 +1756,7 @@
       }, refreshIndexAndCollections);
     } finally {
       isSyncing = false;
+      refreshIndexStatus();
     }
   }
 
