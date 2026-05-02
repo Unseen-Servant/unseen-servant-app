@@ -123,7 +123,7 @@ GAME_SYSTEMS: list[dict] = [
     },
     # --- Generic / universal (tan) ---
     {
-        "tag": "SaWo",
+        "tag": "SWADE",
         # "swade" is the common abbreviation for the current edition.
         "keywords": ["savage worlds", "swade"],
         "color": "#b69f81",
