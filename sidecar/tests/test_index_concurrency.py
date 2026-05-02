@@ -33,7 +33,7 @@ def slow_app(
 
     def slow_index(pdf_path, collection, **kwargs):
         time.sleep(SLOW_S)
-        return 1, None, "unknown"
+        return 1, None, "unknown", []
 
     monkeypatch.setattr(server, "index_single_pdf", slow_index)
 

@@ -11,7 +11,7 @@ folder paths and PDF content, using a three-tier approach:
 from pathlib import Path
 
 from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
-from server import detect_game_system
+from server import detect_game_system, detect_game_systems
 
 
 def test_game_systems_structure():
@@ -155,3 +155,28 @@ def test_detect_custom_from_content():
     path = Path("/unsorted/adventure.pdf")
     text = "This is a Cairn adventure set in the dark forest."
     assert detect_game_system(path, text, known_systems=custom) == "Cairn"
+
+
+# ---------------------------------------------------------------------------
+# Multi-tag detection (issue #98)
+# ---------------------------------------------------------------------------
+
+def test_detect_multiple_systems_from_path():
+    """A path matching multiple systems returns all of them."""
+    path = Path("/RPGs/D&D 5E + PF2E/dual_stat.pdf")
+    result = detect_game_systems(path)
+    assert "D&D 5E" in result
+    assert "PF2E" in result
+
+
+def test_detect_systems_returns_empty_when_no_match():
+    """Generic path + no text → empty list."""
+    assert detect_game_systems(Path("/documents/random_book.pdf")) == []
+
+
+def test_detect_systems_dedupes_within_tag():
+    """Multiple keywords for the same tag in path produce a single entry."""
+    # 'd&d 5e' and '5e srd' both map to 'D&D 5E'.
+    path = Path("/RPGs/D&D 5E/5e srd reference.pdf")
+    result = detect_game_systems(path)
+    assert result.count("D&D 5E") == 1

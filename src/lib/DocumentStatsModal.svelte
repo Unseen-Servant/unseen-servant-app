@@ -11,6 +11,7 @@
     source: string;
     chunks: number;
     game_system: string;
+    game_systems?: string[];
     pages: number;
     indexed_at: string | null;
     file_size_bytes: number | null;
@@ -85,7 +86,7 @@
         </div>
         <div class="stat-cell">
           <div class="stat-label">SYSTEM</div>
-          <div class="stat-value">{stats.game_system || 'unknown'}</div>
+          <div class="stat-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : (stats.game_system || 'unknown')}</div>
         </div>
       </div>
     {/if}

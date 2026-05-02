@@ -26,10 +26,15 @@
     const byTag = new Map<string, FileStatusEntry[]>();
     for (const e of entries) {
       if (displayPaths && !displayPaths.has(e.path)) continue;
-      const tag = e.game_system && e.game_system !== 'unknown' ? e.game_system : 'Untagged';
-      const list = byTag.get(tag) ?? [];
-      list.push(e);
-      byTag.set(tag, list);
+      const tags = e.game_systems && e.game_systems.length > 0
+        ? e.game_systems
+        : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : ['Untagged']);
+      // A multi-tagged file appears under every group it belongs to.
+      for (const tag of tags) {
+        const list = byTag.get(tag) ?? [];
+        list.push(e);
+        byTag.set(tag, list);
+      }
     }
     for (const list of byTag.values()) {
       list.sort((a, b) => a.filename.localeCompare(b.filename));

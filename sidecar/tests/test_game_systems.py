@@ -156,3 +156,82 @@ def test_sources_unknown_game_system(client, untagged_pdf_path):
     response = client.get("/api/sources")
     data = response.json()
     assert data["sources"][0]["game_system"] == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# POST /api/set-game-systems (multi-tag, issue #98)
+# ---------------------------------------------------------------------------
+
+def test_set_game_systems_multi(
+    client, untagged_pdf_path, test_collection, tmp_path
+):
+    """Setting multiple tags writes the primary to Chroma and full list to manifest."""
+    client.post("/api/index-files", json={"paths": [str(untagged_pdf_path)]})
+
+    response = client.post("/api/set-game-systems", json={
+        "filename": "random_supplement.pdf",
+        "game_systems": ["D&D 5E", "PF2E"],
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["game_system"] == "D&D 5E"
+    assert data["game_systems"] == ["D&D 5E", "PF2E"]
+    assert data["chunks_updated"] > 0
+
+    # Chroma chunks store only the primary scalar.
+    results = test_collection.get(include=["metadatas"])
+    for metadata in results["metadatas"]:
+        assert metadata["game_system"] == "D&D 5E"
+
+    # Manifest carries the full list.
+    manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
+    entry = manifest_raw["files"][str(untagged_pdf_path)]
+    assert entry["game_system"] == "D&D 5E"
+    assert entry["game_systems"] == ["D&D 5E", "PF2E"]
+
+
+def test_set_game_systems_clear(client, untagged_pdf_path, tmp_path):
+    """Empty list clears tags back to 'unknown' / []."""
+    client.post("/api/index-files", json={"paths": [str(untagged_pdf_path)]})
+    client.post("/api/set-game-systems", json={
+        "filename": "random_supplement.pdf",
+        "game_systems": ["D&D 5E"],
+    })
+
+    response = client.post("/api/set-game-systems", json={
+        "filename": "random_supplement.pdf",
+        "game_systems": [],
+    })
+
+    assert response.status_code == 200
+    assert response.json()["game_system"] == "unknown"
+
+    manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
+    entry = manifest_raw["files"][str(untagged_pdf_path)]
+    assert entry["game_system"] == "unknown"
+    assert entry["game_systems"] == []
+
+
+def test_manifest_auto_populates_legacy(tmp_path):
+    """A manifest written before multi-tag support backfills game_systems on load."""
+    from server import IndexManifest, ManifestEntry, load_manifest, save_manifest
+
+    legacy_entry = ManifestEntry.model_construct(
+        filename="legacy.pdf",
+        mtime=0.0,
+        chunk_count=0,
+        indexed_at="2025-01-01T00:00:00Z",
+        game_system="D&D 5E",
+        game_systems=[],
+        content_hash="",
+        file_size=0,
+    )
+    legacy = IndexManifest(version=1, files={"/path/to/legacy.pdf": legacy_entry})
+    save_manifest(tmp_path, legacy)
+
+    # Re-read: model_post_init should have backfilled.
+    reloaded = load_manifest(tmp_path)
+    entry = reloaded.files["/path/to/legacy.pdf"]
+    assert entry.game_system == "D&D 5E"
+    assert entry.game_systems == ["D&D 5E"]

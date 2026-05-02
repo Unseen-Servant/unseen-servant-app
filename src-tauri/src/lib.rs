@@ -33,6 +33,8 @@ struct FileStatusEntry {
     chunk_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     game_system: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    game_systems: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -107,6 +109,8 @@ struct SyncProgressPayload {
 struct SetGameSystemResult {
     filename: String,
     game_system: String,
+    #[serde(default)]
+    game_systems: Vec<String>,
     chunks_updated: u32,
 }
 
@@ -202,6 +206,8 @@ struct DocumentStats {
     source: String,
     chunks: u32,
     game_system: String,
+    #[serde(default)]
+    game_systems: Vec<String>,
     pages: u32,
     indexed_at: Option<String>,
     file_size_bytes: Option<u64>,
@@ -682,6 +688,31 @@ async fn set_game_system(filename: String, game_system: String) -> Result<SetGam
         .json(&serde_json::json!({
             "filename": filename,
             "game_system": game_system,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Sidecar error: {}", response.status()));
+    }
+
+    let result: SetGameSystemResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn set_game_systems(filename: String, game_systems: Vec<String>) -> Result<SetGameSystemResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/set-game-systems", SIDECAR_URL))
+        .json(&serde_json::json!({
+            "filename": filename,
+            "game_systems": game_systems,
         }))
         .send()
         .await
@@ -1402,7 +1433,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app

@@ -10,11 +10,11 @@
   export let level: number = 0;
   export let selectedPaths: Set<string>;
   export let foldersWithSelections: Set<string>;
-  export let gameSystemMap: Map<string, string> = new Map();
+  export let gameSystemMap: Map<string, string[]> = new Map();
   export let knownSystems: KnownGameSystem[] = [];
   export let indexedPaths: Set<string> = new Set();
   export let onToggle: (path: string, isDir: boolean, item: FileItem, shiftKey: boolean) => void;
-  export let onSetGameSystem: (path: string, filename: string, tag: string) => void = () => {};
+  export let onSetGameSystems: (path: string, filename: string, tags: string[]) => void = () => {};
 
   // Focus & context menu props
   export let focusedFilePath: string | null = null;
@@ -97,7 +97,10 @@
   $: isFocused = !item.is_dir && item.path === focusedFilePath;
   $: isRenaming = item.path === renamingFilePath;
 
-  $: hasTag = !item.is_dir && gameSystemMap.has(item.path);
+  $: tags = (!item.is_dir && gameSystemMap.get(item.path)) || [];
+  $: hasTag = tags.length > 0;
+  $: visibleTags = tags.slice(0, 2);
+  $: hiddenTagCount = Math.max(0, tags.length - visibleTags.length);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
 
   async function toggleExpand() {
@@ -131,13 +134,15 @@
     showDropdown = !showDropdown;
   }
 
-  function selectSystem(tag: string) {
-    onSetGameSystem(item.path, item.name, tag);
-    showDropdown = false;
+  function toggleSystem(tag: string) {
+    const next = tags.includes(tag)
+      ? tags.filter((t) => t !== tag)
+      : [...tags, tag];
+    onSetGameSystems(item.path, item.name, next);
   }
 
   function clearSystem() {
-    onSetGameSystem(item.path, item.name, 'unknown');
+    onSetGameSystems(item.path, item.name, []);
     showDropdown = false;
   }
 
@@ -226,25 +231,38 @@
     {#if hasTag}
       <div class="badge-wrapper">
         {#if mode === 'index'}
-          <button class="game-system-badge" on:click={toggleDropdown}>
-            {gameSystemMap.get(item.path)}
+          <button class="badge-cluster" on:click={toggleDropdown} aria-label="Edit game system tags">
+            {#each visibleTags as tag}
+              <span class="game-system-badge">{tag}</span>
+            {/each}
+            {#if hiddenTagCount > 0}
+              <span class="game-system-badge overflow">+{hiddenTagCount}</span>
+            {/if}
           </button>
           {#if showDropdown}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
             <div class="dropdown" on:click|stopPropagation>
               {#each knownSystems as sys}
-                <button class="dropdown-item" on:click={() => selectSystem(sys.tag)}>
+                <button class="dropdown-item" class:selected={tags.includes(sys.tag)} on:click={() => toggleSystem(sys.tag)}>
+                  <span class="dropdown-check">{tags.includes(sys.tag) ? '✓' : ''}</span>
                   <span class="dropdown-tag">{sys.tag}</span>
                 </button>
               {/each}
               <hr class="dropdown-divider" />
               <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
-                Clear tag
+                Clear tags
               </button>
             </div>
           {/if}
         {:else}
-          <span class="game-system-badge readonly">{gameSystemMap.get(item.path)}</span>
+          <span class="badge-cluster readonly">
+            {#each visibleTags as tag}
+              <span class="game-system-badge readonly">{tag}</span>
+            {/each}
+            {#if hiddenTagCount > 0}
+              <span class="game-system-badge readonly overflow">+{hiddenTagCount}</span>
+            {/if}
+          </span>
         {/if}
       </div>
     {:else if isIndexed && mode === 'index'}
@@ -254,7 +272,8 @@
           <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
           <div class="dropdown" on:click|stopPropagation>
             {#each knownSystems as sys}
-              <button class="dropdown-item" on:click={() => selectSystem(sys.tag)}>
+              <button class="dropdown-item" on:click={() => toggleSystem(sys.tag)}>
+                <span class="dropdown-check"></span>
                 <span class="dropdown-tag">{sys.tag}</span>
               </button>
             {/each}
@@ -276,7 +295,7 @@
           {knownSystems}
           {indexedPaths}
           {onToggle}
-          {onSetGameSystem}
+          {onSetGameSystems}
           {expandedPaths}
           {onToggleExpand}
           {focusedFilePath}
@@ -428,10 +447,22 @@
     position: relative;
     flex-shrink: 0;
   }
+  .badge-cluster {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-left: 0.5rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .badge-cluster.readonly {
+    cursor: default;
+  }
   .game-system-badge {
     display: inline-block;
     padding: 0.1rem 0.4rem;
-    margin-left: 0.5rem;
     border-radius: 3px;
     font-size: 0.75rem;
     font-family: var(--font-body);
@@ -439,16 +470,19 @@
     color: var(--text-accent);
     white-space: nowrap;
     border: 1px solid transparent;
-    cursor: pointer;
     transition: border-color var(--transition-fast);
   }
-  .game-system-badge:hover {
+  .badge-cluster:hover .game-system-badge {
     border-color: var(--text-accent);
+  }
+  .game-system-badge.overflow {
+    color: var(--text-secondary);
+    background: rgba(182, 159, 129, 0.08);
   }
   .game-system-badge.readonly {
     cursor: default;
   }
-  .game-system-badge.readonly:hover {
+  .badge-cluster.readonly:hover .game-system-badge {
     border-color: transparent;
   }
   .add-tag-btn {
@@ -500,6 +534,15 @@
   }
   .dropdown-item:hover {
     background: var(--bg-container);
+  }
+  .dropdown-item.selected {
+    background: rgba(182, 159, 129, 0.08);
+  }
+  .dropdown-check {
+    width: 0.9rem;
+    color: var(--text-accent);
+    font-weight: 700;
+    flex-shrink: 0;
   }
   .dropdown-tag {
     font-weight: 600;

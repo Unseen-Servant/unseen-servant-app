@@ -313,3 +313,53 @@ def test_search_game_systems_list_multiple(multi_system_client):
     data = response.json()
     systems = {r["game_system"] for r in data["results"]}
     assert systems.issubset({"D&D 5E", "Dragonbane"})
+
+
+# ---------------------------------------------------------------------------
+# Secondary-tag resolution (issue #98)
+# ---------------------------------------------------------------------------
+
+def test_search_resolves_secondary_tag(client, dnd5e_pdf_path):
+    """Searching by a secondary tag returns the file via filename $in resolution."""
+    # Primary-tag detection from the path puts this file under D&D 5E.
+    client.post("/api/index-files", json={"paths": [str(dnd5e_pdf_path)]})
+
+    # Add PF2E as a secondary tag (D&D 5E remains primary).
+    client.post("/api/set-game-systems", json={
+        "filename": "player_handbook.pdf",
+        "game_systems": ["D&D 5E", "PF2E"],
+    })
+
+    response = client.post("/api/search", json={
+        "query": "character creation rules",
+        "n_results": 5,
+        "game_system": "PF2E",
+    })
+
+    data = response.json()
+    assert len(data["results"]) > 0
+    for result in data["results"]:
+        assert result["filename"] == "player_handbook.pdf"
+
+
+def test_search_primary_tag_unaffected(client, dnd5e_pdf_path, dragonbane_pdf_path):
+    """Primary-tag search returns both primary matches and secondary matches."""
+    client.post("/api/index-files", json={
+        "paths": [str(dnd5e_pdf_path), str(dragonbane_pdf_path)]
+    })
+
+    # Make Dragonbane book a secondary 5E hit too.
+    client.post("/api/set-game-systems", json={
+        "filename": "dragonbane_core.pdf",
+        "game_systems": ["Dragonbane", "D&D 5E"],
+    })
+
+    response = client.post("/api/search", json={
+        "query": "adventure rules",
+        "n_results": 10,
+        "game_system": "D&D 5E",
+    })
+
+    filenames = {r["filename"] for r in response.json()["results"]}
+    assert "player_handbook.pdf" in filenames
+    assert "dragonbane_core.pdf" in filenames

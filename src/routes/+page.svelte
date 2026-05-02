@@ -821,13 +821,17 @@
     return prev;
   }
 
-  // Count files per game system, sorted by count descending
+  // Count files per game system, sorted by count descending. A multi-tagged
+  // file contributes to every tag's count (e.g. a 5E/PF2E book +1 to both).
   $: gameSystemStats = (() => {
     if (!indexStatus) return [];
     const counts = new Map<string, number>();
     for (const e of [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]) {
-      if (e.game_system && e.game_system !== 'unknown') {
-        counts.set(e.game_system, (counts.get(e.game_system) ?? 0) + 1);
+      const tags = e.game_systems && e.game_systems.length > 0
+        ? e.game_systems
+        : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : []);
+      for (const tag of tags) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
       }
     }
     return [...counts.entries()]
@@ -876,8 +880,12 @@
     if (filterActive) {
       visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
       visible = new Set([...visible].filter((p) => {
-        const sys = gameSystemMap.get(p) ?? 'unknown';
-        return !filterExcludedSystems.has(sys);
+        const tags = gameSystemMap.get(p) ?? [];
+        if (tags.length === 0) {
+          return !filterExcludedSystems.has('unknown');
+        }
+        // Keep the file as long as at least one of its tags is not excluded.
+        return tags.some((t) => !filterExcludedSystems.has(t));
       }));
     }
 
@@ -885,12 +893,15 @@
     return new Set<string>([...visible, ...computeAncestorPaths(visible)]);
   })();
 
-  function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string> {
-    const map = new Map<string, string>();
+  function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string[]> {
+    const map = new Map<string, string[]>();
     if (!status) return map;
     for (const entry of [...status.up_to_date, ...status.to_update, ...status.to_remove]) {
-      if (entry.game_system && entry.game_system !== 'unknown') {
-        map.set(entry.path, entry.game_system);
+      const tags = entry.game_systems && entry.game_systems.length > 0
+        ? entry.game_systems
+        : (entry.game_system && entry.game_system !== 'unknown' ? [entry.game_system] : []);
+      if (tags.length > 0) {
+        map.set(entry.path, tags);
       }
     }
     return map;
@@ -916,12 +927,12 @@
     }
   }
 
-  async function handleSetGameSystem(_path: string, filename: string, tag: string) {
+  async function handleSetGameSystems(_path: string, filename: string, tags: string[]) {
     try {
-      await invoke('set_game_system', { filename, gameSystem: tag });
+      await invoke('set_game_systems', { filename, gameSystems: tags });
       await refreshIndexStatus();
     } catch (e) {
-      console.error('Failed to set game system:', e);
+      console.error('Failed to set game systems:', e);
     }
   }
 
@@ -1846,7 +1857,7 @@
               {knownSystems}
               {indexedPaths}
               onToggle={toogleSelection}
-              onSetGameSystem={handleSetGameSystem}
+              onSetGameSystems={handleSetGameSystems}
               {expandedPaths}
               onToggleExpand={handleToggleExpand}
               {focusedFilePath}

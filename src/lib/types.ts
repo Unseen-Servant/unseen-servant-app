@@ -10,6 +10,7 @@ export interface FileStatusEntry {
   filename: string;
   chunk_count?: number;
   game_system?: string;
+  game_systems?: string[];
   indexed_at?: string;
 }
 
@@ -21,6 +22,7 @@ export interface GameSystemsResult {
 export interface SetGameSystemResult {
   filename: string;
   game_system: string;
+  game_systems?: string[];
   chunks_updated: number;
 }
 
