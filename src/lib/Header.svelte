@@ -91,6 +91,38 @@
         </svg>
       </button>
     {/if}
+    {#if viewToggleVisible}
+      <button
+        class="panel-toggle"
+        class:active={viewMode === 'systems'}
+        on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
+        title={viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system'}
+        aria-label="Toggle view mode"
+        aria-pressed={viewMode === 'systems'}
+      >
+        <!-- Layered stack — group by tag -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+          <path d="M12 2 L22 7 L12 12 L2 7 Z" />
+          <path d="M2 12 L12 17 L22 12" />
+          <path d="M2 17 L12 22 L22 17" />
+        </svg>
+      </button>
+    {/if}
+    {#if collapseAllVisible}
+      <button
+        class="panel-toggle"
+        on:click={onCollapseAll}
+        disabled={collapseAllDisabled}
+        title="Collapse all folders"
+        aria-label="Collapse all folders"
+      >
+        <!-- Double chevron up — collapse all -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+          <polyline points="17 11 12 6 7 11" />
+          <polyline points="17 18 12 13 7 18" />
+        </svg>
+      </button>
+    {/if}
     {#if filterVisible}
       <div class="filter-anchor">
         <button
@@ -121,38 +153,6 @@
           onClose={() => { filterOpen = false; }}
         />
       </div>
-    {/if}
-    {#if collapseAllVisible}
-      <button
-        class="panel-toggle"
-        on:click={onCollapseAll}
-        disabled={collapseAllDisabled}
-        title="Collapse all folders"
-        aria-label="Collapse all folders"
-      >
-        <!-- Double chevron up — collapse all -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-          <polyline points="17 11 12 6 7 11" />
-          <polyline points="17 18 12 13 7 18" />
-        </svg>
-      </button>
-    {/if}
-    {#if viewToggleVisible}
-      <button
-        class="panel-toggle"
-        class:active={viewMode === 'systems'}
-        on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
-        title={viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system'}
-        aria-label="Toggle view mode"
-        aria-pressed={viewMode === 'systems'}
-      >
-        <!-- Layered stack — group by tag -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-          <path d="M12 2 L22 7 L12 12 L2 7 Z" />
-          <path d="M2 12 L12 17 L22 12" />
-          <path d="M2 17 L12 22 L22 17" />
-        </svg>
-      </button>
     {/if}
   </div>
   <div class="search-wrapper" class:disabled>
