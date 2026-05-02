@@ -44,7 +44,7 @@
   const tabs = [
     { id: 'library' as const, label: 'Library' },
     { id: 'game-systems' as const, label: 'Game Systems' },
-    { id: 'setup' as const, label: 'Setup' },
+    { id: 'setup' as const, label: 'Help' },
   ];
 </script>
 
