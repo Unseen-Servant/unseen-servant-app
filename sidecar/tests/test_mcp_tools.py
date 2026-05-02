@@ -1,13 +1,10 @@
 """
-Tests for MCP server tools, resources, and prompts.
+Tests for MCP server tools.
 
 These tests mock the HTTP calls to the sidecar, so we're testing
-that each tool/resource correctly transforms sidecar responses into
+that each tool correctly transforms sidecar responses into
 human-readable text — NOT that the sidecar itself works (those
 tests live in test_search.py, test_sources.py, etc.).
-
-Prompt tests don't need mocking — prompts are pure functions that
-build instruction text without calling the sidecar.
 
 Why mock? The MCP server is a separate process from the sidecar.
 In production, it calls the sidecar over HTTP. In tests, we
@@ -28,13 +25,6 @@ from mcp_server import (
     list_collections,
     get_active_context,
     compare_sources,
-    resource_sources,
-    resource_source_content,
-    resource_game_systems,
-    resource_collections,
-    session_prep,
-    rule_lookup,
-    lore_researcher,
     sidecar,
 )
 
@@ -356,150 +346,6 @@ async def test_compare_sources_needs_two_files(mock_sidecar):
 
 
 # ---------------------------------------------------------------------------
-# resource_sources tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_resource_sources_returns_list(mock_sidecar):
-    mock_sidecar.set_get("/api/sources", {
-        "sources": [
-            {"filename": "core_rules.pdf", "source": "/path/core_rules.pdf", "chunks": 12},
-            {"filename": "monsters.pdf", "source": "/path/monsters.pdf", "chunks": 8},
-        ],
-        "count": 2,
-    })
-
-    result = await resource_sources()
-    assert "2 document(s)" in result
-    assert "core_rules.pdf" in result
-    assert "monsters.pdf" in result
-
-
-@pytest.mark.asyncio
-async def test_resource_sources_empty(mock_sidecar):
-    mock_sidecar.set_get("/api/sources", {"sources": [], "count": 0})
-
-    result = await resource_sources()
-    assert "No documents indexed" in result
-
-
-@pytest.mark.asyncio
-async def test_resource_sources_sidecar_down(mock_sidecar):
-    mock_sidecar.set_get("/api/sources", "Cannot connect to Legend Lore app.")
-
-    result = await resource_sources()
-    assert "Cannot connect" in result
-
-
-# ---------------------------------------------------------------------------
-# resource_source_content tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_resource_source_content_returns_text(mock_sidecar):
-    mock_sidecar.set_get("/api/source/dragonbane_monsters.pdf/content", {
-        "filename": "dragonbane_monsters.pdf",
-        "chunks": 3,
-        "content": "Fire Drake\nArmor Class: 14\nHit Points: 45",
-    })
-
-    result = await resource_source_content("dragonbane_monsters.pdf")
-    assert "dragonbane_monsters.pdf" in result
-    assert "3 chunks" in result
-    assert "Fire Drake" in result
-
-
-@pytest.mark.asyncio
-async def test_resource_source_content_not_found(mock_sidecar):
-    mock_sidecar.set_get(
-        "/api/source/nonexistent.pdf/content",
-        "Sidecar error: 404 — Source not found: nonexistent.pdf",
-    )
-
-    result = await resource_source_content("nonexistent.pdf")
-    assert "404" in result
-
-
-# ---------------------------------------------------------------------------
-# resource_game_systems tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_resource_game_systems_returns_list(mock_sidecar):
-    mock_sidecar.set_get("/api/game-systems", {
-        "game_systems": ["D&D 5E", "Dragonbane"],
-        "count": 2,
-    })
-
-    result = await resource_game_systems()
-    assert "D&D 5E" in result
-    assert "Dragonbane" in result
-
-
-# ---------------------------------------------------------------------------
-# session_prep tests
-# ---------------------------------------------------------------------------
-
-def test_session_prep_basic():
-    result = session_prep("players enter the Haunted Mine")
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert "Haunted Mine" in result[0].content.text
-    assert "search_library" in result[0].content.text
-    assert "Key Rules" in result[0].content.text
-
-
-def test_session_prep_with_sources():
-    result = session_prep("dragon encounter", sources="core.pdf,monsters.pdf")
-    text = result[0].content.text
-    assert "core.pdf" in text
-    assert "monsters.pdf" in text
-    assert "source_filter" in text
-
-
-# ---------------------------------------------------------------------------
-# rule_lookup tests
-# ---------------------------------------------------------------------------
-
-def test_rule_lookup_basic():
-    result = rule_lookup("how does grappling work")
-    assert isinstance(result, list)
-    text = result[0].content.text
-    assert "grappling" in text
-    assert "search_library" in text
-    assert "Source" in text
-
-
-def test_rule_lookup_with_game_system():
-    result = rule_lookup("initiative rules", game_system="Dragonbane")
-    text = result[0].content.text
-    assert "Dragonbane" in text
-    assert 'game_system="Dragonbane"' in text
-
-
-# ---------------------------------------------------------------------------
-# lore_researcher tests
-# ---------------------------------------------------------------------------
-
-def test_lore_researcher_basic():
-    result = lore_researcher("elven history")
-    assert isinstance(result, list)
-    text = result[0].content.text
-    assert "elven history" in text
-    assert "search_library" in text
-    assert "Source Breakdown" in text
-
-
-def test_lore_researcher_with_sources():
-    result = lore_researcher(
-        "dragon types", sources="monster_manual.pdf,draconomicon.pdf"
-    )
-    text = result[0].content.text
-    assert "monster_manual.pdf" in text
-    assert "compare_sources" in text
-
-
-# ---------------------------------------------------------------------------
 # list_collections tests
 # ---------------------------------------------------------------------------
 
@@ -588,33 +434,3 @@ async def test_search_library_without_collection(mock_sidecar):
     assert "collection" not in captured
 
 
-# ---------------------------------------------------------------------------
-# resource_collections tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_resource_collections_returns_list(mock_sidecar):
-    mock_sidecar.set_get("/api/collections", {
-        "collections": {
-            "Session 5": {
-                "name": "Session 5",
-                "file_paths": ["/a.pdf"],
-                "file_count": 1,
-                "created_at": "2026-03-02T00:00:00+00:00",
-                "description": "Tonight's prep",
-            },
-        },
-        "count": 1,
-    })
-
-    result = await resource_collections()
-    assert "Session 5" in result
-    assert "1 files" in result
-
-
-@pytest.mark.asyncio
-async def test_resource_collections_empty(mock_sidecar):
-    mock_sidecar.set_get("/api/collections", {"collections": {}, "count": 0})
-
-    result = await resource_collections()
-    assert "No collections" in result
