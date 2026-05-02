@@ -277,7 +277,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-accent);
+    color: var(--text-secondary);
     flex-shrink: 0;
     align-self: center;
   }
