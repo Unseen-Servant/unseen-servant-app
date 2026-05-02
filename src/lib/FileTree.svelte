@@ -30,12 +30,10 @@
   export let expandedPaths: Set<string> = new Set();
   export let onToggleExpand: (path: string) => void = () => {};
 
-  // Collection mode props
-  export let mode: 'index' | 'collection' = 'index';
-  export let collectionPaths: Set<string> = new Set();
-  export let collectionFolders: Set<string> = new Set();
+  // Collection-preview prop — paths get an accent stripe when previewing a
+  // collection's contents from the panel (separate from collection-edit,
+  // which now lives entirely in SystemsView).
   export let highlightPaths: Set<string> = new Set();
-  export let onCollectionToggle: (path: string, isDir: boolean, item: FileItem, shiftKey: boolean) => void = () => {};
 
   // Active-context filter — when set, only paths in this Set render.
   // Includes ancestor folders of every shown file so the tree structure
@@ -78,34 +76,9 @@
   $: isFullySelected = item.is_dir && item.children !== null &&
     areAllDescendantsSelected(item, selectedPaths);
 
-  // Collection mode: check against collectionPaths instead
-  $: isInCollection = item.is_dir
-    ? collectionFolders.has(item.path)
-    : collectionPaths.has(item.path);
-
-  $: isCollectionFullySelected = item.is_dir && item.children !== null &&
-    areAllDescendantsSelected(item, collectionPaths, indexedPaths);
-
-  // Which checked state to show depends on mode
-  $: isChecked = mode === 'collection'
-    ? (item.is_dir ? isCollectionFullySelected : isInCollection)
-    : (item.is_dir ? isFullySelected : isSelected);
-
-  // Indeterminate: has some selections but not all (folders only)
-  $: isIndeterminate = item.is_dir && (
-    mode === 'collection'
-      ? (isInCollection && !isCollectionFullySelected)
-      : (isSelected && !isFullySelected)
-  );
-
-  // In collection mode, only indexed files get checkboxes
-  $: showCheckbox = mode === 'index' || item.is_dir || indexedPaths.has(item.path);
-
-  // Dimmed in collection mode when file is not indexed
-  $: isDimmed = mode === 'collection' && !item.is_dir && !indexedPaths.has(item.path);
-
-  // Highlighted when previewing a collection
-  $: isHighlighted = mode === 'index' && !item.is_dir && highlightPaths.size > 0 && highlightPaths.has(item.path);
+  $: isChecked = item.is_dir ? isFullySelected : isSelected;
+  $: isIndeterminate = item.is_dir && isSelected && !isFullySelected;
+  $: isHighlighted = !item.is_dir && highlightPaths.size > 0 && highlightPaths.has(item.path);
 
   $: isFocused = !item.is_dir && item.path === focusedFilePath;
   $: isRenaming = item.path === renamingFilePath;
@@ -146,12 +119,7 @@
   }
 
   function handleCheckboxChange(event: MouseEvent | KeyboardEvent) {
-    const shiftKey = event.shiftKey;
-    if (mode === 'collection') {
-      onCollectionToggle(item.path, item.is_dir, item, shiftKey);
-    } else {
-      onToggle(item.path, item.is_dir, item, shiftKey);
-    }
+    onToggle(item.path, item.is_dir, item, event.shiftKey);
   }
 
   function toggleDropdown(event: MouseEvent) {
@@ -235,22 +203,17 @@
 <svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
-<div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} style="padding-left: {level * 1.5}rem;">
+<div class="item" class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} style="padding-left: {level * 1.5}rem;">
   <div class="row-container">
-    {#if showCheckbox}
-      <button
-        class="checkbox"
-        class:checked={isChecked}
-        class:indeterminate={isIndeterminate}
-        class:collection={mode === 'collection'}
-        on:click|stopPropagation={handleCheckboxChange}
-        role="checkbox"
-        aria-label="Select {item.name}"
-        aria-checked={isIndeterminate ? 'mixed' : isChecked}
-      ></button>
-    {:else}
-      <span class="checkbox-spacer"></span>
-    {/if}
+    <button
+      class="checkbox"
+      class:checked={isChecked}
+      class:indeterminate={isIndeterminate}
+      on:click|stopPropagation={handleCheckboxChange}
+      role="checkbox"
+      aria-label="Select {item.name}"
+      aria-checked={isIndeterminate ? 'mixed' : isChecked}
+    ></button>
 
     <button class="row" on:click={handleRowClick} on:dblclick={openFile} on:mousedown={handleMouseDown}>
       {#if item.is_dir}
@@ -271,29 +234,17 @@
 
     {#if hasTag}
       <div class="badge-wrapper">
-        {#if mode === 'index'}
-          <button class="badge-cluster" on:click={toggleDropdown} aria-label="Edit game system tags">
-            {#each visibleTags as tag}
-              {@const c = colorFor(tag)}
-              <span class="game-system-badge" style={c ? `--badge-color: ${c}` : ''}>{tag}</span>
-            {/each}
-            {#if hiddenTagCount > 0}
-              <span class="game-system-badge overflow">+{hiddenTagCount}</span>
-            {/if}
-          </button>
-        {:else}
-          <span class="badge-cluster readonly">
-            {#each visibleTags as tag}
-              {@const c = colorFor(tag)}
-              <span class="game-system-badge readonly" style={c ? `--badge-color: ${c}` : ''}>{tag}</span>
-            {/each}
-            {#if hiddenTagCount > 0}
-              <span class="game-system-badge readonly overflow">+{hiddenTagCount}</span>
-            {/if}
-          </span>
-        {/if}
+        <button class="badge-cluster" on:click={toggleDropdown} aria-label="Edit game system tags">
+          {#each visibleTags as tag}
+            {@const c = colorFor(tag)}
+            <span class="game-system-badge" style={c ? `--badge-color: ${c}` : ''}>{tag}</span>
+          {/each}
+          {#if hiddenTagCount > 0}
+            <span class="game-system-badge overflow">+{hiddenTagCount}</span>
+          {/if}
+        </button>
       </div>
-    {:else if isIndexed && mode === 'index'}
+    {:else if isIndexed}
       <div class="badge-wrapper">
         <button class="add-tag-btn" on:click={toggleDropdown}>+</button>
       </div>
@@ -344,14 +295,10 @@
           {renamingFilePath}
           {onRenameSubmit}
           {onRenameCancel}
-          {mode}
-          {collectionPaths}
-          {collectionFolders}
           {highlightPaths}
           {displayPaths}
           {hiddenPaths}
           {showHidden}
-          {onCollectionToggle}
         />
       {/each}
     </div>
@@ -420,23 +367,7 @@
     background: var(--bg-app);
     border-radius: 1px;
   }
-  .checkbox.collection.checked,
-  .checkbox.collection.indeterminate {
-    background: var(--text-active);
-    border-color: var(--text-active);
-  }
-  .checkbox.collection:hover {
-    border-color: var(--text-active);
-  }
-  .checkbox-spacer {
-    display: inline-block;
-    width: 14px;
-    margin-right: 0.5rem;
-  }
-  .dimmed {
-    opacity: 0.35;
-  }
-  /* Hidden via the user's hide flag — rendered only when "Show hidden" is on.
+  /* Hidden via the user's hide flag — only rendered when "Show hidden" is on.
      Italicized + dimmed so it reads as "explicitly suppressed". */
   .hidden-item {
     opacity: 0.55;
@@ -509,9 +440,6 @@
     border: none;
     cursor: pointer;
   }
-  .badge-cluster.readonly {
-    cursor: default;
-  }
   .game-system-badge {
     --badge-color: var(--text-accent);
     display: inline-block;
@@ -531,12 +459,6 @@
   .game-system-badge.overflow {
     color: var(--text-secondary);
     background: rgba(182, 159, 129, 0.08);
-  }
-  .game-system-badge.readonly {
-    cursor: default;
-  }
-  .badge-cluster.readonly:hover .game-system-badge {
-    border-color: transparent;
   }
   .add-tag-btn {
     display: inline-block;

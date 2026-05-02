@@ -33,6 +33,20 @@
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
 
+  // Collection-edit props. When `isCollectionEditMode` is true, rows render
+  // checkboxes and group headers carry a tri-state "select all in group"
+  // toggle. All inert otherwise. The parent owns the underlying Set; this
+  // view is purely additive/subtractive via these two callbacks.
+  export let isCollectionEditMode: boolean = false;
+  export let collectionPaths: Set<string> = new Set();
+  export let onCollectionAdd: (paths: string[]) => void = () => {};
+  export let onCollectionRemove: (paths: string[]) => void = () => {};
+
+  // Anchor for shift-click range selection; bound to a group so a range
+  // never crosses tag boundaries (would feel arbitrary in this view).
+  let lastClickedPath: string | null = null;
+  let lastClickedGroup: string | null = null;
+
   $: tagColors = (() => {
     const m = new Map<string, string>();
     for (const sys of knownSystems) {
@@ -104,6 +118,50 @@
     }
   }
 
+  function handleCheckboxClick(
+    event: MouseEvent,
+    entry: FileStatusEntry,
+    groupTag: string,
+    groupEntries: FileStatusEntry[],
+  ) {
+    event.stopPropagation();
+    const isCurrentlyIn = collectionPaths.has(entry.path);
+    if (event.shiftKey && lastClickedPath && lastClickedGroup === groupTag) {
+      const a = groupEntries.findIndex((e) => e.path === lastClickedPath);
+      const b = groupEntries.findIndex((e) => e.path === entry.path);
+      if (a !== -1 && b !== -1) {
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        const range = groupEntries.slice(lo, hi + 1).map((e) => e.path);
+        if (isCurrentlyIn) onCollectionRemove(range);
+        else onCollectionAdd(range);
+        lastClickedPath = entry.path;
+        lastClickedGroup = groupTag;
+        return;
+      }
+    }
+    if (isCurrentlyIn) onCollectionRemove([entry.path]);
+    else onCollectionAdd([entry.path]);
+    lastClickedPath = entry.path;
+    lastClickedGroup = groupTag;
+  }
+
+  function groupSelectionState(entries: FileStatusEntry[]): 'none' | 'some' | 'all' {
+    let selected = 0;
+    for (const e of entries) if (collectionPaths.has(e.path)) selected++;
+    if (selected === 0) return 'none';
+    if (selected === entries.length) return 'all';
+    return 'some';
+  }
+
+  function handleGroupCheckboxClick(event: MouseEvent, entries: FileStatusEntry[]) {
+    event.stopPropagation();
+    const state = groupSelectionState(entries);
+    const paths = entries.map((e) => e.path);
+    if (state === 'all') onCollectionRemove(paths);
+    else onCollectionAdd(paths);
+  }
+
   function relativeParent(absPath: string): string {
     const i = absPath.lastIndexOf('/');
     if (i < 0) return '';
@@ -142,28 +200,42 @@
   <div class="systems-view">
     {#each groups as group (group.tag)}
       {@const groupColor = colorFor(group.tag)}
+      {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
       <section class="group">
-        <button
-          class="group-head"
-          style={groupColor ? `--group-color: ${groupColor}` : ''}
-          on:click={() => toggleSection(group.tag)}
-        >
-          <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
-          {#if group.tag !== 'Untagged'}
-            <span class="group-icon" class:unset={!groupColor} aria-hidden="true">
-              <!-- Font Awesome "dice-d6" -->
-              <svg viewBox="0 0 640 640" fill="currentColor">
-                <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
-              </svg>
-            </span>
+        <div class="group-head-row" style={groupColor ? `--group-color: ${groupColor}` : ''}>
+          {#if isCollectionEditMode}
+            <button
+              class="checkbox group-checkbox"
+              class:checked={groupState === 'all'}
+              class:indeterminate={groupState === 'some'}
+              on:click={(e) => handleGroupCheckboxClick(e, group.entries)}
+              role="checkbox"
+              aria-label="Select all in {group.tag}"
+              aria-checked={groupState === 'some' ? 'mixed' : groupState === 'all'}
+            ></button>
           {/if}
-          <span class="group-name">{group.tag}</span>
-          <span class="group-count">{group.entries.length}</span>
-        </button>
+          <button
+            class="group-head"
+            on:click={() => toggleSection(group.tag)}
+          >
+            <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
+            {#if group.tag !== 'Untagged'}
+              <span class="group-icon" class:unset={!groupColor} aria-hidden="true">
+                <!-- Font Awesome "dice-d6" -->
+                <svg viewBox="0 0 640 640" fill="currentColor">
+                  <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+                </svg>
+              </span>
+            {/if}
+            <span class="group-name">{group.tag}</span>
+            <span class="group-count">{group.entries.length}</span>
+          </button>
+        </div>
         {#if !collapsed.has(group.tag)}
           <ul class="group-files">
             {#each group.entries as entry (entry.path)}
               {@const relParent = relativeParent(entry.path)}
+              {@const isChecked = isCollectionEditMode && collectionPaths.has(entry.path)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
@@ -173,6 +245,18 @@
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
               >
+                {#if isCollectionEditMode}
+                  <button
+                    class="checkbox row-checkbox"
+                    class:checked={isChecked}
+                    on:click={(e) => handleCheckboxClick(e, entry, group.tag, group.entries)}
+                    on:mousedown|stopPropagation
+                    on:dblclick|stopPropagation
+                    role="checkbox"
+                    aria-label="Add {entry.filename} to collection"
+                    aria-checked={isChecked}
+                  ></button>
+                {/if}
                 <span class="file-icon" aria-hidden="true">
                   <!-- Font Awesome "book" — matches collection rows -->
                   <svg viewBox="0 0 640 640" fill="currentColor">
@@ -214,8 +298,15 @@
     flex-direction: column;
   }
 
-  .group-head {
+  .group-head-row {
     --group-color: var(--text-accent);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--group-color) 35%, var(--border-subtle));
+  }
+  .group-head {
+    flex: 1;
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
@@ -226,7 +317,6 @@
     text-align: left;
     font-family: var(--font-heading, var(--font-body));
     color: var(--group-color);
-    border-bottom: 1px solid color-mix(in srgb, var(--group-color) 35%, var(--border-subtle));
     transition: color var(--transition-fast);
   }
   .group-head:hover {
@@ -270,6 +360,58 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  /* Edit-mode selection checkboxes — same visual language as the tree's
+     checkbox (var(--text-active) accent) so it reads as "collection scope"
+     rather than "indexing scope". */
+  .checkbox {
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    cursor: pointer;
+    border: 1.5px solid var(--text-tertiary);
+    border-radius: 3px;
+    background: transparent;
+    position: relative;
+    flex-shrink: 0;
+    align-self: center;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+  }
+  .checkbox:hover {
+    border-color: var(--text-active);
+  }
+  .checkbox.checked,
+  .checkbox.indeterminate {
+    background: var(--text-active);
+    border-color: var(--text-active);
+  }
+  .checkbox.checked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 0px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--bg-app);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .checkbox.indeterminate::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 5px;
+    width: 8px;
+    height: 2px;
+    background: var(--bg-app);
+    border-radius: 1px;
+  }
+  .group-checkbox {
+    margin-left: 0.25rem;
+  }
+  .row-checkbox {
+    margin-right: 0.1rem;
   }
 
   .file {

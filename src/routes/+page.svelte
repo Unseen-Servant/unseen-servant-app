@@ -458,9 +458,6 @@
     }
   }
 
-  // Effective view mode — collection-edit always falls back to tree.
-  $: effectiveViewMode = isCollectionEditMode ? 'tree' : viewMode;
-
   // Indexed entries with metadata (path, filename, game_system) for the
   // systems view. Excludes pending removals and the to-add bucket.
   $: indexedEntries = (() => {
@@ -740,7 +737,6 @@
   }
 
   let lastIndexClickedPath: string | null = null;
-  let lastCollectionClickedPath: string | null = null;
 
   function flattenVisibleFilePaths(items: FileItem[]): string[] {
     const out: string[] = [];
@@ -944,11 +940,9 @@
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
-  $: treeMode = isCollectionEditMode ? 'collection' as const : 'index' as const;
   $: highlightPaths = highlightedCollection && collections[highlightedCollection]
     ? new Set(collections[highlightedCollection].file_paths)
     : new Set<string>();
-  $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
   // Per-collection count of files currently hidden in the tree. Surfaced
   // in the collections panel so users notice their curated set holds
@@ -1348,6 +1342,7 @@
     isCreatingCollection = true;
     editingCollectionName = null;
     highlightedCollection = null;
+    setViewMode('systems');
   }
 
   function startEditCollection(name: string) {
@@ -1359,6 +1354,7 @@
     editingCollectionName = name;
     isCreatingCollection = false;
     highlightedCollection = null;
+    setViewMode('systems');
   }
 
   function cancelCollectionEdit() {
@@ -1683,52 +1679,17 @@
     isCreatingCollection = true;
     editingCollectionName = null;
     highlightedCollection = null;
+    setViewMode('systems');
   }
 
-  function handleCollectionToggle(path: string, isDir: boolean, item: FileItem, shiftKey: boolean = false) {
-    if (shiftKey && !isDir && lastCollectionClickedPath) {
-      const ok = applyRangeToggle(collectionEditPaths, lastCollectionClickedPath, path, true);
-      if (ok) {
-        collectionEditPaths = collectionEditPaths;
-        lastCollectionClickedPath = path;
-        return;
-      }
-    }
-    if (isDir) {
-      toggleCollectionFolder(item);
-    } else {
-      if (collectionEditPaths.has(path)) {
-        collectionEditPaths.delete(path);
-      } else {
-        collectionEditPaths.add(path);
-      }
-      collectionEditPaths = collectionEditPaths;
-      lastCollectionClickedPath = path;
-    }
-  }
-
-  function toggleCollectionFolder(folder: FileItem) {
-    if (!folder.children) return;
-    // Deselect only when ALL indexed descendants are in the collection
-    const allIn = areAllDescendantsSelected(folder, collectionEditPaths, indexedPaths);
-    const shouldAdd = !allIn;
-    setCollectionFolderRecursive(folder, shouldAdd);
+  function handleCollectionAdd(paths: string[]) {
+    for (const p of paths) collectionEditPaths.add(p);
     collectionEditPaths = collectionEditPaths;
   }
 
-  function setCollectionFolderRecursive(folder: FileItem, add: boolean) {
-    if (!folder.children) return;
-    for (const child of folder.children) {
-      if (child.is_dir) {
-        setCollectionFolderRecursive(child, add);
-      } else if (indexedPaths.has(child.path)) {
-        if (add) {
-          collectionEditPaths.add(child.path);
-        } else {
-          collectionEditPaths.delete(child.path);
-        }
-      }
-    }
+  function handleCollectionRemove(paths: string[]) {
+    for (const p of paths) collectionEditPaths.delete(p);
+    collectionEditPaths = collectionEditPaths;
   }
 
   // Copy MCP config to clipboard
@@ -1928,10 +1889,10 @@
     onToggleShowHidden={toggleShowHidden}
     onClearHidden={clearHidden}
     collapseAllVisible={!!selectedFolder && !searchActive}
-    collapseAllDisabled={effectiveViewMode === 'systems' || expandedPaths.size === 0}
+    collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
     viewToggleVisible={!!selectedFolder && !searchActive && !isCollectionEditMode}
-    viewMode={effectiveViewMode}
+    {viewMode}
     onSetViewMode={setViewMode}
   />
 
@@ -1974,7 +1935,7 @@
             {hiddenPaths}
             onOpenResult={handleOpenResult}
           />
-        {:else if effectiveViewMode === 'systems'}
+        {:else if viewMode === 'systems'}
           <SystemsView
             entries={indexedEntries}
             {displayPaths}
@@ -1986,6 +1947,10 @@
             {focusedFilePath}
             onFocusFile={(path) => { focusedFilePath = path; }}
             onContextMenu={handleContextMenu}
+            {isCollectionEditMode}
+            collectionPaths={collectionEditPaths}
+            onCollectionAdd={handleCollectionAdd}
+            onCollectionRemove={handleCollectionRemove}
           />
         {:else}
           {#each files as file (file.path)}
@@ -2007,14 +1972,10 @@
               {renamingFilePath}
               onRenameSubmit={handleRenameSubmit}
               onRenameCancel={handleRenameCancel}
-              mode={treeMode}
-              collectionPaths={collectionEditPaths}
-              {collectionFolders}
               {highlightPaths}
               {displayPaths}
               {hiddenPaths}
               {showHidden}
-              onCollectionToggle={handleCollectionToggle}
             />
           {/each}
         {/if}
