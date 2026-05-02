@@ -325,6 +325,7 @@
   .row-container {
     display: flex;
     align-items: center;
+    padding: 0 0.4rem;
     border-radius: 3px;
     transition: background var(--transition-fast);
   }
