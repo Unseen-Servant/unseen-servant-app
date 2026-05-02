@@ -96,6 +96,7 @@
   --text-accent: rgb(182, 159, 129);
   --text-danger: #ef4444;
   --text-active: #925ccb;
+  --text-connected: #b08850;
 
   /* Borders & shadows */
   --border-subtle: rgb(50, 50, 50);

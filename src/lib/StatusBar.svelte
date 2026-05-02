@@ -185,21 +185,21 @@
     line-height: 0;
   }
   .indicator.connected {
-    color: #668063;
+    color: var(--text-connected);
   }
   .indicator.mcp.connected {
-    color: #668063;
+    color: var(--text-connected);
   }
   .indicator.mcp.active {
     animation: mcp-pulse 0.9s ease-in-out;
   }
-  /* Resting state is health-green like the sidecar LED. Activity blinks
-     briefly to active-purple with a glow — green = lamp on, purple beat
-     = agent querying right now. Tightened so green dominates and the
-     purple reads like a hardware MIDI-activity LED. */
+  /* Resting state is the warm pilot-lamp amber, like the sidecar LED.
+     Activity blinks briefly to active-purple with a glow — amber = lamp
+     on, purple beat = agent querying right now. Tightened so amber
+     dominates and the purple reads like a hardware MIDI-activity LED. */
   @keyframes mcp-pulse {
-    0%, 100% { color: #668063; filter: brightness(1); }
-    20%, 80% { color: #668063; filter: brightness(1); }
+    0%, 100% { color: var(--text-connected); filter: brightness(1); }
+    20%, 80% { color: var(--text-connected); filter: brightness(1); }
     50% { color: var(--text-active); filter: var(--glow-active) brightness(1.3); }
   }
   .indicator-icon {
