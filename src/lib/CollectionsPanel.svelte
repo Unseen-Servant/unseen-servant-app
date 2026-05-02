@@ -22,9 +22,10 @@
   export let onEditFiles: (name: string) => void = () => {};
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
-  export let onCreate: (name: string) => void = () => {};
+  export let onCreate: () => void = () => {};
   export let onSaveFiles: () => void = () => {};
   export let onCancelFiles: () => void = () => {};
+  export let onDraftRename: (name: string) => void = () => {};
 
   type SortKey = 'last_used' | 'name' | 'size';
   const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -35,14 +36,43 @@
   let sortKey: SortKey = 'last_used';
   let showArchived = false;
 
-  let creating = false;
-  let newName = '';
-  let newNameInput: HTMLInputElement;
+  // Draft name editing — when the user clicks the draft row's name, swap
+  // it for an inline text input. Esc reverts, Enter / blur commits.
+  let renamingDraft = false;
+  let draftRenameValue = '';
 
   let sortMenuOpen = false;
   let sortBtn: HTMLButtonElement;
 
-  $: if (creating && newNameInput) newNameInput.focus();
+  // Reset rename mode when the draft itself goes away.
+  $: if (!draftName) renamingDraft = false;
+
+  function startDraftRename() {
+    if (!draftName) return;
+    draftRenameValue = draftName;
+    renamingDraft = true;
+  }
+
+  function commitDraftRename() {
+    const trimmed = draftRenameValue.trim();
+    if (trimmed && trimmed !== draftName) onDraftRename(trimmed);
+    renamingDraft = false;
+  }
+
+  function handleDraftRenameKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitDraftRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      renamingDraft = false;
+    }
+  }
+
+  function autofocusInput(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
 
   $: rows = (() => {
     const list = Object.values(collections);
@@ -59,34 +89,6 @@
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
-
-  function startCreate() {
-    creating = true;
-    newName = '';
-  }
-
-  function cancelCreate() {
-    creating = false;
-    newName = '';
-  }
-
-  function commitCreate() {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    onCreate(trimmed);
-    creating = false;
-    newName = '';
-  }
-
-  function handleNewKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitCreate();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      cancelCreate();
-    }
-  }
 
   function handleRowClick(name: string) {
     if (activeName === name) onClearActive();
@@ -116,7 +118,7 @@
   <header class="panel-header">
     <span class="panel-title">Collections</span>
     <div class="header-actions">
-      <button class="header-btn" on:click={startCreate} title="New collection" aria-label="New collection">
+      <button class="header-btn" on:click={onCreate} title="New collection" aria-label="New collection">
         <!-- Font Awesome "plus" (static/icons/plus-solid-full.svg) -->
         <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
           <path d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"/>
@@ -162,21 +164,6 @@
     </div>
   </header>
 
-  {#if creating}
-    <div class="create-row">
-      <input
-        bind:this={newNameInput}
-        bind:value={newName}
-        class="new-input"
-        type="text"
-        placeholder="Collection name"
-        on:keydown={handleNewKeydown}
-      />
-      <ActionButton kind="confirm" compact title="Create" onClick={commitCreate} disabled={!newName.trim()} />
-      <ActionButton kind="discard" compact title="Cancel" onClick={cancelCreate} />
-    </div>
-  {/if}
-
   {#if hasNone && !draftName}
     <div class="empty">
       <span class="empty-label">No collections yet</span>
@@ -188,14 +175,25 @@
   {:else}
     <ul class="rows">
       {#if draftName}
-        <li class="row editing draft" title="New collection (unsaved)">
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <li class="row editing draft" title="New collection (unsaved) — click name to rename">
           <span class="row-icon none" aria-hidden="true">
             <!-- "books" — three rounded spines, collection of books -->
             <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
               <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
             </svg>
           </span>
-          <span class="row-name">{draftName}</span>
+          {#if renamingDraft}
+            <input
+              class="draft-name-input"
+              bind:value={draftRenameValue}
+              on:keydown={handleDraftRenameKeydown}
+              on:blur={commitDraftRename}
+              use:autofocusInput
+            />
+          {:else}
+            <button class="row-name draft-name" on:click={startDraftRename} title="Rename">{draftName}</button>
+          {/if}
           <span class="row-count editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
           <div class="row-actions">
             <ActionButton kind="discard" compact title="Discard draft" onClick={onCancelFiles} />
@@ -414,24 +412,6 @@
     margin: 0;
   }
 
-  .create-row {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.4rem 0.75rem;
-    border-bottom: 1px solid var(--bg-category);
-  }
-  .new-input {
-    flex: 1;
-    min-width: 0;
-    padding: 0.2rem 0.4rem;
-    background: var(--bg-app);
-    color: var(--text-primary);
-    border: 1px solid var(--text-accent);
-    border-radius: 3px;
-    font-size: 0.8rem;
-    outline: none;
-  }
   .rows {
     list-style: none;
     margin: 0;
@@ -458,12 +438,45 @@
     background: rgba(182, 159, 129, 0.25);
     border-left-color: var(--text-active, var(--text-accent));
   }
-  /* Draft row — same armed treatment, italic name to telegraph "unsaved". */
+  /* Draft row — same armed treatment, italic name to telegraph "unsaved".
+     The name doubles as a click-to-rename button. */
   .row.draft {
     cursor: default;
   }
   .row.draft .row-name {
     font-style: italic;
+  }
+  .draft-name {
+    flex: 1;
+    min-width: 0;
+    padding: 0.1rem 0.25rem;
+    margin: 0 -0.25rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    text-align: left;
+    color: var(--text-primary);
+    cursor: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: border-color var(--transition-fast);
+  }
+  .draft-name:hover {
+    border-color: var(--bg-category);
+  }
+  .draft-name-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.1rem 0.25rem;
+    margin: 0 -0.25rem;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    border: 1px solid var(--text-active, var(--text-accent));
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-family: var(--font-body);
+    outline: none;
   }
   .row.archived { opacity: 0.55; }
   .row-icon {

@@ -1552,18 +1552,19 @@
     }
   }
 
-  // Panel "+" handler — accepts the typed name and opens a draft. The
-  // collection isn't persisted until the user hits Save on the draft row.
-  function inlineCreateCollection(name: string) {
-    if (collections[name]) {
-      jobNotification.show({
-        type: 'error',
-        message: `A collection named "${name}" already exists`,
-        duration: 4000,
-      });
-      return;
-    }
-    startDraftCollection(name);
+  // Panel "+" handler — opens a fresh draft with an auto-generated name.
+  // The user can rename inline on the draft row before saving.
+  function inlineCreateCollection() {
+    startDraftCollection(uniqueCollectionName('Untitled'));
+  }
+
+  // Inline rename of the active draft. Only updates local state; nothing
+  // hits the database until Save. Collisions are deferred to the backend
+  // on Save (notification surfaces the error).
+  function handleDraftRename(name: string) {
+    if (!draftName) return;
+    draftName = name;
+    collectionEditName = name;
   }
 
   function startEditMetadata(name: string) {
@@ -1890,6 +1891,7 @@
           onCreate={inlineCreateCollection}
           onSaveFiles={saveCollection}
           onCancelFiles={cancelCollectionEdit}
+          onDraftRename={handleDraftRename}
         />
       {/if}
 
