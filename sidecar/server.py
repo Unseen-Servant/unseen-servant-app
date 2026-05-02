@@ -67,17 +67,22 @@ def parse_args():
 from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
 
 
-def detect_game_system(
+def detect_game_systems(
     pdf_path: Path,
     text: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
-) -> str:
-    """Detect the TTRPG game system from folder path or PDF content.
+) -> list[str]:
+    """Detect all matching TTRPG game systems from folder path or PDF content.
 
     Detection priority:
     1. Folder name match (user's deliberate organization)
     2. Content keyword match (first 2000 chars of extracted text)
-    3. Fallback to "unknown"
+    3. Empty list when nothing matches.
+
+    Returns matches in ``KNOWN_SYSTEMS`` insertion order, deduped. Path
+    matches take precedence over content matches: a path hit blocks the
+    content scan from contributing the same tag a second time, but a tag
+    that only appears in content is still included.
 
     Args:
         known_systems: Optional tag→keywords dict. When None, uses the
@@ -85,23 +90,36 @@ def detect_game_system(
             to include user-defined custom systems in detection.
     """
     systems = known_systems if known_systems is not None else KNOWN_SYSTEMS
+    hits: list[str] = []
+    seen: set[str] = set()
 
-    # Check path components (folder names)
     path_lower = str(pdf_path).lower()
     for system, keywords in systems.items():
-        for keyword in keywords:
-            if keyword in path_lower:
-                return system
+        if any(keyword in path_lower for keyword in keywords):
+            if system not in seen:
+                hits.append(system)
+                seen.add(system)
 
-    # Check content if provided
     if text:
         text_sample = text[:2000].lower()
         for system, keywords in systems.items():
-            for keyword in keywords:
-                if keyword in text_sample:
-                    return system
+            if system in seen:
+                continue
+            if any(keyword in text_sample for keyword in keywords):
+                hits.append(system)
+                seen.add(system)
 
-    return "unknown"
+    return hits
+
+
+def detect_game_system(
+    pdf_path: Path,
+    text: str | None = None,
+    known_systems: dict[str, list[str]] | None = None,
+) -> str:
+    """Detect the primary TTRPG game system (first match) or ``"unknown"``."""
+    hits = detect_game_systems(pdf_path, text, known_systems)
+    return hits[0] if hits else "unknown"
 
 
 _BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
@@ -291,6 +309,10 @@ class SetGameSystemRequest(BaseModel):
     filename: str
     game_system: str
 
+class SetGameSystemsRequest(BaseModel):
+    filename: str
+    game_systems: list[str]
+
 class CustomGameSystemRequest(BaseModel):
     tag: str
     keywords: list[str] = []
@@ -329,8 +351,14 @@ class ManifestEntry(BaseModel):
     chunk_count: int
     indexed_at: str
     game_system: str = "unknown"
+    game_systems: list[str] = []
     content_hash: str = ""
     file_size: int = 0
+
+    def model_post_init(self, __context):
+        # Backfill on load for entries written before multi-tag support.
+        if not self.game_systems and self.game_system != "unknown":
+            self.game_systems = [self.game_system]
 
 
 class IndexManifest(BaseModel):
@@ -652,55 +680,64 @@ def _index_chunks(
 def _extract_and_chunk(
     pdf_path: Path, game_system: str | None,
     known_systems: dict[str, list[str]] | None,
-) -> tuple[list[Chunk], str, str | None]:
+) -> tuple[list[Chunk], str, list[str], str | None]:
     """Shared preamble: extract pages, detect system, run structure_aware.
 
-    Returns (chunks, resolved_system, error_message).
+    Returns (chunks, resolved_system, resolved_systems, error_message).
+    ``resolved_system`` is the primary tag (first match) stored in chunk
+    metadata; ``resolved_systems`` is the full multi-tag list stored in
+    the manifest. When ``game_system`` is provided as an override, the
+    list contains just that single tag.
     """
     if not pdf_path.exists():
-        return [], "unknown", f"{pdf_path.name}: File not found"
+        return [], "unknown", [], f"{pdf_path.name}: File not found"
     try:
         pages = _extract_pdf_pages(pdf_path)
         if not pages:
-            return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
+            return [], "unknown", [], f"{pdf_path.name}: Empty or scanned PDF"
         flat_text = "\n\n".join(p.markdown for p in pages)
         if not flat_text.strip():
-            return [], "unknown", f"{pdf_path.name}: Empty or scanned PDF"
-        resolved_system = game_system or detect_game_system(
-            pdf_path, flat_text, known_systems=known_systems
-        )
+            return [], "unknown", [], f"{pdf_path.name}: Empty or scanned PDF"
+        if game_system:
+            resolved_system = game_system
+            resolved_systems = [game_system]
+        else:
+            resolved_systems = detect_game_systems(
+                pdf_path, flat_text, known_systems=known_systems
+            )
+            resolved_system = resolved_systems[0] if resolved_systems else "unknown"
         chunks = structure_aware(pages, source_pdf=pdf_path.name)
-        return chunks, resolved_system, None
+        return chunks, resolved_system, resolved_systems, None
     except Exception as e:
-        return [], "unknown", f"{pdf_path.name}: {str(e)}"
+        return [], "unknown", [], f"{pdf_path.name}: {str(e)}"
 
 
 def index_single_pdf(
     pdf_path: Path, collection, game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
     data_dir: Path | None = None,
-) -> tuple[int, str | None, str]:
+) -> tuple[int, str | None, str, list[str]]:
     """Extract, chunk, and upsert a single PDF into ChromaDB + parents store.
 
-    Returns (embed_unit_count, error_message, game_system).
+    Returns (embed_unit_count, error_message, game_system, game_systems).
     error_message is None on success.
     """
-    chunks, resolved_system, error = _extract_and_chunk(
+    chunks, resolved_system, resolved_systems, error = _extract_and_chunk(
         pdf_path, game_system, known_systems
     )
     if error:
-        return 0, error, resolved_system
+        return 0, error, resolved_system, resolved_systems
     count = _index_chunks(chunks, pdf_path, resolved_system, collection, data_dir)
-    return count, None, resolved_system
+    return count, None, resolved_system, resolved_systems
 
 
 def prepare_pdf(
     pdf_path: Path, game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
-) -> tuple[list[Chunk], str, str | None]:
+) -> tuple[list[Chunk], str, list[str], str | None]:
     """Extract text and chunk a PDF without upserting.
 
-    Returns (chunks, game_system, error_message).
+    Returns (chunks, game_system, game_systems, error_message).
     error_message is None on success.
     """
     return _extract_and_chunk(pdf_path, game_system, known_systems)
@@ -935,6 +972,7 @@ def compute_diff(
                         "filename": path.name,
                         "chunk_count": entry.chunk_count,
                         "game_system": entry.game_system,
+                        "game_systems": list(entry.game_systems),
                         "indexed_at": entry.indexed_at,
                     })
                 else:
@@ -943,6 +981,7 @@ def compute_diff(
                         "filename": path.name,
                         "chunk_count": entry.chunk_count,
                         "game_system": entry.game_system,
+                        "game_systems": list(entry.game_systems),
                         "indexed_at": entry.indexed_at,
                     })
 
@@ -982,6 +1021,7 @@ def compute_diff(
                             "filename": entry.filename,
                             "chunk_count": entry.chunk_count,
                             "game_system": entry.game_system,
+                            "game_systems": list(entry.game_systems),
                         })
                         to_add.append({"path": cand_str, "filename": candidate.name})
                         found_rename = True
@@ -996,6 +1036,7 @@ def compute_diff(
                 "filename": entry.filename,
                 "chunk_count": entry.chunk_count,
                 "game_system": entry.game_system,
+                "game_systems": list(entry.game_systems),
             })
 
     # Files in manifest but no longer selected → to_remove
@@ -1005,6 +1046,7 @@ def compute_diff(
             "filename": manifest.files[path_str].filename,
             "chunk_count": manifest.files[path_str].chunk_count,
             "game_system": manifest.files[path_str].game_system,
+            "game_systems": list(manifest.files[path_str].game_systems),
         }
         for path_str in (indexed - selected)
     ]
@@ -1056,6 +1098,7 @@ def compute_diff(
                             "old_filename": rm_entry["filename"],
                             "chunk_count": rm_entry["chunk_count"],
                             "game_system": rm_entry["game_system"],
+                            "game_systems": list(rm_entry.get("game_systems", [])),
                             "content_hash": add_hash,
                         })
                         break
@@ -1231,7 +1274,7 @@ def create_app(
 
         for pdf_path_str in request.paths:
             pdf_path = Path(pdf_path_str)
-            chunk_count, error, detected_system = index_single_pdf(
+            chunk_count, error, detected_system, detected_systems = index_single_pdf(
                 pdf_path, collection, game_system=request.game_system,
                 known_systems=_merged["known"], data_dir=data_dir,
             )
@@ -1247,6 +1290,7 @@ def create_app(
                         chunk_count=chunk_count,
                         indexed_at=datetime.now(timezone.utc).isoformat(),
                         game_system=detected_system,
+                        game_systems=detected_systems,
                         content_hash=file_content_hash(pdf_path),
                         file_size=os.path.getsize(pdf_path),
                     )
@@ -1280,7 +1324,7 @@ def create_app(
 
             delete_source_chunks(request.path, collection, data_dir)
 
-            chunk_count, error, detected_system = index_single_pdf(
+            chunk_count, error, detected_system, detected_systems = index_single_pdf(
                 pdf_path, collection, game_system=request.game_system,
                 known_systems=_merged["known"], data_dir=data_dir,
             )
@@ -1296,6 +1340,7 @@ def create_app(
                     chunk_count=chunk_count,
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
+                    game_systems=detected_systems,
                     content_hash=file_content_hash(pdf_path),
                     file_size=os.path.getsize(pdf_path),
                 )
@@ -1422,6 +1467,7 @@ def create_app(
                 chunk_count=entry["chunk_count"],
                 indexed_at=datetime.now(timezone.utc).isoformat(),
                 game_system=entry["game_system"],
+                game_systems=list(entry.get("game_systems", [])),
                 content_hash=entry["content_hash"],
                 file_size=os.path.getsize(new_path),
             )
@@ -1438,7 +1484,7 @@ def create_app(
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
             )
-            chunks, detected_system, error = prepare_pdf(
+            chunks, detected_system, detected_systems, error = prepare_pdf(
                 pdf_path, game_system=override,
                 known_systems=_merged["known"],
             )
@@ -1464,6 +1510,7 @@ def create_app(
                     chunk_count=len(embed_units),
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
+                    game_systems=detected_systems,
                     content_hash=file_content_hash(pdf_path),
                     file_size=os.path.getsize(pdf_path),
                 )
@@ -1478,7 +1525,7 @@ def create_app(
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
             )
-            chunks, detected_system, error = prepare_pdf(
+            chunks, detected_system, detected_systems, error = prepare_pdf(
                 pdf_path, game_system=override,
                 known_systems=_merged["known"],
             )
@@ -1504,6 +1551,7 @@ def create_app(
                     chunk_count=len(embed_units),
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=detected_system,
+                    game_systems=detected_systems,
                     content_hash=file_content_hash(pdf_path),
                     file_size=os.path.getsize(pdf_path),
                 )
@@ -1745,6 +1793,7 @@ def create_app(
                 chunk_count=old_entry.chunk_count,
                 indexed_at=datetime.now(timezone.utc).isoformat(),
                 game_system=old_entry.game_system,
+                game_systems=list(old_entry.game_systems),
                 content_hash=old_entry.content_hash,
                 file_size=old_entry.file_size,
             )
@@ -1872,6 +1921,7 @@ def create_app(
                     chunk_count=old_entry.chunk_count,
                     indexed_at=datetime.now(timezone.utc).isoformat(),
                     game_system=old_entry.game_system,
+                    game_systems=list(old_entry.game_systems),
                     content_hash=old_entry.content_hash,
                     file_size=old_entry.file_size,
                 )
@@ -2023,11 +2073,19 @@ def create_app(
                 if filename not in sources_info:
                     source_path = metadata.get("source", "")
                     entry = manifest.files.get(source_path)
+                    primary = metadata.get("game_system", "unknown")
+                    if entry and entry.game_systems:
+                        systems = list(entry.game_systems)
+                    elif primary != "unknown":
+                        systems = [primary]
+                    else:
+                        systems = []
                     sources_info[filename] = {
                         "filename": filename,
                         "source": source_path,
                         "chunks": 0,
-                        "game_system": metadata.get("game_system", "unknown"),
+                        "game_system": primary,
+                        "game_systems": systems,
                         "pages": 0,
                         "indexed_at": entry.indexed_at if entry else None,
                         "file_size_bytes": entry.file_size if entry else None,
@@ -2076,60 +2134,89 @@ def create_app(
         )
         return {"systems": systems}
 
+    def _apply_game_systems(filename: str, game_systems: list[str]) -> dict:
+        """Update Chroma chunk metadata + manifest entry for a file's tags.
+
+        ``game_systems[0]`` becomes the primary scalar in chunk metadata
+        (and the manifest's ``game_system`` field). The full list is
+        written to the manifest's ``game_systems`` field. An empty list
+        clears both back to ``"unknown"`` / ``[]``.
+        """
+        primary = game_systems[0] if game_systems else "unknown"
+
+        manifest = load_manifest(data_dir) if data_dir else None
+        source_path = None
+        if manifest:
+            for path_str, entry in manifest.files.items():
+                if entry.filename == filename:
+                    source_path = path_str
+                    break
+
+        if not source_path:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Source not found: {filename}",
+            )
+
+        results = collection.get(
+            where={"source": source_path},
+            include=["metadatas"],
+        )
+
+        if not results["ids"]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Source not found: {filename}",
+            )
+
+        updated_metadatas = [
+            {**metadata, "game_system": primary}
+            for metadata in results["metadatas"]
+        ]
+
+        collection.update(
+            ids=results["ids"],
+            metadatas=updated_metadatas,
+        )
+
+        if manifest:
+            for entry in manifest.files.values():
+                if entry.filename == filename:
+                    entry.game_system = primary
+                    entry.game_systems = list(game_systems)
+            save_manifest(data_dir, manifest)
+
+        return {
+            "filename": filename,
+            "game_system": primary,
+            "game_systems": list(game_systems),
+            "chunks_updated": len(results["ids"]),
+        }
+
     @app.post("/api/set-game-system")
     async def set_game_system(request: SetGameSystemRequest):
         """Update the game system tag for all chunks of a file.
 
         Changes metadata in ChromaDB and the manifest without re-indexing.
+        Back-compat alias for the multi-tag endpoint.
         """
         try:
-            # Look up the full source path from the manifest
-            manifest = load_manifest(data_dir) if data_dir else None
-            source_path = None
-            if manifest:
-                for path_str, entry in manifest.files.items():
-                    if entry.filename == request.filename:
-                        source_path = path_str
-                        break
+            return _apply_game_systems(request.filename, [request.game_system])
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-            if not source_path:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Source not found: {request.filename}",
-                )
+    @app.post("/api/set-game-systems")
+    async def set_game_systems(request: SetGameSystemsRequest):
+        """Update multiple game system tags for all chunks of a file.
 
-            results = collection.get(
-                where={"source": source_path},
-                include=["metadatas"],
-            )
-
-            if not results["ids"]:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Source not found: {request.filename}",
-                )
-
-            updated_metadatas = [
-                {**metadata, "game_system": request.game_system}
-                for metadata in results["metadatas"]
-            ]
-
-            collection.update(
-                ids=results["ids"],
-                metadatas=updated_metadatas,
-            )
-
-            if manifest:
-                for entry in manifest.files.values():
-                    if entry.filename == request.filename:
-                        entry.game_system = request.game_system
-                save_manifest(data_dir, manifest)
-
-            return {
-                "filename": request.filename,
-                "game_system": request.game_system,
-                "chunks_updated": len(results["ids"]),
-            }
+        The first tag becomes the primary stored in ChromaDB metadata; the
+        full list is persisted to the manifest. An empty list clears all
+        tags back to ``"unknown"``.
+        """
+        try:
+            return _apply_game_systems(request.filename, request.game_systems)
         except HTTPException:
             raise
         except Exception as e:
@@ -2520,10 +2607,39 @@ def create_app(
                 where_clauses.append({"source": {"$in": request.source_paths}})
             if request.source_filter:
                 where_clauses.append({"filename": request.source_filter})
-            if request.game_system:
-                where_clauses.append({"game_system": request.game_system})
-            if request.game_systems:
-                where_clauses.append({"game_system": {"$in": request.game_systems}})
+            if request.game_system or request.game_systems:
+                requested = set(request.game_systems or [])
+                if request.game_system:
+                    requested.add(request.game_system)
+
+                # Resolve secondary-tag matches via the manifest: any file
+                # whose `game_systems` includes a requested tag but whose
+                # primary `game_system` (the one stored in chunk metadata)
+                # does not. Chroma metadata is scalar-only, so secondary
+                # matches must be folded in as a filename `$in` clause.
+                secondary_filenames: list[str] = []
+                if data_dir:
+                    search_manifest = load_manifest(data_dir)
+                    for entry in search_manifest.files.values():
+                        if entry.game_system in requested:
+                            continue
+                        if any(t in requested for t in entry.game_systems):
+                            secondary_filenames.append(entry.filename)
+
+                if request.game_system:
+                    primary_clause: dict = {"game_system": request.game_system}
+                else:
+                    primary_clause = {"game_system": {"$in": list(requested)}}
+
+                if secondary_filenames:
+                    where_clauses.append({
+                        "$or": [
+                            primary_clause,
+                            {"filename": {"$in": secondary_filenames}},
+                        ]
+                    })
+                else:
+                    where_clauses.append(primary_clause)
 
             if len(where_clauses) == 1:
                 query_kwargs["where"] = where_clauses[0]

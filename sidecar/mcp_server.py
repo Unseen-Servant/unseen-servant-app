@@ -264,7 +264,8 @@ async def list_sources(show_all: bool = False) -> str:
 
     lines = [f"{notice}Indexed library: {len(sources)} document(s)\n"]
     for s in sources:
-        system_tag = f" [{s['game_system']}]" if s.get('game_system') else ""
+        systems = s.get("game_systems") or ([s["game_system"]] if s.get("game_system") else [])
+        system_tag = f" [{', '.join(systems)}]" if systems else ""
         lines.append(f"  - {s['filename']} ({s['chunks']} chunks){system_tag}")
 
     return "\n".join(lines)
