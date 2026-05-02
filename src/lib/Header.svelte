@@ -18,6 +18,7 @@
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
   export let collapseAllVisible: boolean = false;
+  export let collapseAllDisabled: boolean = false;
   export let onCollapseAll: () => void = () => {};
   export let viewToggleVisible: boolean = false;
   export let viewMode: 'tree' | 'systems' = 'tree';
@@ -125,13 +126,13 @@
       <button
         class="panel-toggle"
         on:click={onCollapseAll}
+        disabled={collapseAllDisabled}
         title="Collapse all folders"
         aria-label="Collapse all folders"
       >
-        <!-- Double chevron up — collapse all -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-          <polyline points="17 11 12 6 7 11" />
-          <polyline points="17 18 12 13 7 18" />
+        <!-- Font Awesome "folder-minus" icon (static/icons/folder-minus-solid-full.svg) -->
+        <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+          <path d="M512 512L128 512C92.7 512 64 483.3 64 448L64 160C64 124.7 92.7 96 128 96L266.7 96C280.5 96 294 100.5 305.1 108.8L343.5 137.6C349 141.8 355.8 144 362.7 144L512 144C547.3 144 576 172.7 576 208L576 448C576 483.3 547.3 512 512 512zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
         </svg>
       </button>
     {/if}
@@ -237,6 +238,13 @@
   }
   .panel-toggle.active {
     color: var(--text-accent);
+  }
+  .panel-toggle:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .panel-toggle:disabled:hover {
+    color: var(--text-secondary);
   }
   .toggle-icon {
     width: 14px;

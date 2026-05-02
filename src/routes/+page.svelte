@@ -1823,7 +1823,8 @@
     onClearScope={handleClearScope}
     onToggleSystemFilter={toggleSystemFilter}
     onClearSystemFilter={clearSystemFilter}
-    collapseAllVisible={!!selectedFolder && !searchActive && effectiveViewMode === 'tree' && expandedPaths.size > 0}
+    collapseAllVisible={!!selectedFolder && !searchActive}
+    collapseAllDisabled={effectiveViewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
     viewToggleVisible={!!selectedFolder && !searchActive && !isCollectionEditMode}
     viewMode={effectiveViewMode}
