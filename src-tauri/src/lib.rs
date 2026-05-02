@@ -527,6 +527,9 @@ async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncRes
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
+    if response.status() == reqwest::StatusCode::CONFLICT {
+        return Err("sync-busy: a sync is already in progress".to_string());
+    }
     consume_sync_stream(app, response).await
 }
 
@@ -539,6 +542,9 @@ async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
+    if response.status() == reqwest::StatusCode::CONFLICT {
+        return Err("sync-busy: a sync is already in progress".to_string());
+    }
     consume_sync_stream(app, response).await
 }
 
