@@ -11,6 +11,10 @@
   // Same scope/filter narrowing as the tree view. null = no narrowing.
   export let displayPaths: Set<string> | null = null;
 
+  // Tags excluded by the library filter. A multi-system file stays visible
+  // under its non-excluded tags, but the excluded section itself is hidden.
+  export let excludedSystems: Set<string> = new Set();
+
   // Library root path — used to render parent folders relative rather than
   // absolute. Empty string falls back to absolute paths.
   export let libraryRoot: string = '';
@@ -43,8 +47,10 @@
       const tags = e.game_systems && e.game_systems.length > 0
         ? e.game_systems
         : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : ['Untagged']);
-      // A multi-tagged file appears under every group it belongs to.
+      // A multi-tagged file appears under every group it belongs to,
+      // minus any systems hidden by the library filter.
       for (const tag of tags) {
+        if (excludedSystems.has(tag)) continue;
         const list = byTag.get(tag) ?? [];
         list.push(e);
         byTag.set(tag, list);

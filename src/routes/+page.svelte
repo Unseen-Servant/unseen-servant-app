@@ -1872,6 +1872,7 @@
           <SystemsView
             entries={indexedEntries}
             {displayPaths}
+            excludedSystems={filterExcludedSystems}
             libraryRoot={selectedFolder}
             {knownSystems}
             {focusedFilePath}
