@@ -1656,6 +1656,7 @@
   async function handleSync() {
     if (isSyncing) return;
     isSyncing = true;
+    pendingNotification.dismiss();
     try {
       const result = await runSyncJob<SyncResult>({
         command: 'sync_index',
@@ -1707,6 +1708,7 @@
   async function handleReindexAll() {
     if (isSyncing) return;
     isSyncing = true;
+    pendingNotification.dismiss();
     try {
       const result = await runSyncJob<SyncResult>({
         command: 'reindex_all',
@@ -1736,6 +1738,7 @@
   async function handleDeleteIndex() {
     if (isSyncing) return;
     isSyncing = true;
+    pendingNotification.dismiss();
     try {
       await runSyncJob<{ removed_files: number; removed_chunks: number }>({
         command: 'delete_index',
