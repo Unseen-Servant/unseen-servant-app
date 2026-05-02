@@ -808,6 +808,32 @@
   // Build a map of file path → game system from index status data
   $: gameSystemMap = buildGameSystemMap(indexStatus);
 
+  // Optimistic overrides: when the user toggles a tag, flip the local map
+  // immediately so the menu shows the change instantly, while the sidecar
+  // request and index-status refresh proceed in the background. Each entry
+  // clears itself once the server-derived map matches the optimistic value.
+  let pendingTagOverrides: Map<string, string[]> = new Map();
+  $: if (pendingTagOverrides.size > 0) {
+    let changed = false;
+    for (const [path, expected] of pendingTagOverrides) {
+      const actual = gameSystemMap.get(path) ?? [];
+      if (sameTagList(actual, expected)) {
+        pendingTagOverrides.delete(path);
+        changed = true;
+      }
+    }
+    if (changed) pendingTagOverrides = pendingTagOverrides;
+  }
+  $: effectiveGameSystemMap = pendingTagOverrides.size > 0
+    ? new Map([...gameSystemMap, ...pendingTagOverrides])
+    : gameSystemMap;
+
+  function sameTagList(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
   // Track which files are in the index (so untagged indexed files show the "+" button).
   // Stabilize identity: a refresh that returns the same content keeps the same Set
   // reference, so FileTree (which receives indexedPaths as a prop) doesn't re-render
@@ -880,7 +906,7 @@
     if (filterActive) {
       visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
       visible = new Set([...visible].filter((p) => {
-        const tags = gameSystemMap.get(p) ?? [];
+        const tags = effectiveGameSystemMap.get(p) ?? [];
         if (tags.length === 0) {
           return !filterExcludedSystems.has('unknown');
         }
@@ -927,12 +953,16 @@
     }
   }
 
-  async function handleSetGameSystems(_path: string, filename: string, tags: string[]) {
+  async function handleSetGameSystems(path: string, filename: string, tags: string[]) {
+    pendingTagOverrides.set(path, tags);
+    pendingTagOverrides = pendingTagOverrides;
     try {
       await invoke('set_game_systems', { filename, gameSystems: tags });
       await refreshIndexStatus();
     } catch (e) {
       console.error('Failed to set game systems:', e);
+      pendingTagOverrides.delete(path);
+      pendingTagOverrides = pendingTagOverrides;
     }
   }
 
@@ -1853,7 +1883,7 @@
               level={0}
               {selectedPaths}
               {foldersWithSelections}
-              {gameSystemMap}
+              gameSystemMap={effectiveGameSystemMap}
               {knownSystems}
               {indexedPaths}
               onToggle={toogleSelection}
