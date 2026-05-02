@@ -950,6 +950,22 @@
     : new Set<string>();
   $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
+  // Per-collection count of files currently hidden in the tree. Surfaced
+  // in the collections panel so users notice their curated set holds
+  // tucked-away items even when the tree is compressed.
+  $: hiddenCountByCollection = (() => {
+    const out: Record<string, number> = {};
+    if (hiddenPaths.size === 0) return out;
+    for (const col of Object.values(collections)) {
+      let n = 0;
+      for (const p of col.file_paths) {
+        if (isPathOrAncestorIn(p, hiddenPaths)) n++;
+      }
+      if (n > 0) out[col.name] = n;
+    }
+    return out;
+  })();
+
   // Filter for what the file tree shows. Composes scope + library filter:
   // 1. Scope picks the base file pool (collection / edit-mode-indexed / all).
   // 2. Library filter (excludedSystems) narrows to indexed files whose
@@ -1924,6 +1940,7 @@
       {#if collectionsPanelOpen}
         <CollectionsPanel
           {collections}
+          {hiddenCountByCollection}
           activeName={activeContextName}
           editingName={editingCollectionName}
           onSetActive={setActiveContext}
@@ -1962,6 +1979,8 @@
             entries={indexedEntries}
             {displayPaths}
             excludedSystems={filterExcludedSystems}
+            {hiddenPaths}
+            {showHidden}
             libraryRoot={selectedFolder}
             {knownSystems}
             {focusedFilePath}

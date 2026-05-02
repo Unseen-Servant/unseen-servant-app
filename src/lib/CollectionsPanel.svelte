@@ -3,6 +3,10 @@
   import ActionButton from './ActionButton.svelte';
 
   export let collections: Record<string, CollectionInfo> = {};
+  // Per-collection count of files currently hidden in the tree. Only
+  // entries with count > 0 are shown alongside the file-count chip as a
+  // muted reminder that the collection holds tucked-away items.
+  export let hiddenCountByCollection: Record<string, number> = {};
   export let activeName: string | null = null;
   export let editingName: string | null = null;
   export let onSetActive: (name: string) => void = () => {};
@@ -200,6 +204,12 @@
             <span class="row-marker" title="Active">&#9733;</span>
           {/if}
           <span class="row-count">{col.file_count}</span>
+          {#if hiddenCountByCollection[col.name]}
+            <span
+              class="row-hidden-count"
+              title={`${hiddenCountByCollection[col.name]} file${hiddenCountByCollection[col.name] === 1 ? '' : 's'} hidden in the tree`}
+            >({hiddenCountByCollection[col.name]} hidden)</span>
+          {/if}
           <div class="row-actions">
             <button
               class="row-btn"
@@ -443,6 +453,18 @@
     color: var(--text-secondary);
     margin-right: 0.25rem;
     flex-shrink: 0;
+  }
+  .row-hidden-count {
+    font-size: 0.65rem;
+    font-style: italic;
+    color: var(--text-tertiary);
+    margin-right: 0.25rem;
+    flex-shrink: 0;
+  }
+  /* Hide on hover so the action buttons have room to surface. */
+  .row:hover .row-hidden-count,
+  .row.editing .row-hidden-count {
+    display: none;
   }
   .row-actions {
     display: none;
