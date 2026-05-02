@@ -1,11 +1,7 @@
 # Legend Lore
 
-> A desktop app for TTRPG Game Masters to browse, index, and search their PDF collection using AI
+> A desktop app for TTRPG Game Masters to browse, index, and search their local PDF collection
 > when prepping or running a game.
-
-Named after the classic D&D spell, **Legend Lore** does the behind-the-scenes work so you can
-focus on running your game — silently indexing your rulebooks, supplements, and homebrew PDFs so
-you can ask a question during a session and get an answer instantly.
 
 ---
 
@@ -38,82 +34,75 @@ you can ask a question during a session and get an answer instantly.
 
 ## Philosophy
 
-Most TTRPG GMs have enormous digital libraries — hundreds of PDFs scattered across folders, from
-core rulebooks to obscure third-party supplements. Finding a specific rule, creature stat block,
-or random table during a live session often means interrupting the game to dig through files
-manually.
-
 Legend Lore is built around three ideas:
 
-1. **Your collection, your machine.** Everything runs locally. Your PDFs are never uploaded
-   anywhere. The app talks to an AI assistant via MCP (Model Context Protocol), but your files
-   stay on your disk.
+1. **Local-first.** Everything runs on your machine. PDFs are never uploaded anywhere. Embeddings, search, and AI integration all happen locally.
 
-2. **Efficiency at scale.** Designed for large collections (tested with 2,600+ PDFs, ~18GB). The
-   app uses lazy loading and batch processing so it never tries to swallow your whole library at
-   once.
+2. **No lock-in.** Your collection stays readable on disk whether or not you use the app. Indexed metadata is stored in open formats (ChromaDB/SQLite). Inspired by Obsidian's approach to notes.
 
-3. **GM-first UX.** Quick, focused answers during play. Not a general document viewer — a session
-   tool.
+3. **Built for live play.** Design takes cues from DAWs and live performance tools — fast lookup, scoped context, minimal friction. A GM mid-session is closer to a musician performing than a researcher browsing.
 
 ---
 
-## Current Features
+## Features
 
-- **Folder Browser** — Select your TTRPG folder and explore it as a sorted tree (folders first,
-  then files alphabetically), with lazy expansion on demand
-- **PDF Detection** — Automatically filters to only show `.pdf` files and subdirectories
-- **Checkbox Selection** — Select individual PDFs or entire folders (with recursive toggle)
-- **Ancestor Awareness** — Parent folders visually indicate when nested files are selected, even
-  before expanding
-- **Persistent Selections** — Folder and file selections are saved across sessions
-- **PDF Indexing** — Index selected PDFs into ChromaDB for semantic search via a Python sidecar
-  (uses Ollama embeddings locally)
-- **Index Sync** — Detects added, removed, and updated PDFs and syncs the index with real-time
-  progress streaming
-- **Double-click to Open** — Double-click any file in the tree to open it in your system's
-  default viewer
-- **Game System Tagging** — Tag indexed files with their game system (D&D 5e, Pathfinder, etc.)
-  via clickable badges in the file tree
-- **Copy MCP Config** — One-click button to copy the Claude Desktop MCP configuration to your
-  clipboard
-- **System Tray** — Runs in the menu bar with close-to-tray behavior
-- **Status Bar** — Sidecar health indicator, game systems count, and storage size at a glance
-- **Notifications** — Ephemeral banners for sync progress and MCP feedback
-- **Dark Theme** — "Old book" aesthetic with serif fonts
+### Library browser
 
-### Roadmap
+- Folder tree with lazy expansion, checkbox selection, and persistent state across sessions
+- Two views: directory tree and game-system grouping
+- Right-click actions: open, reveal in Finder, rename, reindex, delete, add to collection
+- Double-click to open in system viewer
 
-| Status | Feature                                                     |
-|--------|-------------------------------------------------------------|
-| ✅     | Folder browser with recursive tree and checkbox selection   |
-| ✅     | Persistent folder and file selections across sessions       |
-| ✅     | ChromaDB integration — index and sync PDFs semantically     |
-| ✅     | Game system tagging for indexed files                       |
-| ✅     | Claude AI via MCP — answer questions from library           |
-| ✅     | System tray, status bar, and notification banners           |
-| 🔜     | Search UI — query indexed content during sessions           |
-| 🔜     | Better collections — improved display and filtering         |
-| 🔜     | Intuitive navigation — toolbar controls and view toggles    |
-| 🔜     | Collection-scoped MCP — lock tools to a specific collection |
-| 🔜     | Dynamic game system tagging                                 |
+### Indexing and sync
+
+- Indexes selected PDFs into ChromaDB via a local Python sidecar (PyMuPDF4LLM + Ollama embeddings)
+- Detects added, removed, and modified files; syncs incrementally with real-time progress
+- Configurable sync behavior: background polling, disk event handling, per-event policies
+
+### Search
+
+- Semantic full-text search across indexed PDFs with relevance scoring and page citations
+- Scope search to a folder, file, game system, or collection
+
+### Collections
+
+- Curated subsets of PDFs with name, description, color, and archived state
+- Inline creation and editing; MCP tools respect active collection scope
+
+### Game system tagging
+
+- Tag indexed files with a game system (D&D 5e, Pathfinder, etc.)
+- Filter the library view to exclude specific systems
+- Group files by system in the systems view
+
+### Status bar
+
+- Sidecar and MCP connection health at a glance
+- File/index counts, storage size, top game system, last sync timestamp
+- Manual sync button
+
+### System tray
+
+- Runs in the menu bar; close-to-tray behavior
+
+### MCP integration (Claude Desktop)
+
+- `search_library` — semantic search scoped by system, source, or collection
+- `list_sources` — indexed PDFs with chunk counts; respects active collection
+- `list_collections` — curated collections with active-context marker
+- `list_game_systems` — game systems detected across the library
 
 ---
 
 ## MCP Server (Claude Desktop)
 
-The MCP server lets Claude Desktop search your indexed PDF library during a conversation. It runs
-as a separate stdio process that Claude Desktop launches automatically, and calls the FastAPI
-sidecar over HTTP to fulfill requests.
+The MCP server lets Claude Desktop search your indexed library during a conversation. It runs as a separate stdio process that Claude Desktop launches automatically, and calls the FastAPI sidecar over HTTP.
 
 ```text
 Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP :8420) ←→ ChromaDB
 ```
 
-### Connecting to Claude Desktop
-
-**Step 1 — Start the sidecar**, either via `npm run tauri dev` (starts it automatically) or
-manually:
+**Step 1 — Start the sidecar.** It starts automatically with `npm run tauri dev`. To start it manually:
 
 ```bash
 cd sidecar
@@ -121,17 +110,12 @@ source .venv/bin/activate
 python server.py --port 8420
 ```
 
-**Step 2 — Configure Claude Desktop.** Add the MCP config snippet to your Claude Desktop
-config file:
+**Step 2 — Configure Claude Desktop.** Click **"Copy MCP Config"** in the app to copy a ready-to-paste JSON snippet with the correct absolute paths. Paste it into:
 
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-**Easiest way:** Run the app with `npm run tauri dev` and click the **"Copy MCP Config"** button
-in the UI. This copies a ready-to-paste JSON snippet with the correct absolute paths for your
-machine. Paste it into your Claude Desktop config file.
-
-**Manual setup:** If you prefer to build the config yourself:
+Manual config:
 
 ```json
 {
@@ -147,34 +131,23 @@ machine. Paste it into your Claude Desktop config file.
 }
 ```
 
-> **Important:** Use the **full path** to your Python interpreter, not bare `python` or
-> `python3`. Claude Desktop has a limited PATH and won't find pyenv shims or virtualenvs.
+> Use the **full path** to your Python interpreter — Claude Desktop has a limited PATH and won't find pyenv shims or virtualenvs.
 
-**Step 3 — Make sure the Python environment has the dependencies** from
-`sidecar/requirements.txt` installed (notably `mcp` and `httpx`).
-
-### Available tools
-
-| Tool                 | Description                                                      |
-|----------------------|------------------------------------------------------------------|
-| `search_library`     | Semantic search across indexed PDFs (scopes by source/system/collection) |
-| `list_sources`       | List indexed documents (auto-scoped to active context)           |
-| `list_collections`   | List curated collections; marks the active one                   |
-| `list_game_systems`  | List game systems detected in the library                        |
+**Step 3 — Install Python dependencies** from `sidecar/requirements.txt` (notably `mcp` and `httpx`).
 
 ---
 
 ## Tech Stack
 
-| Layer                   | Choice                                             | Why                                              |
-|-------------------------|----------------------------------------------------|--------------------------------------------------|
-| Desktop framework       | [Tauri v2](https://tauri.app)                      | ~3MB binary vs Electron's 150MB+. Rust backend.  |
-| Frontend                | [SvelteKit](https://kit.svelte.dev) + TypeScript   | Lightweight, fast, great reactivity model        |
-| Backend                 | Rust                                               | Ships with Tauri; safe filesystem access         |
-| Indexing sidecar        | Python + [FastAPI](https://fastapi.tiangolo.com)   | Mature PDF/ML ecosystem, managed by Tauri        |
-| Vector DB               | [ChromaDB](https://www.trychroma.com)              | Semantic search for PDF content                  |
-| Embeddings              | [Ollama](https://ollama.com) (bge-m3)              | Local embeddings, no API keys needed             |
-| AI integration          | Claude via [MCP](https://modelcontextprotocol.io)  | Query your library in natural language           |
+| Layer             | Choice                                                          | Why                                             |
+|-------------------|-----------------------------------------------------------------|-------------------------------------------------|
+| Desktop framework | [Tauri v2](https://tauri.app)                                   | ~3MB binary vs Electron's 150MB+. Rust backend. |
+| Frontend          | [SvelteKit](https://kit.svelte.dev) + TypeScript                | Lightweight, fast, great reactivity model       |
+| Backend           | Rust                                                            | Ships with Tauri; safe filesystem access        |
+| Indexing sidecar  | Python + [FastAPI](https://fastapi.tiangolo.com) + PyMuPDF4LLM | Mature PDF/ML ecosystem, managed by Tauri        |
+| Vector DB         | [ChromaDB](https://www.trychroma.com)                           | Semantic search for PDF content                 |
+| Embeddings        | [Ollama](https://ollama.com) (bge-m3)                           | Local embeddings, no API keys needed            |
+| AI integration    | Claude via [MCP](https://modelcontextprotocol.io)               | Query your library in natural language          |
 
 ---
 
@@ -184,21 +157,18 @@ machine. Paste it into your Claude Desktop config file.
 
 - [Rust](https://www.rust-lang.org/tools/install)
 - Node.js 18+ (via [nvm](https://github.com/nvm-sh/nvm) or your preferred manager)
-- Python 3.10+ (via [pyenv](https://github.com/pyenv/pyenv) or system install)
+- Python 3.10+
 - [Ollama](https://ollama.com) with the `bge-m3` model and an 8K context window:
   `ollama pull bge-m3 && OLLAMA_CONTEXT_LENGTH=8192 ollama serve`
 
 ### macOS
 
-- [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/):
-  `xcode-select --install`
+- [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/): `xcode-select --install`
 
 ### Windows
 
-- [Visual Studio Build Tools 2019+](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-  with "Desktop development with C++"
-- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on
-  Windows 11)
+- [Visual Studio Build Tools 2019+](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++"
+- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 
 ### Linux
 
@@ -225,49 +195,22 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cd ..
 
-# 4. Make sure Ollama is running with the embedding model and an 8K context.
-#    OLLAMA_CONTEXT_LENGTH is required — without it Ollama silently
-#    truncates embeddings at 2048 tokens.
+# 4. Start Ollama with the embedding model
 ollama pull bge-m3
 OLLAMA_CONTEXT_LENGTH=8192 ollama serve
 
-# 5. Run in development mode (compiles Rust + starts frontend with HMR)
+# 5. Run in development mode
 npm run tauri dev
 ```
 
-> **Important:** Always use `npm run tauri dev`, not `npm run dev`.
-> Plain `npm run dev` starts only the SvelteKit frontend in a browser — Tauri APIs
-> (file system access, native dialogs) won't work there.
->
-> The Tauri app automatically starts and stops the Python sidecar — you don't need
-> to run it manually.
+> Always use `npm run tauri dev`, not `npm run dev`. Plain `npm run dev` runs only the SvelteKit
+> frontend in a browser — Tauri APIs (filesystem, native dialogs) won't work there.
 
----
-
-## Building for Production
+Other useful commands:
 
 ```bash
-# 1. Build the Python sidecar into standalone binaries
-chmod +x scripts/build-sidecar.sh
-./scripts/build-sidecar.sh
-
-# 2. Build the Tauri app (includes the sidecar binaries in the bundle)
-npm run tauri build
-```
-
-Build artifacts are output to `src-tauri/target/release/bundle/`:
-
-- **macOS:** `dmg/*.dmg`
-- **Windows:** `nsis/*.exe`
-
----
-
-## Other Scripts
-
-```bash
-npm run check         # TypeScript + Svelte type checking
-npm run check:watch   # Type checking in watch mode
-npm run preview       # Preview the production frontend build in browser
+npm run check                    # TypeScript + Svelte type checking
+bash scripts/bump-version.sh 1.2.0  # Bump version across package.json, tauri.conf.json, Cargo.toml
 ```
 
 ### Sidecar Tests
@@ -275,9 +218,21 @@ npm run preview       # Preview the production frontend build in browser
 ```bash
 cd sidecar
 source .venv/bin/activate
-pip install -r requirements-test.txt   # One-time: adds pytest, reportlab, etc.
-python -m pytest tests/ -v             # Run all 39 tests (no Ollama needed)
+pip install -r requirements-test.txt   # One-time
+python -m pytest tests/ -v             # Run all tests (no Ollama needed)
 ```
+
+---
+
+## Building for Production
+
+```bash
+chmod +x scripts/build-sidecar.sh
+./scripts/build-sidecar.sh   # Bundle Python sidecar into standalone binaries
+npm run tauri build           # Build Tauri app (includes sidecar binaries)
+```
+
+Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe` (Windows).
 
 ---
 
@@ -304,98 +259,42 @@ legend-lore/
 │
 ├── sidecar/                    # Python indexing sidecar
 │   ├── server.py               # FastAPI server (ChromaDB + PDF extraction)
+│   ├── mcp_server.py           # MCP tool definitions for Claude Desktop
 │   ├── requirements.txt        # Production dependencies
 │   ├── requirements-test.txt   # Test dependencies (pytest, reportlab)
-│   ├── pytest.ini              # Test configuration
-│   └── tests/                  # 39 tests across 7 files
-│       ├── conftest.py         # Shared fixtures (test DB, PDF generators)
-│       ├── test_chunking.py    # Text chunking unit tests
-│       ├── test_health.py      # Health endpoint
-│       ├── test_indexing.py    # PDF indexing tests
-│       ├── test_search.py      # Semantic search tests
-│       ├── test_stats.py       # Database statistics
-│       ├── test_sources.py     # Source listing + deletion
-│       └── test_error_cases.py # Edge cases and robustness
+│   └── tests/                  # Pytest suite
 │
-├── static/                     # Static assets (favicon, etc.)
-├── package.json
-└── svelte.config.js
+└── scripts/
+    ├── build-sidecar.sh        # Bundles Python sidecar for production
+    └── bump-version.sh         # Version bump across all config files
 ```
 
 ---
 
-## Architecture
-
-### How Svelte Talks to Rust
-
-Tauri uses a command pattern to bridge the frontend and backend:
+## Data Flow
 
 ```text
-User action in Svelte
-        ↓
-  invoke('command_name', { params })   ← Tauri IPC call
-        ↓
-  Rust function tagged with #[tauri::command]
-        ↓
-  Returns Result<T, String> as JSON
-        ↓
-  Svelte receives typed response
-```
-
-**Current commands:**
-
-| Command                  | Description                                                   |
-|--------------------------|---------------------------------------------------------------|
-| `select_folder`          | Opens a native OS folder picker dialog, returns chosen path   |
-| `list_files`             | Reads a directory, returns `FileItem[]` (PDFs + subfolders)   |
-| `index_files`            | Sends selected PDF paths to the sidecar for indexing          |
-| `get_index_status`       | Queries sidecar for what needs adding, removing, or updating  |
-| `sync_index`             | Synchronizes the index — adds, removes, and updates as needed |
-| `get_game_systems`       | Retrieves game system tags from indexed files                 |
-| `get_known_game_systems` | Lists all predefined game system options                      |
-| `set_game_system`        | Tags a file with a game system and updates its index chunks   |
-| `get_mcp_config`         | Returns ready-to-paste MCP config JSON with absolute paths    |
-
-### How Indexing Works
-
-The Tauri app manages a Python sidecar process for PDF indexing:
-
-```text
-Tauri app launches
-        ↓
-  Spawns Python sidecar (FastAPI on port 8420)
-        ↓
-  User selects PDFs and clicks "Index"
-        ↓
-  Rust sends HTTP POST to sidecar with file paths
-        ↓
-  Sidecar extracts text (PyMuPDF) → chunks (1000 chars, 200 overlap)
-        ↓
-  Embeds via Ollama (bge-m3) → stores in ChromaDB
-        ↓
-  Returns { indexed, total, errors } to Rust → Svelte
-        ↓
-  Tauri app closes → kills sidecar process
+PDF files on disk
+  → text extraction (PyMuPDF)
+  → chunking (1000 chars, 200 overlap)
+  → embedding (Ollama bge-m3, 1024-dim)
+  → storage (ChromaDB)
+  → semantic search (query → embed → nearest neighbors)
+  → results to UI or Claude via MCP
 ```
 
 ---
 
-## Experiments
+## Recommended IDE Setup
 
-Time-boxed research spikes (PDF extraction comparisons, chunking strategies, and similar investigations) live in the sibling repo [Unseen-Servant/unseen-legend-lore-experiments](https://github.com/Unseen-Servant/unseen-legend-lore-experiments). Each spike has its own `FINDINGS.md` documenting the verdict.
+[VS Code](https://code.visualstudio.com/) with:
+
+- [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode)
+- [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
+- [rust-analyzer](https://marketplace.visualstudio.com/items?rust-lang.rust-analyzer)
 
 ---
 
 ## License
 
 Legend Lore is proprietary software. See [LICENSE](LICENSE) for details.
-
----
-
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) with these extensions:
-
-- [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode)
-- [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
-- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
