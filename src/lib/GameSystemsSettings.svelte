@@ -40,12 +40,28 @@
   let modalColor: string | null = null;
   let modalError = '';
   let editOriginalTag = '';
+  let editOriginalKeywords = '';
+  let editOriginalColor: string | null = null;
   let editIsBuiltin = false;
   let editIsCustomized = false;
 
+  let tagInput: HTMLInputElement;
   let colorBtn: HTMLButtonElement;
   let colorMenuEl: HTMLDivElement;
   let colorMenuOpen = false;
+
+  // Auto-focus the first input when the modal opens.
+  $: if (showModal && tagInput) tagInput.focus();
+
+  // Save is enabled only when there is a tag and either we're adding
+  // or the user actually changed something — same convention as the
+  // Collection modal.
+  $: dirty = modalMode === 'add' || (
+    modalTag.trim() !== editOriginalTag ||
+    modalKeywords !== editOriginalKeywords ||
+    (modalColor ?? null) !== (editOriginalColor ?? null)
+  );
+  $: canSave = modalTag.trim().length > 0 && dirty;
 
   function openAddModal() {
     modalMode = 'add';
@@ -54,6 +70,8 @@
     modalColor = null;
     modalError = '';
     editOriginalTag = '';
+    editOriginalKeywords = '';
+    editOriginalColor = null;
     editIsBuiltin = false;
     editIsCustomized = false;
     colorMenuOpen = false;
@@ -67,6 +85,8 @@
     modalColor = sys.color ?? null;
     modalError = '';
     editOriginalTag = sys.tag;
+    editOriginalKeywords = modalKeywords;
+    editOriginalColor = sys.color ?? null;
     editIsBuiltin = sys.is_builtin ?? false;
     editIsCustomized = sys.is_customized ?? false;
     colorMenuOpen = false;
@@ -93,8 +113,13 @@
   }
 
   function handleWindowKey(event: KeyboardEvent) {
-    if (colorMenuOpen && event.key === 'Escape') {
+    if (!showModal) return;
+    if (event.key === 'Escape' && colorMenuOpen) {
       colorMenuOpen = false;
+      return;
+    }
+    if (event.key === 'Enter' && canSave && (event.metaKey || event.ctrlKey)) {
+      handleSave();
     }
   }
 
@@ -190,8 +215,8 @@
           type="text"
           class="input"
           bind:value={modalTag}
+          bind:this={tagInput}
           placeholder="e.g. Cairn"
-          on:keydown={(e) => e.key === 'Enter' && handleSave()}
         />
         <div class="color-wrapper">
           <button
@@ -247,7 +272,6 @@
         class="input"
         bind:value={modalKeywords}
         placeholder="e.g. cairn, cairn rpg"
-        on:keydown={(e) => e.key === 'Enter' && handleSave()}
       />
       <p class="hint">
         Comma-separated. Detection checks the file's <strong>folder path</strong> first,
@@ -277,8 +301,8 @@
         {/if}
       </div>
       <div class="footer-right">
-        <ActionButton kind="discard" label="Cancel" onClick={closeModal} />
-        <ActionButton kind="confirm" label={modalMode === 'add' ? 'Add' : 'Save'} onClick={handleSave} />
+        <ActionButton kind="discard" label="Discard" onClick={closeModal} />
+        <ActionButton kind="confirm" label={modalMode === 'add' ? 'Add' : 'Save'} onClick={handleSave} disabled={!canSave} />
       </div>
     </div>
   </div>
@@ -515,7 +539,7 @@
     box-shadow: var(--shadow-dropdown);
     padding: 0.5rem;
     display: grid;
-    grid-template-columns: repeat(4, auto);
+    grid-template-columns: repeat(3, auto);
     gap: 0.4rem;
     z-index: 50;
   }
