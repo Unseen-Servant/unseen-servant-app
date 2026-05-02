@@ -516,20 +516,22 @@
     box-shadow: var(--shadow-dropdown);
     max-height: 300px;
     overflow-y: auto;
-    min-width: 220px;
+    min-width: 200px;
     margin-top: 2px;
+    padding: 0.15rem 0;
   }
   .dropdown-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     width: 100%;
-    padding: 0.35rem 0.6rem;
+    padding: 0.2rem 0.6rem;
     border: none;
     background: none;
     cursor: pointer;
     text-align: left;
     font-size: 0.8rem;
+    line-height: 1.3;
     font-family: var(--font-body);
     color: var(--text-primary);
     transition: background var(--transition-fast);
@@ -538,7 +540,7 @@
     background: var(--bg-container);
   }
   .dropdown-item.selected {
-    background: rgba(182, 159, 129, 0.08);
+    background: var(--bg-container);
   }
   .dropdown-check {
     width: 0.9rem;
@@ -552,7 +554,7 @@
     white-space: nowrap;
   }
   .dropdown-divider {
-    margin: 0.25rem 0;
+    margin: 0.15rem 0;
     border: none;
     border-top: 1px solid var(--bg-category);
   }
