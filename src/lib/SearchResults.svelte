@@ -3,12 +3,17 @@
   import Markdown from 'svelte-exmarkdown';
   import type { SearchResultItem } from './types';
   import { pageHint } from './pdfUrl';
+  import { isPathOrAncestorIn } from './selectionUtils';
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
   export let query: string = '';
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
+  // User-hidden paths from the file tree. Hidden files still surface in
+  // search; the badge tags them so the user remembers why a "tucked away"
+  // file is appearing in results.
+  export let hiddenPaths: Set<string> = new Set();
   export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
 
   let expanded = new Set<number>();
@@ -150,6 +155,9 @@
             <span class="meta-text">
               {result.filename} · {result.game_system}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
             </span>
+            {#if isPathOrAncestorIn(result.source, hiddenPaths)}
+              <span class="hidden-badge" title="This file is hidden in the tree. Hiding only affects display — search still surfaces it.">hidden</span>
+            {/if}
           </div>
         </div>
         <div class="result-aside">
@@ -388,13 +396,30 @@
     font-family: var(--font-body);
     font-size: 0.8rem;
     color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
   }
 
   .meta-text {
-    display: block;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .hidden-badge {
+    flex-shrink: 0;
+    padding: 0.05rem 0.35rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    font-style: italic;
   }
 
   .result-aside {

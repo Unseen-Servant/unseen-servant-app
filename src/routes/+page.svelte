@@ -1954,6 +1954,7 @@
             query={committedQuery}
             error={searchError}
             indexedFileCount={indexedPathsSet.size}
+            {hiddenPaths}
             onOpenResult={handleOpenResult}
           />
         {:else if effectiveViewMode === 'systems'}
