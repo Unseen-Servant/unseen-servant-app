@@ -1,6 +1,6 @@
 <script lang="ts">
   import { openPath } from '@tauri-apps/plugin-opener';
-  import type { FileItem, FileStatusEntry } from './types';
+  import type { FileItem, FileStatusEntry, KnownGameSystem } from './types';
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -15,9 +15,23 @@
   // absolute. Empty string falls back to absolute paths.
   export let libraryRoot: string = '';
 
+  // Known systems — used to look up each tag's accent color for group headers.
+  export let knownSystems: KnownGameSystem[] = [];
+
   export let focusedFilePath: string | null = null;
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
+
+  $: tagColors = (() => {
+    const m = new Map<string, string>();
+    for (const sys of knownSystems) {
+      if (sys.color) m.set(sys.tag, sys.color);
+    }
+    return m;
+  })();
+  function colorFor(tag: string): string | null {
+    return tagColors.get(tag) ?? null;
+  }
 
   // Section collapse state — transient (not persisted).
   let collapsed = new Set<string>();
@@ -113,9 +127,17 @@
 {:else}
   <div class="systems-view">
     {#each groups as group (group.tag)}
+      {@const groupColor = colorFor(group.tag)}
       <section class="group">
-        <button class="group-head" on:click={() => toggleSection(group.tag)}>
+        <button
+          class="group-head"
+          style={groupColor ? `--group-color: ${groupColor}` : ''}
+          on:click={() => toggleSection(group.tag)}
+        >
           <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
+          {#if groupColor}
+            <span class="group-dot" aria-hidden="true"></span>
+          {/if}
           <span class="group-name">{group.tag}</span>
           <span class="group-count">{group.entries.length}</span>
         </button>
@@ -173,6 +195,7 @@
   }
 
   .group-head {
+    --group-color: var(--text-accent);
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
@@ -182,8 +205,8 @@
     cursor: pointer;
     text-align: left;
     font-family: var(--font-heading, var(--font-body));
-    color: var(--text-accent);
-    border-bottom: 1px solid var(--border-subtle);
+    color: var(--group-color);
+    border-bottom: 1px solid color-mix(in srgb, var(--group-color) 35%, var(--border-subtle));
     transition: color var(--transition-fast);
   }
   .group-head:hover {
@@ -194,6 +217,14 @@
     color: var(--text-secondary);
     font-size: 0.7rem;
     flex-shrink: 0;
+  }
+  .group-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--group-color);
+    flex-shrink: 0;
+    align-self: center;
   }
   .group-name {
     flex: 1;

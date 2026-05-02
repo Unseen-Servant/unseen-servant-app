@@ -120,6 +120,8 @@ struct KnownGameSystem {
     #[serde(default)]
     keywords: Vec<String>,
     #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
     is_builtin: bool,
     #[serde(default)]
     is_customized: bool,
@@ -134,6 +136,8 @@ struct KnownGameSystemsResult {
 struct CustomGameSystemResult {
     tag: String,
     keywords: Vec<String>,
+    #[serde(default)]
+    color: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -735,13 +739,14 @@ async fn set_game_systems(filename: String, game_systems: Vec<String>) -> Result
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-async fn create_custom_game_system(tag: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
+async fn create_custom_game_system(tag: String, keywords: Vec<String>, color: Option<String>) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/api/custom-game-systems", SIDECAR_URL))
         .json(&serde_json::json!({
             "tag": tag,
             "keywords": keywords,
+            "color": color,
         }))
         .send()
         .await
@@ -762,7 +767,7 @@ async fn create_custom_game_system(tag: String, keywords: Vec<String>) -> Result
 }
 
 #[tauri::command]
-async fn update_custom_game_system(original_tag: String, tag: String, keywords: Vec<String>) -> Result<CustomGameSystemResult, String> {
+async fn update_custom_game_system(original_tag: String, tag: String, keywords: Vec<String>, color: Option<String>) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let encoded_tag = original_tag.replace("&", "%26").replace(" ", "%20");
     let response = client
@@ -770,6 +775,7 @@ async fn update_custom_game_system(original_tag: String, tag: String, keywords: 
         .json(&serde_json::json!({
             "tag": tag,
             "keywords": keywords,
+            "color": color,
         }))
         .send()
         .await

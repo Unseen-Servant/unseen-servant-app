@@ -316,6 +316,7 @@ class SetGameSystemsRequest(BaseModel):
 class CustomGameSystemRequest(BaseModel):
     tag: str
     keywords: list[str] = []
+    color: str | None = None
 
 class ToggleBuiltinRequest(BaseModel):
     tag: str
@@ -469,6 +470,7 @@ CUSTOM_SYSTEMS_FILENAME = "custom_game_systems.json"
 class CustomGameSystemEntry(BaseModel):
     tag: str
     keywords: list[str] = []
+    color: str | None = None
 
 
 class CustomGameSystemsStore(BaseModel):
@@ -494,16 +496,20 @@ def save_custom_systems(data_dir: Path, store: CustomGameSystemsStore) -> None:
     os.replace(tmp_path, path)
 
 
+DEFAULT_CUSTOM_COLOR = "#b69f81"  # tan, matches the app accent
+
+
 def get_merged_systems(
     custom_store: CustomGameSystemsStore,
 ) -> tuple[list[dict], dict[str, list[str]]]:
     """Merge built-in GAME_SYSTEMS with custom overrides/additions.
 
     Returns (merged_list, known_systems_dict) where:
-    - merged_list: full entries with tag, keywords, is_builtin, is_customized
+    - merged_list: full entries with tag, keywords, color, is_builtin,
+      is_customized
     - known_systems_dict: tag → keywords mapping for detect_game_system
     """
-    builtin_tags = {entry["tag"] for entry in GAME_SYSTEMS}
+    builtin_by_tag = {entry["tag"]: entry for entry in GAME_SYSTEMS}
     custom_tags = {entry.tag for entry in custom_store.systems}
     disabled = set(custom_store.disabled_builtins)
 
@@ -517,10 +523,19 @@ def get_merged_systems(
         merged.append({**entry, "is_builtin": True, "is_customized": False})
 
     for entry in custom_store.systems:
-        is_override = entry.tag in builtin_tags
+        is_override = entry.tag in builtin_by_tag
+        # Override inherits the built-in color when the user didn't pick one;
+        # pure-custom entries fall back to the default app accent.
+        if entry.color is not None:
+            color = entry.color
+        elif is_override:
+            color = builtin_by_tag[entry.tag].get("color", DEFAULT_CUSTOM_COLOR)
+        else:
+            color = DEFAULT_CUSTOM_COLOR
         merged.append({
             "tag": entry.tag,
             "keywords": entry.keywords,
+            "color": color,
             "is_builtin": is_override,
             "is_customized": is_override,
         })
@@ -2125,6 +2140,7 @@ def create_app(
                 {
                     "tag": e["tag"],
                     "keywords": e.get("keywords", []),
+                    "color": e.get("color"),
                     "is_builtin": e.get("is_builtin", True),
                     "is_customized": e.get("is_customized", False),
                 }
@@ -2245,6 +2261,7 @@ def create_app(
         store.systems.append(CustomGameSystemEntry(
             tag=request.tag,
             keywords=request.keywords,
+            color=request.color,
         ))
         if data_dir:
             save_custom_systems(data_dir, store)
@@ -2253,6 +2270,7 @@ def create_app(
         return {
             "tag": request.tag,
             "keywords": request.keywords,
+            "color": request.color,
         }
 
     @app.put("/api/custom-game-systems/{tag}")
@@ -2266,6 +2284,7 @@ def create_app(
             if entry.tag == tag:
                 entry.tag = request.tag
                 entry.keywords = request.keywords
+                entry.color = request.color
                 found = True
                 break
 
@@ -2276,6 +2295,7 @@ def create_app(
                 store.systems.append(CustomGameSystemEntry(
                     tag=request.tag,
                     keywords=request.keywords,
+                    color=request.color,
                 ))
             else:
                 raise HTTPException(
@@ -2289,6 +2309,7 @@ def create_app(
         return {
             "tag": request.tag,
             "keywords": request.keywords,
+            "color": request.color,
         }
 
     @app.delete("/api/custom-game-systems/{tag}")
