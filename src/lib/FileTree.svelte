@@ -325,6 +325,11 @@
   .row-container {
     display: flex;
     align-items: center;
+    border-radius: 3px;
+    transition: background var(--transition-fast);
+  }
+  .row-container:hover {
+    background: var(--bg-focused);
   }
   .checkbox {
     width: 14px;
@@ -393,7 +398,7 @@
     border-left: 3px solid var(--text-accent);
     margin-left: -3px;
   }
-  .focused > .row-container > .row {
+  .focused > .row-container {
     background: var(--bg-focused);
   }
   .row {
@@ -411,10 +416,6 @@
     color: var(--text-primary);
     -webkit-user-select: none;
     user-select: none;
-    transition: background var(--transition-fast);
-  }
-  .row:hover {
-    background: var(--bg-focused);
   }
   .icon {
     margin-right: 0.3rem;
