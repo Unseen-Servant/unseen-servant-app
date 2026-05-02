@@ -19,7 +19,6 @@
     '#9b6cb6', // purple
     '#b69f81', // tan (matches accent)
   ];
-  const DEFAULT_CUSTOM_COLOR = '#b69f81';
 
   // Sort state
   let sortDirection: 'asc' | 'desc' = 'asc';
@@ -38,7 +37,7 @@
   let modalMode: 'add' | 'edit' = 'add';
   let modalTag = '';
   let modalKeywords = '';
-  let modalColor: string = DEFAULT_CUSTOM_COLOR;
+  let modalColor: string | null = null;
   let modalError = '';
   let editOriginalTag = '';
   let editIsBuiltin = false;
@@ -52,7 +51,7 @@
     modalMode = 'add';
     modalTag = '';
     modalKeywords = '';
-    modalColor = DEFAULT_CUSTOM_COLOR;
+    modalColor = null;
     modalError = '';
     editOriginalTag = '';
     editIsBuiltin = false;
@@ -65,7 +64,7 @@
     modalMode = 'edit';
     modalTag = sys.tag;
     modalKeywords = (sys.keywords || []).join(', ');
-    modalColor = sys.color || DEFAULT_CUSTOM_COLOR;
+    modalColor = sys.color ?? null;
     modalError = '';
     editOriginalTag = sys.tag;
     editIsBuiltin = sys.is_builtin ?? false;
@@ -80,7 +79,7 @@
     modalError = '';
   }
 
-  function handleColorPick(c: string) {
+  function handleColorPick(c: string | null) {
     modalColor = c;
     colorMenuOpen = false;
   }
@@ -156,7 +155,7 @@
     {#each sorted as sys}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
       <div class="system-row" on:click={() => openEditModal(sys)}>
-        <span class="system-icon" style="color: {sys.color || DEFAULT_CUSTOM_COLOR}" aria-hidden="true">
+        <span class="system-icon" style={sys.color ? `color: ${sys.color}` : ''} class:unset={!sys.color} aria-hidden="true">
           <!-- Font Awesome "dice-d6" -->
           <svg viewBox="0 0 640 640" fill="currentColor">
             <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
@@ -206,11 +205,23 @@
             aria-haspopup="menu"
             aria-expanded={colorMenuOpen}
           >
-            <span class="color-swatch" style="background: {modalColor}" aria-hidden="true"></span>
+            {#if modalColor}
+              <span class="color-swatch" style="background: {modalColor}" aria-hidden="true"></span>
+            {:else}
+              <span class="color-swatch none" aria-hidden="true">&times;</span>
+            {/if}
           </button>
           {#if colorMenuOpen}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
             <div class="color-menu" bind:this={colorMenuEl} on:click|stopPropagation>
+              <button
+                type="button"
+                class="swatch none"
+                class:selected={!modalColor}
+                on:click={() => handleColorPick(null)}
+                title="No color"
+                aria-label="No color"
+              >&times;</button>
               {#each PALETTE as c}
                 <button
                   type="button"
@@ -366,6 +377,9 @@
     justify-content: center;
     flex-shrink: 0;
   }
+  .system-icon.unset {
+    color: var(--text-tertiary);
+  }
   .system-icon svg {
     width: 0.85rem;
     height: 0.85rem;
@@ -480,7 +494,16 @@
     width: 14px;
     height: 14px;
     border-radius: 3px;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .color-swatch.none {
+    background: transparent;
+    border: 1px dashed var(--text-tertiary);
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+    line-height: 1;
   }
   .color-menu {
     position: absolute;
@@ -510,6 +533,21 @@
   }
   .swatch.selected {
     border-color: var(--text-primary);
+  }
+  .swatch.none {
+    background: transparent;
+    border: 1px dashed var(--text-secondary);
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .swatch.none.selected {
+    border-color: var(--text-primary);
+    border-style: solid;
+    color: var(--text-primary);
   }
 
   .hint {

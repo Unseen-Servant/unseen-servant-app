@@ -354,8 +354,9 @@ def test_create_custom_with_color(client, tmp_path):
     assert cairn["color"] == "#4fa896"
 
 
-def test_create_custom_without_color_uses_default(client):
-    """A custom system without a color falls back to the app default accent."""
+def test_create_custom_without_color_stays_unset(client):
+    """A custom system without a color reports color=None so the UI can render
+    the 'no color' state explicitly."""
     client.post("/api/custom-game-systems", json={
         "tag": "Mothership",
         "keywords": ["mothership"],
@@ -363,7 +364,7 @@ def test_create_custom_without_color_uses_default(client):
 
     known = client.get("/api/known-game-systems").json()
     moth = next(s for s in known["systems"] if s["tag"] == "Mothership")
-    assert moth["color"] == "#b69f81"
+    assert moth["color"] is None
 
 
 def test_update_custom_changes_color(client):

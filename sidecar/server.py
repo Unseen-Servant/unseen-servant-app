@@ -519,9 +519,6 @@ def save_custom_systems(data_dir: Path, store: CustomGameSystemsStore) -> None:
     os.replace(tmp_path, path)
 
 
-DEFAULT_CUSTOM_COLOR = "#b69f81"  # tan, matches the app accent
-
-
 def get_merged_systems(
     custom_store: CustomGameSystemsStore,
 ) -> tuple[list[dict], dict[str, list[str]]]:
@@ -529,7 +526,9 @@ def get_merged_systems(
 
     Returns (merged_list, known_systems_dict) where:
     - merged_list: full entries with tag, keywords, color, is_builtin,
-      is_customized
+      is_customized. ``color`` is ``None`` when the user opted out;
+      built-in overrides without a custom color inherit the built-in's
+      default. The frontend renders a neutral fallback for ``None``.
     - known_systems_dict: tag → keywords mapping for detect_game_system
     """
     builtin_by_tag = {entry["tag"]: entry for entry in GAME_SYSTEMS}
@@ -548,13 +547,14 @@ def get_merged_systems(
     for entry in custom_store.systems:
         is_override = entry.tag in builtin_by_tag
         # Override inherits the built-in color when the user didn't pick one;
-        # pure-custom entries fall back to the default app accent.
+        # pure-custom entries with no color stay None so the UI can render
+        # an explicit "no color" state.
         if entry.color is not None:
             color = entry.color
         elif is_override:
-            color = builtin_by_tag[entry.tag].get("color", DEFAULT_CUSTOM_COLOR)
+            color = builtin_by_tag[entry.tag].get("color")
         else:
-            color = DEFAULT_CUSTOM_COLOR
+            color = None
         merged.append({
             "tag": entry.tag,
             "keywords": entry.keywords,
