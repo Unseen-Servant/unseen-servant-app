@@ -45,6 +45,10 @@
 
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
+  let dropdownX: number = 0;
+  let dropdownY: number = 0;
+  const DROPDOWN_WIDTH = 200;
+  const DROPDOWN_MAX_HEIGHT = 320;
   let childrenLoading = false;
   // Auto-fetch children when a folder is expanded but tree data was reloaded
   afterUpdate(() => {
@@ -131,7 +135,17 @@
 
   function toggleDropdown(event: MouseEvent) {
     event.stopPropagation();
-    showDropdown = !showDropdown;
+    if (showDropdown) {
+      showDropdown = false;
+      return;
+    }
+    // Anchor the menu under the badge button using viewport coords so it
+    // doesn't get pulled around by the file tree's own layout shifts.
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    dropdownX = Math.min(rect.right - DROPDOWN_WIDTH, window.innerWidth - DROPDOWN_WIDTH - 4);
+    dropdownX = Math.max(4, dropdownX);
+    dropdownY = Math.min(rect.bottom + 2, window.innerHeight - DROPDOWN_MAX_HEIGHT - 4);
+    showDropdown = true;
   }
 
   function toggleSystem(tag: string) {
@@ -186,12 +200,18 @@
     node.select();
   }
 
-  function handleClickOutside(event: MouseEvent) {
+  function closeDropdown() {
     showDropdown = false;
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (showDropdown && event.key === 'Escape') {
+      closeDropdown();
+    }
   }
 </script>
 
-<svelte:window on:click={handleClickOutside} />
+<svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
 <div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} class:focused={isFocused} style="padding-left: {level * 1.5}rem;">
@@ -239,21 +259,6 @@
               <span class="game-system-badge overflow">+{hiddenTagCount}</span>
             {/if}
           </button>
-          {#if showDropdown}
-            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-            <div class="dropdown" on:click|stopPropagation>
-              {#each knownSystems as sys}
-                <button class="dropdown-item" class:selected={tags.includes(sys.tag)} on:click={() => toggleSystem(sys.tag)}>
-                  <span class="dropdown-check">{tags.includes(sys.tag) ? '✓' : ''}</span>
-                  <span class="dropdown-tag">{sys.tag}</span>
-                </button>
-              {/each}
-              <hr class="dropdown-divider" />
-              <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
-                Clear tags
-              </button>
-            </div>
-          {/if}
         {:else}
           <span class="badge-cluster readonly">
             {#each visibleTags as tag}
@@ -268,20 +273,32 @@
     {:else if isIndexed && mode === 'index'}
       <div class="badge-wrapper">
         <button class="add-tag-btn" on:click={toggleDropdown}>+</button>
-        {#if showDropdown}
-          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-          <div class="dropdown" on:click|stopPropagation>
-            {#each knownSystems as sys}
-              <button class="dropdown-item" on:click={() => toggleSystem(sys.tag)}>
-                <span class="dropdown-check"></span>
-                <span class="dropdown-tag">{sys.tag}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
       </div>
     {/if}
   </div>
+
+  {#if showDropdown}
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div
+      class="dropdown"
+      style="left: {dropdownX}px; top: {dropdownY}px"
+      on:click|stopPropagation
+      on:mousedown|stopPropagation
+    >
+      {#each knownSystems as sys}
+        <button class="dropdown-item" class:selected={tags.includes(sys.tag)} on:click={() => toggleSystem(sys.tag)}>
+          <span class="dropdown-check">{tags.includes(sys.tag) ? '✓' : ''}</span>
+          <span class="dropdown-tag">{sys.tag}</span>
+        </button>
+      {/each}
+      {#if hasTag}
+        <hr class="dropdown-divider" />
+        <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
+          Clear tags
+        </button>
+      {/if}
+    </div>
+  {/if}
 
   {#if isExpanded && item.children}
     <div transition:slide={{ duration: 150 }}>
@@ -506,18 +523,15 @@
     border-color: var(--text-accent);
   }
   .dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    z-index: 100;
+    position: fixed;
+    z-index: 200;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
     border-radius: 4px;
     box-shadow: var(--shadow-dropdown);
-    max-height: 300px;
+    max-height: 320px;
     overflow-y: auto;
-    min-width: 200px;
-    margin-top: 2px;
+    width: 200px;
     padding: 0.15rem 0;
   }
   .dropdown-item {
