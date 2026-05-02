@@ -238,14 +238,20 @@
     color: var(--text-primary);
   }
   .panel-toggle.active {
-    color: var(--text-accent);
+    color: var(--text-active);
+  }
+  .panel-toggle.active .toggle-icon {
+    filter: var(--glow-active);
   }
   .panel-toggle:disabled {
-    opacity: 0.4;
+    color: var(--text-tertiary);
     cursor: not-allowed;
   }
   .panel-toggle:disabled:hover {
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
+  }
+  .panel-toggle:disabled .toggle-icon {
+    filter: none;
   }
   .toggle-icon {
     width: 14px;
@@ -262,6 +268,9 @@
   }
   .filter-btn.has-filter {
     color: var(--text-accent);
+  }
+  .filter-btn.has-filter .toggle-icon {
+    filter: var(--glow-accent);
   }
   .filter-dot {
     position: absolute;

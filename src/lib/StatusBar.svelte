@@ -193,12 +193,14 @@
   .indicator.mcp.active {
     animation: mcp-pulse 0.9s ease-in-out;
   }
-  /* Resting state is health-green like the sidecar LED. Activity pulses
-     briefly toward the active-purple — green = lamp on, purple = agent
-     querying right now. */
+  /* Resting state is health-green like the sidecar LED. Activity blinks
+     briefly to active-purple with a glow — green = lamp on, purple beat
+     = agent querying right now. Tightened so green dominates and the
+     purple reads like a hardware MIDI-activity LED. */
   @keyframes mcp-pulse {
     0%, 100% { color: #668063; filter: brightness(1); }
-    50% { color: var(--text-active); filter: brightness(1.3); }
+    20%, 80% { color: #668063; filter: brightness(1); }
+    50% { color: var(--text-active); filter: var(--glow-active) brightness(1.3); }
   }
   .indicator-icon {
     width: 12px;
@@ -283,7 +285,11 @@
   }
   .sync-btn:disabled {
     cursor: default;
-    opacity: 0.7;
+    color: var(--text-tertiary);
+  }
+  .sync-btn.spinning,
+  .sync-btn.spinning:disabled {
+    color: var(--text-accent);
   }
   .sync-icon {
     width: 12px;
@@ -291,6 +297,7 @@
   }
   .sync-btn.spinning .sync-icon {
     animation: spin 1s linear infinite;
+    filter: var(--glow-accent);
   }
   @keyframes spin {
     from { transform: rotate(0deg); }

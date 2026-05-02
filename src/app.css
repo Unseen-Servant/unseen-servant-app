@@ -102,6 +102,12 @@
   --border-accent: rgb(182, 159, 129);
   --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
 
+  /* LED-style glows for engaged controls. Purple = mode on,
+     brass = content/data armed. Reserved for activated states only —
+     hover should not glow. */
+  --glow-active: drop-shadow(0 0 3px rgba(146, 92, 203, 0.45));
+  --glow-accent: drop-shadow(0 0 3px rgba(182, 159, 129, 0.4));
+
   /* Layout */
   --header-height: 40px;
   --statusbar-height: 28px;
