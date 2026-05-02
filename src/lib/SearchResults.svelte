@@ -152,12 +152,12 @@
             {/if}
           </div>
           <div class="meta-row">
-            <span class="meta-text">
-              {result.filename} · {result.game_system}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
-            </span>
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
               <span class="hidden-badge" title="This file is hidden in the tree. Hiding only affects display — search still surfaces it.">hidden</span>
             {/if}
+            <span class="meta-text">
+              {result.filename} · {result.game_system}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
+            </span>
           </div>
         </div>
         <div class="result-aside">
