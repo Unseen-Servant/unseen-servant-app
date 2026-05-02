@@ -239,6 +239,12 @@
         like &ldquo;<em>{modalTag.trim() || 'Cairn'}</em>&rdquo; or its abbreviation
         match best — a folder named that way wins over content.
       </p>
+      <p class="hint">
+        Matching ignores case, spaces, punctuation, and accents — so
+        <em>d&amp;d 5e</em>, <em>dnd-5e</em>, and <em>DnD 5E</em> all match the same
+        keyword. Avoid very short keywords (e.g. two-letter abbreviations) since
+        they false-positive on unrelated paths.
+      </p>
     </div>
 
     {#if modalError}

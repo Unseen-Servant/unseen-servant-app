@@ -66,6 +66,24 @@ def parse_args():
 
 from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
 
+import unicodedata
+
+
+def _normalize_for_match(s: str) -> str:
+    """Lowercase, decompose accents, fold ``&`` to ``n``, drop non-alphanum.
+
+    The goal is that a keyword like ``"d&d 5e"`` matches paths or content
+    written as ``"D&D 5E"``, ``"DnD 5e"``, ``"d&d-5e"``, ``"dnd_5e"``, or
+    ``"Mörk Borg"`` all the same. Both the haystack and the needle go
+    through this helper before substring matching.
+    """
+    # NFKD splits ``ö`` into ``o`` + combining diaeresis; the combining
+    # codepoint is then dropped along with all other non-alphanum below.
+    s = unicodedata.normalize("NFKD", s).lower()
+    # ``d&d`` and ``dnd`` collide cleanly when ``&`` becomes ``n``.
+    s = s.replace("&", "n")
+    return "".join(ch for ch in s if ch.isalnum())
+
 
 def detect_game_systems(
     pdf_path: Path,
@@ -78,6 +96,11 @@ def detect_game_systems(
     1. Folder name match (user's deliberate organization)
     2. Content keyword match (first 2000 chars of extracted text)
     3. Empty list when nothing matches.
+
+    Both haystack (path/text) and keywords are normalized via
+    ``_normalize_for_match`` before substring matching, so case,
+    whitespace, punctuation (``&``, ``-``, ``_``, ``.``), and accents
+    are ignored.
 
     Returns matches in ``KNOWN_SYSTEMS`` insertion order, deduped. Path
     matches take precedence over content matches: a path hit blocks the
@@ -93,19 +116,19 @@ def detect_game_systems(
     hits: list[str] = []
     seen: set[str] = set()
 
-    path_lower = str(pdf_path).lower()
+    path_norm = _normalize_for_match(str(pdf_path))
     for system, keywords in systems.items():
-        if any(keyword in path_lower for keyword in keywords):
+        if any(_normalize_for_match(k) in path_norm for k in keywords if k):
             if system not in seen:
                 hits.append(system)
                 seen.add(system)
 
     if text:
-        text_sample = text[:2000].lower()
+        text_norm = _normalize_for_match(text[:2000])
         for system, keywords in systems.items():
             if system in seen:
                 continue
-            if any(keyword in text_sample for keyword in keywords):
+            if any(_normalize_for_match(k) in text_norm for k in keywords if k):
                 hits.append(system)
                 seen.add(system)
 
