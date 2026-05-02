@@ -155,23 +155,6 @@ async def list_collections() -> str:
 
 
 @mcp.tool()
-async def get_active_context() -> str:
-    """Show the currently active collection scope, if any.
-
-    The active context auto-scopes search_library and list_sources to
-    a single collection. The user sets this in the Legend Lore desktop
-    app for session prep or live play.
-    """
-    data = await sidecar.get("/api/active-context")
-    if isinstance(data, str):
-        return data
-    active = data.get("active_context")
-    if not active:
-        return "No active context set. Searches cover the whole library."
-    return f"Active context: {active}"
-
-
-@mcp.tool()
 async def search_library(
     query: str,
     n_results: int = 5,
@@ -244,28 +227,6 @@ async def search_library(
 
 
 @mcp.tool()
-async def read_document(filename: str) -> str:
-    """Read the full text content of an indexed sourcebook.
-
-    Use this when you need to read or summarize an entire document,
-    or when search isn't finding what you need and you want to
-    browse the full text.
-
-    Args:
-        filename: The PDF filename to read
-                  (e.g., "dragonbane_monsters.pdf")
-    """
-    data = await sidecar.get(f"/api/source/{filename}/content")
-    if isinstance(data, str):
-        return data
-
-    return (
-        f"=== {data['filename']} ({data['chunks']} chunks) ===\n\n"
-        f"{data['content']}"
-    )
-
-
-@mcp.tool()
 async def list_sources(show_all: bool = False) -> str:
     """List all indexed TTRPG sourcebooks in the library.
 
@@ -330,56 +291,6 @@ async def list_game_systems() -> str:
     for s in systems:
         lines.append(f"  - {s}")
     return "\n".join(lines)
-
-
-@mcp.tool()
-async def compare_sources(
-    query: str,
-    filenames: list[str],
-    n_results: int = 3,
-) -> str:
-    """Compare how different sourcebooks cover the same topic.
-
-    Searches for the same query in each specified book and returns
-    results side by side. Great for comparing rules across game
-    systems or checking different supplements.
-
-    Args:
-        query: What to compare (e.g., "grappling rules",
-               "character creation")
-        filenames: List of PDF filenames to compare
-                   (e.g., ["dragonbane_core.pdf", "dnd_5e_phb.pdf"])
-        n_results: Results per book (default 3)
-    """
-    if len(filenames) < 2:
-        return "Please provide at least 2 filenames to compare."
-
-    sections = []
-    for fname in filenames:
-        payload = {
-            "query": query,
-            "n_results": n_results,
-            "source_filter": fname,
-        }
-        data = await sidecar.post("/api/search", payload)
-        if isinstance(data, str):
-            sections.append(f"=== {fname} ===\n{data}\n")
-            continue
-
-        results = data.get("results", [])
-        if not results:
-            sections.append(f"=== {fname} ===\nNo results found.\n")
-            continue
-
-        lines = [f"=== {fname} ==="]
-        for r in results:
-            lines.append(f"[relevance: {r['relevance']}]")
-            lines.append(r["text"])
-            lines.append("")
-        sections.append("\n".join(lines))
-
-    header = f"Comparing \"{query}\" across {len(filenames)} sources:\n\n"
-    return header + "\n".join(sections)
 
 
 # ---------------------------------------------------------------------------

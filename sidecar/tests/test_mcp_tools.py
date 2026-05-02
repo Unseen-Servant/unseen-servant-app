@@ -19,12 +19,9 @@ sys.argv = ["mcp_server.py"]
 
 from mcp_server import (
     search_library,
-    read_document,
     list_sources,
     list_game_systems,
     list_collections,
-    get_active_context,
-    compare_sources,
     sidecar,
 )
 
@@ -186,24 +183,6 @@ async def test_search_library_passes_search_all(mock_sidecar):
 
 
 # ---------------------------------------------------------------------------
-# get_active_context tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_get_active_context_when_set(mock_sidecar):
-    mock_sidecar.set_get("/api/active-context", {"active_context": "Strahd"})
-    result = await get_active_context()
-    assert "Strahd" in result
-
-
-@pytest.mark.asyncio
-async def test_get_active_context_when_unset(mock_sidecar):
-    mock_sidecar.set_get("/api/active-context", {"active_context": None})
-    result = await get_active_context()
-    assert "No active context" in result
-
-
-# ---------------------------------------------------------------------------
 # list_collections — active context marker
 # ---------------------------------------------------------------------------
 
@@ -220,35 +199,6 @@ async def test_list_collections_marks_active(mock_sidecar):
     result = await list_collections()
     assert "★" in result
     assert "Active context: Strahd" in result
-
-
-# ---------------------------------------------------------------------------
-# read_document tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_read_document_returns_content(mock_sidecar):
-    mock_sidecar.set_get("/api/source/dragonbane_monsters.pdf/content", {
-        "filename": "dragonbane_monsters.pdf",
-        "chunks": 3,
-        "content": "Fire Drake\nArmor Class: 14\nHit Points: 45",
-    })
-
-    result = await read_document("dragonbane_monsters.pdf")
-    assert "dragonbane_monsters.pdf" in result
-    assert "3 chunks" in result
-    assert "Fire Drake" in result
-
-
-@pytest.mark.asyncio
-async def test_read_document_not_found(mock_sidecar):
-    mock_sidecar.set_get(
-        "/api/source/nonexistent.pdf/content",
-        "Sidecar error: 404 — Source not found: nonexistent.pdf",
-    )
-
-    result = await read_document("nonexistent.pdf")
-    assert "404" in result
 
 
 # ---------------------------------------------------------------------------
@@ -307,42 +257,6 @@ async def test_list_game_systems_empty(mock_sidecar):
 
     result = await list_game_systems()
     assert "No game systems detected" in result
-
-
-# ---------------------------------------------------------------------------
-# compare_sources tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_compare_sources_shows_side_by_side(mock_sidecar):
-    def mock_search(json_data):
-        fname = json_data.get("source_filter", "unknown")
-        return {
-            "results": [
-                {
-                    "text": f"Grappling rules from {fname}",
-                    "filename": fname,
-                    "source": f"/path/{fname}",
-                    "chunk": 0,
-                    "relevance": 0.8,
-                }
-            ]
-        }
-
-    mock_sidecar.set_post("/api/search", mock_search)
-
-    result = await compare_sources(
-        "grappling", ["dragonbane.pdf", "dnd_5e.pdf"]
-    )
-    assert "dragonbane.pdf" in result
-    assert "dnd_5e.pdf" in result
-    assert "Comparing" in result
-
-
-@pytest.mark.asyncio
-async def test_compare_sources_needs_two_files(mock_sidecar):
-    result = await compare_sources("grappling", ["only_one.pdf"])
-    assert "at least 2" in result
 
 
 # ---------------------------------------------------------------------------
