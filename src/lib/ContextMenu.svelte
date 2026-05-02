@@ -9,6 +9,10 @@
   export let containingCollections: string[] = [];
   export let canAddToCollection: boolean = true;
   export let canScopeSearch: boolean = false;
+  // Hide/show state. `inheritedHidden` means an ancestor folder is hidden,
+  // so the toggle is omitted (user must unhide the originally-hidden folder).
+  export let directlyHidden: boolean = false;
+  export let inheritedHidden: boolean = false;
   export let onOpen: () => void = () => {};
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
@@ -20,6 +24,7 @@
   export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
   export let onCreateCollectionFromFolder: () => void = () => {};
+  export let onToggleHidden: () => void = () => {};
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
@@ -126,6 +131,13 @@
         {/if}
       </div>
     {/if}
+  {/if}
+
+  {#if !inheritedHidden}
+    <hr class="context-divider" />
+    <button class="context-item" on:click={onToggleHidden}>
+      {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
+    </button>
   {/if}
 
   <hr class="context-divider" />

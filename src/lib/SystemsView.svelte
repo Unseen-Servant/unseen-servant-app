@@ -1,6 +1,7 @@
 <script lang="ts">
   import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, FileStatusEntry, KnownGameSystem } from './types';
+  import { isPathOrAncestorIn } from './selectionUtils';
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -14,6 +15,12 @@
   // Tags excluded by the library filter. A multi-system file stays visible
   // under its non-excluded tags, but the excluded section itself is hidden.
   export let excludedSystems: Set<string> = new Set();
+
+  // User-hidden paths (same set as the tree). Entries whose path is hidden
+  // are dropped when `showHidden` is false; rendered with dimmed/italic
+  // styling when `showHidden` is true.
+  export let hiddenPaths: Set<string> = new Set();
+  export let showHidden: boolean = false;
 
   // Library root path — used to render parent folders relative rather than
   // absolute. Empty string falls back to absolute paths.
@@ -44,6 +51,7 @@
     const byTag = new Map<string, FileStatusEntry[]>();
     for (const e of entries) {
       if (displayPaths && !displayPaths.has(e.path)) continue;
+      if (!showHidden && isPathOrAncestorIn(e.path, hiddenPaths)) continue;
       const tags = e.game_systems && e.game_systems.length > 0
         ? e.game_systems
         : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : ['Untagged']);
@@ -160,6 +168,7 @@
               <li
                 class="file"
                 class:focused={focusedFilePath === entry.path}
+                class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
                 on:click={() => handleRowClick(entry)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
@@ -278,6 +287,15 @@
   }
   .file.focused {
     background: var(--bg-focused);
+  }
+  /* Hidden via the user's hide flag — only rendered when "Show hidden" is on.
+     Italic + dimmed so it reads as "explicitly suppressed", matching the
+     tree-view treatment. */
+  .file.hidden-item {
+    opacity: 0.55;
+  }
+  .file.hidden-item .file-name {
+    font-style: italic;
   }
   .file-icon {
     display: inline-flex;

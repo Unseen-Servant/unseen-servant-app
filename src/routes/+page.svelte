@@ -23,7 +23,7 @@
   import ActionButton from '../lib/ActionButton.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
-  import { computeAncestorPaths, areAllDescendantsSelected } from '../lib/selectionUtils';
+  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { runSyncJob } from '../lib/syncJob';
 
   let selectedFolder = '';
@@ -50,7 +50,17 @@
 
   // File focus & context menu
   let focusedFilePath: string | null = null;
-  let contextMenu: { x: number; y: number; item: FileItem; isIndexed: boolean } | null = null;
+  // `hideState` snapshots both the directly-hidden flag (path itself in
+  // hiddenPaths) and the inherited flag (an ancestor folder is). The menu
+  // shows Hide/Show only when `directlyHidden` is true or nothing is
+  // hidden along the path — descendants of a hidden folder get no toggle.
+  let contextMenu: {
+    x: number;
+    y: number;
+    item: FileItem;
+    isIndexed: boolean;
+    hideState: { directlyHidden: boolean; inheritedHidden: boolean };
+  } | null = null;
   let renamingFilePath: string | null = null;
   let statsModalPath: string | null = null;
 
@@ -76,6 +86,13 @@
   // filter narrows it further. Implies indexed-only since only indexed
   // files carry system tags.
   let filterExcludedSystems = new Set<string>();
+
+  // Display-only hidden flag. Stores explicitly-hidden paths (files or
+  // folder roots); descendants of a hidden folder are hidden via prefix
+  // match, not stored individually. Indexing is unaffected — hidden files
+  // still get indexed, searched, and counted in SystemsView.
+  let hiddenPaths = new Set<string>();
+  let showHidden = false;
 
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
   // 'systems' = flat list grouped by game system. Forced to 'tree' in
@@ -311,6 +328,14 @@
       if (savedFilter && typeof savedFilter === 'object' && Array.isArray(savedFilter.excludedSystems)) {
         filterExcludedSystems = new Set(savedFilter.excludedSystems);
       }
+      const savedHidden = await store.get<string[]>('hiddenPaths');
+      if (Array.isArray(savedHidden)) {
+        hiddenPaths = new Set(savedHidden);
+      }
+      const savedShowHidden = await store.get<boolean>('showHidden');
+      if (typeof savedShowHidden === 'boolean') {
+        showHidden = savedShowHidden;
+      }
       const savedViewMode = await store.get<string>('viewMode');
       if (savedViewMode === 'tree' || savedViewMode === 'systems') {
         viewMode = savedViewMode;
@@ -468,6 +493,53 @@
   function clearSystemFilter() {
     filterExcludedSystems = new Set();
     persistFilter();
+  }
+
+  $: hiddenCount = hiddenPaths.size;
+
+  function isPathHidden(path: string): boolean {
+    return isPathOrAncestorIn(path, hiddenPaths);
+  }
+
+  async function persistHidden() {
+    try {
+      const store = await load('settings.json');
+      await store.set('hiddenPaths', Array.from(hiddenPaths));
+      await store.set('showHidden', showHidden);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist hidden state:', e);
+    }
+  }
+
+  function toggleHidden(item: FileItem) {
+    // If the item is hidden by ancestor inheritance (not directly), do
+    // nothing — the context menu omits the action in that case, but guard
+    // here too in case the path is reached via another entry point.
+    if (hiddenPaths.has(item.path)) {
+      hiddenPaths.delete(item.path);
+    } else if (isPathHidden(item.path)) {
+      return;
+    } else {
+      hiddenPaths.add(item.path);
+    }
+    hiddenPaths = hiddenPaths;
+    // Once nothing is hidden, the "Show hidden" toggle has no meaningful
+    // state — snap it back to the default so reopening the filter menu
+    // shows a clean default rather than a stuck-on toggle.
+    if (hiddenPaths.size === 0) showHidden = false;
+    persistHidden();
+  }
+
+  function clearHidden() {
+    hiddenPaths = new Set();
+    showHidden = false;
+    persistHidden();
+  }
+
+  function toggleShowHidden() {
+    showHidden = !showHidden;
+    persistHidden();
   }
 
   async function setHideSetupButton(value: boolean) {
@@ -878,6 +950,22 @@
     : new Set<string>();
   $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
+  // Per-collection count of files currently hidden in the tree. Surfaced
+  // in the collections panel so users notice their curated set holds
+  // tucked-away items even when the tree is compressed.
+  $: hiddenCountByCollection = (() => {
+    const out: Record<string, number> = {};
+    if (hiddenPaths.size === 0) return out;
+    for (const col of Object.values(collections)) {
+      let n = 0;
+      for (const p of col.file_paths) {
+        if (isPathOrAncestorIn(p, hiddenPaths)) n++;
+      }
+      if (n > 0) out[col.name] = n;
+    }
+    return out;
+  })();
+
   // Filter for what the file tree shows. Composes scope + library filter:
   // 1. Scope picks the base file pool (collection / edit-mode-indexed / all).
   // 2. Library filter (excludedSystems) narrows to indexed files whose
@@ -996,11 +1084,16 @@
     focusedFilePath = item.is_dir ? null : item.path;
     // Snapshot isIndexed at click time so the open menu doesn't keep a live
     // reactive dependency on indexedPaths.
+    const directlyHidden = hiddenPaths.has(item.path);
     contextMenu = {
       x: event.clientX,
       y: event.clientY,
       item,
       isIndexed: indexedPaths.has(item.path),
+      hideState: {
+        directlyHidden,
+        inheritedHidden: !directlyHidden && isPathHidden(item.path),
+      },
     };
   }
 
@@ -1072,6 +1165,13 @@
     const item = contextMenu.item;
     contextMenu = null;
     setPathScope(item);
+  }
+
+  function handleContextToggleHidden() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    toggleHidden(item);
   }
 
   function handleContextAddToNewCollection() {
@@ -1823,6 +1923,10 @@
     onClearScope={handleClearScope}
     onToggleSystemFilter={toggleSystemFilter}
     onClearSystemFilter={clearSystemFilter}
+    {showHidden}
+    {hiddenCount}
+    onToggleShowHidden={toggleShowHidden}
+    onClearHidden={clearHidden}
     collapseAllVisible={!!selectedFolder && !searchActive}
     collapseAllDisabled={effectiveViewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
@@ -1836,6 +1940,7 @@
       {#if collectionsPanelOpen}
         <CollectionsPanel
           {collections}
+          {hiddenCountByCollection}
           activeName={activeContextName}
           editingName={editingCollectionName}
           onSetActive={setActiveContext}
@@ -1866,6 +1971,7 @@
             query={committedQuery}
             error={searchError}
             indexedFileCount={indexedPathsSet.size}
+            {hiddenPaths}
             onOpenResult={handleOpenResult}
           />
         {:else if effectiveViewMode === 'systems'}
@@ -1873,6 +1979,8 @@
             entries={indexedEntries}
             {displayPaths}
             excludedSystems={filterExcludedSystems}
+            {hiddenPaths}
+            {showHidden}
             libraryRoot={selectedFolder}
             {knownSystems}
             {focusedFilePath}
@@ -1904,6 +2012,8 @@
               {collectionFolders}
               {highlightPaths}
               {displayPaths}
+              {hiddenPaths}
+              {showHidden}
               onCollectionToggle={handleCollectionToggle}
             />
           {/each}
@@ -1952,6 +2062,9 @@
       onAddToNewCollection={handleContextAddToNewCollection}
       onRemoveFromCollection={handleContextRemoveFromCollection}
       onCreateCollectionFromFolder={handleContextCreateCollectionFromFolder}
+      directlyHidden={contextMenu.hideState.directlyHidden}
+      inheritedHidden={contextMenu.hideState.inheritedHidden}
+      onToggleHidden={handleContextToggleHidden}
       onClose={() => { contextMenu = null; }}
     />
   {/if}
