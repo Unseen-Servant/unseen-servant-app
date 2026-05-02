@@ -79,3 +79,18 @@ export function computeAncestorPaths(paths: Set<string>): Set<string> {
   }
   return ancestors;
 }
+
+/**
+ * Returns true if `path` itself is in `roots`, or any ancestor folder is.
+ * Used for inheritance-style flags (e.g. hidden) where flagging a folder
+ * implicitly flags its descendants.
+ */
+export function isPathOrAncestorIn(path: string, roots: Set<string>): boolean {
+  if (roots.size === 0) return false;
+  if (roots.has(path)) return true;
+  let dir = path;
+  while ((dir = dir.substring(0, dir.lastIndexOf('/'))) !== '') {
+    if (roots.has(dir)) return true;
+  }
+  return false;
+}

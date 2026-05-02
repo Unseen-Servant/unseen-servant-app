@@ -4,7 +4,7 @@
   import { openPath } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
-  import { areAllDescendantsSelected } from './selectionUtils';
+  import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
 
   export let item: FileItem;
   export let level: number = 0;
@@ -41,7 +41,16 @@
   // Includes ancestor folders of every shown file so the tree structure
   // remains intact.
   export let displayPaths: Set<string> | null = null;
-  $: hidden = displayPaths !== null && !displayPaths.has(item.path);
+
+  // User-hidden files/folders. Stores explicit hides; descendants of a
+  // hidden folder are hidden via prefix match. When `showHidden` is true,
+  // hidden rows still render but with a dimmed style.
+  export let hiddenPaths: Set<string> = new Set();
+  export let showHidden: boolean = false;
+
+  $: isHiddenItem = isPathOrAncestorIn(item.path, hiddenPaths);
+  $: hidden = (displayPaths !== null && !displayPaths.has(item.path)) ||
+              (isHiddenItem && !showHidden);
 
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
@@ -226,7 +235,7 @@
 <svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
-<div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} class:focused={isFocused} style="padding-left: {level * 1.5}rem;">
+<div class="item" class:dimmed={isDimmed} class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} style="padding-left: {level * 1.5}rem;">
   <div class="row-container">
     {#if showCheckbox}
       <button
@@ -340,6 +349,8 @@
           {collectionFolders}
           {highlightPaths}
           {displayPaths}
+          {hiddenPaths}
+          {showHidden}
           {onCollectionToggle}
         />
       {/each}
@@ -424,6 +435,14 @@
   }
   .dimmed {
     opacity: 0.35;
+  }
+  /* Hidden via the user's hide flag — rendered only when "Show hidden" is on.
+     Italicized + dimmed so it reads as "explicitly suppressed". */
+  .hidden-item {
+    opacity: 0.55;
+  }
+  .hidden-item .name {
+    font-style: italic;
   }
   .highlighted {
     background: rgba(182, 159, 129, 0.12);
