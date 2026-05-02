@@ -203,13 +203,14 @@
           {#if activeName === col.name}
             <span class="row-marker" title="Active">&#9733;</span>
           {/if}
-          <span class="row-count">{col.file_count}</span>
-          {#if hiddenCountByCollection[col.name]}
-            <span
-              class="row-hidden-count"
-              title={`${hiddenCountByCollection[col.name]} file${hiddenCountByCollection[col.name] === 1 ? '' : 's'} hidden in the tree`}
-            >({hiddenCountByCollection[col.name]} hidden)</span>
-          {/if}
+          <span
+            class="row-count"
+            title={hiddenCountByCollection[col.name]
+              ? `${col.file_count} file${col.file_count === 1 ? '' : 's'} (${hiddenCountByCollection[col.name]} hidden in the tree)`
+              : `${col.file_count} file${col.file_count === 1 ? '' : 's'}`}
+          >
+            {col.file_count}{#if hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
+          </span>
           <div class="row-actions">
             <button
               class="row-btn"
@@ -455,16 +456,7 @@
     flex-shrink: 0;
   }
   .row-hidden-count {
-    font-size: 0.65rem;
-    font-style: italic;
     color: var(--text-tertiary);
-    margin-right: 0.25rem;
-    flex-shrink: 0;
-  }
-  /* Hide on hover so the action buttons have room to surface. */
-  .row:hover .row-hidden-count,
-  .row.editing .row-hidden-count {
-    display: none;
   }
   .row-actions {
     display: none;
