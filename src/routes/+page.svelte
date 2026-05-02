@@ -20,7 +20,6 @@
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
-  import ActionButton from '../lib/ActionButton.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
@@ -70,7 +69,6 @@
   // Collections state
   let collections: Record<string, CollectionInfo> = {};
   let editingCollectionName: string | null = null;
-  let isCreatingCollection = false;
   let collectionEditPaths = new Set<string>();
   let collectionEditName = '';
   let collectionEditDescription = '';
@@ -939,7 +937,7 @@
     : '';
 
   // Collection mode derived state
-  $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
+  $: isCollectionEditMode = editingCollectionName !== null;
   $: highlightPaths = highlightedCollection && collections[highlightedCollection]
     ? new Set(collections[highlightedCollection].file_paths)
     : new Set<string>();
@@ -1151,7 +1149,7 @@
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    startCreateCollectionFromFolder(item);
+    createCollectionFromItem(item);
   }
 
   function handleContextSearchInScope() {
@@ -1172,7 +1170,7 @@
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    startCreateCollectionWithItem(item);
+    createCollectionFromItem(item);
   }
 
   async function handleContextDelete() {
@@ -1335,16 +1333,6 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  function startCreateCollection() {
-    collectionEditName = '';
-    collectionEditDescription = '';
-    collectionEditPaths = new Set();
-    isCreatingCollection = true;
-    editingCollectionName = null;
-    highlightedCollection = null;
-    setViewMode('systems');
-  }
-
   function startEditCollection(name: string) {
     const col = collections[name];
     if (!col) return;
@@ -1352,7 +1340,6 @@
     collectionEditDescription = col.description;
     collectionEditPaths = new Set(col.file_paths);
     editingCollectionName = name;
-    isCreatingCollection = false;
     highlightedCollection = null;
     setViewMode('systems');
     // The Save/Cancel controls now live inline on the panel row, so the
@@ -1362,43 +1349,21 @@
 
   function cancelCollectionEdit() {
     editingCollectionName = null;
-    isCreatingCollection = false;
     collectionEditPaths = new Set();
     collectionEditName = '';
     collectionEditDescription = '';
   }
 
   async function saveCollection() {
-    const name = collectionEditName.trim();
-    if (!name) return;
+    if (!editingCollectionName) return;
     const filePaths = Array.from(collectionEditPaths);
-
     try {
-      if (isCreatingCollection) {
-        await invoke<CollectionMutationResult>('create_collection', {
-          name,
-          filePaths,
-          description: collectionEditDescription,
-        });
-        jobNotification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
-      } else if (editingCollectionName) {
-        if (editingCollectionName !== name) {
-          await invoke('delete_collection', { name: editingCollectionName });
-          await invoke<CollectionMutationResult>('create_collection', {
-            name,
-            filePaths,
-            description: collectionEditDescription,
-          });
-          jobNotification.show({ type: 'success', message: `Renamed to "${name}"`, duration: 4000 });
-        } else {
-          await invoke<CollectionMutationResult>('update_collection', {
-            name,
-            filePaths,
-            description: collectionEditDescription,
-          });
-          jobNotification.show({ type: 'success', message: `Updated "${name}"`, duration: 4000 });
-        }
-      }
+      await invoke<CollectionMutationResult>('update_collection', {
+        name: editingCollectionName,
+        filePaths,
+        description: collectionEditDescription,
+      });
+      jobNotification.show({ type: 'success', message: `Updated "${editingCollectionName}"`, duration: 4000 });
       cancelCollectionEdit();
       await loadCollections();
     } catch (e) {
@@ -1516,22 +1481,48 @@
     }
   }
 
-  function startCreateCollectionFromFolder(folder: FileItem) {
-    const candidates = indexedPdfsUnderPath(folder.path);
+  // Pick a name based on `base`, suffixing " 2", " 3" etc. on collision.
+  function uniqueCollectionName(base: string): string {
+    if (!collections[base]) return base;
+    let suffix = 2;
+    while (collections[`${base} ${suffix}`]) suffix++;
+    return `${base} ${suffix}`;
+  }
+
+  // Create a collection seeded with the indexed PDFs under `item` and drop
+  // straight into edit mode for it. Saves immediately so there's always a
+  // panel row carrying the inline Save/Cancel controls; if the user
+  // cancels the edit, the seeded collection persists (matching the panel
+  // "+" flow).
+  async function createCollectionFromItem(item: FileItem) {
+    const candidates = item.is_dir
+      ? indexedPdfsUnderPath(item.path)
+      : [item.path];
     if (candidates.length === 0) {
       jobNotification.show({
         type: 'info',
-        message: `No indexed PDFs under "${folder.name}"`,
+        message: `No indexed PDFs under "${item.name}"`,
         duration: 4000,
       });
       return;
     }
-    collectionEditName = folder.name;
-    collectionEditDescription = '';
-    collectionEditPaths = new Set(candidates);
-    isCreatingCollection = true;
-    editingCollectionName = null;
-    highlightedCollection = null;
+    const baseName = item.is_dir ? item.name : item.name.replace(/\.pdf$/i, '');
+    const name = uniqueCollectionName(baseName);
+    try {
+      await invoke<CollectionMutationResult>('create_collection', {
+        name,
+        filePaths: candidates,
+        description: '',
+      });
+      await loadCollections();
+      startEditCollection(name);
+    } catch (e) {
+      jobNotification.show({
+        type: 'error',
+        message: `Could not create: ${String(e)}`,
+        duration: 5000,
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1662,27 +1653,6 @@
         duration: 5000,
       });
     }
-  }
-
-  function startCreateCollectionWithItem(item: FileItem) {
-    const candidates = item.is_dir
-      ? indexedPdfsUnderPath(item.path)
-      : [item.path];
-    if (candidates.length === 0) {
-      jobNotification.show({
-        type: 'info',
-        message: `No indexed PDFs under "${item.name}"`,
-        duration: 4000,
-      });
-      return;
-    }
-    collectionEditName = '';
-    collectionEditDescription = '';
-    collectionEditPaths = new Set(candidates);
-    isCreatingCollection = true;
-    editingCollectionName = null;
-    highlightedCollection = null;
-    setViewMode('systems');
   }
 
   function handleCollectionAdd(paths: string[]) {
@@ -1873,7 +1843,7 @@
   <Header
     bind:searchQuery
     {isSearching}
-    disabled={!selectedFolder || editingCollectionName !== null || isCreatingCollection}
+    disabled={!selectedFolder || isCollectionEditMode}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
     {scopeChip}
@@ -1921,20 +1891,6 @@
       {/if}
 
       <div class="file-tree-area">
-        {#if isCollectionEditMode && !editingCollectionName}
-          <!-- Fallback strip for in-progress create flows that don't yet have
-               a row in the panel (right-click "Create collection from
-               folder"). Established edits are controlled inline on the
-               panel row. -->
-          <div class="edit-files-strip">
-            <span class="ef-label">Creating collection:</span>
-            <span class="ef-name">{collectionEditName || 'New collection'}</span>
-            <span class="ef-count">{collectionEditPaths.size} file{collectionEditPaths.size === 1 ? '' : 's'}</span>
-            <div class="ef-spacer"></div>
-            <ActionButton kind="discard" label="Cancel" onClick={cancelCollectionEdit} />
-            <ActionButton kind="confirm" label="Save" onClick={saveCollection} />
-          </div>
-        {/if}
         {#if searchActive}
           <SearchResults
             results={searchResults}
@@ -2150,28 +2106,6 @@
   }
 
 
-  .edit-files-strip {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    margin: 0 0 0.5rem 0;
-    /* Opaque background so file rows scrolling under the sticky strip
-       don't bleed through. Keeps the warm tan accent on the border + text. */
-    background: var(--bg-focused);
-    border: 1px solid var(--text-accent);
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: var(--text-accent);
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  }
-  .ef-label { color: var(--text-secondary); }
-  .ef-name { font-weight: 600; }
-  .ef-count { color: var(--text-secondary); font-size: 0.75rem; }
-  .ef-spacer { flex: 1; }
   .error-banner {
     padding: 0.4rem 1rem;
     background: rgba(239, 68, 68, 0.1);
