@@ -268,10 +268,12 @@
 
   // Enter is overloaded: same query + results showing → open selected (the
   // user has already searched and is now committing). Otherwise → submit a
-  // (re-)search. This is the "Enter opens" UX confirmed in design review.
+  // (re-)search. The isSearching guard was dropped intentionally: a stale
+  // result list is still the right thing to act on when the user hits
+  // Enter — they're targeting what they can see.
   function handleSearchSubmit(q: string) {
     const trimmed = q.trim();
-    if (trimmed && trimmed === committedQuery && searchResults.length > 0 && !isSearching) {
+    if (trimmed && trimmed === committedQuery && searchResults.length > 0) {
       const sel = searchResults[selectedResultIndex];
       if (sel) {
         handleOpenResult(sel.filename, sel.page_start);
@@ -1257,6 +1259,13 @@
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       selectedResultIndex = Math.max(0, selectedResultIndex - 1);
+    } else if (event.key === 'Enter' && target?.closest('.search-results')) {
+      // Enter from a focused result row opens the selection. The search
+      // input has its own Enter handler (handleSearchSubmit) — don't
+      // double-fire by acting on this branch when focus is in the input.
+      event.preventDefault();
+      const sel = searchResults[selectedResultIndex];
+      if (sel) handleOpenResult(sel.filename, sel.page_start);
     }
   }
 
