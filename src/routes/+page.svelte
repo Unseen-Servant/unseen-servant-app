@@ -6,7 +6,7 @@
   import { pdfFileUrl } from '../lib/pdfUrl';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
+  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
@@ -998,21 +998,24 @@
     return out;
   })();
 
-  // Files (not folders) on disk that aren't in any collection. Walks the
-  // file tree once; the cost is fine for libraries up to a few thousand
-  // files. Also feeds the count shown in the filter menu.
+  // PDFs on disk that aren't in any collection. The frontend tree
+  // lazy-loads children one level at a time, so it only knows about
+  // expanded folders — instead, draw the universe from indexStatus,
+  // which the sidecar built by walking the whole library:
+  //   on-disk = up_to_date ∪ to_update ∪ to_add
+  // (to_remove / to_auto_remove are paths the index still tracks but
+  // that have already been deleted from disk, so they're excluded.)
   $: uncollectedFilePaths = (() => {
     const out = new Set<string>();
-    function walk(items: FileItem[]) {
-      for (const item of items) {
-        if (item.is_dir) {
-          if (item.children) walk(item.children);
-        } else if (!collectedPaths.has(item.path)) {
-          out.add(item.path);
-        }
+    if (!indexStatus) return out;
+    const consider = (entries: FileStatusEntry[]) => {
+      for (const e of entries) {
+        if (!collectedPaths.has(e.path)) out.add(e.path);
       }
-    }
-    walk(files);
+    };
+    consider(indexStatus.up_to_date);
+    consider(indexStatus.to_update);
+    consider(indexStatus.to_add);
     return out;
   })();
   $: uncollectedCount = uncollectedFilePaths.size;
