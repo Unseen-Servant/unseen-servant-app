@@ -211,7 +211,7 @@
           class:editing={isEditing}
           class:archived={col.archived}
           title={col.description || col.name}
-          on:click={() => handleRowClick(col.name)}
+          on:click={() => { if (!isEditing) handleRowClick(col.name); }}
         >
           <span
             class="row-icon"
@@ -237,7 +237,8 @@
           >
             {displayCount}{#if !isEditing && hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
           </span>
-          <div class="row-actions">
+          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+          <div class="row-actions" on:click|stopPropagation>
             {#if isEditing}
               <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
               <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
