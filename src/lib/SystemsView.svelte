@@ -98,11 +98,26 @@
     return { name: entry.filename, path: entry.path, is_dir: false, children: null };
   }
 
-  function handleRowClick(entry: FileStatusEntry) {
+  function handleRowClick(
+    event: MouseEvent,
+    entry: FileStatusEntry,
+    groupTag: string,
+    groupEntries: FileStatusEntry[],
+  ) {
+    // In edit mode the row IS the checkbox — clicking anywhere on it
+    // toggles inclusion (with shift-range support). Focus-on-click would
+    // just be friction when curating a collection.
+    if (isCollectionEditMode) {
+      handleCheckboxClick(event, entry, groupTag, groupEntries);
+      return;
+    }
     onFocusFile(entry.path);
   }
 
   async function handleDoubleClick(entry: FileStatusEntry) {
+    // In edit mode the row's job is "tick to include" — opening the
+    // PDF on double-click would just compete with that intent.
+    if (isCollectionEditMode) return;
     try {
       await openPath(entry.path);
     } catch (e) {
@@ -241,7 +256,7 @@
                 class="file"
                 class:focused={focusedFilePath === entry.path}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
-                on:click={() => handleRowClick(entry)}
+                on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
               >
