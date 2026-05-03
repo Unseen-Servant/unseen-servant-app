@@ -81,17 +81,19 @@
       </button>
     </header>
 
-    {#if segments.length > 0}
-      <div class="breadcrumb" aria-label="Section path">
-        {#each segments as segment, idx (idx)}
-          {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
-          <span class="bc-segment">{segment}</span>
-        {/each}
-      </div>
-    {/if}
+    <div class="body">
+      {#if segments.length > 0}
+        <div class="breadcrumb" aria-label="Section path">
+          {#each segments as segment, idx (idx)}
+            {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
+            <span class="bc-segment">{segment}</span>
+          {/each}
+        </div>
+      {/if}
 
-    <div class="snippet">
-      <Markdown md={result.text} />
+      <div class="snippet">
+        <Markdown md={result.text} />
+      </div>
     </div>
   {/if}
 </aside>
@@ -101,8 +103,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow-y: auto;
-    padding: 1rem 1.1rem;
+    overflow: hidden;
     background: var(--bg-container);
     border-left: 1px solid var(--border-subtle);
     font-family: var(--font-body);
@@ -111,19 +112,27 @@
 
   .empty {
     margin: auto;
+    padding: 1rem;
     color: var(--text-tertiary);
     font-style: italic;
     font-size: 0.9rem;
   }
 
   .head {
+    flex-shrink: 0;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.7rem;
-    padding-bottom: 0.6rem;
+    padding: 1rem 1.1rem 0.6rem;
     border-bottom: 2px solid color-mix(in srgb, var(--system-color, var(--text-accent)) 40%, var(--border-subtle));
-    margin-bottom: 0.7rem;
+  }
+
+  .body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.7rem 1.1rem 1rem;
   }
 
   .head-text {
