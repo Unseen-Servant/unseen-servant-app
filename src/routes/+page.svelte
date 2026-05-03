@@ -96,6 +96,12 @@
   let hiddenPaths = new Set<string>();
   let showHidden = false;
 
+  // Library filter: when on, narrow the tree to files not in any
+  // collection — a curation gap-finder. Inert when the view is already
+  // scoped to a collection (active context or edit mode), since
+  // "uncategorized within a collection" is empty by definition.
+  let showOnlyUncollected = false;
+
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
   // 'systems' = flat list grouped by game system. Forced to 'tree' in
   // collection-edit mode (selection requires the directory tree).
@@ -338,6 +344,10 @@
       if (typeof savedShowHidden === 'boolean') {
         showHidden = savedShowHidden;
       }
+      const savedShowOnlyUncollected = await store.get<boolean>('showOnlyUncollected');
+      if (typeof savedShowOnlyUncollected === 'boolean') {
+        showOnlyUncollected = savedShowOnlyUncollected;
+      }
       const savedViewMode = await store.get<string>('viewMode');
       if (savedViewMode === 'tree' || savedViewMode === 'systems') {
         viewMode = savedViewMode;
@@ -539,6 +549,21 @@
   function toggleShowHidden() {
     showHidden = !showHidden;
     persistHidden();
+  }
+
+  async function persistShowOnlyUncollected() {
+    try {
+      const store = await load('settings.json');
+      await store.set('showOnlyUncollected', showOnlyUncollected);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist showOnlyUncollected:', e);
+    }
+  }
+
+  function toggleShowOnlyUncollected() {
+    showOnlyUncollected = !showOnlyUncollected;
+    persistShowOnlyUncollected();
   }
 
   async function setHideSetupButton(value: boolean) {
@@ -962,15 +987,58 @@
     return out;
   })();
 
-  // Filter for what the file tree shows. Composes scope + library filter:
+  // Union of every collection's file paths. Powers the "uncategorized"
+  // filter and any membership check that's library-wide rather than
+  // single-collection.
+  $: collectedPaths = (() => {
+    const out = new Set<string>();
+    for (const col of Object.values(collections)) {
+      for (const p of col.file_paths) out.add(p);
+    }
+    return out;
+  })();
+
+  // Files (not folders) on disk that aren't in any collection. Walks the
+  // file tree once; the cost is fine for libraries up to a few thousand
+  // files. Also feeds the count shown in the filter menu.
+  $: uncollectedFilePaths = (() => {
+    const out = new Set<string>();
+    function walk(items: FileItem[]) {
+      for (const item of items) {
+        if (item.is_dir) {
+          if (item.children) walk(item.children);
+        } else if (!collectedPaths.has(item.path)) {
+          out.add(item.path);
+        }
+      }
+    }
+    walk(files);
+    return out;
+  })();
+  $: uncollectedCount = uncollectedFilePaths.size;
+
+  // The "uncategorized" filter is meaningful only at library scope, with
+  // collections to compare against. Hide it inside collection scopes
+  // (active context / edit mode) and when no collections exist.
+  $: collectionFilterAvailable =
+    !isCollectionEditMode &&
+    !activeContextName &&
+    Object.keys(collections).length > 0;
+
+  // Filter for what the file tree shows. Composes scope + library filters:
   // 1. Scope picks the base file pool (collection / edit-mode-indexed / all).
-  // 2. Library filter (excludedSystems) narrows to indexed files whose
+  // 2. Systems filter (excludedSystems) narrows to indexed files whose
   //    system isn't excluded — implies indexed-only since only indexed
-  //    files carry system tags.
-  // 3. Add ancestor folders so the tree structure stays intact.
+  //    files carry system tags. Scoped to systems view: tags are that
+  //    view's organizing axis, but in tree view they'd silently filter a
+  //    filesystem-shaped structure that wasn't organized around them.
+  // 3. Uncategorized filter narrows to files not in any collection.
+  // 4. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
   $: displayPaths = (() => {
-    const filterActive = filterExcludedSystems.size > 0;
+    const systemsFilterActive =
+      filterExcludedSystems.size > 0 && viewMode === 'systems';
+    const uncollectedActive = showOnlyUncollected && collectionFilterAvailable;
 
     let baseFiles: Set<string> | null;
     if (isCollectionEditMode) {
@@ -978,8 +1046,10 @@
     } else if (activeContextName) {
       const col = collections[activeContextName];
       baseFiles = col ? new Set(col.file_paths) : null;
-    } else if (filterActive) {
+    } else if (systemsFilterActive) {
       baseFiles = new Set(indexedPaths);
+    } else if (uncollectedActive) {
+      baseFiles = new Set(uncollectedFilePaths);
     } else {
       return null;
     }
@@ -987,7 +1057,7 @@
     if (!baseFiles) return null;
 
     let visible = baseFiles;
-    if (filterActive) {
+    if (systemsFilterActive) {
       visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
       visible = new Set([...visible].filter((p) => {
         const tags = effectiveGameSystemMap.get(p) ?? [];
@@ -997,6 +1067,9 @@
         // Keep the file as long as at least one of its tags is not excluded.
         return tags.some((t) => !filterExcludedSystems.has(t));
       }));
+    }
+    if (uncollectedActive) {
+      visible = new Set([...visible].filter((p) => !collectedPaths.has(p)));
     }
 
     if (visible.size === 0) return new Set<string>();
@@ -1864,6 +1937,10 @@
     {hiddenCount}
     onToggleShowHidden={toggleShowHidden}
     onClearHidden={clearHidden}
+    {collectionFilterAvailable}
+    {showOnlyUncollected}
+    {uncollectedCount}
+    onToggleShowOnlyUncollected={toggleShowOnlyUncollected}
     collapseAllVisible={!!selectedFolder && !searchActive}
     collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}

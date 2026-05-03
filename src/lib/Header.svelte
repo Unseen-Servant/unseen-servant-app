@@ -12,6 +12,9 @@
   export let availableSystems: { name: string; count: number }[] = [];
   export let showHidden: boolean = false;
   export let hiddenCount: number = 0;
+  export let collectionFilterAvailable: boolean = false;
+  export let showOnlyUncollected: boolean = false;
+  export let uncollectedCount: number = 0;
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
@@ -21,6 +24,7 @@
   export let onClearSystemFilter: () => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
+  export let onToggleShowOnlyUncollected: () => void = () => {};
   export let collapseAllVisible: boolean = false;
   export let collapseAllDisabled: boolean = false;
   export let onCollapseAll: () => void = () => {};
@@ -33,9 +37,14 @@
 
   // Indicator lights up only for non-default filter states. The default for
   // hidden items is "not shown" (showHidden = false), so the dot appears
-  // when the user has flipped it on. System exclusions are non-default by
-  // existing as a non-empty set.
-  $: filterActive = excludedSystems.size > 0 || (hiddenCount > 0 && showHidden);
+  // when the user has flipped it on. System exclusions are scoped to the
+  // systems view (where they're the organizing axis); they're dormant in
+  // tree view, so they don't contribute to the indicator there.
+  $: systemsFilterRelevant = viewMode === 'systems';
+  $: filterActive =
+    (systemsFilterRelevant && excludedSystems.size > 0) ||
+    (hiddenCount > 0 && showHidden) ||
+    (collectionFilterAvailable && showOnlyUncollected);
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -156,12 +165,17 @@
           anchorEl={filterBtn}
           {excludedSystems}
           systems={availableSystems}
+          showSystemFilter={systemsFilterRelevant}
           onToggleSystem={onToggleSystemFilter}
           onClearSystems={onClearSystemFilter}
           {showHidden}
           {hiddenCount}
           {onToggleShowHidden}
           {onClearHidden}
+          showCollectionFilter={collectionFilterAvailable}
+          {showOnlyUncollected}
+          {uncollectedCount}
+          {onToggleShowOnlyUncollected}
           onClose={() => { filterOpen = false; }}
         />
       </div>
