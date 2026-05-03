@@ -12,6 +12,8 @@
   import ContextMenu from '../lib/ContextMenu.svelte';
   import Header from '../lib/Header.svelte';
   import SearchResults from '../lib/SearchResults.svelte';
+  import SearchInspector from '../lib/SearchInspector.svelte';
+  import SearchScopeBar from '../lib/SearchScopeBar.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
@@ -150,7 +152,14 @@
   let isSearching = false;
   let searchError: string | null = null;
   let searchSeq = 0;
+  let selectedResultIndex = 0;
+  let headerComponent: Header | undefined;
   $: searchActive = committedQuery.trim() !== '';
+  // Clamp selection when results shrink (e.g. new query returns fewer hits).
+  $: if (selectedResultIndex >= searchResults.length) {
+    selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
+  }
+  $: selectedResult = searchResults.length > 0 ? searchResults[selectedResultIndex] ?? null : null;
   $: scopeChip = (() => {
     if (isCollectionEditMode) return null;
     if (pathScope) {
@@ -240,6 +249,7 @@
       });
       if (seq !== searchSeq) return;
       searchResults = response.results ?? [];
+      selectedResultIndex = 0;
     } catch (e) {
       if (seq !== searchSeq) return;
       searchError = String(e);
@@ -256,8 +266,19 @@
     runSearch(q);
   }
 
+  // Enter is overloaded: same query + results showing → open selected (the
+  // user has already searched and is now committing). Otherwise → submit a
+  // (re-)search. This is the "Enter opens" UX confirmed in design review.
   function handleSearchSubmit(q: string) {
-    committedQuery = q.trim();
+    const trimmed = q.trim();
+    if (trimmed && trimmed === committedQuery && searchResults.length > 0 && !isSearching) {
+      const sel = searchResults[selectedResultIndex];
+      if (sel) {
+        handleOpenResult(sel.filename, sel.page_start);
+        return;
+      }
+    }
+    committedQuery = trimmed;
     runSearch(q);
   }
 
@@ -268,6 +289,7 @@
     searchError = null;
     isSearching = false;
     searchSeq += 1;
+    selectedResultIndex = 0;
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -1202,6 +1224,40 @@
       if (renamingFilePath) { renamingFilePath = null; return; }
       if (focusedFilePath) { focusedFilePath = null; }
     }
+
+    // Cmd/Ctrl+F: focus the search input from anywhere in the app.
+    if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+      event.preventDefault();
+      headerComponent?.focus();
+      return;
+    }
+
+    if (!searchActive || searchResults.length === 0) return;
+
+    // Cmd/Ctrl + 1..9: jump to result N. Works regardless of focus.
+    if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
+      const idx = parseInt(event.key, 10) - 1;
+      if (idx < searchResults.length) {
+        event.preventDefault();
+        selectedResultIndex = idx;
+      }
+      return;
+    }
+
+    // Arrow keys move selection only when the user is navigating search
+    // (focus is in the search input or the results list). Outside those
+    // surfaces — e.g. file tree, panels — arrow keys retain native behavior.
+    const target = event.target as HTMLElement | null;
+    const inSearchSurface = target?.closest('.search-input, .search-results') !== null;
+    if (!inSearchSurface) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      selectedResultIndex = Math.max(0, selectedResultIndex - 1);
+    }
   }
 
   function handleContextMenu(event: MouseEvent, item: FileItem) {
@@ -1970,6 +2026,7 @@
 
 <main class="app-layout">
   <Header
+    bind:this={headerComponent}
     bind:searchQuery
     {isSearching}
     disabled={!selectedFolder || isCollectionEditMode}
@@ -2030,17 +2087,41 @@
         />
       {/if}
 
-      <div class="file-tree-area">
+      <div class="file-tree-area" class:search-mode={searchActive}>
         {#if searchActive}
-          <SearchResults
-            results={searchResults}
-            isLoading={isSearching}
-            query={committedQuery}
-            error={searchError}
+          <SearchScopeBar
+            {scopeChip}
+            excludedSystems={filterExcludedSystems}
+            {showHidden}
+            resultCount={searchResults.length}
             indexedFileCount={indexedPathsSet.size}
-            {hiddenPaths}
-            onOpenResult={handleOpenResult}
+            isLoading={isSearching}
+            onClearScope={handleClearScope}
+            onToggleSystemFilter={toggleSystemFilter}
+            onToggleShowHidden={toggleShowHidden}
           />
+          <div class="search-split">
+            <div class="search-list-pane">
+              <SearchResults
+                results={searchResults}
+                isLoading={isSearching}
+                query={committedQuery}
+                error={searchError}
+                indexedFileCount={indexedPathsSet.size}
+                selectedIndex={selectedResultIndex}
+                {hiddenPaths}
+                onSelect={(i) => { selectedResultIndex = i; }}
+                onOpenResult={handleOpenResult}
+              />
+            </div>
+            <div class="search-inspector-pane">
+              <SearchInspector
+                result={selectedResult}
+                {hiddenPaths}
+                onOpenResult={handleOpenResult}
+              />
+            </div>
+          </div>
         {:else if viewMode === 'systems'}
           <SystemsView
             entries={indexedEntries}
@@ -2244,6 +2325,42 @@
     min-width: 0;
     overflow-y: auto;
     padding: 0.25rem 0.75rem;
+  }
+
+  /* Search mode replaces the scrollable single column with a fixed scope
+     bar on top and a split (list / inspector) below. The .file-tree-area
+     itself stops scrolling — child panes manage their own overflow. */
+  .file-tree-area.search-mode {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .search-split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
+
+  .search-list-pane {
+    flex: 0 0 38%;
+    min-width: 280px;
+    max-width: 520px;
+    border-right: 1px solid var(--border-subtle);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .search-inspector-pane {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
 
