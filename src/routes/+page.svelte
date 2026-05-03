@@ -2081,6 +2081,7 @@
     viewToggleVisible={!!selectedFolder && !searchActive}
     {viewMode}
     onSetViewMode={setViewMode}
+    {searchActive}
   />
 
   {#if selectedFolder}

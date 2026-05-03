@@ -36,16 +36,19 @@
   export let viewToggleVisible: boolean = false;
   export let viewMode: 'tree' | 'systems' = 'tree';
   export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
+  export let searchActive: boolean = false;
 
   let filterOpen = false;
   let filterBtn: HTMLButtonElement | undefined;
 
   // Indicator lights up only for non-default filter states. The default for
   // hidden items is "not shown" (showHidden = false), so the dot appears
-  // when the user has flipped it on. System exclusions are scoped to the
-  // systems view (where they're the organizing axis); they're dormant in
-  // tree view, so they don't contribute to the indicator there.
-  $: systemsFilterRelevant = viewMode === 'systems';
+  // when the user has flipped it on. System exclusions are dormant in tree
+  // view (they're the organizing axis only in systems view) but are also
+  // applied to the search backend, so they're relevant whenever search is
+  // active too — exposing the filter section in both contexts keeps the
+  // editor reachable wherever the exclusion is taking effect.
+  $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
   $: filterActive =
     (systemsFilterRelevant && excludedSystems.size > 0) ||
     (hiddenCount > 0 && showHidden) ||
