@@ -1056,16 +1056,19 @@
   $: uncollectedCount = uncollectedFilePaths.size;
 
   // Whether the Collections section in the filter menu has anything to
-  // show. Two mutually-exclusive rows live there:
-  //   - Focus on {activeContextName}  — when a collection is active
-  //   - Show only uncategorized       — when none is active and at
-  //                                     least one collection exists
+  // show. Three mutually-exclusive radio options live there:
+  //   - Show all              — default, no narrowing
+  //   - Show only collection  — focus mode, requires an active context
+  //   - Show only loose       — uncategorized files, requires that any
+  //                             collection exists (works alongside an
+  //                             active collection — useful when
+  //                             scouting candidates to add)
   // Edit mode forces its own UI, so the section is hidden there.
   $: collectionFilterAvailable =
     !isCollectionEditMode &&
     (activeContextName !== null || Object.keys(collections).length > 0);
   $: uncategorizedFilterAvailable =
-    collectionFilterAvailable && !activeContextName;
+    !isCollectionEditMode && Object.keys(collections).length > 0;
   $: focusFilterAvailable =
     collectionFilterAvailable && activeContextName !== null;
 
@@ -1084,8 +1087,13 @@
   $: displayPaths = (() => {
     const systemsFilterActive =
       filterExcludedSystems.size > 0 && viewMode === 'systems';
-    const uncollectedActive = showOnlyUncollected && uncategorizedFilterAvailable;
     const focusActive = focusActiveCollection && focusFilterAvailable;
+    // Focus and loose are radio-mutex through the menu, but a stray
+    // persisted state could in principle have both set. Treat focus as
+    // canonical so the tree never collapses to empty (collection ∩ not-
+    // in-any-collection = ∅).
+    const uncollectedActive =
+      !focusActive && showOnlyUncollected && uncategorizedFilterAvailable;
 
     let baseFiles: Set<string> | null;
     if (isCollectionEditMode) {

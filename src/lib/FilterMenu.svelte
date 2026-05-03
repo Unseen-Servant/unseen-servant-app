@@ -66,6 +66,30 @@
 
   $: hasSystemFilter = excludedSystems.size > 0;
   $: hasHidden = hiddenCount > 0;
+
+  // The Collections section presents three mutually-exclusive radio
+  // options. The radio reflects the *effective* state, but the two
+  // underlying preferences (focusActiveCollection, showOnlyUncollected)
+  // are persisted independently — so a user who prefers loose-mode keeps
+  // that preference even after a context activation temporarily shifts
+  // the effective state. Switching modes clears the other flag so the
+  // mutex is enforced by the handler regardless of how persisted state
+  // started.
+  $: collectionsMode = (() => {
+    if (focusFilterAvailable && focusActiveCollection) return 'collection';
+    if (uncategorizedFilterAvailable && showOnlyUncollected) return 'loose';
+    return 'all';
+  })();
+  function handleCollectionsMode(value: 'all' | 'collection' | 'loose') {
+    const desiredFocus = value === 'collection';
+    const desiredLoose = value === 'loose';
+    if (focusFilterAvailable && desiredFocus !== focusActiveCollection) {
+      onToggleFocusActiveCollection();
+    }
+    if (uncategorizedFilterAvailable && desiredLoose !== showOnlyUncollected) {
+      onToggleShowOnlyUncollected();
+    }
+  }
 </script>
 
 <svelte:window on:click={handleWindowClick} on:keydown={handleKey} />
@@ -99,28 +123,47 @@
         <div class="section-head">
           <span class="section-label">Collections</span>
         </div>
-        {#if focusFilterAvailable && activeContextName}
-          <label class="row" title="Narrow the tree to just this collection's files. Off = highlight them in the full library.">
-            <span class="row-name">Focus on {activeContextName}</span>
-            <input
-              class="app-checkbox"
-              type="checkbox"
-              checked={focusActiveCollection}
-              on:change={onToggleFocusActiveCollection}
-            />
-          </label>
-        {:else if uncategorizedFilterAvailable}
-          <label class="row" title="Show only files that aren't in any collection — find what you haven't curated yet">
-            <span class="row-name">Show only uncategorized</span>
-            <span class="row-count">{uncollectedCount}</span>
-            <input
-              class="app-checkbox"
-              type="checkbox"
-              checked={showOnlyUncollected}
-              on:change={onToggleShowOnlyUncollected}
-            />
-          </label>
-        {/if}
+        <label class="row" title="Show every file in the library">
+          <span class="row-name">Show all</span>
+          <input
+            class="app-radio"
+            type="radio"
+            name="collections-mode"
+            checked={collectionsMode === 'all'}
+            on:change={() => handleCollectionsMode('all')}
+          />
+        </label>
+        <label
+          class="row"
+          class:row-disabled={!focusFilterAvailable}
+          title={focusFilterAvailable
+            ? `Narrow the tree to just ${activeContextName}'s files`
+            : 'Activate a collection from the panel to enable'}
+        >
+          <span class="row-name">Show only collection</span>
+          <input
+            class="app-radio"
+            type="radio"
+            name="collections-mode"
+            checked={collectionsMode === 'collection'}
+            disabled={!focusFilterAvailable}
+            on:change={() => handleCollectionsMode('collection')}
+          />
+        </label>
+        <label
+          class="row"
+          title="Show only files that aren't in any collection — useful for scouting curation candidates"
+        >
+          <span class="row-name">Show only loose</span>
+          <span class="row-count">{uncollectedCount}</span>
+          <input
+            class="app-radio"
+            type="radio"
+            name="collections-mode"
+            checked={collectionsMode === 'loose'}
+            on:change={() => handleCollectionsMode('loose')}
+          />
+        </label>
       </div>
     {/if}
 
