@@ -522,11 +522,13 @@
     }
     filterExcludedSystems = filterExcludedSystems;
     persistFilter();
+    if (committedQuery) runSearch(committedQuery);
   }
 
   function clearSystemFilter() {
     filterExcludedSystems = new Set();
     persistFilter();
+    if (committedQuery) runSearch(committedQuery);
   }
 
   $: hiddenCount = hiddenPaths.size;
