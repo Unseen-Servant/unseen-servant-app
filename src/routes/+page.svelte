@@ -1867,7 +1867,7 @@
     collapseAllVisible={!!selectedFolder && !searchActive}
     collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
-    viewToggleVisible={!!selectedFolder && !searchActive && !isCollectionEditMode}
+    viewToggleVisible={!!selectedFolder && !searchActive}
     {viewMode}
     onSetViewMode={setViewMode}
   />
