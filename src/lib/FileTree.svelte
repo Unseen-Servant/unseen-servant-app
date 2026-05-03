@@ -78,7 +78,7 @@
 
   $: isChecked = item.is_dir ? isFullySelected : isSelected;
   $: isIndeterminate = item.is_dir && isSelected && !isFullySelected;
-  $: isHighlighted = !item.is_dir && highlightPaths.size > 0 && highlightPaths.has(item.path);
+  $: isHighlighted = highlightPaths.size > 0 && highlightPaths.has(item.path);
 
   $: isFocused = !item.is_dir && item.path === focusedFilePath;
   $: isRenaming = item.path === renamingFilePath;

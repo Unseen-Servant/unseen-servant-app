@@ -22,6 +22,11 @@
   export let hiddenPaths: Set<string> = new Set();
   export let showHidden: boolean = false;
 
+  // Paths to visually highlight (e.g. files in the active collection).
+  // Mirrors FileTree's treatment so highlighting works the same way
+  // regardless of view mode.
+  export let highlightPaths: Set<string> = new Set();
+
   // Library root path — used to render parent folders relative rather than
   // absolute. Empty string falls back to absolute paths.
   export let libraryRoot: string = '';
@@ -256,6 +261,7 @@
                 class="file"
                 class:focused={focusedFilePath === entry.path}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
+                class:highlighted={highlightPaths.has(entry.path)}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
@@ -455,6 +461,12 @@
   }
   .file.hidden-item .file-name {
     font-style: italic;
+  }
+  /* Mirrors FileTree's highlighted treatment so a collection's members
+     read the same way regardless of view mode. */
+  .file.highlighted {
+    background: rgba(182, 159, 129, 0.12);
+    box-shadow: inset 3px 0 0 var(--text-accent);
   }
   .file-icon {
     display: inline-flex;

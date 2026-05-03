@@ -14,6 +14,12 @@
   // Available systems (with counts) — typically gameSystemStats from +page.
   export let systems: { name: string; count: number }[] = [];
 
+  // Whether the Game systems section is meaningful in the current context.
+  // System tags are the organizing axis of the systems view, so we only
+  // expose the filter there — in tree view it's a foreign content filter
+  // over a filesystem-shaped structure.
+  export let showSystemFilter: boolean = true;
+
   // Hidden items section. `hiddenCount` is the number of explicitly-hidden
   // paths (folders count as 1 each — descendants are implicit). The row
   // toggles `showHidden`; when count is 0 the row is disabled.
@@ -21,6 +27,22 @@
   export let hiddenCount: number = 0;
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
+
+  // Curation section. Three mutually-exclusive radios live here,
+  // dispatched by the parent via `*FilterAvailable` flags:
+  //   - Show all: no narrowing
+  //   - Show only collection: focus on the active collection
+  //   - Show only loose: files not in any collection
+  // The parent gates the entire section via `showCollectionFilter`.
+  export let showCollectionFilter: boolean = false;
+  export let uncategorizedFilterAvailable: boolean = false;
+  export let focusFilterAvailable: boolean = false;
+  export let activeContextName: string | null = null;
+  export let showOnlyUncollected: boolean = false;
+  export let uncollectedCount: number = 0;
+  export let focusActiveCollection: boolean = false;
+  export let onToggleShowOnlyUncollected: () => void = () => {};
+  export let onToggleFocusActiveCollection: () => void = () => {};
 
   export let onClose: () => void = () => {};
 
@@ -43,6 +65,30 @@
 
   $: hasSystemFilter = excludedSystems.size > 0;
   $: hasHidden = hiddenCount > 0;
+
+  // The Collections section presents three mutually-exclusive radio
+  // options. The radio reflects the *effective* state, but the two
+  // underlying preferences (focusActiveCollection, showOnlyUncollected)
+  // are persisted independently — so a user who prefers loose-mode keeps
+  // that preference even after a context activation temporarily shifts
+  // the effective state. Switching modes clears the other flag so the
+  // mutex is enforced by the handler regardless of how persisted state
+  // started.
+  $: collectionsMode = (() => {
+    if (focusFilterAvailable && focusActiveCollection) return 'collection';
+    if (uncategorizedFilterAvailable && showOnlyUncollected) return 'loose';
+    return 'all';
+  })();
+  function handleCollectionsMode(value: 'all' | 'collection' | 'loose') {
+    const desiredFocus = value === 'collection';
+    const desiredLoose = value === 'loose';
+    if (focusFilterAvailable && desiredFocus !== focusActiveCollection) {
+      onToggleFocusActiveCollection();
+    }
+    if (uncategorizedFilterAvailable && desiredLoose !== showOnlyUncollected) {
+      onToggleShowOnlyUncollected();
+    }
+  }
 </script>
 
 <svelte:window on:click={handleWindowClick} on:keydown={handleKey} />
@@ -70,33 +116,85 @@
       </label>
     </div>
 
-    {#if systems.length > 0}
+    {#if showCollectionFilter}
       <hr class="section-divider" />
       <div class="section">
         <div class="section-head">
-          <span class="section-label">Game systems</span>
-          {#if hasSystemFilter}
-            <button class="reset-link" on:click={onClearSystems}>Reset</button>
-          {/if}
+          <span class="section-label">Curation</span>
         </div>
-        <div class="systems">
-          {#each systems as { name, count }}
-            <label class="row" title={name}>
-              <span class="row-name">{name}</span>
-              <span class="row-count">{count}</span>
-              <input
-                class="app-checkbox"
-                type="checkbox"
-                checked={!excludedSystems.has(name)}
-                on:change={() => onToggleSystem(name)}
-              />
-            </label>
-          {/each}
-        </div>
+        <label class="row" title="Show every file in the library">
+          <span class="row-name">Show all</span>
+          <input
+            class="app-radio"
+            type="radio"
+            name="collections-mode"
+            checked={collectionsMode === 'all'}
+            on:change={() => handleCollectionsMode('all')}
+          />
+        </label>
+        <label
+          class="row"
+          class:row-disabled={!focusFilterAvailable}
+          title={focusFilterAvailable
+            ? `Narrow the tree to just ${activeContextName}'s files`
+            : 'Activate a collection from the panel to enable'}
+        >
+          <span class="row-name">Show only collection</span>
+          <input
+            class="app-radio"
+            type="radio"
+            name="collections-mode"
+            checked={collectionsMode === 'collection'}
+            disabled={!focusFilterAvailable}
+            on:change={() => handleCollectionsMode('collection')}
+          />
+        </label>
+        <label
+          class="row"
+          title="Show only files that aren't in any collection — useful for scouting curation candidates"
+        >
+          <span class="row-name">Show only loose</span>
+          <span class="row-count">{uncollectedCount}</span>
+          <input
+            class="app-radio"
+            type="radio"
+            name="collections-mode"
+            checked={collectionsMode === 'loose'}
+            on:change={() => handleCollectionsMode('loose')}
+          />
+        </label>
       </div>
-    {:else}
-      <hr class="section-divider" />
-      <div class="empty">No game systems detected yet. Index some files first.</div>
+    {/if}
+
+    {#if showSystemFilter}
+      {#if systems.length > 0}
+        <hr class="section-divider" />
+        <div class="section">
+          <div class="section-head">
+            <span class="section-label">Game systems</span>
+            {#if hasSystemFilter}
+              <button class="reset-link" on:click={onClearSystems}>Reset</button>
+            {/if}
+          </div>
+          <div class="systems">
+            {#each systems as { name, count }}
+              <label class="row" title={name}>
+                <span class="row-name">{name}</span>
+                <span class="row-count">{count}</span>
+                <input
+                  class="app-checkbox"
+                  type="checkbox"
+                  checked={!excludedSystems.has(name)}
+                  on:change={() => onToggleSystem(name)}
+                />
+              </label>
+            {/each}
+          </div>
+        </div>
+      {:else}
+        <hr class="section-divider" />
+        <div class="empty">No game systems detected yet. Index some files first.</div>
+      {/if}
     {/if}
   </div>
 {/if}

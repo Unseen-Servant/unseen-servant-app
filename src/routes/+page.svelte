@@ -6,7 +6,7 @@
   import { pdfFileUrl } from '../lib/pdfUrl';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
+  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
@@ -76,7 +76,6 @@
   let collectionEditPaths = new Set<string>();
   let collectionEditName = '';
   let collectionEditDescription = '';
-  let highlightedCollection: string | null = null;
   let activeContextName: string | null = null;
   let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
@@ -95,6 +94,18 @@
   // still get indexed, searched, and counted in SystemsView.
   let hiddenPaths = new Set<string>();
   let showHidden = false;
+
+  // Library filter: when on, narrow the tree to files not in any
+  // collection — a curation gap-finder. Inert when the view is already
+  // scoped to a collection (active context or edit mode), since
+  // "uncategorized within a collection" is empty by definition.
+  let showOnlyUncollected = false;
+
+  // Focus mode for the active collection. Default off: activating a
+  // collection just highlights its files in the tree (the library map
+  // stays whole). When on, the tree narrows to that collection — the
+  // pre-highlight focused-view behavior, kept for live-play workflows.
+  let focusActiveCollection = false;
 
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
   // 'systems' = flat list grouped by game system. Forced to 'tree' in
@@ -338,6 +349,14 @@
       if (typeof savedShowHidden === 'boolean') {
         showHidden = savedShowHidden;
       }
+      const savedShowOnlyUncollected = await store.get<boolean>('showOnlyUncollected');
+      if (typeof savedShowOnlyUncollected === 'boolean') {
+        showOnlyUncollected = savedShowOnlyUncollected;
+      }
+      const savedFocusActiveCollection = await store.get<boolean>('focusActiveCollection');
+      if (typeof savedFocusActiveCollection === 'boolean') {
+        focusActiveCollection = savedFocusActiveCollection;
+      }
       const savedViewMode = await store.get<string>('viewMode');
       if (savedViewMode === 'tree' || savedViewMode === 'systems') {
         viewMode = savedViewMode;
@@ -539,6 +558,36 @@
   function toggleShowHidden() {
     showHidden = !showHidden;
     persistHidden();
+  }
+
+  async function persistShowOnlyUncollected() {
+    try {
+      const store = await load('settings.json');
+      await store.set('showOnlyUncollected', showOnlyUncollected);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist showOnlyUncollected:', e);
+    }
+  }
+
+  function toggleShowOnlyUncollected() {
+    showOnlyUncollected = !showOnlyUncollected;
+    persistShowOnlyUncollected();
+  }
+
+  async function persistFocusActiveCollection() {
+    try {
+      const store = await load('settings.json');
+      await store.set('focusActiveCollection', focusActiveCollection);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist focusActiveCollection:', e);
+    }
+  }
+
+  function toggleFocusActiveCollection() {
+    focusActiveCollection = !focusActiveCollection;
+    persistFocusActiveCollection();
   }
 
   async function setHideSetupButton(value: boolean) {
@@ -942,9 +991,20 @@
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
-  $: highlightPaths = highlightedCollection && collections[highlightedCollection]
-    ? new Set(collections[highlightedCollection].file_paths)
-    : new Set<string>();
+  // Activating a collection highlights its files in the tree rather
+  // than filtering everything else out. Ancestors are included so the
+  // highlight propagates up through collapsed folders — without that,
+  // a scattered collection's files would be invisible until every
+  // containing folder was manually expanded. Edit mode handles its own
+  // membership UI (checkboxes) and shouldn't compete with highlights.
+  $: highlightPaths = (() => {
+    if (isCollectionEditMode || !activeContextName) return new Set<string>();
+    const col = collections[activeContextName];
+    if (!col) return new Set<string>();
+    const files = new Set(col.file_paths);
+    if (files.size === 0) return files;
+    return new Set<string>([...files, ...computeAncestorPaths(files)]);
+  })();
 
   // Per-collection count of files currently hidden in the tree. Surfaced
   // in the collections panel so users notice their curated set holds
@@ -962,24 +1022,89 @@
     return out;
   })();
 
-  // Filter for what the file tree shows. Composes scope + library filter:
-  // 1. Scope picks the base file pool (collection / edit-mode-indexed / all).
-  // 2. Library filter (excludedSystems) narrows to indexed files whose
+  // Union of every collection's file paths. Powers the "uncategorized"
+  // filter and any membership check that's library-wide rather than
+  // single-collection.
+  $: collectedPaths = (() => {
+    const out = new Set<string>();
+    for (const col of Object.values(collections)) {
+      for (const p of col.file_paths) out.add(p);
+    }
+    return out;
+  })();
+
+  // PDFs on disk that aren't in any collection. The frontend tree
+  // lazy-loads children one level at a time, so it only knows about
+  // expanded folders — instead, draw the universe from indexStatus,
+  // which the sidecar built by walking the whole library:
+  //   on-disk = up_to_date ∪ to_update ∪ to_add
+  // (to_remove / to_auto_remove are paths the index still tracks but
+  // that have already been deleted from disk, so they're excluded.)
+  $: uncollectedFilePaths = (() => {
+    const out = new Set<string>();
+    if (!indexStatus) return out;
+    const consider = (entries: FileStatusEntry[]) => {
+      for (const e of entries) {
+        if (!collectedPaths.has(e.path)) out.add(e.path);
+      }
+    };
+    consider(indexStatus.up_to_date);
+    consider(indexStatus.to_update);
+    consider(indexStatus.to_add);
+    return out;
+  })();
+  $: uncollectedCount = uncollectedFilePaths.size;
+
+  // Whether the Collections section in the filter menu has anything to
+  // show. Three mutually-exclusive radio options live there:
+  //   - Show all              — default, no narrowing
+  //   - Show only collection  — focus mode, requires an active context
+  //   - Show only loose       — uncategorized files, requires that any
+  //                             collection exists (works alongside an
+  //                             active collection — useful when
+  //                             scouting candidates to add)
+  // Edit mode forces its own UI, so the section is hidden there.
+  $: collectionFilterAvailable =
+    !isCollectionEditMode &&
+    (activeContextName !== null || Object.keys(collections).length > 0);
+  $: uncategorizedFilterAvailable =
+    !isCollectionEditMode && Object.keys(collections).length > 0;
+  $: focusFilterAvailable =
+    collectionFilterAvailable && activeContextName !== null;
+
+  // Filter for what the file tree shows. Composes scope + library filters:
+  // 1. Edit mode and focus mode pick the base file pool. An active
+  //    collection without focus mode just highlights — the tree shows
+  //    the whole library so users can see those files in context.
+  // 2. Systems filter (excludedSystems) narrows to indexed files whose
   //    system isn't excluded — implies indexed-only since only indexed
-  //    files carry system tags.
-  // 3. Add ancestor folders so the tree structure stays intact.
+  //    files carry system tags. Scoped to systems view: tags are that
+  //    view's organizing axis, but in tree view they'd silently filter a
+  //    filesystem-shaped structure that wasn't organized around them.
+  // 3. Uncategorized filter narrows to files not in any collection.
+  // 4. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
   $: displayPaths = (() => {
-    const filterActive = filterExcludedSystems.size > 0;
+    const systemsFilterActive =
+      filterExcludedSystems.size > 0 && viewMode === 'systems';
+    const focusActive = focusActiveCollection && focusFilterAvailable;
+    // Focus and loose are radio-mutex through the menu, but a stray
+    // persisted state could in principle have both set. Treat focus as
+    // canonical so the tree never collapses to empty (collection ∩ not-
+    // in-any-collection = ∅).
+    const uncollectedActive =
+      !focusActive && showOnlyUncollected && uncategorizedFilterAvailable;
 
     let baseFiles: Set<string> | null;
     if (isCollectionEditMode) {
       baseFiles = new Set(indexedPaths);
-    } else if (activeContextName) {
+    } else if (focusActive && activeContextName) {
       const col = collections[activeContextName];
       baseFiles = col ? new Set(col.file_paths) : null;
-    } else if (filterActive) {
+    } else if (systemsFilterActive) {
       baseFiles = new Set(indexedPaths);
+    } else if (uncollectedActive) {
+      baseFiles = new Set(uncollectedFilePaths);
     } else {
       return null;
     }
@@ -987,7 +1112,7 @@
     if (!baseFiles) return null;
 
     let visible = baseFiles;
-    if (filterActive) {
+    if (systemsFilterActive) {
       visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
       visible = new Set([...visible].filter((p) => {
         const tags = effectiveGameSystemMap.get(p) ?? [];
@@ -997,6 +1122,9 @@
         // Keep the file as long as at least one of its tags is not excluded.
         return tags.some((t) => !filterExcludedSystems.has(t));
       }));
+    }
+    if (uncollectedActive) {
+      visible = new Set([...visible].filter((p) => !collectedPaths.has(p)));
     }
 
     if (visible.size === 0) return new Set<string>();
@@ -1345,7 +1473,6 @@
     collectionEditPaths = new Set(col.file_paths);
     editingCollectionName = name;
     draftName = null;
-    highlightedCollection = null;
     setViewMode('systems');
     // The Save/Cancel controls now live inline on the panel row, so the
     // panel must be visible while editing.
@@ -1360,7 +1487,6 @@
     collectionEditPaths = new Set(paths);
     draftName = name;
     editingCollectionName = null;
-    highlightedCollection = null;
     setViewMode('systems');
     collectionsPanelOpen = true;
   }
@@ -1864,6 +1990,15 @@
     {hiddenCount}
     onToggleShowHidden={toggleShowHidden}
     onClearHidden={clearHidden}
+    {collectionFilterAvailable}
+    {uncategorizedFilterAvailable}
+    {focusFilterAvailable}
+    {activeContextName}
+    {showOnlyUncollected}
+    {uncollectedCount}
+    {focusActiveCollection}
+    onToggleShowOnlyUncollected={toggleShowOnlyUncollected}
+    onToggleFocusActiveCollection={toggleFocusActiveCollection}
     collapseAllVisible={!!selectedFolder && !searchActive}
     collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
@@ -1913,6 +2048,7 @@
             excludedSystems={filterExcludedSystems}
             {hiddenPaths}
             {showHidden}
+            {highlightPaths}
             libraryRoot={selectedFolder}
             {knownSystems}
             {focusedFilePath}
