@@ -28,12 +28,11 @@
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
 
-  // Collections section. Two mutually-exclusive rows live here, picked
-  // by the parent via `*FilterAvailable` flags:
-  //   - Focus on {activeContextName}: when a collection is active, this
-  //     toggle narrows the tree to it (vs. the default highlight).
-  //   - Show only uncategorized: when none is active, this toggle
-  //     narrows the tree to files not in any collection.
+  // Curation section. Three mutually-exclusive radios live here,
+  // dispatched by the parent via `*FilterAvailable` flags:
+  //   - Show all: no narrowing
+  //   - Show only collection: focus on the active collection
+  //   - Show only loose: files not in any collection
   // The parent gates the entire section via `showCollectionFilter`.
   export let showCollectionFilter: boolean = false;
   export let uncategorizedFilterAvailable: boolean = false;
@@ -121,7 +120,7 @@
       <hr class="section-divider" />
       <div class="section">
         <div class="section-head">
-          <span class="section-label">Collections</span>
+          <span class="section-label">Curation</span>
         </div>
         <label class="row" title="Show every file in the library">
           <span class="row-name">Show all</span>
