@@ -172,6 +172,15 @@
     box-shadow: inset 3px 0 0 var(--text-accent);
   }
 
+  /* Selection state is the visual cue for "current row"; click-focus on a
+     tabindex=-1 row would otherwise stack a parchment focus outline on top
+     when arrow keys are pressed (keyboard interaction triggers
+     :focus-visible), so suppress it here. */
+  .result-row:focus,
+  .result-row:focus-visible {
+    outline: none;
+  }
+
   .result-row.selected .index {
     color: var(--text-accent);
   }
