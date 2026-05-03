@@ -1,12 +1,23 @@
 <script lang="ts">
   import Markdown from 'svelte-exmarkdown';
-  import type { SearchResultItem } from './types';
+  import type { SearchResultItem, KnownGameSystem } from './types';
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
 
   export let result: SearchResultItem | null = null;
   export let hiddenPaths: Set<string> = new Set();
+  export let knownSystems: KnownGameSystem[] = [];
   export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
+
+  // Tag → color lookup, matching the FileTree / SystemsView pattern.
+  $: tagColors = (() => {
+    const m = new Map<string, string>();
+    for (const sys of knownSystems) {
+      if (sys.color) m.set(sys.tag, sys.color);
+    }
+    return m;
+  })();
+  $: sysColor = result ? tagColors.get(result.game_system) ?? null : null;
 
   function relevancePercent(r: number): number {
     return Math.round(r * 100);
@@ -26,7 +37,7 @@
   }
 </script>
 
-<aside class="inspector">
+<aside class="inspector" style={sysColor ? `--system-color: ${sysColor}` : ''}>
   {#if !result}
     <div class="empty">Select a result to preview.</div>
   {:else}
@@ -111,7 +122,7 @@
     justify-content: space-between;
     gap: 0.7rem;
     padding-bottom: 0.6rem;
-    border-bottom: 1px solid var(--border-subtle);
+    border-bottom: 2px solid color-mix(in srgb, var(--system-color, var(--text-accent)) 40%, var(--border-subtle));
     margin-bottom: 0.7rem;
   }
 

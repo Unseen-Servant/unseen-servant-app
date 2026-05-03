@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { SearchResultItem } from './types';
+  import type { SearchResultItem, KnownGameSystem } from './types';
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
 
@@ -10,9 +10,23 @@
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
   export let hiddenPaths: Set<string> = new Set();
+  export let knownSystems: KnownGameSystem[] = [];
   export let selectedIndex: number = 0;
   export let onSelect: (index: number) => void = () => {};
   export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
+
+  // Tag → color lookup. Matches the pattern in FileTree.svelte and
+  // SystemsView.svelte so the system color cue is consistent across views.
+  $: tagColors = (() => {
+    const m = new Map<string, string>();
+    for (const sys of knownSystems) {
+      if (sys.color) m.set(sys.tag, sys.color);
+    }
+    return m;
+  })();
+  function colorFor(tag: string): string | null {
+    return tagColors.get(tag) ?? null;
+  }
 
   let rowEls: (HTMLElement | null)[] = [];
 
@@ -87,10 +101,12 @@
       {@const pct = relevancePercent(result.relevance)}
       {@const span = pageSpan(result.page_start, result.page_end)}
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
+      {@const sysColor = colorFor(result.game_system)}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <div
         class="result-row"
         class:selected={i === selectedIndex}
+        style={sysColor ? `--system-color: ${sysColor}` : ''}
         bind:this={rowEls[i]}
         on:click={() => handleRowClick(i)}
         on:dblclick={() => handleRowDblClick(i, result)}
@@ -154,6 +170,7 @@
   }
 
   .result-row {
+    position: relative;
     display: flex;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
@@ -163,13 +180,33 @@
     align-items: flex-start;
   }
 
+  /* DAW track-color stripe at the left edge: always-on system color,
+     widens with a soft glow on selection. Falls back to parchment when
+     the row's system has no color so selection still reads. */
+  .result-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--system-color, transparent);
+    transition: width var(--transition-fast), filter var(--transition-fast), background var(--transition-fast);
+    pointer-events: none;
+  }
+
   .result-row:hover {
     background: var(--bg-focused);
   }
 
   .result-row.selected {
     background: var(--bg-focused);
-    box-shadow: inset 3px 0 0 var(--text-accent);
+  }
+
+  .result-row.selected::before {
+    width: 4px;
+    background: var(--system-color, var(--text-accent));
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--system-color, var(--text-accent)) 65%, transparent));
   }
 
   /* Selection state is the visual cue for "current row"; click-focus on a

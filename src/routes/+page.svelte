@@ -2110,6 +2110,7 @@
                 indexedFileCount={indexedPathsSet.size}
                 selectedIndex={selectedResultIndex}
                 {hiddenPaths}
+                {knownSystems}
                 onSelect={(i) => { selectedResultIndex = i; }}
                 onOpenResult={handleOpenResult}
               />
@@ -2118,6 +2119,7 @@
               <SearchInspector
                 result={selectedResult}
                 {hiddenPaths}
+                {knownSystems}
                 onOpenResult={handleOpenResult}
               />
             </div>
