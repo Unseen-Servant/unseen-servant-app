@@ -13,8 +13,12 @@
   export let showHidden: boolean = false;
   export let hiddenCount: number = 0;
   export let collectionFilterAvailable: boolean = false;
+  export let uncategorizedFilterAvailable: boolean = false;
+  export let focusFilterAvailable: boolean = false;
+  export let activeContextName: string | null = null;
   export let showOnlyUncollected: boolean = false;
   export let uncollectedCount: number = 0;
+  export let focusActiveCollection: boolean = false;
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
@@ -25,6 +29,7 @@
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
   export let onToggleShowOnlyUncollected: () => void = () => {};
+  export let onToggleFocusActiveCollection: () => void = () => {};
   export let collapseAllVisible: boolean = false;
   export let collapseAllDisabled: boolean = false;
   export let onCollapseAll: () => void = () => {};
@@ -44,7 +49,8 @@
   $: filterActive =
     (systemsFilterRelevant && excludedSystems.size > 0) ||
     (hiddenCount > 0 && showHidden) ||
-    (collectionFilterAvailable && showOnlyUncollected);
+    (uncategorizedFilterAvailable && showOnlyUncollected) ||
+    (focusFilterAvailable && focusActiveCollection);
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -173,9 +179,14 @@
           {onToggleShowHidden}
           {onClearHidden}
           showCollectionFilter={collectionFilterAvailable}
+          {uncategorizedFilterAvailable}
+          {focusFilterAvailable}
+          {activeContextName}
           {showOnlyUncollected}
           {uncollectedCount}
+          {focusActiveCollection}
           {onToggleShowOnlyUncollected}
+          {onToggleFocusActiveCollection}
           onClose={() => { filterOpen = false; }}
         />
       </div>

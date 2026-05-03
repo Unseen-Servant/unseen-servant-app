@@ -28,14 +28,22 @@
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
 
-  // Collections section. The "uncategorized" filter narrows the tree to
-  // files not in any collection — a curation gap-finder. Hidden in
-  // collection scopes (active context, edit mode) and when no collections
-  // exist; the parent decides via `showCollectionFilter`.
+  // Collections section. Two mutually-exclusive rows live here, picked
+  // by the parent via `*FilterAvailable` flags:
+  //   - Focus on {activeContextName}: when a collection is active, this
+  //     toggle narrows the tree to it (vs. the default highlight).
+  //   - Show only uncategorized: when none is active, this toggle
+  //     narrows the tree to files not in any collection.
+  // The parent gates the entire section via `showCollectionFilter`.
   export let showCollectionFilter: boolean = false;
+  export let uncategorizedFilterAvailable: boolean = false;
+  export let focusFilterAvailable: boolean = false;
+  export let activeContextName: string | null = null;
   export let showOnlyUncollected: boolean = false;
   export let uncollectedCount: number = 0;
+  export let focusActiveCollection: boolean = false;
   export let onToggleShowOnlyUncollected: () => void = () => {};
+  export let onToggleFocusActiveCollection: () => void = () => {};
 
   export let onClose: () => void = () => {};
 
@@ -91,16 +99,28 @@
         <div class="section-head">
           <span class="section-label">Collections</span>
         </div>
-        <label class="row" title="Show only files that aren't in any collection — find what you haven't curated yet">
-          <span class="row-name">Show only uncategorized</span>
-          <span class="row-count">{uncollectedCount}</span>
-          <input
-            class="app-checkbox"
-            type="checkbox"
-            checked={showOnlyUncollected}
-            on:change={onToggleShowOnlyUncollected}
-          />
-        </label>
+        {#if focusFilterAvailable && activeContextName}
+          <label class="row" title="Narrow the tree to just this collection's files. Off = highlight them in the full library.">
+            <span class="row-name">Focus on {activeContextName}</span>
+            <input
+              class="app-checkbox"
+              type="checkbox"
+              checked={focusActiveCollection}
+              on:change={onToggleFocusActiveCollection}
+            />
+          </label>
+        {:else if uncategorizedFilterAvailable}
+          <label class="row" title="Show only files that aren't in any collection — find what you haven't curated yet">
+            <span class="row-name">Show only uncategorized</span>
+            <span class="row-count">{uncollectedCount}</span>
+            <input
+              class="app-checkbox"
+              type="checkbox"
+              checked={showOnlyUncollected}
+              on:change={onToggleShowOnlyUncollected}
+            />
+          </label>
+        {/if}
       </div>
     {/if}
 
