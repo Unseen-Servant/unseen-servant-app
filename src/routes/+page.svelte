@@ -191,6 +191,32 @@
       .concat((indexStatus?.to_update ?? []).map((e) => e.path))
   );
 
+  // The "of N files" denominator in the SearchScopeBar — mirrors the same
+  // narrowing primitives runSearch passes to the backend (path scope OR
+  // active collection, then system exclusion). When no filters are set,
+  // this collapses to the full indexed-paths count.
+  $: searchableFileCount = (() => {
+    let universe: string[];
+    if (pathScope) {
+      universe = pathScope.kind === 'file'
+        ? (indexedPathsSet.has(pathScope.path) ? [pathScope.path] : [])
+        : indexedPdfsUnderPath(pathScope.path);
+    } else if (activeContextName && collections[activeContextName]) {
+      universe = collections[activeContextName].file_paths.filter((p) => indexedPathsSet.has(p));
+    } else {
+      universe = Array.from(indexedPathsSet);
+    }
+    if (filterExcludedSystems.size === 0) return universe.length;
+    // A file passes when at least one of its tags is not excluded — matches
+    // the include-list semantics of the gameSystems param to search_index.
+    let count = 0;
+    for (const path of universe) {
+      const tags = effectiveGameSystemMap.get(path) ?? [];
+      if (tags.length > 0 && tags.some((t) => !filterExcludedSystems.has(t))) count++;
+    }
+    return count;
+  })();
+
   async function runSearch(q: string) {
     const trimmed = q.trim();
     if (!trimmed) {
@@ -2116,7 +2142,7 @@
             excludedSystems={filterExcludedSystems}
             {showHidden}
             resultCount={searchResults.length}
-            indexedFileCount={indexedPathsSet.size}
+            indexedFileCount={searchableFileCount}
             isLoading={isSearching}
             onClearScope={handleClearScope}
             onToggleSystemFilter={toggleSystemFilter}

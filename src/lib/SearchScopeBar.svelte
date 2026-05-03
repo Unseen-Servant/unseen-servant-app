@@ -66,7 +66,7 @@
     {#if isLoading}
       <span class="meter">searching…</span>
     {:else}
-      <span class="meter" title="Across {indexedFileCount} indexed file{indexedFileCount === 1 ? '' : 's'}">
+      <span class="meter" title="Across {indexedFileCount} file{indexedFileCount === 1 ? '' : 's'} matching the active scope and filters">
         {resultCount} {resultCount === 1 ? 'hit' : 'hits'} <span class="meter-of">of {indexedFileCount} files</span>
       </span>
     {/if}
