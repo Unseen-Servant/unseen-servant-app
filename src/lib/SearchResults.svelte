@@ -39,6 +39,15 @@
     });
   }
 
+  // Imperative handle for the parent so it can move keyboard focus into the
+  // list (e.g. ArrowDown from the search input). Selection state and focus
+  // are kept in lockstep so Enter on a focused row opens the visible
+  // selection without ambiguity.
+  export function focusRow(index: number): void {
+    const el = rowEls[index];
+    el?.focus();
+  }
+
   function relevanceCells(r: number): number {
     if (r <= 0) return 0;
     return Math.max(1, Math.min(5, Math.ceil(r * 5)));

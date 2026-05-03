@@ -154,6 +154,7 @@
   let searchSeq = 0;
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
+  let searchResultsComponent: SearchResults | undefined;
   $: searchActive = committedQuery.trim() !== '';
   // Clamp selection when results shrink (e.g. new query returns fewer hits).
   $: if (selectedResultIndex >= searchResults.length) {
@@ -266,21 +267,12 @@
     runSearch(q);
   }
 
-  // Enter is overloaded: same query + results showing → open selected (the
-  // user has already searched and is now committing). Otherwise → submit a
-  // (re-)search. The isSearching guard was dropped intentionally: a stale
-  // result list is still the right thing to act on when the user hits
-  // Enter — they're targeting what they can see.
+  // Enter in the search input always (re-)submits. To open a result, the
+  // user moves focus into the list with ArrowDown (or clicks a row) and
+  // presses Enter there. This combobox split avoids the overloaded-Enter
+  // ambiguity we tried earlier.
   function handleSearchSubmit(q: string) {
-    const trimmed = q.trim();
-    if (trimmed && trimmed === committedQuery && searchResults.length > 0) {
-      const sel = searchResults[selectedResultIndex];
-      if (sel) {
-        handleOpenResult(sel.filename, sel.page_start);
-        return;
-      }
-    }
-    committedQuery = trimmed;
+    committedQuery = q.trim();
     runSearch(q);
   }
 
@@ -1236,36 +1228,50 @@
 
     if (!searchActive || searchResults.length === 0) return;
 
-    // Cmd/Ctrl + 1..9: jump to result N. Works regardless of focus.
+    const target = event.target as HTMLElement | null;
+    const inInput = target?.closest('.search-input') !== null;
+    const inList = target?.closest('.search-results') !== null;
+
+    // Cmd/Ctrl + 1..9: jump to result N and move focus to it so Enter
+    // opens. Works regardless of where focus currently lives.
     if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
       const idx = parseInt(event.key, 10) - 1;
       if (idx < searchResults.length) {
         event.preventDefault();
         selectedResultIndex = idx;
+        searchResultsComponent?.focusRow(idx);
       }
       return;
     }
 
-    // Arrow keys move selection only when the user is navigating search
-    // (focus is in the search input or the results list). Outside those
-    // surfaces — e.g. file tree, panels — arrow keys retain native behavior.
-    const target = event.target as HTMLElement | null;
-    const inSearchSurface = target?.closest('.search-input, .search-results') !== null;
-    if (!inSearchSurface) return;
-
+    // Combobox flow: ArrowDown from the input pops focus into the list at
+    // the current selection. Arrow nav within the list moves both
+    // selection and focus together. ArrowUp from the first row pops back
+    // to the input. Enter on a focused row opens; Escape returns to input.
     if (event.key === 'ArrowDown') {
+      if (inInput) {
+        event.preventDefault();
+        searchResultsComponent?.focusRow(selectedResultIndex);
+      } else if (inList) {
+        event.preventDefault();
+        selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
+        searchResultsComponent?.focusRow(selectedResultIndex);
+      }
+    } else if (event.key === 'ArrowUp' && inList) {
       event.preventDefault();
-      selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      selectedResultIndex = Math.max(0, selectedResultIndex - 1);
-    } else if (event.key === 'Enter' && target?.closest('.search-results')) {
-      // Enter from a focused result row opens the selection. The search
-      // input has its own Enter handler (handleSearchSubmit) — don't
-      // double-fire by acting on this branch when focus is in the input.
+      if (selectedResultIndex > 0) {
+        selectedResultIndex -= 1;
+        searchResultsComponent?.focusRow(selectedResultIndex);
+      } else {
+        headerComponent?.focus();
+      }
+    } else if (event.key === 'Enter' && inList) {
       event.preventDefault();
       const sel = searchResults[selectedResultIndex];
       if (sel) handleOpenResult(sel.filename, sel.page_start);
+    } else if (event.key === 'Escape' && inList) {
+      event.preventDefault();
+      headerComponent?.focus();
     }
   }
 
@@ -2112,6 +2118,7 @@
           <div class="search-split">
             <div class="search-list-pane">
               <SearchResults
+                bind:this={searchResultsComponent}
                 results={searchResults}
                 isLoading={isSearching}
                 query={committedQuery}
