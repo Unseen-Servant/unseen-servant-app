@@ -1,5 +1,6 @@
 <script lang="ts">
   import FilterMenu from './FilterMenu.svelte';
+  import { chordHint } from './keybindings';
 
   export let searchQuery: string = '';
   export let isSearching: boolean = false;
@@ -70,6 +71,11 @@
     inputEl?.focus();
   }
 
+  export function toggleFilter() {
+    if (!filterVisible) return;
+    filterOpen = !filterOpen;
+  }
+
   function clearDebounce() {
     if (debounceTimer !== null) {
       clearTimeout(debounceTimer);
@@ -134,7 +140,7 @@
         class="panel-toggle"
         class:active={panelOpen}
         on:click={onTogglePanel}
-        title={panelOpen ? 'Hide collections panel' : 'Show collections panel'}
+        title={(panelOpen ? 'Hide collections panel' : 'Show collections panel') + chordHint('sidebar.toggle')}
         aria-label="Toggle collections panel"
         aria-pressed={panelOpen}
       >
@@ -149,7 +155,7 @@
         class="panel-toggle"
         class:active={viewMode === 'systems'}
         on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
-        title={viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system'}
+        title={(viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system') + chordHint('view.toggle')}
         aria-label="Toggle view mode"
         aria-pressed={viewMode === 'systems'}
       >
@@ -184,7 +190,7 @@
           class:has-filter={filterActive}
           on:click|stopPropagation={() => { filterOpen = !filterOpen; }}
           bind:this={filterBtn}
-          title="Filter library"
+          title={`Filter library${chordHint('filter.toggle')}`}
           aria-label="Filter library"
           aria-haspopup="menu"
           aria-expanded={filterOpen}
