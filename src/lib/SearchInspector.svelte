@@ -56,9 +56,7 @@
           {/if}
         </div>
         <div class="sub">
-          {#if result.game_system}
-            <span class="system-name">{result.game_system}</span>
-          {/if}
+          {#if result.game_system}<span>{result.game_system}</span>{/if}
           {#if span}<span class="dot">·</span><span>{span}</span>{/if}
           <span class="dot">·</span>
           <span class="gauge" role="img" aria-label="{pct}% match" title="{pct}% match">
@@ -171,10 +169,6 @@
     gap: 0.35rem;
     font-size: 0.8rem;
     color: var(--text-secondary);
-  }
-
-  .system-name {
-    color: var(--system-color, var(--text-secondary));
   }
 
   .dot {
