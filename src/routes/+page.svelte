@@ -1529,6 +1529,10 @@
         .catch(() => {});
     }
     if (committedQuery) runSearch(committedQuery);
+    // Setting scope is a clear signal of intent to type a query in that
+    // scope — auto-focus the search input so the user doesn't have to
+    // click. Standard "Search in <X>" pattern.
+    headerComponent?.focus();
   }
 
   function clearPathScope() {

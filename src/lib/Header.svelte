@@ -56,6 +56,13 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let inputEl: HTMLInputElement | null = null;
 
+  // Two-press backspace on the scope chip: first press arms the chip
+  // (visual highlight, no removal yet — gives the user a chance to back
+  // out), second press clears it. Disarmed by typing, by Escape, by the
+  // chip being externally cleared, or by the input losing focus.
+  let scopeChipArmed = false;
+  $: if (!scopeChip) scopeChipArmed = false;
+
   export function focus() {
     inputEl?.focus();
   }
@@ -68,6 +75,7 @@
   }
 
   function handleInput() {
+    scopeChipArmed = false;
     clearDebounce();
     const current = searchQuery;
     debounceTimer = setTimeout(() => {
@@ -77,16 +85,35 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Backspace' && searchQuery === '' && scopeChip) {
+      e.preventDefault();
+      if (scopeChipArmed) {
+        scopeChipArmed = false;
+        onClearScope();
+      } else {
+        scopeChipArmed = true;
+      }
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       clearDebounce();
       onSubmit(searchQuery);
-    } else if (e.key === 'Escape' && searchQuery.length > 0) {
-      e.preventDefault();
-      clearDebounce();
-      searchQuery = '';
-      onClear();
+    } else if (e.key === 'Escape') {
+      if (scopeChipArmed) {
+        e.preventDefault();
+        scopeChipArmed = false;
+      } else if (searchQuery.length > 0) {
+        e.preventDefault();
+        clearDebounce();
+        searchQuery = '';
+        onClear();
+      }
     }
+  }
+
+  function handleBlur() {
+    scopeChipArmed = false;
   }
 
   function handleClear() {
@@ -197,6 +224,7 @@
     {#if scopeChip}
       <span
         class="scope-chip"
+        class:armed={scopeChipArmed}
         title={scopeChip.tooltip ?? `${scopeChip.kind}: ${scopeChip.label}`}
       >
         <span class="scope-kind">in {scopeChip.kind}:</span>
@@ -218,6 +246,7 @@
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
+      on:blur={handleBlur}
       aria-label="Search library"
     />
     {#if isSearching}
@@ -412,6 +441,15 @@
     line-height: 1.2;
     flex-shrink: 0;
     min-width: 0;
+    transition: background var(--transition-fast), filter var(--transition-fast);
+  }
+
+  /* First Backspace on the empty input arms the chip — visual signal that
+     the next Backspace will clear the scope. Type, Escape, click away, or
+     external clear all disarm. */
+  .scope-chip.armed {
+    background: rgba(146, 92, 203, 0.32);
+    filter: var(--glow-active);
   }
   .scope-kind {
     color: var(--text-secondary);
