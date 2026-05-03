@@ -20,7 +20,6 @@
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
-  import ActionButton from '../lib/ActionButton.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
@@ -70,7 +69,10 @@
   // Collections state
   let collections: Record<string, CollectionInfo> = {};
   let editingCollectionName: string | null = null;
-  let isCreatingCollection = false;
+  // Proposed name of an in-progress new collection that hasn't been saved
+  // yet. Mutually exclusive with editingCollectionName: either we're
+  // editing an existing row or shaping a draft, never both.
+  let draftName: string | null = null;
   let collectionEditPaths = new Set<string>();
   let collectionEditName = '';
   let collectionEditDescription = '';
@@ -458,9 +460,6 @@
     }
   }
 
-  // Effective view mode — collection-edit always falls back to tree.
-  $: effectiveViewMode = isCollectionEditMode ? 'tree' : viewMode;
-
   // Indexed entries with metadata (path, filename, game_system) for the
   // systems view. Excludes pending removals and the to-add bucket.
   $: indexedEntries = (() => {
@@ -740,7 +739,6 @@
   }
 
   let lastIndexClickedPath: string | null = null;
-  let lastCollectionClickedPath: string | null = null;
 
   function flattenVisibleFilePaths(items: FileItem[]): string[] {
     const out: string[] = [];
@@ -943,12 +941,10 @@
     : '';
 
   // Collection mode derived state
-  $: isCollectionEditMode = editingCollectionName !== null || isCreatingCollection;
-  $: treeMode = isCollectionEditMode ? 'collection' as const : 'index' as const;
+  $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
   $: highlightPaths = highlightedCollection && collections[highlightedCollection]
     ? new Set(collections[highlightedCollection].file_paths)
     : new Set<string>();
-  $: collectionFolders = computeAncestorPaths(collectionEditPaths);
 
   // Per-collection count of files currently hidden in the tree. Surfaced
   // in the collections panel so users notice their curated set holds
@@ -1157,7 +1153,7 @@
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    startCreateCollectionFromFolder(item);
+    createCollectionFromItem(item);
   }
 
   function handleContextSearchInScope() {
@@ -1178,7 +1174,7 @@
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    startCreateCollectionWithItem(item);
+    createCollectionFromItem(item);
   }
 
   async function handleContextDelete() {
@@ -1341,15 +1337,6 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  function startCreateCollection() {
-    collectionEditName = '';
-    collectionEditDescription = '';
-    collectionEditPaths = new Set();
-    isCreatingCollection = true;
-    editingCollectionName = null;
-    highlightedCollection = null;
-  }
-
   function startEditCollection(name: string) {
     const col = collections[name];
     if (!col) return;
@@ -1357,48 +1344,54 @@
     collectionEditDescription = col.description;
     collectionEditPaths = new Set(col.file_paths);
     editingCollectionName = name;
-    isCreatingCollection = false;
+    draftName = null;
     highlightedCollection = null;
+    setViewMode('systems');
+    // The Save/Cancel controls now live inline on the panel row, so the
+    // panel must be visible while editing.
+    collectionsPanelOpen = true;
+  }
+
+  // Open a draft for a new (unsaved) collection. The draft renders as a
+  // synthetic top row in the panel; nothing hits the database until Save.
+  function startDraftCollection(name: string, paths: Iterable<string> = []) {
+    collectionEditName = name;
+    collectionEditDescription = '';
+    collectionEditPaths = new Set(paths);
+    draftName = name;
+    editingCollectionName = null;
+    highlightedCollection = null;
+    setViewMode('systems');
+    collectionsPanelOpen = true;
   }
 
   function cancelCollectionEdit() {
     editingCollectionName = null;
-    isCreatingCollection = false;
+    draftName = null;
     collectionEditPaths = new Set();
     collectionEditName = '';
     collectionEditDescription = '';
   }
 
   async function saveCollection() {
-    const name = collectionEditName.trim();
-    if (!name) return;
     const filePaths = Array.from(collectionEditPaths);
-
     try {
-      if (isCreatingCollection) {
+      if (draftName) {
         await invoke<CollectionMutationResult>('create_collection', {
-          name,
+          name: draftName,
           filePaths,
           description: collectionEditDescription,
         });
-        jobNotification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
+        jobNotification.show({ type: 'success', message: `Created "${draftName}"`, duration: 4000 });
       } else if (editingCollectionName) {
-        if (editingCollectionName !== name) {
-          await invoke('delete_collection', { name: editingCollectionName });
-          await invoke<CollectionMutationResult>('create_collection', {
-            name,
-            filePaths,
-            description: collectionEditDescription,
-          });
-          jobNotification.show({ type: 'success', message: `Renamed to "${name}"`, duration: 4000 });
-        } else {
-          await invoke<CollectionMutationResult>('update_collection', {
-            name,
-            filePaths,
-            description: collectionEditDescription,
-          });
-          jobNotification.show({ type: 'success', message: `Updated "${name}"`, duration: 4000 });
-        }
+        await invoke<CollectionMutationResult>('update_collection', {
+          name: editingCollectionName,
+          filePaths,
+          description: collectionEditDescription,
+        });
+        jobNotification.show({ type: 'success', message: `Updated "${editingCollectionName}"`, duration: 4000 });
+      } else {
+        return;
       }
       cancelCollectionEdit();
       await loadCollections();
@@ -1517,22 +1510,31 @@
     }
   }
 
-  function startCreateCollectionFromFolder(folder: FileItem) {
-    const candidates = indexedPdfsUnderPath(folder.path);
+  // Pick a name based on `base`, suffixing " 2", " 3" etc. on collision.
+  function uniqueCollectionName(base: string): string {
+    if (!collections[base]) return base;
+    let suffix = 2;
+    while (collections[`${base} ${suffix}`]) suffix++;
+    return `${base} ${suffix}`;
+  }
+
+  // Open a draft seeded with the indexed PDFs under `item`. The draft
+  // appears as a synthetic top row in the panel and doesn't hit the
+  // database until Save.
+  function createCollectionFromItem(item: FileItem) {
+    const candidates = item.is_dir
+      ? indexedPdfsUnderPath(item.path)
+      : [item.path];
     if (candidates.length === 0) {
       jobNotification.show({
         type: 'info',
-        message: `No indexed PDFs under "${folder.name}"`,
+        message: `No indexed PDFs under "${item.name}"`,
         duration: 4000,
       });
       return;
     }
-    collectionEditName = folder.name;
-    collectionEditDescription = '';
-    collectionEditPaths = new Set(candidates);
-    isCreatingCollection = true;
-    editingCollectionName = null;
-    highlightedCollection = null;
+    const baseName = item.is_dir ? item.name : item.name.replace(/\.pdf$/i, '');
+    startDraftCollection(uniqueCollectionName(baseName), candidates);
   }
 
   // ---------------------------------------------------------------------------
@@ -1550,28 +1552,19 @@
     }
   }
 
-  async function inlineCreateCollection(name: string) {
-    try {
-      await invoke<CollectionMutationResult>('create_collection', {
-        name,
-        filePaths: [],
-        description: '',
-      });
-      jobNotification.show({
-        type: 'success',
-        message: `Created "${name}"`,
-        duration: 3000,
-      });
-      await loadCollections();
-      // Drop straight into edit-files mode for the new collection.
-      startEditCollection(name);
-    } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Could not create: ${String(e)}`,
-        duration: 5000,
-      });
-    }
+  // Panel "+" handler — opens a fresh draft with an auto-generated name.
+  // The user can rename inline on the draft row before saving.
+  function inlineCreateCollection() {
+    startDraftCollection(uniqueCollectionName('Untitled'));
+  }
+
+  // Inline rename of the active draft. Only updates local state; nothing
+  // hits the database until Save. Collisions are deferred to the backend
+  // on Save (notification surfaces the error).
+  function handleDraftRename(name: string) {
+    if (!draftName) return;
+    draftName = name;
+    collectionEditName = name;
   }
 
   function startEditMetadata(name: string) {
@@ -1665,70 +1658,14 @@
     }
   }
 
-  function startCreateCollectionWithItem(item: FileItem) {
-    const candidates = item.is_dir
-      ? indexedPdfsUnderPath(item.path)
-      : [item.path];
-    if (candidates.length === 0) {
-      jobNotification.show({
-        type: 'info',
-        message: `No indexed PDFs under "${item.name}"`,
-        duration: 4000,
-      });
-      return;
-    }
-    collectionEditName = '';
-    collectionEditDescription = '';
-    collectionEditPaths = new Set(candidates);
-    isCreatingCollection = true;
-    editingCollectionName = null;
-    highlightedCollection = null;
-  }
-
-  function handleCollectionToggle(path: string, isDir: boolean, item: FileItem, shiftKey: boolean = false) {
-    if (shiftKey && !isDir && lastCollectionClickedPath) {
-      const ok = applyRangeToggle(collectionEditPaths, lastCollectionClickedPath, path, true);
-      if (ok) {
-        collectionEditPaths = collectionEditPaths;
-        lastCollectionClickedPath = path;
-        return;
-      }
-    }
-    if (isDir) {
-      toggleCollectionFolder(item);
-    } else {
-      if (collectionEditPaths.has(path)) {
-        collectionEditPaths.delete(path);
-      } else {
-        collectionEditPaths.add(path);
-      }
-      collectionEditPaths = collectionEditPaths;
-      lastCollectionClickedPath = path;
-    }
-  }
-
-  function toggleCollectionFolder(folder: FileItem) {
-    if (!folder.children) return;
-    // Deselect only when ALL indexed descendants are in the collection
-    const allIn = areAllDescendantsSelected(folder, collectionEditPaths, indexedPaths);
-    const shouldAdd = !allIn;
-    setCollectionFolderRecursive(folder, shouldAdd);
+  function handleCollectionAdd(paths: string[]) {
+    for (const p of paths) collectionEditPaths.add(p);
     collectionEditPaths = collectionEditPaths;
   }
 
-  function setCollectionFolderRecursive(folder: FileItem, add: boolean) {
-    if (!folder.children) return;
-    for (const child of folder.children) {
-      if (child.is_dir) {
-        setCollectionFolderRecursive(child, add);
-      } else if (indexedPaths.has(child.path)) {
-        if (add) {
-          collectionEditPaths.add(child.path);
-        } else {
-          collectionEditPaths.delete(child.path);
-        }
-      }
-    }
+  function handleCollectionRemove(paths: string[]) {
+    for (const p of paths) collectionEditPaths.delete(p);
+    collectionEditPaths = collectionEditPaths;
   }
 
   // Copy MCP config to clipboard
@@ -1909,7 +1846,7 @@
   <Header
     bind:searchQuery
     {isSearching}
-    disabled={!selectedFolder || editingCollectionName !== null || isCreatingCollection}
+    disabled={!selectedFolder || isCollectionEditMode}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
     {scopeChip}
@@ -1928,10 +1865,10 @@
     onToggleShowHidden={toggleShowHidden}
     onClearHidden={clearHidden}
     collapseAllVisible={!!selectedFolder && !searchActive}
-    collapseAllDisabled={effectiveViewMode === 'systems' || expandedPaths.size === 0}
+    collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
-    viewToggleVisible={!!selectedFolder && !searchActive && !isCollectionEditMode}
-    viewMode={effectiveViewMode}
+    viewToggleVisible={!!selectedFolder && !searchActive}
+    {viewMode}
     onSetViewMode={setViewMode}
   />
 
@@ -1943,6 +1880,8 @@
           {hiddenCountByCollection}
           activeName={activeContextName}
           editingName={editingCollectionName}
+          {draftName}
+          editFileCount={collectionEditPaths.size}
           onSetActive={setActiveContext}
           onClearActive={clearActiveContext}
           onEdit={startEditMetadata}
@@ -1950,20 +1889,13 @@
           onDelete={requestDeleteCollection}
           onToggleArchived={toggleArchived}
           onCreate={inlineCreateCollection}
+          onSaveFiles={saveCollection}
+          onCancelFiles={cancelCollectionEdit}
+          onDraftRename={handleDraftRename}
         />
       {/if}
 
       <div class="file-tree-area">
-        {#if isCollectionEditMode}
-          <div class="edit-files-strip">
-            <span class="ef-label">Editing files:</span>
-            <span class="ef-name">{editingCollectionName ?? collectionEditName ?? 'New collection'}</span>
-            <span class="ef-count">{collectionEditPaths.size} file{collectionEditPaths.size === 1 ? '' : 's'}</span>
-            <div class="ef-spacer"></div>
-            <ActionButton kind="discard" label="Cancel" onClick={cancelCollectionEdit} />
-            <ActionButton kind="confirm" label="Save" onClick={saveCollection} />
-          </div>
-        {/if}
         {#if searchActive}
           <SearchResults
             results={searchResults}
@@ -1974,7 +1906,7 @@
             {hiddenPaths}
             onOpenResult={handleOpenResult}
           />
-        {:else if effectiveViewMode === 'systems'}
+        {:else if viewMode === 'systems'}
           <SystemsView
             entries={indexedEntries}
             {displayPaths}
@@ -1986,6 +1918,10 @@
             {focusedFilePath}
             onFocusFile={(path) => { focusedFilePath = path; }}
             onContextMenu={handleContextMenu}
+            {isCollectionEditMode}
+            collectionPaths={collectionEditPaths}
+            onCollectionAdd={handleCollectionAdd}
+            onCollectionRemove={handleCollectionRemove}
           />
         {:else}
           {#each files as file (file.path)}
@@ -2007,14 +1943,10 @@
               {renamingFilePath}
               onRenameSubmit={handleRenameSubmit}
               onRenameCancel={handleRenameCancel}
-              mode={treeMode}
-              collectionPaths={collectionEditPaths}
-              {collectionFolders}
               {highlightPaths}
               {displayPaths}
               {hiddenPaths}
               {showHidden}
-              onCollectionToggle={handleCollectionToggle}
             />
           {/each}
         {/if}
@@ -2179,28 +2111,6 @@
   }
 
 
-  .edit-files-strip {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    margin: 0 0 0.5rem 0;
-    /* Opaque background so file rows scrolling under the sticky strip
-       don't bleed through. Keeps the warm tan accent on the border + text. */
-    background: var(--bg-focused);
-    border: 1px solid var(--text-accent);
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: var(--text-accent);
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  }
-  .ef-label { color: var(--text-secondary); }
-  .ef-name { font-weight: 600; }
-  .ef-count { color: var(--text-secondary); font-size: 0.75rem; }
-  .ef-spacer { flex: 1; }
   .error-banner {
     padding: 0.4rem 1rem;
     background: rgba(239, 68, 68, 0.1);

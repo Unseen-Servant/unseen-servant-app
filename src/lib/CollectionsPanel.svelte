@@ -9,13 +9,23 @@
   export let hiddenCountByCollection: Record<string, number> = {};
   export let activeName: string | null = null;
   export let editingName: string | null = null;
+  // Proposed name of an in-progress draft (new collection that hasn't been
+  // saved yet). When set, the panel renders a synthetic top row carrying
+  // the inline Save/Cancel controls just like an editing row.
+  export let draftName: string | null = null;
+  // Live count of paths currently selected in the in-progress edit/draft.
+  // Shown in place of the persisted file_count on the row being edited.
+  export let editFileCount: number = 0;
   export let onSetActive: (name: string) => void = () => {};
   export let onClearActive: () => void = () => {};
   export let onEdit: (name: string) => void = () => {};
   export let onEditFiles: (name: string) => void = () => {};
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
-  export let onCreate: (name: string) => void = () => {};
+  export let onCreate: () => void = () => {};
+  export let onSaveFiles: () => void = () => {};
+  export let onCancelFiles: () => void = () => {};
+  export let onDraftRename: (name: string) => void = () => {};
 
   type SortKey = 'last_used' | 'name' | 'size';
   const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -26,14 +36,43 @@
   let sortKey: SortKey = 'last_used';
   let showArchived = false;
 
-  let creating = false;
-  let newName = '';
-  let newNameInput: HTMLInputElement;
+  // Draft name editing — when the user clicks the draft row's name, swap
+  // it for an inline text input. Esc reverts, Enter / blur commits.
+  let renamingDraft = false;
+  let draftRenameValue = '';
 
   let sortMenuOpen = false;
   let sortBtn: HTMLButtonElement;
 
-  $: if (creating && newNameInput) newNameInput.focus();
+  // Reset rename mode when the draft itself goes away.
+  $: if (!draftName) renamingDraft = false;
+
+  function startDraftRename() {
+    if (!draftName) return;
+    draftRenameValue = draftName;
+    renamingDraft = true;
+  }
+
+  function commitDraftRename() {
+    const trimmed = draftRenameValue.trim();
+    if (trimmed && trimmed !== draftName) onDraftRename(trimmed);
+    renamingDraft = false;
+  }
+
+  function handleDraftRenameKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitDraftRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      renamingDraft = false;
+    }
+  }
+
+  function autofocusInput(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
 
   $: rows = (() => {
     const list = Object.values(collections);
@@ -50,34 +89,6 @@
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
-
-  function startCreate() {
-    creating = true;
-    newName = '';
-  }
-
-  function cancelCreate() {
-    creating = false;
-    newName = '';
-  }
-
-  function commitCreate() {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    onCreate(trimmed);
-    creating = false;
-    newName = '';
-  }
-
-  function handleNewKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitCreate();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      cancelCreate();
-    }
-  }
 
   function handleRowClick(name: string) {
     if (activeName === name) onClearActive();
@@ -107,7 +118,7 @@
   <header class="panel-header">
     <span class="panel-title">Collections</span>
     <div class="header-actions">
-      <button class="header-btn" on:click={startCreate} title="New collection" aria-label="New collection">
+      <button class="header-btn" on:click={onCreate} title="New collection" aria-label="New collection">
         <!-- Font Awesome "plus" (static/icons/plus-solid-full.svg) -->
         <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
           <path d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"/>
@@ -153,40 +164,54 @@
     </div>
   </header>
 
-  {#if creating}
-    <div class="create-row">
-      <input
-        bind:this={newNameInput}
-        bind:value={newName}
-        class="new-input"
-        type="text"
-        placeholder="Collection name"
-        on:keydown={handleNewKeydown}
-      />
-      <ActionButton kind="confirm" compact title="Create" onClick={commitCreate} disabled={!newName.trim()} />
-      <ActionButton kind="discard" compact title="Cancel" onClick={cancelCreate} />
-    </div>
-  {/if}
-
-  {#if hasNone}
+  {#if hasNone && !draftName}
     <div class="empty">
       <span class="empty-label">No collections yet</span>
     </div>
-  {:else if rows.length === 0}
+  {:else if rows.length === 0 && !draftName}
     <div class="empty">
       <span class="empty-label">All archived</span>
     </div>
   {:else}
     <ul class="rows">
+      {#if draftName}
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <li class="row editing draft" title="New collection (unsaved) — click name to rename">
+          <span class="row-icon none" aria-hidden="true">
+            <!-- "books" — three rounded spines, collection of books -->
+            <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+              <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
+            </svg>
+          </span>
+          {#if renamingDraft}
+            <input
+              class="draft-name-input"
+              bind:value={draftRenameValue}
+              on:keydown={handleDraftRenameKeydown}
+              on:blur={commitDraftRename}
+              use:autofocusInput
+            />
+          {:else}
+            <button class="row-name draft-name" on:click={startDraftRename} title="Rename">{draftName}</button>
+          {/if}
+          <span class="row-count editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
+          <div class="row-actions">
+            <ActionButton kind="discard" compact title="Discard draft" onClick={onCancelFiles} />
+            <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
+          </div>
+        </li>
+      {/if}
       {#each rows as col (col.name)}
+        {@const isEditing = editingName === col.name}
+        {@const displayCount = isEditing ? editFileCount : col.file_count}
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <li
           class="row"
           class:active={activeName === col.name}
-          class:editing={editingName === col.name}
+          class:editing={isEditing}
           class:archived={col.archived}
           title={col.description || col.name}
-          on:click={() => handleRowClick(col.name)}
+          on:click={() => { if (!isEditing) handleRowClick(col.name); }}
         >
           <span
             class="row-icon"
@@ -205,57 +230,64 @@
           {/if}
           <span
             class="row-count"
-            title={hiddenCountByCollection[col.name]
+            class:editing-count={isEditing}
+            title={hiddenCountByCollection[col.name] && !isEditing
               ? `${col.file_count} file${col.file_count === 1 ? '' : 's'} (${hiddenCountByCollection[col.name]} hidden in the tree)`
-              : `${col.file_count} file${col.file_count === 1 ? '' : 's'}`}
+              : `${displayCount} file${displayCount === 1 ? '' : 's'}`}
           >
-            {col.file_count}{#if hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
+            {displayCount}{#if !isEditing && hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
           </span>
-          <div class="row-actions">
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onEditFiles(col.name)}
-              title="Edit files"
-              aria-label="Edit files"
-            >
-              <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onEdit(col.name)}
-              title="Edit info"
-              aria-label="Edit info"
-            >
-              <!-- Font Awesome "pen-to-square" -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn"
-              on:click|stopPropagation={() => onToggleArchived(col.name, !col.archived)}
-              title={col.archived ? 'Unarchive' : 'Archive'}
-              aria-label={col.archived ? 'Unarchive' : 'Archive'}
-            >
-              <!-- Font Awesome "box-archive" (static/icons/box-archive-solid-full.svg) -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
-              </svg>
-            </button>
-            <button
-              class="row-btn danger"
-              on:click|stopPropagation={() => onDelete(col.name)}
-              title="Delete"
-              aria-label="Delete"
-            >
-              <!-- Font Awesome "trash" (static/icons/trash-solid-full.svg) -->
-              <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
-              </svg>
-            </button>
+          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+          <div class="row-actions" on:click|stopPropagation>
+            {#if isEditing}
+              <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
+              <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
+            {:else}
+              <button
+                class="row-btn"
+                on:click|stopPropagation={() => onEditFiles(col.name)}
+                title="Edit files"
+                aria-label="Edit files"
+              >
+                <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
+                </svg>
+              </button>
+              <button
+                class="row-btn"
+                on:click|stopPropagation={() => onEdit(col.name)}
+                title="Edit info"
+                aria-label="Edit info"
+              >
+                <!-- Font Awesome "pen-to-square" -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
+                </svg>
+              </button>
+              <button
+                class="row-btn"
+                on:click|stopPropagation={() => onToggleArchived(col.name, !col.archived)}
+                title={col.archived ? 'Unarchive' : 'Archive'}
+                aria-label={col.archived ? 'Unarchive' : 'Archive'}
+              >
+                <!-- Font Awesome "box-archive" (static/icons/box-archive-solid-full.svg) -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
+                </svg>
+              </button>
+              <button
+                class="row-btn danger"
+                on:click|stopPropagation={() => onDelete(col.name)}
+                title="Delete"
+                aria-label="Delete"
+              >
+                <!-- Font Awesome "trash" (static/icons/trash-solid-full.svg) -->
+                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
+                  <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
+                </svg>
+              </button>
+            {/if}
           </div>
         </li>
       {/each}
@@ -381,24 +413,6 @@
     margin: 0;
   }
 
-  .create-row {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.4rem 0.75rem;
-    border-bottom: 1px solid var(--bg-category);
-  }
-  .new-input {
-    flex: 1;
-    min-width: 0;
-    padding: 0.2rem 0.4rem;
-    background: var(--bg-app);
-    color: var(--text-primary);
-    border: 1px solid var(--text-accent);
-    border-radius: 3px;
-    font-size: 0.8rem;
-    outline: none;
-  }
   .rows {
     list-style: none;
     margin: 0;
@@ -412,13 +426,59 @@
     gap: 0.55rem;
     padding: 0.3rem 0.75rem;
     border-bottom: 1px solid var(--bg-container);
+    border-left: 2px solid transparent;
     cursor: pointer;
     transition: background var(--transition-fast);
     min-height: 28px;
   }
   .row:hover { background: var(--bg-focused); }
   .row.active { background: rgba(182, 159, 129, 0.15); }
-  .row.editing { background: rgba(182, 159, 129, 0.25); }
+  /* Armed-for-edit state: warmer background + accent stripe on the leading
+     edge — DAW-style "this track is record-armed" affordance. */
+  .row.editing {
+    background: rgba(182, 159, 129, 0.25);
+    border-left-color: var(--text-active, var(--text-accent));
+  }
+  /* Draft row — same armed treatment, italic name to telegraph "unsaved".
+     The name doubles as a click-to-rename button. */
+  .row.draft {
+    cursor: default;
+  }
+  .row.draft .row-name {
+    font-style: italic;
+  }
+  .draft-name {
+    flex: 1;
+    min-width: 0;
+    padding: 0.1rem 0.25rem;
+    margin: 0 -0.25rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    text-align: left;
+    color: var(--text-primary);
+    cursor: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: border-color var(--transition-fast);
+  }
+  .draft-name:hover {
+    border-color: var(--bg-category);
+  }
+  .draft-name-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.1rem 0.25rem;
+    margin: 0 -0.25rem;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    border: 1px solid var(--text-active, var(--text-accent));
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-family: var(--font-body);
+    outline: none;
+  }
   .row.archived { opacity: 0.55; }
   .row-icon {
     display: inline-flex;
@@ -454,6 +514,11 @@
     color: var(--text-secondary);
     margin-right: 0.25rem;
     flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .row-count.editing-count {
+    color: var(--text-active, var(--text-accent));
+    font-weight: 600;
   }
   .row-hidden-count {
     color: var(--text-tertiary);
