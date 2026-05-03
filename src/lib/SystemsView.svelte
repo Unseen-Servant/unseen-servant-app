@@ -434,6 +434,8 @@
     align-items: baseline;
     gap: 0.4rem;
     padding: 0.25rem 0.75rem 0.25rem 1.5rem;
+    margin: 0 0.25rem;
+    border-radius: 3px;
     cursor: pointer;
     transition: background var(--transition-fast);
     -webkit-user-select: none;
