@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
-  import Markdown from 'svelte-exmarkdown';
-  import type { SearchResultItem } from './types';
+  import { tick } from 'svelte';
+  import type { SearchResultItem, KnownGameSystem } from './types';
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
 
@@ -10,70 +9,58 @@
   export let query: string = '';
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
-  // User-hidden paths from the file tree. Hidden files still surface in
-  // search; the badge tags them so the user remembers why a "tucked away"
-  // file is appearing in results.
   export let hiddenPaths: Set<string> = new Set();
+  export let knownSystems: KnownGameSystem[] = [];
+  export let selectedIndex: number = 0;
+  export let canLoadMore: boolean = false;
+  export let onSelect: (index: number) => void = () => {};
+  export let onLoadMore: () => void = () => {};
   export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
 
-  let expanded = new Set<number>();
-  let snippetEls: (HTMLElement | null)[] = [];
-  let overflowing = new Set<number>();
-  let resizeObserver: ResizeObserver | null = null;
-
-  function checkOverflow() {
-    const next = new Set(overflowing);
-    for (let i = 0; i < snippetEls.length; i++) {
-      const el = snippetEls[i];
-      if (!el) continue;
-      if (!expanded.has(i)) {
-        if (el.scrollHeight > el.clientHeight + 1) next.add(i);
-        else next.delete(i);
-      }
+  // Scroll-near-bottom triggers an upstream fetch for more results. The
+  // parent's canLoadMore prop reflects the actual load gate (not searching,
+  // not at cap, backend hasn't said it's empty), so we just have to detect
+  // proximity here. 80px from the bottom is enough lead time for the next
+  // batch to arrive before the user runs out of rows.
+  function handleScroll(e: Event) {
+    if (!canLoadMore) return;
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+      onLoadMore();
     }
-    overflowing = next;
   }
 
-  function reobserve() {
-    if (!resizeObserver) return;
-    resizeObserver.disconnect();
-    for (const el of snippetEls) if (el) resizeObserver.observe(el);
+  // Tag → color lookup. Matches the pattern in FileTree.svelte and
+  // SystemsView.svelte so the system color cue is consistent across views.
+  $: tagColors = (() => {
+    const m = new Map<string, string>();
+    for (const sys of knownSystems) {
+      if (sys.color) m.set(sys.tag, sys.color);
+    }
+    return m;
+  })();
+  function colorFor(tag: string): string | null {
+    return tagColors.get(tag) ?? null;
   }
 
-  onMount(() => {
-    resizeObserver = new ResizeObserver(() => checkOverflow());
-    reobserve();
-    checkOverflow();
-    return () => resizeObserver?.disconnect();
-  });
+  let rowEls: (HTMLElement | null)[] = [];
 
-  $: if (results) {
+  // Scroll the selected row into view whenever selection changes — pairs
+  // with arrow-key navigation in +page.svelte.
+  $: if (results.length > 0 && selectedIndex >= 0) {
     tick().then(() => {
-      reobserve();
-      checkOverflow();
+      const el = rowEls[selectedIndex];
+      if (el) el.scrollIntoView({ block: 'nearest' });
     });
   }
 
-  $: if (expanded) {
-    tick().then(checkOverflow);
-  }
-
-  function toggleExpand(i: number) {
-    if (expanded.has(i)) {
-      expanded.delete(i);
-    } else {
-      expanded.add(i);
-    }
-    expanded = expanded;
-  }
-
-  function handleOpenClick(e: MouseEvent, filename: string, page?: number | null) {
-    e.stopPropagation();
-    onOpenResult(filename, page);
-  }
-
-  function relevancePercent(r: number): number {
-    return Math.round(r * 100);
+  // Imperative handle for the parent so it can move keyboard focus into the
+  // list (e.g. ArrowDown from the search input). Selection state and focus
+  // are kept in lockstep so Enter on a focused row opens the visible
+  // selection without ambiguity.
+  export function focusRow(index: number): void {
+    const el = rowEls[index];
+    el?.focus();
   }
 
   function relevanceCells(r: number): number {
@@ -81,27 +68,48 @@
     return Math.max(1, Math.min(5, Math.ceil(r * 5)));
   }
 
+  function relevancePercent(r: number): number {
+    return Math.round(r * 100);
+  }
+
   function pageSpan(start: number, end: number): string {
     return pageHint(start, end);
   }
 
-  // pymupdf4llm captures headings as `## **Goblin**`, so the breadcrumb
-  // text carries the bold markup. Strip for display only — the
-  // embedding pipeline keeps the original (the +0.184 MRR uplift
-  // from heading-prepend was measured with the asterisks present).
   function stripBold(s: string): string {
     return s.replace(/\*\*(.+?)\*\*/g, '$1');
   }
 
-  // Chunker breadcrumbs join ancestors with " > ". Split for per-segment
-  // styling and clean wrapping at separators.
   function breadcrumbSegments(s: string): string[] {
     return s.split(' > ').map(stripBold).filter(Boolean);
   }
+
+  // Snippet preview: strip markdown markers and collapse whitespace so the
+  // single-line row stays scannable. The full markdown still renders in the
+  // inspector — this is just a glyph for the row.
+  function snippetPreview(text: string): string {
+    return text
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/[*_~>#]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function handleRowClick(i: number) {
+    onSelect(i);
+  }
+
+  function handleRowDblClick(i: number, result: SearchResultItem) {
+    onSelect(i);
+    onOpenResult(result.filename, result.page_start);
+  }
 </script>
 
-<div class="search-results">
-  {#if isLoading}
+<div class="search-results" role="listbox" aria-label="Search results" on:scroll={handleScroll}>
+  {#if isLoading && results.length === 0}
     <div class="state-msg">Searching…</div>
   {:else if error}
     <div class="state-msg state-error">{error}</div>
@@ -113,80 +121,58 @@
     {/if}
   {:else}
     {#each results as result, i (i)}
-      {@const pct = relevancePercent(result.relevance)}
       {@const cells = relevanceCells(result.relevance)}
-      {@const openLabel = result.page_start
-        ? `Open PDF at ${pageHint(result.page_start, result.page_end)}`
-        : 'Open PDF'}
+      {@const pct = relevancePercent(result.relevance)}
+      {@const span = pageSpan(result.page_start, result.page_end)}
+      {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
+      {@const sysColor = colorFor(result.game_system)}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <div
         class="result-row"
-        class:expanded={expanded.has(i)}
-        on:click={() => toggleExpand(i)}
-        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(i); } }}
-        role="button"
-        tabindex="0"
+        class:selected={i === selectedIndex}
+        style={sysColor ? `--system-color: ${sysColor}` : ''}
+        bind:this={rowEls[i]}
+        on:click={() => handleRowClick(i)}
+        on:dblclick={() => handleRowDblClick(i, result)}
+        role="option"
+        aria-selected={i === selectedIndex}
+        tabindex="-1"
       >
-        <span class="chevron" aria-hidden="true">{expanded.has(i) ? '⌄' : '›'}</span>
-        <div class="result-body">
-          {#if result.section_heading}
-            {@const segments = breadcrumbSegments(result.section_heading)}
-            {#if segments.length > 0}
-              <div class="breadcrumb" aria-label="Section path">
-                {#each segments as segment, idx (idx)}
-                  {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
-                  <span class="bc-segment">{segment}</span>
-                {/each}
-              </div>
-            {/if}
-          {/if}
-          <div class="snippet-wrap">
-            <div
-              class="snippet"
-              class:clamped={!expanded.has(i)}
-              bind:this={snippetEls[i]}
-            >
-              <Markdown md={result.text} />
+        <span class="index" aria-hidden="true">{i + 1}</span>
+        <div class="row-body">
+          {#if segments.length > 0}
+            <div class="breadcrumb">
+              {#each segments as segment, idx (idx)}
+                {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
+                <span class="bc-segment">{segment}</span>
+              {/each}
             </div>
-            {#if !expanded.has(i) && overflowing.has(i)}
-              <span class="more-hint" aria-hidden="true">more…</span>
-            {/if}
-          </div>
+          {/if}
+          <div class="snippet">{snippetPreview(result.text)}</div>
           <div class="meta-row">
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
-              <span class="hidden-badge" title="This file is hidden in the tree. Hiding only affects display — search still surfaces it.">hidden</span>
+              <span class="hidden-badge" title="This file is hidden in the tree.">hidden</span>
             {/if}
             <span class="meta-text">
-              {result.filename} · {result.game_system}{pageSpan(result.page_start, result.page_end) ? ` · ${pageSpan(result.page_start, result.page_end)}` : ''}
+              {result.filename}{result.game_system ? ` · ${result.game_system}` : ''}{span ? ` · ${span}` : ''}
             </span>
           </div>
         </div>
-        <div class="result-aside">
-          <button
-            type="button"
-            class="open-icon-btn"
-            title={openLabel}
-            aria-label={openLabel}
-            on:click={(e) => handleOpenClick(e, result.filename, result.page_start)}
-            on:keydown|stopPropagation
-          >
-            <!-- Font Awesome "arrow-up-right-from-square" icon (static/icons/arrow-up-right-from-square-solid-full.svg) -->
-            <svg class="open-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-              <path d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z"/>
-            </svg>
-          </button>
-          <span
-            class="gauge"
-            role="img"
-            aria-label="{pct}% match"
-            title="{pct}% match"
-          >
-            {#each [0, 1, 2, 3, 4] as idx (idx)}
-              <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
-            {/each}
-          </span>
-        </div>
+        <span
+          class="gauge"
+          role="img"
+          aria-label="{pct}% match"
+          title="{pct}% match"
+        >
+          {#each [0, 1, 2, 3, 4] as idx (idx)}
+            <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
+          {/each}
+        </span>
       </div>
     {/each}
+    {#if isLoading && results.length > 0}
+      <div class="loading-more" aria-live="polite">loading more…</div>
+    {/if}
   {/if}
 </div>
 
@@ -195,6 +181,8 @@
     display: flex;
     flex-direction: column;
     padding: 0.25rem 0;
+    height: 100%;
+    overflow-y: auto;
   }
 
   .state-msg {
@@ -208,153 +196,103 @@
     color: var(--text-danger);
   }
 
+  .loading-more {
+    padding: 0.5rem 0.75rem 0.75rem;
+    color: var(--text-tertiary);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-style: italic;
+    text-align: center;
+  }
+
   .result-row {
+    position: relative;
     display: flex;
     gap: 0.5rem;
-    padding: 0.6rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-subtle);
     cursor: pointer;
     transition: background var(--transition-fast);
+    align-items: flex-start;
+  }
+
+  /* DAW track-color stripe at the left edge: always-on system color,
+     widens with a soft glow on selection. Falls back to parchment when
+     the row's system has no color so selection still reads. */
+  .result-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--system-color, transparent);
+    transition: width var(--transition-fast), filter var(--transition-fast), background var(--transition-fast);
+    pointer-events: none;
   }
 
   .result-row:hover {
     background: var(--bg-focused);
   }
 
-  .result-row:focus-visible {
-    outline: 1px solid var(--text-accent);
-    outline-offset: -1px;
+  .result-row.selected {
+    background: var(--bg-focused);
   }
 
-  .chevron {
+  .result-row.selected::before {
+    width: 4px;
+    background: var(--system-color, var(--text-accent));
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--system-color, var(--text-accent)) 65%, transparent));
+  }
+
+  /* Selection state is the visual cue for "current row"; click-focus on a
+     tabindex=-1 row would otherwise stack a parchment focus outline on top
+     when arrow keys are pressed (keyboard interaction triggers
+     :focus-visible), so suppress it here. */
+  .result-row:focus,
+  .result-row:focus-visible {
+    outline: none;
+  }
+
+  .result-row.selected .index {
+    color: var(--text-accent);
+  }
+
+  .result-row.selected .gauge {
+    opacity: 1;
+  }
+
+  .index {
     flex-shrink: 0;
-    width: 1rem;
-    color: var(--text-secondary);
-    font-size: 1rem;
-    line-height: 1.3;
+    width: 1.2rem;
+    text-align: right;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-tertiary);
+    line-height: 1.5;
     -webkit-user-select: none;
     user-select: none;
   }
 
-  .result-body {
+  .row-body {
     flex: 1;
     min-width: 0;
   }
 
-  .snippet {
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--text-primary);
-    line-height: 1.4;
-    word-break: break-word;
-  }
-
-  .snippet :global(> *:first-child) { margin-top: 0; }
-  .snippet :global(> *:last-child) { margin-bottom: 0; }
-  .snippet :global(p) { margin: 0.35em 0; }
-  .snippet :global(h1),
-  .snippet :global(h2),
-  .snippet :global(h3),
-  .snippet :global(h4),
-  .snippet :global(h5),
-  .snippet :global(h6) {
-    font-size: 1em;
-    font-weight: 600;
-    margin: 0.4em 0 0.2em;
-  }
-  .snippet :global(ul),
-  .snippet :global(ol) { margin: 0.35em 0; padding-left: 1.25em; }
-  .snippet :global(li) { margin: 0.1em 0; }
-  .snippet :global(code) {
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.9em;
-    padding: 0 0.25em;
-    background: var(--bg-container);
-    border-radius: 2px;
-  }
-  .snippet :global(pre) {
-    margin: 0.4em 0;
-    padding: 0.4em 0.6em;
-    background: var(--bg-container);
-    border-radius: 3px;
-    overflow-x: auto;
-  }
-  .snippet :global(pre code) { background: transparent; padding: 0; }
-  .snippet :global(blockquote) {
-    margin: 0.4em 0;
-    padding-left: 0.75em;
-    border-left: 2px solid var(--border-subtle);
-    color: var(--text-secondary);
-  }
-  .snippet :global(a) { color: var(--text-accent); }
-  .snippet :global(img) { max-width: 100%; height: auto; }
-
-  /* Tables — pymupdf4llm pipe-table output. Old-school grid look:
-     subtle borders matching the dark/parchment aesthetic, compact dense
-     layout for reference data, horizontal scroll for wide tables (some
-     OSRIC saving-throw tables hit 20+ columns). `display: block` is the
-     standard responsive-table trick — keeps the table renderable inside
-     the snippet box while letting overflow scroll horizontally. */
-  .snippet :global(table) {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
-    border-collapse: collapse;
-    margin: 0.4em 0;
-    font-size: 0.88em;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-container);
-  }
-  .snippet :global(thead) {
-    background: var(--bg-header);
-  }
-  .snippet :global(th),
-  .snippet :global(td) {
-    border: 1px solid var(--border-subtle);
-    padding: 0.25em 0.5em;
-    vertical-align: top;
-    text-align: left;
-    white-space: normal;
-  }
-  .snippet :global(th) {
-    font-weight: 600;
-    color: var(--text-accent);
-  }
-  /* Empty cells are common in pymupdf4llm output (multi-row PDF headers
-     and continuation rows produce `||` patterns). Render them as
-     intentional gaps rather than invisible whitespace so the table
-     structure stays legible. */
-  .snippet :global(td:empty),
-  .snippet :global(th:empty) {
-    background: rgba(0, 0, 0, 0.2);
-  }
-  .snippet :global(tbody tr:nth-child(even) td) {
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .snippet.clamped {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .breadcrumb {
     font-family: var(--font-body);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
-    margin-bottom: 0.3rem;
-    line-height: 1.35;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 0.3rem;
-    row-gap: 0.1rem;
+    margin-bottom: 0.15rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bc-segment {
-    word-break: break-word;
+    word-break: keep-all;
   }
 
   .bc-segment:last-child {
@@ -365,36 +303,23 @@
     color: var(--border-subtle);
     -webkit-user-select: none;
     user-select: none;
+    margin: 0 0.25rem;
   }
 
-  .snippet-wrap {
-    position: relative;
-  }
-
-  .more-hint {
-    position: absolute;
-    right: 0;
-    bottom: 0;
+  .snippet {
     font-family: var(--font-body);
-    font-size: 0.8rem;
-    font-style: italic;
-    color: var(--text-secondary);
-    background: linear-gradient(to right, transparent, var(--bg-focused) 40%);
-    padding: 0 0.15rem 0 2rem;
-    line-height: 1.4;
-    pointer-events: none;
-    visibility: hidden;
-  }
-
-  .result-row:hover .more-hint,
-  .result-row:focus-visible .more-hint {
-    visibility: visible;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .meta-row {
-    margin-top: 0.35rem;
+    margin-top: 0.2rem;
     font-family: var(--font-body);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
@@ -415,20 +340,11 @@
     padding: 0.05rem 0.35rem;
     border: 1px solid var(--border-subtle);
     border-radius: 3px;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-tertiary);
     font-style: italic;
-  }
-
-  .result-aside {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 0.4rem;
   }
 
   .gauge {
@@ -436,8 +352,9 @@
     gap: 2px;
     flex-shrink: 0;
     align-items: center;
-    opacity: 0.85;
+    opacity: 0.7;
     transition: opacity var(--transition-fast);
+    margin-top: 0.2rem;
   }
 
   .result-row:hover .gauge {
@@ -445,8 +362,8 @@
   }
 
   .cell {
-    width: 6px;
-    height: 10px;
+    width: 5px;
+    height: 9px;
     border-radius: 1px;
     background: var(--border-subtle);
     transition: background var(--transition-fast);
@@ -454,39 +371,5 @@
 
   .cell.filled {
     background: var(--text-accent);
-  }
-
-  .open-icon-btn {
-    flex-shrink: 0;
-    background: transparent;
-    border: none;
-    padding: 0.15rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: 3px;
-    line-height: 0;
-    visibility: hidden;
-    transition: color var(--transition-fast), background var(--transition-fast);
-  }
-
-  .result-row:hover .open-icon-btn,
-  .open-icon-btn:focus-visible {
-    visibility: visible;
-  }
-
-  .open-icon-btn:hover {
-    color: var(--text-accent);
-    background: var(--bg-container);
-  }
-
-  .open-icon-btn:focus-visible {
-    outline: 1px solid var(--text-accent);
-    outline-offset: 1px;
-  }
-
-  .open-icon {
-    width: 14px;
-    height: 14px;
-    display: block;
   }
 </style>

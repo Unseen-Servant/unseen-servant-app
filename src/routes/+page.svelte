@@ -12,6 +12,8 @@
   import ContextMenu from '../lib/ContextMenu.svelte';
   import Header from '../lib/Header.svelte';
   import SearchResults from '../lib/SearchResults.svelte';
+  import SearchInspector from '../lib/SearchInspector.svelte';
+  import SearchScopeBar from '../lib/SearchScopeBar.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
@@ -150,7 +152,24 @@
   let isSearching = false;
   let searchError: string | null = null;
   let searchSeq = 0;
+  let selectedResultIndex = 0;
+  let headerComponent: Header | undefined;
+  let searchResultsComponent: SearchResults | undefined;
+  // Lazy result loading: start with 25, grow by 25 each scroll-to-bottom,
+  // hard cap at 100 to keep us out of the long tail of low-relevance hits.
+  // reachedEnd flips when the backend returns fewer than requested — we've
+  // drained the post-dedup pool, no point asking for more.
+  const PAGE_SIZE_INITIAL = 25;
+  const PAGE_SIZE_STEP = 25;
+  const PAGE_SIZE_MAX = 100;
+  let pageSize = PAGE_SIZE_INITIAL;
+  let reachedEnd = false;
   $: searchActive = committedQuery.trim() !== '';
+  // Clamp selection when results shrink (e.g. new query returns fewer hits).
+  $: if (selectedResultIndex >= searchResults.length) {
+    selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
+  }
+  $: selectedResult = searchResults.length > 0 ? searchResults[selectedResultIndex] ?? null : null;
   $: scopeChip = (() => {
     if (isCollectionEditMode) return null;
     if (pathScope) {
@@ -180,6 +199,32 @@
     (indexStatus?.up_to_date ?? []).map((e) => e.path)
       .concat((indexStatus?.to_update ?? []).map((e) => e.path))
   );
+
+  // The "of N files" denominator in the SearchScopeBar — mirrors the same
+  // narrowing primitives runSearch passes to the backend (path scope OR
+  // active collection, then system exclusion). When no filters are set,
+  // this collapses to the full indexed-paths count.
+  $: searchableFileCount = (() => {
+    let universe: string[];
+    if (pathScope) {
+      universe = pathScope.kind === 'file'
+        ? (indexedPathsSet.has(pathScope.path) ? [pathScope.path] : [])
+        : indexedPdfsUnderPath(pathScope.path);
+    } else if (activeContextName && collections[activeContextName]) {
+      universe = collections[activeContextName].file_paths.filter((p) => indexedPathsSet.has(p));
+    } else {
+      universe = Array.from(indexedPathsSet);
+    }
+    if (filterExcludedSystems.size === 0) return universe.length;
+    // A file passes when at least one of its tags is not excluded — matches
+    // the include-list semantics of the gameSystems param to search_index.
+    let count = 0;
+    for (const path of universe) {
+      const tags = effectiveGameSystemMap.get(path) ?? [];
+      if (tags.length > 0 && tags.some((t) => !filterExcludedSystems.has(t))) count++;
+    }
+    return count;
+  })();
 
   async function runSearch(q: string) {
     const trimmed = q.trim();
@@ -229,17 +274,27 @@
 
     searchSeq += 1;
     const seq = searchSeq;
+    const requestedPageSize = pageSize;
     isSearching = true;
     searchError = null;
     try {
       const response = await invoke<SearchResponse>('search_index', {
         query: trimmed,
-        nResults: 10,
+        nResults: requestedPageSize,
         sourcePaths,
         gameSystems,
       });
       if (seq !== searchSeq) return;
-      searchResults = response.results ?? [];
+      const next = response.results ?? [];
+      // Backend returned fewer than asked → there's nothing more to fetch
+      // even if pageSize hasn't hit the cap. Stops scroll-load from spinning.
+      reachedEnd = next.length < requestedPageSize;
+      // Preserve selection across grow-fetches: when the new result list
+      // contains the previously-selected row in place, leave selectedIndex
+      // alone. Only reset for fresh queries (first page) or shrinkage.
+      const wasGrowing = next.length > searchResults.length && searchResults.length > 0;
+      searchResults = next;
+      if (!wasGrowing) selectedResultIndex = 0;
     } catch (e) {
       if (seq !== searchSeq) return;
       searchError = String(e);
@@ -251,14 +306,37 @@
     }
   }
 
+  function resetPageSize() {
+    pageSize = PAGE_SIZE_INITIAL;
+    reachedEnd = false;
+  }
+
   function handleSearchDebounced(q: string) {
-    committedQuery = q.trim();
+    const trimmed = q.trim();
+    if (trimmed !== committedQuery) resetPageSize();
+    committedQuery = trimmed;
     runSearch(q);
   }
 
+  // Enter in the search input always (re-)submits. To open a result, the
+  // user moves focus into the list with ArrowDown (or clicks a row) and
+  // presses Enter there. This combobox split avoids the overloaded-Enter
+  // ambiguity we tried earlier.
   function handleSearchSubmit(q: string) {
-    committedQuery = q.trim();
+    const trimmed = q.trim();
+    if (trimmed !== committedQuery) resetPageSize();
+    committedQuery = trimmed;
     runSearch(q);
+  }
+
+  // Scroll-to-bottom in the result list bumps the page size and re-runs
+  // the same query with a larger n_results. Re-querying (vs. true offset
+  // pagination) is fine on a local sidecar — the embedding is cached and
+  // ChromaDB's nearest-neighbor cost is sub-linear in N at this scale.
+  function loadMoreResults() {
+    if (isSearching || reachedEnd || pageSize >= PAGE_SIZE_MAX || !committedQuery) return;
+    pageSize = Math.min(PAGE_SIZE_MAX, pageSize + PAGE_SIZE_STEP);
+    runSearch(committedQuery);
   }
 
   function handleSearchClear() {
@@ -268,6 +346,8 @@
     searchError = null;
     isSearching = false;
     searchSeq += 1;
+    selectedResultIndex = 0;
+    resetPageSize();
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -506,11 +586,13 @@
     }
     filterExcludedSystems = filterExcludedSystems;
     persistFilter();
+    if (committedQuery) runSearch(committedQuery);
   }
 
   function clearSystemFilter() {
     filterExcludedSystems = new Set();
     persistFilter();
+    if (committedQuery) runSearch(committedQuery);
   }
 
   $: hiddenCount = hiddenPaths.size;
@@ -1202,6 +1284,61 @@
       if (renamingFilePath) { renamingFilePath = null; return; }
       if (focusedFilePath) { focusedFilePath = null; }
     }
+
+    // Cmd/Ctrl+F: focus the search input from anywhere in the app.
+    if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+      event.preventDefault();
+      headerComponent?.focus();
+      return;
+    }
+
+    if (!searchActive || searchResults.length === 0) return;
+
+    const target = event.target as HTMLElement | null;
+    const inInput = target?.closest('.search-input') !== null;
+    const inList = target?.closest('.search-results') !== null;
+
+    // Cmd/Ctrl + 1..9: jump to result N and move focus to it so Enter
+    // opens. Works regardless of where focus currently lives.
+    if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
+      const idx = parseInt(event.key, 10) - 1;
+      if (idx < searchResults.length) {
+        event.preventDefault();
+        selectedResultIndex = idx;
+        searchResultsComponent?.focusRow(idx);
+      }
+      return;
+    }
+
+    // Combobox flow: ArrowDown from the input pops focus into the list at
+    // the current selection. Arrow nav within the list moves both
+    // selection and focus together. ArrowUp from the first row pops back
+    // to the input. Enter on a focused row opens; Escape returns to input.
+    if (event.key === 'ArrowDown') {
+      if (inInput) {
+        event.preventDefault();
+        searchResultsComponent?.focusRow(selectedResultIndex);
+      } else if (inList) {
+        event.preventDefault();
+        selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
+        searchResultsComponent?.focusRow(selectedResultIndex);
+      }
+    } else if (event.key === 'ArrowUp' && inList) {
+      event.preventDefault();
+      if (selectedResultIndex > 0) {
+        selectedResultIndex -= 1;
+        searchResultsComponent?.focusRow(selectedResultIndex);
+      } else {
+        headerComponent?.focus();
+      }
+    } else if (event.key === 'Enter' && inList) {
+      event.preventDefault();
+      const sel = searchResults[selectedResultIndex];
+      if (sel) handleOpenResult(sel.filename, sel.page_start);
+    } else if (event.key === 'Escape' && inList) {
+      event.preventDefault();
+      headerComponent?.focus();
+    }
   }
 
   function handleContextMenu(event: MouseEvent, item: FileItem) {
@@ -1458,6 +1595,10 @@
         .catch(() => {});
     }
     if (committedQuery) runSearch(committedQuery);
+    // Setting scope is a clear signal of intent to type a query in that
+    // scope — auto-focus the search input so the user doesn't have to
+    // click. Standard "Search in <X>" pattern.
+    headerComponent?.focus();
   }
 
   function clearPathScope() {
@@ -1970,6 +2111,7 @@
 
 <main class="app-layout">
   <Header
+    bind:this={headerComponent}
     bind:searchQuery
     {isSearching}
     disabled={!selectedFolder || isCollectionEditMode}
@@ -2005,6 +2147,7 @@
     viewToggleVisible={!!selectedFolder && !searchActive}
     {viewMode}
     onSetViewMode={setViewMode}
+    {searchActive}
   />
 
   {#if selectedFolder}
@@ -2030,17 +2173,46 @@
         />
       {/if}
 
-      <div class="file-tree-area">
+      <div class="file-tree-area" class:search-mode={searchActive}>
         {#if searchActive}
-          <SearchResults
-            results={searchResults}
+          <SearchScopeBar
+            {scopeChip}
+            excludedSystems={filterExcludedSystems}
+            {showHidden}
+            resultCount={searchResults.length}
+            indexedFileCount={searchableFileCount}
             isLoading={isSearching}
-            query={committedQuery}
-            error={searchError}
-            indexedFileCount={indexedPathsSet.size}
-            {hiddenPaths}
-            onOpenResult={handleOpenResult}
+            onClearScope={handleClearScope}
+            onToggleSystemFilter={toggleSystemFilter}
+            onToggleShowHidden={toggleShowHidden}
           />
+          <div class="search-split">
+            <div class="search-list-pane">
+              <SearchResults
+                bind:this={searchResultsComponent}
+                results={searchResults}
+                isLoading={isSearching}
+                query={committedQuery}
+                error={searchError}
+                indexedFileCount={indexedPathsSet.size}
+                selectedIndex={selectedResultIndex}
+                canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
+                {hiddenPaths}
+                {knownSystems}
+                onSelect={(i) => { selectedResultIndex = i; }}
+                onLoadMore={loadMoreResults}
+                onOpenResult={handleOpenResult}
+              />
+            </div>
+            <div class="search-inspector-pane">
+              <SearchInspector
+                result={selectedResult}
+                {hiddenPaths}
+                {knownSystems}
+                onOpenResult={handleOpenResult}
+              />
+            </div>
+          </div>
         {:else if viewMode === 'systems'}
           <SystemsView
             entries={indexedEntries}
@@ -2244,6 +2416,42 @@
     min-width: 0;
     overflow-y: auto;
     padding: 0.25rem 0.75rem;
+  }
+
+  /* Search mode replaces the scrollable single column with a fixed scope
+     bar on top and a split (list / inspector) below. The .file-tree-area
+     itself stops scrolling — child panes manage their own overflow. */
+  .file-tree-area.search-mode {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .search-split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
+
+  .search-list-pane {
+    flex: 0 0 38%;
+    min-width: 280px;
+    max-width: 520px;
+    border-right: 1px solid var(--border-subtle);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .search-inspector-pane {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
 
