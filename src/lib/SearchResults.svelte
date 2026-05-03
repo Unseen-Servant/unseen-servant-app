@@ -12,8 +12,23 @@
   export let hiddenPaths: Set<string> = new Set();
   export let knownSystems: KnownGameSystem[] = [];
   export let selectedIndex: number = 0;
+  export let canLoadMore: boolean = false;
   export let onSelect: (index: number) => void = () => {};
+  export let onLoadMore: () => void = () => {};
   export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
+
+  // Scroll-near-bottom triggers an upstream fetch for more results. The
+  // parent's canLoadMore prop reflects the actual load gate (not searching,
+  // not at cap, backend hasn't said it's empty), so we just have to detect
+  // proximity here. 80px from the bottom is enough lead time for the next
+  // batch to arrive before the user runs out of rows.
+  function handleScroll(e: Event) {
+    if (!canLoadMore) return;
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+      onLoadMore();
+    }
+  }
 
   // Tag → color lookup. Matches the pattern in FileTree.svelte and
   // SystemsView.svelte so the system color cue is consistent across views.
@@ -93,8 +108,8 @@
   }
 </script>
 
-<div class="search-results" role="listbox" aria-label="Search results">
-  {#if isLoading}
+<div class="search-results" role="listbox" aria-label="Search results" on:scroll={handleScroll}>
+  {#if isLoading && results.length === 0}
     <div class="state-msg">Searching…</div>
   {:else if error}
     <div class="state-msg state-error">{error}</div>
@@ -155,6 +170,9 @@
         </span>
       </div>
     {/each}
+    {#if isLoading && results.length > 0}
+      <div class="loading-more" aria-live="polite">loading more…</div>
+    {/if}
   {/if}
 </div>
 
@@ -176,6 +194,15 @@
 
   .state-error {
     color: var(--text-danger);
+  }
+
+  .loading-more {
+    padding: 0.5rem 0.75rem 0.75rem;
+    color: var(--text-tertiary);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-style: italic;
+    text-align: center;
   }
 
   .result-row {

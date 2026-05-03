@@ -155,6 +155,15 @@
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
   let searchResultsComponent: SearchResults | undefined;
+  // Lazy result loading: start with 25, grow by 25 each scroll-to-bottom,
+  // hard cap at 100 to keep us out of the long tail of low-relevance hits.
+  // reachedEnd flips when the backend returns fewer than requested — we've
+  // drained the post-dedup pool, no point asking for more.
+  const PAGE_SIZE_INITIAL = 25;
+  const PAGE_SIZE_STEP = 25;
+  const PAGE_SIZE_MAX = 100;
+  let pageSize = PAGE_SIZE_INITIAL;
+  let reachedEnd = false;
   $: searchActive = committedQuery.trim() !== '';
   // Clamp selection when results shrink (e.g. new query returns fewer hits).
   $: if (selectedResultIndex >= searchResults.length) {
@@ -265,18 +274,27 @@
 
     searchSeq += 1;
     const seq = searchSeq;
+    const requestedPageSize = pageSize;
     isSearching = true;
     searchError = null;
     try {
       const response = await invoke<SearchResponse>('search_index', {
         query: trimmed,
-        nResults: 10,
+        nResults: requestedPageSize,
         sourcePaths,
         gameSystems,
       });
       if (seq !== searchSeq) return;
-      searchResults = response.results ?? [];
-      selectedResultIndex = 0;
+      const next = response.results ?? [];
+      // Backend returned fewer than asked → there's nothing more to fetch
+      // even if pageSize hasn't hit the cap. Stops scroll-load from spinning.
+      reachedEnd = next.length < requestedPageSize;
+      // Preserve selection across grow-fetches: when the new result list
+      // contains the previously-selected row in place, leave selectedIndex
+      // alone. Only reset for fresh queries (first page) or shrinkage.
+      const wasGrowing = next.length > searchResults.length && searchResults.length > 0;
+      searchResults = next;
+      if (!wasGrowing) selectedResultIndex = 0;
     } catch (e) {
       if (seq !== searchSeq) return;
       searchError = String(e);
@@ -288,8 +306,15 @@
     }
   }
 
+  function resetPageSize() {
+    pageSize = PAGE_SIZE_INITIAL;
+    reachedEnd = false;
+  }
+
   function handleSearchDebounced(q: string) {
-    committedQuery = q.trim();
+    const trimmed = q.trim();
+    if (trimmed !== committedQuery) resetPageSize();
+    committedQuery = trimmed;
     runSearch(q);
   }
 
@@ -298,8 +323,20 @@
   // presses Enter there. This combobox split avoids the overloaded-Enter
   // ambiguity we tried earlier.
   function handleSearchSubmit(q: string) {
-    committedQuery = q.trim();
+    const trimmed = q.trim();
+    if (trimmed !== committedQuery) resetPageSize();
+    committedQuery = trimmed;
     runSearch(q);
+  }
+
+  // Scroll-to-bottom in the result list bumps the page size and re-runs
+  // the same query with a larger n_results. Re-querying (vs. true offset
+  // pagination) is fine on a local sidecar — the embedding is cached and
+  // ChromaDB's nearest-neighbor cost is sub-linear in N at this scale.
+  function loadMoreResults() {
+    if (isSearching || reachedEnd || pageSize >= PAGE_SIZE_MAX || !committedQuery) return;
+    pageSize = Math.min(PAGE_SIZE_MAX, pageSize + PAGE_SIZE_STEP);
+    runSearch(committedQuery);
   }
 
   function handleSearchClear() {
@@ -310,6 +347,7 @@
     isSearching = false;
     searchSeq += 1;
     selectedResultIndex = 0;
+    resetPageSize();
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -2158,9 +2196,11 @@
                 error={searchError}
                 indexedFileCount={indexedPathsSet.size}
                 selectedIndex={selectedResultIndex}
+                canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
                 {hiddenPaths}
                 {knownSystems}
                 onSelect={(i) => { selectedResultIndex = i; }}
+                onLoadMore={loadMoreResults}
                 onOpenResult={handleOpenResult}
               />
             </div>
