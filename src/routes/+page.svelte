@@ -992,11 +992,19 @@
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
   // Activating a collection highlights its files in the tree rather
-  // than filtering everything else out. Edit mode handles its own
+  // than filtering everything else out. Ancestors are included so the
+  // highlight propagates up through collapsed folders — without that,
+  // a scattered collection's files would be invisible until every
+  // containing folder was manually expanded. Edit mode handles its own
   // membership UI (checkboxes) and shouldn't compete with highlights.
-  $: highlightPaths = !isCollectionEditMode && activeContextName && collections[activeContextName]
-    ? new Set(collections[activeContextName].file_paths)
-    : new Set<string>();
+  $: highlightPaths = (() => {
+    if (isCollectionEditMode || !activeContextName) return new Set<string>();
+    const col = collections[activeContextName];
+    if (!col) return new Set<string>();
+    const files = new Set(col.file_paths);
+    if (files.size === 0) return files;
+    return new Set<string>([...files, ...computeAncestorPaths(files)]);
+  })();
 
   // Per-collection count of files currently hidden in the tree. Surfaced
   // in the collections panel so users notice their curated set holds
