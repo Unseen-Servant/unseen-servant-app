@@ -56,8 +56,10 @@
           {/if}
         </div>
         <div class="sub">
-          <span>{result.game_system}</span>
-          {#if span}<span class="dot">·</span><span>{span}</span>{/if}
+          {#if result.game_system}
+            <span class="system-chip">{result.game_system}</span>
+          {/if}
+          {#if span}<span>{span}</span>{/if}
           <span class="dot">·</span>
           <span class="gauge" role="img" aria-label="{pct}% match" title="{pct}% match">
             {#each [0, 1, 2, 3, 4] as idx (idx)}
@@ -122,7 +124,7 @@
     justify-content: space-between;
     gap: 0.7rem;
     padding-bottom: 0.6rem;
-    border-bottom: 2px solid color-mix(in srgb, var(--system-color, var(--text-accent)) 40%, var(--border-subtle));
+    border-bottom: 1px solid var(--border-subtle);
     margin-bottom: 0.7rem;
   }
 
@@ -166,9 +168,24 @@
   .sub {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
     font-size: 0.8rem;
     color: var(--text-secondary);
+  }
+
+  .system-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid color-mix(in srgb, var(--system-color, var(--text-secondary)) 55%, var(--border-subtle));
+    background: color-mix(in srgb, var(--system-color, transparent) 12%, transparent);
+    border-radius: 3px;
+    color: var(--system-color, var(--text-secondary));
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.3;
   }
 
   .dot {
