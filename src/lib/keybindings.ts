@@ -48,6 +48,24 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'search.clear',          keys: { mac: 'Esc',  other: 'Esc' },           label: 'Clear query (or disarm chip)', scope: 'searchInput' },
   { id: 'search.clearScope',     keys: { mac: '⌫⌫',   other: 'Backspace ×2' },  label: 'Clear scope chip',             scope: 'searchInput' },
   { id: 'search.intoResults',    keys: { mac: '↓',    other: '↓' },             label: 'Move focus into results',      scope: 'searchInput' },
+  { id: 'search.intoTree',       keys: { mac: '↓',    other: '↓' },             label: 'Move focus into file tree',    scope: 'searchInput' },
+  { id: 'search.escToTree',      keys: { mac: 'Esc',  other: 'Esc' },           label: 'Empty input → focus tree',     scope: 'searchInput' },
+
+  // File tree (when a row is focused)
+  { id: 'tree.next',             keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'fileTree' },
+  { id: 'tree.prev',             keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'fileTree' },
+  { id: 'tree.home',             keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'fileTree' },
+  { id: 'tree.end',              keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
+  { id: 'tree.expand',           keys: { mac: '→',    other: '→' },             label: 'Expand folder / first child',  scope: 'fileTree' },
+  { id: 'tree.collapse',         keys: { mac: '←',    other: '←' },             label: 'Collapse folder / parent',     scope: 'fileTree' },
+  { id: 'tree.toggleSelect',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
+  { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
+  { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open file with system app',    scope: 'fileTree' },
+  { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
+  { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
+  { id: 'tree.scope',            keys: { mac: 'S',    other: 'S' },             label: 'Set as search scope',          scope: 'fileTree' },
+  { id: 'tree.info',             keys: { mac: 'I',    other: 'I' },             label: 'Show document info (files)',   scope: 'fileTree' },
+  { id: 'tree.hide',             keys: { mac: 'H',    other: 'H' },             label: 'Toggle hidden state',          scope: 'fileTree' },
 
   // Search results list
   { id: 'results.next',          keys: { mac: '↓',    other: '↓' },             label: 'Next result',                  scope: 'searchResults' },

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -25,6 +25,7 @@
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
+  import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
   import { runSyncJob } from '../lib/syncJob';
 
   let selectedFolder = '';
@@ -1213,6 +1214,10 @@
     return new Set<string>([...visible, ...computeAncestorPaths(visible)]);
   })();
 
+  // Flat list of currently-visible tree rows for keyboard nav. Mirrors what
+  // FileTree renders, so consecutive entries here are visually adjacent.
+  $: visibleTreeRows = computeVisibleRows(files, expandedPaths, displayPaths, hiddenPaths, showHidden);
+
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string[]> {
     const map = new Map<string, string[]>();
     if (!status) return map;
@@ -1278,17 +1283,171 @@
     expandedPaths = new Set();
   }
 
+  async function focusTreeRow(path: string) {
+    focusedFilePath = path;
+    await tick();
+    const el = document.querySelector(`[data-tree-row="${CSS.escape(path)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function moveTreeFocus(delta: number) {
+    if (visibleTreeRows.length === 0) return;
+    const current = indexOfPath(visibleTreeRows, focusedFilePath);
+    let next: number;
+    if (current < 0) {
+      next = delta > 0 ? 0 : visibleTreeRows.length - 1;
+    } else {
+      next = Math.min(visibleTreeRows.length - 1, Math.max(0, current + delta));
+    }
+    focusTreeRow(visibleTreeRows[next].path);
+  }
+
+  function activateFocusedTreeRow() {
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return;
+    const row = visibleTreeRows[idx];
+    if (row.item.is_dir) {
+      handleToggleExpand(row.path);
+    } else {
+      openPath(row.path).catch((e) => console.error('Failed to open file:', e));
+    }
+  }
+
+  // Returns true if the event was handled and shouldn't bubble further.
+  function handleTreeNavKey(event: KeyboardEvent): boolean {
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+
+    // Vim-style aliases: j = ArrowDown, k = ArrowUp. Only when no modifier
+    // is held so chords like Cmd+J keep their meaning.
+    const isDown = event.key === 'ArrowDown' || (!meta && !event.shiftKey && lk === 'j');
+    const isUp   = event.key === 'ArrowUp'   || (!meta && !event.shiftKey && lk === 'k');
+
+    if (isDown) { event.preventDefault(); moveTreeFocus(1);  return true; }
+    if (isUp)   { event.preventDefault(); moveTreeFocus(-1); return true; }
+
+    if (event.key === 'Home' && !meta) {
+      event.preventDefault();
+      if (visibleTreeRows.length > 0) focusTreeRow(visibleTreeRows[0].path);
+      return true;
+    }
+    if (event.key === 'End' && !meta) {
+      event.preventDefault();
+      if (visibleTreeRows.length > 0) focusTreeRow(visibleTreeRows[visibleTreeRows.length - 1].path);
+      return true;
+    }
+
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return false;
+    const row = visibleTreeRows[idx];
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      if (row.item.is_dir) {
+        if (!expandedPaths.has(row.path)) {
+          handleToggleExpand(row.path);
+        } else {
+          // Already expanded — move to first child if any are visible.
+          const childIdx = visibleTreeRows.findIndex((r, i) => i > idx && r.parentPath === row.path);
+          if (childIdx > -1) focusTreeRow(visibleTreeRows[childIdx].path);
+        }
+      }
+      return true;
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      if (row.item.is_dir && expandedPaths.has(row.path)) {
+        handleToggleExpand(row.path);
+      } else if (row.parentPath) {
+        focusTreeRow(row.parentPath);
+      }
+      return true;
+    }
+
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      toogleSelection(row.path, row.item.is_dir, row.item, false);
+      return true;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      activateFocusedTreeRow();
+      return true;
+    }
+    if (meta && lk === 'o') {
+      event.preventDefault();
+      if (!row.item.is_dir) openPath(row.path).catch((e) => console.error('Failed to open file:', e));
+      return true;
+    }
+
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      openContextMenuAtFocusedRow();
+      return true;
+    }
+
+    // Single-letter actions on the focused row. Plain letters only — no
+    // modifiers — and only when an input isn't focused (caller already
+    // checked that). c/t are deferred to chunk (c) since they need menu
+    // navigation to feel finished.
+    if (!meta && !event.shiftKey && !event.altKey) {
+      if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
+      if (lk === 'i' && !row.item.is_dir) { event.preventDefault(); statsModalPath = row.path; return true; }
+      if (lk === 's') { event.preventDefault(); setPathScope(row.item); return true; }
+      if (lk === 'h') {
+        if (!isPathHidden(row.path) || hiddenPaths.has(row.path)) {
+          event.preventDefault();
+          toggleHidden(row.item);
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function openContextMenuAtFocusedRow() {
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return;
+    const row = visibleTreeRows[idx];
+    const el = document.querySelector(`[data-tree-row="${CSS.escape(row.path)}"]`) as HTMLElement | null;
+    const rect = el?.getBoundingClientRect();
+    const synthetic = {
+      clientX: rect ? rect.left + 24 : 100,
+      clientY: rect ? rect.bottom : 100,
+    } as MouseEvent;
+    handleContextMenu(synthetic, row.item);
+  }
+
   // Escape ladder (closing precedence, top-most first):
-  //   1. Open context menu       → close
-  //   2. Inline rename in flight  → cancel
-  //   3. Focused file row         → blur
-  //   4. (modal Esc handled by Modal.svelte)
-  //   5. (search results → input handled below)
-  //   6. (search input chip/text  handled in Header.svelte)
+  //   1. Open context menu        → close
+  //   2. Inline rename in flight   → cancel
+  //   3. Empty search input        → blur and hand focus to tree
+  //   4. Focused tree row          → clear focus
+  //   5. (modal Esc handled by Modal.svelte)
+  //   6. (search results → input handled below)
+  //   7. (search input chip/text  handled in Header.svelte)
   function handleGlobalKeydown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    const inSearchInput = target?.classList.contains('search-input') === true;
+    const inAnyInput =
+      target?.matches('input, textarea, [contenteditable="true"]') === true;
+
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
       if (renamingFilePath) { renamingFilePath = null; return; }
+      // Empty search input: blur and place keyboard focus in the tree so
+      // arrows immediately navigate. If a tree row was already focused,
+      // we leave it where it is.
+      if (inSearchInput && searchQuery === '' && !searchActive) {
+        (target as HTMLInputElement).blur();
+        if (!focusedFilePath && visibleTreeRows.length > 0) {
+          focusTreeRow(visibleTreeRows[0].path);
+        }
+        event.preventDefault();
+        return;
+      }
       if (focusedFilePath) { focusedFilePath = null; }
     }
 
@@ -1349,10 +1508,26 @@
       return;
     }
 
+    // ── Tree-row navigation ─────────────────────────────────────────────
+    // Active when a library is loaded, search is not active, no menu/rename
+    // is open. ArrowDown from an empty search input also enters the tree
+    // (parallel to the search-results combobox).
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath) {
+      if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
+        if (visibleTreeRows.length > 0) {
+          event.preventDefault();
+          (target as HTMLInputElement).blur();
+          focusTreeRow(visibleTreeRows[0].path);
+        }
+        return;
+      }
+
+      if (!inAnyInput && handleTreeNavKey(event)) return;
+    }
+
     if (!searchActive || searchResults.length === 0) return;
 
-    const target = event.target as HTMLElement | null;
-    const inInput = target?.closest('.search-input') !== null;
+    const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
 
     // Cmd/Ctrl + 1..9: jump to result N and move focus to it so Enter
