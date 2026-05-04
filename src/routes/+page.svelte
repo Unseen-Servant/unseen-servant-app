@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
+  import { get } from 'svelte/store';
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -1557,6 +1558,19 @@
       event.preventDefault();
       if (selectedFolder && !isSyncing) handleSync();
       return;
+    }
+
+    // Cmd/Ctrl+Z: revert pending (unsynced) selection changes — same effect
+    // as clicking the X on the "N to add, M to remove" banner. Skipped when
+    // an input has focus so native text undo still works while typing.
+    if (meta && !event.shiftKey && lk === 'z' && !inAnyInput) {
+      const pending = get(pendingNotification);
+      if (pending?.onDismiss) {
+        event.preventDefault();
+        pending.onDismiss();
+        pendingNotification.dismiss();
+        return;
+      }
     }
 
     // Cmd/Ctrl+Shift+F: open the filter menu.
