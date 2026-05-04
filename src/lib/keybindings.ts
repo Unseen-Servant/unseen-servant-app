@@ -65,7 +65,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open file with system app',    scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
-  { id: 'tree.scope',            keys: { mac: 'S',    other: 'S' },             label: 'Set as search scope',          scope: 'fileTree' },
+  { id: 'tree.scope',            keys: { mac: 'F',    other: 'F' },             label: 'Set as search scope (find here)', scope: 'fileTree' },
   { id: 'tree.info',             keys: { mac: 'I',    other: 'I' },             label: 'Show document info (indexed files)', scope: 'fileTree' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
 
