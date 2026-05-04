@@ -1429,9 +1429,9 @@
       activateFocusedTreeRow();
       return true;
     }
-    if (meta && lk === 'o') {
+    if (meta && !event.shiftKey && lk === 'o') {
       event.preventDefault();
-      if (!row.item.is_dir) openPath(row.path).catch((e) => console.error('Failed to open file:', e));
+      revealItemInDir(row.path);
       return true;
     }
 
@@ -1584,6 +1584,14 @@
     if (meta && event.shiftKey && (event.key === '.' || event.key === '>') && selectedFolder) {
       event.preventDefault();
       toggleShowHidden();
+      return;
+    }
+
+    // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
+    // explorer (same handler the status-bar folder button calls).
+    if (meta && event.shiftKey && lk === 'o' && selectedFolder) {
+      event.preventDefault();
+      revealItemInDir(selectedFolder);
       return;
     }
 
