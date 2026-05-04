@@ -1427,7 +1427,7 @@
     // free for vim-style nav and '.' mirrors the Cmd+Shift+. global chord.
     if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
-      if (lk === 'i' && !row.item.is_dir) { event.preventDefault(); statsModalPath = row.path; return true; }
+      if (lk === 'i' && !row.item.is_dir && indexedPaths.has(row.path)) { event.preventDefault(); statsModalPath = row.path; return true; }
       if (lk === 's') { event.preventDefault(); setPathScope(row.item); return true; }
       if (event.key === '.') {
         if (!isPathHidden(row.path) || hiddenPaths.has(row.path)) {

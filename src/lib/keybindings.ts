@@ -65,7 +65,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
   { id: 'tree.scope',            keys: { mac: 'S',    other: 'S' },             label: 'Set as search scope',          scope: 'fileTree' },
-  { id: 'tree.info',             keys: { mac: 'I',    other: 'I' },             label: 'Show document info (files)',   scope: 'fileTree' },
+  { id: 'tree.info',             keys: { mac: 'I',    other: 'I' },             label: 'Show document info (indexed files)', scope: 'fileTree' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
 
   // Search results list
