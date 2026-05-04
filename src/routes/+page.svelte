@@ -1270,13 +1270,42 @@
   // File focus, context menu & file operations
   // ---------------------------------------------------------------------------
 
-  function handleToggleExpand(path: string) {
+  function findTreeNode(items: FileItem[], target: string): FileItem | null {
+    for (const item of items) {
+      if (item.path === target) return item;
+      if (item.is_dir && item.children) {
+        const found = findTreeNode(item.children, target);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  // Loaded children must live in the root `files` array (not just inside
+  // the FileTree component instance) so derived views like visibleTreeRows
+  // can walk into them. Without this, keyboard nav skipped over freshly
+  // expanded folders.
+  async function ensureChildrenLoaded(path: string) {
+    const node = findTreeNode(files, path);
+    if (!node || !node.is_dir || node.children !== null) return;
+    try {
+      node.children = await invoke<FileItem[]>('list_files', { folderPath: path });
+    } catch (e) {
+      console.error('Failed to load folder:', e);
+      node.children = [];
+    }
+    files = files;
+  }
+
+  async function handleToggleExpand(path: string) {
     if (expandedPaths.has(path)) {
       expandedPaths.delete(path);
+      expandedPaths = expandedPaths;
     } else {
+      await ensureChildrenLoaded(path);
       expandedPaths.add(path);
+      expandedPaths = expandedPaths;
     }
-    expandedPaths = expandedPaths;
   }
 
   function collapseAll() {
