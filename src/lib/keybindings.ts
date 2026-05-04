@@ -36,7 +36,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open Settings',               scope: 'global' },
   { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle Collections sidebar',  scope: 'global' },
-  { id: 'view.toggle',           keys: { mac: '⌘\\',  other: 'Ctrl+\\' },       label: 'Toggle Tree ↔ Systems view',  scope: 'global' },
+  { id: 'view.toggle',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Toggle Tree ↔ Systems view',  scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Sync / re-index changes',     scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Open filter menu',            scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },

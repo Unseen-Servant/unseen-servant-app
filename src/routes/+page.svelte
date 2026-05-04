@@ -1317,9 +1317,11 @@
       return;
     }
 
-    // Cmd/Ctrl+\: toggle Tree ↔ Systems view (matches the visible button:
-    // hidden during search, so the chord no-ops there too).
-    if (meta && !event.shiftKey && event.key === '\\' && selectedFolder && !searchActive) {
+    // Cmd/Ctrl+J: toggle Tree ↔ Systems view (matches the visible button:
+    // hidden during search, so the chord no-ops there too). 'J' was chosen
+    // over '\' because backslash isn't a single key on Canadian CSA and
+    // several other ISO layouts.
+    if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
       event.preventDefault();
       setViewMode(viewMode === 'systems' ? 'tree' : 'systems');
       return;
