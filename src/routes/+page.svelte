@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
+  import { get } from 'svelte/store';
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -25,6 +26,7 @@
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
+  import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
   import { runSyncJob } from '../lib/syncJob';
 
   let selectedFolder = '';
@@ -859,7 +861,27 @@
 
   async function loadFiles(path: string) {
     try {
-      files = await invoke<FileItem[]>('list_files', { folderPath: path });
+      const newFiles = await invoke<FileItem[]>('list_files', { folderPath: path });
+      // Rehydrate any currently-expanded folders before the swap so
+      // visibleTreeRows matches the rendered tree the moment files updates.
+      // FileTree.svelte's afterUpdate would self-heal anyway, but only into
+      // its component-local item — the root files array would stay stale,
+      // breaking keyboard nav for any focus inside an expanded folder.
+      // Sort shallowest-first so a child can find its parent populated.
+      const sortedExpanded = Array.from(expandedPaths)
+        .sort((a, b) => a.split('/').length - b.split('/').length);
+      for (const expandedPath of sortedExpanded) {
+        const node = findTreeNode(newFiles, expandedPath);
+        if (node && node.is_dir && node.children === null) {
+          try {
+            node.children = await invoke<FileItem[]>('list_files', { folderPath: expandedPath });
+          } catch (e) {
+            console.error('Failed to rehydrate folder:', expandedPath, e);
+            node.children = [];
+          }
+        }
+      }
+      files = newFiles;
       error = '';
       refreshTotalFilesFound();
     } catch (e) {
@@ -1213,6 +1235,10 @@
     return new Set<string>([...visible, ...computeAncestorPaths(visible)]);
   })();
 
+  // Flat list of currently-visible tree rows for keyboard nav. Mirrors what
+  // FileTree renders, so consecutive entries here are visually adjacent.
+  $: visibleTreeRows = computeVisibleRows(files, expandedPaths, displayPaths, hiddenPaths, showHidden);
+
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string[]> {
     const map = new Map<string, string[]>();
     if (!status) return map;
@@ -1265,30 +1291,219 @@
   // File focus, context menu & file operations
   // ---------------------------------------------------------------------------
 
-  function handleToggleExpand(path: string) {
+  function findTreeNode(items: FileItem[], target: string): FileItem | null {
+    for (const item of items) {
+      if (item.path === target) return item;
+      if (item.is_dir && item.children) {
+        const found = findTreeNode(item.children, target);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  // Loaded children must live in the root `files` array (not just inside
+  // the FileTree component instance) so derived views like visibleTreeRows
+  // can walk into them. Without this, keyboard nav skipped over freshly
+  // expanded folders.
+  async function ensureChildrenLoaded(path: string) {
+    const node = findTreeNode(files, path);
+    if (!node || !node.is_dir || node.children !== null) return;
+    try {
+      node.children = await invoke<FileItem[]>('list_files', { folderPath: path });
+    } catch (e) {
+      console.error('Failed to load folder:', e);
+      node.children = [];
+    }
+    files = files;
+  }
+
+  async function handleToggleExpand(path: string) {
     if (expandedPaths.has(path)) {
       expandedPaths.delete(path);
+      expandedPaths = expandedPaths;
     } else {
+      await ensureChildrenLoaded(path);
       expandedPaths.add(path);
+      expandedPaths = expandedPaths;
     }
-    expandedPaths = expandedPaths;
   }
 
   function collapseAll() {
     expandedPaths = new Set();
   }
 
+  async function focusTreeRow(path: string) {
+    focusedFilePath = path;
+    await tick();
+    const el = document.querySelector(`[data-tree-row="${CSS.escape(path)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function moveTreeFocus(delta: number) {
+    if (visibleTreeRows.length === 0) return;
+    const current = indexOfPath(visibleTreeRows, focusedFilePath);
+    let next: number;
+    if (current < 0) {
+      next = delta > 0 ? 0 : visibleTreeRows.length - 1;
+    } else {
+      next = Math.min(visibleTreeRows.length - 1, Math.max(0, current + delta));
+    }
+    focusTreeRow(visibleTreeRows[next].path);
+  }
+
+  function activateFocusedTreeRow() {
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return;
+    const row = visibleTreeRows[idx];
+    if (row.item.is_dir) {
+      handleToggleExpand(row.path);
+    } else {
+      openPath(row.path).catch((e) => console.error('Failed to open file:', e));
+    }
+  }
+
+  // Returns true if the event was handled and shouldn't bubble further.
+  function handleTreeNavKey(event: KeyboardEvent): boolean {
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+
+    // Vim-style aliases: hjkl mirror the arrow keys. Only when no modifier
+    // is held so chords like Cmd+J keep their meaning. h/l free up because
+    // the hide action moved to '.', matching the Cmd+Shift+. show-hidden chord.
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown  = event.key === 'ArrowDown'  || (bareLetter && lk === 'j');
+    const isUp    = event.key === 'ArrowUp'    || (bareLetter && lk === 'k');
+    const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
+    const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
+
+    if (isDown) { event.preventDefault(); moveTreeFocus(1);  return true; }
+    if (isUp)   { event.preventDefault(); moveTreeFocus(-1); return true; }
+
+    if (event.key === 'Home' && !meta) {
+      event.preventDefault();
+      if (visibleTreeRows.length > 0) focusTreeRow(visibleTreeRows[0].path);
+      return true;
+    }
+    if (event.key === 'End' && !meta) {
+      event.preventDefault();
+      if (visibleTreeRows.length > 0) focusTreeRow(visibleTreeRows[visibleTreeRows.length - 1].path);
+      return true;
+    }
+
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return false;
+    const row = visibleTreeRows[idx];
+
+    if (isRight) {
+      event.preventDefault();
+      if (row.item.is_dir) {
+        if (!expandedPaths.has(row.path)) {
+          handleToggleExpand(row.path);
+        } else {
+          // Already expanded — move to first child if any are visible.
+          const childIdx = visibleTreeRows.findIndex((r, i) => i > idx && r.parentPath === row.path);
+          if (childIdx > -1) focusTreeRow(visibleTreeRows[childIdx].path);
+        }
+      }
+      return true;
+    }
+    if (isLeft) {
+      event.preventDefault();
+      if (row.item.is_dir && expandedPaths.has(row.path)) {
+        handleToggleExpand(row.path);
+      } else if (row.parentPath) {
+        focusTreeRow(row.parentPath);
+      }
+      return true;
+    }
+
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      toogleSelection(row.path, row.item.is_dir, row.item, false);
+      return true;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      activateFocusedTreeRow();
+      return true;
+    }
+    if (meta && !event.shiftKey && lk === 'o') {
+      event.preventDefault();
+      revealItemInDir(row.path);
+      return true;
+    }
+
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      openContextMenuAtFocusedRow();
+      return true;
+    }
+
+    // Single-letter actions on the focused row. Plain letters only — no
+    // modifiers — and only when an input isn't focused (caller already
+    // checked that). c/t are deferred to chunk (c) since they need menu
+    // navigation to feel finished. Hide is on '.' (not 'h') so hjkl is
+    // free for vim-style nav and '.' mirrors the Cmd+Shift+. global chord.
+    if (bareLetter) {
+      if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
+      if (lk === 'i' && !row.item.is_dir && indexedPaths.has(row.path)) { event.preventDefault(); statsModalPath = row.path; return true; }
+      if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
+      // toggleHidden internally no-ops on ancestor-hidden rows, so just
+      // delegate the gating decision to it. Always preventDefault so the
+      // keypress doesn't fall through to anything else.
+      if (event.key === '.') {
+        event.preventDefault();
+        toggleHidden(row.item);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function openContextMenuAtFocusedRow() {
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return;
+    const row = visibleTreeRows[idx];
+    const el = document.querySelector(`[data-tree-row="${CSS.escape(row.path)}"]`) as HTMLElement | null;
+    const rect = el?.getBoundingClientRect();
+    const synthetic = {
+      clientX: rect ? rect.left + 24 : 100,
+      clientY: rect ? rect.bottom : 100,
+    } as MouseEvent;
+    handleContextMenu(synthetic, row.item);
+  }
+
   // Escape ladder (closing precedence, top-most first):
-  //   1. Open context menu       → close
-  //   2. Inline rename in flight  → cancel
-  //   3. Focused file row         → blur
-  //   4. (modal Esc handled by Modal.svelte)
-  //   5. (search results → input handled below)
-  //   6. (search input chip/text  handled in Header.svelte)
+  //   1. Open context menu        → close
+  //   2. Inline rename in flight   → cancel
+  //   3. Empty search input        → blur and hand focus to tree
+  //   4. Focused tree row          → clear focus
+  //   5. (modal Esc handled by Modal.svelte)
+  //   6. (search results → input handled below)
+  //   7. (search input chip/text  handled in Header.svelte)
   function handleGlobalKeydown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    const inSearchInput = target?.classList.contains('search-input') === true;
+    const inAnyInput =
+      target?.matches('input, textarea, [contenteditable="true"]') === true;
+
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
       if (renamingFilePath) { renamingFilePath = null; return; }
+      // Empty search input: blur and place keyboard focus in the tree so
+      // arrows immediately navigate. If a tree row was already focused,
+      // we leave it where it is.
+      if (inSearchInput && searchQuery === '' && !searchActive) {
+        (target as HTMLInputElement).blur();
+        if (!focusedFilePath && visibleTreeRows.length > 0) {
+          focusTreeRow(visibleTreeRows[0].path);
+        }
+        event.preventDefault();
+        return;
+      }
       if (focusedFilePath) { focusedFilePath = null; }
     }
 
@@ -1327,12 +1542,35 @@
       return;
     }
 
-    // Cmd/Ctrl+R: trigger manual sync. Always preventDefault to keep the
-    // Tauri webview from reloading the app even when sync isn't available.
+    // Cmd/Ctrl+R: re-detect changes from disk (the lighter "what changed?"
+    // action). Always preventDefault to keep the Tauri webview from
+    // reloading the app even when this isn't available.
     if (meta && !event.shiftKey && lk === 'r') {
       event.preventDefault();
       if (selectedFolder && !isSyncing) handleManualSync();
       return;
+    }
+
+    // Cmd/Ctrl+S: commit selected files to the index — the real sync work
+    // (same handler the "Sync Now" banner button calls). Standalone chord
+    // because this is the headline action of the app.
+    if (meta && !event.shiftKey && lk === 's') {
+      event.preventDefault();
+      if (selectedFolder && !isSyncing) handleSync();
+      return;
+    }
+
+    // Cmd/Ctrl+Z: revert pending (unsynced) selection changes — same effect
+    // as clicking the X on the "N to add, M to remove" banner. Skipped when
+    // an input has focus so native text undo still works while typing.
+    if (meta && !event.shiftKey && lk === 'z' && !inAnyInput) {
+      const pending = get(pendingNotification);
+      if (pending?.onDismiss) {
+        event.preventDefault();
+        pending.onDismiss();
+        pendingNotification.dismiss();
+        return;
+      }
     }
 
     // Cmd/Ctrl+Shift+F: open the filter menu.
@@ -1349,10 +1587,34 @@
       return;
     }
 
+    // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
+    // explorer (same handler the status-bar folder button calls).
+    if (meta && event.shiftKey && lk === 'o' && selectedFolder) {
+      event.preventDefault();
+      revealItemInDir(selectedFolder);
+      return;
+    }
+
+    // ── Tree-row navigation ─────────────────────────────────────────────
+    // Active when a library is loaded, search is not active, no menu/rename
+    // is open. ArrowDown from an empty search input also enters the tree
+    // (parallel to the search-results combobox).
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath) {
+      if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
+        if (visibleTreeRows.length > 0) {
+          event.preventDefault();
+          (target as HTMLInputElement).blur();
+          focusTreeRow(visibleTreeRows[0].path);
+        }
+        return;
+      }
+
+      if (!inAnyInput && handleTreeNavKey(event)) return;
+    }
+
     if (!searchActive || searchResults.length === 0) return;
 
-    const target = event.target as HTMLElement | null;
-    const inInput = target?.closest('.search-input') !== null;
+    const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
 
     // Cmd/Ctrl + 1..9: jump to result N and move focus to it so Enter

@@ -80,7 +80,7 @@
   $: isIndeterminate = item.is_dir && isSelected && !isFullySelected;
   $: isHighlighted = highlightPaths.size > 0 && highlightPaths.has(item.path);
 
-  $: isFocused = !item.is_dir && item.path === focusedFilePath;
+  $: isFocused = item.path === focusedFilePath;
   $: isRenaming = item.path === renamingFilePath;
 
   $: tags = (!item.is_dir && gameSystemMap.get(item.path)) || [];
@@ -203,7 +203,7 @@
 <svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
-<div class="item" class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} style="padding-left: {level * 1.5}rem;">
+<div class="item" class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
   <div class="row-container">
     <button
       class="checkbox"
