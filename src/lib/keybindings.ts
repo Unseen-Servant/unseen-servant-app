@@ -56,8 +56,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.prev',             keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'fileTree' },
   { id: 'tree.home',             keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'fileTree' },
   { id: 'tree.end',              keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
-  { id: 'tree.expand',           keys: { mac: '→',    other: '→' },             label: 'Expand folder / first child',  scope: 'fileTree' },
-  { id: 'tree.collapse',         keys: { mac: '←',    other: '←' },             label: 'Collapse folder / parent',     scope: 'fileTree' },
+  { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
+  { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
   { id: 'tree.toggleSelect',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
   { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
   { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open file with system app',    scope: 'fileTree' },
@@ -65,7 +65,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
   { id: 'tree.scope',            keys: { mac: 'S',    other: 'S' },             label: 'Set as search scope',          scope: 'fileTree' },
   { id: 'tree.info',             keys: { mac: 'I',    other: 'I' },             label: 'Show document info (files)',   scope: 'fileTree' },
-  { id: 'tree.hide',             keys: { mac: 'H',    other: 'H' },             label: 'Toggle hidden state',          scope: 'fileTree' },
+  { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
 
   // Search results list
   { id: 'results.next',          keys: { mac: '↓',    other: '↓' },             label: 'Next result',                  scope: 'searchResults' },

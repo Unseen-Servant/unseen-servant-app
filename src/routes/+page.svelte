@@ -1347,10 +1347,14 @@
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
 
-    // Vim-style aliases: j = ArrowDown, k = ArrowUp. Only when no modifier
-    // is held so chords like Cmd+J keep their meaning.
-    const isDown = event.key === 'ArrowDown' || (!meta && !event.shiftKey && lk === 'j');
-    const isUp   = event.key === 'ArrowUp'   || (!meta && !event.shiftKey && lk === 'k');
+    // Vim-style aliases: hjkl mirror the arrow keys. Only when no modifier
+    // is held so chords like Cmd+J keep their meaning. h/l free up because
+    // the hide action moved to '.', matching the Cmd+Shift+. show-hidden chord.
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown  = event.key === 'ArrowDown'  || (bareLetter && lk === 'j');
+    const isUp    = event.key === 'ArrowUp'    || (bareLetter && lk === 'k');
+    const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
+    const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
 
     if (isDown) { event.preventDefault(); moveTreeFocus(1);  return true; }
     if (isUp)   { event.preventDefault(); moveTreeFocus(-1); return true; }
@@ -1370,7 +1374,7 @@
     if (idx < 0) return false;
     const row = visibleTreeRows[idx];
 
-    if (event.key === 'ArrowRight') {
+    if (isRight) {
       event.preventDefault();
       if (row.item.is_dir) {
         if (!expandedPaths.has(row.path)) {
@@ -1383,7 +1387,7 @@
       }
       return true;
     }
-    if (event.key === 'ArrowLeft') {
+    if (isLeft) {
       event.preventDefault();
       if (row.item.is_dir && expandedPaths.has(row.path)) {
         handleToggleExpand(row.path);
@@ -1419,12 +1423,13 @@
     // Single-letter actions on the focused row. Plain letters only — no
     // modifiers — and only when an input isn't focused (caller already
     // checked that). c/t are deferred to chunk (c) since they need menu
-    // navigation to feel finished.
-    if (!meta && !event.shiftKey && !event.altKey) {
+    // navigation to feel finished. Hide is on '.' (not 'h') so hjkl is
+    // free for vim-style nav and '.' mirrors the Cmd+Shift+. global chord.
+    if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
       if (lk === 'i' && !row.item.is_dir) { event.preventDefault(); statsModalPath = row.path; return true; }
       if (lk === 's') { event.preventDefault(); setPathScope(row.item); return true; }
-      if (lk === 'h') {
+      if (event.key === '.') {
         if (!isPathHidden(row.path) || hiddenPaths.has(row.path)) {
           event.preventDefault();
           toggleHidden(row.item);
