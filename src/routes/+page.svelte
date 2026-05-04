@@ -1520,11 +1520,21 @@
       return;
     }
 
-    // Cmd/Ctrl+R: trigger manual sync. Always preventDefault to keep the
-    // Tauri webview from reloading the app even when sync isn't available.
+    // Cmd/Ctrl+R: re-detect changes from disk (the lighter "what changed?"
+    // action). Always preventDefault to keep the Tauri webview from
+    // reloading the app even when this isn't available.
     if (meta && !event.shiftKey && lk === 'r') {
       event.preventDefault();
       if (selectedFolder && !isSyncing) handleManualSync();
+      return;
+    }
+
+    // Cmd/Ctrl+S: commit selected files to the index — the real sync work
+    // (same handler the "Sync Now" banner button calls). Standalone chord
+    // because this is the headline action of the app.
+    if (meta && !event.shiftKey && lk === 's') {
+      event.preventDefault();
+      if (selectedFolder && !isSyncing) handleSync();
       return;
     }
 
