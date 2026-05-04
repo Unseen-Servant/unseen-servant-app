@@ -1278,6 +1278,13 @@
     expandedPaths = new Set();
   }
 
+  // Escape ladder (closing precedence, top-most first):
+  //   1. Open context menu       → close
+  //   2. Inline rename in flight  → cancel
+  //   3. Focused file row         → blur
+  //   4. (modal Esc handled by Modal.svelte)
+  //   5. (search results → input handled below)
+  //   6. (search input chip/text  handled in Header.svelte)
   function handleGlobalKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
@@ -1285,10 +1292,60 @@
       if (focusedFilePath) { focusedFilePath = null; }
     }
 
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+
     // Cmd/Ctrl+F: focus the search input from anywhere in the app.
-    if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+    if (meta && !event.shiftKey && lk === 'f') {
       event.preventDefault();
       headerComponent?.focus();
+      return;
+    }
+
+    // Cmd/Ctrl+,: open Settings (always available).
+    if (meta && !event.shiftKey && event.key === ',') {
+      event.preventDefault();
+      settingsInitialTab = 'library';
+      showSettings = true;
+      return;
+    }
+
+    // Cmd/Ctrl+B: toggle Collections sidebar.
+    if (meta && !event.shiftKey && lk === 'b' && selectedFolder) {
+      event.preventDefault();
+      togglePanel();
+      return;
+    }
+
+    // Cmd/Ctrl+J: toggle Tree ↔ Systems view (matches the visible button:
+    // hidden during search, so the chord no-ops there too). 'J' was chosen
+    // over '\' because backslash isn't a single key on Canadian CSA and
+    // several other ISO layouts.
+    if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
+      event.preventDefault();
+      setViewMode(viewMode === 'systems' ? 'tree' : 'systems');
+      return;
+    }
+
+    // Cmd/Ctrl+R: trigger manual sync. Always preventDefault to keep the
+    // Tauri webview from reloading the app even when sync isn't available.
+    if (meta && !event.shiftKey && lk === 'r') {
+      event.preventDefault();
+      if (selectedFolder && !isSyncing) handleManualSync();
+      return;
+    }
+
+    // Cmd/Ctrl+Shift+F: open the filter menu.
+    if (meta && event.shiftKey && lk === 'f' && selectedFolder) {
+      event.preventDefault();
+      headerComponent?.toggleFilter();
+      return;
+    }
+
+    // Cmd/Ctrl+Shift+.: toggle "Show hidden" (Finder convention).
+    if (meta && event.shiftKey && (event.key === '.' || event.key === '>') && selectedFolder) {
+      event.preventDefault();
+      toggleShowHidden();
       return;
     }
 
