@@ -860,7 +860,27 @@
 
   async function loadFiles(path: string) {
     try {
-      files = await invoke<FileItem[]>('list_files', { folderPath: path });
+      const newFiles = await invoke<FileItem[]>('list_files', { folderPath: path });
+      // Rehydrate any currently-expanded folders before the swap so
+      // visibleTreeRows matches the rendered tree the moment files updates.
+      // FileTree.svelte's afterUpdate would self-heal anyway, but only into
+      // its component-local item — the root files array would stay stale,
+      // breaking keyboard nav for any focus inside an expanded folder.
+      // Sort shallowest-first so a child can find its parent populated.
+      const sortedExpanded = Array.from(expandedPaths)
+        .sort((a, b) => a.split('/').length - b.split('/').length);
+      for (const expandedPath of sortedExpanded) {
+        const node = findTreeNode(newFiles, expandedPath);
+        if (node && node.is_dir && node.children === null) {
+          try {
+            node.children = await invoke<FileItem[]>('list_files', { folderPath: expandedPath });
+          } catch (e) {
+            console.error('Failed to rehydrate folder:', expandedPath, e);
+            node.children = [];
+          }
+        }
+      }
+      files = newFiles;
       error = '';
       refreshTotalFilesFound();
     } catch (e) {
