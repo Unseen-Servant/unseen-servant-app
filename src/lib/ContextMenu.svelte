@@ -38,7 +38,12 @@
 
   let menuEl: HTMLDivElement;
   let openSubmenu: 'add' | 'remove' | null = initialSubmenu;
-  let focusedIdx = 0;
+  // -1 means "no keyboard cursor yet" — stays that way for mouse users.
+  // First ↑/↓ promotes to 0 (Math.max(0, -1 ± 1) clamps to 0). When the
+  // menu opens directly into a submenu (C chord) the trigger's index is
+  // resolved in refreshItemsAndFocus so ← from the submenu has somewhere
+  // to land.
+  let focusedIdx = -1;
   let focusedSubmenuIdx: number | null = openSubmenu ? 0 : null;
   let mainItems: HTMLElement[] = [];
   let submenuItems: HTMLElement[] = [];
@@ -63,11 +68,20 @@
     } else {
       submenuItems = [];
     }
-    if (mainItems.length > 0) {
-      focusedIdx = Math.max(0, Math.min(mainItems.length - 1, focusedIdx));
-    }
+    // Clamp upper bound only — leave -1 alone so mouse users don't get
+    // a false cursor highlight on the first row.
+    if (focusedIdx >= mainItems.length) focusedIdx = mainItems.length - 1;
     if (focusedSubmenuIdx !== null && submenuItems.length > 0) {
       focusedSubmenuIdx = Math.max(0, Math.min(submenuItems.length - 1, focusedSubmenuIdx));
+    }
+    // When the menu opened directly into a submenu (C chord), resolve
+    // the trigger's index so ← / Esc from the submenu has a row to fall
+    // back to.
+    if (openSubmenu && focusedIdx < 0) {
+      const triggerIdx = mainItems.findIndex(
+        (el) => el.dataset.mi === 'submenu-trigger' && el.dataset.submenu === openSubmenu,
+      );
+      if (triggerIdx >= 0) focusedIdx = triggerIdx;
     }
     const inSub = focusedSubmenuIdx !== null;
     mainItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx && !inSub));
