@@ -1622,7 +1622,13 @@
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
     // (parallel to the search-results combobox).
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath) {
+    // Other popovers (filter menu, sort menu, dropdowns) attach their own
+    // keydown listeners but they fire AFTER this one — so we have to skip
+    // here when the DOM tells us a competing menu is open. Querying by
+    // class is pragmatic; once chunk c is fully shipped these could share
+    // a small open-menus store instead.
+    const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen) {
       if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
         if (visibleTreeRows.length > 0) {
           event.preventDefault();
