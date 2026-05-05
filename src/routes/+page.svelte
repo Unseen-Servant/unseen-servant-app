@@ -1463,8 +1463,11 @@
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
       // keypress doesn't fall through to anything else.
-      // Period key: '.' on the main row, 'Decimal' on numeric keypads.
-      if (event.key === '.' || event.key === 'Decimal') {
+      // Period key on the main row OR on the numpad. event.code is
+      // layout-independent — some layouts produce a different event.key
+      // for the numpad period (e.g. ',' on German), so checking the code
+      // is the reliable way to catch all keyboards.
+      if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
         toggleHidden(row.item);
         return true;
