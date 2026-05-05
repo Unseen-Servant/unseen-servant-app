@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo } from './types';
 
   export let x: number;
@@ -13,6 +14,10 @@
   // so the toggle is omitted (user must unhide the originally-hidden folder).
   export let directlyHidden: boolean = false;
   export let inheritedHidden: boolean = false;
+  // Optional initial submenu to open on mount (used by the C tree-row chord
+  // in PR 2 of chunk c — for now the prop just exists so callers can land
+  // a row directly in the Add submenu without a follow-up keystroke).
+  export let initialSubmenu: 'add' | 'remove' | null = null;
   export let onOpen: () => void = () => {};
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
@@ -28,11 +33,101 @@
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
-  let openSubmenu: 'add' | 'remove' | null = null;
+  let openSubmenu: 'add' | 'remove' | null = initialSubmenu;
+  let focusedIdx = 0;
+  let focusedSubmenuIdx: number | null = openSubmenu ? 0 : null;
+  let mainItems: HTMLElement[] = [];
+  let submenuItems: HTMLElement[] = [];
 
   function handleOutsideMouseDown(event: MouseEvent) {
     if (event.button === 2 && menuEl && !menuEl.contains(event.target as Node)) {
       onClose();
+    }
+  }
+
+  // Re-query items after every render so adding/removing conditional sections
+  // doesn't desync the keyboard cursor. Apply the .kb-focused class
+  // imperatively because the row markup is conditional, not #each-driven.
+  function refreshItemsAndFocus() {
+    if (!menuEl) return;
+    mainItems = Array.from(menuEl.querySelectorAll(':scope > [data-mi]')) as HTMLElement[];
+    if (openSubmenu) {
+      const trigger = menuEl.querySelector(`[data-mi="submenu-trigger"][data-submenu="${openSubmenu}"]`);
+      submenuItems = trigger
+        ? Array.from(trigger.querySelectorAll('.submenu > [data-mi]')) as HTMLElement[]
+        : [];
+    } else {
+      submenuItems = [];
+    }
+    if (mainItems.length > 0) {
+      focusedIdx = Math.max(0, Math.min(mainItems.length - 1, focusedIdx));
+    }
+    if (focusedSubmenuIdx !== null && submenuItems.length > 0) {
+      focusedSubmenuIdx = Math.max(0, Math.min(submenuItems.length - 1, focusedSubmenuIdx));
+    }
+    const inSub = focusedSubmenuIdx !== null;
+    mainItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx && !inSub));
+    submenuItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedSubmenuIdx));
+  }
+
+  onMount(refreshItemsAndFocus);
+  afterUpdate(refreshItemsAndFocus);
+
+  function handleKeydown(event: KeyboardEvent) {
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const inSub = focusedSubmenuIdx !== null;
+
+    const isDown  = event.key === 'ArrowDown'  || (bareLetter && lk === 'j');
+    const isUp    = event.key === 'ArrowUp'    || (bareLetter && lk === 'k');
+    const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
+    const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
+
+    if (isDown) {
+      event.preventDefault();
+      if (inSub) focusedSubmenuIdx = Math.min(submenuItems.length - 1, (focusedSubmenuIdx ?? -1) + 1);
+      else       focusedIdx = Math.min(mainItems.length - 1, focusedIdx + 1);
+      refreshItemsAndFocus();
+      return;
+    }
+    if (isUp) {
+      event.preventDefault();
+      if (inSub) focusedSubmenuIdx = Math.max(0, (focusedSubmenuIdx ?? 0) - 1);
+      else       focusedIdx = Math.max(0, focusedIdx - 1);
+      refreshItemsAndFocus();
+      return;
+    }
+    if (isRight && !inSub) {
+      const item = mainItems[focusedIdx];
+      const which = item?.dataset.submenu as 'add' | 'remove' | undefined;
+      if (item?.dataset.mi === 'submenu-trigger' && which) {
+        event.preventDefault();
+        openSubmenu = which;
+        focusedSubmenuIdx = 0;
+      }
+      return;
+    }
+    if (isLeft && inSub) {
+      event.preventDefault();
+      openSubmenu = null;
+      focusedSubmenuIdx = null;
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const target = inSub ? submenuItems[focusedSubmenuIdx!] : mainItems[focusedIdx];
+      target?.click();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (inSub) {
+        openSubmenu = null;
+        focusedSubmenuIdx = null;
+      } else {
+        onClose();
+      }
     }
   }
 
@@ -45,7 +140,7 @@
   $: clampedY = Math.min(y, window.innerHeight - 240);
 </script>
 
-<svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} />
+<svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} on:keydown={handleKeydown} />
 
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 <div
@@ -56,25 +151,25 @@
   on:mousedown|stopPropagation
 >
   {#if !item.is_dir}
-    <button class="context-item" on:click={onOpen}>Open file</button>
+    <button class="context-item" data-mi="item" on:click={onOpen}>Open file</button>
   {/if}
-  <button class="context-item" on:click={onReveal}>Reveal in folder</button>
+  <button class="context-item" data-mi="item" on:click={onReveal}>Reveal in folder</button>
   {#if canScopeSearch}
     <hr class="context-divider" />
-    <button class="context-item" on:click={onSearchInScope}>
+    <button class="context-item" data-mi="item" on:click={onSearchInScope}>
       Search in this {item.is_dir ? 'folder' : 'file'}
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
     <hr class="context-divider" />
-    <button class="context-item" on:click={onReindex}>Re-index file</button>
-    <button class="context-item" on:click={onShowStats}>Get info</button>
+    <button class="context-item" data-mi="item" on:click={onReindex}>Re-index file</button>
+    <button class="context-item" data-mi="item" on:click={onShowStats}>Get info</button>
   {/if}
 
   {#if canAddToCollection}
     <hr class="context-divider" />
     {#if item.is_dir}
-      <button class="context-item" on:click={onCreateCollectionFromFolder}>
+      <button class="context-item" data-mi="item" on:click={onCreateCollectionFromFolder}>
         Create collection from folder
       </button>
     {/if}
@@ -82,6 +177,8 @@
     <div
       class="context-item submenu-trigger"
       class:open={openSubmenu === 'add'}
+      data-mi="submenu-trigger"
+      data-submenu="add"
       on:mouseenter={() => { openSubmenu = 'add'; }}
       on:mouseleave={() => { openSubmenu = null; }}
     >
@@ -92,6 +189,7 @@
           {#each collectionList as col}
             <button
               class="context-item"
+              data-mi="item"
               on:click={() => onAddToCollection(col.name)}
             >
               {col.name}
@@ -100,7 +198,7 @@
           {#if hasCollections}
             <hr class="context-divider" />
           {/if}
-          <button class="context-item" on:click={onAddToNewCollection}>
+          <button class="context-item" data-mi="item" on:click={onAddToNewCollection}>
             + New collection&hellip;
           </button>
         </div>
@@ -112,6 +210,8 @@
       <div
         class="context-item submenu-trigger"
         class:open={openSubmenu === 'remove'}
+        data-mi="submenu-trigger"
+        data-submenu="remove"
         on:mouseenter={() => { openSubmenu = 'remove'; }}
         on:mouseleave={() => { openSubmenu = null; }}
       >
@@ -122,6 +222,7 @@
             {#each containingCollections as name}
               <button
                 class="context-item"
+                data-mi="item"
                 on:click={() => onRemoveFromCollection(name)}
               >
                 {name}
@@ -135,14 +236,14 @@
 
   {#if !inheritedHidden}
     <hr class="context-divider" />
-    <button class="context-item" on:click={onToggleHidden}>
+    <button class="context-item" data-mi="item" on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
     </button>
   {/if}
 
   <hr class="context-divider" />
-  <button class="context-item" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
-  <button class="context-item danger" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
+  <button class="context-item" data-mi="item" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
+  <button class="context-item danger" data-mi="item" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
 </div>
 
 <style>
@@ -170,7 +271,8 @@
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
-  .context-item:hover {
+  .context-item:hover,
+  .context-item:global(.kb-focused) {
     background: var(--bg-container);
   }
   .context-item.danger {

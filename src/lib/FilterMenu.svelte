@@ -1,6 +1,7 @@
 <script lang="ts">
   // Filter popover. Same anchor pattern as the sort menu in CollectionsPanel:
   // outside-click and Escape close it.
+  import { afterUpdate } from 'svelte';
 
   export let open: boolean = false;
   export let anchorEl: HTMLElement | undefined = undefined;
@@ -47,6 +48,8 @@
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
+  let focusedIdx = 0;
+  let rowEls: HTMLElement[] = [];
 
   function handleWindowClick(event: MouseEvent) {
     if (!open) return;
@@ -56,10 +59,53 @@
     onClose();
   }
 
+  // Re-query enabled rows after every render and apply .kb-focused. Disabled
+  // rows are skipped because they carry no [data-fm] attribute — keeps the
+  // keyboard cursor away from rows the user can't act on.
+  function refreshRowsAndFocus() {
+    if (!menuEl) {
+      rowEls = [];
+      return;
+    }
+    rowEls = Array.from(menuEl.querySelectorAll('[data-fm]')) as HTMLElement[];
+    if (rowEls.length > 0) {
+      focusedIdx = Math.max(0, Math.min(rowEls.length - 1, focusedIdx));
+    }
+    rowEls.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx));
+  }
+
+  // Reset cursor to the top whenever the menu opens.
+  $: if (open) focusedIdx = 0;
+
+  afterUpdate(refreshRowsAndFocus);
+
   function handleKey(event: KeyboardEvent) {
-    if (open && event.key === 'Escape') {
+    if (!open) return;
+    if (event.key === 'Escape') {
       event.preventDefault();
       onClose();
+      return;
+    }
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
+    const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+
+    if (isDown) {
+      event.preventDefault();
+      focusedIdx = Math.min(rowEls.length - 1, focusedIdx + 1);
+      refreshRowsAndFocus();
+    } else if (isUp) {
+      event.preventDefault();
+      focusedIdx = Math.max(0, focusedIdx - 1);
+      refreshRowsAndFocus();
+    } else if (event.key === ' ' || event.key === 'Enter') {
+      const row = rowEls[focusedIdx];
+      if (row) {
+        event.preventDefault();
+        row.click();
+      }
     }
   }
 
@@ -103,7 +149,12 @@
           <button class="reset-link" on:click={onClearHidden}>Clear</button>
         {/if}
       </div>
-      <label class="row" class:row-disabled={!hasHidden} title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}>
+      <label
+        class="row"
+        class:row-disabled={!hasHidden}
+        title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
+        data-fm={hasHidden ? 'row' : undefined}
+      >
         <span class="row-name">Show hidden items</span>
         <span class="row-count">{hiddenCount}</span>
         <input
@@ -122,7 +173,7 @@
         <div class="section-head">
           <span class="section-label">Curation</span>
         </div>
-        <label class="row" title="Show every file in the library">
+        <label class="row" title="Show every file in the library" data-fm="row">
           <span class="row-name">Show all</span>
           <input
             class="app-radio"
@@ -138,6 +189,7 @@
           title={focusFilterAvailable
             ? `Narrow the tree to just ${activeContextName}'s files`
             : 'Activate a collection from the panel to enable'}
+          data-fm={focusFilterAvailable ? 'row' : undefined}
         >
           <span class="row-name">Show only collection</span>
           <input
@@ -152,6 +204,7 @@
         <label
           class="row"
           title="Show only files that aren't in any collection — useful for scouting curation candidates"
+          data-fm="row"
         >
           <span class="row-name">Show only loose</span>
           <span class="row-count">{uncollectedCount}</span>
@@ -178,7 +231,7 @@
           </div>
           <div class="systems">
             {#each systems as { name, count }}
-              <label class="row" title={name}>
+              <label class="row" title={name} data-fm="row">
                 <span class="row-name">{name}</span>
                 <span class="row-count">{count}</span>
                 <input
@@ -268,7 +321,8 @@
     cursor: pointer;
     transition: background var(--transition-fast);
   }
-  .row:hover {
+  .row:hover,
+  .row:global(.kb-focused) {
     background: var(--bg-category);
   }
   .row-disabled {
