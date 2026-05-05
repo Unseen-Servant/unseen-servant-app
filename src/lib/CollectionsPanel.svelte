@@ -223,6 +223,22 @@
     if (target?.closest('[data-cp-row]')) return;
     if (rows.length > 0) onFocusCollection(rows[0].name);
   }
+
+  // Exposed for the page-level Cmd+Alt+← jump. Restores `preferred` if
+  // it's still in the visible list (matches user expectation: "take me
+  // back to where I was"); otherwise falls back to the first row, or
+  // the draft when one is being created.
+  export function claim(preferred: string | null) {
+    if (draftName !== null) {
+      onFocusCollection(draftName);
+      return;
+    }
+    if (preferred && rows.some((r) => r.name === preferred)) {
+      onFocusCollection(preferred);
+      return;
+    }
+    if (rows.length > 0) onFocusCollection(rows[0].name);
+  }
 </script>
 
 <svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />

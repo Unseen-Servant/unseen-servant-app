@@ -357,10 +357,18 @@
   // Exposed so the parent's .file-tree-area mousedown can claim systems
   // mode too — .systems-view only spans the height of its content, so
   // chrome clicks in the scrollable area below the last group fall on
-  // the parent and miss handleViewMousedown.
-  export function claimFirst() {
+  // the parent and miss handleViewMousedown. Also used by the Cmd+Alt+→
+  // jump: passing a path restores that entry when it's still visible
+  // (multi-tagged files land on the first occurrence and ↓ walks the
+  // rest), otherwise we fall back to the first visible entry.
+  export function claim(preferred: string | null = null) {
     if (focusedFilePath !== null) return;
-    if (visibleEntries.length > 0) setFocusedIdx(0);
+    if (visibleEntries.length === 0) return;
+    if (preferred) {
+      const i = visibleEntries.findIndex((v) => v.path === preferred);
+      if (i >= 0) { setFocusedIdx(i); return; }
+    }
+    setFocusedIdx(0);
   }
 </script>
 

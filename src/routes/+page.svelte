@@ -65,6 +65,13 @@
     focusedCollectionName = name;
     if (name) focusedFilePath = null;
   }
+  // Remember the last non-null focus on each side so Cmd+Alt+←/→ can
+  // restore the user to where they were instead of always landing on
+  // row 0 of the target region.
+  let lastFocusedFilePath: string | null = null;
+  let lastFocusedCollectionName: string | null = null;
+  $: if (focusedFilePath !== null) lastFocusedFilePath = focusedFilePath;
+  $: if (focusedCollectionName !== null) lastFocusedCollectionName = focusedCollectionName;
   // `hideState` snapshots both the directly-hidden flag (path itself in
   // hiddenPaths) and the inherited flag (an ancestor folder is). The menu
   // shows Hide/Show only when `directlyHidden` is true or nothing is
@@ -171,6 +178,7 @@
   let headerComponent: Header | undefined;
   let searchResultsComponent: SearchResults | undefined;
   let systemsViewComponent: SystemsView | undefined;
+  let collectionsPanelComponent: CollectionsPanel | undefined;
   // Lazy result loading: start with 25, grow by 25 each scroll-to-bottom,
   // hard cap at 100 to keep us out of the long tail of low-relevance hits.
   // reachedEnd flips when the backend returns fewer than requested — we've
@@ -1370,6 +1378,32 @@
     focusTreeRow(visibleTreeRows[next].path);
   }
 
+  // Cmd+Alt+← target. Opens the collections panel if it's collapsed, then
+  // hands off to the panel's claim() so the rendering details (sort,
+  // archive filter, draft row) stay encapsulated there.
+  async function focusCollectionsRegion() {
+    if (focusedCollectionName !== null) return;
+    if (!collectionsPanelOpen) await togglePanel();
+    await tick();
+    collectionsPanelComponent?.claim(lastFocusedCollectionName);
+  }
+
+  // Cmd+Alt+→ target. Tree mode uses the locally-known visibleTreeRows;
+  // systems mode delegates so SystemsView can resolve the right entry
+  // (multi-tagged files have multiple visible-entries indices).
+  function focusFileRegion() {
+    if (focusedFilePath !== null) return;
+    if (viewMode === 'systems') {
+      systemsViewComponent?.claim(lastFocusedFilePath);
+      return;
+    }
+    if (visibleTreeRows.length === 0) return;
+    const restore = lastFocusedFilePath && indexOfPath(visibleTreeRows, lastFocusedFilePath) >= 0
+      ? lastFocusedFilePath
+      : visibleTreeRows[0].path;
+    focusTreeRow(restore);
+  }
+
   function activateFocusedTreeRow() {
     const idx = indexOfPath(visibleTreeRows, focusedFilePath);
     if (idx < 0) return;
@@ -1394,7 +1428,7 @@
     const target = event.target as HTMLElement | null;
     if (viewMode === 'systems') {
       if (target?.closest('[data-sv-row]')) return;
-      systemsViewComponent?.claimFirst();
+      systemsViewComponent?.claim();
       return;
     }
     if (target?.closest('[data-tree-row]')) return;
@@ -1595,6 +1629,19 @@
     if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
       event.preventDefault();
       setViewMode(viewMode === 'systems' ? 'tree' : 'systems');
+      return;
+    }
+
+    // Cmd/Ctrl+Alt+←/→: jump keyboard focus between the collections panel
+    // and the file pane (tree or systems). Restores the last-focused row
+    // in the target region if it's still visible, else lands on the first
+    // visible row. Skipped during search (the search input owns ←/→ for
+    // text editing).
+    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchActive
+        && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+      event.preventDefault();
+      if (event.key === 'ArrowLeft') focusCollectionsRegion();
+      else focusFileRegion();
       return;
     }
 
@@ -2593,6 +2640,7 @@
     <div class="workspace">
       {#if collectionsPanelOpen}
         <CollectionsPanel
+          bind:this={collectionsPanelComponent}
           {collections}
           {hiddenCountByCollection}
           activeName={activeContextName}

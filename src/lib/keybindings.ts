@@ -36,6 +36,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open Settings',               scope: 'global' },
   { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle Collections sidebar',  scope: 'global' },
+  { id: 'focus.collections',     keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Jump focus to Collections',   scope: 'global' },
+  { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Jump focus to file pane',     scope: 'global' },
   { id: 'view.toggle',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Toggle Tree ↔ Systems view',  scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
