@@ -99,6 +99,14 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'contextMenu.activate',  keys: { mac: '↵',    other: 'Enter' },         label: 'Activate focused item',        scope: 'contextMenu' },
   { id: 'contextMenu.close',     keys: { mac: 'Esc',  other: 'Esc' },           label: 'Close (or back to parent)',    scope: 'contextMenu' },
 
+  // Systems view (when ⌘J view is active)
+  { id: 'systems.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'fileTree' },
+  { id: 'systems.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'fileTree' },
+  { id: 'systems.home',          keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first entry',          scope: 'fileTree' },
+  { id: 'systems.end',           keys: { mac: 'End',  other: 'End' },           label: 'Jump to last entry',           scope: 'fileTree' },
+  { id: 'systems.open',          keys: { mac: '↵',    other: 'Enter' },         label: 'Open focused file',            scope: 'fileTree' },
+  { id: 'systems.toggleSelect',  keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection (edit mode)', scope: 'fileTree' },
+
   // Search results list
   { id: 'results.next',          keys: { mac: '↓',    other: '↓' },             label: 'Next result',                  scope: 'searchResults' },
   { id: 'results.prev',          keys: { mac: '↑',    other: '↑' },             label: 'Previous result (or back to input)', scope: 'searchResults' },

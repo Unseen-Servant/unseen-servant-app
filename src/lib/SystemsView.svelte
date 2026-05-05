@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, FileStatusEntry, KnownGameSystem } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
@@ -182,6 +183,86 @@
     else onCollectionAdd(paths);
   }
 
+  // Flat list of entries the user can keyboard-navigate to: every entry
+  // from a non-collapsed group, in display order. A multi-tagged file
+  // appears once per group it belongs to — same as the rendered list,
+  // so ↓ walks visually adjacent rows.
+  $: visibleEntries = (() => {
+    const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
+    for (const g of groups) {
+      if (collapsed.has(g.tag)) continue;
+      for (const e of g.entries) out.push({ path: e.path, entry: e, tag: g.tag });
+    }
+    return out;
+  })();
+
+  $: if (focusedFilePath) scrollFocusedIntoView(focusedFilePath);
+  async function scrollFocusedIntoView(path: string) {
+    await tick();
+    const el = document.querySelector(`[data-sv-row="${CSS.escape(path)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function moveFocus(delta: number) {
+    if (visibleEntries.length === 0) return;
+    const cur = visibleEntries.findIndex((v) => v.path === focusedFilePath);
+    const next = cur < 0
+      ? (delta > 0 ? 0 : visibleEntries.length - 1)
+      : Math.max(0, Math.min(visibleEntries.length - 1, cur + delta));
+    onFocusFile(visibleEntries[next].path);
+  }
+
+  function handleWindowKey(event: KeyboardEvent) {
+    // Yield to inputs, popovers, and any rename in flight elsewhere.
+    if (document.querySelector('.filter-menu, .dropdown, .context-menu, .sort-menu')) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
+    const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+
+    if (isDown) { event.preventDefault(); moveFocus(1);  return; }
+    if (isUp)   { event.preventDefault(); moveFocus(-1); return; }
+
+    if (event.key === 'Home' && !meta && visibleEntries[0]) {
+      event.preventDefault();
+      onFocusFile(visibleEntries[0].path);
+      return;
+    }
+    if (event.key === 'End' && !meta && visibleEntries.length > 0) {
+      event.preventDefault();
+      onFocusFile(visibleEntries[visibleEntries.length - 1].path);
+      return;
+    }
+
+    // Esc clears focus when no other handler claimed the keypress; only
+    // act if a systems entry is focused so we don't fight the page's Esc
+    // ladder (search, modals, etc.).
+    if (event.key === 'Escape' && focusedFilePath && visibleEntries.some((v) => v.path === focusedFilePath)) {
+      event.preventDefault();
+      onFocusFile(null);
+      return;
+    }
+
+    if (focusedFilePath === null) return;
+    const focused = visibleEntries.find((v) => v.path === focusedFilePath);
+    if (!focused) return;
+
+    if (event.key === 'Enter' && !isCollectionEditMode) {
+      event.preventDefault();
+      handleDoubleClick(focused.entry);
+      return;
+    }
+    if (event.key === ' ' && isCollectionEditMode) {
+      event.preventDefault();
+      handleCheckboxClick({ shiftKey: false, stopPropagation: () => {} } as MouseEvent, focused.entry, focused.tag, groups.find((g) => g.tag === focused.tag)?.entries ?? []);
+      return;
+    }
+  }
+
   function relativeParent(absPath: string): string {
     const i = absPath.lastIndexOf('/');
     if (i < 0) return '';
@@ -213,6 +294,8 @@
     return `${years}y`;
   }
 </script>
+
+<svelte:window on:keydown={handleWindowKey} />
 
 {#if groups.length === 0}
   <div class="empty">No indexed files match the current view.</div>
@@ -262,6 +345,7 @@
                 class:focused={focusedFilePath === entry.path}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
                 class:highlighted={highlightPaths.has(entry.path)}
+                data-sv-row={entry.path}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}

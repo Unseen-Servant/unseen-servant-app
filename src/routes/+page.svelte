@@ -1673,7 +1673,9 @@
     // class is pragmatic; once chunk c is fully shipped these could share
     // a small open-menus store instead.
     const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName) {
+    // Tree-nav handler is for the directory tree; systems view owns its
+    // own arrow nav so we skip here when that view is active.
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
       if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
         if (visibleTreeRows.length > 0) {
           event.preventDefault();
