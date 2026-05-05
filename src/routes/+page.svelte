@@ -1458,7 +1458,6 @@
     // free for vim-style nav and '.' mirrors the Cmd+Shift+. global chord.
     if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
-      if (lk === 'i' && !row.item.is_dir && indexedPaths.has(row.path)) { event.preventDefault(); statsModalPath = row.path; return true; }
       if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
@@ -1583,6 +1582,18 @@
         event.preventDefault();
         pending.onDismiss();
         pendingNotification.dismiss();
+        return;
+      }
+    }
+
+    // Cmd/Ctrl+I: show document info for the focused row. Mac muscle
+    // memory from Finder ("Get Info"). indexedPaths.has implies the row
+    // is a file (folders aren't tracked there) AND that get_document_stats
+    // has data to return — matches the context menu's gating.
+    if (meta && !event.shiftKey && lk === 'i' && !inAnyInput) {
+      if (focusedFilePath && indexedPaths.has(focusedFilePath)) {
+        event.preventDefault();
+        statsModalPath = focusedFilePath;
         return;
       }
     }

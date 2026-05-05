@@ -40,6 +40,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
   { id: 'sync.revert',           keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Revert pending sync changes',  scope: 'global' },
+  { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Open filter menu',            scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
@@ -67,7 +68,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
   { id: 'tree.scope',            keys: { mac: 'F',    other: 'F' },             label: 'Set as search scope (find here)', scope: 'fileTree' },
-  { id: 'tree.info',             keys: { mac: 'I',    other: 'I' },             label: 'Show document info (indexed files)', scope: 'fileTree' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
 
   // Search results list
