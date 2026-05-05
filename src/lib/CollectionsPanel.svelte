@@ -161,21 +161,12 @@
       return;
     }
 
-    if (idx < 0) return;
-    const col = rows[idx];
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      if (activeName === col.name) onClearActive();
-      else onSetActive(col.name);
-      return;
-    }
+    // Esc handled before the idx-out-of-range early return below: a fresh
+    // draft sits outside `rows` (it's rendered separately) so idx is -1
+    // for the focused draft. Without this ordering the second Esc never
+    // reached the discard branch.
     if (event.key === 'Escape') {
       event.preventDefault();
-      // Esc on a focused draft / row being edited discards the in-progress
-      // change instead of just blurring — second-Esc-deletes for Cmd+N's
-      // auto-named drafts. The first Esc on the rename input was already
-      // handled by handleDraftRenameKeydown (input target gets skipped above).
       const isOnDraft = draftName !== null && focusedName === draftName;
       const isOnEditing = editingName !== null && focusedName === editingName;
       if (isOnDraft || isOnEditing) {
@@ -183,6 +174,16 @@
       } else {
         onFocusCollection(null);
       }
+      return;
+    }
+
+    if (idx < 0) return;
+    const col = rows[idx];
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (activeName === col.name) onClearActive();
+      else onSetActive(col.name);
       return;
     }
     if (bareLetter) {
