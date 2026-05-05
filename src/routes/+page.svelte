@@ -868,8 +868,9 @@
       // its component-local item — the root files array would stay stale,
       // breaking keyboard nav for any focus inside an expanded folder.
       // Sort shallowest-first so a child can find its parent populated.
+      // Splits on both separators so Windows paths (\\) sort correctly too.
       const sortedExpanded = Array.from(expandedPaths)
-        .sort((a, b) => a.split('/').length - b.split('/').length);
+        .sort((a, b) => a.split(/[/\\]/).length - b.split(/[/\\]/).length);
       for (const expandedPath of sortedExpanded) {
         const node = findTreeNode(newFiles, expandedPath);
         if (node && node.is_dir && node.children === null) {
@@ -1399,7 +1400,16 @@
       event.preventDefault();
       if (row.item.is_dir) {
         if (!expandedPaths.has(row.path)) {
-          handleToggleExpand(row.path);
+          // Expand and follow into the first child once children load.
+          // Matches IDE convention (single-press to enter a folder) and
+          // dodges the race where a fast ↓ would walk visibleTreeRows
+          // before the lazy-load resolved. Guard on focusedFilePath so we
+          // don't yank focus if the user moved on during the load.
+          handleToggleExpand(row.path).then(() => {
+            if (focusedFilePath !== row.path) return;
+            const childIdx = visibleTreeRows.findIndex((r) => r.parentPath === row.path);
+            if (childIdx > -1) focusTreeRow(visibleTreeRows[childIdx].path);
+          });
         } else {
           // Already expanded — move to first child if any are visible.
           const childIdx = visibleTreeRows.findIndex((r, i) => i > idx && r.parentPath === row.path);
@@ -1418,7 +1428,7 @@
       return true;
     }
 
-    if (event.key === ' ' || event.key === 'Spacebar') {
+    if (event.key === ' ') {
       event.preventDefault();
       toogleSelection(row.path, row.item.is_dir, row.item, false);
       return true;
@@ -1453,7 +1463,11 @@
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
       // keypress doesn't fall through to anything else.
-      if (event.key === '.') {
+      // Period key on the main row OR on the numpad. event.code is
+      // layout-independent — some layouts produce a different event.key
+      // for the numpad period (e.g. ',' on German), so checking the code
+      // is the reliable way to catch all keyboards.
+      if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
         toggleHidden(row.item);
         return true;
@@ -1588,8 +1602,9 @@
     }
 
     // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
-    // explorer (same handler the status-bar folder button calls).
-    if (meta && event.shiftKey && lk === 'o' && selectedFolder) {
+    // explorer (same handler the status-bar folder button calls). Skipped
+    // when an input has focus to match Cmd+Z's behavior.
+    if (meta && event.shiftKey && lk === 'o' && selectedFolder && !inAnyInput) {
       event.preventDefault();
       revealItemInDir(selectedFolder);
       return;
