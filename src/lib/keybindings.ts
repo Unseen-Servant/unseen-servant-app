@@ -84,6 +84,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.discard',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Discard draft / cancel edit (when focused)', scope: 'collections' },
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
   { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
+  { id: 'region.tab',            keys: { mac: 'Tab',  other: 'Tab' },           label: 'Tab → tree, Shift+Tab → collections', scope: 'global' },
 
   // Filter menu (when open)
   { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
