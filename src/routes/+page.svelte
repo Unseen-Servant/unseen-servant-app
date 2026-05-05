@@ -1348,7 +1348,10 @@
   }
 
   async function focusTreeRow(path: string) {
-    focusedFilePath = path;
+    // Go through the setter so the focusedCollectionName mutex clears too —
+    // assigning focusedFilePath directly leaves a stale collection focus
+    // and the tree-nav gate keeps blocking ↓ in the tree.
+    setFocusedFilePath(path);
     await tick();
     const el = document.querySelector(`[data-tree-row="${CSS.escape(path)}"]`);
     el?.scrollIntoView({ block: 'nearest' });
