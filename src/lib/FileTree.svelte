@@ -150,11 +150,8 @@
   }
 
   function handleRowClick() {
-    if (item.is_dir) {
-      toggleExpand();
-    } else {
-      onFocusFile(item.path);
-    }
+    onFocusFile(item.path);
+    if (item.is_dir) toggleExpand();
   }
 
   async function openFile() {

@@ -2644,7 +2644,7 @@
             libraryRoot={selectedFolder}
             {knownSystems}
             {focusedFilePath}
-            onFocusFile={(path) => { focusedFilePath = path; }}
+            onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
             {isCollectionEditMode}
             collectionPaths={collectionEditPaths}
