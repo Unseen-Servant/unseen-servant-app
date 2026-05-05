@@ -1506,6 +1506,10 @@
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
       if (renamingFilePath) { renamingFilePath = null; return; }
+      // A competing popover (filter / sort / dropdown) handles its own Esc.
+      // Don't reach the focus-clear branch below — that would wipe the
+      // user's tree highlight as a side effect of closing a menu.
+      if (document.querySelector('.filter-menu, .sort-menu, .dropdown')) return;
       // Empty search input: blur and place keyboard focus in the tree so
       // arrows immediately navigate. If a tree row was already focused,
       // we leave it where it is.
@@ -1690,7 +1694,9 @@
   }
 
   function handleContextMenu(event: MouseEvent, item: FileItem) {
-    focusedFilePath = item.is_dir ? null : item.path;
+    // Highlight whatever was right-clicked / triggered via M, including
+    // folders — keyboard nav allows folder focus since chunk b.
+    focusedFilePath = item.path;
     // Snapshot isIndexed at click time so the open menu doesn't keep a live
     // reactive dependency on indexedPaths.
     const directlyHidden = hiddenPaths.has(item.path);
