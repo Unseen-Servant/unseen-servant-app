@@ -1663,25 +1663,6 @@
       return;
     }
 
-    // Tab moves between regions: from a focused collection → first tree
-    // row; Shift+Tab from a focused tree row → first collection. preventDefault
-    // so the browser's native focus traversal doesn't also fire.
-    if (event.key === 'Tab' && !meta && !inAnyInput) {
-      if (!event.shiftKey && focusedCollectionName && visibleTreeRows.length > 0) {
-        event.preventDefault();
-        focusTreeRow(visibleTreeRows[0].path);
-        return;
-      }
-      if (event.shiftKey && focusedFilePath) {
-        const collectionRows = collectionsPanelOpen ? Object.values(collections).filter((c) => !c.archived) : [];
-        if (collectionRows.length > 0) {
-          event.preventDefault();
-          setFocusedCollectionName(collectionRows[0].name);
-          return;
-        }
-      }
-    }
-
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
