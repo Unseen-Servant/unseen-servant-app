@@ -343,14 +343,26 @@
     const years = Math.floor(days / 365);
     return `${years}y`;
   }
+
+  // Click anywhere in the systems-view chrome (not on a specific row)
+  // claims the file-side region with the first visible entry, mirroring
+  // the same behavior on the collections panel.
+  function handleViewMousedown(event: MouseEvent) {
+    if (focusedFilePath !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-sv-row]')) return;
+    if (visibleEntries.length > 0) setFocusedIdx(0);
+  }
 </script>
 
 <svelte:window on:keydown={handleWindowKey} />
 
 {#if groups.length === 0}
-  <div class="empty">No indexed files match the current view.</div>
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="empty" on:mousedown={handleViewMousedown}>No indexed files match the current view.</div>
 {:else}
-  <div class="systems-view">
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="systems-view" on:mousedown={handleViewMousedown}>
     {#each groups as group (group.tag)}
       {@const groupColor = colorFor(group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}

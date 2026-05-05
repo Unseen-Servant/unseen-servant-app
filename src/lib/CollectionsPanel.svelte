@@ -212,11 +212,23 @@
     if (sortBtn && (sortBtn === target || sortBtn.contains(target))) return;
     sortMenuOpen = false;
   }
+
+  // Click anywhere in the panel chrome (not on a specific row) claims the
+  // collections region — so arrow keys move here next, even when the user
+  // hasn't picked a row yet. Row clicks set their own focus and we let
+  // those win by skipping when the target is inside a [data-cp-row].
+  function handlePanelMousedown(event: MouseEvent) {
+    if (focusedName !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-cp-row]')) return;
+    if (rows.length > 0) onFocusCollection(rows[0].name);
+  }
 </script>
 
 <svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
 
-<aside class="panel">
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<aside class="panel" on:mousedown={handlePanelMousedown}>
   <header class="panel-header">
     <span class="panel-title">Collections</span>
     <div class="header-actions">

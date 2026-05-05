@@ -1380,6 +1380,19 @@
     }
   }
 
+  // Click anywhere in the file-tree pane chrome (not on a specific row)
+  // claims the file-side region with the first visible tree row, mirroring
+  // how the collections panel claims itself on chrome clicks. Skip in
+  // search mode (search owns its own selectedResultIndex) and in systems
+  // mode (SystemsView claims itself when clicked).
+  function handleFileTreeAreaMousedown(event: MouseEvent) {
+    if (searchActive || viewMode !== 'tree') return;
+    if (focusedFilePath !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-tree-row]')) return;
+    if (visibleTreeRows.length > 0) setFocusedFilePath(visibleTreeRows[0].path);
+  }
+
   // Returns true if the event was handled and shouldn't bubble further.
   function handleTreeNavKey(event: KeyboardEvent): boolean {
     const meta = event.metaKey || event.ctrlKey;
@@ -2593,7 +2606,8 @@
         />
       {/if}
 
-      <div class="file-tree-area" class:search-mode={searchActive}>
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
         {#if searchActive}
           <SearchScopeBar
             {scopeChip}
