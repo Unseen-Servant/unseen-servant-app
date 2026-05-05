@@ -117,7 +117,12 @@
       handleCheckboxClick(event, entry, groupTag, groupEntries);
       return;
     }
-    onFocusFile(entry.path);
+    // Pin focusedIdx to the specific (path, tag) the user clicked so the
+    // multi-occurrence case lands on the right row. The reactive sync
+    // would otherwise pick the first match for an external focus change.
+    const i = visibleEntries.findIndex((v) => v.path === entry.path && v.tag === groupTag);
+    if (i >= 0) setFocusedIdx(i);
+    else onFocusFile(entry.path);
   }
 
   async function handleDoubleClick(entry: FileStatusEntry) {
@@ -196,20 +201,61 @@
     return out;
   })();
 
+  // focusedFilePath is shared with the tree view (one focus state for
+  // global actions), but a multi-tagged file appears at multiple indices
+  // here. Track the visible-entries index locally so ↓ from the second
+  // occurrence steps to the next row, not back to "first occurrence + 1".
+  let focusedIdx: number | null = null;
+
+  // Reconcile focusedIdx when focusedFilePath changes externally (mouse
+  // click that didn't go through us, page-level setter, etc.) or when
+  // the visible list changes (group expand/collapse). For the multi-
+  // occurrence case we land on the first match — moving down then walks
+  // through subsequent occurrences naturally.
+  $: {
+    if (focusedFilePath === null) {
+      focusedIdx = null;
+    } else if (focusedIdx === null || visibleEntries[focusedIdx]?.path !== focusedFilePath) {
+      const i = visibleEntries.findIndex((v) => v.path === focusedFilePath);
+      focusedIdx = i >= 0 ? i : null;
+    }
+  }
+
+  function isFocused(entry: FileStatusEntry, tag: string): boolean {
+    if (focusedIdx === null) return false;
+    const f = visibleEntries[focusedIdx];
+    return f?.path === entry.path && f?.tag === tag;
+  }
+
+  function setFocusedIdx(i: number | null) {
+    focusedIdx = i;
+    onFocusFile(i === null ? null : visibleEntries[i]?.path ?? null);
+  }
+
   $: if (focusedFilePath) scrollFocusedIntoView(focusedFilePath);
   async function scrollFocusedIntoView(path: string) {
     await tick();
-    const el = document.querySelector(`[data-sv-row="${CSS.escape(path)}"]`);
-    el?.scrollIntoView({ block: 'nearest' });
+    // When the same path appears multiple times, scroll the focused
+    // index's row specifically rather than the first DOM match.
+    const focused = focusedIdx !== null ? visibleEntries[focusedIdx] : null;
+    if (focused) {
+      const rows = document.querySelectorAll(`[data-sv-row="${CSS.escape(focused.path)}"]`);
+      const target = rows[
+        visibleEntries.slice(0, focusedIdx!).filter((v) => v.path === focused.path).length
+      ];
+      target?.scrollIntoView({ block: 'nearest' });
+    } else {
+      document.querySelector(`[data-sv-row="${CSS.escape(path)}"]`)?.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   function moveFocus(delta: number) {
     if (visibleEntries.length === 0) return;
-    const cur = visibleEntries.findIndex((v) => v.path === focusedFilePath);
-    const next = cur < 0
+    const cur = focusedIdx;
+    const next = cur === null
       ? (delta > 0 ? 0 : visibleEntries.length - 1)
       : Math.max(0, Math.min(visibleEntries.length - 1, cur + delta));
-    onFocusFile(visibleEntries[next].path);
+    setFocusedIdx(next);
   }
 
   function handleWindowKey(event: KeyboardEvent) {
@@ -229,26 +275,25 @@
 
     if (event.key === 'Home' && !meta && visibleEntries[0]) {
       event.preventDefault();
-      onFocusFile(visibleEntries[0].path);
+      setFocusedIdx(0);
       return;
     }
     if (event.key === 'End' && !meta && visibleEntries.length > 0) {
       event.preventDefault();
-      onFocusFile(visibleEntries[visibleEntries.length - 1].path);
+      setFocusedIdx(visibleEntries.length - 1);
       return;
     }
 
-    // Esc clears focus when no other handler claimed the keypress; only
-    // act if a systems entry is focused so we don't fight the page's Esc
-    // ladder (search, modals, etc.).
-    if (event.key === 'Escape' && focusedFilePath && visibleEntries.some((v) => v.path === focusedFilePath)) {
+    // Esc clears focus when a systems entry is focused. Skip otherwise so
+    // we don't fight the page's Esc ladder (search, modals, etc.).
+    if (event.key === 'Escape' && focusedIdx !== null) {
       event.preventDefault();
-      onFocusFile(null);
+      setFocusedIdx(null);
       return;
     }
 
-    if (focusedFilePath === null) return;
-    const focused = visibleEntries.find((v) => v.path === focusedFilePath);
+    if (focusedIdx === null) return;
+    const focused = visibleEntries[focusedIdx];
     if (!focused) return;
 
     if (event.key === 'Enter' && !isCollectionEditMode) {
@@ -342,7 +387,7 @@
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
-                class:focused={focusedFilePath === entry.path}
+                class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
                 class:highlighted={highlightPaths.has(entry.path)}
                 data-sv-row={entry.path}
