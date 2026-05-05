@@ -36,6 +36,9 @@
   export let knownSystems: KnownGameSystem[] = [];
 
   export let focusedFilePath: string | null = null;
+  // Collections panel claims arrow keys when a collection row is focused —
+  // SystemsView must yield so ↓/↑ doesn't move the systems cursor too.
+  export let focusedCollectionName: string | null = null;
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
 
@@ -263,6 +266,8 @@
     if (document.querySelector('.filter-menu, .dropdown, .context-menu, .sort-menu')) return;
     const target = event.target as HTMLElement | null;
     if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+    // Yield to the collections panel when a collection row is focused.
+    if (focusedCollectionName !== null) return;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
