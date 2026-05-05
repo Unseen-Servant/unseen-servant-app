@@ -52,6 +52,15 @@
   // Reset rename mode when the draft itself goes away.
   $: if (!draftName) renamingDraft = false;
 
+  // Auto-enter rename mode when a fresh draft appears (matches Finder's
+  // "new folder lands you in rename" convention). Tracks the last-seen
+  // draft name so renames don't re-trigger this.
+  let lastSeenDraft: string | null = null;
+  $: {
+    if (draftName && !lastSeenDraft) startDraftRename();
+    lastSeenDraft = draftName;
+  }
+
   function startDraftRename() {
     if (!draftName) return;
     draftRenameValue = draftName;
@@ -68,6 +77,9 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       commitDraftRename();
+      // Don't call onSaveFiles here for Cmd/Ctrl+Enter — the global
+      // handler in +page.svelte sees the bubbled event and saves once
+      // commitDraftRename has updated draftName, avoiding a double-fire.
     } else if (e.key === 'Escape') {
       e.preventDefault();
       renamingDraft = false;
@@ -160,7 +172,17 @@
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      onFocusCollection(null);
+      // Esc on a focused draft / row being edited discards the in-progress
+      // change instead of just blurring — second-Esc-deletes for Cmd+N's
+      // auto-named drafts. The first Esc on the rename input was already
+      // handled by handleDraftRenameKeydown (input target gets skipped above).
+      const isOnDraft = draftName !== null && focusedName === draftName;
+      const isOnEditing = editingName !== null && focusedName === editingName;
+      if (isOnDraft || isOnEditing) {
+        onCancelFiles();
+      } else {
+        onFocusCollection(null);
+      }
       return;
     }
     if (bareLetter) {

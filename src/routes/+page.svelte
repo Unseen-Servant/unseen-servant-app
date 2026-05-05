@@ -1648,6 +1648,18 @@
       return;
     }
 
+    // Cmd/Ctrl+Enter: save the in-progress collection (draft or files
+    // edit). Works from anywhere, including inside the rename input —
+    // it commits the rename via that input's own handler first, then
+    // this branch fires because metaKey + Enter wasn't preventDefault'd
+    // by the input's logic. Guard on having pending state so the chord
+    // is a clear no-op when nothing's being edited.
+    if (meta && !event.shiftKey && event.key === 'Enter' && (draftName || editingCollectionName)) {
+      event.preventDefault();
+      saveCollection();
+      return;
+    }
+
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
@@ -2217,9 +2229,13 @@
   }
 
   // Panel "+" handler — opens a fresh draft with an auto-generated name.
-  // The user can rename inline on the draft row before saving.
+  // CollectionsPanel auto-enters rename mode when the draft appears, so
+  // the user can immediately type a name. Focusing the draft also lets
+  // Esc-on-draft discard it via the panel's window keydown handler.
   function inlineCreateCollection() {
-    startDraftCollection(uniqueCollectionName('Untitled'));
+    const name = uniqueCollectionName('Untitled');
+    startDraftCollection(name);
+    setFocusedCollectionName(name);
   }
 
   // Inline rename of the active draft. Only updates local state; nothing

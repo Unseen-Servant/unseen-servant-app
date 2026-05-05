@@ -81,7 +81,9 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.editFiles', keys: { mac: 'F',    other: 'F' },             label: 'Edit collection files',        scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
   { id: 'collections.blur',      keys: { mac: 'Esc',  other: 'Esc' },           label: 'Clear focus',                  scope: 'collections' },
+  { id: 'collections.discard',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Discard draft / cancel edit (when focused)', scope: 'collections' },
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
+  { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
 
   // Filter menu (when open)
   { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
