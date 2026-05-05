@@ -65,7 +65,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.toggleSelect',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
   { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
   { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Reveal row in OS file explorer', scope: 'fileTree' },
-  { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
+  { id: 'tree.contextMenu',      keys: { mac: 'M / ⇧F10', other: 'M / Shift+F10 / Menu' }, label: 'Open context menu',     scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
   { id: 'tree.scope',            keys: { mac: 'F',    other: 'F' },             label: 'Set as search scope (find here)', scope: 'fileTree' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },

@@ -1458,6 +1458,7 @@
     if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
       if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
+      if (lk === 'm') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
       // keypress doesn't fall through to anything else.
