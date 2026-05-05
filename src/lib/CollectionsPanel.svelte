@@ -77,9 +77,11 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       commitDraftRename();
-      // Don't call onSaveFiles here for Cmd/Ctrl+Enter — the global
-      // handler in +page.svelte sees the bubbled event and saves once
-      // commitDraftRename has updated draftName, avoiding a double-fire.
+      // Plain Enter from the rename input commits AND saves (Finder
+      // "type name + Enter creates the folder"). For Cmd/Ctrl+Enter we
+      // skip saving here so the global handler in +page.svelte fires
+      // exactly once instead of double-firing.
+      if (!e.metaKey && !e.ctrlKey) onSaveFiles();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       renamingDraft = false;
@@ -161,19 +163,21 @@
       return;
     }
 
-    // Esc handled before the idx-out-of-range early return below: a fresh
-    // draft sits outside `rows` (it's rendered separately) so idx is -1
-    // for the focused draft. Without this ordering the second Esc never
-    // reached the discard branch.
+    // Esc/Enter on a focused draft / row-being-edited handled before the
+    // idx-out-of-range early return: a fresh draft sits outside `rows`
+    // (it's rendered separately above the list) so idx is -1 for it.
+    const isOnDraft = draftName !== null && focusedName === draftName;
+    const isOnEditing = editingName !== null && focusedName === editingName;
+
     if (event.key === 'Escape') {
       event.preventDefault();
-      const isOnDraft = draftName !== null && focusedName === draftName;
-      const isOnEditing = editingName !== null && focusedName === editingName;
-      if (isOnDraft || isOnEditing) {
-        onCancelFiles();
-      } else {
-        onFocusCollection(null);
-      }
+      if (isOnDraft || isOnEditing) onCancelFiles();
+      else onFocusCollection(null);
+      return;
+    }
+    if (event.key === 'Enter' && (isOnDraft || isOnEditing)) {
+      event.preventDefault();
+      onSaveFiles();
       return;
     }
 
