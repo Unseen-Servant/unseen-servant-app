@@ -32,6 +32,12 @@ function createNotificationStore() {
   const { subscribe, set } = writable<Notification | null>(null);
 
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let current: Notification | null = null;
+
+  // Mirror the writable's value into a local snapshot so dismissByUser()
+  // can reach the current notification's onDismiss without external code
+  // having to subscribe + read internal shape.
+  subscribe((n) => { current = n; });
 
   function clearTimer() {
     if (timer) {
@@ -45,6 +51,17 @@ function createNotificationStore() {
     set(null);
   }
 
+  // Dismiss as if the user clicked the X: fires the current notification's
+  // onDismiss callback (e.g. revertToSyncedPaths) before clearing. Returns
+  // true if anything was dismissed — callers can decide whether to
+  // preventDefault on the keystroke that triggered them.
+  function dismissByUser(): boolean {
+    if (!current?.onDismiss) return false;
+    current.onDismiss();
+    dismiss();
+    return true;
+  }
+
   function show(notif: Omit<Notification, 'id'>) {
     clearTimer();
     const id = Date.now().toString(36);
@@ -55,7 +72,7 @@ function createNotificationStore() {
     }
   }
 
-  return { subscribe, show, dismiss };
+  return { subscribe, show, dismiss, dismissByUser };
 }
 
 export const jobNotification = createNotificationStore();

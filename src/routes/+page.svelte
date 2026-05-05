@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { get } from 'svelte/store';
   import { invoke } from '@tauri-apps/api/core';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -1459,6 +1458,7 @@
     if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
       if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
+      if (lk === 'm') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
       // keypress doesn't fall through to anything else.
@@ -1506,6 +1506,10 @@
     if (event.key === 'Escape') {
       if (contextMenu) { contextMenu = null; return; }
       if (renamingFilePath) { renamingFilePath = null; return; }
+      // A competing popover (filter / sort / dropdown) handles its own Esc.
+      // Don't reach the focus-clear branch below — that would wipe the
+      // user's tree highlight as a side effect of closing a menu.
+      if (document.querySelector('.filter-menu, .sort-menu, .dropdown')) return;
       // Empty search input: blur and place keyboard focus in the tree so
       // arrows immediately navigate. If a tree row was already focused,
       // we leave it where it is.
@@ -1577,11 +1581,8 @@
     // as clicking the X on the "N to add, M to remove" banner. Skipped when
     // an input has focus so native text undo still works while typing.
     if (meta && !event.shiftKey && lk === 'z' && !inAnyInput) {
-      const pending = get(pendingNotification);
-      if (pending?.onDismiss) {
+      if (pendingNotification.dismissByUser()) {
         event.preventDefault();
-        pending.onDismiss();
-        pendingNotification.dismiss();
         return;
       }
     }
@@ -1625,7 +1626,13 @@
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
     // (parallel to the search-results combobox).
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath) {
+    // Other popovers (filter menu, sort menu, dropdowns) attach their own
+    // keydown listeners but they fire AFTER this one — so we have to skip
+    // here when the DOM tells us a competing menu is open. Querying by
+    // class is pragmatic; once chunk c is fully shipped these could share
+    // a small open-menus store instead.
+    const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen) {
       if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
         if (visibleTreeRows.length > 0) {
           event.preventDefault();
@@ -1687,7 +1694,9 @@
   }
 
   function handleContextMenu(event: MouseEvent, item: FileItem) {
-    focusedFilePath = item.is_dir ? null : item.path;
+    // Highlight whatever was right-clicked / triggered via M, including
+    // folders — keyboard nav allows folder focus since chunk b.
+    focusedFilePath = item.path;
     // Snapshot isIndexed at click time so the open menu doesn't keep a live
     // reactive dependency on indexedPaths.
     const directlyHidden = hiddenPaths.has(item.path);

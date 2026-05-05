@@ -65,10 +65,24 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.toggleSelect',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
   { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
   { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Reveal row in OS file explorer', scope: 'fileTree' },
-  { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
+  { id: 'tree.contextMenu',      keys: { mac: 'M / ⇧F10', other: 'M / Shift+F10 / Menu' }, label: 'Open context menu',     scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
   { id: 'tree.scope',            keys: { mac: 'F',    other: 'F' },             label: 'Set as search scope (find here)', scope: 'fileTree' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
+
+  // Filter menu (when open)
+  { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
+  { id: 'filterMenu.prev',       keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterMenu' },
+  { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle focused row',           scope: 'filterMenu' },
+  { id: 'filterMenu.close',      keys: { mac: 'Esc',  other: 'Esc' },           label: 'Close filter menu',            scope: 'filterMenu' },
+
+  // Context menu (when open)
+  { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },
+  { id: 'contextMenu.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'contextMenu' },
+  { id: 'contextMenu.openSub',   keys: { mac: '→ / L', other: '→ / L' },        label: 'Open submenu',                 scope: 'contextMenu' },
+  { id: 'contextMenu.closeSub',  keys: { mac: '← / H', other: '← / H' },        label: 'Close submenu',                scope: 'contextMenu' },
+  { id: 'contextMenu.activate',  keys: { mac: '↵',    other: 'Enter' },         label: 'Activate focused item',        scope: 'contextMenu' },
+  { id: 'contextMenu.close',     keys: { mac: 'Esc',  other: 'Esc' },           label: 'Close (or back to parent)',    scope: 'contextMenu' },
 
   // Search results list
   { id: 'results.next',          keys: { mac: '↓',    other: '↓' },             label: 'Next result',                  scope: 'searchResults' },
