@@ -353,6 +353,15 @@
     if (target?.closest('[data-sv-row]')) return;
     if (visibleEntries.length > 0) setFocusedIdx(0);
   }
+
+  // Exposed so the parent's .file-tree-area mousedown can claim systems
+  // mode too — .systems-view only spans the height of its content, so
+  // chrome clicks in the scrollable area below the last group fall on
+  // the parent and miss handleViewMousedown.
+  export function claimFirst() {
+    if (focusedFilePath !== null) return;
+    if (visibleEntries.length > 0) setFocusedIdx(0);
+  }
 </script>
 
 <svelte:window on:keydown={handleWindowKey} />
