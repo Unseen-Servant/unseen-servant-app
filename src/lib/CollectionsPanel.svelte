@@ -1,8 +1,13 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
   import ActionButton from './ActionButton.svelte';
+  import { tick } from 'svelte';
 
   export let collections: Record<string, CollectionInfo> = {};
+  // Keyboard focus is lifted to +page.svelte so it can mutex against
+  // focusedFilePath (only one region claims arrow keys at a time).
+  export let focusedName: string | null = null;
+  export let onFocusCollection: (name: string | null) => void = () => {};
   // Per-collection count of files currently hidden in the tree. Only
   // entries with count > 0 are shown alongside the file-count chip as a
   // muted reminder that the collection holds tucked-away items.
@@ -91,8 +96,78 @@
   $: hasNone = Object.keys(collections).length === 0;
 
   function handleRowClick(name: string) {
+    onFocusCollection(name);
     if (activeName === name) onClearActive();
     else onSetActive(name);
+  }
+
+  // Scroll the focused row into view whenever focus changes.
+  $: if (focusedName) scrollFocusedIntoView(focusedName);
+  async function scrollFocusedIntoView(name: string) {
+    await tick();
+    const el = document.querySelector(`[data-cp-row="${CSS.escape(name)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function handleWindowKey(event: KeyboardEvent) {
+    if (focusedName === null) return;
+    // Yield to inline draft rename, the sort menu, and any other popover
+    // that may be claiming keys.
+    if (renamingDraft || sortMenuOpen) return;
+    if (document.querySelector('.filter-menu, .dropdown, .context-menu')) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
+    const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+
+    const idx = rows.findIndex((r) => r.name === focusedName);
+
+    if (isDown) {
+      event.preventDefault();
+      const next = idx < 0 ? 0 : Math.min(rows.length - 1, idx + 1);
+      if (rows[next]) onFocusCollection(rows[next].name);
+      return;
+    }
+    if (isUp) {
+      event.preventDefault();
+      const prev = idx < 0 ? rows.length - 1 : Math.max(0, idx - 1);
+      if (rows[prev]) onFocusCollection(rows[prev].name);
+      return;
+    }
+    if (event.key === 'Home' && !meta && rows[0]) {
+      event.preventDefault();
+      onFocusCollection(rows[0].name);
+      return;
+    }
+    if (event.key === 'End' && !meta && rows.length > 0) {
+      event.preventDefault();
+      onFocusCollection(rows[rows.length - 1].name);
+      return;
+    }
+
+    if (idx < 0) return;
+    const col = rows[idx];
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (activeName === col.name) onClearActive();
+      else onSetActive(col.name);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onFocusCollection(null);
+      return;
+    }
+    if (bareLetter) {
+      if (lk === 'e') { event.preventDefault(); onEdit(col.name); return; }
+      if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
+      if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
+    }
   }
 
   function toggleSortMenu() {
@@ -112,7 +187,7 @@
   }
 </script>
 
-<svelte:window on:click={handleWindowClick} />
+<svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
 
 <aside class="panel">
   <header class="panel-header">
@@ -210,7 +285,9 @@
           class:active={activeName === col.name}
           class:editing={isEditing}
           class:archived={col.archived}
+          class:kb-focused={focusedName === col.name}
           title={col.description || col.name}
+          data-cp-row={col.name}
           on:click={() => { if (!isEditing) handleRowClick(col.name); }}
         >
           <span
@@ -431,8 +508,11 @@
     transition: background var(--transition-fast);
     min-height: 28px;
   }
-  .row:hover { background: var(--bg-focused); }
+  .row:hover,
+  .row.kb-focused { background: var(--bg-focused); }
   .row.active { background: rgba(182, 159, 129, 0.15); }
+  .row.kb-focused .row-actions,
+  .row.active .row-actions { display: flex; }
   /* Armed-for-edit state: warmer background + accent stripe on the leading
      edge — DAW-style "this track is record-armed" affordance. */
   .row.editing {

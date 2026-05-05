@@ -52,6 +52,19 @@
 
   // File focus & context menu
   let focusedFilePath: string | null = null;
+  // Mirror state for collection-row keyboard focus. focusedFilePath and
+  // focusedCollectionName are mutually exclusive — only one region claims
+  // the keyboard at a time, which is how arrow keys know where to route.
+  let focusedCollectionName: string | null = null;
+
+  function setFocusedFilePath(path: string | null) {
+    focusedFilePath = path;
+    if (path) focusedCollectionName = null;
+  }
+  function setFocusedCollectionName(name: string | null) {
+    focusedCollectionName = name;
+    if (name) focusedFilePath = null;
+  }
   // `hideState` snapshots both the directly-hidden flag (path itself in
   // hiddenPaths) and the inherited flag (an ancestor folder is). The menu
   // shows Hide/Show only when `directlyHidden` is true or nothing is
@@ -61,6 +74,7 @@
     y: number;
     item: FileItem;
     isIndexed: boolean;
+    initialSubmenu: 'add' | 'remove' | null;
     hideState: { directlyHidden: boolean; inheritedHidden: boolean };
   } | null = null;
   let renamingFilePath: string | null = null;
@@ -1459,6 +1473,7 @@
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
       if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
       if (lk === 'm') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
+      if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
       // keypress doesn't fall through to anything else.
@@ -1476,7 +1491,7 @@
     return false;
   }
 
-  function openContextMenuAtFocusedRow() {
+  function openContextMenuAtFocusedRow(initialSubmenu: 'add' | 'remove' | null = null) {
     const idx = indexOfPath(visibleTreeRows, focusedFilePath);
     if (idx < 0) return;
     const row = visibleTreeRows[idx];
@@ -1486,7 +1501,7 @@
       clientX: rect ? rect.left + 24 : 100,
       clientY: rect ? rect.bottom : 100,
     } as MouseEvent;
-    handleContextMenu(synthetic, row.item);
+    handleContextMenu(synthetic, row.item, initialSubmenu);
   }
 
   // Escape ladder (closing precedence, top-most first):
@@ -1622,6 +1637,17 @@
       return;
     }
 
+    // Cmd/Ctrl+N: start a new collection. Auto-opens the sidebar if it's
+    // closed so the draft row is visible immediately.
+    if (meta && !event.shiftKey && lk === 'n' && selectedFolder && !inAnyInput) {
+      event.preventDefault();
+      (async () => {
+        if (!collectionsPanelOpen) await togglePanel();
+        inlineCreateCollection();
+      })();
+      return;
+    }
+
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
@@ -1632,7 +1658,7 @@
     // class is pragmatic; once chunk c is fully shipped these could share
     // a small open-menus store instead.
     const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen) {
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName) {
       if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
         if (visibleTreeRows.length > 0) {
           event.preventDefault();
@@ -1693,10 +1719,10 @@
     }
   }
 
-  function handleContextMenu(event: MouseEvent, item: FileItem) {
+  function handleContextMenu(event: MouseEvent, item: FileItem, initialSubmenu: 'add' | 'remove' | null = null) {
     // Highlight whatever was right-clicked / triggered via M, including
     // folders — keyboard nav allows folder focus since chunk b.
-    focusedFilePath = item.path;
+    setFocusedFilePath(item.path);
     // Snapshot isIndexed at click time so the open menu doesn't keep a live
     // reactive dependency on indexedPaths.
     const directlyHidden = hiddenPaths.has(item.path);
@@ -1705,6 +1731,7 @@
       y: event.clientY,
       item,
       isIndexed: indexedPaths.has(item.path),
+      initialSubmenu,
       hideState: {
         directlyHidden,
         inheritedHidden: !directlyHidden && isPathHidden(item.path),
@@ -2056,6 +2083,22 @@
     if (targets.size === 0) return [];
     return Object.values(collections)
       .filter(c => c.file_paths.some(p => targets.has(p)))
+      .map(c => c.name);
+  }
+
+  // Collections that already contain ALL of the target's indexed pdfs.
+  // Used to suppress them from the "Add to collection" submenu — adding
+  // would be a no-op. For folders this differs from collectionsContaining
+  // (which is "any") because partial overlap still permits adding the rest.
+  function collectionsFullyContaining(target: string, isDir: boolean): string[] {
+    const targets = isDir ? new Set(indexedPdfsUnderPath(target)) : new Set([target]);
+    if (targets.size === 0) return [];
+    return Object.values(collections)
+      .filter(c => {
+        const cFiles = new Set(c.file_paths);
+        for (const t of targets) if (!cFiles.has(t)) return false;
+        return true;
+      })
       .map(c => c.name);
   }
 
@@ -2524,6 +2567,8 @@
           onSaveFiles={saveCollection}
           onCancelFiles={cancelCollectionEdit}
           onDraftRename={handleDraftRename}
+          focusedName={focusedCollectionName}
+          onFocusCollection={setFocusedCollectionName}
         />
       {/if}
 
@@ -2600,7 +2645,7 @@
               {expandedPaths}
               onToggleExpand={handleToggleExpand}
               {focusedFilePath}
-              onFocusFile={(path) => { focusedFilePath = path; }}
+              onFocusFile={setFocusedFilePath}
               onContextMenu={handleContextMenu}
               {renamingFilePath}
               onRenameSubmit={handleRenameSubmit}
@@ -2645,6 +2690,8 @@
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      excludeFromAdd={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      initialSubmenu={contextMenu.initialSubmenu}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}

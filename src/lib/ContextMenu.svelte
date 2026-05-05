@@ -8,6 +8,10 @@
   export let isIndexed: boolean = false;
   export let collections: Record<string, CollectionInfo> = {};
   export let containingCollections: string[] = [];
+  // Names to suppress from the Add-to-collection submenu — used to hide
+  // collections that already fully contain the target so we don't offer
+  // a no-op action. Folder partials (some files in, some not) stay visible.
+  export let excludeFromAdd: string[] = [];
   export let canAddToCollection: boolean = true;
   export let canScopeSearch: boolean = false;
   // Hide/show state. `inheritedHidden` means an ancestor folder is hidden,
@@ -131,8 +135,9 @@
     }
   }
 
-  $: collectionList = Object.values(collections);
-  $: hasCollections = collectionList.length > 0;
+  $: addExcludeSet = new Set(excludeFromAdd);
+  $: addableCollections = Object.values(collections).filter((c) => !addExcludeSet.has(c.name));
+  $: hasCollections = addableCollections.length > 0;
   $: hasContainingCollections = containingCollections.length > 0;
 
   // Clamp position so the menu stays within the viewport
@@ -186,7 +191,7 @@
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'add'}
         <div class="submenu">
-          {#each collectionList as col}
+          {#each addableCollections as col}
             <button
               class="context-item"
               data-mi="item"
