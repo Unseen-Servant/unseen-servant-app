@@ -18,6 +18,7 @@
   import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
+  import KeyboardHelpOverlay from '../lib/KeyboardHelpOverlay.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
@@ -155,6 +156,7 @@
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showLicense = false;
   let showSettings = false;
+  let showHelpOverlay = false;
   let settingsInitialTab: 'library' | 'game-systems' | 'setup' = 'library';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
   let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
@@ -1740,6 +1742,16 @@
       return;
     }
 
+    // `?` — show keyboard shortcuts overlay. Match on event.key (the
+    // produced character) rather than Shift+/ so any layout that emits
+    // `?` from a different physical key still triggers. Bare chord, gated
+    // out of inputs so typing a literal `?` works as expected.
+    if (event.key === '?' && !meta && !event.altKey && !inAnyInput) {
+      event.preventDefault();
+      showHelpOverlay = true;
+      return;
+    }
+
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
@@ -2857,6 +2869,7 @@
     onShowLicense={() => { showLicense = true; }}
     onShowGuide={() => { settingsInitialTab = 'setup'; showSettings = true; }}
     onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
+    onShowHelp={() => { showHelpOverlay = true; }}
     showGuideButton={!hideSetupButton}
   />
 </main>
@@ -2895,6 +2908,12 @@
   onOpenDataDir={handleOpenDataDir}
   onSync={handleManualSync}
   onCopyMcpConfig={handleCopyMcpConfig}
+  onShowHelp={() => { showSettings = false; showHelpOverlay = true; }}
+/>
+
+<KeyboardHelpOverlay
+  visible={showHelpOverlay}
+  onClose={() => { showHelpOverlay = false; }}
 />
 
 <style>

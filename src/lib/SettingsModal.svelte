@@ -36,6 +36,7 @@
   export let mcpConnected: boolean = false;
   export let hideSetupButton: boolean = false;
   export let onHideSetupButtonChange: (value: boolean) => void = () => {};
+  export let onShowHelp: () => void = () => {};
   export let initialTab: 'library' | 'game-systems' | 'setup' = 'library';
 
   let activeTab: 'library' | 'game-systems' | 'setup' = initialTab;
@@ -111,6 +112,9 @@
             {onSelectFolder}
             {onCopyMcpConfig}
           />
+          <div class="setup-help">
+            <button class="btn-link" on:click={onShowHelp}>Keyboard shortcuts</button>
+          </div>
         </div>
       {/if}
     </div>
@@ -195,5 +199,42 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
     line-height: 1.35;
+  }
+
+  .setup-help {
+    display: flex;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .btn-link {
+    align-self: flex-start;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    color: var(--text-accent);
+    cursor: pointer;
+    transition: filter var(--transition-fast);
+  }
+  .btn-link::before,
+  .btn-link::after {
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+  }
+  .btn-link::before {
+    content: '[';
+    margin-right: 0.15rem;
+  }
+  .btn-link::after {
+    content: ']';
+    margin-left: 0.15rem;
+  }
+  .btn-link:hover {
+    filter: brightness(1.25);
+  }
+  .btn-link:hover::before,
+  .btn-link:hover::after {
+    color: var(--text-accent);
   }
 </style>
