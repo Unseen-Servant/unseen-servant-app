@@ -32,16 +32,17 @@
       returnTarget = document.activeElement as HTMLElement | null;
       dialogEl.showModal();
       await tick();
-      if (!autofocus) return;
-      // Override the UA's default focus pick: prefer the first text
-      // input in the slot for edit dialogs. Skip checkboxes/radios so
-      // we don't paint a focus ring on a stray toggle. If there's no
-      // input we leave focus on the dialog itself — Esc and Tab still
-      // work, and mouse users don't see a misleading outline.
-      const firstInput = dialogEl.querySelector(
-        'input:not([disabled]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea:not([disabled]), [contenteditable="true"]',
-      ) as HTMLElement | null;
-      if (firstInput) firstInput.focus();
+      // showModal() auto-focuses the first sequentially-focusable
+      // descendant — that's the × button in our header, which paints
+      // a focus ring on what should be inert chrome. Override it.
+      const firstInput = autofocus
+        ? (dialogEl.querySelector(
+            'input:not([disabled]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea:not([disabled]), [contenteditable="true"]',
+          ) as HTMLElement | null)
+        : null;
+      // Falling back to the dialog itself keeps Esc/Tab working without
+      // any visible focus ring (the dialog has tabindex="-1").
+      (firstInput ?? dialogEl).focus();
     } else if (!v && dialogEl.open) {
       dialogEl.close();
     }
@@ -82,6 +83,7 @@
 <dialog
   bind:this={dialogEl}
   class="modal"
+  tabindex="-1"
   style:width
   style:height
   style:max-height={maxHeight}
@@ -115,6 +117,14 @@
   dialog.modal[open] {
     display: flex;
     flex-direction: column;
+  }
+
+  /* When focus lands on the dialog itself (autofocus={false} or no
+     input found), don't paint a focus ring on the chrome — Esc and
+     Tab still work, but the user shouldn't see a "selected" frame. */
+  dialog.modal:focus,
+  dialog.modal:focus-visible {
+    outline: none;
   }
 
   dialog.modal::backdrop {
