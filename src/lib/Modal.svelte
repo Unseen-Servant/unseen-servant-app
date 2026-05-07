@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, onDestroy } from 'svelte';
 
   export let visible = false;
   export let onClose: () => void;
@@ -8,75 +8,102 @@
   export let height: string = 'auto';
   export let maxHeight: string | undefined = undefined;
 
-  let backdropEl: HTMLElement | undefined;
-  // Element that had focus when the modal opened — restored on close so
-  // the user lands back where they were (typically the button or row
-  // that triggered the modal). Skipped if the trigger is gone by the
-  // time we close (re-rendered, removed from DOM, etc.).
+  let dialogEl: HTMLDialogElement | undefined;
+  // Element that held focus before the modal opened — restored on close
+  // so the user lands back where they were instead of falling to <body>.
   let returnTarget: HTMLElement | null = null;
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onClose();
-  }
+  // Drive the native dialog from the `visible` prop so existing call
+  // sites can stay declarative. Reactive runs once dialogEl is bound.
+  $: if (dialogEl) sync(visible);
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (visible && e.key === 'Escape') onClose();
-  }
-
-  // Auto-focus on open / restore on close. Picks the first text input
-  // when the modal has one (the common case for edit dialogs); falls
-  // back to the backdrop so Esc / Tab work without a mouse click first.
-  $: handleVisibilityChange(visible);
-  async function handleVisibilityChange(v: boolean) {
-    if (v) {
+  async function sync(v: boolean) {
+    if (!dialogEl) return;
+    if (v && !dialogEl.open) {
       returnTarget = document.activeElement as HTMLElement | null;
+      dialogEl.showModal();
       await tick();
-      if (!backdropEl) return;
-      const firstInput = backdropEl.querySelector(
-        'input:not([disabled]), textarea:not([disabled]), [contenteditable="true"]',
+      // Override the UA's default focus pick: prefer the first text
+      // input in the slot for edit dialogs. Skip checkboxes/radios so
+      // we don't paint a focus ring on a stray toggle. If there's no
+      // input we leave focus on the dialog itself — Esc and Tab still
+      // work, and mouse users don't see a misleading outline.
+      const firstInput = dialogEl.querySelector(
+        'input:not([disabled]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea:not([disabled]), [contenteditable="true"]',
       ) as HTMLElement | null;
-      (firstInput ?? backdropEl).focus();
-    } else if (returnTarget && document.contains(returnTarget)) {
-      returnTarget.focus();
-      returnTarget = null;
+      if (firstInput) firstInput.focus();
+    } else if (!v && dialogEl.open) {
+      dialogEl.close();
     }
+  }
+
+  function handleCancel(e: Event) {
+    // Esc on a native <dialog> fires `cancel` first. preventDefault so
+    // the close goes through onClose (which the parent uses to flip
+    // its own visibility state), keeping the source of truth in sync.
+    e.preventDefault();
+    onClose();
+  }
+
+  function handleClose() {
+    restoreFocus();
+  }
+
+  // Some callers unmount the modal directly (e.g. `{#if statsModalPath}`)
+  // rather than flipping `visible` first, so the dialog's close event
+  // never fires. Restore focus on destroy too — restoreFocus is
+  // idempotent because returnTarget is cleared after use.
+  onDestroy(() => restoreFocus());
+
+  function restoreFocus() {
+    if (returnTarget && document.contains(returnTarget)) {
+      returnTarget.focus();
+    }
+    returnTarget = null;
+  }
+
+  function handleClick(e: MouseEvent) {
+    // Clicks where target IS the dialog (not a descendant) hit the
+    // backdrop area between its border and the visible content edge.
+    if (e.target === dialogEl) onClose();
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
-
-{#if visible}
-  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <div class="backdrop" role="dialog" aria-modal="true" aria-label={title} tabindex="-1" bind:this={backdropEl} on:click={handleBackdrop}>
-    <div class="modal" style:width style:height style:max-height={maxHeight}>
-      <div class="modal-header">
-        <span class="modal-title font-heading">{title}</span>
-        <button class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
-      </div>
-      <slot />
-    </div>
+<dialog
+  bind:this={dialogEl}
+  class="modal"
+  style:width
+  style:height
+  style:max-height={maxHeight}
+  aria-label={title}
+  on:cancel={handleCancel}
+  on:close={handleClose}
+  on:click={handleClick}
+>
+  <div class="modal-header">
+    <span class="modal-title font-heading">{title}</span>
+    <button type="button" class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
   </div>
-{/if}
+  <slot />
+</dialog>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-
-  .modal {
+  dialog.modal {
     background: var(--bg-container);
+    color: var(--text-primary);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  dialog.modal[open] {
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  dialog.modal::backdrop {
+    background: rgba(0, 0, 0, 0.6);
   }
 
   .modal-header {

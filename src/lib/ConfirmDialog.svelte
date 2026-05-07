@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, onDestroy, tick } from 'svelte';
   import ActionButton from './ActionButton.svelte';
 
   export let title: string = 'Confirm';
@@ -9,49 +10,72 @@
   export let onConfirm: () => void = () => {};
   export let onCancel: () => void = () => {};
 
+  let dialogEl: HTMLDialogElement | undefined;
   let confirmBtn: HTMLButtonElement | undefined;
+  let cancelBtn: HTMLButtonElement | undefined;
+  let returnTarget: HTMLElement | null = null;
+
+  onMount(async () => {
+    returnTarget = document.activeElement as HTMLElement | null;
+    dialogEl?.showModal();
+    await tick();
+    // Destructive prompts auto-focus Cancel — pressing Enter on muscle
+    // memory shouldn't commit a permanent action. Safe prompts focus
+    // Confirm so power users can rip through them.
+    (danger ? cancelBtn : confirmBtn)?.focus();
+  });
+
+  onDestroy(() => {
+    if (returnTarget && document.contains(returnTarget)) {
+      returnTarget.focus();
+    }
+  });
 
   function handleKey(event: KeyboardEvent) {
-    if (event.key === 'Escape') onCancel();
-    else if (event.key === 'Enter') onConfirm();
+    // Esc is handled via the native cancel event below. Enter still
+    // commits regardless of which button is auto-focused — danger only
+    // changes the auto-focus target, not the chord semantics.
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onConfirm();
+    }
   }
 
-  $: if (confirmBtn) confirmBtn.focus();
+  function handleCancel(e: Event) {
+    e.preventDefault();
+    onCancel();
+  }
+
+  function handleClick(e: MouseEvent) {
+    if (e.target === dialogEl) onCancel();
+  }
 </script>
 
-<svelte:window on:keydown={handleKey} />
-
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="backdrop" on:click={onCancel}>
-  <div class="dialog" on:click|stopPropagation>
-    <div class="title">{title}</div>
-    {#if message}
-      <div class="message">{message}</div>
-    {/if}
-    <div class="actions">
-      <ActionButton kind="discard" label={cancelLabel} onClick={onCancel} />
-      <ActionButton
-        kind="confirm"
-        {danger}
-        label={confirmLabel}
-        onClick={onConfirm}
-        bind:buttonRef={confirmBtn}
-      />
-    </div>
+<dialog
+  bind:this={dialogEl}
+  class="confirm-dialog"
+  on:cancel={handleCancel}
+  on:keydown={handleKey}
+  on:click={handleClick}
+>
+  <div class="title">{title}</div>
+  {#if message}
+    <div class="message">{message}</div>
+  {/if}
+  <div class="actions">
+    <ActionButton kind="discard" label={cancelLabel} onClick={onCancel} bind:buttonRef={cancelBtn} />
+    <ActionButton
+      kind="confirm"
+      {danger}
+      label={confirmLabel}
+      onClick={onConfirm}
+      bind:buttonRef={confirmBtn}
+    />
   </div>
-</div>
+</dialog>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 300;
-  }
-  .dialog {
+  dialog.confirm-dialog {
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
     border-radius: 6px;
@@ -60,6 +84,10 @@
     min-width: 320px;
     max-width: 480px;
     font-family: var(--font-body);
+    color: var(--text-primary);
+  }
+  dialog.confirm-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
   }
   .title {
     font-family: var(--font-heading);

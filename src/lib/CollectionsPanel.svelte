@@ -129,6 +129,10 @@
     // that may be claiming keys.
     if (renamingDraft || sortMenuOpen) return;
     if (document.querySelector('.filter-menu, .dropdown, .context-menu')) return;
+    // Yield to any open <dialog> — the browser inerts the page but
+    // window-level keydown still bubbles, so we'd otherwise navigate
+    // collections behind the modal.
+    if (document.querySelector('dialog[open]')) return;
     const target = event.target as HTMLElement | null;
     if (target?.matches('input, textarea, [contenteditable="true"]')) return;
 

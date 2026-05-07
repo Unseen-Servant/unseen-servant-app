@@ -1571,6 +1571,15 @@
   //   6. (search results → input handled below)
   //   7. (search input chip/text  handled in Header.svelte)
   function handleGlobalKeydown(event: KeyboardEvent) {
+    // When a native <dialog> is open via showModal(), the browser inerts
+    // the rest of the page (clicks, focus, screen-readers all skip), but
+    // window-level keydown listeners still fire because keydown bubbles
+    // through the focused dialog. Bail here so app-wide chords (Cmd+B,
+    // Cmd+J, Cmd+Alt+←/→, Esc ladder, tree-nav letters, etc.) don't run
+    // behind the modal. The dialog has its own handlers for what it
+    // needs (Esc → cancel, Enter → submit, Tab cycles inside).
+    if (document.querySelector('dialog[open]')) return;
+
     const target = event.target as HTMLElement | null;
     const inSearchInput = target?.classList.contains('search-input') === true;
     const inAnyInput =
