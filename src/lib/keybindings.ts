@@ -33,29 +33,27 @@ const isMac =
 
 export const KEYBINDINGS: KeybindingEntry[] = [
   // Global
-  { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open Settings',               scope: 'global' },
   { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle Collections sidebar',  scope: 'global' },
-  { id: 'focus.collections',     keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Jump focus to Collections',   scope: 'global' },
-  { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Jump focus to file pane',     scope: 'global' },
+  { id: 'focus.collections',     keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Focus left pane',             scope: 'global' },
+  { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Focus right pane',            scope: 'global' },
   { id: 'view.toggle',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Toggle Tree ↔ Systems view',  scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
   { id: 'sync.revert',           keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Revert pending sync changes',  scope: 'global' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global' },
+  { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Open filter menu',            scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
   { id: 'help.overlay',          keys: { mac: '?',    other: '?' },             label: 'Show keyboard shortcuts',     scope: 'global' },
-  { id: 'app.escape',            keys: { mac: 'Esc',  other: 'Esc' },           label: 'Dismiss / cancel',            scope: 'global' },
+  { id: 'app.escape',            keys: { mac: 'Esc',  other: 'Esc' },           label: 'Cancel / close / step back', scope: 'global' },
 
   // Search input
   { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Submit search',                scope: 'searchInput' },
-  { id: 'search.clear',          keys: { mac: 'Esc',  other: 'Esc' },           label: 'Clear query (or disarm chip)', scope: 'searchInput' },
   { id: 'search.clearScope',     keys: { mac: '⌫⌫',   other: 'Backspace ×2' },  label: 'Clear scope chip',             scope: 'searchInput' },
   { id: 'search.intoResults',    keys: { mac: '↓',    other: '↓' },             label: 'Move focus into results',      scope: 'searchInput' },
   { id: 'search.intoTree',       keys: { mac: '↓',    other: '↓' },             label: 'Move focus into file tree',    scope: 'searchInput' },
-  { id: 'search.escToTree',      keys: { mac: 'Esc',  other: 'Esc' },           label: 'Empty input → focus tree',     scope: 'searchInput' },
 
   // File tree (when a row is focused)
   { id: 'tree.next',             keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'fileTree' },
@@ -82,8 +80,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.editInfo',  keys: { mac: 'E',    other: 'E' },             label: 'Edit collection info',         scope: 'collections' },
   { id: 'collections.editFiles', keys: { mac: 'F',    other: 'F' },             label: 'Edit collection files',        scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
-  { id: 'collections.blur',      keys: { mac: 'Esc',  other: 'Esc' },           label: 'Clear focus',                  scope: 'collections' },
-  { id: 'collections.discard',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Discard draft / cancel edit (when focused)', scope: 'collections' },
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
   { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
 
@@ -91,7 +87,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
   { id: 'filterMenu.prev',       keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterMenu' },
   { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle focused row',           scope: 'filterMenu' },
-  { id: 'filterMenu.close',      keys: { mac: 'Esc',  other: 'Esc' },           label: 'Close filter menu',            scope: 'filterMenu' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },
@@ -99,21 +94,11 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'contextMenu.openSub',   keys: { mac: '→ / L', other: '→ / L' },        label: 'Open submenu',                 scope: 'contextMenu' },
   { id: 'contextMenu.closeSub',  keys: { mac: '← / H', other: '← / H' },        label: 'Close submenu',                scope: 'contextMenu' },
   { id: 'contextMenu.activate',  keys: { mac: '↵',    other: 'Enter' },         label: 'Activate focused item',        scope: 'contextMenu' },
-  { id: 'contextMenu.close',     keys: { mac: 'Esc',  other: 'Esc' },           label: 'Close (or back to parent)',    scope: 'contextMenu' },
-
-  // Systems view (when ⌘J view is active)
-  { id: 'systems.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'fileTree' },
-  { id: 'systems.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'fileTree' },
-  { id: 'systems.home',          keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first entry',          scope: 'fileTree' },
-  { id: 'systems.end',           keys: { mac: 'End',  other: 'End' },           label: 'Jump to last entry',           scope: 'fileTree' },
-  { id: 'systems.open',          keys: { mac: '↵',    other: 'Enter' },         label: 'Open focused file',            scope: 'fileTree' },
-  { id: 'systems.toggleSelect',  keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection (edit mode)', scope: 'fileTree' },
 
   // Search results list
   { id: 'results.next',          keys: { mac: '↓',    other: '↓' },             label: 'Next result',                  scope: 'searchResults' },
   { id: 'results.prev',          keys: { mac: '↑',    other: '↑' },             label: 'Previous result (or back to input)', scope: 'searchResults' },
   { id: 'results.open',          keys: { mac: '↵',    other: 'Enter' },         label: 'Open focused result',          scope: 'searchResults' },
-  { id: 'results.backToInput',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Return focus to search input', scope: 'searchResults' },
   { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
 ];
 
