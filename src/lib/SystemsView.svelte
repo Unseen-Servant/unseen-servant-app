@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, FileStatusEntry, KnownGameSystem } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
@@ -35,6 +36,9 @@
   export let knownSystems: KnownGameSystem[] = [];
 
   export let focusedFilePath: string | null = null;
+  // Collections panel claims arrow keys when a collection row is focused —
+  // SystemsView must yield so ↓/↑ doesn't move the systems cursor too.
+  export let focusedCollectionName: string | null = null;
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
 
@@ -116,7 +120,12 @@
       handleCheckboxClick(event, entry, groupTag, groupEntries);
       return;
     }
-    onFocusFile(entry.path);
+    // Pin focusedIdx to the specific (path, tag) the user clicked so the
+    // multi-occurrence case lands on the right row. The reactive sync
+    // would otherwise pick the first match for an external focus change.
+    const i = visibleEntries.findIndex((v) => v.path === entry.path && v.tag === groupTag);
+    if (i >= 0) setFocusedIdx(i);
+    else onFocusFile(entry.path);
   }
 
   async function handleDoubleClick(entry: FileStatusEntry) {
@@ -182,6 +191,131 @@
     else onCollectionAdd(paths);
   }
 
+  // Flat list of entries the user can keyboard-navigate to: every entry
+  // from a non-collapsed group, in display order. A multi-tagged file
+  // appears once per group it belongs to — same as the rendered list,
+  // so ↓ walks visually adjacent rows.
+  $: visibleEntries = (() => {
+    const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
+    for (const g of groups) {
+      if (collapsed.has(g.tag)) continue;
+      for (const e of g.entries) out.push({ path: e.path, entry: e, tag: g.tag });
+    }
+    return out;
+  })();
+
+  // focusedFilePath is shared with the tree view (one focus state for
+  // global actions), but a multi-tagged file appears at multiple indices
+  // here. Track the visible-entries index locally so ↓ from the second
+  // occurrence steps to the next row, not back to "first occurrence + 1".
+  let focusedIdx: number | null = null;
+
+  // Reconcile focusedIdx when focusedFilePath changes externally (mouse
+  // click that didn't go through us, page-level setter, etc.) or when
+  // the visible list changes (group expand/collapse). For the multi-
+  // occurrence case we land on the first match — moving down then walks
+  // through subsequent occurrences naturally.
+  $: {
+    if (focusedFilePath === null) {
+      focusedIdx = null;
+    } else if (focusedIdx === null || visibleEntries[focusedIdx]?.path !== focusedFilePath) {
+      const i = visibleEntries.findIndex((v) => v.path === focusedFilePath);
+      focusedIdx = i >= 0 ? i : null;
+    }
+  }
+
+  function isFocused(entry: FileStatusEntry, tag: string): boolean {
+    if (focusedIdx === null) return false;
+    const f = visibleEntries[focusedIdx];
+    return f?.path === entry.path && f?.tag === tag;
+  }
+
+  function setFocusedIdx(i: number | null) {
+    focusedIdx = i;
+    onFocusFile(i === null ? null : visibleEntries[i]?.path ?? null);
+  }
+
+  $: if (focusedFilePath) scrollFocusedIntoView(focusedFilePath);
+  async function scrollFocusedIntoView(path: string) {
+    await tick();
+    // When the same path appears multiple times, scroll the focused
+    // index's row specifically rather than the first DOM match.
+    const focused = focusedIdx !== null ? visibleEntries[focusedIdx] : null;
+    if (focused) {
+      const rows = document.querySelectorAll(`[data-sv-row="${CSS.escape(focused.path)}"]`);
+      const target = rows[
+        visibleEntries.slice(0, focusedIdx!).filter((v) => v.path === focused.path).length
+      ];
+      target?.scrollIntoView({ block: 'nearest' });
+    } else {
+      document.querySelector(`[data-sv-row="${CSS.escape(path)}"]`)?.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function moveFocus(delta: number) {
+    if (visibleEntries.length === 0) return;
+    const cur = focusedIdx;
+    const next = cur === null
+      ? (delta > 0 ? 0 : visibleEntries.length - 1)
+      : Math.max(0, Math.min(visibleEntries.length - 1, cur + delta));
+    setFocusedIdx(next);
+  }
+
+  function handleWindowKey(event: KeyboardEvent) {
+    // Yield to inputs, popovers, and any rename in flight elsewhere.
+    if (document.querySelector('.filter-menu, .dropdown, .context-menu, .sort-menu')) return;
+    // Yield to any open <dialog> — modal inerting doesn't suppress
+    // window-level keydown listeners, so without this we'd nav behind it.
+    if (document.querySelector('dialog[open]')) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+    // Yield to the collections panel when a collection row is focused.
+    if (focusedCollectionName !== null) return;
+
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
+    const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+
+    if (isDown) { event.preventDefault(); moveFocus(1);  return; }
+    if (isUp)   { event.preventDefault(); moveFocus(-1); return; }
+
+    if (event.key === 'Home' && !meta && visibleEntries[0]) {
+      event.preventDefault();
+      setFocusedIdx(0);
+      return;
+    }
+    if (event.key === 'End' && !meta && visibleEntries.length > 0) {
+      event.preventDefault();
+      setFocusedIdx(visibleEntries.length - 1);
+      return;
+    }
+
+    // Esc clears focus when a systems entry is focused. Skip otherwise so
+    // we don't fight the page's Esc ladder (search, modals, etc.).
+    if (event.key === 'Escape' && focusedIdx !== null) {
+      event.preventDefault();
+      setFocusedIdx(null);
+      return;
+    }
+
+    if (focusedIdx === null) return;
+    const focused = visibleEntries[focusedIdx];
+    if (!focused) return;
+
+    if (event.key === 'Enter' && !isCollectionEditMode) {
+      event.preventDefault();
+      handleDoubleClick(focused.entry);
+      return;
+    }
+    if (event.key === ' ' && isCollectionEditMode) {
+      event.preventDefault();
+      handleCheckboxClick({ shiftKey: false, stopPropagation: () => {} } as MouseEvent, focused.entry, focused.tag, groups.find((g) => g.tag === focused.tag)?.entries ?? []);
+      return;
+    }
+  }
+
   function relativeParent(absPath: string): string {
     const i = absPath.lastIndexOf('/');
     if (i < 0) return '';
@@ -212,12 +346,43 @@
     const years = Math.floor(days / 365);
     return `${years}y`;
   }
+
+  // Click anywhere in the systems-view chrome (not on a specific row)
+  // claims the file-side region with the first visible entry, mirroring
+  // the same behavior on the collections panel.
+  function handleViewMousedown(event: MouseEvent) {
+    if (focusedFilePath !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-sv-row]')) return;
+    if (visibleEntries.length > 0) setFocusedIdx(0);
+  }
+
+  // Exposed so the parent's .file-tree-area mousedown can claim systems
+  // mode too — .systems-view only spans the height of its content, so
+  // chrome clicks in the scrollable area below the last group fall on
+  // the parent and miss handleViewMousedown. Also used by the Cmd+Alt+→
+  // jump: passing a path restores that entry when it's still visible
+  // (multi-tagged files land on the first occurrence and ↓ walks the
+  // rest), otherwise we fall back to the first visible entry.
+  export function claim(preferred: string | null = null) {
+    if (focusedFilePath !== null) return;
+    if (visibleEntries.length === 0) return;
+    if (preferred) {
+      const i = visibleEntries.findIndex((v) => v.path === preferred);
+      if (i >= 0) { setFocusedIdx(i); return; }
+    }
+    setFocusedIdx(0);
+  }
 </script>
 
+<svelte:window on:keydown={handleWindowKey} />
+
 {#if groups.length === 0}
-  <div class="empty">No indexed files match the current view.</div>
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="empty" on:mousedown={handleViewMousedown}>No indexed files match the current view.</div>
 {:else}
-  <div class="systems-view">
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="systems-view" on:mousedown={handleViewMousedown}>
     {#each groups as group (group.tag)}
       {@const groupColor = colorFor(group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
@@ -259,9 +424,10 @@
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
-                class:focused={focusedFilePath === entry.path}
+                class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
                 class:highlighted={highlightPaths.has(entry.path)}
+                data-sv-row={entry.path}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}

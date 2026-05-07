@@ -1,8 +1,13 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
   import ActionButton from './ActionButton.svelte';
+  import { tick } from 'svelte';
 
   export let collections: Record<string, CollectionInfo> = {};
+  // Keyboard focus is lifted to +page.svelte so it can mutex against
+  // focusedFilePath (only one region claims arrow keys at a time).
+  export let focusedName: string | null = null;
+  export let onFocusCollection: (name: string | null) => void = () => {};
   // Per-collection count of files currently hidden in the tree. Only
   // entries with count > 0 are shown alongside the file-count chip as a
   // muted reminder that the collection holds tucked-away items.
@@ -47,6 +52,15 @@
   // Reset rename mode when the draft itself goes away.
   $: if (!draftName) renamingDraft = false;
 
+  // Auto-enter rename mode when a fresh draft appears (matches Finder's
+  // "new folder lands you in rename" convention). Tracks the last-seen
+  // draft name so renames don't re-trigger this.
+  let lastSeenDraft: string | null = null;
+  $: {
+    if (draftName && !lastSeenDraft) startDraftRename();
+    lastSeenDraft = draftName;
+  }
+
   function startDraftRename() {
     if (!draftName) return;
     draftRenameValue = draftName;
@@ -63,6 +77,11 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       commitDraftRename();
+      // Plain Enter from the rename input commits AND saves (Finder
+      // "type name + Enter creates the folder"). For Cmd/Ctrl+Enter we
+      // skip saving here so the global handler in +page.svelte fires
+      // exactly once instead of double-firing.
+      if (!e.metaKey && !e.ctrlKey) onSaveFiles();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       renamingDraft = false;
@@ -91,8 +110,95 @@
   $: hasNone = Object.keys(collections).length === 0;
 
   function handleRowClick(name: string) {
+    onFocusCollection(name);
     if (activeName === name) onClearActive();
     else onSetActive(name);
+  }
+
+  // Scroll the focused row into view whenever focus changes.
+  $: if (focusedName) scrollFocusedIntoView(focusedName);
+  async function scrollFocusedIntoView(name: string) {
+    await tick();
+    const el = document.querySelector(`[data-cp-row="${CSS.escape(name)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function handleWindowKey(event: KeyboardEvent) {
+    if (focusedName === null) return;
+    // Yield to inline draft rename, the sort menu, and any other popover
+    // that may be claiming keys.
+    if (renamingDraft || sortMenuOpen) return;
+    if (document.querySelector('.filter-menu, .dropdown, .context-menu')) return;
+    // Yield to any open <dialog> — the browser inerts the page but
+    // window-level keydown still bubbles, so we'd otherwise navigate
+    // collections behind the modal.
+    if (document.querySelector('dialog[open]')) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+    const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
+    const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+
+    const idx = rows.findIndex((r) => r.name === focusedName);
+
+    if (isDown) {
+      event.preventDefault();
+      const next = idx < 0 ? 0 : Math.min(rows.length - 1, idx + 1);
+      if (rows[next]) onFocusCollection(rows[next].name);
+      return;
+    }
+    if (isUp) {
+      event.preventDefault();
+      const prev = idx < 0 ? rows.length - 1 : Math.max(0, idx - 1);
+      if (rows[prev]) onFocusCollection(rows[prev].name);
+      return;
+    }
+    if (event.key === 'Home' && !meta && rows[0]) {
+      event.preventDefault();
+      onFocusCollection(rows[0].name);
+      return;
+    }
+    if (event.key === 'End' && !meta && rows.length > 0) {
+      event.preventDefault();
+      onFocusCollection(rows[rows.length - 1].name);
+      return;
+    }
+
+    // Esc/Enter on a focused draft / row-being-edited handled before the
+    // idx-out-of-range early return: a fresh draft sits outside `rows`
+    // (it's rendered separately above the list) so idx is -1 for it.
+    const isOnDraft = draftName !== null && focusedName === draftName;
+    const isOnEditing = editingName !== null && focusedName === editingName;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (isOnDraft || isOnEditing) onCancelFiles();
+      else onFocusCollection(null);
+      return;
+    }
+    if (event.key === 'Enter' && (isOnDraft || isOnEditing)) {
+      event.preventDefault();
+      onSaveFiles();
+      return;
+    }
+
+    if (idx < 0) return;
+    const col = rows[idx];
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (activeName === col.name) onClearActive();
+      else onSetActive(col.name);
+      return;
+    }
+    if (bareLetter) {
+      if (lk === 'e') { event.preventDefault(); onEdit(col.name); return; }
+      if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
+      if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
+    }
   }
 
   function toggleSortMenu() {
@@ -110,11 +216,39 @@
     if (sortBtn && (sortBtn === target || sortBtn.contains(target))) return;
     sortMenuOpen = false;
   }
+
+  // Click anywhere in the panel chrome (not on a specific row) claims the
+  // collections region — so arrow keys move here next, even when the user
+  // hasn't picked a row yet. Row clicks set their own focus and we let
+  // those win by skipping when the target is inside a [data-cp-row].
+  function handlePanelMousedown(event: MouseEvent) {
+    if (focusedName !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-cp-row]')) return;
+    if (rows.length > 0) onFocusCollection(rows[0].name);
+  }
+
+  // Exposed for the page-level Cmd+Alt+← jump. Restores `preferred` if
+  // it's still in the visible list (matches user expectation: "take me
+  // back to where I was"); otherwise falls back to the first row, or
+  // the draft when one is being created.
+  export function claim(preferred: string | null) {
+    if (draftName !== null) {
+      onFocusCollection(draftName);
+      return;
+    }
+    if (preferred && rows.some((r) => r.name === preferred)) {
+      onFocusCollection(preferred);
+      return;
+    }
+    if (rows.length > 0) onFocusCollection(rows[0].name);
+  }
 </script>
 
-<svelte:window on:click={handleWindowClick} />
+<svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
 
-<aside class="panel">
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<aside class="panel" on:mousedown={handlePanelMousedown}>
   <header class="panel-header">
     <span class="panel-title">Collections</span>
     <div class="header-actions">
@@ -210,7 +344,9 @@
           class:active={activeName === col.name}
           class:editing={isEditing}
           class:archived={col.archived}
+          class:kb-focused={focusedName === col.name}
           title={col.description || col.name}
+          data-cp-row={col.name}
           on:click={() => { if (!isEditing) handleRowClick(col.name); }}
         >
           <span
@@ -431,8 +567,11 @@
     transition: background var(--transition-fast);
     min-height: 28px;
   }
-  .row:hover { background: var(--bg-focused); }
+  .row:hover,
+  .row.kb-focused { background: var(--bg-focused); }
   .row.active { background: rgba(182, 159, 129, 0.15); }
+  .row.kb-focused .row-actions,
+  .row.active .row-actions { display: flex; }
   /* Armed-for-edit state: warmer background + accent stripe on the leading
      edge — DAW-style "this track is record-armed" affordance. */
   .row.editing {

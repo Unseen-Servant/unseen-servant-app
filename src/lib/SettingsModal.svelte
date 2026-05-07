@@ -48,7 +48,7 @@
   ];
 </script>
 
-<Modal {visible} {onClose} title="Settings" width="min(640px, 90vw)" height="min(520px, 80vh)">
+<Modal {visible} {onClose} title="Settings" width="min(640px, 90vw)" height="min(520px, 80vh)" autofocus={false}>
   <div class="panel-content">
     <nav class="tab-nav">
       {#each tabs as tab}

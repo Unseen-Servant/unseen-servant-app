@@ -8,6 +8,10 @@
   export let isIndexed: boolean = false;
   export let collections: Record<string, CollectionInfo> = {};
   export let containingCollections: string[] = [];
+  // Names to suppress from the Add-to-collection submenu — used to hide
+  // collections that already fully contain the target so we don't offer
+  // a no-op action. Folder partials (some files in, some not) stay visible.
+  export let excludeFromAdd: string[] = [];
   export let canAddToCollection: boolean = true;
   export let canScopeSearch: boolean = false;
   // Hide/show state. `inheritedHidden` means an ancestor folder is hidden,
@@ -34,7 +38,12 @@
 
   let menuEl: HTMLDivElement;
   let openSubmenu: 'add' | 'remove' | null = initialSubmenu;
-  let focusedIdx = 0;
+  // -1 means "no keyboard cursor yet" — stays that way for mouse users.
+  // First ↑/↓ promotes to 0 (Math.max(0, -1 ± 1) clamps to 0). When the
+  // menu opens directly into a submenu (C chord) the trigger's index is
+  // resolved in refreshItemsAndFocus so ← from the submenu has somewhere
+  // to land.
+  let focusedIdx = -1;
   let focusedSubmenuIdx: number | null = openSubmenu ? 0 : null;
   let mainItems: HTMLElement[] = [];
   let submenuItems: HTMLElement[] = [];
@@ -59,11 +68,20 @@
     } else {
       submenuItems = [];
     }
-    if (mainItems.length > 0) {
-      focusedIdx = Math.max(0, Math.min(mainItems.length - 1, focusedIdx));
-    }
+    // Clamp upper bound only — leave -1 alone so mouse users don't get
+    // a false cursor highlight on the first row.
+    if (focusedIdx >= mainItems.length) focusedIdx = mainItems.length - 1;
     if (focusedSubmenuIdx !== null && submenuItems.length > 0) {
       focusedSubmenuIdx = Math.max(0, Math.min(submenuItems.length - 1, focusedSubmenuIdx));
+    }
+    // When the menu opened directly into a submenu (C chord), resolve
+    // the trigger's index so ← / Esc from the submenu has a row to fall
+    // back to.
+    if (openSubmenu && focusedIdx < 0) {
+      const triggerIdx = mainItems.findIndex(
+        (el) => el.dataset.mi === 'submenu-trigger' && el.dataset.submenu === openSubmenu,
+      );
+      if (triggerIdx >= 0) focusedIdx = triggerIdx;
     }
     const inSub = focusedSubmenuIdx !== null;
     mainItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx && !inSub));
@@ -131,8 +149,9 @@
     }
   }
 
-  $: collectionList = Object.values(collections);
-  $: hasCollections = collectionList.length > 0;
+  $: addExcludeSet = new Set(excludeFromAdd);
+  $: addableCollections = Object.values(collections).filter((c) => !addExcludeSet.has(c.name));
+  $: hasCollections = addableCollections.length > 0;
   $: hasContainingCollections = containingCollections.length > 0;
 
   // Clamp position so the menu stays within the viewport
@@ -186,7 +205,7 @@
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'add'}
         <div class="submenu">
-          {#each collectionList as col}
+          {#each addableCollections as col}
             <button
               class="context-item"
               data-mi="item"

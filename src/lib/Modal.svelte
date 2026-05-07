@@ -1,54 +1,134 @@
 <script lang="ts">
+  import { tick, onDestroy } from 'svelte';
+
   export let visible = false;
   export let onClose: () => void;
   export let title: string;
   export let width: string = 'min(480px, 90vw)';
-  export let height: string = 'auto';
+  // Undefined by default so the dialog sizes to its content. The old
+  // implementation (overlay div + child div) made `height: auto` mean
+  // "shrink-wrap content"; on a native <dialog> the user-agent inset
+  // rules make `auto` stretch instead, so callers who want intrinsic
+  // height should leave this unset (the default).
+  export let height: string | undefined = undefined;
   export let maxHeight: string | undefined = undefined;
+  // Opt-out for modals where auto-focusing the first text input is
+  // wrong — e.g., Settings opens on a readonly path field that we
+  // don't want highlighted as if it were inviting an edit.
+  export let autofocus: boolean = true;
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onClose();
+  let dialogEl: HTMLDialogElement | undefined;
+  // Element that held focus before the modal opened — restored on close
+  // so the user lands back where they were instead of falling to <body>.
+  let returnTarget: HTMLElement | null = null;
+
+  // Drive the native dialog from the `visible` prop so existing call
+  // sites can stay declarative. Reactive runs once dialogEl is bound.
+  $: if (dialogEl) sync(visible);
+
+  async function sync(v: boolean) {
+    if (!dialogEl) return;
+    if (v && !dialogEl.open) {
+      returnTarget = document.activeElement as HTMLElement | null;
+      dialogEl.showModal();
+      await tick();
+      // showModal() auto-focuses the first sequentially-focusable
+      // descendant — that's the × button in our header, which paints
+      // a focus ring on what should be inert chrome. Override it.
+      const firstInput = autofocus
+        ? (dialogEl.querySelector(
+            'input:not([disabled]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea:not([disabled]), [contenteditable="true"]',
+          ) as HTMLElement | null)
+        : null;
+      // Falling back to the dialog itself keeps Esc/Tab working without
+      // any visible focus ring (the dialog has tabindex="-1").
+      (firstInput ?? dialogEl).focus();
+    } else if (!v && dialogEl.open) {
+      dialogEl.close();
+    }
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (visible && e.key === 'Escape') onClose();
+  function handleCancel(e: Event) {
+    // Esc on a native <dialog> fires `cancel` first. preventDefault so
+    // the close goes through onClose (which the parent uses to flip
+    // its own visibility state), keeping the source of truth in sync.
+    e.preventDefault();
+    onClose();
+  }
+
+  function handleClose() {
+    restoreFocus();
+  }
+
+  // Some callers unmount the modal directly (e.g. `{#if statsModalPath}`)
+  // rather than flipping `visible` first, so the dialog's close event
+  // never fires. Restore focus on destroy too — restoreFocus is
+  // idempotent because returnTarget is cleared after use.
+  onDestroy(() => restoreFocus());
+
+  function restoreFocus() {
+    if (returnTarget && document.contains(returnTarget)) {
+      returnTarget.focus();
+    }
+    returnTarget = null;
+  }
+
+  function handleClick(e: MouseEvent) {
+    // Clicks where target IS the dialog (not a descendant) hit the
+    // backdrop area between its border and the visible content edge.
+    if (e.target === dialogEl) onClose();
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
-
-{#if visible}
-  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <div class="backdrop" role="dialog" aria-modal="true" aria-label={title} tabindex="-1" on:click={handleBackdrop}>
-    <div class="modal" style:width style:height style:max-height={maxHeight}>
-      <div class="modal-header">
-        <span class="modal-title font-heading">{title}</span>
-        <button class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
-      </div>
-      <slot />
-    </div>
+<dialog
+  bind:this={dialogEl}
+  class="modal"
+  tabindex="-1"
+  style:width
+  style:height
+  style:max-height={maxHeight}
+  aria-label={title}
+  on:cancel={handleCancel}
+  on:close={handleClose}
+  on:click={handleClick}
+>
+  <div class="modal-header">
+    <span class="modal-title font-heading">{title}</span>
+    <button type="button" class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
   </div>
-{/if}
+  <slot />
+</dialog>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-
-  .modal {
+  dialog.modal {
     background: var(--bg-container);
+    color: var(--text-primary);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    /* Override the UA default that stretches a dialog to fill its
+       inset region — without this, modals without an explicit height
+       prop balloon to the viewport height. */
+    height: max-content;
+    max-height: calc(100vh - 2rem);
+  }
+
+  dialog.modal[open] {
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  /* When focus lands on the dialog itself (autofocus={false} or no
+     input found), don't paint a focus ring on the chrome — Esc and
+     Tab still work, but the user shouldn't see a "selected" frame. */
+  dialog.modal:focus,
+  dialog.modal:focus-visible {
+    outline: none;
+  }
+
+  dialog.modal::backdrop {
+    background: rgba(0, 0, 0, 0.6);
   }
 
   .modal-header {

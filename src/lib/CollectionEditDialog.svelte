@@ -47,7 +47,15 @@
       colorMenuOpen = false;
       return;
     }
-    if (event.key === 'Enter' && canSave && (event.metaKey || event.ctrlKey)) {
+    if (event.key !== 'Enter' || !canSave) return;
+    // Plain Enter saves when the user is in any of the dialog's text
+    // inputs — matches "I typed a name, I press Enter, it commits."
+    // Cmd/Ctrl+Enter saves regardless so the chord still works from
+    // the checkbox or button focus state.
+    const target = event.target as HTMLElement | null;
+    const inTextInput = target instanceof HTMLInputElement && target.type === 'text';
+    if (event.metaKey || event.ctrlKey || inTextInput) {
+      event.preventDefault();
       submit();
     }
   }

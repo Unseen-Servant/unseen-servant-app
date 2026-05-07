@@ -118,7 +118,13 @@
       colorMenuOpen = false;
       return;
     }
-    if (event.key === 'Enter' && canSave && (event.metaKey || event.ctrlKey)) {
+    if (event.key !== 'Enter' || !canSave) return;
+    // Plain Enter saves from any text input (matches the rest of the
+    // app's "Enter commits" feel); Cmd/Ctrl+Enter still works globally.
+    const target = event.target as HTMLElement | null;
+    const inTextInput = target instanceof HTMLInputElement && target.type === 'text';
+    if (event.metaKey || event.ctrlKey || inTextInput) {
+      event.preventDefault();
       handleSave();
     }
   }

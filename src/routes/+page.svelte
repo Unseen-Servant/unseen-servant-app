@@ -52,6 +52,26 @@
 
   // File focus & context menu
   let focusedFilePath: string | null = null;
+  // Mirror state for collection-row keyboard focus. focusedFilePath and
+  // focusedCollectionName are mutually exclusive — only one region claims
+  // the keyboard at a time, which is how arrow keys know where to route.
+  let focusedCollectionName: string | null = null;
+
+  function setFocusedFilePath(path: string | null) {
+    focusedFilePath = path;
+    if (path) focusedCollectionName = null;
+  }
+  function setFocusedCollectionName(name: string | null) {
+    focusedCollectionName = name;
+    if (name) focusedFilePath = null;
+  }
+  // Remember the last non-null focus on each side so Cmd+Alt+←/→ can
+  // restore the user to where they were instead of always landing on
+  // row 0 of the target region.
+  let lastFocusedFilePath: string | null = null;
+  let lastFocusedCollectionName: string | null = null;
+  $: if (focusedFilePath !== null) lastFocusedFilePath = focusedFilePath;
+  $: if (focusedCollectionName !== null) lastFocusedCollectionName = focusedCollectionName;
   // `hideState` snapshots both the directly-hidden flag (path itself in
   // hiddenPaths) and the inherited flag (an ancestor folder is). The menu
   // shows Hide/Show only when `directlyHidden` is true or nothing is
@@ -61,6 +81,7 @@
     y: number;
     item: FileItem;
     isIndexed: boolean;
+    initialSubmenu: 'add' | 'remove' | null;
     hideState: { directlyHidden: boolean; inheritedHidden: boolean };
   } | null = null;
   let renamingFilePath: string | null = null;
@@ -156,6 +177,8 @@
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
   let searchResultsComponent: SearchResults | undefined;
+  let systemsViewComponent: SystemsView | undefined;
+  let collectionsPanelComponent: CollectionsPanel | undefined;
   // Lazy result loading: start with 25, grow by 25 each scroll-to-bottom,
   // hard cap at 100 to keep us out of the long tail of low-relevance hits.
   // reachedEnd flips when the backend returns fewer than requested — we've
@@ -1334,7 +1357,10 @@
   }
 
   async function focusTreeRow(path: string) {
-    focusedFilePath = path;
+    // Go through the setter so the focusedCollectionName mutex clears too —
+    // assigning focusedFilePath directly leaves a stale collection focus
+    // and the tree-nav gate keeps blocking ↓ in the tree.
+    setFocusedFilePath(path);
     await tick();
     const el = document.querySelector(`[data-tree-row="${CSS.escape(path)}"]`);
     el?.scrollIntoView({ block: 'nearest' });
@@ -1352,6 +1378,32 @@
     focusTreeRow(visibleTreeRows[next].path);
   }
 
+  // Cmd+Alt+← target. Opens the collections panel if it's collapsed, then
+  // hands off to the panel's claim() so the rendering details (sort,
+  // archive filter, draft row) stay encapsulated there.
+  async function focusCollectionsRegion() {
+    if (focusedCollectionName !== null) return;
+    if (!collectionsPanelOpen) await togglePanel();
+    await tick();
+    collectionsPanelComponent?.claim(lastFocusedCollectionName);
+  }
+
+  // Cmd+Alt+→ target. Tree mode uses the locally-known visibleTreeRows;
+  // systems mode delegates so SystemsView can resolve the right entry
+  // (multi-tagged files have multiple visible-entries indices).
+  function focusFileRegion() {
+    if (focusedFilePath !== null) return;
+    if (viewMode === 'systems') {
+      systemsViewComponent?.claim(lastFocusedFilePath);
+      return;
+    }
+    if (visibleTreeRows.length === 0) return;
+    const restore = lastFocusedFilePath && indexOfPath(visibleTreeRows, lastFocusedFilePath) >= 0
+      ? lastFocusedFilePath
+      : visibleTreeRows[0].path;
+    focusTreeRow(restore);
+  }
+
   function activateFocusedTreeRow() {
     const idx = indexOfPath(visibleTreeRows, focusedFilePath);
     if (idx < 0) return;
@@ -1361,6 +1413,26 @@
     } else {
       openPath(row.path).catch((e) => console.error('Failed to open file:', e));
     }
+  }
+
+  // Click anywhere in the file-tree pane chrome (not on a specific row)
+  // claims the file-side region with the first visible row, mirroring how
+  // the collections panel claims itself on chrome clicks. Skip in search
+  // mode (search owns its own selectedResultIndex). Systems mode delegates
+  // to SystemsView.claimFirst() because .systems-view only spans the
+  // height of its content, so clicks in the empty area below the last
+  // group still land here.
+  function handleFileTreeAreaMousedown(event: MouseEvent) {
+    if (searchActive) return;
+    if (focusedFilePath !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (viewMode === 'systems') {
+      if (target?.closest('[data-sv-row]')) return;
+      systemsViewComponent?.claim();
+      return;
+    }
+    if (target?.closest('[data-tree-row]')) return;
+    if (visibleTreeRows.length > 0) setFocusedFilePath(visibleTreeRows[0].path);
   }
 
   // Returns true if the event was handled and shouldn't bubble further.
@@ -1459,6 +1531,7 @@
       if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
       if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
       if (lk === 'm') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
+      if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
       // toggleHidden internally no-ops on ancestor-hidden rows, so just
       // delegate the gating decision to it. Always preventDefault so the
       // keypress doesn't fall through to anything else.
@@ -1476,7 +1549,7 @@
     return false;
   }
 
-  function openContextMenuAtFocusedRow() {
+  function openContextMenuAtFocusedRow(initialSubmenu: 'add' | 'remove' | null = null) {
     const idx = indexOfPath(visibleTreeRows, focusedFilePath);
     if (idx < 0) return;
     const row = visibleTreeRows[idx];
@@ -1486,7 +1559,7 @@
       clientX: rect ? rect.left + 24 : 100,
       clientY: rect ? rect.bottom : 100,
     } as MouseEvent;
-    handleContextMenu(synthetic, row.item);
+    handleContextMenu(synthetic, row.item, initialSubmenu);
   }
 
   // Escape ladder (closing precedence, top-most first):
@@ -1498,6 +1571,15 @@
   //   6. (search results → input handled below)
   //   7. (search input chip/text  handled in Header.svelte)
   function handleGlobalKeydown(event: KeyboardEvent) {
+    // When a native <dialog> is open via showModal(), the browser inerts
+    // the rest of the page (clicks, focus, screen-readers all skip), but
+    // window-level keydown listeners still fire because keydown bubbles
+    // through the focused dialog. Bail here so app-wide chords (Cmd+B,
+    // Cmd+J, Cmd+Alt+←/→, Esc ladder, tree-nav letters, etc.) don't run
+    // behind the modal. The dialog has its own handlers for what it
+    // needs (Esc → cancel, Enter → submit, Tab cycles inside).
+    if (document.querySelector('dialog[open]')) return;
+
     const target = event.target as HTMLElement | null;
     const inSearchInput = target?.classList.contains('search-input') === true;
     const inAnyInput =
@@ -1556,6 +1638,19 @@
     if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
       event.preventDefault();
       setViewMode(viewMode === 'systems' ? 'tree' : 'systems');
+      return;
+    }
+
+    // Cmd/Ctrl+Alt+←/→: jump keyboard focus between the collections panel
+    // and the file pane (tree or systems). Restores the last-focused row
+    // in the target region if it's still visible, else lands on the first
+    // visible row. Skipped during search (the search input owns ←/→ for
+    // text editing).
+    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchActive
+        && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+      event.preventDefault();
+      if (event.key === 'ArrowLeft') focusCollectionsRegion();
+      else focusFileRegion();
       return;
     }
 
@@ -1622,6 +1717,29 @@
       return;
     }
 
+    // Cmd/Ctrl+N: start a new collection. Auto-opens the sidebar if it's
+    // closed so the draft row is visible immediately.
+    if (meta && !event.shiftKey && lk === 'n' && selectedFolder && !inAnyInput) {
+      event.preventDefault();
+      (async () => {
+        if (!collectionsPanelOpen) await togglePanel();
+        inlineCreateCollection();
+      })();
+      return;
+    }
+
+    // Cmd/Ctrl+Enter: save the in-progress collection (draft or files
+    // edit). Works from anywhere, including inside the rename input —
+    // it commits the rename via that input's own handler first, then
+    // this branch fires because metaKey + Enter wasn't preventDefault'd
+    // by the input's logic. Guard on having pending state so the chord
+    // is a clear no-op when nothing's being edited.
+    if (meta && !event.shiftKey && event.key === 'Enter' && (draftName || editingCollectionName)) {
+      event.preventDefault();
+      saveCollection();
+      return;
+    }
+
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, search is not active, no menu/rename
     // is open. ArrowDown from an empty search input also enters the tree
@@ -1632,7 +1750,9 @@
     // class is pragmatic; once chunk c is fully shipped these could share
     // a small open-menus store instead.
     const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen) {
+    // Tree-nav handler is for the directory tree; systems view owns its
+    // own arrow nav so we skip here when that view is active.
+    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
       if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
         if (visibleTreeRows.length > 0) {
           event.preventDefault();
@@ -1693,10 +1813,10 @@
     }
   }
 
-  function handleContextMenu(event: MouseEvent, item: FileItem) {
+  function handleContextMenu(event: MouseEvent, item: FileItem, initialSubmenu: 'add' | 'remove' | null = null) {
     // Highlight whatever was right-clicked / triggered via M, including
     // folders — keyboard nav allows folder focus since chunk b.
-    focusedFilePath = item.path;
+    setFocusedFilePath(item.path);
     // Snapshot isIndexed at click time so the open menu doesn't keep a live
     // reactive dependency on indexedPaths.
     const directlyHidden = hiddenPaths.has(item.path);
@@ -1705,6 +1825,7 @@
       y: event.clientY,
       item,
       isIndexed: indexedPaths.has(item.path),
+      initialSubmenu,
       hideState: {
         directlyHidden,
         inheritedHidden: !directlyHidden && isPathHidden(item.path),
@@ -2059,6 +2180,22 @@
       .map(c => c.name);
   }
 
+  // Collections that already contain ALL of the target's indexed pdfs.
+  // Used to suppress them from the "Add to collection" submenu — adding
+  // would be a no-op. For folders this differs from collectionsContaining
+  // (which is "any") because partial overlap still permits adding the rest.
+  function collectionsFullyContaining(target: string, isDir: boolean): string[] {
+    const targets = isDir ? new Set(indexedPdfsUnderPath(target)) : new Set([target]);
+    if (targets.size === 0) return [];
+    return Object.values(collections)
+      .filter(c => {
+        const cFiles = new Set(c.file_paths);
+        for (const t of targets) if (!cFiles.has(t)) return false;
+        return true;
+      })
+      .map(c => c.name);
+  }
+
   async function addToCollection(name: string, item: FileItem) {
     const col = collections[name];
     if (!col) return;
@@ -2174,9 +2311,13 @@
   }
 
   // Panel "+" handler — opens a fresh draft with an auto-generated name.
-  // The user can rename inline on the draft row before saving.
+  // CollectionsPanel auto-enters rename mode when the draft appears, so
+  // the user can immediately type a name. Focusing the draft also lets
+  // Esc-on-draft discard it via the panel's window keydown handler.
   function inlineCreateCollection() {
-    startDraftCollection(uniqueCollectionName('Untitled'));
+    const name = uniqueCollectionName('Untitled');
+    startDraftCollection(name);
+    setFocusedCollectionName(name);
   }
 
   // Inline rename of the active draft. Only updates local state; nothing
@@ -2508,6 +2649,7 @@
     <div class="workspace">
       {#if collectionsPanelOpen}
         <CollectionsPanel
+          bind:this={collectionsPanelComponent}
           {collections}
           {hiddenCountByCollection}
           activeName={activeContextName}
@@ -2524,10 +2666,13 @@
           onSaveFiles={saveCollection}
           onCancelFiles={cancelCollectionEdit}
           onDraftRename={handleDraftRename}
+          focusedName={focusedCollectionName}
+          onFocusCollection={setFocusedCollectionName}
         />
       {/if}
 
-      <div class="file-tree-area" class:search-mode={searchActive}>
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
         {#if searchActive}
           <SearchScopeBar
             {scopeChip}
@@ -2569,6 +2714,7 @@
           </div>
         {:else if viewMode === 'systems'}
           <SystemsView
+            bind:this={systemsViewComponent}
             entries={indexedEntries}
             {displayPaths}
             excludedSystems={filterExcludedSystems}
@@ -2578,7 +2724,8 @@
             libraryRoot={selectedFolder}
             {knownSystems}
             {focusedFilePath}
-            onFocusFile={(path) => { focusedFilePath = path; }}
+            {focusedCollectionName}
+            onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
             {isCollectionEditMode}
             collectionPaths={collectionEditPaths}
@@ -2600,7 +2747,7 @@
               {expandedPaths}
               onToggleExpand={handleToggleExpand}
               {focusedFilePath}
-              onFocusFile={(path) => { focusedFilePath = path; }}
+              onFocusFile={setFocusedFilePath}
               onContextMenu={handleContextMenu}
               {renamingFilePath}
               onRenameSubmit={handleRenameSubmit}
@@ -2645,6 +2792,8 @@
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      excludeFromAdd={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      initialSubmenu={contextMenu.initialSubmenu}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}
