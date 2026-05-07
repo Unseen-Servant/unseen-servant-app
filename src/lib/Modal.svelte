@@ -12,6 +12,10 @@
   // height should leave this unset (the default).
   export let height: string | undefined = undefined;
   export let maxHeight: string | undefined = undefined;
+  // Opt-out for modals where auto-focusing the first text input is
+  // wrong — e.g., Settings opens on a readonly path field that we
+  // don't want highlighted as if it were inviting an edit.
+  export let autofocus: boolean = true;
 
   let dialogEl: HTMLDialogElement | undefined;
   // Element that held focus before the modal opened — restored on close
@@ -28,6 +32,7 @@
       returnTarget = document.activeElement as HTMLElement | null;
       dialogEl.showModal();
       await tick();
+      if (!autofocus) return;
       // Override the UA's default focus pick: prefer the first text
       // input in the slot for edit dialogs. Skip checkboxes/radios so
       // we don't paint a focus ring on a stray toggle. If there's no
