@@ -5,7 +5,12 @@
   export let onClose: () => void;
   export let title: string;
   export let width: string = 'min(480px, 90vw)';
-  export let height: string = 'auto';
+  // Undefined by default so the dialog sizes to its content. The old
+  // implementation (overlay div + child div) made `height: auto` mean
+  // "shrink-wrap content"; on a native <dialog> the user-agent inset
+  // rules make `auto` stretch instead, so callers who want intrinsic
+  // height should leave this unset (the default).
+  export let height: string | undefined = undefined;
   export let maxHeight: string | undefined = undefined;
 
   let dialogEl: HTMLDialogElement | undefined;
@@ -95,6 +100,11 @@
     border-radius: 8px;
     padding: 0;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    /* Override the UA default that stretches a dialog to fill its
+       inset region — without this, modals without an explicit height
+       prop balloon to the viewport height. */
+    height: max-content;
+    max-height: calc(100vh - 2rem);
   }
 
   dialog.modal[open] {
