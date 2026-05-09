@@ -402,10 +402,15 @@
       const ext = entry.filename.match(/\.[^.]+$/)?.[0] ?? '';
       onRenameSubmit(entry.path, input.value + ext, false);
     } else if (event.key === 'Escape') {
+      // See FileTree.handleRenameKeydown for why two rAF rounds: WebKit
+      // fires a delayed scroll reset ~2 frames after the input unmounts,
+      // and a single rAF runs too early to overwrite it.
       const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
       if (scroller) {
         const saved = scroller.scrollTop;
-        requestAnimationFrame(() => { scroller.scrollTop = saved; });
+        const restore = () => { scroller.scrollTop = saved; };
+        requestAnimationFrame(restore);
+        requestAnimationFrame(() => requestAnimationFrame(restore));
       }
     }
   }

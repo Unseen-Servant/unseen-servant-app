@@ -178,19 +178,18 @@
       onRenameSubmit(item.path, input.value + ext, item.is_dir);
     } else if (event.key === 'Escape') {
       // The global Escape ladder owns cancel (it nulls renamingFilePath
-      // and returns before the focus-clear branch). What it doesn't do
-      // is keep the .file-tree-area scroll position — when Svelte
-      // unmounts the input, WebKit reassigns DOM focus and resets the
-      // container's scrollTop, jumping the user back to the top. Snap
-      // the scroll back to its pre-unmount value on the next animation
-      // frame, which lands *after* Svelte's re-render (microtasks)
-      // and any browser-initiated scroll change. Touching DOM focus
-      // here would add focus rings and side effects without fixing
-      // anything.
+      // and returns before the focus-clear branch). What it doesn't
+      // address is WebKit's delayed scroll reset: ~2 frames after the
+      // rename input is removed, the engine fires a scroll event that
+      // nudges scrollTop (likely its "scroll on focus removal"
+      // heuristic). A single rAF restore runs before that fires and is
+      // futile; restoring across frame 1 AND frame 2 wins.
       const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
       if (scroller) {
         const saved = scroller.scrollTop;
-        requestAnimationFrame(() => { scroller.scrollTop = saved; });
+        const restore = () => { scroller.scrollTop = saved; };
+        requestAnimationFrame(restore);
+        requestAnimationFrame(() => requestAnimationFrame(restore));
       }
     }
   }
