@@ -406,6 +406,14 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  /* Suppress the browser default focus ring — DOM focus lands here
+     after a rename cancel (we hand it off from the unmounting input
+     to keep the .file-tree-area scroll position pinned), but the
+     visible-focus state is conveyed by .focused > .row-container
+     above. Two rings on the same row reads as "focus is lost". */
+  .row:focus {
+    outline: none;
+  }
   .icon {
     margin-right: 0.3rem;
     flex-shrink: 0;
