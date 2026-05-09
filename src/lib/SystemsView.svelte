@@ -389,16 +389,18 @@
     return v ? entryToFileItem(v.entry) : null;
   }
 
-  // Inline rename helpers, lifted verbatim from FileTree so the UX
-  // matches: Enter commits with the original extension preserved, Esc
-  // cancels, blur cancels.
+  // Inline rename helpers, lifted from FileTree so the UX matches:
+  // Enter commits with the original extension preserved, blur cancels.
+  // Esc is intentionally not handled here — the page's global Escape
+  // ladder owns it (`if (renamingFilePath) { renamingFilePath = null;
+  // return; }`) and returns before clearing focusedFilePath. Handling
+  // Esc locally would null renamingFilePath synchronously and let the
+  // global handler fall through to the focus-clear branch.
   function handleRenameKeydown(event: KeyboardEvent, entry: FileStatusEntry) {
     if (event.key === 'Enter') {
       const input = event.currentTarget as HTMLInputElement;
       const ext = entry.filename.match(/\.[^.]+$/)?.[0] ?? '';
       onRenameSubmit(entry.path, input.value + ext, false);
-    } else if (event.key === 'Escape') {
-      onRenameCancel();
     }
   }
   function autofocus(node: HTMLInputElement) {

@@ -176,9 +176,11 @@
       const input = event.currentTarget as HTMLInputElement;
       const ext = item.is_dir ? '' : (item.name.match(/\.[^.]+$/)?.[0] ?? '');
       onRenameSubmit(item.path, input.value + ext, item.is_dir);
-    } else if (event.key === 'Escape') {
-      onRenameCancel();
     }
+    // Esc is handled by the page's global Escape ladder, which nulls
+    // renamingFilePath and returns before reaching the focus-clear
+    // branch. Handling it locally would race the ladder and clear
+    // focusedFilePath.
   }
 
   function autofocus(node: HTMLInputElement) {
