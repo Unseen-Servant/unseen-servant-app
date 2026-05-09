@@ -51,6 +51,23 @@
   export let onCollectionAdd: (paths: string[]) => void = () => {};
   export let onCollectionRemove: (paths: string[]) => void = () => {};
 
+  // Inline rename — mirrors FileTree's pattern. Set by the parent when
+  // R is pressed on a focused row; the matching occurrence renders an
+  // <input> in place of the filename. The input is gated to the focused
+  // occurrence so a multi-tagged file doesn't grow editors in every
+  // group it appears under.
+  export let renamingFilePath: string | null = null;
+  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => void = () => {};
+  export let onRenameCancel: () => void = () => {};
+
+  // Whether the parent's context menu is open. Used to yield Esc handling
+  // to ContextMenu's own keydown listener (so it can step submenu →
+  // parent menu, then close), and to keep this view from clearing
+  // focused-row state while the menu is open. State-based, not DOM-
+  // queried, so the invariant doesn't depend on Svelte's DOM-update
+  // timing.
+  export let contextMenuOpen: boolean = false;
+
   // Anchor for shift-click range selection; bound to a group so a range
   // never crosses tag boundaries (would feel arbitrary in this view).
   let lastClickedPath: string | null = null;
@@ -262,8 +279,12 @@
   }
 
   function handleWindowKey(event: KeyboardEvent) {
+    // Yield to the context menu via state — DOM checks for `.context-menu`
+    // are racy because Svelte's reactive DOM updates flush in a microtask
+    // after the synchronous handler chain. State is the source of truth.
+    if (contextMenuOpen) return;
     // Yield to inputs, popovers, and any rename in flight elsewhere.
-    if (document.querySelector('.filter-menu, .dropdown, .context-menu, .sort-menu')) return;
+    if (document.querySelector('.filter-menu, .dropdown, .sort-menu')) return;
     // Yield to any open <dialog> — modal inerting doesn't suppress
     // window-level keydown listeners, so without this we'd nav behind it.
     if (document.querySelector('dialog[open]')) return;
@@ -355,6 +376,34 @@
     const target = event.target as HTMLElement | null;
     if (target?.closest('[data-sv-row]')) return;
     if (visibleEntries.length > 0) setFocusedIdx(0);
+  }
+
+  // Resolve the currently-focused entry as a FileItem so the parent's
+  // shared action-key helper (R/F/./M/C/Cmd+O) can run against it
+  // regardless of view mode. Returns null when nothing is focused or
+  // the focused index is stale (mid-update). Indexed PDFs are always
+  // leaves, so is_dir is hardcoded false.
+  export function getFocusedItem(): FileItem | null {
+    if (focusedIdx === null) return null;
+    const v = visibleEntries[focusedIdx];
+    return v ? entryToFileItem(v.entry) : null;
+  }
+
+  // Inline rename helpers, lifted verbatim from FileTree so the UX
+  // matches: Enter commits with the original extension preserved, Esc
+  // cancels, blur cancels.
+  function handleRenameKeydown(event: KeyboardEvent, entry: FileStatusEntry) {
+    if (event.key === 'Enter') {
+      const input = event.currentTarget as HTMLInputElement;
+      const ext = entry.filename.match(/\.[^.]+$/)?.[0] ?? '';
+      onRenameSubmit(entry.path, input.value + ext, false);
+    } else if (event.key === 'Escape') {
+      onRenameCancel();
+    }
+  }
+  function autofocus(node: HTMLInputElement) {
+    node.focus();
+    node.select();
   }
 
   // Exposed so the parent's .file-tree-area mousedown can claim systems
@@ -450,7 +499,19 @@
                     <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
                   </svg>
                 </span>
-                <span class="file-name">{entry.filename}</span>
+                {#if renamingFilePath === entry.path && isFocused(entry, group.tag)}
+                  <input
+                    class="rename-input"
+                    value={entry.filename.replace(/\.[^.]+$/, '')}
+                    on:click|stopPropagation
+                    on:mousedown|stopPropagation
+                    on:keydown={(e) => handleRenameKeydown(e, entry)}
+                    on:blur={onRenameCancel}
+                    use:autofocus
+                  />
+                {:else}
+                  <span class="file-name">{entry.filename}</span>
+                {/if}
                 {#if relParent}
                   <span class="file-sep" aria-hidden="true">·</span>
                   <span class="file-path" title={entry.path}>{relParent}</span>
@@ -655,6 +716,18 @@
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+  }
+  .rename-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-container);
+    color: var(--text-primary);
+    border: 1px solid var(--text-accent);
+    border-radius: 3px;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.85rem;
+    font-family: var(--font-body);
+    outline: none;
   }
   .file-sep {
     color: var(--text-tertiary);
