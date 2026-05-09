@@ -3000,6 +3000,7 @@
     flex: 1;
     min-width: 0;
     overflow-y: auto;
+    overflow-anchor: none;
     padding: 0.25rem 0.75rem;
   }
 
