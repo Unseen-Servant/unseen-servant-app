@@ -22,6 +22,7 @@
   export let dataDir: string = '';
   export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
+  export let onDeselectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
@@ -79,6 +80,7 @@
           {dataDir}
           {lastSyncTime}
           {onSelectFolder}
+          {onDeselectFolder}
           {onCompact}
           {onReindexAll}
           {onDeleteIndex}
