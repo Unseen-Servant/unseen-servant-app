@@ -410,7 +410,10 @@
     }
   }
   function autofocus(node: HTMLInputElement) {
-    node.focus();
+    // preventScroll mirrors FileTree's autofocus — R is pressed on a
+    // focused (visible) row, so focus()'s default scroll-into-view is
+    // both unnecessary and the source of drift on Esc-cancel.
+    node.focus({ preventScroll: true });
     node.select();
   }
 

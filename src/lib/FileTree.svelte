@@ -196,7 +196,12 @@
   }
 
   function autofocus(node: HTMLInputElement) {
-    node.focus();
+    // preventScroll: true so mounting the rename input doesn't nudge the
+    // .file-tree-area scrollTop. R is only ever pressed on a focused row,
+    // which is by construction visible — focus() doesn't need to scroll
+    // anything into view, and letting it do so means Esc-cancel restores
+    // to the post-nudge position, which the user reads as "drift."
+    node.focus({ preventScroll: true });
     node.select();
   }
 
