@@ -28,6 +28,7 @@
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
   import { runSyncJob } from '../lib/syncJob';
+  import { chord } from '../lib/keybindings';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -2041,7 +2042,18 @@
       if (selectedFolder) await loadFiles(selectedFolder);
       refreshIndexStatus();
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Rename failed: ${String(e)}`, duration: 5000 });
+      console.error('Rename failed', { oldPath, newName, isDir, error: e });
+      // "File not found" / "Folder not found" almost always means the
+      // entry shown in the UI is stale — the file was moved or renamed
+      // outside the app, and our cached list still references the old
+      // path. Point the user at the re-detect chord rather than just
+      // surfacing the raw rust error.
+      const msg = String(e);
+      const isMissing = msg === 'File not found' || msg === 'Folder not found';
+      const message = isMissing
+        ? `${msg} — the ${isDir ? 'folder' : 'file'} may have been moved or renamed outside the app. Press ${chord('sync.run')} to refresh and try again.`
+        : `Rename failed: ${msg}`;
+      jobNotification.show({ type: 'error', message, duration: 8000 });
       renamingFilePath = null;
     }
   }
