@@ -501,6 +501,7 @@
       clearInterval(autoSyncInterval);
       autoSyncInterval = null;
     }
+    if (!selectedFolder) return;
     const seconds = syncPreferences.backgroundCheckInterval;
     if (seconds <= 0) return;
     autoSyncInterval = setInterval(async () => {
@@ -869,6 +870,7 @@
   }
 
   async function handleSelectFolder() {
+    const wasEmpty = !selectedFolder;
     try {
       const folder = await invoke<string>('select_folder');
       selectedFolder = folder;
@@ -876,12 +878,22 @@
       await loadFiles(selectedFolder);
       error = '';
       await saveState();
+      if (wasEmpty) restartAutoSyncInterval();
     } catch (e) {
       // User cancelled the dialog — keep the current folder
       if (!selectedFolder) {
         error = String(e);
       }
     }
+  }
+
+  async function handleDeselectFolder() {
+    selectedFolder = '';
+    files = [];
+    expandedPaths = new Set();
+    error = '';
+    await saveState();
+    restartAutoSyncInterval();
   }
 
   async function loadFiles(path: string) {
@@ -2964,6 +2976,7 @@
   {hideSetupButton}
   onHideSetupButtonChange={setHideSetupButton}
   onSelectFolder={handleSelectFolder}
+  onDeselectFolder={handleDeselectFolder}
   onCompact={handleCompact}
   onReindexAll={handleReindexAll}
   onDeleteIndex={handleDeleteIndex}

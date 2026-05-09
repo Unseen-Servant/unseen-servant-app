@@ -14,6 +14,7 @@
   export let dataDir: string = '';
   export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
+  export let onDeselectFolder: () => void = () => {};
   export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
@@ -181,6 +182,20 @@
         </svg>
       </button>
     </div>
+
+    {#if selectedFolder}
+      <div class="meta-row">
+        <button
+          type="button"
+          class="btn-link"
+          on:click={onDeselectFolder}
+          disabled={isSyncing}
+          title="Clear the library folder and return to the Getting Started screen"
+        >
+          Deselect folder
+        </button>
+      </div>
+    {/if}
   </section>
 
   <section class="field">
