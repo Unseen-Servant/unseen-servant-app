@@ -28,6 +28,7 @@
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
   import { runSyncJob } from '../lib/syncJob';
+  import { chord } from '../lib/keybindings';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -1512,9 +1513,42 @@
       activateFocusedTreeRow();
       return true;
     }
+
+    return false;
+  }
+
+  // Resolve the currently-focused row's path + FileItem in either view
+  // mode. Tree mode reads from visibleTreeRows; systems mode delegates
+  // to the SystemsView component (which owns the multi-occurrence
+  // focusedIdx). Returns null when nothing is focused or the focused
+  // path is no longer visible.
+  function getFocusedFileItem(): { path: string; item: FileItem } | null {
+    if (!focusedFilePath) return null;
+    if (viewMode === 'systems') {
+      const item = systemsViewComponent?.getFocusedItem();
+      return item ? { path: item.path, item } : null;
+    }
+    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
+    if (idx < 0) return null;
+    const row = visibleTreeRows[idx];
+    return { path: row.path, item: row.item };
+  }
+
+  // Action keys on the focused file — R/F/./M/C plus Cmd+O reveal and
+  // Shift+F10 / ContextMenu key. Lifted out of handleTreeNavKey so it
+  // runs in both tree and systems modes. The caller already gates on
+  // !inAnyInput, !renamingFilePath, !competingMenuOpen.
+  function handleFocusedFileActionKey(event: KeyboardEvent): boolean {
+    const focused = getFocusedFileItem();
+    if (!focused) return false;
+
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
+
     if (meta && !event.shiftKey && lk === 'o') {
       event.preventDefault();
-      revealItemInDir(row.path);
+      revealItemInDir(focused.path);
       return true;
     }
 
@@ -1524,26 +1558,19 @@
       return true;
     }
 
-    // Single-letter actions on the focused row. Plain letters only — no
-    // modifiers — and only when an input isn't focused (caller already
-    // checked that). c/t are deferred to chunk (c) since they need menu
-    // navigation to feel finished. Hide is on '.' (not 'h') so hjkl is
-    // free for vim-style nav and '.' mirrors the Cmd+Shift+. global chord.
+    // Plain letters only — no modifiers. Hide is on '.' (not 'h') so
+    // hjkl stays free for vim-style nav and '.' mirrors the Cmd+Shift+.
+    // global chord. Period key on the main row OR on the numpad —
+    // event.code is layout-independent (some layouts produce a different
+    // event.key for the numpad period, e.g. ',' on German).
     if (bareLetter) {
-      if (lk === 'r') { event.preventDefault(); renamingFilePath = row.path; return true; }
-      if (lk === 'f') { event.preventDefault(); setPathScope(row.item); return true; }
+      if (lk === 'r') { event.preventDefault(); renamingFilePath = focused.path; return true; }
+      if (lk === 'f') { event.preventDefault(); setPathScope(focused.item); return true; }
       if (lk === 'm') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
       if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
-      // toggleHidden internally no-ops on ancestor-hidden rows, so just
-      // delegate the gating decision to it. Always preventDefault so the
-      // keypress doesn't fall through to anything else.
-      // Period key on the main row OR on the numpad. event.code is
-      // layout-independent — some layouts produce a different event.key
-      // for the numpad period (e.g. ',' on German), so checking the code
-      // is the reliable way to catch all keyboards.
       if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
-        toggleHidden(row.item);
+        toggleHidden(focused.item);
         return true;
       }
     }
@@ -1552,16 +1579,22 @@
   }
 
   function openContextMenuAtFocusedRow(initialSubmenu: 'add' | 'remove' | null = null) {
-    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
-    if (idx < 0) return;
-    const row = visibleTreeRows[idx];
-    const el = document.querySelector(`[data-tree-row="${CSS.escape(row.path)}"]`) as HTMLElement | null;
+    const focused = getFocusedFileItem();
+    if (!focused) return;
+    // Try the tree row first, fall back to the systems-view row. Both
+    // views share the focused-row anchor convention via a data-* attr;
+    // multi-tagged files appear at multiple [data-sv-row] nodes, but the
+    // first DOM match is good enough for menu placement (matches
+    // SystemsView.scrollFocusedIntoView's fallback path).
+    const el =
+      (document.querySelector(`[data-tree-row="${CSS.escape(focused.path)}"]`) ??
+        document.querySelector(`[data-sv-row="${CSS.escape(focused.path)}"]`)) as HTMLElement | null;
     const rect = el?.getBoundingClientRect();
     const synthetic = {
       clientX: rect ? rect.left + 24 : 100,
       clientY: rect ? rect.bottom : 100,
     } as MouseEvent;
-    handleContextMenu(synthetic, row.item, initialSubmenu);
+    handleContextMenu(synthetic, focused.item, initialSubmenu);
   }
 
   // Escape ladder (closing precedence, top-most first):
@@ -1588,7 +1621,12 @@
       target?.matches('input, textarea, [contenteditable="true"]') === true;
 
     if (event.key === 'Escape') {
-      if (contextMenu) { contextMenu = null; return; }
+      // Yield to ContextMenu's own Esc handler — it knows about submenu
+      // state, so it can step back from a submenu to the parent menu
+      // before closing the whole thing. Closing here would skip that
+      // step and slam the menu shut. focusedFilePath is intentionally
+      // left intact across menu open/close.
+      if (contextMenu) return;
       if (renamingFilePath) { renamingFilePath = null; return; }
       // A competing popover (filter / sort / dropdown) handles its own Esc.
       // Don't reach the focus-clear branch below — that would wipe the
@@ -1762,8 +1800,18 @@
     // class is pragmatic; once chunk c is fully shipped these could share
     // a small open-menus store instead.
     const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
-    // Tree-nav handler is for the directory tree; systems view owns its
-    // own arrow nav so we skip here when that view is active.
+
+    // Action keys (R/F/./M/C, Cmd+O reveal, Shift+F10/ContextMenu) work
+    // on the focused file in both tree and systems modes. Runs ahead of
+    // the tree-only nav block so action keys don't fall through to view-
+    // specific handlers in either mode.
+    const fileActionGate =
+      selectedFolder && !searchActive && !contextMenu && !renamingFilePath &&
+      !competingMenuOpen && !focusedCollectionName && !inAnyInput;
+    if (fileActionGate && handleFocusedFileActionKey(event)) return;
+
+    // Tree-row arrow navigation. Systems view owns its own arrow nav,
+    // so this block is gated to tree mode only.
     if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
       if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
         if (visibleTreeRows.length > 0) {
@@ -1994,7 +2042,18 @@
       if (selectedFolder) await loadFiles(selectedFolder);
       refreshIndexStatus();
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Rename failed: ${String(e)}`, duration: 5000 });
+      console.error('Rename failed', { oldPath, newName, isDir, error: e });
+      // "File not found" / "Folder not found" almost always means the
+      // entry shown in the UI is stale — the file was moved or renamed
+      // outside the app, and our cached list still references the old
+      // path. Point the user at the re-detect chord rather than just
+      // surfacing the raw rust error.
+      const msg = String(e);
+      const isMissing = msg === 'File not found' || msg === 'Folder not found';
+      const message = isMissing
+        ? `${msg} — the ${isDir ? 'folder' : 'file'} may have been moved or renamed outside the app. Press ${chord('sync.run')} to refresh and try again.`
+        : `Rename failed: ${msg}`;
+      jobNotification.show({ type: 'error', message, duration: 8000 });
       renamingFilePath = null;
     }
   }
@@ -2739,6 +2798,10 @@
             {focusedCollectionName}
             onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
+            {renamingFilePath}
+            onRenameSubmit={handleRenameSubmit}
+            onRenameCancel={handleRenameCancel}
+            contextMenuOpen={!!contextMenu}
             {isCollectionEditMode}
             collectionPaths={collectionEditPaths}
             onCollectionAdd={handleCollectionAdd}
@@ -2937,6 +3000,7 @@
     flex: 1;
     min-width: 0;
     overflow-y: auto;
+    overflow-anchor: none;
     padding: 0.25rem 0.75rem;
   }
 

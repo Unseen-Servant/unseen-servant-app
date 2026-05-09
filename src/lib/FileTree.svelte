@@ -177,12 +177,30 @@
       const ext = item.is_dir ? '' : (item.name.match(/\.[^.]+$/)?.[0] ?? '');
       onRenameSubmit(item.path, input.value + ext, item.is_dir);
     } else if (event.key === 'Escape') {
-      onRenameCancel();
+      // The global Escape ladder owns cancel (it nulls renamingFilePath
+      // and returns before the focus-clear branch). What it doesn't
+      // address is WebKit's delayed scroll reset: ~2 frames after the
+      // rename input is removed, the engine fires a scroll event that
+      // nudges scrollTop (likely its "scroll on focus removal"
+      // heuristic). A single rAF restore runs before that fires and is
+      // futile; restoring across frame 1 AND frame 2 wins.
+      const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
+      if (scroller) {
+        const saved = scroller.scrollTop;
+        const restore = () => { scroller.scrollTop = saved; };
+        requestAnimationFrame(restore);
+        requestAnimationFrame(() => requestAnimationFrame(restore));
+      }
     }
   }
 
   function autofocus(node: HTMLInputElement) {
-    node.focus();
+    // preventScroll: true so mounting the rename input doesn't nudge the
+    // .file-tree-area scrollTop. R is only ever pressed on a focused row,
+    // which is by construction visible — focus() doesn't need to scroll
+    // anything into view, and letting it do so means Esc-cancel restores
+    // to the post-nudge position, which the user reads as "drift."
+    node.focus({ preventScroll: true });
     node.select();
   }
 
