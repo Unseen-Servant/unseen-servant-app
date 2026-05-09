@@ -389,18 +389,22 @@
     return v ? entryToFileItem(v.entry) : null;
   }
 
-  // Inline rename helpers, lifted from FileTree so the UX matches:
-  // Enter commits with the original extension preserved, blur cancels.
-  // Esc is intentionally not handled here — the page's global Escape
-  // ladder owns it (`if (renamingFilePath) { renamingFilePath = null;
-  // return; }`) and returns before clearing focusedFilePath. Handling
-  // Esc locally would null renamingFilePath synchronously and let the
-  // global handler fall through to the focus-clear branch.
+  // Inline rename helpers. Enter commits with the extension preserved,
+  // blur cancels. The page's global Escape ladder owns cancel (it nulls
+  // renamingFilePath and returns before the focus-clear branch). On Esc
+  // we additionally hand DOM focus to the row <li> via a microtask —
+  // when Svelte unmounts the input, WebKit otherwise defaults focus to
+  // <body> and resets the scroll container's scrollTop, bouncing the
+  // user back to the top.
   function handleRenameKeydown(event: KeyboardEvent, entry: FileStatusEntry) {
     if (event.key === 'Enter') {
       const input = event.currentTarget as HTMLInputElement;
       const ext = entry.filename.match(/\.[^.]+$/)?.[0] ?? '';
       onRenameSubmit(entry.path, input.value + ext, false);
+    } else if (event.key === 'Escape') {
+      const input = event.currentTarget as HTMLElement;
+      const rowEl = input.closest('li.file') as HTMLElement | null;
+      if (rowEl) queueMicrotask(() => rowEl.focus({ preventScroll: true }));
     }
   }
   function autofocus(node: HTMLInputElement) {
@@ -479,6 +483,7 @@
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
                 class:highlighted={highlightPaths.has(entry.path)}
                 data-sv-row={entry.path}
+                tabindex="-1"
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
@@ -678,6 +683,13 @@
   }
   .file:hover {
     background: var(--bg-focused);
+  }
+  /* tabindex="-1" makes the <li> programmatically focusable so we can
+     restore DOM focus to it after a rename cancel — suppress the
+     browser default ring since visual focus is already conveyed by
+     .file.focused below. */
+  .file:focus {
+    outline: none;
   }
   .file.focused {
     background: var(--bg-focused);
