@@ -179,15 +179,19 @@
     } else if (event.key === 'Escape') {
       // The global Escape ladder owns cancel (it nulls renamingFilePath
       // and returns before the focus-clear branch). What it doesn't do
-      // is keep DOM focus inside the scroll container — when Svelte
-      // unmounts the input, WebKit defaults focus to <body> and resets
-      // the .file-tree-area's scrollTop, jumping the user back to the
-      // top. Hand DOM focus to the row button before the unmount via a
-      // microtask (scheduled now, runs after the ladder) with
-      // preventScroll so the container stays put.
-      const input = event.currentTarget as HTMLElement;
-      const rowBtn = input.closest('button.row') as HTMLElement | null;
-      if (rowBtn) queueMicrotask(() => rowBtn.focus({ preventScroll: true }));
+      // is keep the .file-tree-area scroll position — when Svelte
+      // unmounts the input, WebKit reassigns DOM focus and resets the
+      // container's scrollTop, jumping the user back to the top. Snap
+      // the scroll back to its pre-unmount value on the next animation
+      // frame, which lands *after* Svelte's re-render (microtasks)
+      // and any browser-initiated scroll change. Touching DOM focus
+      // here would add focus rings and side effects without fixing
+      // anything.
+      const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
+      if (scroller) {
+        const saved = scroller.scrollTop;
+        requestAnimationFrame(() => { scroller.scrollTop = saved; });
+      }
     }
   }
 
@@ -405,14 +409,6 @@
     color: var(--text-primary);
     -webkit-user-select: none;
     user-select: none;
-  }
-  /* Suppress the browser default focus ring — DOM focus lands here
-     after a rename cancel (we hand it off from the unmounting input
-     to keep the .file-tree-area scroll position pinned), but the
-     visible-focus state is conveyed by .focused > .row-container
-     above. Two rings on the same row reads as "focus is lost". */
-  .row:focus {
-    outline: none;
   }
   .icon {
     margin-right: 0.3rem;
