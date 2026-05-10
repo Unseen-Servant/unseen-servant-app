@@ -261,7 +261,7 @@
       </div>
     {:else if isIndexed}
       <div class="badge-wrapper">
-        <button class="add-tag-btn" on:click={toggleDropdown}>+</button>
+        <button class="add-tag-btn" on:click={toggleDropdown}>+ tag</button>
       </div>
     {/if}
   </div>
@@ -477,21 +477,23 @@
   }
   .add-tag-btn {
     display: inline-block;
-    padding: 0 0.35rem;
+    padding: 0.1rem 0.55rem;
     margin-left: 0.5rem;
     border-radius: 3px;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     background: transparent;
-    color: var(--text-tertiary);
-    border: 1px dashed var(--bg-category);
+    color: var(--text-secondary);
+    border: 1px dashed var(--text-tertiary);
     cursor: pointer;
     line-height: 1.4;
+    letter-spacing: 0.02em;
     transition: all var(--transition-fast);
   }
   .add-tag-btn:hover {
     background: rgba(182, 159, 129, 0.1);
     color: var(--text-accent);
     border-color: var(--text-accent);
+    border-style: solid;
   }
   .dropdown {
     position: fixed;

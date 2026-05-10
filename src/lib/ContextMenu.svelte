@@ -1,6 +1,6 @@
 <script lang="ts">
   import { afterUpdate, onMount } from 'svelte';
-  import type { FileItem, CollectionInfo } from './types';
+  import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
 
   export let x: number;
   export let y: number;
@@ -21,7 +21,12 @@
   // Optional initial submenu to open on mount (used by the C tree-row chord
   // in PR 2 of chunk c — for now the prop just exists so callers can land
   // a row directly in the Add submenu without a follow-up keystroke).
-  export let initialSubmenu: 'add' | 'remove' | null = null;
+  export let initialSubmenu: 'add' | 'remove' | 'tag' | null = null;
+  // Game-system tagging — only relevant for indexed PDFs. Empty arrays
+  // are valid (no tags / no known systems) and gate the trigger off.
+  export let knownSystems: KnownGameSystem[] = [];
+  export let currentTags: string[] = [];
+  export let onSetGameSystems: (tags: string[]) => void = () => {};
   export let onOpen: () => void = () => {};
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
@@ -37,7 +42,7 @@
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
-  let openSubmenu: 'add' | 'remove' | null = initialSubmenu;
+  let openSubmenu: 'add' | 'remove' | 'tag' | null = initialSubmenu;
   // -1 means "no keyboard cursor yet" — stays that way for mouse users.
   // First ↑/↓ promotes to 0 (Math.max(0, -1 ± 1) clamps to 0). When the
   // menu opens directly into a submenu (C chord) the trigger's index is
@@ -93,9 +98,48 @@
     const inSub = focusedSubmenuIdx !== null;
     mainItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx && !inSub));
     submenuItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedSubmenuIdx));
+
+    clampOpenSubmenuToViewport();
   }
 
-  onMount(() => refreshItemsAndFocus({ initial: true }));
+  // The static .submenu CSS opens downward at top: -0.15rem and caps at
+  // 320px, but a trigger near the bottom of the window leaves no room —
+  // items become unreachable. Re-measure on every render: pick whichever
+  // side (above or below the trigger) has more room, anchor the submenu
+  // there, and shrink max-height to fit. Generic across Add/Remove/Tag.
+  function clampOpenSubmenuToViewport() {
+    if (!menuEl || !openSubmenu) return;
+    const trigger = menuEl.querySelector(
+      `[data-submenu="${openSubmenu}"]`,
+    ) as HTMLElement | null;
+    const submenu = trigger?.querySelector('.submenu') as HTMLElement | null;
+    if (!trigger || !submenu) return;
+
+    const padding = 8;
+    const triggerRect = trigger.getBoundingClientRect();
+    // If anchored at top: -0.15rem the submenu starts at trigger.top, so
+    // the room below is the viewport from there. If anchored at bottom:
+    // -0.15rem it ends at trigger.bottom, so the room above is the
+    // viewport up to there.
+    const spaceBelow = window.innerHeight - triggerRect.top - padding;
+    const spaceAbove = triggerRect.bottom - padding;
+
+    if (spaceAbove > spaceBelow) {
+      submenu.style.top = 'auto';
+      submenu.style.bottom = '-0.15rem';
+      submenu.style.maxHeight = `${Math.max(120, Math.min(spaceAbove, 320))}px`;
+    } else {
+      submenu.style.top = '-0.15rem';
+      submenu.style.bottom = 'auto';
+      submenu.style.maxHeight = `${Math.max(120, Math.min(spaceBelow, 320))}px`;
+    }
+  }
+
+  onMount(() => {
+    clampMenuToViewport();
+    positioned = true;
+    refreshItemsAndFocus({ initial: true });
+  });
   afterUpdate(() => refreshItemsAndFocus());
 
   function handleKeydown(event: KeyboardEvent) {
@@ -125,7 +169,7 @@
     }
     if (isRight && !inSub) {
       const item = mainItems[focusedIdx];
-      const which = item?.dataset.submenu as 'add' | 'remove' | undefined;
+      const which = item?.dataset.submenu as 'add' | 'remove' | 'tag' | undefined;
       if (item?.dataset.mi === 'submenu-trigger' && which) {
         event.preventDefault();
         openSubmenu = which;
@@ -156,14 +200,42 @@
     }
   }
 
+  // Position is bound on first render then measured-and-shifted in onMount
+  // so the menu always fits within the viewport, regardless of how many
+  // conditional sections (Game system, collection submenus, etc.) end up
+  // rendered. Hidden for one tick during the measurement to avoid the
+  // pre-clamp position flashing on screen.
+  let clampedX = x;
+  let clampedY = y;
+  let positioned = false;
+
+  function clampMenuToViewport() {
+    if (!menuEl) return;
+    const padding = 8;
+    const h = menuEl.offsetHeight;
+    const w = menuEl.offsetWidth;
+    clampedX = Math.max(padding, Math.min(x, window.innerWidth - w - padding));
+    clampedY = Math.max(padding, Math.min(y, window.innerHeight - h - padding));
+  }
+
   $: addExcludeSet = new Set(excludeFromAdd);
   $: addableCollections = Object.values(collections).filter((c) => !addExcludeSet.has(c.name));
   $: hasCollections = addableCollections.length > 0;
   $: hasContainingCollections = containingCollections.length > 0;
 
-  // Clamp position so the menu stays within the viewport
-  $: clampedX = Math.min(x, window.innerWidth - 200);
-  $: clampedY = Math.min(y, window.innerHeight - 240);
+  $: canTag = !item.is_dir && isIndexed && knownSystems.length > 0;
+
+  function toggleGameSystem(tag: string) {
+    const next = currentTags.includes(tag)
+      ? currentTags.filter((t) => t !== tag)
+      : [...currentTags, tag];
+    onSetGameSystems(next);
+  }
+
+  function clearGameSystems() {
+    onSetGameSystems([]);
+  }
+
 </script>
 
 <svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} on:keydown={handleKeydown} />
@@ -172,7 +244,7 @@
 <div
   class="context-menu"
   bind:this={menuEl}
-  style="left: {clampedX}px; top: {clampedY}px"
+  style="left: {clampedX}px; top: {clampedY}px; visibility: {positioned ? 'visible' : 'hidden'}"
   on:click|stopPropagation
   on:mousedown|stopPropagation
 >
@@ -190,6 +262,42 @@
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" on:click={onReindex}>Re-index file</button>
     <button class="context-item" data-mi="item" on:click={onShowStats}>Get info</button>
+  {/if}
+
+  {#if canTag}
+    <hr class="context-divider" />
+    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
+    <div
+      class="context-item submenu-trigger"
+      class:open={openSubmenu === 'tag'}
+      data-mi="submenu-trigger"
+      data-submenu="tag"
+      on:mouseenter={() => { openSubmenu = 'tag'; }}
+      on:mouseleave={() => { openSubmenu = null; }}
+    >
+      <span>Game system&hellip;</span>
+      <span class="submenu-caret">&#9656;</span>
+      {#if openSubmenu === 'tag'}
+        <div class="submenu">
+          {#each knownSystems as sys}
+            <button
+              class="context-item"
+              data-mi="item"
+              on:click={() => toggleGameSystem(sys.tag)}
+            >
+              <span class="submenu-check">{currentTags.includes(sys.tag) ? '✓' : ''}</span>
+              <span>{sys.tag}</span>
+            </button>
+          {/each}
+          {#if currentTags.length > 0}
+            <hr class="context-divider" />
+            <button class="context-item" data-mi="item" on:click={clearGameSystems}>
+              Clear tags
+            </button>
+          {/if}
+        </div>
+      {/if}
+    </div>
   {/if}
 
   {#if canAddToCollection}
@@ -324,6 +432,13 @@
     font-size: 0.7rem;
     opacity: 0.6;
     margin-left: 0.5rem;
+  }
+  .submenu-check {
+    display: inline-block;
+    width: 1rem;
+    text-align: center;
+    margin-right: 0.25rem;
+    color: var(--text-accent);
   }
   .submenu {
     position: absolute;

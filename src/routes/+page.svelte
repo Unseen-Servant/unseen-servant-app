@@ -2996,6 +2996,9 @@
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      knownSystems={knownSystems}
+      currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
+      onSetGameSystems={(tags) => handleSetGameSystems(contextMenu!.item.path, contextMenu!.item.name, tags)}
       excludeFromAdd={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir)}
       initialSubmenu={contextMenu.initialSubmenu}
       onOpen={handleContextOpen}
