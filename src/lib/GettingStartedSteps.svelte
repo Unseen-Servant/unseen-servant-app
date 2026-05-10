@@ -1,4 +1,6 @@
 <script lang="ts">
+  import OllamaStatus from './OllamaStatus.svelte';
+
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;
   export let folderSelected: boolean = false;
@@ -14,26 +16,13 @@
     else expanded.add(i);
     expanded = expanded;
   }
-
-  $: ollamaReady = ollamaRunning && ollamaModelReady;
 </script>
 
 <div class="manual">
   <!-- 1. Ollama -->
   <section class="field">
     <div class="field-head">
-      <div class="field-title-row">
-        <h3 class="field-title font-heading">Ollama — local AI engine</h3>
-        <span
-          class="field-status"
-          class:ok={ollamaReady}
-          class:partial={ollamaRunning && !ollamaModelReady}
-        >
-          {#if ollamaReady}Ready
-          {:else if ollamaRunning}Model pending
-          {:else}Not detected{/if}
-        </span>
-      </div>
+      <h3 class="field-title font-heading">Ollama — local AI engine</h3>
       <p class="field-desc">
         Legend Lore runs entirely on your machine. Ollama is the local
         model server that turns your PDFs into vectors — numerical
@@ -42,15 +31,7 @@
         your disk.
       </p>
     </div>
-    {#if !ollamaRunning}
-      <p class="field-desc">
-        Download from <strong>ollama.com</strong>, install, and launch
-        the app.
-      </p>
-    {:else if !ollamaModelReady}
-      <p class="field-desc">Pull the embedding model (one-time):</p>
-      <code class="command">ollama pull bge-m3</code>
-    {/if}
+    <OllamaStatus {ollamaRunning} {ollamaModelReady} />
     <button class="expander" on:click={() => toggleExpand(0)}>
       {expanded.has(0) ? '▾' : '▸'} Why bge-m3?
     </button>
@@ -259,9 +240,6 @@
   .field-status.ok {
     color: var(--text-active);
   }
-  .field-status.partial {
-    color: var(--text-accent);
-  }
 
   .field-desc {
     font-family: var(--font-body);
@@ -284,19 +262,6 @@
     border-left: 1px solid var(--border-subtle);
   }
 
-  .command {
-    display: inline-block;
-    padding: 0.3rem 0.55rem;
-    background: var(--bg-focused);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.75rem;
-    color: var(--text-primary);
-    user-select: all;
-    -webkit-user-select: all;
-    width: fit-content;
-  }
   .inline-code {
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: 0.85em;
