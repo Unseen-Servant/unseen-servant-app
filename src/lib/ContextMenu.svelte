@@ -102,20 +102,37 @@
     clampOpenSubmenuToViewport();
   }
 
-  // The static .submenu CSS caps height at 320px and scrolls inside, but
-  // the 320px container itself can hang below the window if the trigger
-  // sits low on screen — items at the bottom of long lists become
-  // unreachable. Re-measure on every render and shrink max-height to fit
-  // between the submenu's top and the viewport bottom.
+  // The static .submenu CSS opens downward at top: -0.15rem and caps at
+  // 320px, but a trigger near the bottom of the window leaves no room —
+  // items become unreachable. Re-measure on every render: pick whichever
+  // side (above or below the trigger) has more room, anchor the submenu
+  // there, and shrink max-height to fit. Generic across Add/Remove/Tag.
   function clampOpenSubmenuToViewport() {
     if (!menuEl || !openSubmenu) return;
-    const submenu = menuEl.querySelector(
-      `[data-submenu="${openSubmenu}"] .submenu`,
+    const trigger = menuEl.querySelector(
+      `[data-submenu="${openSubmenu}"]`,
     ) as HTMLElement | null;
-    if (!submenu) return;
-    const top = submenu.getBoundingClientRect().top;
-    const available = window.innerHeight - top - 8;
-    submenu.style.maxHeight = `${Math.max(120, Math.min(available, 320))}px`;
+    const submenu = trigger?.querySelector('.submenu') as HTMLElement | null;
+    if (!trigger || !submenu) return;
+
+    const padding = 8;
+    const triggerRect = trigger.getBoundingClientRect();
+    // If anchored at top: -0.15rem the submenu starts at trigger.top, so
+    // the room below is the viewport from there. If anchored at bottom:
+    // -0.15rem it ends at trigger.bottom, so the room above is the
+    // viewport up to there.
+    const spaceBelow = window.innerHeight - triggerRect.top - padding;
+    const spaceAbove = triggerRect.bottom - padding;
+
+    if (spaceAbove > spaceBelow) {
+      submenu.style.top = 'auto';
+      submenu.style.bottom = '-0.15rem';
+      submenu.style.maxHeight = `${Math.max(120, Math.min(spaceAbove, 320))}px`;
+    } else {
+      submenu.style.top = '-0.15rem';
+      submenu.style.bottom = 'auto';
+      submenu.style.maxHeight = `${Math.max(120, Math.min(spaceBelow, 320))}px`;
+    }
   }
 
   onMount(() => refreshItemsAndFocus({ initial: true }));
