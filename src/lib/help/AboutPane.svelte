@@ -8,8 +8,7 @@
   export let onHideSetupButtonChange: (value: boolean) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
 
-  const REPO_URL = 'https://github.com/Unseen-Servant/unseen-legend-lore';
-  const ISSUES_URL = 'https://github.com/Unseen-Servant/unseen-legend-lore/issues';
+  const HOMEPAGE_URL = 'https://www.unseenservant.games';
   const LICENSE_URL = 'https://unseenservant.games/license';
 
   let appVersion = '';
@@ -60,12 +59,8 @@
     </header>
     <ul class="link-list">
       <li>
-        <button class="btn-link" on:click={() => open(REPO_URL)}>GitHub repo</button>
-        <span class="link-desc">source, releases, contributors</span>
-      </li>
-      <li>
-        <button class="btn-link" on:click={() => open(ISSUES_URL)}>Issue tracker</button>
-        <span class="link-desc">report bugs and suggest features</span>
+        <button class="btn-link" on:click={() => open(HOMEPAGE_URL)}>Unseen Servant</button>
+        <span class="link-desc">project homepage</span>
       </li>
       <li>
         <button class="btn-link" on:click={() => open(LICENSE_URL)}>Software license</button>
