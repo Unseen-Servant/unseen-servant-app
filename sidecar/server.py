@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import hashlib
+import secrets
 import json
 import os
 import re
@@ -399,6 +400,11 @@ class ManifestEntry(BaseModel):
     game_systems: list[str] = []
     content_hash: str = ""
     file_size: int = 0
+    # Set when the most recent re-index attempt failed. The previous
+    # successful index (chunk_count, indexed_at, content_hash, ...) is
+    # preserved so search keeps working until the next sync retries.
+    last_error: str | None = None
+    last_error_at: str | None = None
 
     def model_post_init(self, __context):
         # Backfill on load for entries written before multi-tag support.
@@ -426,6 +432,27 @@ def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
     tmp_path = manifest_path.with_suffix(".json.tmp")
     tmp_path.write_text(manifest.model_dump_json(indent=2))
     os.replace(tmp_path, manifest_path)
+
+
+def _mark_manifest_error(
+    manifest: IndexManifest,
+    data_dir: Path | None,
+    path_str: str,
+    error: str,
+) -> None:
+    """Record a re-index failure on the existing manifest entry, if any.
+
+    No-op when the entry doesn't exist (e.g. a brand-new add that failed —
+    nothing to preserve, just retry on next sync). Persists the manifest.
+    """
+    if not data_dir:
+        return
+    entry = manifest.files.get(path_str)
+    if entry is None:
+        return
+    entry.last_error = error
+    entry.last_error_at = datetime.now(timezone.utc).isoformat()
+    save_manifest(data_dir, manifest)
 
 
 # ---------------------------------------------------------------------------
@@ -607,14 +634,18 @@ def resolve_collection_filenames(
 # ---------------------------------------------------------------------------
 
 
-def chunk_id_prefix(pdf_path: Path) -> str:
+def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
     """Return a stable, collision-free prefix for chunk IDs.
 
     Uses an 8-char hex digest of the full path so that two PDFs with the same
     stem (e.g. ``/5e/Monster Manual.pdf`` and ``/pf2e/Monster Manual.pdf``)
-    never collide.
+    never collide. When ``nonce`` is provided, it is folded into the prefix
+    so a re-index can stage new chunks under a distinct prefix and atomically
+    swap them in once embedding succeeds.
     """
     path_hash = hashlib.sha256(str(pdf_path).encode()).hexdigest()[:8]
+    if nonce:
+        return f"{path_hash}_{nonce}_{pdf_path.stem}"
     return f"{path_hash}_{pdf_path.stem}"
 
 
@@ -678,6 +709,19 @@ def _upsert_batch(
     )
 
 
+class EmbedBatchError(Exception):
+    """Raised when embedding or upsert fails for a single source.
+
+    Carries the source path so callers can record which file failed and
+    preserve any prior successful index for it. The original cause is
+    chained via ``__cause__``.
+    """
+
+    def __init__(self, source_path: Path, message: str):
+        super().__init__(f"{source_path.name}: {message}")
+        self.source_path = source_path
+
+
 def _embed_and_upsert_units(
     collection,
     embed_units: list[EmbedUnit],
@@ -693,6 +737,10 @@ def _embed_and_upsert_units(
     Chroma. Callers that don't need progress can `sum(...)` to get the total.
     Submission-order draining keeps chunk ordinals deterministic in the DB
     and progress events monotonic for streaming callers.
+
+    Raises ``EmbedBatchError`` if any embed or upsert fails. Pending futures
+    are cancelled before the exception propagates so the executor exits
+    promptly.
     """
     if not embed_units:
         return
@@ -702,10 +750,78 @@ def _embed_and_upsert_units(
     ]
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
         futures = [ex.submit(_embed_batch, collection, b) for b in batches]
-        for batch, fut in zip(batches, futures):
-            embeddings = fut.result()
-            _upsert_batch(collection, batch, embeddings, pdf_path, game_system, prefix)
-            yield len(batch)
+        try:
+            for batch, fut in zip(batches, futures):
+                embeddings = fut.result()
+                _upsert_batch(collection, batch, embeddings, pdf_path, game_system, prefix)
+                yield len(batch)
+        except EmbedBatchError:
+            raise
+        except Exception as e:
+            for f in futures:
+                f.cancel()
+            raise EmbedBatchError(pdf_path, str(e)) from e
+
+
+def _split_chunk_ids_by_prefix(
+    collection, source_path: str, prefix: str
+) -> tuple[list[str], list[str]]:
+    """Return (matching_prefix, not_matching_prefix) chunk IDs for a source.
+
+    Used by the atomic re-index path to separate freshly inserted chunks
+    (under a per-write nonce prefix) from any pre-existing chunks for the
+    same source.
+    """
+    results = collection.get(where={"source": source_path}, include=[])
+    pattern = f"{prefix}_"
+    matching, not_matching = [], []
+    for cid in results["ids"]:
+        if cid.startswith(pattern):
+            matching.append(cid)
+        else:
+            not_matching.append(cid)
+    return matching, not_matching
+
+
+def _atomic_index_pdf(
+    pdf_path: Path,
+    game_system: str,
+    embed_units: list[EmbedUnit],
+    parents: list,
+    collection,
+    data_dir: Path | None,
+    batch_size: int = EMBED_BATCH_SIZE,
+):
+    """Generator: stage new chunks under a fresh prefix, then swap atomically.
+
+    Yields each batch's unit count as it lands in Chroma so callers can
+    surface progress. On full iteration: deletes any pre-existing chunks
+    for this source that don't share the new prefix, then writes the new
+    parents. On ``EmbedBatchError``: rolls back the partial new chunks and
+    re-raises — pre-existing chunks and parents are untouched.
+
+    The per-write nonce ensures even a same-content force re-index gets a
+    distinct prefix, so leftovers from a prior larger chunking can never
+    survive the swap.
+    """
+    nonce = secrets.token_hex(4)
+    new_prefix = chunk_id_prefix(pdf_path, nonce)
+    try:
+        for n in _embed_and_upsert_units(
+            collection, embed_units, pdf_path, game_system, new_prefix,
+            batch_size=batch_size,
+        ):
+            yield n
+    except EmbedBatchError:
+        partial, _ = _split_chunk_ids_by_prefix(collection, str(pdf_path), new_prefix)
+        if partial:
+            collection.delete(ids=partial)
+        raise
+    _, stale = _split_chunk_ids_by_prefix(collection, str(pdf_path), new_prefix)
+    if stale:
+        collection.delete(ids=stale)
+    if data_dir:
+        upsert_parents(data_dir, str(pdf_path), parents)
 
 
 def _index_chunks(
@@ -722,16 +838,18 @@ def _index_chunks(
     same-breadcrumb parents (capped at 6,000 chars). Embed units go to
     ChromaDB with parent_id in metadata; parents go to the SQLite store.
 
+    Uses the atomic re-index pattern: stages new chunks under a per-write
+    prefix, then swaps in the new parents only after embed succeeds. Raises
+    ``EmbedBatchError`` if embedding fails — old chunks and parents stay
+    intact in that case.
+
     Returns the number of embed units upserted.
     """
     if not chunks:
         return 0
     embed_units, parents = build_granularity(chunks)
-    if data_dir:
-        upsert_parents(data_dir, str(pdf_path), parents)
-    prefix = chunk_id_prefix(pdf_path)
-    return sum(_embed_and_upsert_units(
-        collection, embed_units, pdf_path, game_system, prefix,
+    return sum(_atomic_index_pdf(
+        pdf_path, game_system, embed_units, parents, collection, data_dir,
         batch_size=batch_size,
     ))
 
@@ -779,14 +897,19 @@ def index_single_pdf(
     """Extract, chunk, and upsert a single PDF into ChromaDB + parents store.
 
     Returns (embed_unit_count, error_message, game_system, game_systems).
-    error_message is None on success.
+    error_message is None on success. Embedding failures are converted to
+    an error message so callers can surface them without crashing — any
+    pre-existing chunks/parents for this source are left intact.
     """
     chunks, resolved_system, resolved_systems, error = _extract_and_chunk(
         pdf_path, game_system, known_systems
     )
     if error:
         return 0, error, resolved_system, resolved_systems
-    count = _index_chunks(chunks, pdf_path, resolved_system, collection, data_dir)
+    try:
+        count = _index_chunks(chunks, pdf_path, resolved_system, collection, data_dir)
+    except EmbedBatchError as e:
+        return 0, str(e), resolved_system, resolved_systems
     return count, None, resolved_system, resolved_systems
 
 
@@ -1382,14 +1505,18 @@ def create_app(
                     status_code=404, detail=f"File not found: {request.path}"
                 )
 
-            delete_source_chunks(request.path, collection, data_dir)
-
+            # Atomic: index_single_pdf stages new chunks under a fresh prefix
+            # and only swaps in once embedding succeeds. Old chunks/parents
+            # remain on failure so search keeps working.
             chunk_count, error, detected_system, detected_systems = index_single_pdf(
                 pdf_path, collection, game_system=request.game_system,
                 known_systems=_merged["known"], data_dir=data_dir,
             )
 
             if error:
+                if data_dir:
+                    manifest = load_manifest(data_dir)
+                    _mark_manifest_error(manifest, data_dir, request.path, error)
                 return {"chunks": 0, "game_system": detected_system, "error": error}
 
             if data_dir:
@@ -1552,34 +1679,46 @@ def create_app(
                 errors.append(error)
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
-            else:
-                embed_units, parents = build_granularity(chunks)
-                if data_dir:
-                    upsert_parents(data_dir, str(pdf_path), parents)
-                prefix = chunk_id_prefix(pdf_path)
-                for n in _embed_and_upsert_units(
-                    collection, embed_units, pdf_path, detected_system, prefix,
+                continue
+
+            embed_units, parents = build_granularity(chunks)
+            try:
+                for n in _atomic_index_pdf(
+                    pdf_path, detected_system, embed_units, parents,
+                    collection, data_dir,
                 ):
                     chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
-                added += 1
+            except EmbedBatchError as e:
+                # Partial new chunks already rolled back by _atomic_index_pdf.
+                # No prior manifest entry exists for an add; just record the
+                # error so the user sees it. Next sync will retry.
+                err_msg = str(e)
+                errors.append(err_msg)
                 files_done += 1
-                manifest.files[entry["path"]] = ManifestEntry(
-                    filename=pdf_path.name,
-                    mtime=os.path.getmtime(pdf_path),
-                    chunk_count=len(embed_units),
-                    indexed_at=datetime.now(timezone.utc).isoformat(),
-                    game_system=detected_system,
-                    game_systems=detected_systems,
-                    content_hash=file_content_hash(pdf_path),
-                    file_size=os.path.getsize(pdf_path),
-                )
-                save_manifest(data_dir, manifest)
+                yield {"event": "error", "file": pdf_path.name, "message": err_msg, "phase": "add"}
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+                continue
 
-        # Phase 3: Re-index modified files (delete old chunks first to prevent orphans)
+            added += 1
+            files_done += 1
+            manifest.files[entry["path"]] = ManifestEntry(
+                filename=pdf_path.name,
+                mtime=os.path.getmtime(pdf_path),
+                chunk_count=len(embed_units),
+                indexed_at=datetime.now(timezone.utc).isoformat(),
+                game_system=detected_system,
+                game_systems=detected_systems,
+                content_hash=file_content_hash(pdf_path),
+                file_size=os.path.getsize(pdf_path),
+            )
+            save_manifest(data_dir, manifest)
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+
+        # Phase 3: Re-index modified files. Atomic — old chunks are only
+        # removed once the new ones land. On failure, the previous
+        # successful manifest entry is preserved with last_error set.
         for entry in diff["to_update"]:
-            delete_source_chunks(entry["path"], collection, data_dir=data_dir)
             pdf_path = Path(entry["path"])
             override = (
                 request.game_system_overrides.get(entry["path"])
@@ -1592,31 +1731,42 @@ def create_app(
             if error:
                 errors.append(error)
                 files_done += 1
+                _mark_manifest_error(manifest, data_dir, entry["path"], error)
+                yield {"event": "error", "file": pdf_path.name, "message": error, "phase": "update"}
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
-            else:
-                embed_units, parents = build_granularity(chunks)
-                if data_dir:
-                    upsert_parents(data_dir, str(pdf_path), parents)
-                prefix = chunk_id_prefix(pdf_path)
-                for n in _embed_and_upsert_units(
-                    collection, embed_units, pdf_path, detected_system, prefix,
+                continue
+
+            embed_units, parents = build_granularity(chunks)
+            try:
+                for n in _atomic_index_pdf(
+                    pdf_path, detected_system, embed_units, parents,
+                    collection, data_dir,
                 ):
                     chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
-                updated += 1
+            except EmbedBatchError as e:
+                err_msg = str(e)
+                errors.append(err_msg)
                 files_done += 1
-                manifest.files[entry["path"]] = ManifestEntry(
-                    filename=pdf_path.name,
-                    mtime=os.path.getmtime(pdf_path),
-                    chunk_count=len(embed_units),
-                    indexed_at=datetime.now(timezone.utc).isoformat(),
-                    game_system=detected_system,
-                    game_systems=detected_systems,
-                    content_hash=file_content_hash(pdf_path),
-                    file_size=os.path.getsize(pdf_path),
-                )
-                save_manifest(data_dir, manifest)
+                _mark_manifest_error(manifest, data_dir, entry["path"], err_msg)
+                yield {"event": "error", "file": pdf_path.name, "message": err_msg, "phase": "update"}
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
+                continue
+
+            updated += 1
+            files_done += 1
+            manifest.files[entry["path"]] = ManifestEntry(
+                filename=pdf_path.name,
+                mtime=os.path.getmtime(pdf_path),
+                chunk_count=len(embed_units),
+                indexed_at=datetime.now(timezone.utc).isoformat(),
+                game_system=detected_system,
+                game_systems=detected_systems,
+                content_hash=file_content_hash(pdf_path),
+                file_size=os.path.getsize(pdf_path),
+            )
+            save_manifest(data_dir, manifest)
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
 
         # Update collections that reference renamed or auto-removed paths
         if renamed > 0 or auto_removed > 0:
