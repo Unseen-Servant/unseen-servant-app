@@ -449,6 +449,10 @@
   }
 
   let unlistenSidecarFailed: (() => void) | null = null;
+  // Set when the startup load surfaces a missing-folder toast; cleared
+  // by loadFiles when a subsequent load succeeds — typically when the
+  // user picks a new folder.
+  let missingFolderToastId: string | null = null;
 
   onMount(async () => {
     splashTimer = setTimeout(() => {
@@ -496,8 +500,10 @@
         if (error) {
           // Library folder is gone (renamed, unmounted, deleted). Surface
           // it on startup so the user notices now, not later when they
-          // try to act on a stale tree. Sticky — they need to relocate.
-          jobNotification.show({
+          // try to act on a stale tree. Sticky — but cleared automatically
+          // by the next loadFiles() success (e.g. when they pick a new
+          // folder), via dismissIf below.
+          missingFolderToastId = jobNotification.show({
             type: 'error',
             message: `Library folder is no longer accessible: ${savedFolder}`,
             duration: null,
@@ -988,6 +994,10 @@
       files = newFiles;
       error = '';
       refreshTotalFilesFound();
+      if (missingFolderToastId) {
+        jobNotification.dismissIf(missingFolderToastId);
+        missingFolderToastId = null;
+      }
     } catch (e) {
       error = String(e);
       files = [];

@@ -62,17 +62,27 @@ function createNotificationStore() {
     return true;
   }
 
-  function show(notif: Omit<Notification, 'id'>) {
+  function show(notif: Omit<Notification, 'id'>): string {
     clearTimer();
-    const id = Date.now().toString(36);
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     set({ ...notif, id });
 
     if (notif.duration !== null) {
       timer = setTimeout(() => set(null), notif.duration);
     }
+
+    return id;
   }
 
-  return { subscribe, show, dismiss, dismissByUser };
+  // Dismiss only if the current notification is the one matching `id`.
+  // Lets a long-lived sticky toast clear itself when its underlying
+  // condition resolves, without clobbering whatever the user is seeing
+  // now if another notification has displaced ours in the meantime.
+  function dismissIf(id: string) {
+    if (current?.id === id) dismiss();
+  }
+
+  return { subscribe, show, dismiss, dismissByUser, dismissIf };
 }
 
 export const jobNotification = createNotificationStore();
