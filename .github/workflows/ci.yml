@@ -6,10 +6,57 @@ on:
   push:
     branches: [main]
 
+# Cancel an in-progress PR run when a new commit lands on the same PR.
+# Pushes to main aren't cancelled — those are the canonical post-merge
+# validation, so the latest run for each commit must complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Detect which surfaces a PR actually touches so the expensive jobs
+  # below can opt out when irrelevant. On push to main everything runs
+  # so the post-merge state is fully validated regardless of which file
+  # paths changed.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      sidecar: ${{ steps.filter.outputs.sidecar }}
+      rust: ${{ steps.filter.outputs.rust }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      tauri_build: ${{ steps.filter.outputs.tauri_build }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            sidecar:
+              - 'sidecar/**'
+              - 'scripts/build-sidecar.sh'
+            rust:
+              - 'src-tauri/**'
+            frontend:
+              - 'src/**'
+              - 'static/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'svelte.config.js'
+              - 'vite.config.ts'
+              - 'tsconfig.json'
+            tauri_build:
+              - 'src-tauri/**'
+              - 'src/**'
+              - 'static/**'
+              - 'package.json'
+              - 'package-lock.json'
+
   # Pure Python tests against the in-memory ChromaDB fixture. Fast,
   # exercises every endpoint contract.
   sidecar-tests:
+    needs: changes
+    if: needs.changes.outputs.sidecar == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -37,6 +84,8 @@ jobs:
   # break the Tauri compile or trip clippy. Uses Ubuntu because Tauri's
   # webkit deps install via apt; the Rust code is platform-independent.
   rust-checks:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -70,6 +119,8 @@ jobs:
   # svelte-check + vitest + production vite build. Covers TypeScript
   # errors, frontend unit tests, and any build-time regression.
   frontend-checks:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -97,8 +148,11 @@ jobs:
   # bundled binary on import). Runs on macOS because that's the actual
   # distribution target and the build script is currently macOS-only;
   # the data-file bug it catches is platform-independent so one platform
-  # is enough.
+  # is enough. Expensive (~10 min for PyInstaller) so we only run it
+  # when sidecar code or the build script actually changed.
   sidecar-binary-smoke:
+    needs: changes
+    if: needs.changes.outputs.sidecar == 'true' || github.event_name == 'push'
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -134,8 +188,11 @@ jobs:
   # Cross-platform Tauri compile on the actual distribution targets.
   # --no-bundle skips dmg/nsis packaging (slow and platform-fragile);
   # the goal here is to catch link errors and platform-specific Rust
-  # issues, not to validate the bundler.
+  # issues, not to validate the bundler. Skipped for PRs that don't
+  # touch any frontend/Rust code.
   tauri-build-smoke:
+    needs: changes
+    if: needs.changes.outputs.tauri_build == 'true' || github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
