@@ -197,36 +197,6 @@
         anything outside what you asked it to look for.
       </p>
     {/if}
-    <button class="expander" on:click={() => toggleExpand(5)}>
-      {expanded.has(5) ? '▾' : '▸'} What can my agent do?
-    </button>
-    {#if expanded.has(5)}
-      <div class="field-desc detail">
-        <ul class="tools-list">
-          <li>
-            <strong>Search the library</strong> by meaning — scoped by
-            source, game system, or collection. Results come back with
-            page numbers and section headings, ready to cite.
-          </li>
-          <li>
-            <strong>List indexed PDFs</strong> — what's actually
-            queryable.
-          </li>
-          <li>
-            <strong>List collections</strong> — your curated subsets,
-            with the active one marked.
-          </li>
-          <li>
-            <strong>List game systems</strong> — which systems are
-            present, so the agent doesn't guess names.
-          </li>
-        </ul>
-        <p class="tools-footnote">
-          Set an active collection and search and listings auto-scope to
-          it — your agent stays focused on tonight's session.
-        </p>
-      </div>
-    {/if}
   </section>
 </div>
 
@@ -368,24 +338,6 @@
   .btn-link:hover::before,
   .btn-link:hover::after {
     color: var(--text-accent);
-  }
-
-  /* Tool list inside the MCP "What can my agent do?" expander. Lives
-     inside .field-desc.detail, so it inherits font, color, and the
-     left border. Compact list with strong-tagged tool names. */
-  .tools-list {
-    margin: 0;
-    padding-left: 1.1rem;
-    list-style: disc;
-  }
-  .tools-list li {
-    margin-bottom: 0.4rem;
-  }
-  .tools-list li:last-child {
-    margin-bottom: 0;
-  }
-  .tools-footnote {
-    margin: 0.6rem 0 0 0;
   }
 
   /* Expander — disclosure widget, distinct from .btn-link. No brackets,

@@ -4,7 +4,9 @@
   import Modal from './Modal.svelte';
   import GameSystemsSettings from './GameSystemsSettings.svelte';
   import LibrarySettings from './LibrarySettings.svelte';
-  import GettingStartedSteps from './GettingStartedSteps.svelte';
+  import GuidesPane from './help/GuidesPane.svelte';
+  import ReferencePane from './help/ReferencePane.svelte';
+  import AboutPane from './help/AboutPane.svelte';
 
   export let visible = false;
   export let onClose: () => void;
@@ -37,16 +39,26 @@
   export let mcpConnected: boolean = false;
   export let hideSetupButton: boolean = false;
   export let onHideSetupButtonChange: (value: boolean) => void = () => {};
-  export let onShowHelp: () => void = () => {};
-  export let initialTab: 'library' | 'game-systems' | 'setup' = 'library';
+  export let initialTab: 'library' | 'game-systems' | 'help' = 'library';
+  export let initialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
 
-  let activeTab: 'library' | 'game-systems' | 'setup' = initialTab;
-  $: if (visible) activeTab = initialTab;
+  let activeTab: 'library' | 'game-systems' | 'help' = initialTab;
+  let activeHelpSubTab: 'guides' | 'reference' | 'about' = initialHelpSubTab;
+  $: if (visible) {
+    activeTab = initialTab;
+    activeHelpSubTab = initialHelpSubTab;
+  }
 
   const tabs = [
     { id: 'library' as const, label: 'Library' },
     { id: 'game-systems' as const, label: 'Game Systems' },
-    { id: 'setup' as const, label: 'Setup' },
+    { id: 'help' as const, label: 'Help' },
+  ];
+
+  const helpSubTabs = [
+    { id: 'guides' as const, label: 'Guides' },
+    { id: 'reference' as const, label: 'Reference' },
+    { id: 'about' as const, label: 'About' },
   ];
 </script>
 
@@ -88,34 +100,41 @@
           {onOpenDataDir}
           {onSync}
         />
-      {:else if activeTab === 'setup'}
-        <div class="setup-pane">
-          <label class="setup-toggle">
-            <span class="setup-toggle-text">
-              <span class="setup-toggle-title">Hide setup shortcut in the status bar</span>
-              <span class="setup-toggle-hint">
-                You can still reopen this tab from the gear icon.
-              </span>
-            </span>
-            <input
-              class="app-checkbox"
-              type="checkbox"
-              checked={hideSetupButton}
-              on:change={(e) => onHideSetupButtonChange(e.currentTarget.checked)}
-            />
-          </label>
-          <GettingStartedSteps
-            {ollamaRunning}
-            {ollamaModelReady}
-            folderSelected={!!selectedFolder}
-            {filesIndexed}
-            {collectionsCreated}
-            {mcpConnected}
-            {onSelectFolder}
-            {onCopyMcpConfig}
-          />
-          <div class="setup-help">
-            <button class="btn-link" on:click={onShowHelp}>Keyboard shortcuts</button>
+      {:else if activeTab === 'help'}
+        <div class="help-pane">
+          <nav class="subtab-nav">
+            {#each helpSubTabs as sub}
+              <button
+                class="subtab-btn"
+                class:active={activeHelpSubTab === sub.id}
+                on:click={() => { activeHelpSubTab = sub.id; }}
+              >
+                {sub.label}
+              </button>
+            {/each}
+          </nav>
+          <div class="subtab-body">
+            {#if activeHelpSubTab === 'guides'}
+              <GuidesPane
+                {ollamaRunning}
+                {ollamaModelReady}
+                folderSelected={!!selectedFolder}
+                {filesIndexed}
+                {collectionsCreated}
+                {mcpConnected}
+                {onSelectFolder}
+                {onCopyMcpConfig}
+              />
+            {:else if activeHelpSubTab === 'reference'}
+              <ReferencePane />
+            {:else if activeHelpSubTab === 'about'}
+              <AboutPane
+                {dataDir}
+                {hideSetupButton}
+                {onHideSetupButtonChange}
+                {onOpenDataDir}
+              />
+            {/if}
           </div>
         </div>
       {/if}
@@ -125,118 +144,86 @@
 
 <style>
   .panel-content {
-    display: flex;
     flex: 1;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .tab-nav {
     display: flex;
-    flex-direction: column;
     gap: 0.25rem;
-    padding: 0.5rem;
-    border-right: 1px solid var(--border-subtle);
+    padding: 0.5rem 1rem 0;
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
-    width: 140px;
   }
 
   .tab-btn {
-    background: none;
+    background: transparent;
     border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.4rem 0.85rem 0.55rem;
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    text-align: left;
-    padding: 0.4rem 0.6rem;
-    border-radius: 4px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: color var(--transition-fast), border-color var(--transition-fast);
   }
-  .tab-btn:hover {
+  .tab-btn:hover:not(.active) {
     color: var(--text-primary);
-    background: var(--bg-focused);
   }
   .tab-btn.active {
     color: var(--text-accent);
-    background: var(--bg-focused);
+    border-bottom-color: var(--text-accent);
   }
 
   .tab-body {
     flex: 1;
-    min-width: 0;
+    min-height: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
 
-  .setup-pane {
-    overflow-y: auto;
-    padding: 1rem;
+  .help-pane {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-  }
-  .setup-toggle {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding-bottom: 1.1rem;
-    border-bottom: 1px solid var(--border-subtle);
-    cursor: pointer;
-  }
-  .setup-toggle-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-  }
-  .setup-toggle-title {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.85rem;
-    color: var(--text-primary);
-  }
-  .setup-toggle-hint {
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    line-height: 1.35;
   }
 
-  .setup-help {
+  .subtab-nav {
     display: flex;
-    padding-top: 0.4rem;
-    border-top: 1px solid var(--border-subtle);
+    gap: 0.15rem;
+    padding: 0.5rem 1rem 0;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
   }
-  .btn-link {
-    align-self: flex-start;
+
+  .subtab-btn {
     background: transparent;
     border: none;
-    padding: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.7rem;
-    color: var(--text-accent);
+    border-bottom: 1px solid transparent;
+    padding: 0.3rem 0.6rem 0.4rem;
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
     cursor: pointer;
-    transition: filter var(--transition-fast);
+    transition: color var(--transition-fast), border-color var(--transition-fast);
   }
-  .btn-link::before,
-  .btn-link::after {
+  .subtab-btn:hover:not(.active) {
     color: var(--text-secondary);
-    transition: color var(--transition-fast);
   }
-  .btn-link::before {
-    content: '[';
-    margin-right: 0.15rem;
-  }
-  .btn-link::after {
-    content: ']';
-    margin-left: 0.15rem;
-  }
-  .btn-link:hover {
-    filter: brightness(1.25);
-  }
-  .btn-link:hover::before,
-  .btn-link:hover::after {
+  .subtab-btn.active {
     color: var(--text-accent);
+    border-bottom-color: var(--text-accent);
+  }
+
+  .subtab-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
   }
 </style>
