@@ -6,6 +6,13 @@ on:
   push:
     branches: [main]
 
+# dorny/paths-filter calls the PR Files API to detect which surfaces a
+# PR touches. The repo's default GITHUB_TOKEN doesn't grant that, so
+# request it explicitly.
+permissions:
+  contents: read
+  pull-requests: read
+
 # Cancel an in-progress PR run when a new commit lands on the same PR.
 # Pushes to main aren't cancelled — those are the canonical post-merge
 # validation, so the latest run for each commit must complete.
