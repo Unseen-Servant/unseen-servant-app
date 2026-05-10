@@ -9,6 +9,13 @@ Key concepts:
   This means each test starts with a clean, empty database.
 """
 
+import os
+
+# Skip the cross-encoder model load in unit tests. Tests that need to
+# verify rerank-specific behaviour either patch ``rerank_scores`` or
+# clear this env var explicitly.
+os.environ.setdefault("RERANK_DISABLED", "1")
+
 import pytest
 import chromadb
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
