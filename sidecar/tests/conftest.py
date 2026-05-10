@@ -64,6 +64,7 @@ def test_collection(test_chroma_client, test_embedding_function):
     return test_chroma_client.get_or_create_collection(
         name="ttrpg_docs_test",
         embedding_function=test_embedding_function,
+        metadata={"hnsw:space": "cosine"},
     )
 
 

@@ -57,6 +57,14 @@ from reranker import rerank_scores
 RERANK_CANDIDATE_POOL = int(os.getenv("RERANK_CANDIDATES", "50"))
 
 
+# Pinning HNSW space at collection creation makes `relevance = 1 - distance`
+# bounded in [0, 1] for the normalised embeddings bge-m3 produces. Chroma's
+# default is l2, where distances can exceed 1.0 and yield negative relevance.
+# The space is locked at creation; existing l2 collections flip to cosine
+# only when the user re-indexes (delete-index drops and recreates).
+COLLECTION_METADATA = {"hnsw:space": "cosine"}
+
+
 # ---------------------------------------------------------------------------
 # CLI arguments
 # ---------------------------------------------------------------------------
@@ -1218,6 +1226,7 @@ def create_app(
         collection = chroma_client.get_or_create_collection(
             name="ttrpg_docs",
             embedding_function=embedding_function,
+            metadata=COLLECTION_METADATA,
         )
 
     app = FastAPI(title="Legend Lore Sidecar")
@@ -1769,6 +1778,7 @@ def create_app(
                 collection = chroma_client.get_or_create_collection(
                     name=collection_name,
                     embedding_function=embedding_function,
+                    metadata=COLLECTION_METADATA,
                 )
                 if data_dir:
                     for sid in old_segment_ids:
@@ -2781,7 +2791,7 @@ def create_app(
                     "page_start": parent.page_start if parent else metadata.get("page_start", 0),
                     "page_end": parent.page_end if parent else metadata.get("page_end", 0),
                     "game_system": metadata.get("game_system", "unknown"),
-                    "relevance": round(1 - distance, 3),
+                    "relevance": round(max(0.0, min(1.0, 1 - distance)), 3),
                 })
 
             return {
