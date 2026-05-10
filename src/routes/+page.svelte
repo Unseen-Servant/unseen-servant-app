@@ -2863,6 +2863,7 @@
                 stale={isSearching && committedQuery !== resultsQuery}
                 query={committedQuery}
                 error={searchError}
+                {ollamaRunning}
                 indexedFileCount={indexedPathsSet.size}
                 selectedIndex={selectedResultIndex}
                 canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
