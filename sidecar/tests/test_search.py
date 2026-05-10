@@ -95,12 +95,13 @@ def test_search_empty_collection(client):
 
 
 def test_search_default_n_results(indexed_client):
-    """If n_results is omitted, default should be 5."""
+    """If n_results is omitted, default should be 15."""
     response = indexed_client.post("/api/search", json={
         "query": "dragon"
     })
 
     assert response.status_code == 200
+    assert len(response.json()["results"]) <= 15
 
 
 # ---------------------------------------------------------------------------

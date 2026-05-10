@@ -157,7 +157,7 @@ async def list_collections() -> str:
 @mcp.tool()
 async def search_library(
     query: str,
-    n_results: int = 5,
+    n_results: int = 15,
     source_filter: str | None = None,
     game_system: str | None = None,
     collection: str | None = None,
@@ -176,7 +176,7 @@ async def search_library(
     Args:
         query: What to search for (e.g., "grappling rules",
                "fire drake stats", "healing potions")
-        n_results: How many results to return (default 5)
+        n_results: How many results to return (default 15)
         source_filter: Optional PDF filename to restrict search
                        to one book (e.g., "dragonbane_core.pdf")
         game_system: Optional game system to filter by

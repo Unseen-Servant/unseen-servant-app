@@ -320,7 +320,7 @@ class SyncIndexRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
-    n_results: int = 5
+    n_results: int = 15
     source_filter: str | None = None
     game_system: str | None = None
     game_systems: list[str] | None = None
