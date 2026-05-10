@@ -135,7 +135,11 @@
     }
   }
 
-  onMount(() => refreshItemsAndFocus({ initial: true }));
+  onMount(() => {
+    clampMenuToViewport();
+    positioned = true;
+    refreshItemsAndFocus({ initial: true });
+  });
   afterUpdate(() => refreshItemsAndFocus());
 
   function handleKeydown(event: KeyboardEvent) {
@@ -196,6 +200,24 @@
     }
   }
 
+  // Position is bound on first render then measured-and-shifted in onMount
+  // so the menu always fits within the viewport, regardless of how many
+  // conditional sections (Game system, collection submenus, etc.) end up
+  // rendered. Hidden for one tick during the measurement to avoid the
+  // pre-clamp position flashing on screen.
+  let clampedX = x;
+  let clampedY = y;
+  let positioned = false;
+
+  function clampMenuToViewport() {
+    if (!menuEl) return;
+    const padding = 8;
+    const h = menuEl.offsetHeight;
+    const w = menuEl.offsetWidth;
+    clampedX = Math.max(padding, Math.min(x, window.innerWidth - w - padding));
+    clampedY = Math.max(padding, Math.min(y, window.innerHeight - h - padding));
+  }
+
   $: addExcludeSet = new Set(excludeFromAdd);
   $: addableCollections = Object.values(collections).filter((c) => !addExcludeSet.has(c.name));
   $: hasCollections = addableCollections.length > 0;
@@ -214,9 +236,6 @@
     onSetGameSystems([]);
   }
 
-  // Clamp position so the menu stays within the viewport
-  $: clampedX = Math.min(x, window.innerWidth - 200);
-  $: clampedY = Math.min(y, window.innerHeight - 240);
 </script>
 
 <svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} on:keydown={handleKeydown} />
@@ -225,7 +244,7 @@
 <div
   class="context-menu"
   bind:this={menuEl}
-  style="left: {clampedX}px; top: {clampedY}px"
+  style="left: {clampedX}px; top: {clampedY}px; visibility: {positioned ? 'visible' : 'hidden'}"
   on:click|stopPropagation
   on:mousedown|stopPropagation
 >
