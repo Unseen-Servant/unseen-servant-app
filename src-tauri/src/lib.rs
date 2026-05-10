@@ -989,6 +989,33 @@ async fn update_collection(
 }
 
 #[tauri::command]
+async fn rename_collection(
+    name: String,
+    new_name: String,
+) -> Result<CollectionMutationResult, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/api/collections/{}/rename", SIDECAR_URL, name))
+        .json(&serde_json::json!({ "new_name": new_name }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
+
+    let result: CollectionMutationResult = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
+
+    Ok(result)
+}
+
+#[tauri::command]
 async fn delete_collection(name: String) -> Result<CollectionDeleteResult, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -1085,14 +1112,54 @@ async fn clear_active_context() -> Result<ActiveContextResult, String> {
 // Tauri commands — file management
 // ---------------------------------------------------------------------------
 
+/// Reject names that could escape the parent directory or violate filesystem
+/// constraints on macOS or Windows. Path-traversal defense (`..`, separators,
+/// null bytes) is the primary purpose; the rest catches names that would
+/// behave unexpectedly on Windows.
+fn validate_rename_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("Name cannot be empty".to_string());
+    }
+    if name.contains('/') || name.contains('\\') {
+        return Err("Name cannot contain '/' or '\\'".to_string());
+    }
+    if name.contains('\0') {
+        return Err("Name contains an invalid character".to_string());
+    }
+    if name == "." || name == ".." {
+        return Err("Name cannot be '.' or '..'".to_string());
+    }
+    if name.chars().any(|c| (c as u32) < 0x20 || c == '\u{7F}') {
+        return Err("Name contains a control character".to_string());
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err("Name cannot end with a period or space".to_string());
+    }
+    let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
+    const WIN_RESERVED: &[&str] = &[
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if WIN_RESERVED.iter().any(|r| *r == stem) {
+        return Err(format!("'{}' is a reserved name on Windows", name));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn rename_file(old_path: String, new_name: String) -> Result<String, String> {
+    validate_rename_name(&new_name)?;
     let old = Path::new(&old_path);
     if !old.exists() {
         return Err("File not found".to_string());
     }
     let parent = old.parent().ok_or("Cannot determine parent directory".to_string())?;
     let new_path = parent.join(&new_name);
+    // Defense in depth: confirm new_path stays in the original parent.
+    if new_path.parent() != Some(parent) {
+        return Err("Name escapes parent directory".to_string());
+    }
     if new_path.exists() {
         return Err(format!("A file named '{}' already exists", new_name));
     }
@@ -1139,12 +1206,16 @@ async fn delete_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn rename_folder(old_path: String, new_name: String) -> Result<String, String> {
+    validate_rename_name(&new_name)?;
     let old = Path::new(&old_path);
     if !old.exists() || !old.is_dir() {
         return Err("Folder not found".to_string());
     }
     let parent = old.parent().ok_or("Cannot determine parent directory".to_string())?;
     let new_path = parent.join(&new_name);
+    if new_path.parent() != Some(parent) {
+        return Err("Name escapes parent directory".to_string());
+    }
     if new_path.exists() {
         return Err(format!("A folder named '{}' already exists", new_name));
     }
@@ -1439,7 +1510,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, rename_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
@@ -1553,4 +1624,59 @@ pub fn run() {
                 _ => {}
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_rename_name_accepts_normal_names() {
+        assert!(validate_rename_name("Curse of Strahd.pdf").is_ok());
+        assert!(validate_rename_name("My Campaign").is_ok());
+        assert!(validate_rename_name("file_with-dashes.pdf").is_ok());
+        assert!(validate_rename_name("résumé.pdf").is_ok());
+    }
+
+    #[test]
+    fn validate_rename_name_rejects_path_traversal() {
+        assert!(validate_rename_name("..").is_err());
+        assert!(validate_rename_name(".").is_err());
+        assert!(validate_rename_name("../evil").is_err());
+        assert!(validate_rename_name("..\\evil").is_err());
+        assert!(validate_rename_name("foo/bar").is_err());
+        assert!(validate_rename_name("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn validate_rename_name_rejects_null_byte() {
+        assert!(validate_rename_name("foo\0bar").is_err());
+    }
+
+    #[test]
+    fn validate_rename_name_rejects_empty() {
+        assert!(validate_rename_name("").is_err());
+    }
+
+    #[test]
+    fn validate_rename_name_rejects_control_chars() {
+        assert!(validate_rename_name("foo\nbar").is_err());
+        assert!(validate_rename_name("foo\tbar").is_err());
+        assert!(validate_rename_name("foo\x7fbar").is_err());
+    }
+
+    #[test]
+    fn validate_rename_name_rejects_windows_reserved() {
+        assert!(validate_rename_name("CON").is_err());
+        assert!(validate_rename_name("con").is_err());
+        assert!(validate_rename_name("NUL.pdf").is_err());
+        assert!(validate_rename_name("COM1.txt").is_err());
+        assert!(validate_rename_name("LPT9").is_err());
+    }
+
+    #[test]
+    fn validate_rename_name_rejects_trailing_dot_or_space() {
+        assert!(validate_rename_name("foo.").is_err());
+        assert!(validate_rename_name("foo ").is_err());
+    }
 }

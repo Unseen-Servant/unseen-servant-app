@@ -2491,42 +2491,33 @@
     editingMetadataFor = null;
 
     const renaming = changes.name !== original;
+    const metadataChanged =
+      changes.description !== col.description ||
+      (changes.color || null) !== col.color ||
+      changes.archived !== col.archived;
 
     try {
+      let effectiveName = original;
       if (renaming) {
-        // Rename = delete + create with all metadata + paths
-        await invoke('delete_collection', { name: original });
-        await invoke<CollectionMutationResult>('create_collection', {
-          name: changes.name,
-          filePaths: col.file_paths,
-          description: changes.description,
-          color: changes.color || null,
+        await invoke<CollectionMutationResult>('rename_collection', {
+          name: original,
+          newName: changes.name,
         });
-        // create can't set archived; PUT it in if needed
-        if (changes.archived !== col.archived) {
-          await invoke('update_collection', {
-            name: changes.name,
-            archived: changes.archived,
-          });
-        }
-        jobNotification.show({
-          type: 'success',
-          message: `Renamed to "${changes.name}"`,
-          duration: 4000,
-        });
-      } else {
+        effectiveName = changes.name;
+      }
+      if (metadataChanged) {
         await invoke('update_collection', {
-          name: changes.name,
+          name: effectiveName,
           description: changes.description,
           color: changes.color,
           archived: changes.archived,
         });
-        jobNotification.show({
-          type: 'success',
-          message: `Updated "${changes.name}"`,
-          duration: 4000,
-        });
       }
+      jobNotification.show({
+        type: 'success',
+        message: renaming ? `Renamed to "${changes.name}"` : `Updated "${changes.name}"`,
+        duration: 4000,
+      });
       // If the user archived the active context, clear it.
       if (changes.archived && activeContextName === original) {
         await invoke('clear_active_context');
