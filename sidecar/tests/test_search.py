@@ -57,13 +57,8 @@ def test_search_result_shape(indexed_client):
 
 
 def test_search_relevance_is_numeric(indexed_client):
-    """Relevance should be a float (computed as 1 - distance).
-
-    Note: with L2 distance (used by ONNX DefaultEmbeddingFunction),
-    distances can exceed 1.0, making relevance negative. With cosine
-    distance (used by Ollama in production), relevance stays in [0, 1].
-    So we only check it's a number, not its bounds.
-    """
+    """Relevance should be a float in [0, 1] (1 - cosine distance,
+    clamped at the response boundary)."""
     response = indexed_client.post("/api/search", json={
         "query": "dragon fire",
         "n_results": 5
@@ -72,6 +67,8 @@ def test_search_relevance_is_numeric(indexed_client):
     for result in response.json()["results"]:
         assert isinstance(result["relevance"], float), \
             f"Expected float, got {type(result['relevance'])}"
+        assert 0.0 <= result["relevance"] <= 1.0, \
+            f"Relevance out of bounds: {result['relevance']}"
 
 
 def test_search_respects_n_results(indexed_client):
