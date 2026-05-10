@@ -1,43 +1,64 @@
 <script lang="ts">
-  import OllamaStatus from './OllamaStatus.svelte';
-
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;
   export let onSelectFolder: () => void;
   export let onOpenHelp: () => void = () => {};
+
+  $: ollamaState = ollamaRunning && ollamaModelReady
+    ? 'ready'
+    : ollamaRunning
+      ? 'pending'
+      : 'missing';
+
+  $: ollamaLabel = ollamaState === 'ready'
+    ? 'READY'
+    : ollamaState === 'pending'
+      ? 'MODEL PENDING'
+      : 'NOT DETECTED';
 </script>
 
 <div class="page">
-  <div class="page-inner">
-    <header class="hero">
-      <h1 class="title font-heading">Legend Lore</h1>
-      <p class="tagline">A local-first reference for your TTRPG library.</p>
+  <div class="frame">
+    <header class="frame-strip frame-strip-top">
+      <span class="brand">LEGEND LORE</span>
+      <span
+        class="ollama-pill"
+        class:ok={ollamaState === 'ready'}
+        class:partial={ollamaState === 'pending'}
+      >
+        OLLAMA · {ollamaLabel}
+      </span>
     </header>
 
-    <section class="block">
-      <h2 class="block-title font-heading">Pick your library folder</h2>
-      <p class="block-desc">
-        Legend Lore reads PDFs from this folder. Nothing leaves your machine.
+    <div class="frame-body">
+      <h1 class="hero-title font-heading">Set up your library</h1>
+      <p class="hero-desc">
+        Legend Lore reads PDFs from a folder you choose.<br />
+        Nothing leaves your machine.
       </p>
-      <button class="primary-cta" type="button" on:click={onSelectFolder}>
-        Choose folder
+
+      <button class="primary-cta font-heading" type="button" on:click={onSelectFolder}>
+        [ Choose library folder ]
       </button>
-    </section>
 
-    <section class="block">
-      <h2 class="block-title font-heading">Ollama — local AI engine</h2>
-      <p class="block-desc">
-        The local model server that turns your PDFs into searchable
-        vectors. Free, open-source, runs alongside the app.
-      </p>
-      <OllamaStatus {ollamaRunning} {ollamaModelReady} />
-    </section>
+      {#if ollamaState === 'missing'}
+        <p class="ollama-hint">
+          Ollama not detected — install from <strong>ollama.com</strong>,
+          then launch the app.
+        </p>
+      {:else if ollamaState === 'pending'}
+        <p class="ollama-hint">
+          Ollama running, embedding model pending. Run:
+        </p>
+        <code class="command">ollama pull bge-m3</code>
+      {/if}
+    </div>
 
-    <p class="more-link">
+    <footer class="frame-strip frame-strip-bottom">
       <button type="button" class="btn-link" on:click={onOpenHelp}>
         More setup info in Help → Guides
       </button>
-    </p>
+    </footer>
   </div>
 </div>
 
@@ -47,80 +68,124 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3rem 2rem;
+    justify-content: center;
+    padding: 2rem;
     overflow-y: auto;
   }
 
-  .page-inner {
+  /* The frame is the visual anchor. Centered card with thin border, top
+     and bottom status strips, content body. Mirrors the old-school
+     control-panel feel: status at the edges, action in the center. */
+  .frame {
     width: 100%;
-    max-width: 540px;
-    display: flex;
-    flex-direction: column;
-    gap: 1.75rem;
+    max-width: 460px;
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    overflow: hidden;
   }
 
-  .hero {
+  .frame-strip {
+    padding: 0.5rem 0.85rem;
+    font-family: var(--font-heading, var(--font-body));
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    color: var(--text-tertiary);
+  }
+
+  .frame-strip-top {
     display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    align-items: center;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .frame-strip-bottom {
+    border-top: 1px solid var(--border-subtle);
     text-align: center;
-    margin-bottom: 0.5rem;
   }
 
-  .title {
-    margin: 0;
-    font-size: 1.6rem;
-    color: var(--text-primary);
-    letter-spacing: 0.02em;
-  }
-
-  .tagline {
-    margin: 0;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
+  .brand {
     color: var(--text-secondary);
   }
 
-  .block {
+  .ollama-pill {
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+  .ollama-pill.ok {
+    color: var(--text-active);
+  }
+  .ollama-pill.partial {
+    color: var(--text-accent);
+  }
+
+  .frame-body {
+    padding: 1.8rem 1.4rem 1.6rem;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    align-items: center;
+    text-align: center;
+    gap: 0.8rem;
   }
 
-  .block-title {
+  .hero-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.25rem;
     color: var(--text-primary);
+    letter-spacing: 0.01em;
   }
 
-  .block-desc {
+  .hero-desc {
     margin: 0;
     font-family: var(--font-body);
     font-size: 0.85rem;
     color: var(--text-secondary);
-    line-height: 1.45;
+    line-height: 1.55;
   }
 
+  /* Bracket-button: text-only, no background, accent-colored, generous
+     padding so it has presence. The brackets are part of the rendered
+     text (not pseudo-elements) so the spacing inside reads as a single
+     framed phrase. */
   .primary-cta {
-    align-self: flex-start;
+    margin-top: 0.5rem;
     padding: 0.55rem 1rem;
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.9rem;
-    color: var(--bg-container);
-    background: var(--text-accent);
-    border: 1px solid var(--text-accent);
-    border-radius: 4px;
+    font-size: 0.95rem;
+    color: var(--text-accent);
+    background: transparent;
+    border: none;
     cursor: pointer;
+    letter-spacing: 0.02em;
     transition: filter var(--transition-fast);
   }
   .primary-cta:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.2);
   }
 
-  .more-link {
-    margin: 0.4rem 0 0;
-    text-align: center;
+  .ollama-hint {
+    margin: 0.6rem 0 0;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .ollama-hint strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .command {
+    display: inline-block;
+    padding: 0.3rem 0.55rem;
+    background: var(--bg-focused);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    user-select: all;
+    -webkit-user-select: all;
   }
 
   /* Bracketed terminal-style action — matches LibrarySettings/AboutPane */
