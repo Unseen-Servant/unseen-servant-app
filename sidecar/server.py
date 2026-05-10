@@ -47,6 +47,14 @@ from parents_store import (
     delete_parents_for_source,
     clear_all_parents,
 )
+from reranker import rerank_scores
+
+
+# Number of top ChromaDB candidates to feed into the cross-encoder. Set
+# to balance re-rank latency against the size of the candidate pool the
+# parent-dedupe loop sees in re-ranked order. Trailing candidates beyond
+# this still appear (in cosine order) so dedupe never starves.
+RERANK_CANDIDATE_POOL = int(os.getenv("RERANK_CANDIDATES", "50"))
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +336,7 @@ class SearchRequest(BaseModel):
     collection: str | None = None
     source_paths: list[str] | None = None
     search_all: bool = False
+    rerank: bool = True
 
 class SetGameSystemRequest(BaseModel):
     filename: str
@@ -2701,14 +2710,34 @@ def create_app(
                     "auto_scoped": auto_scoped,
                 }
 
-            # Dedupe by parent_id, keeping the first hit per parent (Chroma
-            # returns results in similarity order, so first = highest).
+            ordered_metadatas = results["metadatas"][0]
+            ordered_distances = results["distances"][0]
+
+            # Re-rank the top of the candidate pool with a cross-encoder.
+            # Scoring (query, chunk-text) jointly is more accurate than raw
+            # cosine, especially when several candidates are topically
+            # adjacent. Trailing candidates stay in cosine order so the
+            # dedupe loop never starves if a section has many slices.
+            if request.rerank:
+                pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
+                pool_docs = results["documents"][0][:pool]
+                scores = rerank_scores(request.query, pool_docs)
+                if scores is not None:
+                    order = sorted(
+                        range(pool), key=lambda i: scores[i], reverse=True
+                    )
+                    head_metadatas = [ordered_metadatas[i] for i in order]
+                    # Use 1 - rerank_score so 1 - distance = rerank score
+                    # downstream, keeping the response shape unchanged.
+                    head_distances = [1.0 - scores[i] for i in order]
+                    ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
+                    ordered_distances = head_distances + ordered_distances[pool:]
+
+            # Dedupe by parent_id, keeping the first hit per parent (the
+            # iteration order is the re-ranked-then-cosine order from above).
             seen: set[str] = set()
             picked: list[tuple[dict, float]] = []   # (metadata, distance)
-            for metadata, distance in zip(
-                results["metadatas"][0],
-                results["distances"][0],
-            ):
+            for metadata, distance in zip(ordered_metadatas, ordered_distances):
                 pid = metadata.get("parent_id")
                 if not pid or pid in seen:
                     continue
