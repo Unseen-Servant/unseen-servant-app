@@ -98,6 +98,24 @@
     const inSub = focusedSubmenuIdx !== null;
     mainItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx && !inSub));
     submenuItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedSubmenuIdx));
+
+    clampOpenSubmenuToViewport();
+  }
+
+  // The static .submenu CSS caps height at 320px and scrolls inside, but
+  // the 320px container itself can hang below the window if the trigger
+  // sits low on screen — items at the bottom of long lists become
+  // unreachable. Re-measure on every render and shrink max-height to fit
+  // between the submenu's top and the viewport bottom.
+  function clampOpenSubmenuToViewport() {
+    if (!menuEl || !openSubmenu) return;
+    const submenu = menuEl.querySelector(
+      `[data-submenu="${openSubmenu}"] .submenu`,
+    ) as HTMLElement | null;
+    if (!submenu) return;
+    const top = submenu.getBoundingClientRect().top;
+    const available = window.innerHeight - top - 8;
+    submenu.style.maxHeight = `${Math.max(120, Math.min(available, 320))}px`;
   }
 
   onMount(() => refreshItemsAndFocus({ initial: true }));
