@@ -60,7 +60,7 @@ def test_pre_bind_socket_yields_real_port_for_port_zero():
 
 
 # ---------------------------------------------------------------------------
-# MCP-side discovery
+# MCP-side discovery — startup (with grace window)
 # ---------------------------------------------------------------------------
 
 
@@ -71,7 +71,6 @@ def test_discover_sidecar_url_prefers_explicit_url(tmp_path):
         sidecar_url = "http://example.com:9999"
         data_dir = str(tmp_path)
 
-    # data_dir is set but no port file exists; explicit URL still wins
     assert discover_sidecar_url(Args()) == "http://example.com:9999"
 
 
@@ -92,14 +91,12 @@ def test_discover_sidecar_url_picks_up_late_port_file(tmp_path, monkeypatch):
     from mcp_server import discover_sidecar_url
     import mcp_server
 
-    # Shrink the timeout so the test runs quickly even on a slow machine
     monkeypatch.setattr(mcp_server, "SIDECAR_URL_DISCOVERY_TIMEOUT", 2.0)
 
     class Args:
         sidecar_url = None
         data_dir = str(tmp_path)
 
-    # Drop the port file mid-poll from another thread
     import threading
     def write_after_delay():
         time.sleep(0.6)
@@ -123,5 +120,79 @@ def test_discover_sidecar_url_falls_back_on_timeout(tmp_path, monkeypatch):
         sidecar_url = None
         data_dir = str(tmp_path)
 
-    # No port file ever appears; we should fall back to the legacy default
     assert discover_sidecar_url(Args()) == "http://localhost:8420"
+
+
+# ---------------------------------------------------------------------------
+# MCP-side discovery — per-request (no retry, follows sidecar restarts)
+# ---------------------------------------------------------------------------
+
+
+def test_current_sidecar_url_returns_none_when_no_port_file(tmp_path):
+    """No port file = sidecar isn't running. Returns None so callers can
+    show a 'launch the app' hint instead of timing out a retry loop."""
+    from mcp_server import current_sidecar_url
+
+    class Args:
+        sidecar_url = None
+        data_dir = str(tmp_path)
+
+    assert current_sidecar_url(Args()) is None
+
+
+def test_current_sidecar_url_reads_port_file(tmp_path):
+    from mcp_server import current_sidecar_url
+
+    write_port_file(tmp_path, 11111)
+
+    class Args:
+        sidecar_url = None
+        data_dir = str(tmp_path)
+
+    assert current_sidecar_url(Args()) == "http://127.0.0.1:11111"
+
+
+def test_current_sidecar_url_follows_port_changes(tmp_path):
+    """The whole point: re-reading picks up the latest port written by
+    a fresh Legend Lore launch."""
+    from mcp_server import current_sidecar_url
+
+    class Args:
+        sidecar_url = None
+        data_dir = str(tmp_path)
+
+    write_port_file(tmp_path, 11111)
+    assert current_sidecar_url(Args()) == "http://127.0.0.1:11111"
+
+    # Simulate Legend Lore quitting and relaunching with a new ephemeral port
+    write_port_file(tmp_path, 22222)
+    assert current_sidecar_url(Args()) == "http://127.0.0.1:22222"
+
+
+def test_current_sidecar_url_explicit_overrides_data_dir(tmp_path):
+    from mcp_server import current_sidecar_url
+
+    write_port_file(tmp_path, 11111)
+
+    class Args:
+        sidecar_url = "http://override:9000"
+        data_dir = str(tmp_path)
+
+    assert current_sidecar_url(Args()) == "http://override:9000"
+
+
+def test_sidecar_client_returns_down_hint_when_no_port_file(tmp_path):
+    """SidecarClient surfaces a friendly 'app not running' message instead
+    of a connection error when discovery returns None."""
+    import asyncio
+    from mcp_server import SidecarClient
+
+    class Args:
+        sidecar_url = None
+        data_dir = str(tmp_path)
+
+    client = SidecarClient(Args())
+    result = asyncio.run(client.get("/api/anything"))
+    assert isinstance(result, str)
+    assert "Cannot connect" in result
+    assert "desktop app" in result.lower()
