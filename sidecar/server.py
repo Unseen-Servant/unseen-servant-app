@@ -70,12 +70,37 @@ COLLECTION_METADATA = {"hnsw:space": "cosine"}
 # CLI arguments
 # ---------------------------------------------------------------------------
 
+PORT_FILENAME = "sidecar.port"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Legend Lore indexing sidecar")
-    parser.add_argument("--port", type=int, default=8420, help="HTTP port")
+    parser.add_argument("--port", type=int, default=8420,
+                        help="HTTP port; pass 0 to bind an ephemeral port")
     parser.add_argument("--data-dir", type=str, default=None,
                         help="Directory for ChromaDB storage (default: ./chroma_db)")
     return parser.parse_args()
+
+
+def write_port_file(data_dir: Path, port: int) -> None:
+    """Atomically publish the bound port so Tauri/MCP can discover it.
+
+    Written before uvicorn starts serving so the Rust readiness gate can
+    pick it up the moment the process is alive. ``os.replace`` is atomic
+    on POSIX and Windows so a partial read is not possible.
+    """
+    target = data_dir / PORT_FILENAME
+    tmp = target.with_suffix(".port.tmp")
+    tmp.write_text(str(port))
+    os.replace(tmp, target)
+
+
+def remove_port_file(data_dir: Path) -> None:
+    """Best-effort cleanup of the published port file on shutdown."""
+    try:
+        (data_dir / PORT_FILENAME).unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -3019,9 +3044,35 @@ def _watch_parent(parent_pid: int, poll_interval: float = 2.0) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import asyncio
+    import socket
+
     args = parse_args()
     data_dir = Path(args.data_dir) if args.data_dir else Path(__file__).parent / "chroma_db"
-    print(f"Starting sidecar on port {args.port}, data dir: {data_dir}")
+
+    # Install graceful-exit handlers BEFORE uvicorn does. uvicorn captures
+    # signals during ``serve()`` and re-raises them after its own cleanup
+    # (server.py:capture_signals); with Python's default SIGTERM handler
+    # restored at that point, the process would be terminated before our
+    # ``finally`` block runs and the port file would never be cleaned up.
+    # Raising SystemExit instead lets the unwind reach the finally.
+    def _graceful_exit(signum, frame):
+        raise SystemExit(0)
+    signal.signal(signal.SIGTERM, _graceful_exit)
+    signal.signal(signal.SIGINT, _graceful_exit)
+
+    # Pre-bind the socket ourselves so ``--port 0`` resolves to an actual port
+    # number that we can publish to disk before uvicorn starts serving. The
+    # Rust readiness gate polls ``data_dir/sidecar.port`` to learn where to
+    # talk to us — without this, ephemeral binding would be opaque.
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("127.0.0.1", args.port))
+    actual_port = sock.getsockname()[1]
+    print(f"Starting sidecar on port {actual_port}, data dir: {data_dir}")
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    write_port_file(data_dir, actual_port)
 
     # Start parent-death watchdog (daemon thread — won't block exit)
     parent_pid = os.getppid()
@@ -3029,4 +3080,9 @@ if __name__ == "__main__":
     watchdog.start()
 
     application = create_app()
-    uvicorn.run(application, host="127.0.0.1", port=args.port, log_level="info")
+    config = uvicorn.Config(application, log_level="info")
+    server = uvicorn.Server(config)
+    try:
+        asyncio.run(server.serve(sockets=[sock]))
+    finally:
+        remove_port_file(data_dir)

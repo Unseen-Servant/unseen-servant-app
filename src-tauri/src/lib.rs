@@ -6,12 +6,18 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::menu::{Menu, MenuItem};
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU16, Ordering};
 
 // ---------------------------------------------------------------------------
-// Sidecar state — holds the Python child process handle
+// Sidecar state — holds the Python child process handle and any startup
+// failure payload. The failure is stashed so the frontend can pull it on
+// mount even though the emit happens during setup() (before the webview
+// has loaded a listener).
 // ---------------------------------------------------------------------------
 
 struct SidecarState(Mutex<Option<Child>>);
+
+struct SidecarFailureState(Mutex<Option<SidecarFailedPayload>>);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +100,12 @@ struct SyncResult {
     renames: Vec<RenameMapping>,
     auto_removed_paths: Vec<String>,
     stale_paths: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+struct SidecarFailedPayload {
+    log_path: String,
+    message: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -348,7 +360,16 @@ fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
 // Tauri commands — indexing (calls the Python sidecar via HTTP)
 // ---------------------------------------------------------------------------
 
-const SIDECAR_URL: &str = "http://localhost:8420";
+/// Port the sidecar bound at startup, published via ``data_dir/sidecar.port``.
+/// Zero means the sidecar has not come up yet — every command that calls it
+/// will fail-fast with a connection error in that case, which is the same
+/// outcome as a sidecar crash mid-session.
+static SIDECAR_PORT: AtomicU16 = AtomicU16::new(0);
+
+fn sidecar_url() -> String {
+    format!("http://127.0.0.1:{}", SIDECAR_PORT.load(Ordering::Relaxed))
+}
+
 const OLLAMA_URL: &str = "http://localhost:11434";
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -401,7 +422,7 @@ async fn check_ollama_health() -> Result<OllamaStatus, String> {
 async fn check_sidecar_health() -> Result<bool, String> {
     let client = reqwest::Client::new();
     match client
-        .get(format!("{}/health", SIDECAR_URL))
+        .get(format!("{}/health", sidecar_url()))
         .timeout(std::time::Duration::from_secs(3))
         .send()
         .await
@@ -421,7 +442,7 @@ struct McpStatus {
 async fn check_mcp_status() -> Result<McpStatus, String> {
     let client = reqwest::Client::new();
     match client
-        .get(format!("{}/api/mcp-status", SIDECAR_URL))
+        .get(format!("{}/api/mcp-status", sidecar_url()))
         .timeout(std::time::Duration::from_secs(3))
         .send()
         .await
@@ -440,7 +461,7 @@ async fn check_mcp_status() -> Result<McpStatus, String> {
 async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/index-status", SIDECAR_URL))
+        .post(format!("{}/api/index-status", sidecar_url()))
         .json(&serde_json::json!({ "selected_paths": paths }))
         .send()
         .await
@@ -531,7 +552,7 @@ async fn consume_sync_stream(
 async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/sync-index-stream", SIDECAR_URL))
+        .post(format!("{}/api/sync-index-stream", sidecar_url()))
         .json(&serde_json::json!({ "selected_paths": paths }))
         .send()
         .await
@@ -547,7 +568,7 @@ async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncRes
 async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/reindex-all-stream", SIDECAR_URL))
+        .post(format!("{}/api/reindex-all-stream", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -562,7 +583,7 @@ async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
 async fn reindex_file(path: String) -> Result<ReindexFileResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/reindex-file", SIDECAR_URL))
+        .post(format!("{}/api/reindex-file", sidecar_url()))
         .json(&serde_json::json!({ "path": path }))
         .send()
         .await
@@ -582,7 +603,7 @@ async fn reindex_file(path: String) -> Result<ReindexFileResult, String> {
 async fn get_document_stats(path: String) -> Result<DocumentStats, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/api/sources", SIDECAR_URL))
+        .get(format!("{}/api/sources", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -607,7 +628,7 @@ async fn get_document_stats(path: String) -> Result<DocumentStats, String> {
 async fn get_known_game_systems() -> Result<KnownGameSystemsResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/api/known-game-systems", SIDECAR_URL))
+        .get(format!("{}/api/known-game-systems", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -624,7 +645,7 @@ async fn get_known_game_systems() -> Result<KnownGameSystemsResult, String> {
 async fn get_stats() -> Result<StatsResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/api/stats", SIDECAR_URL))
+        .get(format!("{}/api/stats", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -641,7 +662,7 @@ async fn get_stats() -> Result<StatsResult, String> {
 async fn compact_database() -> Result<CompactResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/compact", SIDECAR_URL))
+        .post(format!("{}/api/compact", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -667,7 +688,7 @@ fn get_data_dir(app: tauri::AppHandle) -> Result<String, String> {
 async fn delete_index() -> Result<DeleteIndexResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/delete-index", SIDECAR_URL))
+        .post(format!("{}/api/delete-index", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -688,7 +709,7 @@ async fn delete_index() -> Result<DeleteIndexResult, String> {
 async fn set_game_system(filename: String, game_system: String) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/set-game-system", SIDECAR_URL))
+        .post(format!("{}/api/set-game-system", sidecar_url()))
         .json(&serde_json::json!({
             "filename": filename,
             "game_system": game_system,
@@ -713,7 +734,7 @@ async fn set_game_system(filename: String, game_system: String) -> Result<SetGam
 async fn set_game_systems(filename: String, game_systems: Vec<String>) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/set-game-systems", SIDECAR_URL))
+        .post(format!("{}/api/set-game-systems", sidecar_url()))
         .json(&serde_json::json!({
             "filename": filename,
             "game_systems": game_systems,
@@ -742,7 +763,7 @@ async fn set_game_systems(filename: String, game_systems: Vec<String>) -> Result
 async fn create_custom_game_system(tag: String, keywords: Vec<String>, color: Option<String>) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/custom-game-systems", SIDECAR_URL))
+        .post(format!("{}/api/custom-game-systems", sidecar_url()))
         .json(&serde_json::json!({
             "tag": tag,
             "keywords": keywords,
@@ -771,7 +792,7 @@ async fn update_custom_game_system(original_tag: String, tag: String, keywords: 
     let client = reqwest::Client::new();
     let encoded_tag = original_tag.replace("&", "%26").replace(" ", "%20");
     let response = client
-        .put(format!("{}/api/custom-game-systems/{}", SIDECAR_URL, encoded_tag))
+        .put(format!("{}/api/custom-game-systems/{}", sidecar_url(), encoded_tag))
         .json(&serde_json::json!({
             "tag": tag,
             "keywords": keywords,
@@ -800,7 +821,7 @@ async fn delete_custom_game_system(tag: String) -> Result<DeleteCustomSystemResu
     let client = reqwest::Client::new();
     let encoded_tag = tag.replace("&", "%26").replace(" ", "%20");
     let response = client
-        .delete(format!("{}/api/custom-game-systems/{}", SIDECAR_URL, encoded_tag))
+        .delete(format!("{}/api/custom-game-systems/{}", sidecar_url(), encoded_tag))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -823,7 +844,7 @@ async fn delete_custom_game_system(tag: String) -> Result<DeleteCustomSystemResu
 async fn toggle_builtin_game_system(tag: String, disabled: bool) -> Result<ToggleBuiltinResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/custom-game-systems/toggle-builtin", SIDECAR_URL))
+        .post(format!("{}/api/custom-game-systems/toggle-builtin", sidecar_url()))
         .json(&serde_json::json!({
             "tag": tag,
             "disabled": disabled,
@@ -854,7 +875,7 @@ async fn toggle_builtin_game_system(tag: String, disabled: bool) -> Result<Toggl
 async fn get_collections() -> Result<CollectionsResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/api/collections", SIDECAR_URL))
+        .get(format!("{}/api/collections", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -879,7 +900,7 @@ async fn search_index(
 ) -> Result<SearchResponse, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/search", SIDECAR_URL))
+        .post(format!("{}/api/search", sidecar_url()))
         .json(&serde_json::json!({
             "query": query,
             "n_results": n_results.unwrap_or(10),
@@ -924,7 +945,7 @@ async fn create_collection(
         body["color"] = serde_json::Value::String(c);
     }
     let response = client
-        .post(format!("{}/api/collections", SIDECAR_URL))
+        .post(format!("{}/api/collections", sidecar_url()))
         .json(&body)
         .send()
         .await
@@ -968,7 +989,7 @@ async fn update_collection(
     }
 
     let response = client
-        .put(format!("{}/api/collections/{}", SIDECAR_URL, name))
+        .put(format!("{}/api/collections/{}", sidecar_url(), name))
         .json(&body)
         .send()
         .await
@@ -995,7 +1016,7 @@ async fn rename_collection(
 ) -> Result<CollectionMutationResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/collections/{}/rename", SIDECAR_URL, name))
+        .post(format!("{}/api/collections/{}/rename", sidecar_url(), name))
         .json(&serde_json::json!({ "new_name": new_name }))
         .send()
         .await
@@ -1019,7 +1040,7 @@ async fn rename_collection(
 async fn delete_collection(name: String) -> Result<CollectionDeleteResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .delete(format!("{}/api/collections/{}", SIDECAR_URL, name))
+        .delete(format!("{}/api/collections/{}", sidecar_url(), name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -1042,7 +1063,7 @@ async fn delete_collection(name: String) -> Result<CollectionDeleteResult, Strin
 async fn get_active_context() -> Result<ActiveContextResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/api/active-context", SIDECAR_URL))
+        .get(format!("{}/api/active-context", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -1065,7 +1086,7 @@ async fn get_active_context() -> Result<ActiveContextResult, String> {
 async fn set_active_context(name: String) -> Result<ActiveContextResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/active-context", SIDECAR_URL))
+        .post(format!("{}/api/active-context", sidecar_url()))
         .json(&serde_json::json!({ "name": name }))
         .send()
         .await
@@ -1089,7 +1110,7 @@ async fn set_active_context(name: String) -> Result<ActiveContextResult, String>
 async fn clear_active_context() -> Result<ActiveContextResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .delete(format!("{}/api/active-context", SIDECAR_URL))
+        .delete(format!("{}/api/active-context", sidecar_url()))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -1170,7 +1191,7 @@ async fn rename_file(old_path: String, new_name: String) -> Result<String, Strin
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
     let client = reqwest::Client::new();
     let _ = client
-        .post(format!("{}/api/file-rename", SIDECAR_URL))
+        .post(format!("{}/api/file-rename", sidecar_url()))
         .json(&serde_json::json!({
             "old_path": old_path,
             "new_path": new_path_str,
@@ -1193,7 +1214,7 @@ async fn delete_file(path: String) -> Result<(), String> {
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
     let client = reqwest::Client::new();
     let _ = client
-        .post(format!("{}/api/file-delete", SIDECAR_URL))
+        .post(format!("{}/api/file-delete", sidecar_url()))
         .json(&serde_json::json!({
             "path": path,
         }))
@@ -1226,7 +1247,7 @@ async fn rename_folder(old_path: String, new_name: String) -> Result<String, Str
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
     let client = reqwest::Client::new();
     let _ = client
-        .post(format!("{}/api/folder-rename", SIDECAR_URL))
+        .post(format!("{}/api/folder-rename", sidecar_url()))
         .json(&serde_json::json!({
             "old_prefix": old_path,
             "new_prefix": new_path_str,
@@ -1249,7 +1270,7 @@ async fn delete_folder(path: String) -> Result<(), String> {
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
     let client = reqwest::Client::new();
     let _ = client
-        .post(format!("{}/api/folder-delete", SIDECAR_URL))
+        .post(format!("{}/api/folder-delete", sidecar_url()))
         .json(&serde_json::json!({
             "folder_prefix": path,
         }))
@@ -1266,6 +1287,18 @@ async fn delete_folder(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
+    // MCP server is launched in a separate process by Claude Desktop, so it
+    // can't share our in-memory port. We hand it the data dir instead and let
+    // it read sidecar.port at startup — that file follows the ephemeral port
+    // the sidecar binds at every launch.
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data directory: {}", e))?
+        .join("chroma_db")
+        .to_string_lossy()
+        .into_owned();
+
     let (command, args) = if cfg!(debug_assertions) {
         // Dev mode: use source-tree Python.
         //
@@ -1293,7 +1326,7 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
             "python3".to_string()
         };
 
-        (python_path, vec![mcp_server_py, "--sidecar-url".to_string(), SIDECAR_URL.to_string()])
+        (python_path, vec![mcp_server_py, "--data-dir".to_string(), data_dir])
     } else {
         // Production: use bundled binary
         let resource_dir = app_handle
@@ -1317,7 +1350,7 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
 
         let binary = binary_path.to_string_lossy().into_owned();
 
-        (binary, vec!["--sidecar-url".to_string(), SIDECAR_URL.to_string()])
+        (binary, vec!["--data-dir".to_string(), data_dir])
     };
 
     let config = serde_json::json!({
@@ -1365,31 +1398,69 @@ fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, Str
 // Sidecar lifecycle
 // ---------------------------------------------------------------------------
 
-fn wait_for_sidecar(log_path: &Path) {
+/// Return the stashed startup-failure payload, if any. The frontend calls
+/// this on mount to recover from the race where ``setup()`` emits
+/// ``sidecar://failed`` before the webview has loaded a listener.
+#[tauri::command]
+fn get_sidecar_failure(
+    state: tauri::State<SidecarFailureState>,
+) -> Option<SidecarFailedPayload> {
+    state.0.lock().ok().and_then(|g| g.clone())
+}
+
+/// Block until the sidecar publishes its port file and accepts a TCP
+/// connection, then return the bound port. Errors carry a single
+/// human-readable message — the caller is responsible for surfacing it.
+///
+/// The sidecar binds with ``--port 0`` so the OS assigns a free port; we
+/// learn what that port is by polling for ``data_dir/sidecar.port`` to
+/// appear. PyInstaller ``--onefile`` extraction in production can take a
+/// few seconds on first run, hence the longer attempt budget there.
+fn wait_for_sidecar(port_file: &Path, log_path: &Path) -> Result<u16, String> {
     use std::net::TcpStream;
     use std::time::Duration;
 
-    let addr = "127.0.0.1:8420";
-    let timeout = Duration::from_millis(200);
-
-    // PyInstaller --onefile binaries need extra time to extract on first run
     let max_attempts: u32 = if cfg!(debug_assertions) { 50 } else { 150 };
+    let connect_timeout = Duration::from_millis(200);
 
     for attempt in 1..=max_attempts {
-        if TcpStream::connect_timeout(&addr.parse().unwrap(), timeout).is_ok() {
-            println!("Sidecar ready after {} attempts", attempt);
-            return;
+        if let Ok(contents) = std::fs::read_to_string(port_file) {
+            if let Ok(port) = contents.trim().parse::<u16>() {
+                let addr = format!("127.0.0.1:{}", port);
+                if let Ok(socket_addr) = addr.parse() {
+                    if TcpStream::connect_timeout(&socket_addr, connect_timeout).is_ok() {
+                        println!("Sidecar ready on port {} after {} attempts", port, attempt);
+                        return Ok(port);
+                    }
+                }
+            }
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    eprintln!("Warning: Sidecar did not become ready within timeout");
-    eprintln!("Check sidecar log for details: {}", log_path.display());
+
+    let mut log_tail = String::new();
     if let Ok(log_contents) = std::fs::read_to_string(log_path) {
         if !log_contents.is_empty() {
-            let tail: String = log_contents.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
-            eprintln!("Sidecar log (last 20 lines):\n{}", tail);
+            log_tail = log_contents
+                .lines()
+                .rev()
+                .take(20)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("\n");
         }
     }
+
+    let mut msg = format!(
+        "Sidecar did not become ready within timeout. Check log at {}",
+        log_path.display()
+    );
+    if !log_tail.is_empty() {
+        msg.push_str(&format!("\n--- last 20 lines ---\n{}", log_tail));
+    }
+    Err(msg)
 }
 
 fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child, String> {
@@ -1444,10 +1515,14 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
     let stderr_file = log_file.try_clone()
         .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
 
+    // Stale port file from a previous run would mislead wait_for_sidecar.
+    // Sidecar will rewrite it after it binds, but clear it now to be safe.
+    let _ = std::fs::remove_file(data_dir.join("sidecar.port"));
+
     let mut cmd = Command::new(&program);
     cmd.args(&base_args)
         .arg("--port")
-        .arg("8420")
+        .arg("0") // ephemeral — sidecar publishes the actual port to data_dir/sidecar.port
         .arg("--data-dir")
         .arg(data_dir.to_string_lossy().as_ref())
         .stdout(std::process::Stdio::from(log_file))
@@ -1475,9 +1550,14 @@ fn stop_sidecar(state: &SidecarState) {
                 let pid = child.id() as i32;
                 unsafe { libc::kill(-pid, libc::SIGTERM); }
             }
+            // Windows: child.kill() only terminates the immediate process via
+            // TerminateProcess and leaves any subprocesses orphaned. taskkill
+            // /T walks the process tree by parent PID, /F skips graceful exit.
             #[cfg(not(unix))]
             {
-                let _ = child.kill();
+                let _ = Command::new("taskkill")
+                    .args(["/T", "/F", "/PID", &child.id().to_string()])
+                    .status();
             }
 
             // Wait up to 3 seconds for graceful exit, then force kill
@@ -1510,7 +1590,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, rename_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, rename_collection, delete_collection, get_sidecar_failure, get_active_context, set_active_context, clear_active_context, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
@@ -1523,17 +1603,46 @@ pub fn run() {
 
             let sidecar_log = app_data_dir.join("sidecar.log");
 
+            app.manage(SidecarFailureState(Mutex::new(None)));
+
+            // record_failure: stash for the frontend's late mount AND emit for
+            // any listener that's already attached (e.g. mid-session restart).
+            let record_failure = |app: &tauri::AppHandle, payload: SidecarFailedPayload| {
+                if let Some(state) = app.try_state::<SidecarFailureState>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        *guard = Some(payload.clone());
+                    }
+                }
+                let _ = app.emit("sidecar://failed", &payload);
+            };
+
             // Start the Python sidecar
+            let port_file = chroma_dir.join("sidecar.port");
             match start_sidecar(app.handle(), &chroma_dir) {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));
-                    wait_for_sidecar(&sidecar_log);
+                    match wait_for_sidecar(&port_file, &sidecar_log) {
+                        Ok(port) => {
+                            SIDECAR_PORT.store(port, Ordering::Relaxed);
+                        }
+                        Err(msg) => {
+                            eprintln!("{}", msg);
+                            record_failure(app.handle(), SidecarFailedPayload {
+                                log_path: sidecar_log.to_string_lossy().into_owned(),
+                                message: msg,
+                            });
+                        }
+                    }
                 }
                 Err(e) => {
                     eprintln!("Warning: Could not start sidecar: {}", e);
                     eprintln!("Indexing features will be unavailable.");
                     app.manage(SidecarState(Mutex::new(None)));
+                    record_failure(app.handle(), SidecarFailedPayload {
+                        log_path: sidecar_log.to_string_lossy().into_owned(),
+                        message: format!("Could not start sidecar: {}", e),
+                    });
                 }
             }
 

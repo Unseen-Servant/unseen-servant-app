@@ -9,7 +9,7 @@ Architecture:
     Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP) ←→ ChromaDB
 
 Usage:
-    python mcp_server.py
+    python mcp_server.py --data-dir /path/to/app/data
     python mcp_server.py --sidecar-url http://localhost:8420
 """
 
@@ -18,9 +18,14 @@ import re
 import sys
 import threading
 import time
+from pathlib import Path
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+
+PORT_FILENAME = "sidecar.port"
+SIDECAR_URL_DISCOVERY_TIMEOUT = 30.0  # seconds; covers a slow sidecar boot
 
 
 # Tag every sidecar request from this process so the sidecar can track
@@ -50,46 +55,117 @@ def parse_args():
     parser.add_argument(
         "--sidecar-url",
         type=str,
-        default="http://localhost:8420",
-        help="URL of the FastAPI sidecar (default: http://localhost:8420)",
+        default=None,
+        help="Explicit sidecar URL. Takes precedence over --data-dir.",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default=None,
+        help="App data directory containing sidecar.port (preferred — picks up "
+             "the ephemeral port the sidecar binds at launch).",
     )
     return parser.parse_args()
+
+
+def current_sidecar_url(args) -> str | None:
+    """Resolve the sidecar URL right now, with no retry.
+
+    Used per-request so the MCP server follows the sidecar across Legend
+    Lore restarts: ephemeral binding gives a different port every launch,
+    but ``sidecar.port`` always reflects the current one. Returns ``None``
+    when the file is absent (sidecar not running) so callers can show a
+    "launch the app" hint.
+
+    Precedence: ``--sidecar-url`` (explicit, frozen) > ``--data-dir``
+    (live port file lookup).
+    """
+    if args.sidecar_url:
+        return args.sidecar_url
+    if args.data_dir:
+        port_file = Path(args.data_dir) / PORT_FILENAME
+        try:
+            port = int(port_file.read_text().strip())
+            return f"http://127.0.0.1:{port}"
+        except (FileNotFoundError, ValueError):
+            return None
+    return None
+
+
+def discover_sidecar_url(args) -> str:
+    """Resolve the sidecar URL at startup, with a grace window for slow boots.
+
+    Used by ``check_sidecar_health`` (one-shot diagnostic at startup).
+    Falls back to the legacy default URL when discovery times out so old
+    configs without ``--data-dir`` still work in dev.
+    """
+    url = current_sidecar_url(args)
+    if url:
+        return url
+    if args.data_dir:
+        deadline = time.monotonic() + SIDECAR_URL_DISCOVERY_TIMEOUT
+        while time.monotonic() < deadline:
+            time.sleep(0.5)
+            url = current_sidecar_url(args)
+            if url:
+                return url
+        print(
+            f"Warning: timed out waiting for sidecar port file in {args.data_dir}. "
+            f"Falling back to default URL.",
+            file=sys.stderr,
+        )
+    return "http://localhost:8420"
 
 
 # ---------------------------------------------------------------------------
 # Sidecar HTTP client
 # ---------------------------------------------------------------------------
 
+_SIDECAR_DOWN_HINT = (
+    "Cannot connect to Legend Lore app. Make sure the desktop app is running."
+)
+
+
 class SidecarClient:
     """Thin wrapper around httpx for calling the FastAPI sidecar.
 
-    Why a class? So every tool doesn't repeat the base URL and
-    error-handling logic. If the sidecar is down, we return a
-    helpful message instead of crashing the MCP server.
+    Holds the parsed CLI args and re-resolves the sidecar URL on every
+    request. The MCP server outlives any single Legend Lore launch, so a
+    cached URL would go stale the moment the user quit and relaunched the
+    desktop app (each launch picks a fresh ephemeral port).
     """
 
-    def __init__(self, base_url: str):
-        self.base_url = base_url
+    def __init__(self, args):
+        self._args = args
+
+    def _resolve(self) -> str | None:
+        return current_sidecar_url(self._args)
 
     async def get(self, path: str) -> dict | str:
+        url = self._resolve()
+        if url is None:
+            return _SIDECAR_DOWN_HINT
         try:
             async with httpx.AsyncClient(headers=MCP_HEADERS) as client:
-                resp = await client.get(f"{self.base_url}{path}")
+                resp = await client.get(f"{url}{path}")
                 resp.raise_for_status()
                 return resp.json()
         except httpx.ConnectError:
-            return f"Cannot connect to Legend Lore app. Make sure the desktop app is running (sidecar at {self.base_url})."
+            return _SIDECAR_DOWN_HINT
         except httpx.HTTPStatusError as e:
             return f"Sidecar error: {e.response.status_code} — {e.response.text}"
 
     async def post(self, path: str, json: dict) -> dict | str:
+        url = self._resolve()
+        if url is None:
+            return _SIDECAR_DOWN_HINT
         try:
             async with httpx.AsyncClient(headers=MCP_HEADERS) as client:
-                resp = await client.post(f"{self.base_url}{path}", json=json)
+                resp = await client.post(f"{url}{path}", json=json)
                 resp.raise_for_status()
                 return resp.json()
         except httpx.ConnectError:
-            return f"Cannot connect to Legend Lore app. Make sure the desktop app is running (sidecar at {self.base_url})."
+            return _SIDECAR_DOWN_HINT
         except httpx.HTTPStatusError as e:
             return f"Sidecar error: {e.response.status_code} — {e.response.text}"
 
@@ -98,8 +174,10 @@ class SidecarClient:
 # MCP server setup
 # ---------------------------------------------------------------------------
 
-args = parse_args()
-sidecar = SidecarClient(args.sidecar_url)
+# Sidecar client is set in __main__ once CLI args are parsed. Tool handlers
+# capture this global at call time, so it's safe to leave as None during
+# import (e.g. when pytest collects the module).
+sidecar: SidecarClient | None = None
 
 mcp = FastMCP(
     name="Legend Lore",
@@ -313,23 +391,28 @@ def check_sidecar_health(url: str) -> None:
         )
 
 
-def heartbeat_loop(url: str) -> None:
+def heartbeat_loop(args) -> None:
     """Tell the sidecar we're alive every HEARTBEAT_INTERVAL_SECONDS so the
-    desktop UI can show an "MCP connected" indicator. Failures are silently
-    ignored — the sidecar may be unreachable temporarily."""
+    desktop UI can show an "MCP connected" indicator. Re-resolves the URL
+    on each tick so heartbeats follow the sidecar across Legend Lore
+    restarts. Silently skips when the sidecar is down."""
     while True:
-        try:
-            httpx.post(f"{url}/api/mcp-heartbeat", timeout=2.0)
-        except Exception:
-            pass
+        url = current_sidecar_url(args)
+        if url:
+            try:
+                httpx.post(f"{url}/api/mcp-heartbeat", timeout=2.0)
+            except Exception:
+                pass
         time.sleep(HEARTBEAT_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":
-    check_sidecar_health(args.sidecar_url)
+    args = parse_args()
+    sidecar = SidecarClient(args)
+    check_sidecar_health(discover_sidecar_url(args))
     threading.Thread(
         target=heartbeat_loop,
-        args=(args.sidecar_url,),
+        args=(args,),
         daemon=True,
     ).start()
     mcp.run(transport="stdio")

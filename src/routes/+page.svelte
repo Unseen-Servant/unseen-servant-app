@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { pdfFileUrl } from '../lib/pdfUrl';
@@ -441,11 +442,40 @@
     }
   }
 
+  let unlistenSidecarFailed: (() => void) | null = null;
+
   onMount(async () => {
     splashTimer = setTimeout(() => {
       showSplash = false;
       splashTimer = null;
     }, 1200);
+
+    // Sidecar failed to start at app launch — show one sticky banner so the
+    // user gets a single clear failure message instead of N "failed to
+    // connect" toasts on every per-call attempt. The setup() emit happens
+    // before the webview is ready, so we also poll the stashed state here;
+    // the listener covers any future failures (e.g. mid-session restart).
+    function showSidecarFailure(payload: { log_path: string; message: string }) {
+      jobNotification.show({
+        type: 'error',
+        message: `Indexer failed to start. See log: ${payload.log_path}`,
+        duration: null,
+      });
+    }
+
+    unlistenSidecarFailed = await listen<{ log_path: string; message: string }>(
+      'sidecar://failed',
+      (event) => showSidecarFailure(event.payload),
+    );
+
+    try {
+      const stashed = await invoke<{ log_path: string; message: string } | null>(
+        'get_sidecar_failure',
+      );
+      if (stashed) showSidecarFailure(stashed);
+    } catch {
+      // Non-fatal — command may not exist on older builds during dev rebuilds.
+    }
 
     try {
       const store = await load('settings.json');
@@ -593,6 +623,7 @@
     if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
     if (splashTimer) clearTimeout(splashTimer);
+    if (unlistenSidecarFailed) unlistenSidecarFailed();
   });
 
   async function checkSidecarHealth() {
