@@ -3,7 +3,6 @@
   import { chordHint } from './keybindings';
 
   export let searchQuery: string = '';
-  export let isSearching: boolean = false;
   export let disabled: boolean = false;
   export let panelOpen: boolean = false;
   export let panelToggleVisible: boolean = true;
@@ -258,10 +257,7 @@
       on:blur={handleBlur}
       aria-label="Search library"
     />
-    {#if isSearching}
-      <span class="spinner" aria-label="Searching">⟳</span>
-    {/if}
-    {#if searchQuery.length > 0 && !isSearching}
+    {#if searchQuery.length > 0}
       <button
         class="clear-btn"
         type="button"
@@ -404,19 +400,6 @@
 
   .search-input:disabled {
     cursor: not-allowed;
-  }
-
-  .spinner {
-    color: var(--text-accent);
-    font-size: 0.9rem;
-    margin-left: 0.4rem;
-    animation: spin 1s linear infinite;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
   }
 
   .clear-btn {

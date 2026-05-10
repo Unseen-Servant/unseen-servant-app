@@ -6,6 +6,11 @@
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
+  // True only when a fresh search is in flight — i.e., the displayed
+  // rows belong to an older query than the one currently committed.
+  // Dims the rows so they read as stale, distinguishes from "load more"
+  // pagination where the existing rows are still authoritative.
+  export let stale: boolean = false;
   export let query: string = '';
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
@@ -108,7 +113,14 @@
   }
 </script>
 
-<div class="search-results" role="listbox" aria-label="Search results" on:scroll={handleScroll}>
+<div
+  class="search-results"
+  class:dimmed={stale && results.length > 0}
+  aria-busy={stale && results.length > 0}
+  role="listbox"
+  aria-label="Search results"
+  on:scroll={handleScroll}
+>
   {#if isLoading && results.length === 0}
     <div class="state-msg">Searching…</div>
   {:else if error}
@@ -170,7 +182,7 @@
         </span>
       </div>
     {/each}
-    {#if isLoading && results.length > 0}
+    {#if isLoading && !stale && results.length > 0}
       <div class="loading-more" aria-live="polite">loading more…</div>
     {/if}
   {/if}
@@ -212,8 +224,17 @@
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-subtle);
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition: background var(--transition-fast), opacity var(--transition-fast);
     align-items: flex-start;
+  }
+
+  /* Stale-results state: a new search is in flight against a different
+     query, but the previous rows are still rendered. Fade them so the
+     reader registers "this is what you were looking at, the new answer
+     is on the way" without losing scroll position or layout. */
+  .search-results.dimmed .result-row {
+    opacity: 0.35;
+    pointer-events: none;
   }
 
   /* DAW track-color stripe at the left edge: always-on system color,

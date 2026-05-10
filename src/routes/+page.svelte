@@ -178,6 +178,11 @@
   let searchQuery = '';
   let committedQuery = '';
   let searchResults: SearchResultItem[] = [];
+  // Tracks which query produced the rows currently in `searchResults`.
+  // Used to distinguish a fresh search-in-flight (committedQuery !==
+  // resultsQuery, displayed rows are stale) from a "load more"
+  // pagination (same query, rows still authoritative).
+  let resultsQuery = '';
   let isSearching = false;
   let searchError: string | null = null;
   let searchSeq = 0;
@@ -325,11 +330,13 @@
       // alone. Only reset for fresh queries (first page) or shrinkage.
       const wasGrowing = next.length > searchResults.length && searchResults.length > 0;
       searchResults = next;
+      resultsQuery = trimmed;
       if (!wasGrowing) selectedResultIndex = 0;
     } catch (e) {
       if (seq !== searchSeq) return;
       searchError = String(e);
       searchResults = [];
+      resultsQuery = '';
     } finally {
       if (seq === searchSeq) {
         isSearching = false;
@@ -374,6 +381,7 @@
     searchQuery = '';
     committedQuery = '';
     searchResults = [];
+    resultsQuery = '';
     searchError = null;
     isSearching = false;
     searchSeq += 1;
@@ -2721,7 +2729,6 @@
   <Header
     bind:this={headerComponent}
     bind:searchQuery
-    {isSearching}
     disabled={!selectedFolder || isCollectionEditMode}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
@@ -2804,6 +2811,7 @@
                 bind:this={searchResultsComponent}
                 results={searchResults}
                 isLoading={isSearching}
+                stale={isSearching && committedQuery !== resultsQuery}
                 query={committedQuery}
                 error={searchError}
                 indexedFileCount={indexedPathsSet.size}
