@@ -9,7 +9,7 @@ Architecture:
     Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP) ←→ ChromaDB
 
 Usage:
-    python mcp_server.py
+    python mcp_server.py --data-dir /path/to/app/data
     python mcp_server.py --sidecar-url http://localhost:8420
 """
 
@@ -18,9 +18,14 @@ import re
 import sys
 import threading
 import time
+from pathlib import Path
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+
+PORT_FILENAME = "sidecar.port"
+SIDECAR_URL_DISCOVERY_TIMEOUT = 30.0  # seconds; covers a slow sidecar boot
 
 
 # Tag every sidecar request from this process so the sidecar can track
@@ -50,10 +55,45 @@ def parse_args():
     parser.add_argument(
         "--sidecar-url",
         type=str,
-        default="http://localhost:8420",
-        help="URL of the FastAPI sidecar (default: http://localhost:8420)",
+        default=None,
+        help="Explicit sidecar URL. Takes precedence over --data-dir.",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default=None,
+        help="App data directory containing sidecar.port (preferred — picks up "
+             "the ephemeral port the sidecar binds at launch).",
     )
     return parser.parse_args()
+
+
+def discover_sidecar_url(args) -> str:
+    """Resolve the sidecar base URL from CLI args.
+
+    Precedence: ``--sidecar-url`` (explicit) > ``--data-dir`` (read port file).
+    Falls back to ``http://localhost:8420`` so existing configs that pass
+    neither still work in dev. When reading the port file, retry briefly to
+    cover the case where Claude Desktop launches the MCP server before the
+    sidecar finishes booting.
+    """
+    if args.sidecar_url:
+        return args.sidecar_url
+    if args.data_dir:
+        port_file = Path(args.data_dir) / PORT_FILENAME
+        deadline = time.monotonic() + SIDECAR_URL_DISCOVERY_TIMEOUT
+        while time.monotonic() < deadline:
+            try:
+                port = int(port_file.read_text().strip())
+                return f"http://127.0.0.1:{port}"
+            except (FileNotFoundError, ValueError):
+                time.sleep(0.5)
+        print(
+            f"Warning: timed out waiting for sidecar port file at {port_file}. "
+            f"Falling back to default URL.",
+            file=sys.stderr,
+        )
+    return "http://localhost:8420"
 
 
 # ---------------------------------------------------------------------------
@@ -98,8 +138,10 @@ class SidecarClient:
 # MCP server setup
 # ---------------------------------------------------------------------------
 
-args = parse_args()
-sidecar = SidecarClient(args.sidecar_url)
+# Sidecar client is set in __main__ once CLI args are parsed. Tool handlers
+# capture this global at call time, so it's safe to leave as None during
+# import (e.g. when pytest collects the module).
+sidecar: SidecarClient | None = None
 
 mcp = FastMCP(
     name="Legend Lore",
@@ -326,10 +368,13 @@ def heartbeat_loop(url: str) -> None:
 
 
 if __name__ == "__main__":
-    check_sidecar_health(args.sidecar_url)
+    args = parse_args()
+    sidecar_url = discover_sidecar_url(args)
+    sidecar = SidecarClient(sidecar_url)
+    check_sidecar_health(sidecar_url)
     threading.Thread(
         target=heartbeat_loop,
-        args=(args.sidecar_url,),
+        args=(sidecar_url,),
         daemon=True,
     ).start()
     mcp.run(transport="stdio")
