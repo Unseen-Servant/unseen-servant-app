@@ -7,6 +7,8 @@ on:
     branches: [main]
 
 jobs:
+  # Pure Python tests against the in-memory ChromaDB fixture. Fast,
+  # exercises every endpoint contract.
   sidecar-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -30,3 +32,148 @@ jobs:
         run: |
           cd sidecar
           pytest -v
+
+  # Rust formatting + lint + unit tests. Catches anything that would
+  # break the Tauri compile or trip clippy. Uses Ubuntu because Tauri's
+  # webkit deps install via apt; the Rust code is platform-independent.
+  rust-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --lib
+
+  # svelte-check + vitest + production vite build. Covers TypeScript
+  # errors, frontend unit tests, and any build-time regression.
+  frontend-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: svelte-check
+        run: npm run check
+
+      - name: vitest
+        run: npm test
+
+      - name: vite build
+        run: npm run build
+
+  # Builds the PyInstaller sidecar binary and asserts it actually starts.
+  # Would have caught #274 (missing pymupdf data files crashed the
+  # bundled binary on import). Runs on macOS because that's the actual
+  # distribution target and the build script is currently macOS-only;
+  # the data-file bug it catches is platform-independent so one platform
+  # is enough.
+  sidecar-binary-smoke:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Build sidecar venv + install deps
+        working-directory: sidecar
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build PyInstaller binaries
+        run: bash scripts/build-sidecar.sh
+
+      - name: Sidecar binary --help
+        run: |
+          BIN=$(ls src-tauri/binaries/legend-lore-sidecar-*)
+          echo "Smoke testing: $BIN"
+          "$BIN" --help
+
+      - name: MCP binary --help
+        run: |
+          BIN=$(ls src-tauri/binaries/legend-lore-mcp-*)
+          echo "Smoke testing: $BIN"
+          "$BIN" --help
+
+  # Cross-platform Tauri compile on the actual distribution targets.
+  # --no-bundle skips dmg/nsis packaging (slow and platform-fragile);
+  # the goal here is to catch link errors and platform-specific Rust
+  # issues, not to validate the bundler.
+  tauri-build-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      # tauri build expects the sidecar binaries to exist (they're a
+      # bundle resource); empty placeholders are enough for --no-bundle
+      # since that path skips resource copying. Touching the platform-
+      # specific filenames keeps the resource glob happy on either OS.
+      - name: Stub sidecar binaries
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            touch src-tauri/binaries/legend-lore-sidecar-aarch64-apple-darwin
+            touch src-tauri/binaries/legend-lore-mcp-aarch64-apple-darwin
+          else
+            touch src-tauri/binaries/legend-lore-sidecar-x86_64-pc-windows-msvc.exe
+            touch src-tauri/binaries/legend-lore-mcp-x86_64-pc-windows-msvc.exe
+          fi
+
+      - name: tauri build --no-bundle
+        run: npm run tauri build -- --no-bundle

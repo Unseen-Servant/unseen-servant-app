@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use tauri::{Emitter, Manager};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::menu::{Menu, MenuItem};
 use std::process::{Child, Command};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Mutex;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Sidecar state — holds the Python child process handle and any startup
@@ -276,7 +276,8 @@ struct SearchResponse {
 async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
 
-    let folder = app.dialog()
+    let folder = app
+        .dialog()
         .file()
         .set_title("Select your TTRPG folder")
         .blocking_pick_folder();
@@ -349,7 +350,8 @@ fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
 
     // Sort: folders first, then alphabetically (case-insensitive)
     items.sort_by(|a, b| {
-        b.is_dir.cmp(&a.is_dir)
+        b.is_dir
+            .cmp(&a.is_dir)
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
 
@@ -402,10 +404,7 @@ async fn check_ollama_health() -> Result<OllamaStatus, String> {
                 .json()
                 .await
                 .unwrap_or(OllamaTagsResponse { models: vec![] });
-            let has_model = tags
-                .models
-                .iter()
-                .any(|m| m.name.starts_with("bge-m3"));
+            let has_model = tags.models.iter().any(|m| m.name.starts_with("bge-m3"));
             Ok(OllamaStatus {
                 running: true,
                 has_model,
@@ -499,10 +498,7 @@ async fn consume_sync_stream(
                         Some("started") => {
                             let payload = SyncProgressPayload {
                                 files_done: 0,
-                                total_files: json["total_files"]
-                                    .as_u64()
-                                    .unwrap_or(0)
-                                    as u32,
+                                total_files: json["total_files"].as_u64().unwrap_or(0) as u32,
                                 chunks_total: 0,
                                 current_file: String::new(),
                                 phase: String::new(),
@@ -706,7 +702,10 @@ async fn delete_index() -> Result<DeleteIndexResult, String> {
 }
 
 #[tauri::command]
-async fn set_game_system(filename: String, game_system: String) -> Result<SetGameSystemResult, String> {
+async fn set_game_system(
+    filename: String,
+    game_system: String,
+) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/api/set-game-system", sidecar_url()))
@@ -731,7 +730,10 @@ async fn set_game_system(filename: String, game_system: String) -> Result<SetGam
 }
 
 #[tauri::command]
-async fn set_game_systems(filename: String, game_systems: Vec<String>) -> Result<SetGameSystemResult, String> {
+async fn set_game_systems(
+    filename: String,
+    game_systems: Vec<String>,
+) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/api/set-game-systems", sidecar_url()))
@@ -760,7 +762,11 @@ async fn set_game_systems(filename: String, game_systems: Vec<String>) -> Result
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-async fn create_custom_game_system(tag: String, keywords: Vec<String>, color: Option<String>) -> Result<CustomGameSystemResult, String> {
+async fn create_custom_game_system(
+    tag: String,
+    keywords: Vec<String>,
+    color: Option<String>,
+) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/api/custom-game-systems", sidecar_url()))
@@ -788,11 +794,20 @@ async fn create_custom_game_system(tag: String, keywords: Vec<String>, color: Op
 }
 
 #[tauri::command]
-async fn update_custom_game_system(original_tag: String, tag: String, keywords: Vec<String>, color: Option<String>) -> Result<CustomGameSystemResult, String> {
+async fn update_custom_game_system(
+    original_tag: String,
+    tag: String,
+    keywords: Vec<String>,
+    color: Option<String>,
+) -> Result<CustomGameSystemResult, String> {
     let client = reqwest::Client::new();
     let encoded_tag = original_tag.replace("&", "%26").replace(" ", "%20");
     let response = client
-        .put(format!("{}/api/custom-game-systems/{}", sidecar_url(), encoded_tag))
+        .put(format!(
+            "{}/api/custom-game-systems/{}",
+            sidecar_url(),
+            encoded_tag
+        ))
         .json(&serde_json::json!({
             "tag": tag,
             "keywords": keywords,
@@ -821,7 +836,11 @@ async fn delete_custom_game_system(tag: String) -> Result<DeleteCustomSystemResu
     let client = reqwest::Client::new();
     let encoded_tag = tag.replace("&", "%26").replace(" ", "%20");
     let response = client
-        .delete(format!("{}/api/custom-game-systems/{}", sidecar_url(), encoded_tag))
+        .delete(format!(
+            "{}/api/custom-game-systems/{}",
+            sidecar_url(),
+            encoded_tag
+        ))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -841,10 +860,16 @@ async fn delete_custom_game_system(tag: String) -> Result<DeleteCustomSystemResu
 }
 
 #[tauri::command]
-async fn toggle_builtin_game_system(tag: String, disabled: bool) -> Result<ToggleBuiltinResult, String> {
+async fn toggle_builtin_game_system(
+    tag: String,
+    disabled: bool,
+) -> Result<ToggleBuiltinResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/custom-game-systems/toggle-builtin", sidecar_url()))
+        .post(format!(
+            "{}/api/custom-game-systems/toggle-builtin",
+            sidecar_url()
+        ))
         .json(&serde_json::json!({
             "tag": tag,
             "disabled": disabled,
@@ -1158,9 +1183,8 @@ fn validate_rename_name(name: &str) -> Result<(), String> {
     }
     let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
     const WIN_RESERVED: &[&str] = &[
-        "CON", "PRN", "AUX", "NUL",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     ];
     if WIN_RESERVED.iter().any(|r| *r == stem) {
         return Err(format!("'{}' is a reserved name on Windows", name));
@@ -1175,7 +1199,9 @@ async fn rename_file(old_path: String, new_name: String) -> Result<String, Strin
     if !old.exists() {
         return Err("File not found".to_string());
     }
-    let parent = old.parent().ok_or("Cannot determine parent directory".to_string())?;
+    let parent = old
+        .parent()
+        .ok_or("Cannot determine parent directory".to_string())?;
     let new_path = parent.join(&new_name);
     // Defense in depth: confirm new_path stays in the original parent.
     if new_path.parent() != Some(parent) {
@@ -1232,7 +1258,9 @@ async fn rename_folder(old_path: String, new_name: String) -> Result<String, Str
     if !old.exists() || !old.is_dir() {
         return Err("Folder not found".to_string());
     }
-    let parent = old.parent().ok_or("Cannot determine parent directory".to_string())?;
+    let parent = old
+        .parent()
+        .ok_or("Cannot determine parent directory".to_string())?;
     let new_path = parent.join(&new_name);
     if new_path.parent() != Some(parent) {
         return Err("Name escapes parent directory".to_string());
@@ -1326,7 +1354,10 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
             "python3".to_string()
         };
 
-        (python_path, vec![mcp_server_py, "--data-dir".to_string(), data_dir])
+        (
+            python_path,
+            vec![mcp_server_py, "--data-dir".to_string(), data_dir],
+        )
     } else {
         // Production: use bundled binary
         let resource_dir = app_handle
@@ -1362,8 +1393,7 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
         }
     });
 
-    serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))
+    serde_json::to_string_pretty(&config).map_err(|e| format!("Failed to serialize config: {}", e))
 }
 
 // ---------------------------------------------------------------------------
@@ -1391,7 +1421,11 @@ fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, Str
         }
     }
 
-    Err(format!("Bundled binary '{}' not found in {}", name, dir.display()))
+    Err(format!(
+        "Bundled binary '{}' not found in {}",
+        name,
+        dir.display()
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -1402,9 +1436,7 @@ fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, Str
 /// this on mount to recover from the race where ``setup()`` emits
 /// ``sidecar://failed`` before the webview has loaded a listener.
 #[tauri::command]
-fn get_sidecar_failure(
-    state: tauri::State<SidecarFailureState>,
-) -> Option<SidecarFailedPayload> {
+fn get_sidecar_failure(state: tauri::State<SidecarFailureState>) -> Option<SidecarFailedPayload> {
     state.0.lock().ok().and_then(|g| g.clone())
 }
 
@@ -1512,7 +1544,8 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
     let log_dir = data_dir.parent().unwrap_or(data_dir);
     let log_file = std::fs::File::create(log_dir.join("sidecar.log"))
         .map_err(|e| format!("Failed to create sidecar log file: {}", e))?;
-    let stderr_file = log_file.try_clone()
+    let stderr_file = log_file
+        .try_clone()
         .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
 
     // Stale port file from a previous run would mislead wait_for_sidecar.
@@ -1535,7 +1568,8 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
         cmd.process_group(0);
     }
 
-    let child = cmd.spawn()
+    let child = cmd
+        .spawn()
         .map_err(|e| format!("Failed to start sidecar with {}: {}", program.display(), e))?;
 
     Ok(child)
@@ -1548,7 +1582,9 @@ fn stop_sidecar(state: &SidecarState) {
             #[cfg(unix)]
             {
                 let pid = child.id() as i32;
-                unsafe { libc::kill(-pid, libc::SIGTERM); }
+                unsafe {
+                    libc::kill(-pid, libc::SIGTERM);
+                }
             }
             // Windows: child.kill() only terminates the immediate process via
             // TerminateProcess and leaves any subprocesses orphaned. taskkill
@@ -1590,7 +1626,45 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, rename_collection, delete_collection, get_sidecar_failure, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![
+            select_folder,
+            list_files,
+            count_pdfs_recursive,
+            rename_file,
+            delete_file,
+            rename_folder,
+            delete_folder,
+            check_ollama_health,
+            check_sidecar_health,
+            check_mcp_status,
+            get_index_status,
+            sync_index,
+            reindex_all,
+            reindex_file,
+            get_document_stats,
+            get_stats,
+            compact_database,
+            delete_index,
+            get_data_dir,
+            get_known_game_systems,
+            set_game_system,
+            set_game_systems,
+            create_custom_game_system,
+            update_custom_game_system,
+            delete_custom_game_system,
+            toggle_builtin_game_system,
+            get_mcp_config,
+            get_collections,
+            create_collection,
+            update_collection,
+            rename_collection,
+            delete_collection,
+            get_sidecar_failure,
+            get_active_context,
+            set_active_context,
+            clear_active_context,
+            search_index
+        ])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
@@ -1628,10 +1702,13 @@ pub fn run() {
                         }
                         Err(msg) => {
                             eprintln!("{}", msg);
-                            record_failure(app.handle(), SidecarFailedPayload {
-                                log_path: sidecar_log.to_string_lossy().into_owned(),
-                                message: msg,
-                            });
+                            record_failure(
+                                app.handle(),
+                                SidecarFailedPayload {
+                                    log_path: sidecar_log.to_string_lossy().into_owned(),
+                                    message: msg,
+                                },
+                            );
                         }
                     }
                 }
@@ -1639,10 +1716,13 @@ pub fn run() {
                     eprintln!("Warning: Could not start sidecar: {}", e);
                     eprintln!("Indexing features will be unavailable.");
                     app.manage(SidecarState(Mutex::new(None)));
-                    record_failure(app.handle(), SidecarFailedPayload {
-                        log_path: sidecar_log.to_string_lossy().into_owned(),
-                        message: format!("Could not start sidecar: {}", e),
-                    });
+                    record_failure(
+                        app.handle(),
+                        SidecarFailedPayload {
+                            log_path: sidecar_log.to_string_lossy().into_owned(),
+                            message: format!("Could not start sidecar: {}", e),
+                        },
+                    );
                 }
             }
 
@@ -1659,20 +1739,18 @@ pub fn run() {
                 .tooltip("Legend Lore")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.unminimize();
-                                let _ = window.set_focus();
-                            }
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
                         }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
                     }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
