@@ -343,6 +343,30 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
     assert large_entry.last_error is None
 
 
+# ---------------------------------------------------------------------------
+# Ollama embed timeout — defends against wedged Ollama hanging the sync
+# ---------------------------------------------------------------------------
+
+
+def test_build_ollama_embedding_function_default_timeout(monkeypatch):
+    """Default timeout is 120s — long enough for a slow embed batch but
+    short enough that a wedged Ollama can't hang sync forever."""
+    from server import build_ollama_embedding_function
+
+    monkeypatch.delenv("OLLAMA_EMBED_TIMEOUT_SECONDS", raising=False)
+    ef = build_ollama_embedding_function()
+    assert ef.timeout == 120
+
+
+def test_build_ollama_embedding_function_env_override(monkeypatch):
+    """OLLAMA_EMBED_TIMEOUT_SECONDS overrides the default."""
+    from server import build_ollama_embedding_function
+
+    monkeypatch.setenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "30")
+    ef = build_ollama_embedding_function()
+    assert ef.timeout == 30
+
+
 def test_sync_stream_phase3_failure_releases_lock(
     client, sample_pdf_path, monkeypatch
 ):

@@ -659,6 +659,25 @@ def resolve_collection_filenames(
 # ---------------------------------------------------------------------------
 
 
+def build_ollama_embedding_function():
+    """Construct the Ollama embedding function with an explicit timeout.
+
+    chromadb defaults to 60s, which is too tight for a 256-input bge-m3
+    batch on slower hardware. Without an effective timeout, a wedged
+    Ollama (process suspended, network down) blocks the worker thread
+    indefinitely, which blocks ``fut.result()`` in
+    ``_embed_and_upsert_units``, which holds the sync lock forever.
+
+    Override at runtime with ``OLLAMA_EMBED_TIMEOUT_SECONDS``.
+    """
+    timeout = int(os.getenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "120"))
+    return embedding_functions.OllamaEmbeddingFunction(
+        url="http://localhost:11434/api/embeddings",
+        model_name="bge-m3",
+        timeout=timeout,
+    )
+
+
 def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
     """Return a stable, collision-free prefix for chunk IDs.
 
@@ -1370,10 +1389,7 @@ def create_app(
         reclaimed = gc_orphan_segments(data_dir)
         if reclaimed > 0:
             print(f"[gc] removed orphan segment dirs: {reclaimed:,} bytes reclaimed")
-        embedding_function = embedding_functions.OllamaEmbeddingFunction(
-            url="http://localhost:11434/api/embeddings",
-            model_name="bge-m3"
-        )
+        embedding_function = build_ollama_embedding_function()
         collection = chroma_client.get_or_create_collection(
             name="ttrpg_docs",
             embedding_function=embedding_function,
@@ -1866,13 +1882,18 @@ def create_app(
 
     @app.post("/api/sync-index-stream")
     async def sync_index_stream(request: SyncIndexRequest):
-        """Streaming version of sync-index that emits SSE progress events."""
-        acquire_sync_lock_or_409()
+        """Streaming version of sync-index that emits SSE progress events.
+
+        Acquires the sync lock synchronously so 409 surfaces as a normal
+        HTTP error. Once the lock is held, the only release path is the
+        generator's ``finally`` — so any intermediate validation must run
+        before the acquire to avoid leaking the lock.
+        """
         if not data_dir:
-            _sync_lock.release()
             raise HTTPException(
                 status_code=500, detail="No data directory configured"
             )
+        acquire_sync_lock_or_409()
 
         def generate_with_lock():
             try:
@@ -1892,12 +1913,11 @@ def create_app(
         indexed paths, so unchanged-on-disk files are re-processed with the
         current extractor.
         """
-        acquire_sync_lock_or_409()
         if not data_dir:
-            _sync_lock.release()
             raise HTTPException(
                 status_code=500, detail="No data directory configured"
             )
+        acquire_sync_lock_or_409()
 
         manifest = load_manifest(data_dir)
         request = SyncIndexRequest(
