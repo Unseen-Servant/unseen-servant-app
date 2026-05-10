@@ -20,6 +20,14 @@ from granularity import ParentDoc
 
 PARENTS_FILENAME = "parents.sqlite3"
 
+# Max characters of sibling-parent text to stitch onto a search hit. A
+# section that exceeded PARENT_HARD_CAP during indexing is split across
+# multiple parents; this budget lets us stitch them back together at
+# retrieval time. Sized to typically capture one full neighbor (most
+# split sections produce a "big half + remainder" pair where the
+# remainder is well under this cap).
+SECTION_EXPANSION_MAX_EXTRA_CHARS = 4000
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS parents (
@@ -110,6 +118,118 @@ def fetch_parents(
         )
         for row in rows
     }
+
+
+def _extend_one(
+    conn: sqlite3.Connection,
+    parent_id: str,
+    max_extra_chars: int,
+) -> ParentDoc | None:
+    """Fetch one parent and stitch contiguous sibling parents that share
+    its source + section_heading, capped at `max_extra_chars`.
+
+    Adjacency uses SQLite rowid order. Within a single source, rowid
+    order equals document order because upsert_parents does
+    delete-then-insert in chunk order. Walks rowid neighbors outward;
+    stops on the first neighbor with a different section_heading or
+    when adding the neighbor would exceed the budget.
+    """
+    target = conn.execute(
+        """
+        SELECT rowid, parent_id, source, text, section_heading,
+               page_start, page_end, chunk_type
+        FROM parents WHERE parent_id = ?
+        """,
+        (parent_id,),
+    ).fetchone()
+    if not target:
+        return None
+    target_rowid, pid, source, text, section, ps, pe, ctype = target
+
+    parts = [text]
+    page_start, page_end = ps, pe
+    budget = max_extra_chars
+
+    cursor = target_rowid
+    while budget > 0:
+        row = conn.execute(
+            """
+            SELECT rowid, text, section_heading, page_start, page_end
+            FROM parents WHERE source = ? AND rowid < ?
+            ORDER BY rowid DESC LIMIT 1
+            """,
+            (source, cursor),
+        ).fetchone()
+        if not row:
+            break
+        r_rowid, r_text, r_section, r_ps, r_pe = row
+        if r_section != section:
+            break
+        cost = len(r_text) + 2  # "\n\n" join
+        if cost > budget:
+            break
+        parts.insert(0, r_text)
+        page_start = min(page_start, r_ps)
+        budget -= cost
+        cursor = r_rowid
+
+    cursor = target_rowid
+    while budget > 0:
+        row = conn.execute(
+            """
+            SELECT rowid, text, section_heading, page_start, page_end
+            FROM parents WHERE source = ? AND rowid > ?
+            ORDER BY rowid ASC LIMIT 1
+            """,
+            (source, cursor),
+        ).fetchone()
+        if not row:
+            break
+        r_rowid, r_text, r_section, r_ps, r_pe = row
+        if r_section != section:
+            break
+        cost = len(r_text) + 2
+        if cost > budget:
+            break
+        parts.append(r_text)
+        page_end = max(page_end, r_pe)
+        budget -= cost
+        cursor = r_rowid
+
+    return ParentDoc(
+        parent_id=pid,
+        source_pdf=source,
+        text="\n\n".join(parts),
+        section_heading=section,
+        page_start=page_start,
+        page_end=page_end,
+        chunk_type=ctype,
+    )
+
+
+def fetch_parents_extended(
+    data_dir: Path,
+    parent_ids: list[str],
+    max_extra_chars: int = SECTION_EXPANSION_MAX_EXTRA_CHARS,
+) -> dict[str, ParentDoc]:
+    """Like `fetch_parents`, but stitches each parent with rowid-adjacent
+    sibling parents that share the same source + section_heading.
+
+    Section-aware result expansion: a section that exceeded
+    PARENT_HARD_CAP at indexing time was split across multiple parents.
+    Without stitching, a search hit on a middle slice loses surrounding
+    context. With stitching, the returned text rounds out to the full
+    section (or `max_extra_chars` worth, whichever is first).
+    """
+    if not data_dir or not parent_ids:
+        return {}
+    out: dict[str, ParentDoc] = {}
+    with _txn(data_dir) as conn:
+        for pid in parent_ids:
+            doc = _extend_one(conn, pid, max_extra_chars)
+            if doc is not None:
+                out[pid] = doc
+    return out
 
 
 def delete_parents_for_source(data_dir: Path, source: str) -> int:

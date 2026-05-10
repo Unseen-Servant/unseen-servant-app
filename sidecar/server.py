@@ -43,7 +43,8 @@ from cleanup import clean_pages
 from promote_headings import promote_markdown
 from granularity import EmbedUnit, ParentDoc, build as build_granularity
 from parents_store import (
-    upsert_parents, fetch_parents, delete_parents_for_source,
+    upsert_parents, fetch_parents_extended,
+    delete_parents_for_source,
     clear_all_parents,
 )
 
@@ -2716,7 +2717,9 @@ def create_app(
                 if len(picked) >= request.n_results:
                     break
 
-            parent_docs = fetch_parents(data_dir, [m["parent_id"] for m, _ in picked]) if data_dir else {}
+            parent_docs = fetch_parents_extended(
+                data_dir, [m["parent_id"] for m, _ in picked]
+            ) if data_dir else {}
 
             formatted = []
             for metadata, distance in picked:
