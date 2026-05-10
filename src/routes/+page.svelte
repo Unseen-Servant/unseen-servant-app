@@ -2853,12 +2853,12 @@
     <GettingStartedPage
       {ollamaRunning}
       {ollamaModelReady}
-      folderSelected={false}
-      filesIndexed={false}
-      collectionsCreated={false}
-      {mcpConnected}
       onSelectFolder={handleSelectFolder}
-      onCopyMcpConfig={handleCopyMcpConfig}
+      onOpenHelp={() => {
+        settingsInitialTab = 'help';
+        settingsInitialHelpSubTab = 'guides';
+        showSettings = true;
+      }}
     />
   {/if}
 
