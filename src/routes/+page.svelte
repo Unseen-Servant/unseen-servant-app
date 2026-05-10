@@ -15,7 +15,6 @@
   import SearchInspector from '../lib/SearchInspector.svelte';
   import SearchScopeBar from '../lib/SearchScopeBar.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
-  import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../lib/KeyboardHelpOverlay.svelte';
@@ -106,7 +105,6 @@
   let activeContextName: string | null = null;
   let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
-  let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
   // Library filter (next to the search bar). DAW-style mute + solo:
@@ -159,7 +157,6 @@
   let mcpActive = false;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
-  let showLicense = false;
   let showSettings = false;
   let showHelpOverlay = false;
   let showSplash = true;
@@ -472,10 +469,6 @@
       if (typeof savedPanelOpen === 'boolean') {
         collectionsPanelOpen = savedPanelOpen;
       }
-      const savedHideSetup = await store.get<boolean>('hideSetupButton');
-      if (typeof savedHideSetup === 'boolean') {
-        hideSetupButton = savedHideSetup;
-      }
       // libraryFilter persistence intentionally removed: filter state is
       // session-scoped now. We delete the old key to avoid confusion if a
       // user inspects settings.json — and so older versions don't reload
@@ -732,17 +725,6 @@
   function toggleFocusActiveCollection() {
     focusActiveCollection = !focusActiveCollection;
     persistFocusActiveCollection();
-  }
-
-  async function setHideSetupButton(value: boolean) {
-    hideSetupButton = value;
-    try {
-      const store = await load('settings.json');
-      await store.set('hideSetupButton', value);
-      await store.save();
-    } catch (e) {
-      console.log('Could not persist hideSetupButton:', e);
-    }
   }
 
   async function checkMcpStatus() {
@@ -3024,15 +3006,10 @@
     {lastSyncTime}
     onSync={handleManualSync}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
-    onShowLicense={() => { showLicense = true; }}
-    onShowGuide={() => { settingsInitialTab = 'help'; settingsInitialHelpSubTab = 'guides'; showSettings = true; }}
     onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
     onShowHelp={() => { showHelpOverlay = true; }}
-    showGuideButton={!hideSetupButton}
   />
 </main>
-
-<LicenseModal visible={showLicense} onClose={() => { showLicense = false; }} />
 
 <SettingsModal
   visible={showSettings}
@@ -3057,8 +3034,6 @@
   filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
   collectionsCreated={Object.keys(collections).length > 0}
   {mcpConnected}
-  {hideSetupButton}
-  onHideSetupButtonChange={setHideSetupButton}
   onSelectFolder={handleSelectFolder}
   onDeselectFolder={handleDeselectFolder}
   onCompact={handleCompact}

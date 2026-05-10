@@ -4,8 +4,6 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
 
   export let dataDir: string = '';
-  export let hideSetupButton: boolean = false;
-  export let onHideSetupButtonChange: (value: boolean) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
 
   const HOMEPAGE_URL = 'https://unseenservant.games';
@@ -69,25 +67,6 @@
     </ul>
   </section>
 
-  <section class="block">
-    <header class="block-head">
-      <h3 class="block-title font-heading">Preferences</h3>
-    </header>
-    <label class="toggle-row">
-      <span class="toggle-text">
-        <span class="toggle-title">Hide help shortcut in the status bar</span>
-        <span class="toggle-hint">
-          You can still reopen Help from the gear icon → Settings → Help.
-        </span>
-      </span>
-      <input
-        class="app-checkbox"
-        type="checkbox"
-        checked={hideSetupButton}
-        on:change={(e) => onHideSetupButtonChange(e.currentTarget.checked)}
-      />
-    </label>
-  </section>
 </div>
 
 <style>
@@ -226,32 +205,4 @@
     cursor: not-allowed;
   }
 
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.5rem 0;
-    cursor: pointer;
-  }
-
-  .toggle-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-  }
-
-  .toggle-title {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.85rem;
-    color: var(--text-primary);
-  }
-
-  .toggle-hint {
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-  }
 </style>

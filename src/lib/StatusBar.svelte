@@ -17,11 +17,8 @@
   export let lastSyncTime: Date | null = null;
   export let onSync: (() => void) | undefined = undefined;
   export let onOpenFolder: () => void;
-  export let onShowLicense: () => void;
-  export let onShowGuide: () => void;
   export let onOpenSettings: () => void;
   export let onShowHelp: () => void;
-  export let showGuideButton: boolean = true;
 
   $: jobNote = $jobNotification;
   $: pendingNote = $pendingNotification;
@@ -69,6 +66,7 @@
           <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
         </svg>
       </span>
+      <span class="separator">&middot;</span>
       {#if indexedCount > 0}
         <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
         {#if gameSystemCount > 0}
@@ -140,20 +138,6 @@
         <path d="M320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576zM320 240C302.3 240 288 254.3 288 272C288 285.3 277.3 296 264 296C250.7 296 240 285.3 240 272C240 227.8 275.8 192 320 192C364.2 192 400 227.8 400 272C400 319.2 364 339.2 344 346.5L344 350.3C344 363.6 333.3 374.3 320 374.3C306.7 374.3 296 363.6 296 350.3L296 342.2C296 321.7 310.8 307 326.1 302C332.5 299.9 339.3 296.5 344.3 291.7C348.6 287.5 352 281.7 352 272.1C352 254.4 337.7 240.1 320 240.1zM288 432C288 414.3 302.3 400 320 400C337.7 400 352 414.3 352 432C352 449.7 337.7 464 320 464C302.3 464 288 449.7 288 432z"/>
       </svg>
     </button>
-    {#if showGuideButton}
-      <button class="license-link" on:click={onShowGuide} title="Help">
-        <!-- Font Awesome "circle-info" icon (static/icons/circle-info-solid-full.svg) -->
-        <svg class="license-icon" viewBox="0 0 640 640" fill="currentColor">
-          <path d="M320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576zM288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224C352 241.7 337.7 256 320 256C302.3 256 288 241.7 288 224zM280 288L328 288C341.3 288 352 298.7 352 312L352 400L360 400C373.3 400 384 410.7 384 424C384 437.3 373.3 448 360 448L280 448C266.7 448 256 437.3 256 424C256 410.7 266.7 400 280 400L304 400L304 336L280 336C266.7 336 256 325.3 256 312C256 298.7 266.7 288 280 288z"/>
-        </svg>
-      </button>
-    {/if}
-    <button class="license-link" on:click={onShowLicense} title="View License">
-      <!-- Font Awesome "scroll" icon (static/icons/scroll-solid-full.svg) -->
-      <svg class="license-icon" viewBox="0 0 640 640" fill="currentColor">
-        <path d="M32 176C32 134.5 63.6 100.4 104 96.4L104 96L384 96C437 96 480 139 480 192L480 368L304 368C264.2 368 232 400.2 232 440L232 500C232 524.3 212.3 544 188 544C163.7 544 144 524.3 144 500L144 272L80 272C53.5 272 32 250.5 32 224L32 176zM268.8 544C275.9 530.9 280 515.9 280 500L280 440C280 426.7 290.7 416 304 416L552 416C565.3 416 576 426.7 576 440L576 464C576 508.2 540.2 544 496 544L268.8 544zM112 144C94.3 144 80 158.3 80 176L80 224L144 224L144 176C144 158.3 129.7 144 112 144z"/>
-      </svg>
-    </button>
   </div>
 </footer>
 
@@ -182,7 +166,7 @@
   .statusbar-right {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.6rem;
     min-width: 0;
   }
 
@@ -191,6 +175,9 @@
     align-items: center;
     color: var(--text-tertiary);
     line-height: 0;
+  }
+  .indicator + .indicator {
+    margin-left: 0.2rem;
   }
   .indicator.connected {
     color: var(--text-connected);
@@ -287,6 +274,9 @@
     align-items: center;
     transition: color var(--transition-fast);
     line-height: 0;
+  }
+  .sync-btn + .sync-btn {
+    margin-left: 0.2rem;
   }
   .sync-btn:hover:not(:disabled) {
     color: var(--text-accent);
