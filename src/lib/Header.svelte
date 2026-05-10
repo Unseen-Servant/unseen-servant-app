@@ -9,6 +9,7 @@
   export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let filterVisible: boolean = false;
   export let excludedSystems: Set<string> = new Set();
+  export let soloedSystems: Set<string> = new Set();
   export let availableSystems: { name: string; count: number }[] = [];
   export let showHidden: boolean = false;
   export let hiddenCount: number = 0;
@@ -25,6 +26,7 @@
   export let onTogglePanel: () => void = () => {};
   export let onClearScope: () => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
+  export let onToggleSystemSolo: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
@@ -50,7 +52,7 @@
   // editor reachable wherever the exclusion is taking effect.
   $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
   $: filterActive =
-    (systemsFilterRelevant && excludedSystems.size > 0) ||
+    (systemsFilterRelevant && (excludedSystems.size > 0 || soloedSystems.size > 0)) ||
     (hiddenCount > 0 && showHidden) ||
     (uncategorizedFilterAvailable && showOnlyUncollected) ||
     (focusFilterAvailable && focusActiveCollection);
@@ -205,9 +207,11 @@
           open={filterOpen}
           anchorEl={filterBtn}
           {excludedSystems}
+          {soloedSystems}
           systems={availableSystems}
           showSystemFilter={systemsFilterRelevant}
           onToggleSystem={onToggleSystemFilter}
+          onToggleSolo={onToggleSystemSolo}
           onClearSystems={onClearSystemFilter}
           {showHidden}
           {hiddenCount}

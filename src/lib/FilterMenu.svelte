@@ -6,10 +6,16 @@
   export let open: boolean = false;
   export let anchorEl: HTMLElement | undefined = undefined;
 
-  // Game systems to EXCLUDE. Empty = show all. Persisting "excluded" rather
-  // than "selected" means newly-detected systems show up automatically.
+  // DAW-style filter state for game systems.
+  //   - excludedSystems: "muted" rows (checkbox unchecked). Empty = nothing muted.
+  //   - soloedSystems:   "solo'd" rows. When non-empty, mute is overridden:
+  //                      only solo'd systems pass, regardless of which rows
+  //                      are muted. This matches Logic Pro / Ableton.
+  //                      Untagged files don't pass under solos.
   export let excludedSystems: Set<string> = new Set();
+  export let soloedSystems: Set<string> = new Set();
   export let onToggleSystem: (system: string) => void = () => {};
+  export let onToggleSolo: (system: string) => void = () => {};
   export let onClearSystems: () => void = () => {};
 
   // Available systems (with counts) — typically gameSystemStats from +page.
@@ -109,7 +115,8 @@
     }
   }
 
-  $: hasSystemFilter = excludedSystems.size > 0;
+  $: hasSystemFilter = excludedSystems.size > 0 || soloedSystems.size > 0;
+  $: anySoloed = soloedSystems.size > 0;
   $: hasHidden = hiddenCount > 0;
 
   // The Collections section presents three mutually-exclusive radio
@@ -231,7 +238,21 @@
           </div>
           <div class="systems">
             {#each systems as { name, count }}
-              <label class="row" title={name} data-fm="row">
+              <label
+                class="row system-row"
+                class:row-dimmed={anySoloed && !soloedSystems.has(name)}
+                title={name}
+                data-fm="row"
+              >
+                <button
+                  type="button"
+                  class="solo-btn"
+                  class:active={soloedSystems.has(name)}
+                  on:click|preventDefault|stopPropagation={() => onToggleSolo(name)}
+                  aria-pressed={soloedSystems.has(name)}
+                  aria-label={soloedSystems.has(name) ? `Stop soloing ${name}` : `Solo ${name}`}
+                  title={soloedSystems.has(name) ? `Stop soloing ${name}` : `Solo ${name} (focus search on it)`}
+                >S</button>
                 <span class="row-name">{name}</span>
                 <span class="row-count">{count}</span>
                 <input
@@ -334,6 +355,55 @@
   }
   .row-disabled .row-count {
     color: var(--text-tertiary);
+  }
+
+  /* When any system is solo'd, non-solo'd rows fade — visual cue that
+     mute state on these rows is being overridden until solo clears. */
+  .row-dimmed {
+    opacity: 0.45;
+  }
+  .row-dimmed:hover {
+    opacity: 0.7;
+  }
+
+  .system-row {
+    /* Solo button takes the lead position; checkbox + name flow after. */
+    gap: 0.4rem;
+  }
+
+  .solo-btn {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-tertiary);
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: color var(--transition-fast), border-color var(--transition-fast),
+                background var(--transition-fast), filter var(--transition-fast);
+  }
+  .solo-btn:hover {
+    color: var(--text-secondary);
+    border-color: var(--text-secondary);
+  }
+  .solo-btn.active {
+    color: var(--text-active);
+    border-color: var(--text-active);
+    background: rgba(146, 92, 203, 0.15);
+    filter: var(--glow-active);
+  }
+  .solo-btn:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 1px;
   }
 
   .section-divider {

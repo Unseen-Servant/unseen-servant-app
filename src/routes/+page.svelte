@@ -109,11 +109,14 @@
   let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
-  // Library filter (next to the search bar). Empty = no filter. Composes
-  // with active scope (collection / path) — scope picks the file pool, the
-  // filter narrows it further. Implies indexed-only since only indexed
-  // files carry system tags.
+  // Library filter (next to the search bar). DAW-style mute + solo:
+  //   - filterExcludedSystems: muted rows (checkbox unchecked).
+  //   - soloedSystems:         solo'd rows. When non-empty, mute state is
+  //                            overridden — only solo'd systems pass.
+  // Both Sets are session-scoped: they reset on app launch (no Tauri
+  // store persistence), so each session starts with a clean library.
   let filterExcludedSystems = new Set<string>();
+  let soloedSystems = new Set<string>();
 
   // Display-only hidden flag. Stores explicitly-hidden paths (files or
   // folder roots); descendants of a hidden folder are hidden via prefix
@@ -251,13 +254,19 @@
     } else {
       universe = Array.from(indexedPathsSet);
     }
-    if (filterExcludedSystems.size === 0) return universe.length;
-    // A file passes when at least one of its tags is not excluded — matches
-    // the include-list semantics of the gameSystems param to search_index.
+    if (filterExcludedSystems.size === 0 && soloedSystems.size === 0) return universe.length;
+    // A file passes when at least one of its tags survives the active
+    // filter — matches the include-list semantics of `gameSystems` in
+    // runSearch. Solo overrides mute when active; under solos, untagged
+    // files (no tags) never pass.
     let count = 0;
     for (const path of universe) {
       const tags = effectiveGameSystemMap.get(path) ?? [];
-      if (tags.length > 0 && tags.some((t) => !filterExcludedSystems.has(t))) count++;
+      if (soloedSystems.size > 0) {
+        if (tags.some((t) => soloedSystems.has(t))) count++;
+      } else if (tags.length > 0 && tags.some((t) => !filterExcludedSystems.has(t))) {
+        count++;
+      }
     }
     return count;
   })();
@@ -293,11 +302,17 @@
       sourcePaths = paths;
     }
 
-    // Library filter: convert "excluded systems" to the include-list the
-    // backend expects via game_systems. Empty included list (everything
-    // excluded) short-circuits to no results.
+    // Library filter resolution (DAW semantics):
+    //   - solo active: only solo'd systems pass — mute is overridden.
+    //   - else mute active: all systems minus muted ones.
+    //   - else: no narrowing.
+    // The backend's `game_systems` is an include-list, so both branches
+    // produce the same shape. An empty include-list (everything muted)
+    // short-circuits to no results.
     let gameSystems: string[] | null = null;
-    if (filterExcludedSystems.size > 0) {
+    if (soloedSystems.size > 0) {
+      gameSystems = Array.from(soloedSystems);
+    } else if (filterExcludedSystems.size > 0) {
       const all = gameSystemStats.map((s) => s.name);
       gameSystems = all.filter((s) => !filterExcludedSystems.has(s));
       if (gameSystems.length === 0) {
@@ -461,10 +476,11 @@
       if (typeof savedHideSetup === 'boolean') {
         hideSetupButton = savedHideSetup;
       }
-      const savedFilter = await store.get<{ excludedSystems?: string[] }>('libraryFilter');
-      if (savedFilter && typeof savedFilter === 'object' && Array.isArray(savedFilter.excludedSystems)) {
-        filterExcludedSystems = new Set(savedFilter.excludedSystems);
-      }
+      // libraryFilter persistence intentionally removed: filter state is
+      // session-scoped now. We delete the old key to avoid confusion if a
+      // user inspects settings.json — and so older versions don't reload
+      // a filter the new build doesn't honor anyway.
+      try { await store.delete('libraryFilter'); } catch {}
       const savedHidden = await store.get<string[]>('hiddenPaths');
       if (Array.isArray(savedHidden)) {
         hiddenPaths = new Set(savedHidden);
@@ -612,18 +628,6 @@
     return [...indexStatus.up_to_date, ...indexStatus.to_update];
   })();
 
-  async function persistFilter() {
-    try {
-      const store = await load('settings.json');
-      await store.set('libraryFilter', {
-        excludedSystems: Array.from(filterExcludedSystems),
-      });
-      await store.save();
-    } catch (e) {
-      console.log('Could not persist libraryFilter:', e);
-    }
-  }
-
   function toggleSystemFilter(system: string) {
     if (filterExcludedSystems.has(system)) {
       filterExcludedSystems.delete(system);
@@ -631,13 +635,25 @@
       filterExcludedSystems.add(system);
     }
     filterExcludedSystems = filterExcludedSystems;
-    persistFilter();
     if (committedQuery) runSearch(committedQuery);
   }
 
+  function toggleSystemSolo(system: string) {
+    if (soloedSystems.has(system)) {
+      soloedSystems.delete(system);
+    } else {
+      soloedSystems.add(system);
+    }
+    soloedSystems = soloedSystems;
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  // Section-level "Reset" link: clears both mute and solo at once. The
+  // user reads "Game systems" as one filter — splitting the two clears
+  // would be more clicks for a single conceptual action.
   function clearSystemFilter() {
     filterExcludedSystems = new Set();
-    persistFilter();
+    soloedSystems = new Set();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -1145,6 +1161,20 @@
   })();
   $: gameSystemCount = gameSystemStats.length;
   $: gameSystemNames = gameSystemStats.map(s => s.name);
+
+  // SystemsView and any view-narrowing consumers want a single "what to
+  // hide" set. When solos are active, every non-solo'd system (plus the
+  // Untagged bucket) is effectively excluded — that's how solo dominates
+  // mute. When no solos, this just mirrors filterExcludedSystems.
+  $: effectiveExcludedSystems = (() => {
+    if (soloedSystems.size === 0) return filterExcludedSystems;
+    const eff = new Set<string>();
+    for (const { name } of gameSystemStats) {
+      if (!soloedSystems.has(name)) eff.add(name);
+    }
+    if (!soloedSystems.has('Untagged')) eff.add('Untagged');
+    return eff;
+  })();
   $: topGameSystem = gameSystemStats.length > 0
     ? `Top system: ${gameSystemStats[0].name} with ${gameSystemStats[0].count} file${gameSystemStats[0].count === 1 ? '' : 's'}`
     : '';
@@ -1246,7 +1276,7 @@
   // Returns null = show everything, no narrowing.
   $: displayPaths = (() => {
     const systemsFilterActive =
-      filterExcludedSystems.size > 0 && viewMode === 'systems';
+      (filterExcludedSystems.size > 0 || soloedSystems.size > 0) && viewMode === 'systems';
     const focusActive = focusActiveCollection && focusFilterAvailable;
     // Focus and loose are radio-mutex through the menu, but a stray
     // persisted state could in principle have both set. Treat focus as
@@ -1276,10 +1306,14 @@
       visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
       visible = new Set([...visible].filter((p) => {
         const tags = effectiveGameSystemMap.get(p) ?? [];
+        // Solo branch: only files with at least one solo'd tag pass.
+        // Untagged files don't pass — solo means "focus on these systems".
+        if (soloedSystems.size > 0) {
+          return tags.some((t) => soloedSystems.has(t));
+        }
         if (tags.length === 0) {
           return !filterExcludedSystems.has('unknown');
         }
-        // Keep the file as long as at least one of its tags is not excluded.
         return tags.some((t) => !filterExcludedSystems.has(t));
       }));
     }
@@ -2735,6 +2769,7 @@
     {scopeChip}
     filterVisible={!!selectedFolder}
     excludedSystems={filterExcludedSystems}
+    {soloedSystems}
     availableSystems={gameSystemStats}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
@@ -2742,6 +2777,7 @@
     onTogglePanel={togglePanel}
     onClearScope={handleClearScope}
     onToggleSystemFilter={toggleSystemFilter}
+    onToggleSystemSolo={toggleSystemSolo}
     onClearSystemFilter={clearSystemFilter}
     {showHidden}
     {hiddenCount}
@@ -2797,12 +2833,14 @@
           <SearchScopeBar
             {scopeChip}
             excludedSystems={filterExcludedSystems}
+            {soloedSystems}
             {showHidden}
             resultCount={searchResults.length}
             indexedFileCount={searchableFileCount}
             isLoading={isSearching}
             onClearScope={handleClearScope}
             onToggleSystemFilter={toggleSystemFilter}
+            onToggleSystemSolo={toggleSystemSolo}
             onToggleShowHidden={toggleShowHidden}
           />
           <div class="search-split">
@@ -2838,7 +2876,7 @@
             bind:this={systemsViewComponent}
             entries={indexedEntries}
             {displayPaths}
-            excludedSystems={filterExcludedSystems}
+            excludedSystems={effectiveExcludedSystems}
             {hiddenPaths}
             {showHidden}
             {highlightPaths}

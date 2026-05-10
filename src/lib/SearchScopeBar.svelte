@@ -6,15 +6,21 @@
 
   export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let excludedSystems: Set<string> = new Set();
+  export let soloedSystems: Set<string> = new Set();
   export let showHidden: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   export let isLoading: boolean = false;
   export let onClearScope: () => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
+  export let onToggleSystemSolo: (system: string) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
 
-  $: excludedList = Array.from(excludedSystems).sort();
+  // When a system is solo'd, mute state on other rows is overridden — the
+  // exclusion chips would be misleading, so suppress them. Only the solo
+  // chips remain to communicate the active narrowing.
+  $: soloedList = Array.from(soloedSystems).sort();
+  $: excludedList = soloedList.length > 0 ? [] : Array.from(excludedSystems).sort();
   $: scopeKindLabel = scopeChip ? scopeChip.kind : 'library';
 </script>
 
@@ -33,6 +39,20 @@
         >×</button>
       {/if}
     </span>
+
+    {#each soloedList as system (system)}
+      <span class="chip solo" title="Solo: {system}">
+        <span class="chip-prefix">solo</span>
+        <span class="chip-label">{system}</span>
+        <button
+          type="button"
+          class="chip-clear"
+          on:click|stopPropagation={() => onToggleSystemSolo(system)}
+          aria-label="Stop soloing {system}"
+          title="Stop soloing {system}"
+        >×</button>
+      </span>
+    {/each}
 
     {#each excludedList as system (system)}
       <span class="chip exclusion" title="Excluded: {system}">
@@ -199,6 +219,19 @@
   .chip.exclusion {
     border-color: rgba(239, 68, 68, 0.3);
     color: var(--text-secondary);
+  }
+
+  /* Solo chips use the active accent so they read as a positive
+     focus state, not a removal. Mirrors the solo button in the
+     filter menu. */
+  .chip.solo {
+    border-color: var(--text-active);
+    background: rgba(146, 92, 203, 0.12);
+    color: var(--text-active);
+  }
+  .chip.solo .chip-prefix {
+    color: var(--text-active);
+    opacity: 0.75;
   }
 
   .chip-prefix {
