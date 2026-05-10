@@ -8,7 +8,7 @@
   export let onHideSetupButtonChange: (value: boolean) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
 
-  const HOMEPAGE_URL = 'https://www.unseenservant.games';
+  const HOMEPAGE_URL = 'https://unseenservant.games';
   const LICENSE_URL = 'https://unseenservant.games/license';
 
   let appVersion = '';
