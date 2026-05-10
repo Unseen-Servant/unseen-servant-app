@@ -19,6 +19,7 @@
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../lib/KeyboardHelpOverlay.svelte';
+  import LaunchSplash from '../lib/LaunchSplash.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
@@ -158,6 +159,8 @@
   let showLicense = false;
   let showSettings = false;
   let showHelpOverlay = false;
+  let showSplash = true;
+  let splashTimer: ReturnType<typeof setTimeout> | null = null;
   let settingsInitialTab: 'library' | 'game-systems' | 'help' = 'library';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
@@ -419,6 +422,11 @@
   }
 
   onMount(async () => {
+    splashTimer = setTimeout(() => {
+      showSplash = false;
+      splashTimer = null;
+    }, 1200);
+
     try {
       const store = await load('settings.json');
       const savedFolder = await store.get<string>('selectedFolder');
@@ -567,6 +575,7 @@
     if (healthInterval) clearInterval(healthInterval);
     if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
+    if (splashTimer) clearTimeout(splashTimer);
   });
 
   async function checkSidecarHealth() {
@@ -1618,7 +1627,25 @@
   //   5. (modal Esc handled by Modal.svelte)
   //   6. (search results → input handled below)
   //   7. (search input chip/text  handled in Header.svelte)
+  function dismissSplash() {
+    if (!showSplash) return;
+    showSplash = false;
+    if (splashTimer) {
+      clearTimeout(splashTimer);
+      splashTimer = null;
+    }
+  }
+
   function handleGlobalKeydown(event: KeyboardEvent) {
+    // While the launch splash is up, swallow the first keypress to dismiss
+    // it. Users who hit a shortcut on launch shouldn't have it interpreted
+    // as both "skip splash" and "trigger shortcut".
+    if (showSplash) {
+      dismissSplash();
+      event.preventDefault();
+      return;
+    }
+
     // When a native <dialog> is open via showModal(), the browser inerts
     // the rest of the page (clicks, focus, screen-readers all skip), but
     // window-level keydown listeners still fire because keydown bubbles
@@ -2687,6 +2714,8 @@
 </script>
 
 <svelte:window on:keydown={handleGlobalKeydown} on:contextmenu|preventDefault />
+
+<LaunchSplash visible={showSplash} onDismiss={dismissSplash} />
 
 <main class="app-layout">
   <Header
