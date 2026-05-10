@@ -1398,9 +1398,18 @@ def create_app(
 
     app = FastAPI(title="Legend Lore Sidecar")
 
+    # Sidecar binds to 127.0.0.1 only, but the wildcard CORS still let any
+    # local origin's webview talk to us. Tightening to the known Tauri
+    # origins closes that off — production loads via tauri://localhost,
+    # dev via http://localhost:1420 (per tauri.conf.json devUrl).
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "tauri://localhost",
+            "http://tauri.localhost",
+            "http://localhost:1420",
+            "http://127.0.0.1:1420",
+        ],
         allow_methods=["*"],
         allow_headers=["*"],
     )
