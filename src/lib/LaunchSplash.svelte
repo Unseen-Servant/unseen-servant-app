@@ -32,7 +32,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-container);
+    background: var(--bg-app);
     cursor: default;
     user-select: none;
     -webkit-user-select: none;
