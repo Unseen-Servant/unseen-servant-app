@@ -379,6 +379,9 @@ class UpdateCollectionRequest(BaseModel):
 class SetActiveContextRequest(BaseModel):
     name: str
 
+class RenameCollectionRequest(BaseModel):
+    new_name: str
+
 
 # ---------------------------------------------------------------------------
 # Index manifest — tracks what's been indexed and when
@@ -2563,6 +2566,41 @@ def create_app(
             store.active_context = None
         save_collections(data_dir, store)
         return {"message": f"Deleted collection: {name}"}
+
+    @app.post("/api/collections/{name}/rename")
+    async def rename_collection(name: str, request: RenameCollectionRequest):
+        """Atomically rename a collection.
+
+        Preserves all metadata (id, file_paths, color, archived, timestamps)
+        and moves the active_context pointer if it referenced the old name.
+        Frontend used to do delete + create which lost the collection on
+        partial failure.
+        """
+        if not data_dir:
+            raise HTTPException(status_code=500, detail="No data directory configured")
+        new_name = request.new_name.strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="New name cannot be empty")
+        store = load_collections(data_dir)
+        if name not in store.collections:
+            raise HTTPException(
+                status_code=404, detail=f"Collection not found: {name}"
+            )
+        if new_name == name:
+            coll = store.collections[name]
+            return {"name": name, "file_count": len(coll.file_paths)}
+        if new_name in store.collections:
+            raise HTTPException(
+                status_code=409, detail=f"Collection already exists: {new_name}"
+            )
+        coll = store.collections.pop(name)
+        coll.name = new_name
+        coll.updated_at = _now_iso()
+        store.collections[new_name] = coll
+        if store.active_context == name:
+            store.active_context = new_name
+        save_collections(data_dir, store)
+        return {"name": new_name, "file_count": len(coll.file_paths)}
 
     # ------------------------------------------------------------------
     # Active context — currently-scoped collection for tree filter + MCP

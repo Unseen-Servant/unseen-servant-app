@@ -519,6 +519,116 @@ def test_search_all_bypasses_active_context(
     assert len(filenames) >= 1
 
 
+# ---------------------------------------------------------------------------
+# Atomic rename — POST /api/collections/{name}/rename
+# ---------------------------------------------------------------------------
+
+def test_rename_collection_basic(client):
+    """Renaming a collection moves it under the new name and preserves metadata."""
+    client.post("/api/collections", json={
+        "name": "Old Name",
+        "file_paths": ["/a.pdf", "/b.pdf"],
+        "description": "kept",
+        "color": "#123456",
+    })
+    before = client.get("/api/collections").json()["collections"]["Old Name"]
+
+    resp = client.post("/api/collections/Old Name/rename", json={"new_name": "New Name"})
+    assert resp.status_code == 200
+    assert resp.json() == {"name": "New Name", "file_count": 2}
+
+    cols = client.get("/api/collections").json()["collections"]
+    assert "Old Name" not in cols
+    assert "New Name" in cols
+    after = cols["New Name"]
+    assert after["id"] == before["id"]
+    assert after["created_at"] == before["created_at"]
+    assert after["file_paths"] == before["file_paths"]
+    assert after["description"] == "kept"
+    assert after["color"] == "#123456"
+    assert after["archived"] is False
+    assert after["updated_at"] >= before["updated_at"]
+
+
+def test_rename_collection_preserves_active_context(client):
+    """Renaming the active collection moves the active_context pointer."""
+    client.post("/api/collections", json={"name": "Active", "file_paths": []})
+    client.post("/api/active-context", json={"name": "Active"})
+
+    resp = client.post("/api/collections/Active/rename", json={"new_name": "Renamed"})
+    assert resp.status_code == 200
+
+    assert client.get("/api/active-context").json()["active_context"] == "Renamed"
+
+
+def test_rename_collection_does_not_touch_unrelated_active_context(client):
+    """Renaming a non-active collection leaves the active_context alone."""
+    client.post("/api/collections", json={"name": "Active", "file_paths": []})
+    client.post("/api/collections", json={"name": "Other", "file_paths": []})
+    client.post("/api/active-context", json={"name": "Active"})
+
+    resp = client.post("/api/collections/Other/rename", json={"new_name": "OtherRenamed"})
+    assert resp.status_code == 200
+
+    assert client.get("/api/active-context").json()["active_context"] == "Active"
+
+
+def test_rename_collection_to_existing_name_returns_409(client):
+    """Renaming onto an existing collection name fails with 409 and is non-destructive."""
+    client.post("/api/collections", json={"name": "A", "file_paths": ["/a.pdf"]})
+    client.post("/api/collections", json={"name": "B", "file_paths": ["/b.pdf"]})
+
+    resp = client.post("/api/collections/A/rename", json={"new_name": "B"})
+    assert resp.status_code == 409
+
+    cols = client.get("/api/collections").json()["collections"]
+    assert "A" in cols and "B" in cols
+    assert cols["A"]["file_paths"] == ["/a.pdf"]
+    assert cols["B"]["file_paths"] == ["/b.pdf"]
+
+
+def test_rename_collection_missing_returns_404(client):
+    resp = client.post("/api/collections/Ghost/rename", json={"new_name": "Whatever"})
+    assert resp.status_code == 404
+
+
+def test_rename_collection_to_same_name_is_noop(client):
+    """Renaming to the same name returns success without touching updated_at."""
+    client.post("/api/collections", json={"name": "Same", "file_paths": ["/a.pdf"]})
+    before = client.get("/api/collections").json()["collections"]["Same"]
+
+    resp = client.post("/api/collections/Same/rename", json={"new_name": "Same"})
+    assert resp.status_code == 200
+    assert resp.json() == {"name": "Same", "file_count": 1}
+
+    after = client.get("/api/collections").json()["collections"]["Same"]
+    assert after["updated_at"] == before["updated_at"]
+
+
+def test_rename_collection_empty_name_returns_400(client):
+    client.post("/api/collections", json={"name": "Real", "file_paths": []})
+    resp = client.post("/api/collections/Real/rename", json={"new_name": "   "})
+    assert resp.status_code == 400
+
+
+def test_rename_collection_persists_to_disk(test_collection, tmp_path):
+    """Renamed collections survive a server restart."""
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    app1 = create_app(collection=test_collection, data_dir=tmp_path)
+    c1 = TestClient(app1)
+    c1.post("/api/collections", json={"name": "First", "file_paths": ["/a.pdf"]})
+    c1.post("/api/collections/First/rename", json={"new_name": "Second"})
+
+    app2 = create_app(collection=test_collection, data_dir=tmp_path)
+    c2 = TestClient(app2)
+    cols = c2.get("/api/collections").json()["collections"]
+    assert "First" not in cols
+    assert "Second" in cols
+    assert cols["Second"]["file_paths"] == ["/a.pdf"]
+
+
 def test_v1_disk_migrates_to_v2_on_save(test_collection, tmp_path):
     """After a write, the on-disk file is in v2 shape."""
     import json
