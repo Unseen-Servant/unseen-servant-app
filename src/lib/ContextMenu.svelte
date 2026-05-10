@@ -57,7 +57,13 @@
   // Re-query items after every render so adding/removing conditional sections
   // doesn't desync the keyboard cursor. Apply the .kb-focused class
   // imperatively because the row markup is conditional, not #each-driven.
-  function refreshItemsAndFocus() {
+  //
+  // ``initial`` only true on the onMount call — that's when we may need to
+  // promote focusedIdx to the trigger of an initialSubmenu chord-open.
+  // Doing it on every afterUpdate would also fire when a hover-open sets
+  // openSubmenu, which would leave .kb-focused stuck on the trigger after
+  // mouse-leave clears .open.
+  function refreshItemsAndFocus(opts: { initial?: boolean } = {}) {
     if (!menuEl) return;
     mainItems = Array.from(menuEl.querySelectorAll(':scope > [data-mi]')) as HTMLElement[];
     if (openSubmenu) {
@@ -76,8 +82,9 @@
     }
     // When the menu opened directly into a submenu (C chord), resolve
     // the trigger's index so ← / Esc from the submenu has a row to fall
-    // back to.
-    if (openSubmenu && focusedIdx < 0) {
+    // back to. Only on initial mount — afterUpdate runs would also trip
+    // this branch on hover-opens and strand .kb-focused.
+    if (opts.initial && openSubmenu && focusedIdx < 0) {
       const triggerIdx = mainItems.findIndex(
         (el) => el.dataset.mi === 'submenu-trigger' && el.dataset.submenu === openSubmenu,
       );
@@ -88,8 +95,8 @@
     submenuItems.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedSubmenuIdx));
   }
 
-  onMount(refreshItemsAndFocus);
-  afterUpdate(refreshItemsAndFocus);
+  onMount(() => refreshItemsAndFocus({ initial: true }));
+  afterUpdate(() => refreshItemsAndFocus());
 
   function handleKeydown(event: KeyboardEvent) {
     const meta = event.metaKey || event.ctrlKey;
