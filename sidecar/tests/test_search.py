@@ -36,6 +36,32 @@ def test_search_returns_results(indexed_client):
     assert len(data["results"]) > 0
 
 
+def test_search_result_fields_never_null(client, large_text_pdf_path):
+    """Every string field in a search result must be a string, not null.
+
+    The Tauri SearchResultItem decoder requires String for section_heading
+    and game_system; null would reject the whole response with "error
+    decoding response body". A PDF with no detected section headings used
+    to leak section_heading=None through the formatter.
+    """
+    client.post("/api/index-files", json={"paths": [str(large_text_pdf_path)]})
+    response = client.post("/api/search", json={
+        "query": "adventurer dungeon",
+        "n_results": 10,
+    })
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results, "expected results to exercise the formatter"
+    for r in results:
+        assert isinstance(r["section_heading"], str), \
+            f"section_heading must be str, got {type(r['section_heading'])}"
+        assert isinstance(r["game_system"], str), \
+            f"game_system must be str, got {type(r['game_system'])}"
+        assert isinstance(r["filename"], str)
+        assert isinstance(r["source"], str)
+        assert isinstance(r["text"], str)
+
+
 def test_search_result_shape(indexed_client):
     """Parent-document retrieval response contract: each result carries
     text, source provenance, the section breadcrumb, page span, and

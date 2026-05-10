@@ -3016,14 +3016,24 @@ def create_app(
                      if m.get("parent_id") == pid),
                     "",
                 )
+                # ParentDoc.section_heading is Optional[str] (granularity.py),
+                # so the chain "" or parent.section_heading can leak None into
+                # the response. Trailing `or ""` coerces back to a string —
+                # the Tauri SearchResultItem decoder requires String, not
+                # null, and would otherwise reject the whole response.
+                section_heading = (
+                    metadata.get("section_heading")
+                    or (parent.section_heading if parent else None)
+                    or ""
+                )
                 formatted.append({
                     "text": text,
                     "filename": metadata["filename"],
                     "source": metadata.get("source", ""),
-                    "section_heading": metadata.get("section_heading", "") or (parent.section_heading if parent else ""),
+                    "section_heading": section_heading,
                     "page_start": parent.page_start if parent else metadata.get("page_start", 0),
                     "page_end": parent.page_end if parent else metadata.get("page_end", 0),
-                    "game_system": metadata.get("game_system", "unknown"),
+                    "game_system": metadata.get("game_system") or "unknown",
                     "relevance": round(max(0.0, min(1.0, 1 - distance)), 3),
                 })
 
