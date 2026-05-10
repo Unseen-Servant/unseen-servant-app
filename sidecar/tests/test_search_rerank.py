@@ -51,15 +51,54 @@ def test_rerank_reorders_top_candidates(indexed_client, monkeypatch):
     assert len(data["results"]) > 0
     assert "docs" in captured  # rerank_scores actually called
 
-    # The first result's text should correspond to the last doc fed in
-    # (or one of its parent siblings, after dedupe-by-parent).
-    top_text = data["results"][0]["text"]
-    last_input = captured["docs"][-1]
-    # The reranked top result's parent text should contain the chunk we
-    # ranked highest. Use substring check to handle parent-doc expansion.
-    assert last_input in top_text or top_text in last_input or any(
-        last_input in r["text"] for r in data["results"][:3]
+
+def test_rerank_input_prepends_section_heading(monkeypatch, client, test_collection):
+    """Rerank input should mirror the embedder by prepending section_heading.
+
+    Without this, the cross-encoder loses the breadcrumb context (e.g.
+    "Combat > Grappling") that distinguishes a rule chunk from a
+    keyword-adjacent monster card and tends to over-rank action text.
+
+    Indexes a synthetic chunk with a known section_heading (the real
+    test PDFs have none) and asserts the rerank input starts with it.
+    """
+    import server
+
+    captured = {}
+
+    def fake_scores(query, docs):
+        captured["docs"] = list(docs)
+        return [0.5] * len(docs)
+
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    test_collection.upsert(
+        ids=["synth_1"],
+        documents=["body text about grappling and grapples"],
+        metadatas=[{
+            "source": "/lib/x.pdf",
+            "filename": "x.pdf",
+            "chunk": 0,
+            "game_system": "5e",
+            "chunk_type": "prose",
+            "section_heading": "Combat > Grappling",
+            "page_start": 1,
+            "page_end": 1,
+            "parent_id": "p_synth",
+            "chunker_version": "test",
+            "embedding_model": "test",
+        }],
     )
+
+    response = client.post("/api/search", json={
+        "query": "grappling", "n_results": 3, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    docs = captured.get("docs", [])
+    assert docs, "rerank_scores should have been called"
+    assert any(
+        d.startswith("Combat > Grappling\n\n") for d in docs
+    ), f"Expected at least one input to start with the breadcrumb; got: {docs}"
 
 
 def test_rerank_falls_back_when_scores_none(indexed_client, monkeypatch):

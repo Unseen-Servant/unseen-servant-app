@@ -2718,10 +2718,22 @@ def create_app(
             # cosine, especially when several candidates are topically
             # adjacent. Trailing candidates stay in cosine order so the
             # dedupe loop never starves if a section has many slices.
+            #
+            # Section_heading is prepended to mirror what the embedder saw
+            # (`_embed_text`). Without the breadcrumb the cross-encoder is
+            # blind to whether a chunk is from a rule definition
+            # ("Combat > Grappling") versus a creature card with the same
+            # keyword ("Goblin > Actions"), and tends to over-rank the
+            # keyword-dense action text.
             if request.rerank:
                 pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
                 pool_docs = results["documents"][0][:pool]
-                scores = rerank_scores(request.query, pool_docs)
+                pool_meta = ordered_metadatas[:pool]
+                rerank_inputs = [
+                    f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
+                    for m, d in zip(pool_meta, pool_docs)
+                ]
+                scores = rerank_scores(request.query, rerank_inputs)
                 if scores is not None:
                     order = sorted(
                         range(pool), key=lambda i: scores[i], reverse=True
