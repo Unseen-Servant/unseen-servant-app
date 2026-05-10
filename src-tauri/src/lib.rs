@@ -9,10 +9,15 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU16, Ordering};
 
 // ---------------------------------------------------------------------------
-// Sidecar state — holds the Python child process handle
+// Sidecar state — holds the Python child process handle and any startup
+// failure payload. The failure is stashed so the frontend can pull it on
+// mount even though the emit happens during setup() (before the webview
+// has loaded a listener).
 // ---------------------------------------------------------------------------
 
 struct SidecarState(Mutex<Option<Child>>);
+
+struct SidecarFailureState(Mutex<Option<SidecarFailedPayload>>);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1393,6 +1398,16 @@ fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, Str
 // Sidecar lifecycle
 // ---------------------------------------------------------------------------
 
+/// Return the stashed startup-failure payload, if any. The frontend calls
+/// this on mount to recover from the race where ``setup()`` emits
+/// ``sidecar://failed`` before the webview has loaded a listener.
+#[tauri::command]
+fn get_sidecar_failure(
+    state: tauri::State<SidecarFailureState>,
+) -> Option<SidecarFailedPayload> {
+    state.0.lock().ok().and_then(|g| g.clone())
+}
+
 /// Block until the sidecar publishes its port file and accepts a TCP
 /// connection, then return the bound port. Errors carry a single
 /// human-readable message — the caller is responsible for surfacing it.
@@ -1575,7 +1590,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, rename_collection, delete_collection, get_active_context, set_active_context, clear_active_context, search_index])
+        .invoke_handler(tauri::generate_handler![select_folder, list_files, count_pdfs_recursive, rename_file, delete_file, rename_folder, delete_folder, check_ollama_health, check_sidecar_health, check_mcp_status, get_index_status, sync_index, reindex_all, reindex_file, get_document_stats, get_stats, compact_database, delete_index, get_data_dir, get_known_game_systems, set_game_system, set_game_systems, create_custom_game_system, update_custom_game_system, delete_custom_game_system, toggle_builtin_game_system, get_mcp_config, get_collections, create_collection, update_collection, rename_collection, delete_collection, get_sidecar_failure, get_active_context, set_active_context, clear_active_context, search_index])
         .setup(|app| {
             // Determine where ChromaDB should store data
             let app_data_dir = app
@@ -1587,6 +1602,19 @@ pub fn run() {
             let chroma_dir = app_data_dir.join("chroma_db");
 
             let sidecar_log = app_data_dir.join("sidecar.log");
+
+            app.manage(SidecarFailureState(Mutex::new(None)));
+
+            // record_failure: stash for the frontend's late mount AND emit for
+            // any listener that's already attached (e.g. mid-session restart).
+            let record_failure = |app: &tauri::AppHandle, payload: SidecarFailedPayload| {
+                if let Some(state) = app.try_state::<SidecarFailureState>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        *guard = Some(payload.clone());
+                    }
+                }
+                let _ = app.emit("sidecar://failed", &payload);
+            };
 
             // Start the Python sidecar
             let port_file = chroma_dir.join("sidecar.port");
@@ -1600,10 +1628,7 @@ pub fn run() {
                         }
                         Err(msg) => {
                             eprintln!("{}", msg);
-                            // Emit so the frontend can surface a single clear
-                            // failure banner instead of N "failed to connect"
-                            // toasts on every per-call attempt.
-                            let _ = app.emit("sidecar://failed", &SidecarFailedPayload {
+                            record_failure(app.handle(), SidecarFailedPayload {
                                 log_path: sidecar_log.to_string_lossy().into_owned(),
                                 message: msg,
                             });
@@ -1614,7 +1639,7 @@ pub fn run() {
                     eprintln!("Warning: Could not start sidecar: {}", e);
                     eprintln!("Indexing features will be unavailable.");
                     app.manage(SidecarState(Mutex::new(None)));
-                    let _ = app.emit("sidecar://failed", &SidecarFailedPayload {
+                    record_failure(app.handle(), SidecarFailedPayload {
                         log_path: sidecar_log.to_string_lossy().into_owned(),
                         message: format!("Could not start sidecar: {}", e),
                     });

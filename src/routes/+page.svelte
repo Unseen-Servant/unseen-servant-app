@@ -452,17 +452,30 @@
 
     // Sidecar failed to start at app launch — show one sticky banner so the
     // user gets a single clear failure message instead of N "failed to
-    // connect" toasts on every per-call attempt.
+    // connect" toasts on every per-call attempt. The setup() emit happens
+    // before the webview is ready, so we also poll the stashed state here;
+    // the listener covers any future failures (e.g. mid-session restart).
+    function showSidecarFailure(payload: { log_path: string; message: string }) {
+      jobNotification.show({
+        type: 'error',
+        message: `Indexer failed to start. See log: ${payload.log_path}`,
+        duration: null,
+      });
+    }
+
     unlistenSidecarFailed = await listen<{ log_path: string; message: string }>(
       'sidecar://failed',
-      (event) => {
-        jobNotification.show({
-          type: 'error',
-          message: `Indexer failed to start. See log: ${event.payload.log_path}`,
-          duration: null,
-        });
-      },
+      (event) => showSidecarFailure(event.payload),
     );
+
+    try {
+      const stashed = await invoke<{ log_path: string; message: string } | null>(
+        'get_sidecar_failure',
+      );
+      if (stashed) showSidecarFailure(stashed);
+    } catch {
+      // Non-fatal — command may not exist on older builds during dev rebuilds.
+    }
 
     try {
       const store = await load('settings.json');
