@@ -17,7 +17,7 @@
     transition:fade={{ duration: 200 }}
   >
     <div class="stack">
-      <img class="icon" src="/icon.png" alt="" draggable="false" />
+      <img class="icon" src="/logo.svg" alt="" draggable="false" />
       <h1 class="title font-heading">Legend Lore</h1>
       <span class="byline">Unseen Servant</span>
     </div>
