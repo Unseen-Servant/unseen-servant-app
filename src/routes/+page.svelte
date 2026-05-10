@@ -1275,15 +1275,22 @@
   // 4. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
   $: displayPaths = (() => {
+    // All metadata-based narrowing (system filter, collection focus,
+    // loose-only) is gated to systems view. Tree view is a spatial model
+    // — folders and ancestors should never disappear because of content
+    // tags or collection membership. Highlight via activeContextName
+    // (which composes orthogonally) is the right tree-view affordance;
+    // narrow controls live in systems view.
+    const inSystemsView = viewMode === 'systems';
     const systemsFilterActive =
-      (filterExcludedSystems.size > 0 || soloedSystems.size > 0) && viewMode === 'systems';
-    const focusActive = focusActiveCollection && focusFilterAvailable;
+      (filterExcludedSystems.size > 0 || soloedSystems.size > 0) && inSystemsView;
+    const focusActive = inSystemsView && focusActiveCollection && focusFilterAvailable;
     // Focus and loose are radio-mutex through the menu, but a stray
     // persisted state could in principle have both set. Treat focus as
     // canonical so the tree never collapses to empty (collection ∩ not-
     // in-any-collection = ∅).
     const uncollectedActive =
-      !focusActive && showOnlyUncollected && uncategorizedFilterAvailable;
+      inSystemsView && !focusActive && showOnlyUncollected && uncategorizedFilterAvailable;
 
     let baseFiles: Set<string> | null;
     if (isCollectionEditMode) {
