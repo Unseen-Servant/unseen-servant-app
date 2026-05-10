@@ -64,7 +64,9 @@
 
   <div class="right">
     {#if isLoading}
-      <span class="meter">searching…</span>
+      <span class="meter searching" aria-live="polite">
+        Searching<span class="searching-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+      </span>
     {:else}
       <span class="meter" title="Across {indexedFileCount} file{indexedFileCount === 1 ? '' : 's'} matching the active scope and filters">
         {resultCount} {resultCount === 1 ? 'hit' : 'hits'} <span class="meter-of">of {indexedFileCount} files</span>
@@ -106,6 +108,44 @@
   .meter-of {
     color: var(--text-tertiary);
     opacity: 0.75;
+  }
+
+  /* Active-search readout: accent-coloured and bolder than the muted
+     resting "X hits" so users notice a re-search has kicked off when
+     stale results are still on screen. */
+  .meter.searching {
+    color: var(--text-active);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  /* Three dots whose opacity cycles in stagger — a typewriter "..."
+     animation, intentionally low-fi to stay in keeping with the
+     terminal/desktop aesthetic. Fixed width so the layout doesn't
+     jitter as dots fade. */
+  .searching-dots {
+    display: inline-block;
+    width: 1em;
+    text-align: left;
+    margin-left: 0.05em;
+  }
+  .searching-dots > span {
+    display: inline-block;
+    animation: searching-dot 1.2s infinite ease-in-out;
+  }
+  .searching-dots > span:nth-child(2) { animation-delay: 0.18s; }
+  .searching-dots > span:nth-child(3) { animation-delay: 0.36s; }
+
+  @keyframes searching-dot {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .searching-dots > span {
+      animation: none;
+      opacity: 1;
+    }
   }
 
   .scope-readout {
