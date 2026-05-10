@@ -86,7 +86,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Filter menu (when open)
   { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
   { id: 'filterMenu.prev',       keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterMenu' },
-  { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle focused row',           scope: 'filterMenu' },
+  { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle mute on focused row',   scope: 'filterMenu' },
+  { id: 'filterMenu.solo',       keys: { mac: 'S',    other: 'S' },             label: 'Solo / unsolo focused system', scope: 'filterMenu' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

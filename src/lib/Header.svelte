@@ -9,6 +9,7 @@
   export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let filterVisible: boolean = false;
   export let excludedSystems: Set<string> = new Set();
+  export let soloedSystems: Set<string> = new Set();
   export let availableSystems: { name: string; count: number }[] = [];
   export let showHidden: boolean = false;
   export let hiddenCount: number = 0;
@@ -25,6 +26,7 @@
   export let onTogglePanel: () => void = () => {};
   export let onClearScope: () => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
+  export let onToggleSystemSolo: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
@@ -48,12 +50,23 @@
   // applied to the search backend, so they're relevant whenever search is
   // active too — exposing the filter section in both contexts keeps the
   // editor reachable wherever the exclusion is taking effect.
+  // Two gates for "filters that act on file metadata, not on disk shape":
+  //   - systemsFilterRelevant: game-system mute/solo. Meaningful where the
+  //     organizing axis IS the system tag (systems view) or where the
+  //     filter actually applies (search backend).
+  //   - curationFilterRelevant: collection focus / loose-only. Same logic.
+  // Both are intentionally hidden in tree view because narrowing a
+  // filesystem-shaped tree by content metadata breaks the spatial mental
+  // model — folders and ancestors disappear for reasons the tree itself
+  // can't explain. Highlighting (e.g., active-collection highlight) is
+  // the right pattern there; explicit narrow controls live elsewhere.
   $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
+  $: curationFilterRelevant = viewMode === 'systems' || searchActive;
   $: filterActive =
-    (systemsFilterRelevant && excludedSystems.size > 0) ||
+    (systemsFilterRelevant && (excludedSystems.size > 0 || soloedSystems.size > 0)) ||
     (hiddenCount > 0 && showHidden) ||
-    (uncategorizedFilterAvailable && showOnlyUncollected) ||
-    (focusFilterAvailable && focusActiveCollection);
+    (curationFilterRelevant && uncategorizedFilterAvailable && showOnlyUncollected) ||
+    (curationFilterRelevant && focusFilterAvailable && focusActiveCollection);
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -205,15 +218,17 @@
           open={filterOpen}
           anchorEl={filterBtn}
           {excludedSystems}
+          {soloedSystems}
           systems={availableSystems}
           showSystemFilter={systemsFilterRelevant}
           onToggleSystem={onToggleSystemFilter}
+          onToggleSolo={onToggleSystemSolo}
           onClearSystems={onClearSystemFilter}
           {showHidden}
           {hiddenCount}
           {onToggleShowHidden}
           {onClearHidden}
-          showCollectionFilter={collectionFilterAvailable}
+          showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
           {uncategorizedFilterAvailable}
           {focusFilterAvailable}
           {activeContextName}

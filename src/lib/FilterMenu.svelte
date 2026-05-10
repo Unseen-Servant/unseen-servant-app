@@ -1,15 +1,21 @@
 <script lang="ts">
   // Filter popover. Same anchor pattern as the sort menu in CollectionsPanel:
   // outside-click and Escape close it.
-  import { afterUpdate } from 'svelte';
+  import { afterUpdate, tick } from 'svelte';
 
   export let open: boolean = false;
   export let anchorEl: HTMLElement | undefined = undefined;
 
-  // Game systems to EXCLUDE. Empty = show all. Persisting "excluded" rather
-  // than "selected" means newly-detected systems show up automatically.
+  // DAW-style filter state for game systems.
+  //   - excludedSystems: "muted" rows (checkbox unchecked). Empty = nothing muted.
+  //   - soloedSystems:   "solo'd" rows. When non-empty, mute is overridden:
+  //                      only solo'd systems pass, regardless of which rows
+  //                      are muted. This matches Logic Pro / Ableton.
+  //                      Untagged files don't pass under solos.
   export let excludedSystems: Set<string> = new Set();
+  export let soloedSystems: Set<string> = new Set();
   export let onToggleSystem: (system: string) => void = () => {};
+  export let onToggleSolo: (system: string) => void = () => {};
   export let onClearSystems: () => void = () => {};
 
   // Available systems (with counts) — typically gameSystemStats from +page.
@@ -51,6 +57,34 @@
   let focusedIdx = 0;
   let rowEls: HTMLElement[] = [];
 
+  // We capture whatever was focused when the menu opened (typically the
+  // search input or the trigger button) so keystrokes can't leak into it
+  // while the menu is open, and so Escape can hand focus back.
+  let previouslyFocused: HTMLElement | null = null;
+
+  $: handleOpenChange(open);
+  async function handleOpenChange(o: boolean) {
+    if (o) {
+      if (!previouslyFocused) {
+        previouslyFocused = (document.activeElement as HTMLElement) ?? null;
+      }
+      await tick();
+      menuEl?.focus();
+    } else {
+      // Restore focus only when the close path didn't already move focus
+      // somewhere meaningful (Escape leaves it inside the menu, programmatic
+      // closes leave it on body). Outside-clicks land focus on whatever was
+      // clicked — don't yank it back from the user.
+      const ae = document.activeElement as HTMLElement | null;
+      const focusInsideMenu = !!menuEl && (ae === menuEl || menuEl.contains(ae as Node));
+      const focusOnBody = ae === document.body || ae === null;
+      if (previouslyFocused && (focusInsideMenu || focusOnBody)) {
+        previouslyFocused.focus?.();
+      }
+      previouslyFocused = null;
+    }
+  }
+
   function handleWindowClick(event: MouseEvent) {
     if (!open) return;
     const target = event.target as Node;
@@ -83,6 +117,7 @@
     if (!open) return;
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       onClose();
       return;
     }
@@ -94,22 +129,35 @@
 
     if (isDown) {
       event.preventDefault();
+      event.stopPropagation();
       focusedIdx = Math.min(rowEls.length - 1, focusedIdx + 1);
       refreshRowsAndFocus();
     } else if (isUp) {
       event.preventDefault();
+      event.stopPropagation();
       focusedIdx = Math.max(0, focusedIdx - 1);
       refreshRowsAndFocus();
     } else if (event.key === ' ' || event.key === 'Enter') {
       const row = rowEls[focusedIdx];
       if (row) {
         event.preventDefault();
+        event.stopPropagation();
         row.click();
       }
+    } else if (bareLetter && lk === 's') {
+      // Solo: only meaningful on system rows (tagged with data-fm-system).
+      // No-op on other rows so the keystroke doesn't fall through to the
+      // search input either way.
+      const row = rowEls[focusedIdx];
+      const sys = row?.getAttribute('data-fm-system');
+      event.preventDefault();
+      event.stopPropagation();
+      if (sys) onToggleSolo(sys);
     }
   }
 
-  $: hasSystemFilter = excludedSystems.size > 0;
+  $: hasSystemFilter = excludedSystems.size > 0 || soloedSystems.size > 0;
+  $: anySoloed = soloedSystems.size > 0;
   $: hasHidden = hiddenCount > 0;
 
   // The Collections section presents three mutually-exclusive radio
@@ -141,7 +189,12 @@
 
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="filter-menu" bind:this={menuEl} on:click|stopPropagation>
+  <div
+    class="filter-menu"
+    bind:this={menuEl}
+    on:click|stopPropagation
+    tabindex="-1"
+  >
     <div class="section">
       <div class="section-head">
         <span class="section-label">Hidden items</span>
@@ -231,15 +284,36 @@
           </div>
           <div class="systems">
             {#each systems as { name, count }}
-              <label class="row" title={name} data-fm="row">
-                <span class="row-name">{name}</span>
-                <span class="row-count">{count}</span>
+              <!-- Input is the FIRST labelable descendant so the label's
+                   auto-forwarded click (mouse on row text, or keyboard
+                   row.click()) targets the checkbox = mute toggle. The
+                   solo button comes after in DOM and self-cancels its
+                   click via stopPropagation so the label never sees it.
+                   Visual order is restored with CSS `order` below. -->
+              <label
+                class="row system-row"
+                class:row-dimmed={anySoloed && !soloedSystems.has(name)}
+                title={name}
+                data-fm="row"
+                data-fm-system={name}
+              >
                 <input
                   class="app-checkbox"
                   type="checkbox"
                   checked={!excludedSystems.has(name)}
                   on:change={() => onToggleSystem(name)}
                 />
+                <button
+                  type="button"
+                  class="solo-btn"
+                  class:active={soloedSystems.has(name)}
+                  on:click|preventDefault|stopPropagation={() => onToggleSolo(name)}
+                  aria-pressed={soloedSystems.has(name)}
+                  aria-label={soloedSystems.has(name) ? `Stop soloing ${name}` : `Solo ${name}`}
+                  title={soloedSystems.has(name) ? `Stop soloing ${name} (S)` : `Solo ${name} (S)`}
+                >S</button>
+                <span class="row-name">{name}</span>
+                <span class="row-count">{count}</span>
               </label>
             {/each}
           </div>
@@ -266,6 +340,14 @@
     max-width: 280px;
     z-index: 60;
     font-family: var(--font-body);
+  }
+  /* The menu container holds programmatic focus so keystrokes can't leak
+     into the search input. Per-row keyboard cursor is already drawn via
+     `.kb-focused` on individual rows — a focus ring on the container
+     itself would be redundant noise. */
+  .filter-menu:focus,
+  .filter-menu:focus-visible {
+    outline: none;
   }
 
   .section {
@@ -334,6 +416,61 @@
   }
   .row-disabled .row-count {
     color: var(--text-tertiary);
+  }
+
+  /* When any system is solo'd, non-solo'd rows fade — visual cue that
+     mute state on these rows is being overridden until solo clears. */
+  .row-dimmed {
+    opacity: 0.45;
+  }
+  .row-dimmed:hover {
+    opacity: 0.7;
+  }
+
+  .system-row {
+    /* DOM order is input → button → name → count (so the label binds to
+       the checkbox), but the visual reads solo → name → count → checkbox.
+       CSS `order` separates the two without forcing an unnatural DOM. */
+    gap: 0.4rem;
+  }
+  .system-row .solo-btn { order: 1; }
+  .system-row .row-name { order: 2; }
+  .system-row .row-count { order: 3; }
+  .system-row .app-checkbox { order: 4; }
+
+  .solo-btn {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-tertiary);
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: color var(--transition-fast), border-color var(--transition-fast),
+                background var(--transition-fast), filter var(--transition-fast);
+  }
+  .solo-btn:hover {
+    color: var(--text-secondary);
+    border-color: var(--text-secondary);
+  }
+  .solo-btn.active {
+    color: var(--text-active);
+    border-color: var(--text-active);
+    background: rgba(146, 92, 203, 0.15);
+    filter: var(--glow-active);
+  }
+  .solo-btn:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 1px;
   }
 
   .section-divider {
