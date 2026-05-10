@@ -279,12 +279,12 @@
       isSearching = false;
       return;
     }
-    if (!sidecarConnected) {
-      searchError = 'Indexer not running';
-      searchResults = [];
-      isSearching = false;
-      return;
-    }
+    // Don't pre-check sidecarConnected: that flag is updated by a 10s
+    // poll with a 3s health timeout, so a sidecar that's just busy (e.g.
+    // mid-search after rapid filter toggles) can briefly look "down" even
+    // though it's fine. Just attempt the invoke — the Rust command
+    // surfaces an accurate connection error in the catch below if the
+    // sidecar is genuinely unreachable.
 
     let sourcePaths: string[] | null = null;
     if (pathScope) {
