@@ -15,7 +15,6 @@
   import SearchInspector from '../lib/SearchInspector.svelte';
   import SearchScopeBar from '../lib/SearchScopeBar.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
-  import LicenseModal from '../lib/LicenseModal.svelte';
   import GettingStartedPage from '../lib/GettingStartedPage.svelte';
   import SettingsModal from '../lib/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../lib/KeyboardHelpOverlay.svelte';
@@ -159,7 +158,6 @@
   let mcpActive = false;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
-  let showLicense = false;
   let showSettings = false;
   let showHelpOverlay = false;
   let showSplash = true;
@@ -3024,15 +3022,12 @@
     {lastSyncTime}
     onSync={handleManualSync}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
-    onShowLicense={() => { showLicense = true; }}
     onShowGuide={() => { settingsInitialTab = 'help'; settingsInitialHelpSubTab = 'guides'; showSettings = true; }}
     onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
     onShowHelp={() => { showHelpOverlay = true; }}
     showGuideButton={!hideSetupButton}
   />
 </main>
-
-<LicenseModal visible={showLicense} onClose={() => { showLicense = false; }} />
 
 <SettingsModal
   visible={showSettings}
