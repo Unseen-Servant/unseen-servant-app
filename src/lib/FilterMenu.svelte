@@ -284,6 +284,12 @@
           </div>
           <div class="systems">
             {#each systems as { name, count }}
+              <!-- Input is the FIRST labelable descendant so the label's
+                   auto-forwarded click (mouse on row text, or keyboard
+                   row.click()) targets the checkbox = mute toggle. The
+                   solo button comes after in DOM and self-cancels its
+                   click via stopPropagation so the label never sees it.
+                   Visual order is restored with CSS `order` below. -->
               <label
                 class="row system-row"
                 class:row-dimmed={anySoloed && !soloedSystems.has(name)}
@@ -291,6 +297,12 @@
                 data-fm="row"
                 data-fm-system={name}
               >
+                <input
+                  class="app-checkbox"
+                  type="checkbox"
+                  checked={!excludedSystems.has(name)}
+                  on:change={() => onToggleSystem(name)}
+                />
                 <button
                   type="button"
                   class="solo-btn"
@@ -302,12 +314,6 @@
                 >S</button>
                 <span class="row-name">{name}</span>
                 <span class="row-count">{count}</span>
-                <input
-                  class="app-checkbox"
-                  type="checkbox"
-                  checked={!excludedSystems.has(name)}
-                  on:change={() => onToggleSystem(name)}
-                />
               </label>
             {/each}
           </div>
@@ -422,9 +428,15 @@
   }
 
   .system-row {
-    /* Solo button takes the lead position; checkbox + name flow after. */
+    /* DOM order is input → button → name → count (so the label binds to
+       the checkbox), but the visual reads solo → name → count → checkbox.
+       CSS `order` separates the two without forcing an unnatural DOM. */
     gap: 0.4rem;
   }
+  .system-row .solo-btn { order: 1; }
+  .system-row .row-name { order: 2; }
+  .system-row .row-count { order: 3; }
+  .system-row .app-checkbox { order: 4; }
 
   .solo-btn {
     flex-shrink: 0;
