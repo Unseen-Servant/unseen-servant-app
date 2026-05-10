@@ -37,8 +37,6 @@
   export let filesIndexed: boolean = false;
   export let collectionsCreated: boolean = false;
   export let mcpConnected: boolean = false;
-  export let hideSetupButton: boolean = false;
-  export let onHideSetupButtonChange: (value: boolean) => void = () => {};
   export let initialTab: 'library' | 'game-systems' | 'help' = 'library';
   export let initialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
 
@@ -130,8 +128,6 @@
             {:else if activeHelpSubTab === 'about'}
               <AboutPane
                 {dataDir}
-                {hideSetupButton}
-                {onHideSetupButtonChange}
                 {onOpenDataDir}
               />
             {/if}

@@ -105,7 +105,6 @@
   let activeContextName: string | null = null;
   let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
-  let hideSetupButton = false;
   let editingMetadataFor: string | null = null;
 
   // Library filter (next to the search bar). DAW-style mute + solo:
@@ -470,10 +469,6 @@
       if (typeof savedPanelOpen === 'boolean') {
         collectionsPanelOpen = savedPanelOpen;
       }
-      const savedHideSetup = await store.get<boolean>('hideSetupButton');
-      if (typeof savedHideSetup === 'boolean') {
-        hideSetupButton = savedHideSetup;
-      }
       // libraryFilter persistence intentionally removed: filter state is
       // session-scoped now. We delete the old key to avoid confusion if a
       // user inspects settings.json — and so older versions don't reload
@@ -730,17 +725,6 @@
   function toggleFocusActiveCollection() {
     focusActiveCollection = !focusActiveCollection;
     persistFocusActiveCollection();
-  }
-
-  async function setHideSetupButton(value: boolean) {
-    hideSetupButton = value;
-    try {
-      const store = await load('settings.json');
-      await store.set('hideSetupButton', value);
-      await store.save();
-    } catch (e) {
-      console.log('Could not persist hideSetupButton:', e);
-    }
   }
 
   async function checkMcpStatus() {
@@ -3022,10 +3006,8 @@
     {lastSyncTime}
     onSync={handleManualSync}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
-    onShowGuide={() => { settingsInitialTab = 'help'; settingsInitialHelpSubTab = 'guides'; showSettings = true; }}
     onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
     onShowHelp={() => { showHelpOverlay = true; }}
-    showGuideButton={!hideSetupButton}
   />
 </main>
 
@@ -3052,8 +3034,6 @@
   filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
   collectionsCreated={Object.keys(collections).length > 0}
   {mcpConnected}
-  {hideSetupButton}
-  onHideSetupButtonChange={setHideSetupButton}
   onSelectFolder={handleSelectFolder}
   onDeselectFolder={handleDeselectFolder}
   onCompact={handleCompact}
