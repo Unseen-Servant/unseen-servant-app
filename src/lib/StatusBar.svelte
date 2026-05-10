@@ -66,6 +66,7 @@
           <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
         </svg>
       </span>
+      <span class="separator">&middot;</span>
       {#if indexedCount > 0}
         <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
         {#if gameSystemCount > 0}
@@ -174,6 +175,9 @@
     align-items: center;
     color: var(--text-tertiary);
     line-height: 0;
+  }
+  .indicator + .indicator {
+    margin-left: 0.2rem;
   }
   .indicator.connected {
     color: var(--text-connected);
