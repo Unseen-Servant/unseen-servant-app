@@ -30,6 +30,12 @@
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
+  import {
+    parseString,
+    parseBoolean,
+    parseStringArray,
+    parseEnum,
+  } from '../lib/storeParsers';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -443,6 +449,10 @@
   }
 
   let unlistenSidecarFailed: (() => void) | null = null;
+  // Set when the startup load surfaces a missing-folder toast; cleared
+  // by loadFiles when a subsequent load succeeds — typically when the
+  // user picks a new folder.
+  let missingFolderToastId: string | null = null;
 
   onMount(async () => {
     splashTimer = setTimeout(() => {
@@ -479,14 +489,26 @@
 
     try {
       const store = await load('settings.json');
-      const savedFolder = await store.get<string>('selectedFolder');
-      const savedPaths = await store.get<string[]>('syncedPaths')
-        ?? await store.get<string[]>('selectedPaths');
+      const savedFolder = parseString(await store.get('selectedFolder'));
+      const savedPaths = parseStringArray(await store.get('syncedPaths'))
+        ?? parseStringArray(await store.get('selectedPaths'));
       syncPreferences = await loadSyncPreferences(store);
 
       if (savedFolder) {
         selectedFolder = savedFolder;
         await loadFiles(savedFolder);
+        if (error) {
+          // Library folder is gone (renamed, unmounted, deleted). Surface
+          // it on startup so the user notices now, not later when they
+          // try to act on a stale tree. Sticky — but cleared automatically
+          // by the next loadFiles() success (e.g. when they pick a new
+          // folder), via dismissIf below.
+          missingFolderToastId = jobNotification.show({
+            type: 'error',
+            message: `Library folder is no longer accessible: ${savedFolder}`,
+            duration: null,
+          });
+        }
       }
       if (savedPaths) {
         selectedPaths = new Set(savedPaths);
@@ -495,8 +517,8 @@
           await refreshIndexStatus();
         }
       }
-      const savedPanelOpen = await store.get<boolean>('collectionsPanelOpen');
-      if (typeof savedPanelOpen === 'boolean') {
+      const savedPanelOpen = parseBoolean(await store.get('collectionsPanelOpen'));
+      if (savedPanelOpen !== undefined) {
         collectionsPanelOpen = savedPanelOpen;
       }
       // libraryFilter persistence intentionally removed: filter state is
@@ -504,24 +526,27 @@
       // user inspects settings.json — and so older versions don't reload
       // a filter the new build doesn't honor anyway.
       try { await store.delete('libraryFilter'); } catch {}
-      const savedHidden = await store.get<string[]>('hiddenPaths');
-      if (Array.isArray(savedHidden)) {
+      const savedHidden = parseStringArray(await store.get('hiddenPaths'));
+      if (savedHidden) {
         hiddenPaths = new Set(savedHidden);
       }
-      const savedShowHidden = await store.get<boolean>('showHidden');
-      if (typeof savedShowHidden === 'boolean') {
+      const savedShowHidden = parseBoolean(await store.get('showHidden'));
+      if (savedShowHidden !== undefined) {
         showHidden = savedShowHidden;
       }
-      const savedShowOnlyUncollected = await store.get<boolean>('showOnlyUncollected');
-      if (typeof savedShowOnlyUncollected === 'boolean') {
+      const savedShowOnlyUncollected = parseBoolean(await store.get('showOnlyUncollected'));
+      if (savedShowOnlyUncollected !== undefined) {
         showOnlyUncollected = savedShowOnlyUncollected;
       }
-      const savedFocusActiveCollection = await store.get<boolean>('focusActiveCollection');
-      if (typeof savedFocusActiveCollection === 'boolean') {
+      const savedFocusActiveCollection = parseBoolean(await store.get('focusActiveCollection'));
+      if (savedFocusActiveCollection !== undefined) {
         focusActiveCollection = savedFocusActiveCollection;
       }
-      const savedViewMode = await store.get<string>('viewMode');
-      if (savedViewMode === 'tree' || savedViewMode === 'systems') {
+      const savedViewMode = parseEnum(
+        await store.get('viewMode'),
+        ['tree', 'systems'] as const,
+      );
+      if (savedViewMode) {
         viewMode = savedViewMode;
       }
       await loadCollections();
@@ -969,6 +994,10 @@
       files = newFiles;
       error = '';
       refreshTotalFilesFound();
+      if (missingFolderToastId) {
+        jobNotification.dismissIf(missingFolderToastId);
+        missingFolderToastId = null;
+      }
     } catch (e) {
       error = String(e);
       files = [];
