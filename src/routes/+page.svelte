@@ -158,7 +158,8 @@
   let showLicense = false;
   let showSettings = false;
   let showHelpOverlay = false;
-  let settingsInitialTab: 'library' | 'game-systems' | 'setup' = 'library';
+  let settingsInitialTab: 'library' | 'game-systems' | 'help' = 'library';
+  let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
   let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -2942,7 +2943,7 @@
     onSync={handleManualSync}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
     onShowLicense={() => { showLicense = true; }}
-    onShowGuide={() => { settingsInitialTab = 'setup'; showSettings = true; }}
+    onShowGuide={() => { settingsInitialTab = 'help'; settingsInitialHelpSubTab = 'guides'; showSettings = true; }}
     onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
     onShowHelp={() => { showHelpOverlay = true; }}
     showGuideButton={!hideSetupButton}
@@ -2955,6 +2956,7 @@
   visible={showSettings}
   onClose={() => { showSettings = false; }}
   initialTab={settingsInitialTab}
+  initialHelpSubTab={settingsInitialHelpSubTab}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
@@ -2984,7 +2986,6 @@
   onOpenDataDir={handleOpenDataDir}
   onSync={handleManualSync}
   onCopyMcpConfig={handleCopyMcpConfig}
-  onShowHelp={() => { showSettings = false; showHelpOverlay = true; }}
 />
 
 <KeyboardHelpOverlay
