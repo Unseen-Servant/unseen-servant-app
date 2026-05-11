@@ -7,11 +7,19 @@ fn main() {
         std::fs::create_dir_all(binaries_dir).ok();
     }
 
-    let target_triple = std::env::var("TAURI_ENV_TARGET_TRIPLE")
-        .unwrap_or_else(|_| "aarch64-apple-darwin".to_string());
+    // cargo sets TARGET for build scripts. TAURI_ENV_TARGET_TRIPLE is only
+    // available to the final compile (via cargo:rustc-env=), not in build.rs,
+    // so it would always be empty here.
+    let target_triple = std::env::var("TARGET").expect("cargo must set TARGET");
+
+    let ext = if target_triple.contains("windows") {
+        ".exe"
+    } else {
+        ""
+    };
 
     for name in &["legend-lore-sidecar", "legend-lore-mcp"] {
-        let path = binaries_dir.join(format!("{}-{}", name, target_triple));
+        let path = binaries_dir.join(format!("{}-{}{}", name, target_triple, ext));
         if !path.exists() {
             std::fs::write(&path, "").ok();
         }

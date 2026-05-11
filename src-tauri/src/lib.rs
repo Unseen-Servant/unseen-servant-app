@@ -1359,28 +1359,10 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
             vec![mcp_server_py, "--data-dir".to_string(), data_dir],
         )
     } else {
-        // Production: use bundled binary
-        let resource_dir = app_handle
-            .path()
-            .resource_dir()
-            .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
-        let binaries_dir = resource_dir.join("binaries");
-        let binary_path = find_bundled_binary(&binaries_dir, "legend-lore-mcp")?;
-
-        // Ensure the binary is executable (Tauri resources may lose the execute bit)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&binary_path)
-                .map_err(|e| format!("Failed to read MCP binary metadata: {}", e))?
-                .permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&binary_path, perms)
-                .map_err(|e| format!("Failed to set MCP binary permissions: {}", e))?;
-        }
-
-        let binary = binary_path.to_string_lossy().into_owned();
-
+        // Production: bundled externalBin sidecar
+        let binary = sidecar_binary_path("legend-lore-mcp")?
+            .to_string_lossy()
+            .into_owned();
         (binary, vec!["--data-dir".to_string(), data_dir])
     };
 
@@ -1400,32 +1382,34 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
 // Bundled binary resolution
 // ---------------------------------------------------------------------------
 
-/// Find a bundled binary by name, accounting for target-triple suffix.
-/// Looks for `{name}` first, then `{name}-*` in the given directory.
-fn find_bundled_binary(dir: &Path, name: &str) -> Result<std::path::PathBuf, String> {
-    // Try exact name first
-    let exact = dir.join(name);
-    if exact.exists() {
-        return Ok(exact);
-    }
+/// Resolve a Tauri `externalBin` sidecar binary at runtime.
+///
+/// Tauri strips the target-triple suffix at bundle time and places the binary
+/// next to the main app executable (Contents/MacOS/ on macOS, alongside the
+/// main exe on Windows and Linux). So we find it by walking out of the current
+/// executable's directory.
+fn sidecar_binary_path(name: &str) -> Result<std::path::PathBuf, String> {
+    let exe = std::env::current_exe()
+        .map_err(|e| format!("Failed to resolve current executable: {}", e))?;
+    let exe_dir = exe
+        .parent()
+        .ok_or_else(|| "Current executable has no parent directory".to_string())?;
 
-    // Look for target-triple suffixed variant (e.g., legend-lore-sidecar-aarch64-apple-darwin)
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        let prefix = format!("{}-", name);
-        for entry in entries.flatten() {
-            if let Some(fname) = entry.file_name().to_str() {
-                if fname.starts_with(&prefix) {
-                    return Ok(entry.path());
-                }
-            }
-        }
-    }
+    let filename = if cfg!(windows) {
+        format!("{}.exe", name)
+    } else {
+        name.to_string()
+    };
+    let path = exe_dir.join(&filename);
 
-    Err(format!(
-        "Bundled binary '{}' not found in {}",
-        name,
-        dir.display()
-    ))
+    if !path.exists() {
+        return Err(format!(
+            "Sidecar binary '{}' not found at {}",
+            name,
+            path.display()
+        ));
+    }
+    Ok(path)
 }
 
 // ---------------------------------------------------------------------------
@@ -1495,7 +1479,7 @@ fn wait_for_sidecar(port_file: &Path, log_path: &Path) -> Result<u16, String> {
     Err(msg)
 }
 
-fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child, String> {
+fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
     let (program, base_args): (std::path::PathBuf, Vec<String>) = if cfg!(debug_assertions) {
         // Dev mode: use source-tree Python
         let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
@@ -1514,28 +1498,8 @@ fn start_sidecar(app_handle: &tauri::AppHandle, data_dir: &Path) -> Result<Child
 
         (python, vec![server_py.to_string_lossy().into_owned()])
     } else {
-        // Production: use bundled binary
-        let resource_dir = app_handle
-            .path()
-            .resource_dir()
-            .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
-        let binaries_dir = resource_dir.join("binaries");
-
-        // Find the sidecar binary (may have target-triple suffix)
-        let binary = find_bundled_binary(&binaries_dir, "legend-lore-sidecar")?;
-
-        // Ensure the binary is executable (Tauri resources may lose the execute bit)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&binary)
-                .map_err(|e| format!("Failed to read binary metadata: {}", e))?
-                .permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&binary, perms)
-                .map_err(|e| format!("Failed to set binary permissions: {}", e))?;
-        }
-
+        // Production: bundled externalBin sidecar
+        let binary = sidecar_binary_path("legend-lore-sidecar")?;
         (binary, vec![])
     };
 
@@ -1692,7 +1656,7 @@ pub fn run() {
 
             // Start the Python sidecar
             let port_file = chroma_dir.join("sidecar.port");
-            match start_sidecar(app.handle(), &chroma_dir) {
+            match start_sidecar(&chroma_dir) {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));
