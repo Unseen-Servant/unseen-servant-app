@@ -46,8 +46,17 @@ jobs:
         run: |
           cd sidecar
           source .venv/bin/activate
+          # --collect-all pulls in submodules + binaries + data files:
+          #  - pymupdf{,4llm}: ONNX layout-analyzer YAML/weights at
+          #    pymupdf/layout/resources/
+          #  - fastembed: cross-encoder ONNX model + tokenizer assets
+          #    used by the reranker
+          # Kept in sync with scripts/build-sidecar.sh.
           pyinstaller --onefile --name legend-lore-sidecar server.py \
             --collect-all chromadb \
+            --collect-all pymupdf \
+            --collect-all pymupdf4llm \
+            --collect-all fastembed \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.protocols.http \
             --hidden-import uvicorn.protocols.http.auto \
@@ -171,6 +180,9 @@ jobs:
           .venv\Scripts\Activate.ps1
           pyinstaller --onefile --name legend-lore-sidecar server.py `
             --collect-all chromadb `
+            --collect-all pymupdf `
+            --collect-all pymupdf4llm `
+            --collect-all fastembed `
             --hidden-import uvicorn.logging `
             --hidden-import uvicorn.protocols.http `
             --hidden-import uvicorn.protocols.http.auto `

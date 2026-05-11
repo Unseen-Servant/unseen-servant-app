@@ -26,14 +26,17 @@ source .venv/bin/activate
 pip install --quiet pyinstaller
 
 echo "==> Building legend-lore-sidecar (FastAPI server)..."
-# pymupdf and pymupdf4llm ship runtime data files (e.g. ONNX layout-analyzer
-# YAML resources at pymupdf/layout/resources/) that --hidden-import alone
-# doesn't pull in. --collect-all grabs submodules + binaries + data, which
-# is the same treatment chromadb already gets below for the same reason.
+# --collect-all pulls in submodules + binaries + data files:
+#  - pymupdf{,4llm}: ONNX layout-analyzer YAML/weights at
+#    pymupdf/layout/resources/
+#  - fastembed: cross-encoder ONNX model + tokenizer assets used by
+#    the reranker
+# Kept in sync with .github/workflows/release.yml.
 pyinstaller --onefile --name legend-lore-sidecar server.py \
   --collect-all chromadb \
   --collect-all pymupdf \
   --collect-all pymupdf4llm \
+  --collect-all fastembed \
   --hidden-import uvicorn.logging \
   --hidden-import uvicorn.protocols.http \
   --hidden-import uvicorn.protocols.http.auto \
