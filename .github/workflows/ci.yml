@@ -195,11 +195,14 @@ jobs:
   # Cross-platform Tauri compile on the actual distribution targets.
   # --no-bundle skips dmg/nsis packaging (slow and platform-fragile);
   # the goal here is to catch link errors and platform-specific Rust
-  # issues, not to validate the bundler. Skipped for PRs that don't
-  # touch any frontend/Rust code.
+  # issues, not to validate the bundler. Runs only on push to main —
+  # rust-checks on Ubuntu already catches Tauri config / build.rs
+  # issues at PR time (it's what caught #280's build.rs target-triple
+  # bug), and macOS minutes bill at 10× so PR runs were expensive for
+  # marginal extra coverage.
   tauri-build-smoke:
     needs: changes
-    if: needs.changes.outputs.tauri_build == 'true' || github.event_name == 'push'
+    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
