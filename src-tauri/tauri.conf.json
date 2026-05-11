@@ -25,9 +25,12 @@
     "active": true,
     "targets": ["nsis", "dmg"],
     "resources": {
-      "binaries/legend-lore-*": "binaries/",
       "../LICENSE": "LICENSE"
     },
+    "externalBin": [
+      "binaries/legend-lore-sidecar",
+      "binaries/legend-lore-mcp"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
