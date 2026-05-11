@@ -24,6 +24,9 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg"],
+    "macOS": {
+      "entitlements": "../sidecar/entitlements.plist"
+    },
     "resources": {
       "../LICENSE": "LICENSE"
     },
