@@ -67,11 +67,11 @@ jobs:
       - name: Upload latest/ (overwrite) to R2
         run: |
           aws s3 cp "assets/$MACOS_FILE" \
-            "s3://$R2_BUCKET/legend-lore/latest/macos.dmg" \
+            "s3://$R2_BUCKET/legend-lore/latest/Legend-Lore-macos.dmg" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public, max-age=300"
           aws s3 cp "assets/$WINDOWS_FILE" \
-            "s3://$R2_BUCKET/legend-lore/latest/windows.exe" \
+            "s3://$R2_BUCKET/legend-lore/latest/Legend-Lore-windows.exe" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public, max-age=300"
 
@@ -83,8 +83,8 @@ jobs:
             "version": "$VERSION",
             "released": "$RELEASED",
             "downloads": {
-              "macos":   "$PUBLIC_BASE/latest/macos.dmg",
-              "windows": "$PUBLIC_BASE/latest/windows.exe"
+              "macos":   "$PUBLIC_BASE/latest/Legend-Lore-macos.dmg",
+              "windows": "$PUBLIC_BASE/latest/Legend-Lore-windows.exe"
             },
             "archive": {
               "macos":   "$PUBLIC_BASE/v$VERSION/$MACOS_FILE",
