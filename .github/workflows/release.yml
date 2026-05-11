@@ -46,8 +46,13 @@ jobs:
         run: |
           cd sidecar
           source .venv/bin/activate
+          # --collect-all pymupdf{,4llm}: pull in the ONNX layout-analyzer
+          # YAML/weights at pymupdf/layout/resources/, which --hidden-import
+          # alone misses. Kept in sync with scripts/build-sidecar.sh.
           pyinstaller --onefile --name legend-lore-sidecar server.py \
             --collect-all chromadb \
+            --collect-all pymupdf \
+            --collect-all pymupdf4llm \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.protocols.http \
             --hidden-import uvicorn.protocols.http.auto \
@@ -171,6 +176,8 @@ jobs:
           .venv\Scripts\Activate.ps1
           pyinstaller --onefile --name legend-lore-sidecar server.py `
             --collect-all chromadb `
+            --collect-all pymupdf `
+            --collect-all pymupdf4llm `
             --hidden-import uvicorn.logging `
             --hidden-import uvicorn.protocols.http `
             --hidden-import uvicorn.protocols.http.auto `
