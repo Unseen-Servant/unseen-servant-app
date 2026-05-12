@@ -56,22 +56,22 @@ jobs:
       - name: Upload versioned (immutable) archive to R2
         run: |
           aws s3 cp "assets/$MACOS_FILE" \
-            "s3://$R2_BUCKET/legend-lore/v$VERSION/$MACOS_FILE" \
+            "s3://$R2_BUCKET/legend-lore/v$VERSION/Legend-Lore-$VERSION-macos.dmg" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public, max-age=31536000, immutable"
           aws s3 cp "assets/$WINDOWS_FILE" \
-            "s3://$R2_BUCKET/legend-lore/v$VERSION/$WINDOWS_FILE" \
+            "s3://$R2_BUCKET/legend-lore/v$VERSION/Legend-Lore-$VERSION-windows.exe" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public, max-age=31536000, immutable"
 
-      - name: Upload latest/ (overwrite) to R2
+      - name: Upload latest/ to R2 (versioned filenames)
         run: |
           aws s3 cp "assets/$MACOS_FILE" \
-            "s3://$R2_BUCKET/legend-lore/latest/Legend-Lore-macos.dmg" \
+            "s3://$R2_BUCKET/legend-lore/latest/Legend-Lore-$VERSION-macos.dmg" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public, max-age=300"
           aws s3 cp "assets/$WINDOWS_FILE" \
-            "s3://$R2_BUCKET/legend-lore/latest/Legend-Lore-windows.exe" \
+            "s3://$R2_BUCKET/legend-lore/latest/Legend-Lore-$VERSION-windows.exe" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public, max-age=300"
 
@@ -83,12 +83,12 @@ jobs:
             "version": "$VERSION",
             "released": "$RELEASED",
             "downloads": {
-              "macos":   "$PUBLIC_BASE/latest/Legend-Lore-macos.dmg",
-              "windows": "$PUBLIC_BASE/latest/Legend-Lore-windows.exe"
+              "macos":   "$PUBLIC_BASE/latest/Legend-Lore-$VERSION-macos.dmg",
+              "windows": "$PUBLIC_BASE/latest/Legend-Lore-$VERSION-windows.exe"
             },
             "archive": {
-              "macos":   "$PUBLIC_BASE/v$VERSION/$MACOS_FILE",
-              "windows": "$PUBLIC_BASE/v$VERSION/$WINDOWS_FILE"
+              "macos":   "$PUBLIC_BASE/v$VERSION/Legend-Lore-$VERSION-macos.dmg",
+              "windows": "$PUBLIC_BASE/v$VERSION/Legend-Lore-$VERSION-windows.exe"
             }
           }
           EOF
