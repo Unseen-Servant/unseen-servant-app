@@ -79,6 +79,28 @@ PDF files on disk
 
 ---
 
+## Continuous Integration
+
+Solo dev project on the GitHub Pro tier: **3000 billable minutes/month**. macOS jobs bill at 10×, Windows at 2×, Linux at 1× — macOS dominates any budget. CI is structured around this constraint.
+
+### What runs when
+
+- **PR + push to `main` (`ci.yml`):** Linux-only — `sidecar-tests` (pytest), `rust-checks` (fmt + clippy + cargo test), `frontend-checks` (svelte-check + vitest + vite build). All path-gated on PR; everything runs on push. Effective cost: ~free under the included minutes.
+- **Tag push `v*` (`release.yml`):** Full cross-platform build on macOS + Windows, sidecar PyInstaller bundle, codesign, draft GitHub Release. This *is* the cross-platform validation — there is no separate "tauri-build-smoke" on main.
+
+### Rules for changing CI
+
+1. **No macOS/Windows jobs on PR or push-to-main.** If you're tempted to add one, the question is "what will this catch that Linux + the next release tag won't?" — and the answer needs to justify the billable-min cost.
+2. **Estimate billable minutes before adding any job.** Include the multiplier. Note it in the PR description.
+3. **Release-time regressions are acceptable.** If a cross-platform bug only surfaces at tag push, fix forward and bump the patch version. Re-tagging an unpublished draft once is fine; if a second fix lands, bump the patch.
+4. **Local validation is the dev's responsibility.** Before tagging a release that touches build config, `src-tauri/`, sidecar deps, or the build scripts, run `npm run tauri build` and `bash scripts/build-sidecar.sh` locally.
+
+### PR cadence
+
+Many tiny same-area PRs multiplied by post-merge runs is the cost pattern that drained the budget originally. With expensive jobs gone from main, per-merge cost is near zero — but it's still worth bundling **2–3 related small fixes** into one branch when they're naturally co-located (same file, same area, same sitting). Don't stack PRs; don't bundle unrelated work. The goal is fewer artificial separations, not big mixed PRs.
+
+---
+
 ## Guidelines
 
 ### 1. Think Before Coding

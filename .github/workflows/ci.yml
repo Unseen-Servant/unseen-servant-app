@@ -21,10 +21,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Detect which surfaces a PR actually touches so the expensive jobs
-  # below can opt out when irrelevant. On push to main everything runs
-  # so the post-merge state is fully validated regardless of which file
-  # paths changed.
+  # Detect which surfaces a PR actually touches so the Linux jobs below
+  # can opt out when irrelevant. On push to main everything runs so the
+  # post-merge state is fully validated regardless of which file paths
+  # changed. Cross-platform builds are NOT done here — release.yml
+  # cross-compiles on tag push and is the canonical macOS/Windows gate.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -32,7 +33,6 @@ jobs:
       sidecar: ${{ steps.filter.outputs.sidecar }}
       rust: ${{ steps.filter.outputs.rust }}
       frontend: ${{ steps.filter.outputs.frontend }}
-      tauri_build: ${{ steps.filter.outputs.tauri_build }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
@@ -52,12 +52,6 @@ jobs:
               - 'svelte.config.js'
               - 'vite.config.ts'
               - 'tsconfig.json'
-            tauri_build:
-              - 'src-tauri/**'
-              - 'src/**'
-              - 'static/**'
-              - 'package.json'
-              - 'package-lock.json'
 
   # Pure Python tests against the in-memory ChromaDB fixture. Fast,
   # exercises every endpoint contract.
@@ -149,98 +143,3 @@ jobs:
 
       - name: vite build
         run: npm run build
-
-  # Builds the PyInstaller sidecar binary and asserts it actually starts.
-  # Would have caught #274 (missing pymupdf data files crashed the
-  # bundled binary on import). Runs on macOS because that's the actual
-  # distribution target and the build script is currently macOS-only;
-  # the data-file bug it catches is platform-independent so one platform
-  # is enough. Expensive (~10 min for PyInstaller) so we only run it
-  # when sidecar code or the build script actually changed.
-  sidecar-binary-smoke:
-    needs: changes
-    if: needs.changes.outputs.sidecar == 'true' || github.event_name == 'push'
-    runs-on: macos-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.10'
-
-      - name: Build sidecar venv + install deps
-        working-directory: sidecar
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build PyInstaller binaries
-        run: bash scripts/build-sidecar.sh
-
-      - name: Sidecar binary --help
-        run: |
-          BIN=$(ls src-tauri/binaries/legend-lore-sidecar-*)
-          echo "Smoke testing: $BIN"
-          "$BIN" --help
-
-      - name: MCP binary --help
-        run: |
-          BIN=$(ls src-tauri/binaries/legend-lore-mcp-*)
-          echo "Smoke testing: $BIN"
-          "$BIN" --help
-
-  # Cross-platform Tauri compile on the actual distribution targets.
-  # --no-bundle skips dmg/nsis packaging (slow and platform-fragile);
-  # the goal here is to catch link errors and platform-specific Rust
-  # issues, not to validate the bundler. Runs only on push to main —
-  # rust-checks on Ubuntu already catches Tauri config / build.rs
-  # issues at PR time (it's what caught #280's build.rs target-triple
-  # bug), and macOS minutes bill at 10× so PR runs were expensive for
-  # marginal extra coverage.
-  tauri-build-smoke:
-    needs: changes
-    if: github.event_name == 'push'
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          cache: npm
-
-      - name: npm ci
-        run: npm ci
-
-      # tauri build expects the sidecar binaries to exist (they're a
-      # bundle resource); empty placeholders are enough for --no-bundle
-      # since that path skips resource copying. Touching the platform-
-      # specific filenames keeps the resource glob happy on either OS.
-      - name: Stub sidecar binaries
-        shell: bash
-        run: |
-          mkdir -p src-tauri/binaries
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            touch src-tauri/binaries/legend-lore-sidecar-aarch64-apple-darwin
-            touch src-tauri/binaries/legend-lore-mcp-aarch64-apple-darwin
-          else
-            touch src-tauri/binaries/legend-lore-sidecar-x86_64-pc-windows-msvc.exe
-            touch src-tauri/binaries/legend-lore-mcp-x86_64-pc-windows-msvc.exe
-          fi
-
-      - name: tauri build --no-bundle
-        run: npm run tauri build -- --no-bundle
