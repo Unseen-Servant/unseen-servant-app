@@ -27,6 +27,11 @@ from mcp.server.fastmcp import FastMCP
 PORT_FILENAME = "sidecar.port"
 SIDECAR_URL_DISCOVERY_TIMEOUT = 30.0  # seconds; covers a slow sidecar boot
 
+# Per-request timeout for sidecar HTTP calls. httpx defaults to 5s, but a
+# warm reranked search takes 5-7s (the cross-encoder is the whole budget),
+# so the default silently times out a search the sidecar answers 200 OK.
+SIDECAR_REQUEST_TIMEOUT_SECONDS = 60.0
+
 
 # Tag every sidecar request from this process so the sidecar can track
 # MCP-originated activity separately from desktop UI calls.
@@ -125,6 +130,11 @@ _SIDECAR_DOWN_HINT = (
     "Cannot connect to Legend Lore app. Make sure the desktop app is running."
 )
 
+_SIDECAR_TIMEOUT_HINT = (
+    "Legend Lore timed out waiting for the app to respond. It may be busy "
+    "(a large library or a slow search) — try again, or narrow your query."
+)
+
 
 class SidecarClient:
     """Thin wrapper around httpx for calling the FastAPI sidecar.
@@ -146,12 +156,16 @@ class SidecarClient:
         if url is None:
             return _SIDECAR_DOWN_HINT
         try:
-            async with httpx.AsyncClient(headers=MCP_HEADERS) as client:
+            async with httpx.AsyncClient(
+                headers=MCP_HEADERS, timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS
+            ) as client:
                 resp = await client.get(f"{url}{path}")
                 resp.raise_for_status()
                 return resp.json()
         except httpx.ConnectError:
             return _SIDECAR_DOWN_HINT
+        except httpx.TimeoutException:
+            return _SIDECAR_TIMEOUT_HINT
         except httpx.HTTPStatusError as e:
             return f"Sidecar error: {e.response.status_code} — {e.response.text}"
 
@@ -160,12 +174,16 @@ class SidecarClient:
         if url is None:
             return _SIDECAR_DOWN_HINT
         try:
-            async with httpx.AsyncClient(headers=MCP_HEADERS) as client:
+            async with httpx.AsyncClient(
+                headers=MCP_HEADERS, timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS
+            ) as client:
                 resp = await client.post(f"{url}{path}", json=json)
                 resp.raise_for_status()
                 return resp.json()
         except httpx.ConnectError:
             return _SIDECAR_DOWN_HINT
+        except httpx.TimeoutException:
+            return _SIDECAR_TIMEOUT_HINT
         except httpx.HTTPStatusError as e:
             return f"Sidecar error: {e.response.status_code} — {e.response.text}"
 
