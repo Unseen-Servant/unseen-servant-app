@@ -107,6 +107,37 @@ effective context when it is below bge-m3's 8192. Constraints:
 - Keep it small (~10 lines); it exists to turn a silent misconfiguration
   into a visible log line.
 
+### 5. Robustness against table-layout variation
+
+PDF-extracted tables vary widely, but the exposure is bounded: the chunker
+only tags consecutive pipe-rows as `table`, so the linearizer never sees
+arbitrary extraction weirdness — only pipe-shaped text. On the spike corpus
+(1,014 tables, three publishers) 98.2% parsed into rows; the 18 failures hit
+the atomic fallback (status quo, no recall loss).
+
+The parser does not need to be *accurate*; it needs to be
+**token-lossless-or-fallback**. Mis-labeled but token-complete parses
+(transposed tables, stat-block pseudo-tables) are measured harmless — bge-m3
+rewards rare-token co-occurrence, not schema correctness. The failure mode
+that matters is a parse that "succeeds" while dropping content (e.g. data
+rows truncated to a too-narrow detected header): in replace mode that loss
+is silent. Two safeguards:
+
+- **Coverage guard** (~5 lines, in the `build()` table branch): compare
+  content characters emitted across row sentences against the source
+  table's non-structural characters (pipes/separators excluded); below
+  ~60–70% coverage, fall back to the atomic unit. Converts every
+  silent-loss case — known and unknown — into status quo.
+- **Index-time counters**: log per-source linearization stats (tables
+  linearized / fallbacks / rows emitted), mirroring the spike's summary
+  output. Real-library variation becomes visible in diagnostics; an
+  unusually high fallback rate for a source is the signal to revisit the
+  parser with real examples.
+
+Deliberately *not* doing: smarter heuristics (multi-row headers, transposed
+detection) against unmeasured inputs. The guard makes them unnecessary for
+safety; the counters will show if they ever become necessary for quality.
+
 ## Out of scope (deliberate)
 
 - **`mixed`-type tables** (e.g. BFRPG cleric saving throws): not classified
@@ -132,7 +163,10 @@ effective context when it is below bge-m3's 8192. Constraints:
   **deliberately replaced** by:
   - parseable table → N row units, all sharing the source table's
     `parent_id`, `chunk_type == "table"`;
-  - unparseable table → single atomic unit (fallback).
+  - unparseable table → single atomic unit (fallback);
+  - lossy parse (row sentences covering well under the coverage threshold,
+    e.g. wide data rows under a narrow detected header) → single atomic
+    unit (coverage guard).
 - `tests/test_chunker.py` — over-cap text with only `\n` boundaries cuts on
   a newline, not mid-row.
 - Truncation probe: unit test with a fake embedding function that truncates
