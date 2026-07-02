@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { browser } from '$app/environment';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
@@ -168,12 +167,9 @@
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
   let showHelpOverlay = false;
-  // Read the skip preference synchronously (localStorage) at init so the splash
-  // decision is made before the first paint — no flash of the app UI beforehand.
-  let skipLaunchSplash = browser && localStorage.getItem('skipLaunchSplash') === 'true';
-  let showSplash = !skipLaunchSplash;
+  let showSplash = true;
   let splashTimer: ReturnType<typeof setTimeout> | null = null;
-  let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'library';
+  let settingsInitialTab: 'library' | 'game-systems' | 'help' = 'library';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
   let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
@@ -458,14 +454,10 @@
   let missingFolderToastId: string | null = null;
 
   onMount(async () => {
-    // Splash visibility was decided synchronously at init (see above), so it
-    // paints on the first frame. If it's up, auto-dismiss after 1.2s.
-    if (showSplash) {
-      splashTimer = setTimeout(() => {
-        showSplash = false;
-        splashTimer = null;
-      }, 1200);
-    }
+    splashTimer = setTimeout(() => {
+      showSplash = false;
+      splashTimer = null;
+    }, 1200);
 
     // Sidecar failed to start at app launch — show one sticky banner so the
     // user gets a single clear failure message instead of N "failed to
@@ -2523,11 +2515,6 @@
   // Collections panel + metadata dialog
   // ---------------------------------------------------------------------------
 
-  function handleSkipLaunchSplashChange(value: boolean) {
-    skipLaunchSplash = value;
-    if (browser) localStorage.setItem('skipLaunchSplash', value ? 'true' : 'false');
-  }
-
   async function togglePanel() {
     collectionsPanelOpen = !collectionsPanelOpen;
     try {
@@ -3099,8 +3086,6 @@
   onClose={() => { showSettings = false; }}
   initialTab={settingsInitialTab}
   initialHelpSubTab={settingsInitialHelpSubTab}
-  skipLaunchSplash={skipLaunchSplash}
-  onSkipLaunchSplashChange={handleSkipLaunchSplashChange}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
