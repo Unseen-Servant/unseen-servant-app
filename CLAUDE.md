@@ -99,6 +99,12 @@ Solo dev project on the GitHub Pro tier: **3000 billable minutes/month**. macOS 
 
 Many tiny same-area PRs multiplied by post-merge runs is the cost pattern that drained the budget originally. With expensive jobs gone from main, per-merge cost is near zero — but it's still worth bundling **2–3 related small fixes** into one branch when they're naturally co-located (same file, same area, same sitting). Don't stack PRs; don't bundle unrelated work. The goal is fewer artificial separations, not big mixed PRs.
 
+### Closing issues
+
+Close an issue when the PR that resolves it **lands** — on merge, or on PR open when the work is clearly done and already sitting in an open PR. Don't hold issues open waiting for a later release to merge back to main.
+
+Mind the auto-close gap: GitHub's `Closes #N` / `Fixes #N` keywords only fire when a PR merges into the **default branch**. PRs that target a release branch (e.g. `release/v2.1.0`) won't auto-close their linked issues, so close those manually.
+
 ---
 
 ## Guidelines
