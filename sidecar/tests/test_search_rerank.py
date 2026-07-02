@@ -130,3 +130,52 @@ def test_rerank_relevance_uses_score_when_reranked(indexed_client, monkeypatch):
     for r in response.json()["results"]:
         # Allow rounding (server rounds to 3 decimals).
         assert abs(r["relevance"] - 0.9) < 0.005
+
+
+# ---------------------------------------------------------------------------
+# Non-English guard (issue #305): the bundled cross-encoder is English-only
+# and inverts bge-m3's multilingual cosine order on non-English queries, so
+# a non-ASCII query must bypass the reranker entirely.
+# ---------------------------------------------------------------------------
+
+def test_rerank_safe_for_query_ascii_vs_accented():
+    """All-ASCII queries are reranker-safe; accented ones are not."""
+    import server
+
+    assert server._rerank_safe_for_query("falling damage") is True
+    assert server._rerank_safe_for_query("dégâts de chute") is False
+
+
+def test_non_ascii_query_skips_reranker(indexed_client, monkeypatch):
+    """An accented (non-English) query must bypass the English-only reranker,
+    even with rerank=True, so bge-m3's multilingual order is preserved."""
+    import server
+
+    def boom(query, docs):
+        raise AssertionError("reranker must not run on a non-ASCII query")
+
+    monkeypatch.setattr(server, "rerank_scores", boom)
+
+    response = indexed_client.post("/api/search", json={
+        "query": "dégâts de chute", "n_results": 5, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+
+
+def test_ascii_query_still_reranks(indexed_client, monkeypatch):
+    """The #305 guard must not over-skip: an all-ASCII query still reranks."""
+    import server
+
+    captured = {}
+
+    def fake_scores(query, docs):
+        captured["called"] = True
+        return [0.5] * len(docs)
+
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    response = indexed_client.post("/api/search", json={
+        "query": "falling damage", "n_results": 5, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    assert captured.get("called"), "an ASCII query should still be reranked"

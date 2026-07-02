@@ -128,6 +128,21 @@ def _normalize_for_match(s: str) -> str:
     return "".join(ch for ch in s if ch.isalnum())
 
 
+def _rerank_safe_for_query(query: str) -> bool:
+    """Whether the bundled cross-encoder should be trusted for this query.
+
+    The default reranker (ms-marco-MiniLM) is English-only; on non-English
+    queries it emits noise scores that invert bge-m3's genuinely
+    multilingual cosine ranking (a correct French section gets demoted out
+    of the visible top results). An all-ASCII query is treated as
+    English-and-safe; a query with accented/non-Latin characters skips
+    reranking so the dense order is preserved. Conservative by design — it
+    never reranks-away a non-English query, and never changes English
+    behaviour (issue #305).
+    """
+    return query.isascii()
+
+
 def detect_game_systems(
     pdf_path: Path,
     text: str | None = None,
@@ -2977,7 +2992,7 @@ def create_app(
             # ("Combat > Grappling") versus a creature card with the same
             # keyword ("Goblin > Actions"), and tends to over-rank the
             # keyword-dense action text.
-            if request.rerank:
+            if request.rerank and _rerank_safe_for_query(request.query):
                 pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
                 pool_docs = results["documents"][0][:pool]
                 pool_meta = ordered_metadatas[:pool]
