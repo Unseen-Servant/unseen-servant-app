@@ -13,11 +13,11 @@ Priority = (impact × frequency × confidence) ÷ effort, with a bias toward **t
 These were found empirically by running the real sidecar against production data — not visible from a static read.
 
 ### 0.1 — The MCP search path times out in production
-`SidecarClient` in [mcp_server.py](../../../sidecar/mcp_server.py) uses `httpx.AsyncClient()` with the **default 5s timeout** and catches only `ConnectError`/`HTTPStatusError`. Warm reranked searches take **5–7s**, so `search_library` dies with an unhandled `TimeoutException` — reproduced twice while the sidecar logged `200 OK`. The flagship "ask Claude mid-session" feature fails for typical queries; a fresh install's *first* MCP search always fails (cold-start reranker download + 5s ceiling).
+`SidecarClient` in [mcp_server.py](../../sidecar/mcp_server.py) uses `httpx.AsyncClient()` with the **default 5s timeout** and catches only `ConnectError`/`HTTPStatusError`. Warm reranked searches take **5–7s**, so `search_library` dies with an unhandled `TimeoutException` — reproduced twice while the sidecar logged `200 OK`. The flagship "ask Claude mid-session" feature fails for typical queries; a fresh install's *first* MCP search always fails (cold-start reranker download + 5s ceiling).
 **Fix:** explicit generous timeout + catch `TimeoutException` and surface a real message. **Effort: S. Highest-leverage fix in this document.**
 
 ### 0.2 — The reranker inverts French queries and displays `0.0` relevance
-The default `Xenova/ms-marco-MiniLM-L-12-v2` cross-encoder ([reranker.py](../../../sidecar/reranker.py)) is English-only. On `comment fonctionnent les dégâts de chute`, rerank-**on** put "Underwater Combat" at #1 with every result at 0.0; rerank-**off** returned the two correct FALLING sections at #1/#2. It is also the **entire latency budget** (0.2–0.8s off vs 1.4–7.1s on) and **was never validated against the eval harness** — while the only reranker experiment on record (`hybrid_retrieval_spike`) was a **no-go** (−0.232 MRR@5) on a *stronger* model with the same failure modes (512-token truncation, English calibration).
+The default `Xenova/ms-marco-MiniLM-L-12-v2` cross-encoder ([reranker.py](../../sidecar/reranker.py)) is English-only. On `comment fonctionnent les dégâts de chute`, rerank-**on** put "Underwater Combat" at #1 with every result at 0.0; rerank-**off** returned the two correct FALLING sections at #1/#2. It is also the **entire latency budget** (0.2–0.8s off vs 1.4–7.1s on) and **was never validated against the eval harness** — while the only reranker experiment on record (`hybrid_retrieval_spike`) was a **no-go** (−0.232 MRR@5) on a *stronger* model with the same failure modes (512-token truncation, English calibration).
 **Fix:** validate against the harness; interim, skip rerank for non-English queries or expose the existing `rerank` flag (cosine-fallback is already a tested path). **Effort: S–M.**
 
 ---
@@ -40,16 +40,16 @@ The default `Xenova/ms-marco-MiniLM-L-12-v2` cross-encoder ([reranker.py](../../
 
 ### 8 — Ship table row-linearization *(largest unadopted win)*
 `table_retrieval_spike` measured **+0.152 MRR@5** on table queries with **reference code ready to copy** (`linearize_tables.py`), zero LLM cost, embed-side only (re-index, no schema/retrieval change). It also resolves two other confirmed findings:
-- Large tables embed as a **single diluted vector** ([granularity.py:196](../../../sidecar/granularity.py)) — a query for one row loses to prose that merely mentions the term.
+- Large tables embed as a **single diluted vector** ([granularity.py:196](../../sidecar/granularity.py)) — a query for one row loses to prose that merely mentions the term.
 - **Silent ~2048-token embedding truncation** — verified live, the effective Ollama context is ~2048 (not the documented 8192), so big tables have their tail unsearchable regardless of query.
 
 Targets the signature live-play lookup ("what's on roll 96–00"). **Effort: M. Do this as its own focused piece — it's the reason the tool exists.**
 
 ### 9 — Fix heading-promotion quality
-Live probe showed **junk breadcrumbs actively outranking real content**: a stale never-closed "Level 5 Cleric Spells" heading covers most of Wight-Box and its parents beat OSRIC's real wandering-monster tables at 0.999; OSRIC roots everything at "**CONTENTS**"; stat-lines and table captions get promoted as headings. Breadcrumbs are prepended to **both the embedding and the rerank input** ([server.py:712](../../../sidecar/server.py:712)), so bad headings poison ranking, not just display. Reject stat-line/caption headings, cap heading staleness, add the flagged **R4** running-header strip, assign distinct sub-modal heading levels (not all → level 3), and synthesize headings for bold body-size entry names. [promote_headings.py](../../../sidecar/promote_headings.py). **Effort: M.**
+Live probe showed **junk breadcrumbs actively outranking real content**: a stale never-closed "Level 5 Cleric Spells" heading covers most of Wight-Box and its parents beat OSRIC's real wandering-monster tables at 0.999; OSRIC roots everything at "**CONTENTS**"; stat-lines and table captions get promoted as headings. Breadcrumbs are prepended to **both the embedding and the rerank input** ([server.py:712](../../sidecar/server.py:712)), so bad headings poison ranking, not just display. Reject stat-line/caption headings, cap heading staleness, add the flagged **R4** running-header strip, assign distinct sub-modal heading levels (not all → level 3), and synthesize headings for bold body-size entry names. [promote_headings.py](../../sidecar/promote_headings.py). **Effort: M.**
 
 ### 10 — Two-column reading-order in extraction
-The Dragonbane FALLING rule comes back with sentences interleaved out of order — **the rule as displayed is factually wrong, with a correct citation attached.** Most dangerous class here: confidently-wrong at the table. Per-page extraction at [server.py:298](../../../sidecar/server.py:298). **Effort: M.**
+The Dragonbane FALLING rule comes back with sentences interleaved out of order — **the rule as displayed is factually wrong, with a correct citation attached.** Most dangerous class here: confidently-wrong at the table. Per-page extraction at [server.py:298](../../sidecar/server.py:298). **Effort: M.**
 
 ---
 
@@ -77,8 +77,8 @@ The Dragonbane FALLING rule comes back with sentences interleaved out of order �
 
 - **Game-system soft-boost** — `hybrid_retrieval_spike` measured **+0.042 cross-system MRR**, ~30 lines, "never hurts"; blocked only on a `KNOWN_SYSTEMS` keyword gap (`game_systems.py`).
 - **Printed page-labels in citations** — surface `doc[i].get_label()` so "p.167" matches the book's printed page, not the physical index.
-- **Debounce min-query-length** — the full embed+rerank pipeline fires per keystroke-pause on 1-char queries ([Header.svelte](../../../src/lib/Header.svelte)).
-- **Tighten prose page-spans** — heading-sparse sections stamp every chunk with the whole run's span, so "pp.33–41" is a 9-page scan ([chunker.py:139](../../../sidecar/chunker.py:139)).
+- **Debounce min-query-length** — the full embed+rerank pipeline fires per keystroke-pause on 1-char queries ([Header.svelte](../../src/lib/Header.svelte)).
+- **Tighten prose page-spans** — heading-sparse sections stamp every chunk with the whole run's span, so "pp.33–41" is a 9-page scan ([chunker.py:139](../../sidecar/chunker.py:139)).
 - **Zero-result recovery** — "Search entire library instead" affordance + surface the backend `message` (both currently dropped).
 
 ---
