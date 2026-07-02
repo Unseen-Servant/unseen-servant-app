@@ -112,6 +112,44 @@ async def test_search_library_no_results(mock_sidecar):
 
 
 @pytest.mark.asyncio
+async def test_search_library_surfaces_server_message_on_empty(mock_sidecar):
+    """The server explains WHY the result set is empty (bad filter value,
+    empty collection) — that explanation must reach the model instead of
+    being swallowed into a generic 'No results found' (issue #309)."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [],
+        "message": (
+            'game_system "Shadowrun" is not in the library. '
+            'Available: D&D 5E, Dragonbane.'
+        ),
+    })
+    result = await search_library("grappling", game_system="Shadowrun")
+    assert "Shadowrun" in result
+    assert "Available: D&D 5E, Dragonbane" in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_surfaces_resolution_note_with_results(mock_sidecar):
+    """When the server auto-resolved a near-miss filter, the note is shown
+    so the model learns the exact value for follow-up calls."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [{
+            "text": "Grappling rules.",
+            "filename": "phb.pdf",
+            "source": "/phb.pdf",
+            "game_system": "D&D 5E",
+            "relevance": 0.9,
+            "tier": "strong",
+            "reranked": True,
+        }],
+        "message": 'game_system "dnd" matched "D&D 5E".',
+    })
+    result = await search_library("grappling", game_system="dnd")
+    assert 'matched "D&D 5E"' in result
+    assert "Grappling rules." in result
+
+
+@pytest.mark.asyncio
 async def test_search_library_sidecar_down(mock_sidecar):
     mock_sidecar.set_post("/api/search", "Cannot connect to Legend Lore app.")
 
