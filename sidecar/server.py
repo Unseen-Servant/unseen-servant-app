@@ -691,18 +691,19 @@ def get_merged_systems(
     return merged, known
 
 
-def resolve_collection_filenames(
+def resolve_collection_paths(
     coll: Collection, manifest: IndexManifest
 ) -> list[str]:
-    """Resolve a collection's file_paths to filenames in the manifest.
+    """Resolve a collection's file_paths to the indexed subset.
 
-    Filters out paths no longer indexed (graceful degradation).
+    Filters out paths no longer indexed (graceful degradation). Returns
+    exact source paths — chunk metadata stores the full path, and
+    filtering by bare filename would leak same-named PDFs from other
+    folders into the collection scope (issue #308; the '/5e/Monster
+    Manual.pdf' vs '/pf2e/Monster Manual.pdf' case chunk_id_prefix
+    already guards against).
     """
-    filenames = []
-    for file_path in coll.file_paths:
-        if file_path in manifest.files:
-            filenames.append(manifest.files[file_path].filename)
-    return filenames
+    return [p for p in coll.file_paths if p in manifest.files]
 
 
 # ---------------------------------------------------------------------------
@@ -978,7 +979,12 @@ def _extract_and_chunk(
                 pdf_path, flat_text, known_systems=known_systems
             )
             resolved_system = resolved_systems[0] if resolved_systems else "unknown"
-        chunks = structure_aware(pages, source_pdf=pdf_path.name)
+        # Full path, not .name: source_pdf seeds _make_parent_id, and two
+        # same-named PDFs in different folders would otherwise generate
+        # colliding parent_ids — the second file dies on the parents-store
+        # UNIQUE constraint and never indexes (issue #308 family). The
+        # parents store itself is already keyed by full path.
+        chunks = structure_aware(pages, source_pdf=str(pdf_path))
         return chunks, resolved_system, resolved_systems, None
     except Exception as e:
         return [], "unknown", [], f"{pdf_path.name}: {str(e)}"
@@ -2386,8 +2392,12 @@ def create_app(
             sources_info = {}
             for metadata in results["metadatas"]:
                 filename = metadata["filename"]
-                if filename not in sources_info:
-                    source_path = metadata.get("source", "")
+                source_path = metadata.get("source", "")
+                # Key by source path, not filename: same-named PDFs in
+                # different folders are distinct sources and would
+                # otherwise merge into one entry (issue #308 family).
+                key = source_path or filename
+                if key not in sources_info:
                     entry = manifest.files.get(source_path)
                     primary = metadata.get("game_system", "unknown")
                     if entry and entry.game_systems:
@@ -2396,7 +2406,7 @@ def create_app(
                         systems = [primary]
                     else:
                         systems = []
-                    sources_info[filename] = {
+                    sources_info[key] = {
                         "filename": filename,
                         "source": source_path,
                         "chunks": 0,
@@ -2406,10 +2416,10 @@ def create_app(
                         "indexed_at": entry.indexed_at if entry else None,
                         "file_size_bytes": entry.file_size if entry else None,
                     }
-                sources_info[filename]["chunks"] += 1
+                sources_info[key]["chunks"] += 1
                 page_end = metadata.get("page_end")
-                if isinstance(page_end, int) and page_end > sources_info[filename]["pages"]:
-                    sources_info[filename]["pages"] = page_end
+                if isinstance(page_end, int) and page_end > sources_info[key]["pages"]:
+                    sources_info[key]["pages"] = page_end
 
             sources_list = sorted(sources_info.values(), key=lambda x: x["filename"])
             return {"sources": sources_list, "count": len(sources_list)}
@@ -2949,17 +2959,17 @@ def create_app(
                         detail=f"Collection not found: {effective_collection}",
                     )
                 manifest = load_manifest(data_dir)
-                filenames = resolve_collection_filenames(
+                coll_paths = resolve_collection_paths(
                     store.collections[effective_collection], manifest
                 )
-                if not filenames:
+                if not coll_paths:
                     return {
                         "results": [],
                         "message": "Collection has no indexed files.",
                         "effective_collection": effective_collection,
                         "auto_scoped": auto_scoped,
                     }
-                where_clauses.append({"filename": {"$in": filenames}})
+                where_clauses.append({"source": {"$in": coll_paths}})
             if request.source_paths:
                 where_clauses.append({"source": {"$in": request.source_paths}})
             if request.source_filter:
@@ -2973,26 +2983,28 @@ def create_app(
                 # whose `game_systems` includes a requested tag but whose
                 # primary `game_system` (the one stored in chunk metadata)
                 # does not. Chroma metadata is scalar-only, so secondary
-                # matches must be folded in as a filename `$in` clause.
-                secondary_filenames: list[str] = []
+                # matches must be folded in as a source-path `$in` clause —
+                # exact paths, not filenames, so an untagged same-named
+                # file in another folder can't ride along (issue #308).
+                secondary_paths: list[str] = []
                 if data_dir:
                     search_manifest = load_manifest(data_dir)
-                    for entry in search_manifest.files.values():
+                    for path, entry in search_manifest.files.items():
                         if entry.game_system in requested:
                             continue
                         if any(t in requested for t in entry.game_systems):
-                            secondary_filenames.append(entry.filename)
+                            secondary_paths.append(path)
 
                 if request.game_system:
                     primary_clause: dict = {"game_system": request.game_system}
                 else:
                     primary_clause = {"game_system": {"$in": list(requested)}}
 
-                if secondary_filenames:
+                if secondary_paths:
                     where_clauses.append({
                         "$or": [
                             primary_clause,
-                            {"filename": {"$in": secondary_filenames}},
+                            {"source": {"$in": secondary_paths}},
                         ]
                     })
                 else:
