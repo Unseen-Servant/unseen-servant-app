@@ -28,6 +28,7 @@
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
+  import { searchGameSystemsFilter, UNTAGGED_KEY } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
   import {
@@ -262,13 +263,16 @@
     // A file passes when at least one of its tags survives the active
     // filter — matches the include-list semantics of `gameSystems` in
     // runSearch. Solo overrides mute when active; under solos, untagged
-    // files (no tags) never pass.
+    // files (no tags) never pass. Under mute, untagged files pass unless
+    // the Untagged bucket itself is muted (issue #307).
     let count = 0;
     for (const path of universe) {
       const tags = effectiveGameSystemMap.get(path) ?? [];
       if (soloedSystems.size > 0) {
         if (tags.some((t) => soloedSystems.has(t))) count++;
-      } else if (tags.length > 0 && tags.some((t) => !filterExcludedSystems.has(t))) {
+      } else if (tags.length === 0) {
+        if (!filterExcludedSystems.has(UNTAGGED_KEY)) count++;
+      } else if (tags.some((t) => !filterExcludedSystems.has(t))) {
         count++;
       }
     }
@@ -306,25 +310,20 @@
       sourcePaths = paths;
     }
 
-    // Library filter resolution (DAW semantics):
-    //   - solo active: only solo'd systems pass — mute is overridden.
-    //   - else mute active: all systems minus muted ones.
-    //   - else: no narrowing.
-    // The backend's `game_systems` is an include-list, so both branches
-    // produce the same shape. An empty include-list (everything muted)
-    // short-circuits to no results.
-    let gameSystems: string[] | null = null;
-    if (soloedSystems.size > 0) {
-      gameSystems = Array.from(soloedSystems);
-    } else if (filterExcludedSystems.size > 0) {
-      const all = gameSystemStats.map((s) => s.name);
-      gameSystems = all.filter((s) => !filterExcludedSystems.has(s));
-      if (gameSystems.length === 0) {
-        searchError = 'All game systems are filtered out.';
-        searchResults = [];
-        isSearching = false;
-        return;
-      }
+    // Library filter resolution (DAW semantics): solo overrides mute;
+    // mute keeps every non-muted system plus the untagged bucket unless
+    // it was muted itself (issue #307 — untagged chunks store
+    // game_system "unknown", so the include-list must name it).
+    const gameSystems = searchGameSystemsFilter(
+      soloedSystems,
+      filterExcludedSystems,
+      gameSystemStats.map((s) => s.name)
+    );
+    if (gameSystems !== null && gameSystems.length === 0) {
+      searchError = 'All game systems are filtered out.';
+      searchResults = [];
+      isSearching = false;
+      return;
     }
 
     searchSeq += 1;
@@ -1203,6 +1202,21 @@
   })();
   $: gameSystemCount = gameSystemStats.length;
   $: gameSystemNames = gameSystemStats.map(s => s.name);
+
+  // Indexed files with no game-system tag — the "Untagged" bucket in the
+  // filter menu (issue #307). Same entry sets as gameSystemStats so the
+  // counts stay consistent.
+  $: untaggedFileCount = (() => {
+    if (!indexStatus) return 0;
+    let n = 0;
+    for (const e of [...indexStatus.up_to_date, ...indexStatus.to_update, ...indexStatus.to_remove]) {
+      const tags = e.game_systems && e.game_systems.length > 0
+        ? e.game_systems
+        : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : []);
+      if (tags.length === 0) n++;
+    }
+    return n;
+  })();
 
   // SystemsView and any view-narrowing consumers want a single "what to
   // hide" set. When solos are active, every non-solo'd system (plus the
@@ -2811,6 +2825,7 @@
     excludedSystems={filterExcludedSystems}
     {soloedSystems}
     availableSystems={gameSystemStats}
+    untaggedCount={untaggedFileCount}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}

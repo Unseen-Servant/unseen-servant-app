@@ -2,6 +2,7 @@
   // Filter popover. Same anchor pattern as the sort menu in CollectionsPanel:
   // outside-click and Escape close it.
   import { afterUpdate, tick } from 'svelte';
+  import { UNTAGGED_KEY } from './searchScope';
 
   export let open: boolean = false;
   export let anchorEl: HTMLElement | undefined = undefined;
@@ -20,6 +21,13 @@
 
   // Available systems (with counts) — typically gameSystemStats from +page.
   export let systems: { name: string; count: number }[] = [];
+
+  // Count of indexed files with no game-system tag. Rendered as a
+  // mute-only "Untagged" row (key: UNTAGGED_KEY) so muting a real system
+  // doesn't silently drop untagged files from search (issue #307). No
+  // solo button — solo means "focus on these systems" and untagged files
+  // never pass under solos.
+  export let untaggedCount: number = 0;
 
   // Whether the Game systems section is meaningful in the current context.
   // System tags are the organizing axis of the systems view, so we only
@@ -316,6 +324,26 @@
                 <span class="row-count">{count}</span>
               </label>
             {/each}
+            {#if untaggedCount > 0}
+              <!-- No data-fm-system: the S (solo) shortcut is a no-op here —
+                   untagged files never pass under solos, so soloing the
+                   bucket would only ever produce zero results. -->
+              <label
+                class="row system-row untagged-row"
+                class:row-dimmed={anySoloed}
+                title="Files with no game-system tag"
+                data-fm="row"
+              >
+                <input
+                  class="app-checkbox"
+                  type="checkbox"
+                  checked={!excludedSystems.has(UNTAGGED_KEY)}
+                  on:change={() => onToggleSystem(UNTAGGED_KEY)}
+                />
+                <span class="row-name">Untagged</span>
+                <span class="row-count">{untaggedCount}</span>
+              </label>
+            {/if}
           </div>
         </div>
       {:else}
@@ -436,6 +464,12 @@
   .system-row .solo-btn { order: 1; }
   .system-row .row-name { order: 2; }
   .system-row .row-count { order: 3; }
+  /* No solo button on the Untagged row — pad its name so the columns
+     stay aligned with the 18px button + 0.4rem gap above. */
+  .untagged-row .row-name {
+    margin-left: calc(18px + 0.4rem);
+    font-style: italic;
+  }
   .system-row .app-checkbox { order: 4; }
 
   .solo-btn {
