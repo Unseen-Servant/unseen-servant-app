@@ -64,22 +64,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.10'
-          cache: pip
-          cache-dependency-path: sidecar/requirements-test.txt
-
-      - name: Install dependencies
-        run: |
-          cd sidecar
-          pip install -r requirements-test.txt
+          enable-cache: true
+          cache-dependency-glob: sidecar/uv.lock
 
       - name: Run tests
         run: |
           cd sidecar
-          pytest -v
+          uv run --frozen pytest -v
 
   # Rust formatting + lint + unit tests. Catches anything that would
   # break the Tauri compile or trip clippy. Uses Ubuntu because Tauri's
