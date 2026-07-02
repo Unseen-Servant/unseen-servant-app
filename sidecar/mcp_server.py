@@ -303,9 +303,33 @@ async def search_library(
     if not results:
         return f"{notice}No results found for: {query}"
 
+    # Ordinal tiers, not raw scores (issues #306/#310): the underlying
+    # numbers come from two different scales (cross-encoder sigmoid vs
+    # cosine similarity) and neither is a calibrated probability — printing
+    # them invites over-reading. Weak results are still included (recall),
+    # but flagged so the model doesn't synthesize an answer from noise.
+    all_weak = all(r.get("tier") == "weak" for r in results)
+
     lines = [f"{notice}Found {len(results)} result(s) for \"{query}\":\n"]
+    if all_weak:
+        lines.insert(0, (
+            "No strong matches — every result below scored poorly. The "
+            "content may not be indexed, or may be outside the current "
+            "scope (active context, game_system, or source filters). "
+            "Consider retrying with search_all=True or without filters.\n"
+        ))
+
+    weak_divider_emitted = False
     for i, r in enumerate(results, 1):
-        lines.append(f"--- Result {i} (relevance: {r['relevance']}) ---")
+        tier = r.get("tier")
+        if tier == "weak" and not all_weak and not weak_divider_emitted:
+            lines.append(
+                "--- Results below this line scored poorly (weak matches; "
+                "likely not relevant) ---\n"
+            )
+            weak_divider_emitted = True
+        match_tag = f" (match: {tier})" if tier else ""
+        lines.append(f"--- Result {i}{match_tag} ---")
         system_tag = r.get('game_system', 'unknown')
         lines.append(f"Source: {r['filename']} [{system_tag}]")
         heading = _strip_bold(r.get("section_heading") or "") or "(no section)"

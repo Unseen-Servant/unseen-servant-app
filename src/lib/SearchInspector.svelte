@@ -3,6 +3,7 @@
   import type { SearchResultItem, KnownGameSystem } from './types';
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
+  import { tierCells, tierLabel } from './searchTiers';
 
   export let result: SearchResultItem | null = null;
   export let hiddenPaths: Set<string> = new Set();
@@ -19,15 +20,6 @@
   })();
   $: sysColor = result ? tagColors.get(result.game_system) ?? null : null;
 
-  function relevancePercent(r: number): number {
-    return Math.round(r * 100);
-  }
-
-  function relevanceCells(r: number): number {
-    if (r <= 0) return 0;
-    return Math.max(1, Math.min(5, Math.ceil(r * 5)));
-  }
-
   function stripBold(s: string): string {
     return s.replace(/\*\*(.+?)\*\*/g, '$1');
   }
@@ -41,8 +33,8 @@
   {#if !result}
     <div class="empty">Select a result to preview.</div>
   {:else}
-    {@const cells = relevanceCells(result.relevance)}
-    {@const pct = relevancePercent(result.relevance)}
+    {@const cells = tierCells(result.tier, result.relevance)}
+    {@const label = tierLabel(result.tier, result.relevance)}
     {@const span = pageHint(result.page_start, result.page_end)}
     {@const openLabel = result.page_start ? `Open PDF at ${span}` : 'Open PDF'}
     {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
@@ -59,12 +51,12 @@
           {#if result.game_system}<span>{result.game_system}</span>{/if}
           {#if span}<span class="dot">·</span><span>{span}</span>{/if}
           <span class="dot">·</span>
-          <span class="gauge" role="img" aria-label="{pct}% match" title="{pct}% match">
+          <span class="gauge" role="img" aria-label={label} title={label}>
             {#each [0, 1, 2, 3, 4] as idx (idx)}
               <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
             {/each}
           </span>
-          <span class="pct">{pct}%</span>
+          <span class="pct">{label}</span>
         </div>
       </div>
       <button

@@ -90,6 +90,8 @@ async def test_search_library_returns_formatted_results(mock_sidecar):
                 "chunk": 0,
                 "game_system": "Dragonbane",
                 "relevance": 0.85,
+                "tier": "strong",
+                "reranked": True,
             }
         ]
     })
@@ -97,7 +99,7 @@ async def test_search_library_returns_formatted_results(mock_sidecar):
     result = await search_library("fire drake")
     assert "Fire Drake" in result
     assert "dragonbane_monsters.pdf" in result
-    assert "0.85" in result
+    assert "match: strong" in result
     assert "[Dragonbane]" in result
 
 
@@ -180,6 +182,78 @@ async def test_search_library_passes_search_all(mock_sidecar):
     mock_sidecar.set_post("/api/search", capture_payload)
     await search_library("anything", search_all=True)
     assert captured.get("search_all") is True
+
+
+# ---------------------------------------------------------------------------
+# search_library — tiers instead of raw scores (issues #306/#310)
+# ---------------------------------------------------------------------------
+
+def _result(text, tier, relevance=0.5):
+    return {
+        "text": text,
+        "filename": "book.pdf",
+        "source": "/book.pdf",
+        "game_system": "D&D 5E",
+        "relevance": relevance,
+        "tier": tier,
+        "reranked": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_library_prints_tier_not_raw_relevance(mock_sidecar):
+    """Results show the ordinal tier; the raw cross-scale number is dropped."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [_result("Grappling rules text.", "strong", 0.999)],
+    })
+    result = await search_library("grappling")
+    assert "match: strong" in result
+    assert "relevance" not in result
+    assert "0.999" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_inserts_weak_divider(mock_sidecar):
+    """A divider warns the model before the first weak result."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [
+            _result("Good grappling text.", "strong"),
+            _result("Marginal text.", "weak"),
+        ],
+    })
+    result = await search_library("grappling")
+    divider = result.find("scored poorly")
+    assert divider != -1
+    assert result.find("Good grappling text.") < divider < result.find("Marginal text.")
+
+
+@pytest.mark.asyncio
+async def test_search_library_all_weak_prefaces_warning(mock_sidecar):
+    """When every result is weak, say so up front so the model doesn't
+    synthesize a confident answer from noise."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [
+            _result("Unrelated text A.", "weak"),
+            _result("Unrelated text B.", "weak"),
+        ],
+    })
+    result = await search_library("eldritch blast")
+    head = result[:250]
+    assert "No strong matches" in head
+    assert "search_all" in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_no_divider_when_all_strong(mock_sidecar):
+    mock_sidecar.set_post("/api/search", {
+        "results": [
+            _result("Text A.", "strong"),
+            _result("Text B.", "good"),
+        ],
+    })
+    result = await search_library("grappling")
+    assert "scored poorly" not in result
+    assert "No strong matches" not in result
 
 
 # ---------------------------------------------------------------------------

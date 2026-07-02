@@ -258,6 +258,10 @@ struct SearchResultItem {
     page_end: u32,
     game_system: String,
     relevance: f64,
+    #[serde(default)]
+    tier: Option<String>,
+    #[serde(default)]
+    reranked: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -58,6 +58,26 @@ from reranker import rerank_scores
 RERANK_CANDIDATE_POOL = int(os.getenv("RERANK_CANDIDATES", "50"))
 
 
+# Relevance-tier thresholds (issues #306/#310). Neither score scale is a
+# calibrated probability, so results carry an ordinal tier instead of a
+# raw percentage. Thresholds are scale-specific:
+# - Rerank scale is the cross-encoder sigmoid: logit 0 → 0.5 is the
+#   model's own relevant/irrelevant midpoint; below ~0.1 the model is
+#   confident the pair is irrelevant.
+# - Cosine scale is bge-m3 similarity; defaults calibrated against the
+#   hybrid_retrieval_spike ground truth (V0_h, 200 labeled results):
+#   below 0.50 only 12.5% of results are correct (1 correct result
+#   demoted); at/above 0.60 precision is 66% vs a 53% base rate. bge-m3
+#   cosine lives in a compressed [0.45, 0.76] band — never near 0 or 1.
+# The weak threshold is the "relevance floor": weak results are still
+# returned (recall preserved) but demoted in the UI and flagged to MCP
+# clients so out-of-scope queries stop looking confidently answered.
+RERANK_TIER_STRONG = float(os.getenv("RERANK_TIER_STRONG", "0.5"))
+RERANK_TIER_WEAK = float(os.getenv("RERANK_TIER_WEAK", "0.1"))
+COSINE_TIER_STRONG = float(os.getenv("COSINE_TIER_STRONG", "0.60"))
+COSINE_TIER_WEAK = float(os.getenv("COSINE_TIER_WEAK", "0.50"))
+
+
 # Pinning HNSW space at collection creation makes `relevance = 1 - distance`
 # bounded in [0, 1] for the normalised embeddings bge-m3 produces. Chroma's
 # default is l2, where distances can exceed 1.0 and yield negative relevance.
@@ -141,6 +161,22 @@ def _rerank_safe_for_query(query: str) -> bool:
     behaviour (issue #305).
     """
     return query.isascii()
+
+
+def _tier_for(relevance: float, reranked: bool) -> str:
+    """Ordinal relevance tier for a result, on its own score scale.
+
+    ``relevance`` is the response-shape value (1 - distance, clamped to
+    [0, 1]): the cross-encoder sigmoid when the result was reranked,
+    bge-m3 cosine similarity otherwise.
+    """
+    strong = RERANK_TIER_STRONG if reranked else COSINE_TIER_STRONG
+    weak = RERANK_TIER_WEAK if reranked else COSINE_TIER_WEAK
+    if relevance >= strong:
+        return "strong"
+    if relevance >= weak:
+        return "good"
+    return "weak"
 
 
 def detect_game_systems(
@@ -2992,9 +3028,12 @@ def create_app(
             # ("Combat > Grappling") versus a creature card with the same
             # keyword ("Goblin > Actions"), and tends to over-rank the
             # keyword-dense action text.
+            ordered_docs = results["documents"][0]
+            rerank_applied = False
+            pool = 0
             if request.rerank and _rerank_safe_for_query(request.query):
                 pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
-                pool_docs = results["documents"][0][:pool]
+                pool_docs = ordered_docs[:pool]
                 pool_meta = ordered_metadatas[:pool]
                 rerank_inputs = [
                     f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
@@ -3002,6 +3041,7 @@ def create_app(
                 ]
                 scores = rerank_scores(request.query, rerank_inputs)
                 if scores is not None:
+                    rerank_applied = True
                     order = sorted(
                         range(pool), key=lambda i: scores[i], reverse=True
                     )
@@ -3009,37 +3049,69 @@ def create_app(
                     # Use 1 - rerank_score so 1 - distance = rerank score
                     # downstream, keeping the response shape unchanged.
                     head_distances = [1.0 - scores[i] for i in order]
+                    head_docs = [ordered_docs[i] for i in order]
                     ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
                     ordered_distances = head_distances + ordered_distances[pool:]
+                    ordered_docs = head_docs + ordered_docs[pool:]
 
             # Dedupe by parent_id, keeping the first hit per parent (the
             # iteration order is the re-ranked-then-cosine order from above).
             seen: set[str] = set()
-            picked: list[tuple[dict, float]] = []   # (metadata, distance)
-            for metadata, distance in zip(ordered_metadatas, ordered_distances):
+            picked: list[dict] = []
+            for i, (metadata, distance) in enumerate(
+                zip(ordered_metadatas, ordered_distances)
+            ):
                 pid = metadata.get("parent_id")
                 if not pid or pid in seen:
                     continue
                 seen.add(pid)
-                picked.append((metadata, distance))
+                picked.append({
+                    "metadata": metadata,
+                    "distance": distance,
+                    "doc": ordered_docs[i],
+                    "reranked": rerank_applied and i < pool,
+                })
                 if len(picked) >= request.n_results:
                     break
 
+            # Single-scale page (issue #306): when the reranker ran, picked
+            # results that came from the cosine tail are rescored with the
+            # cross-encoder in one small batch (≤ n_results pairs), so every
+            # returned relevance is on the same scale. On failure the tail
+            # keeps its cosine score and an honest reranked=False flag.
+            if rerank_applied:
+                stragglers = [p for p in picked if not p["reranked"]]
+                if stragglers:
+                    straggler_inputs = [
+                        f"{p['metadata']['section_heading']}\n\n{p['doc']}"
+                        if p["metadata"].get("section_heading") else p["doc"]
+                        for p in stragglers
+                    ]
+                    straggler_scores = rerank_scores(
+                        request.query, straggler_inputs
+                    )
+                    if straggler_scores is not None:
+                        for p, s in zip(stragglers, straggler_scores):
+                            p["distance"] = 1.0 - s
+                            p["reranked"] = True
+                        # All picked distances are now cross-encoder scale;
+                        # stable sort keeps head order, interleaves the
+                        # rescored tail where it belongs.
+                        picked.sort(key=lambda p: p["distance"])
+
             parent_docs = fetch_parents_extended(
-                data_dir, [m["parent_id"] for m, _ in picked]
+                data_dir, [p["metadata"]["parent_id"] for p in picked]
             ) if data_dir else {}
 
             formatted = []
-            for metadata, distance in picked:
+            for p in picked:
+                metadata = p["metadata"]
+                distance = p["distance"]
                 pid = metadata["parent_id"]
                 parent = parent_docs.get(pid)
                 # Fall back to the embed unit text if the parent row is
                 # missing (shouldn't happen post-reindex; defensive).
-                text = parent.text if parent else next(
-                    (d for d, m in zip(results["documents"][0], results["metadatas"][0])
-                     if m.get("parent_id") == pid),
-                    "",
-                )
+                text = parent.text if parent else p["doc"]
                 # ParentDoc.section_heading is Optional[str] (granularity.py),
                 # so the chain "" or parent.section_heading can leak None into
                 # the response. Trailing `or ""` coerces back to a string —
@@ -3050,6 +3122,7 @@ def create_app(
                     or (parent.section_heading if parent else None)
                     or ""
                 )
+                relevance = round(max(0.0, min(1.0, 1 - distance)), 3)
                 formatted.append({
                     "text": text,
                     "filename": metadata["filename"],
@@ -3058,7 +3131,9 @@ def create_app(
                     "page_start": parent.page_start if parent else metadata.get("page_start", 0),
                     "page_end": parent.page_end if parent else metadata.get("page_end", 0),
                     "game_system": metadata.get("game_system") or "unknown",
-                    "relevance": round(max(0.0, min(1.0, 1 - distance)), 3),
+                    "relevance": relevance,
+                    "tier": _tier_for(relevance, p["reranked"]),
+                    "reranked": p["reranked"],
                 })
 
             return {
