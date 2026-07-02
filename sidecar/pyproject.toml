@@ -5,7 +5,7 @@ description = "PDF indexing and semantic search sidecar for Legend Lore"
 requires-python = ">=3.12"
 dependencies = [
     "chromadb==1.5.9",
-    "pymupdf4llm==1.27.2.3",
+    "pymupdf4llm==1.28.0",
     "ollama==0.6.2",
     "fastapi==0.136.3",
     "uvicorn==0.48.0",
