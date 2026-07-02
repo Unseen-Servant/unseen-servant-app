@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
+  import { browser } from '$app/environment';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
@@ -167,8 +168,10 @@
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
   let showHelpOverlay = false;
-  let showSplash = false;
-  let skipLaunchSplash = false;
+  // Read the skip preference synchronously (localStorage) at init so the splash
+  // decision is made before the first paint — no flash of the app UI beforehand.
+  let skipLaunchSplash = browser && localStorage.getItem('skipLaunchSplash') === 'true';
+  let showSplash = !skipLaunchSplash;
   let splashTimer: ReturnType<typeof setTimeout> | null = null;
   let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'library';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
@@ -455,18 +458,9 @@
   let missingFolderToastId: string | null = null;
 
   onMount(async () => {
-    // Decide splash visibility from the persisted preference BEFORE showing it.
-    // Reading first (and defaulting to "show" on any error) means users who
-    // opted out never see a flash — the window background is already --bg-app,
-    // so the splash just fades in a few ms late instead of flashing out.
-    try {
-      const splashStore = await load('settings.json');
-      skipLaunchSplash = parseBoolean(await splashStore.get('skipLaunchSplash')) ?? false;
-    } catch {
-      skipLaunchSplash = false;
-    }
-    if (!skipLaunchSplash) {
-      showSplash = true;
+    // Splash visibility was decided synchronously at init (see above), so it
+    // paints on the first frame. If it's up, auto-dismiss after 1.2s.
+    if (showSplash) {
       splashTimer = setTimeout(() => {
         showSplash = false;
         splashTimer = null;
@@ -2529,15 +2523,9 @@
   // Collections panel + metadata dialog
   // ---------------------------------------------------------------------------
 
-  async function handleSkipLaunchSplashChange(value: boolean) {
+  function handleSkipLaunchSplashChange(value: boolean) {
     skipLaunchSplash = value;
-    try {
-      const store = await load('settings.json');
-      await store.set('skipLaunchSplash', value);
-      await store.save();
-    } catch (e) {
-      console.log('Could not persist skipLaunchSplash:', e);
-    }
+    if (browser) localStorage.setItem('skipLaunchSplash', value ? 'true' : 'false');
   }
 
   async function togglePanel() {
