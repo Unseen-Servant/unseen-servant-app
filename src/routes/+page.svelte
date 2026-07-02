@@ -167,9 +167,10 @@
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
   let showHelpOverlay = false;
-  let showSplash = true;
+  let showSplash = false;
+  let skipLaunchSplash = false;
   let splashTimer: ReturnType<typeof setTimeout> | null = null;
-  let settingsInitialTab: 'library' | 'game-systems' | 'help' = 'library';
+  let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'library';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
   let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
@@ -454,10 +455,23 @@
   let missingFolderToastId: string | null = null;
 
   onMount(async () => {
-    splashTimer = setTimeout(() => {
-      showSplash = false;
-      splashTimer = null;
-    }, 1200);
+    // Decide splash visibility from the persisted preference BEFORE showing it.
+    // Reading first (and defaulting to "show" on any error) means users who
+    // opted out never see a flash — the window background is already --bg-app,
+    // so the splash just fades in a few ms late instead of flashing out.
+    try {
+      const splashStore = await load('settings.json');
+      skipLaunchSplash = parseBoolean(await splashStore.get('skipLaunchSplash')) ?? false;
+    } catch {
+      skipLaunchSplash = false;
+    }
+    if (!skipLaunchSplash) {
+      showSplash = true;
+      splashTimer = setTimeout(() => {
+        showSplash = false;
+        splashTimer = null;
+      }, 1200);
+    }
 
     // Sidecar failed to start at app launch — show one sticky banner so the
     // user gets a single clear failure message instead of N "failed to
@@ -2515,6 +2529,17 @@
   // Collections panel + metadata dialog
   // ---------------------------------------------------------------------------
 
+  async function handleSkipLaunchSplashChange(value: boolean) {
+    skipLaunchSplash = value;
+    try {
+      const store = await load('settings.json');
+      await store.set('skipLaunchSplash', value);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist skipLaunchSplash:', e);
+    }
+  }
+
   async function togglePanel() {
     collectionsPanelOpen = !collectionsPanelOpen;
     try {
@@ -3086,6 +3111,8 @@
   onClose={() => { showSettings = false; }}
   initialTab={settingsInitialTab}
   initialHelpSubTab={settingsInitialHelpSubTab}
+  skipLaunchSplash={skipLaunchSplash}
+  onSkipLaunchSplashChange={handleSkipLaunchSplashChange}
   {knownSystems}
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
