@@ -58,6 +58,7 @@
   .glow {
     position: absolute;
     inset: -40%;
+    z-index: -1;
     border-radius: 50%;
     background: radial-gradient(
       circle,
