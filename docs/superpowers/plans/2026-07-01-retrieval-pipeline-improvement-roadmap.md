@@ -24,15 +24,15 @@ The default `Xenova/ms-marco-MiniLM-L-12-v2` cross-encoder ([reranker.py](../../
 
 ## Tier 1 — Broken or silently wrong, small fix, hits everyone
 
-| # | Opportunity | Evidence | Effort |
-|---|---|---|---|
-| 1 | Fix the MCP timeout (§0.1) | `mcp_server.py` `SidecarClient` | S |
-| 2 | Reranker safety: validate + skip/flag for non-English (§0.2) | `reranker.py`, `server.py:2980` | S–M |
-| 3 | **Reconcile the relevance score.** Three scales — rerank sigmoid, `1−cosine`, and saturated 0.999s — flow through one `relevance` field to UI *and* Claude, producing non-monotonic "% match". Drop the raw % or tag which results were reranked. | `server.py:2994`, `SearchResults.svelte` | S |
-| 4 | **Muting one system silently drops ALL untagged files** from search. Homebrew, indie, and French books auto-tag as `unknown`; muting e.g. "Pathfinder 2e" removes every untagged book. Add `unknown` to the include-list + an "Untagged" filter row. | `+page.svelte:319`, `FilterMenu.svelte` | S |
-| 5 | **Collection scoping filters by filename, not path.** Same-named books (`/5e/Monster Manual.pdf` vs `/pf2e/…`) leak across systems in scoped / active-context search. Switch the where-clause to the `source` path (already stored per chunk). | `server.py:2911` | S |
-| 6 | **Filter mismatches fail silently on MCP.** `game_system='Pathfinder'` (tag is `'Pathfinder 2E'`) → zero hits → Claude reports the content isn't in the library. Validate/fuzzy-resolve against the manifest and surface the reason (server already returns a `message` that the MCP formatter drops). | `mcp_server.py:284`, `server.py:2914` | S |
-| 7 | **No relevance floor.** Searching a 5e spell scoped to a Pathfinder collection confidently returns 15 wrong-system hits (dense NN always finds *something*). Add a weak-match divider using the reranker's `[0,1]` score. | `server.py:2957` | S |
+| # | Opportunity | Evidence | Effort | Issue |
+|---|---|---|---|---|
+| 1 | Fix the MCP timeout (§0.1) | `mcp_server.py` `SidecarClient` | S | [#304](https://github.com/Unseen-Servant/unseen-legend-lore/issues/304) |
+| 2 | Reranker safety: validate + skip/flag for non-English (§0.2) | `reranker.py`, `server.py:2980` | S–M | [#305](https://github.com/Unseen-Servant/unseen-legend-lore/issues/305) |
+| 3 | **Reconcile the relevance score.** Three scales — rerank sigmoid, `1−cosine`, and saturated 0.999s — flow through one `relevance` field to UI *and* Claude, producing non-monotonic "% match". Drop the raw % or tag which results were reranked. | `server.py:2994`, `SearchResults.svelte` | S | [#306](https://github.com/Unseen-Servant/unseen-legend-lore/issues/306) |
+| 4 | **Muting one system silently drops ALL untagged files** from search. Homebrew, indie, and French books auto-tag as `unknown`; muting e.g. "Pathfinder 2e" removes every untagged book. Add `unknown` to the include-list + an "Untagged" filter row. | `+page.svelte:319`, `FilterMenu.svelte` | S | [#307](https://github.com/Unseen-Servant/unseen-legend-lore/issues/307) |
+| 5 | **Collection scoping filters by filename, not path.** Same-named books (`/5e/Monster Manual.pdf` vs `/pf2e/…`) leak across systems in scoped / active-context search. Switch the where-clause to the `source` path (already stored per chunk). | `server.py:2911` | S | [#308](https://github.com/Unseen-Servant/unseen-legend-lore/issues/308) |
+| 6 | **Filter mismatches fail silently on MCP.** `game_system='Pathfinder'` (tag is `'Pathfinder 2E'`) → zero hits → Claude reports the content isn't in the library. Validate/fuzzy-resolve against the manifest and surface the reason (server already returns a `message` that the MCP formatter drops). | `mcp_server.py:284`, `server.py:2914` | S | [#309](https://github.com/Unseen-Servant/unseen-legend-lore/issues/309) |
+| 7 | **No relevance floor.** Searching a 5e spell scoped to a Pathfinder collection confidently returns 15 wrong-system hits (dense NN always finds *something*). Add a weak-match divider using the reranker's `[0,1]` score. | `server.py:2957` | S | [#310](https://github.com/Unseen-Servant/unseen-legend-lore/issues/310) |
 
 ---
 
