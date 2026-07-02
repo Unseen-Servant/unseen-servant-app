@@ -36,12 +36,24 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Reuse the PyInstaller output across runs of the same tag (e.g. a
+      # re-tagged draft whose follow-up fix only touched Rust/frontend).
+      # Any change to deps, bundled sidecar source, or this recipe busts it.
+      - name: Cache sidecar binaries
+        id: sidecar-dist
+        uses: actions/cache@v4
+        with:
+          path: sidecar/dist
+          key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', '.github/workflows/release.yml') }}
+
       - name: Install Python dependencies and PyInstaller
+        if: steps.sidecar-dist.outputs.cache-hit != 'true'
         run: |
           cd sidecar
           uv sync --frozen --group build
 
       - name: Build sidecar binaries
+        if: steps.sidecar-dist.outputs.cache-hit != 'true'
         run: |
           cd sidecar
           # --collect-all pulls in submodules + binaries + data files:
@@ -79,13 +91,15 @@ jobs:
           cp sidecar/dist/legend-lore-sidecar "src-tauri/binaries/legend-lore-sidecar-${TRIPLE}"
           cp sidecar/dist/legend-lore-mcp "src-tauri/binaries/legend-lore-mcp-${TRIPLE}"
 
-      - name: Codesign sidecar binaries
+      - name: Set up signing keychain
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          # Import certificate into a temporary keychain
+          # Import certificate into a temporary keychain. Tauri picks it up
+          # during `tauri build` and deep-signs the whole bundle — including
+          # the sidecar binaries in Contents/MacOS/ — with the entitlements
+          # from bundle.macOS.entitlements, so no pre-signing loop is needed.
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -96,15 +110,6 @@ jobs:
             -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
-          # Sign sidecar binaries with hardened runtime and secure timestamp
-          for binary in src-tauri/binaries/legend-lore-*; do
-            codesign --sign "$APPLE_SIGNING_IDENTITY" \
-              --options runtime \
-              --entitlements sidecar/entitlements.plist \
-              --timestamp \
-              --force \
-              "$binary"
-          done
 
       - name: Build Tauri app
         timeout-minutes: 20
@@ -164,13 +169,25 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Reuse the PyInstaller output across runs of the same tag (e.g. a
+      # re-tagged draft whose follow-up fix only touched Rust/frontend).
+      # Any change to deps, bundled sidecar source, or this recipe busts it.
+      - name: Cache sidecar binaries
+        id: sidecar-dist
+        uses: actions/cache@v4
+        with:
+          path: sidecar/dist
+          key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', '.github/workflows/release.yml') }}
+
       - name: Install Python dependencies and PyInstaller
+        if: steps.sidecar-dist.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           cd sidecar
           uv sync --frozen --group build
 
       - name: Build sidecar binaries
+        if: steps.sidecar-dist.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           cd sidecar
