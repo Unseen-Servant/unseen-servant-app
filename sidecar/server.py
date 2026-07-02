@@ -148,6 +148,41 @@ def _normalize_for_match(s: str) -> str:
     return "".join(ch for ch in s if ch.isalnum())
 
 
+def _resolve_filter_value(
+    value: str, candidates: list[str]
+) -> tuple[str | None, list[str]]:
+    """Resolve a user/agent-supplied filter value against known candidates.
+
+    MCP agents guess filter values from user vernacular ("dnd 5e",
+    "Players Handbook.pdf"), so exact-match-or-nothing turns every
+    near-miss into a silent empty result (issue #309). Resolution order:
+    exact match; case/accent-insensitive equality; unique normalized
+    substring (either direction, so "D&D" finds "D&D 5E" and
+    "dragonbane monsters" finds "dragonbane_monsters.pdf").
+
+    Returns ``(resolved, matches)``: ``resolved`` is the single
+    unambiguous candidate or ``None``; ``matches`` carries the
+    candidates that partially matched, for building hint messages.
+    """
+    if value in candidates:
+        return value, [value]
+    needle = _normalize_for_match(value)
+    if not needle:
+        return None, []
+    normalized = {c: _normalize_for_match(c) for c in candidates}
+    equal = [c for c, n in normalized.items() if n == needle]
+    if len(equal) == 1:
+        return equal[0], equal
+    if equal:
+        return None, equal
+    substring = [
+        c for c, n in normalized.items() if needle in n or n in needle
+    ]
+    if len(substring) == 1:
+        return substring[0], substring
+    return None, substring
+
+
 def _rerank_safe_for_query(query: str) -> bool:
     """Whether the bundled cross-encoder should be trusted for this query.
 
@@ -2972,6 +3007,76 @@ def create_app(
                 where_clauses.append({"source": {"$in": coll_paths}})
             if request.source_paths:
                 where_clauses.append({"source": {"$in": request.source_paths}})
+
+            # source_filter / game_system arrive as guesses over user
+            # vernacular ("dnd 5e", "Players Handbook.pdf") — mostly from
+            # MCP agents. Exact-match-or-nothing turned every near-miss
+            # into a silent empty result indistinguishable from a true
+            # semantic miss (issue #309): resolve unambiguous near-misses
+            # (noted in `message`), and turn unresolvable values into an
+            # actionable message naming what is actually available.
+            filter_notes: list[str] = []
+            if data_dir and (request.source_filter or request.game_system):
+                filt_manifest = load_manifest(data_dir)
+                if request.source_filter:
+                    known_files = sorted(
+                        {e.filename for e in filt_manifest.files.values()}
+                    )
+                    if request.source_filter not in known_files:
+                        resolved, matches = _resolve_filter_value(
+                            request.source_filter, known_files
+                        )
+                        if resolved is not None:
+                            filter_notes.append(
+                                f'source_filter "{request.source_filter}" '
+                                f'matched "{resolved}".'
+                            )
+                            request.source_filter = resolved
+                        else:
+                            hint = (
+                                f"Closest indexed filenames: "
+                                f"{', '.join(sorted(matches))}."
+                                if matches
+                                else "Use the sources list for exact filenames."
+                            )
+                            return {
+                                "results": [],
+                                "message": (
+                                    f'No indexed file matches source_filter '
+                                    f'"{request.source_filter}". {hint}'
+                                ),
+                                "effective_collection": effective_collection,
+                                "auto_scoped": auto_scoped,
+                            }
+                if request.game_system:
+                    known_tags = sorted({
+                        t for e in filt_manifest.files.values()
+                        for t in {e.game_system, *e.game_systems} if t
+                    })
+                    if request.game_system not in known_tags:
+                        resolved, matches = _resolve_filter_value(
+                            request.game_system, known_tags
+                        )
+                        if resolved is not None:
+                            filter_notes.append(
+                                f'game_system "{request.game_system}" '
+                                f'matched "{resolved}".'
+                            )
+                            request.game_system = resolved
+                        else:
+                            pool = sorted(matches) if matches else known_tags
+                            return {
+                                "results": [],
+                                "message": (
+                                    f'game_system "{request.game_system}" is '
+                                    f'not in the library. Available: '
+                                    f'{", ".join(pool)}. Retry with an exact '
+                                    f'value or without the filter.'
+                                ),
+                                "effective_collection": effective_collection,
+                                "auto_scoped": auto_scoped,
+                            }
+
             if request.source_filter:
                 where_clauses.append({"filename": request.source_filter})
             if request.game_system or request.game_systems:
@@ -3020,7 +3125,7 @@ def create_app(
             if not results["documents"][0]:
                 return {
                     "results": [],
-                    "message": "No results found.",
+                    "message": " ".join([*filter_notes, "No results found."]),
                     "effective_collection": effective_collection,
                     "auto_scoped": auto_scoped,
                 }
@@ -3148,11 +3253,14 @@ def create_app(
                     "reranked": p["reranked"],
                 })
 
-            return {
+            response: dict = {
                 "results": formatted,
                 "effective_collection": effective_collection,
                 "auto_scoped": auto_scoped,
             }
+            if filter_notes:
+                response["message"] = " ".join(filter_notes)
+            return response
         except HTTPException:
             raise
         except Exception as e:
