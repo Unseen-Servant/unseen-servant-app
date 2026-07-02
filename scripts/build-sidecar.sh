@@ -20,10 +20,10 @@ fi
 echo "==> Building sidecar binaries for $TARGET_TRIPLE..."
 
 cd "$SIDECAR_DIR"
-source .venv/bin/activate
 
-# Ensure PyInstaller is available
-pip install --quiet pyinstaller
+# Sync the project venv (Python from .python-version) with the build group,
+# which provides PyInstaller. Frozen so the release build matches uv.lock.
+uv sync --frozen --group build
 
 echo "==> Building legend-lore-sidecar (FastAPI server)..."
 # --collect-all pulls in submodules + binaries + data files:
@@ -32,7 +32,7 @@ echo "==> Building legend-lore-sidecar (FastAPI server)..."
 #  - fastembed: cross-encoder ONNX model + tokenizer assets used by
 #    the reranker
 # Kept in sync with .github/workflows/release.yml.
-pyinstaller --onefile --name legend-lore-sidecar server.py \
+uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-sidecar server.py \
   --collect-all chromadb \
   --collect-all pymupdf \
   --collect-all pymupdf4llm \
@@ -52,7 +52,7 @@ pyinstaller --onefile --name legend-lore-sidecar server.py \
   --noconfirm --clean
 
 echo "==> Building legend-lore-mcp (MCP server)..."
-pyinstaller --onefile --name legend-lore-mcp mcp_server.py \
+uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-mcp mcp_server.py \
   --hidden-import mcp.server.fastmcp \
   --noconfirm --clean
 

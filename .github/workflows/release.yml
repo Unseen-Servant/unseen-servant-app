@@ -22,10 +22,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.10'
+          enable-cache: true
+          cache-dependency-glob: sidecar/uv.lock
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -38,21 +39,18 @@ jobs:
       - name: Install Python dependencies and PyInstaller
         run: |
           cd sidecar
-          python -m venv .venv
-          source .venv/bin/activate
-          pip install -r requirements.txt pyinstaller
+          uv sync --frozen --group build
 
       - name: Build sidecar binaries
         run: |
           cd sidecar
-          source .venv/bin/activate
           # --collect-all pulls in submodules + binaries + data files:
           #  - pymupdf{,4llm}: ONNX layout-analyzer YAML/weights at
           #    pymupdf/layout/resources/
           #  - fastembed: cross-encoder ONNX model + tokenizer assets
           #    used by the reranker
           # Kept in sync with scripts/build-sidecar.sh.
-          pyinstaller --onefile --name legend-lore-sidecar server.py \
+          uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-sidecar server.py \
             --collect-all chromadb \
             --collect-all pymupdf \
             --collect-all pymupdf4llm \
@@ -70,7 +68,7 @@ jobs:
             --hidden-import uvicorn.lifespan.on \
             --hidden-import uvicorn.lifespan.off \
             --noconfirm --clean
-          pyinstaller --onefile --name legend-lore-mcp mcp_server.py \
+          uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-mcp mcp_server.py \
             --hidden-import mcp.server.fastmcp \
             --noconfirm --clean
 
@@ -152,10 +150,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.10'
+          enable-cache: true
+          cache-dependency-glob: sidecar/uv.lock
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -169,16 +168,13 @@ jobs:
         shell: pwsh
         run: |
           cd sidecar
-          python -m venv .venv
-          .venv\Scripts\Activate.ps1
-          pip install -r requirements.txt pyinstaller
+          uv sync --frozen --group build
 
       - name: Build sidecar binaries
         shell: pwsh
         run: |
           cd sidecar
-          .venv\Scripts\Activate.ps1
-          pyinstaller --onefile --name legend-lore-sidecar server.py `
+          uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-sidecar server.py `
             --collect-all chromadb `
             --collect-all pymupdf `
             --collect-all pymupdf4llm `
@@ -196,7 +192,7 @@ jobs:
             --hidden-import uvicorn.lifespan.on `
             --hidden-import uvicorn.lifespan.off `
             --noconfirm --clean
-          pyinstaller --onefile --name legend-lore-mcp mcp_server.py `
+          uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-mcp mcp_server.py `
             --hidden-import mcp.server.fastmcp `
             --noconfirm --clean
 

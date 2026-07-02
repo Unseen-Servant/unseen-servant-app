@@ -106,8 +106,7 @@ Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP :8420) 
 
 ```bash
 cd sidecar
-source .venv/bin/activate
-python server.py --port 8420
+uv run python server.py --port 8420
 ```
 
 **Step 2 — Configure Claude Desktop.** Click **"Copy MCP Config"** in the app to copy a ready-to-paste JSON snippet with the correct absolute paths. Paste it into:
@@ -133,7 +132,7 @@ Manual config:
 
 > Use the **full path** to your Python interpreter — Claude Desktop has a limited PATH and won't find pyenv shims or virtualenvs.
 
-**Step 3 — Install Python dependencies** from `sidecar/requirements.txt` (notably `mcp` and `httpx`).
+**Step 3 — Install Python dependencies** with `uv sync` in `sidecar/` (installs from `pyproject.toml`, notably `mcp` and `httpx`).
 
 ---
 
@@ -157,7 +156,8 @@ Manual config:
 
 - [Rust](https://www.rust-lang.org/tools/install)
 - Node.js 18+ (via [nvm](https://github.com/nvm-sh/nvm) or your preferred manager)
-- Python 3.10+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (manages the sidecar's Python environment; installs Python 3.12 for you if missing)
 - [Ollama](https://ollama.com) with the `bge-m3` model and an 8K context window:
   `ollama pull bge-m3 && OLLAMA_CONTEXT_LENGTH=8192 ollama serve`
 
@@ -190,9 +190,7 @@ npm install
 
 # 3. Set up the Python sidecar (one-time)
 cd sidecar
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv sync                          # Creates .venv on Python 3.12 and installs deps
 cd ..
 
 # 4. Start Ollama with the embedding model
@@ -217,9 +215,7 @@ bash scripts/bump-version.sh 1.2.0  # Bump version across package.json, tauri.co
 
 ```bash
 cd sidecar
-source .venv/bin/activate
-pip install -r requirements-test.txt   # One-time
-python -m pytest tests/ -v             # Run all tests (no Ollama needed)
+uv run pytest tests/ -v                # Run all tests (no Ollama needed)
 ```
 
 ---
@@ -260,8 +256,8 @@ legend-lore/
 ├── sidecar/                    # Python indexing sidecar
 │   ├── server.py               # FastAPI server (ChromaDB + PDF extraction)
 │   ├── mcp_server.py           # MCP tool definitions for Claude Desktop
-│   ├── requirements.txt        # Production dependencies
-│   ├── requirements-test.txt   # Test dependencies (pytest, reportlab)
+│   ├── pyproject.toml          # Dependencies (runtime + dev/build groups)
+│   ├── uv.lock                 # Locked dependency versions
 │   └── tests/                  # Pytest suite
 │
 └── scripts/
