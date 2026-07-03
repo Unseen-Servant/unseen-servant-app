@@ -182,7 +182,7 @@ def test_chunks_before_first_heading_have_no_breadcrumb():
     assert chunks[0].section_heading is None
 
 
-# ─────────────────── promotion → chunker integration ───────────────────
+# ─────────────────────── hard-cap enforcement ───────────────────────
 
 
 def test_hard_cap_falls_back_to_single_newline_for_tables():
