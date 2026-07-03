@@ -765,6 +765,35 @@ def build_ollama_embedding_function():
     )
 
 
+def probe_embed_truncation(embed_fn=None) -> None:
+    """Warn when the effective Ollama embed context silently truncates.
+
+    Embeds a ~8k-token filler text and the same text with a distinctive
+    sentinel tail; identical vectors mean the tail was cut off — i.e.
+    the Ollama server is running below bge-m3's native 8192 context
+    (measured ~2048 on a dev machine when OLLAMA_CONTEXT_LENGTH was not
+    set for the server process). Diagnostics only: prints a warning and
+    never raises; indexing and search do not depend on it.
+    """
+    try:
+        if embed_fn is None:
+            embed_fn = build_ollama_embedding_function()
+        base = "word " * 8000  # ~8k bge-m3 tokens, inside the native window
+        tail = "zanzibar quetzal umbra"
+        vec_a = list(embed_fn([base])[0])
+        vec_b = list(embed_fn([base + tail])[0])
+        if vec_a == vec_b:
+            print(
+                "WARNING: Ollama embed truncation detected — a sentinel tail "
+                "at ~8k tokens did not change the embedding. The effective "
+                "context is below bge-m3's native 8192, so long sections are "
+                "only partially searchable. Set OLLAMA_CONTEXT_LENGTH=8192 "
+                "for the Ollama server process and re-index."
+            )
+    except Exception as e:
+        print(f"Embed truncation probe skipped: {e}")
+
+
 def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
     """Return a stable, collision-free prefix for chunk IDs.
 
@@ -965,9 +994,10 @@ def _index_chunks(
 ) -> int:
     """Run the granularity step and persist embed units + parents.
 
-    Splits chunks into ~400-char embed units (tables atomic) and contiguous
-    same-breadcrumb parents (capped at 6,000 chars). Embed units go to
-    ChromaDB with parent_id in metadata; parents go to the SQLite store.
+    Splits chunks into ~400-char embed units (tables linearized into row
+    units, atomic fallback) and contiguous same-breadcrumb parents (capped
+    at 6,000 chars). Embed units go to ChromaDB with parent_id in metadata;
+    parents go to the SQLite store.
 
     Uses the atomic re-index pattern: stages new chunks under a per-write
     prefix, then swaps in the new parents only after embed succeeds. Raises
@@ -3327,6 +3357,10 @@ if __name__ == "__main__":
     parent_pid = os.getppid()
     watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
     watchdog.start()
+
+    # Truncation probe (daemon thread — diagnostics only, must not block
+    # startup and must not fail it if Ollama isn't up yet)
+    threading.Thread(target=probe_embed_truncation, daemon=True).start()
 
     application = create_app()
     config = uvicorn.Config(application, log_level="info")

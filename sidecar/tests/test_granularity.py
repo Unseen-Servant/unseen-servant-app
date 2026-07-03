@@ -3,7 +3,7 @@
 Validated end-to-end in chunk_granularity_spike (sibling experiments
 repo). These tests pin the contract:
   - contiguous-run grouping (not group-by-breadcrumb-globally)
-  - tables atomic
+  - tables linearized into row units (atomic fallback for unparseable/lossy)
   - prose sub-split paragraph-aware
   - 6,000-char parent cap forces sub-parents
   - orphan / no-heading chunks each get their own parent
@@ -153,17 +153,62 @@ def test_build_emits_embed_units_and_parents():
     assert all(eu.parent_id == parent.parent_id for eu in embed_units)
 
 
-def test_build_tables_atomic():
-    """Table chunks must NOT be sub-split — emitted verbatim as their own
-    embed unit."""
-    table = "|a|b|c|\n|---|---|---|\n" + "\n".join(
-        f"|{i}|{i*2}|{i*3}|" for i in range(20)
+def test_build_table_linearized_into_row_units():
+    """Parseable tables emit one row-as-sentence unit per row, all
+    sharing the source table's parent (replaces the atomic unit —
+    table_retrieval_spike, +0.152 MRR@5)."""
+    table = (
+        "|**Armor Type**|**Price**|**Weight**|**AC**|\n"
+        "|---|---|---|---|\n"
+        "|Leather Armor|20gp|15|13|\n"
+        "|Chain Mail|60gp|40|15|"
     )
-    chunks = [_chunk(table, "Stats", 0, chunk_type="table")]
+    chunks = [_chunk(table, "Armor and Shields", 0, chunk_type="table")]
+    embed_units, parents = build(chunks)
+    assert len(embed_units) == 2
+    assert embed_units[1].text == "Armor Type: Chain Mail; Price: 60gp; Weight: 40; AC: 15"
+    assert all(eu.chunk_type == "table" for eu in embed_units)
+    assert all(eu.parent_id == parents[0].parent_id for eu in embed_units)
+    # The parent still carries the full original table for generation.
+    assert table in parents[0].text
+
+
+def test_build_unparseable_table_falls_back_atomic():
+    """chunk_type=='table' text the linearizer can't parse is emitted
+    verbatim as a single atomic unit — never dropped."""
+    not_really_a_table = "A block the chunker tagged as table but has no pipes."
+    chunks = [_chunk(not_really_a_table, "Stats", 0, chunk_type="table")]
+    embed_units, _ = build(chunks)
+    assert len(embed_units) == 1
+    assert embed_units[0].text == not_really_a_table
+    assert embed_units[0].chunk_type == "table"
+
+
+def test_build_lossy_parse_falls_back_atomic():
+    """Coverage guard: a parse that drops most columns (narrow header
+    over wide data rows) must fall back to the atomic unit rather than
+    silently losing content."""
+    wide_cell = "x" * 20
+    rows = "\n".join(
+        f"|{wide_cell}|{wide_cell}|{wide_cell}|{wide_cell}|{wide_cell}|"
+        for _ in range(5)
+    )
+    table = "|Wide|Table|\n|---|---|\n" + rows
+    chunks = [_chunk(table, "Weird", 0, chunk_type="table")]
     embed_units, _ = build(chunks)
     assert len(embed_units) == 1
     assert embed_units[0].text == table
-    assert embed_units[0].chunk_type == "table"
+
+
+def test_build_prints_linearization_counters(capsys):
+    table = "|a|b|\n|---|---|\n|1|2|\n|3|4|"
+    chunks = [
+        _chunk(table, "T", 0, chunk_type="table"),
+        _chunk("no pipes here", "T", 1, chunk_type="table"),
+    ]
+    build(chunks)
+    out = capsys.readouterr().out
+    assert "test.pdf: linearized 1/2 tables into 2 row units (1 atomic fallbacks)" in out
 
 
 def test_build_prose_sub_split():

@@ -116,6 +116,10 @@ def _enforce_hard_cap(chunks: list[Chunk], hard_cap: int) -> list[Chunk]:
         while len(remaining) > hard_cap:
             cut = remaining.rfind("\n\n", 0, hard_cap)
             if cut <= 0:
+                # Tables join rows with single \n and never contain \n\n —
+                # prefer a row boundary over a mid-row character cut.
+                cut = remaining.rfind("\n", 0, hard_cap)
+            if cut <= 0:
                 cut = hard_cap
             piece, remaining = remaining[:cut].strip(), remaining[cut:].strip()
             if piece:

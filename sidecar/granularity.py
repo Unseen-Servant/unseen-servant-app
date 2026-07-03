@@ -8,7 +8,8 @@ Validated by chunk_granularity_spike (sibling experiments repo, verdict
         - new parent on breadcrumb change
         - new parent on cap > PARENT_HARD_CAP chars
     → sub-split prose chunks into ~SMALL_TARGET-char paragraph-aware
-      embed units; tables stay atomic
+      embed units; tables linearize into one row-as-sentence unit per
+      row (atomic fallback when unparseable or coverage < COVERAGE_MIN)
     → embed_units carry parent_id; parents indexed for fetch at retrieval
 
 Why contiguous-run grouping (not group-by-breadcrumb-globally): on
@@ -21,9 +22,12 @@ Why the 6,000-char parent cap: even with contiguous-run grouping, a
 runaway breadcrumb can produce a multi-section parent. The cap bounds
 generation context per result.
 
-Tables atomic: a pipe-table is one embed unit; its parent_id points at
-the heading-section that contains it, so the parent text returns the
-table inline with surrounding prose — the natural reader unit.
+Tables linearized: each pipe-table row embeds as its own
+"<header>: <cell>; ..." sentence, all pointing at the parent that
+contains the full table — so retrieval matches individual rows while
+the reader still gets the whole table in context (table_retrieval_spike,
++0.152 MRR@5). Unparseable or lossy parses (coverage_ratio below
+COVERAGE_MIN) fall back to the pre-#327 atomic embed unit.
 """
 from __future__ import annotations
 
@@ -32,12 +36,14 @@ import re
 from dataclasses import dataclass
 
 from chunker import Chunk
+from linearize import coverage_ratio, linearize_table
 
 
 SMALL_TARGET = 400
 SMALL_HARD = 600
 SMALL_FLOOR = 200
 PARENT_HARD_CAP = 6000
+COVERAGE_MIN = 0.6
 
 _SENT_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
 
@@ -165,8 +171,10 @@ def _group_into_parents(chunks: list[Chunk]) -> list[list[Chunk]]:
 def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
     """Group chunks into parents; sub-split prose into embed units.
 
-    Tables are emitted as atomic embed units pointing at their parent.
-    Returns (embed_units, parents) — both keyed/linked via parent_id.
+    Tables are linearized into row-sentence embed units pointing at
+    their parent; unparseable/lossy tables fall back to a single
+    atomic unit. Returns (embed_units, parents) — both keyed/linked
+    via parent_id.
     """
     groups = _group_into_parents(chunks)
 
@@ -192,21 +200,42 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
 
     embed_units: list[EmbedUnit] = []
     embed_ordinal = 0
+    n_tables = n_linearized = n_row_units = n_fallback = 0
     for c in chunks:
         pid = chunk_to_pid[c.ordinal]
         if c.chunk_type == "table":
-            embed_units.append(EmbedUnit(
-                chunk_id=f"{embed_ordinal}",
-                text=c.text,
-                parent_id=pid,
-                chunk_type="table",
-                section_heading=c.section_heading,
-                source_pdf=c.source_pdf,
-                page_start=c.page_start,
-                page_end=c.page_end,
-                ordinal=embed_ordinal,
-            ))
-            embed_ordinal += 1
+            n_tables += 1
+            header, sentences = linearize_table(c.text)
+            if sentences and coverage_ratio(c.text, header, sentences) >= COVERAGE_MIN:
+                n_linearized += 1
+                n_row_units += len(sentences)
+                for sent in sentences:
+                    embed_units.append(EmbedUnit(
+                        chunk_id=f"{embed_ordinal}",
+                        text=sent,
+                        parent_id=pid,
+                        chunk_type="table",
+                        section_heading=c.section_heading,
+                        source_pdf=c.source_pdf,
+                        page_start=c.page_start,
+                        page_end=c.page_end,
+                        ordinal=embed_ordinal,
+                    ))
+                    embed_ordinal += 1
+            else:
+                n_fallback += 1
+                embed_units.append(EmbedUnit(
+                    chunk_id=f"{embed_ordinal}",
+                    text=c.text,
+                    parent_id=pid,
+                    chunk_type="table",
+                    section_heading=c.section_heading,
+                    source_pdf=c.source_pdf,
+                    page_start=c.page_start,
+                    page_end=c.page_end,
+                    ordinal=embed_ordinal,
+                ))
+                embed_ordinal += 1
             continue
         for sub in _split_prose(c.text):
             embed_units.append(EmbedUnit(
@@ -221,5 +250,11 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
                 ordinal=embed_ordinal,
             ))
             embed_ordinal += 1
+
+    if n_tables:
+        print(
+            f"{chunks[0].source_pdf}: linearized {n_linearized}/{n_tables} tables "
+            f"into {n_row_units} row units ({n_fallback} atomic fallbacks)"
+        )
 
     return embed_units, parents
