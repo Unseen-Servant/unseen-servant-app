@@ -5,7 +5,7 @@ cases (see FINDINGS.md in the experiments repo), most importantly the
 title-row heuristic that the spike found load-bearing on BFRPG tables.
 """
 
-from linearize import linearize_table
+from linearize import coverage_ratio, linearize_table
 
 
 STANDARD_TABLE = (
@@ -84,3 +84,32 @@ def test_non_table_text_returns_empty():
 
 def test_empty_input_returns_empty():
     assert linearize_table("") == ([], [])
+
+
+def test_coverage_high_for_clean_parse():
+    header, sentences = linearize_table(STANDARD_TABLE)
+    assert coverage_ratio(STANDARD_TABLE, header, sentences) >= 0.6
+
+
+def test_coverage_high_for_title_row_table():
+    header, sentences = linearize_table(TITLE_ROW_TABLE)
+    assert coverage_ratio(TITLE_ROW_TABLE, header, sentences) >= 0.6
+
+
+def test_coverage_low_when_narrow_header_drops_columns():
+    """A 2-cell header over 5-cell data rows: _parse_table truncates each
+    row to 2 cells, silently dropping 3 columns. The ratio must expose
+    this so build() can fall back to the atomic unit."""
+    wide_cell = "x" * 20
+    rows = "\n".join(
+        f"|{wide_cell}|{wide_cell}|{wide_cell}|{wide_cell}|{wide_cell}|"
+        for _ in range(5)
+    )
+    table = "|Wide|Table|\n|---|---|\n" + rows
+    header, sentences = linearize_table(table)
+    assert sentences  # parse "succeeds"...
+    assert coverage_ratio(table, header, sentences) < 0.6  # ...but lossily
+
+
+def test_coverage_zero_for_no_sentences():
+    assert coverage_ratio("no table here", [], []) == 0.0

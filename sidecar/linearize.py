@@ -149,3 +149,36 @@ def linearize_table(chunk_text: str) -> tuple[list[str], list[str]]:
         if parts:
             sentences.append("; ".join(parts))
     return header, sentences
+
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _content_len(s: str) -> int:
+    return len(_WS_RE.sub("", s))
+
+
+def coverage_ratio(chunk_text: str, header: list[str], sentences: list[str]) -> float:
+    """Rough fraction of the table's cell content represented in the row
+    sentences. A tripwire for lossy parses (e.g. data rows truncated to a
+    too-narrow detected header), not a precise metric.
+
+    Denominator: content chars of every pipe-row cell in the source,
+    plus the header labels repeated once per additional sentence (labels
+    appear in every sentence, so without this term long tables would
+    inflate the ratio and mask dropped columns).
+    """
+    src = 0
+    for line in chunk_text.splitlines():
+        if _SEPARATOR_RE.match(line):
+            continue
+        cells = _split_pipe_row(line)
+        if cells is None:
+            continue
+        src += sum(_content_len(_strip_emphasis(c)) for c in cells)
+    if src == 0 or not sentences:
+        return 0.0
+    label_chars = sum(_content_len(h) for h in header)
+    denom = src + label_chars * (len(sentences) - 1)
+    emitted = sum(_content_len(s) for s in sentences)
+    return emitted / denom
