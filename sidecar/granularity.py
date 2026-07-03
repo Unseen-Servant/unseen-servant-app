@@ -32,14 +32,11 @@ COVERAGE_MIN) fall back to the pre-#327 atomic embed unit.
 from __future__ import annotations
 
 import hashlib
-import logging
 import re
 from dataclasses import dataclass
 
 from chunker import Chunk
 from linearize import coverage_ratio, linearize_table
-
-logger = logging.getLogger(__name__)
 
 
 SMALL_TARGET = 400
@@ -255,9 +252,9 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
             embed_ordinal += 1
 
     if n_tables:
-        logger.info(
-            "%s: linearized %d/%d tables into %d row units (%d atomic fallbacks)",
-            chunks[0].source_pdf, n_linearized, n_tables, n_row_units, n_fallback,
+        print(
+            f"{chunks[0].source_pdf}: linearized {n_linearized}/{n_tables} tables "
+            f"into {n_row_units} row units ({n_fallback} atomic fallbacks)"
         )
 
     return embed_units, parents

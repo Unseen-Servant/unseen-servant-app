@@ -200,21 +200,15 @@ def test_build_lossy_parse_falls_back_atomic():
     assert embed_units[0].text == table
 
 
-def test_build_logs_linearization_counters(caplog):
-    import logging
-
+def test_build_prints_linearization_counters(capsys):
     table = "|a|b|\n|---|---|\n|1|2|\n|3|4|"
     chunks = [
         _chunk(table, "T", 0, chunk_type="table"),
         _chunk("no pipes here", "T", 1, chunk_type="table"),
     ]
-    with caplog.at_level(logging.INFO, logger="granularity"):
-        build(chunks)
-    messages = [r.getMessage() for r in caplog.records]
-    assert any(
-        "linearized 1/2 tables" in m and "2 row units" in m and "1 atomic fallback" in m
-        for m in messages
-    )
+    build(chunks)
+    out = capsys.readouterr().out
+    assert "test.pdf: linearized 1/2 tables into 2 row units (1 atomic fallbacks)" in out
 
 
 def test_build_prose_sub_split():
