@@ -994,9 +994,10 @@ def _index_chunks(
 ) -> int:
     """Run the granularity step and persist embed units + parents.
 
-    Splits chunks into ~400-char embed units (tables atomic) and contiguous
-    same-breadcrumb parents (capped at 6,000 chars). Embed units go to
-    ChromaDB with parent_id in metadata; parents go to the SQLite store.
+    Splits chunks into ~400-char embed units (tables linearized into row
+    units, atomic fallback) and contiguous same-breadcrumb parents (capped
+    at 6,000 chars). Embed units go to ChromaDB with parent_id in metadata;
+    parents go to the SQLite store.
 
     Uses the atomic re-index pattern: stages new chunks under a per-write
     prefix, then swaps in the new parents only after embed succeeds. Raises
