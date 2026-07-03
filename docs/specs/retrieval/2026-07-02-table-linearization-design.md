@@ -3,7 +3,7 @@
 **Date:** 2026-07-02
 **Issue:** [#327](https://github.com/Unseen-Servant/unseen-legend-lore/issues/327) — roadmap item 8, Tier 2
 **Evidence:** `unseen-legend-lore-experiments/table_retrieval_spike/FINDINGS.md` (verdict 2026-04-27)
-**Target branch:** `release/v2.1.0`
+**Target branch:** `main`
 
 ## Problem
 
@@ -184,5 +184,4 @@ safety; the counters will show if they ever become necessary for quality.
   spike: the spike baseline ran untruncated (`OLLAMA_CONTEXT_LENGTH=8192`),
   while production atomic tables may also be silently truncated — row units
   are tiny and sidestep truncation entirely.
-- One PR based on `release/v2.1.0`. #327 stays open until the release
-  merges back to `main`.
+- One PR based on `main`. Close #327 when the PR lands.

@@ -785,6 +785,6 @@ Re-read `docs/specs/retrieval/2026-07-02-table-linearization-design.md` section 
 
 ## Post-implementation (outside this plan)
 
-- PR base: `release/v2.1.0` (retrieval work targets the release branch, not `main`). Reference #327; note "re-index required to take effect" in the PR body.
+- PR base: `main` (per user direction 2026-07-02, overriding the earlier release-branch convention for this PR). Reference #327; note "re-index required to take effect" in the PR body.
 - Manual validation after the user re-indexes: run the spike's 14 table queries (`~/code/unseen-legend-lore-experiments/table_retrieval_spike/queries.yaml`, `category="table"`) via `search_library` and compare rank-1 hits against the spike's per-query table in FINDINGS.md. Success = roll-table/row queries return the actual tables at rank 1; direction matches the spike.
-- #327 stays open until `release/v2.1.0` merges back.
+- Close #327 when the PR lands on `main`.
