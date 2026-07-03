@@ -166,16 +166,27 @@ def coverage_ratio(chunk_text: str, header: list[str], sentences: list[str]) -> 
     Denominator: content chars of every pipe-row cell in the source,
     plus the header labels repeated once per additional sentence (labels
     appear in every sentence, so without this term long tables would
-    inflate the ratio and mask dropped columns).
+    inflate the ratio and mask dropped columns). Pre-separator title rows
+    (demoted by the parser) are excluded — their content is deliberately
+    absent from the sentences.
     """
     src = 0
+    seen_separator = False
     for line in chunk_text.splitlines():
         if _SEPARATOR_RE.match(line):
+            seen_separator = True
             continue
         cells = _split_pipe_row(line)
         if cells is None:
             continue
-        src += sum(_content_len(_strip_emphasis(c)) for c in cells)
+        non_empty = [c for c in cells if _strip_emphasis(c)]
+        if not seen_separator and len(non_empty) < 2:
+            # Pre-separator title row (mirrors _parse_table's demotion):
+            # its content is legitimately absent from the sentences, so
+            # charging it to the denominator would false-trip the guard
+            # on long-title tables.
+            continue
+        src += sum(_content_len(_strip_emphasis(c)) for c in non_empty)
     if src == 0 or not sentences:
         return 0.0
     label_chars = sum(_content_len(h) for h in header)

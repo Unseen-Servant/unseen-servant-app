@@ -113,3 +113,34 @@ def test_coverage_low_when_narrow_header_drops_columns():
 
 def test_coverage_zero_for_no_sentences():
     assert coverage_ratio("no table here", [], []) == 0.0
+
+
+def test_coverage_high_for_long_title_single_row_table():
+    """A long descriptive title row must not drag a lossless 1-row parse
+    below the threshold (title content is legitimately absent from the
+    sentences)."""
+    table = (
+        "|Cost to Hire Retainers and Specialists by Class and Level||||\n"
+        "|---|---|---|---|\n"
+        "|**Class**|**Level**|**Cost**|**Notes**|\n"
+        "|Fighter|3|100gp|per month|"
+    )
+    header, sentences = linearize_table(table)
+    assert sentences
+    assert coverage_ratio(table, header, sentences) >= 0.6
+
+
+def test_coverage_high_for_sparse_table():
+    """Empty cells contribute nothing to either side of the ratio — a
+    sparse-but-valid table must pass."""
+    table = "|a|b|c|d|\n|---|---|---|---|\n|1|||4|\n||2||#|"
+    header, sentences = linearize_table(table)
+    assert coverage_ratio(table, header, sentences) >= 0.6
+
+
+def test_coverage_passes_when_dropped_cells_are_short():
+    """Truncating short-code columns loses little token mass — the guard
+    correctly lets it through (boundary of its discrimination)."""
+    table = "|k1|k2|\n|---|---|\n" + "\n".join("|ab|cd|ef|gh|ij|" for _ in range(5))
+    header, sentences = linearize_table(table)
+    assert coverage_ratio(table, header, sentences) >= 0.6
