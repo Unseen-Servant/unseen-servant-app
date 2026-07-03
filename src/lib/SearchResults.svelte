@@ -3,6 +3,7 @@
   import type { SearchResultItem, KnownGameSystem } from './types';
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
+  import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
@@ -72,14 +73,11 @@
     el?.focus();
   }
 
-  function relevanceCells(r: number): number {
-    if (r <= 0) return 0;
-    return Math.max(1, Math.min(5, Math.ceil(r * 5)));
-  }
-
-  function relevancePercent(r: number): number {
-    return Math.round(r * 100);
-  }
+  // Weak-tier presentation (issues #306/#310): a divider demotes trailing
+  // weak results, and an all-weak list gets an explicit callout so a
+  // scoped miss doesn't masquerade as a confident answer.
+  $: dividerAt = weakDividerIndex(results);
+  $: allResultsWeak = allWeak(results);
 
   function pageSpan(start: number, end: number): string {
     return pageHint(start, end);
@@ -140,16 +138,25 @@
       <div class="state-msg">0 results for &ldquo;{query}&rdquo;</div>
     {/if}
   {:else}
+    {#if allResultsWeak}
+      <div class="weak-callout" role="status">
+        No strong matches &mdash; the content may be outside the current scope.
+      </div>
+    {/if}
     {#each results as result, i (i)}
-      {@const cells = relevanceCells(result.relevance)}
-      {@const pct = relevancePercent(result.relevance)}
+      {@const cells = tierCells(result.tier, result.relevance)}
+      {@const label = tierLabel(result.tier, result.relevance)}
       {@const span = pageSpan(result.page_start, result.page_end)}
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
       {@const sysColor = colorFor(result.game_system)}
+      {#if i === dividerAt}
+        <div class="weak-divider" role="separator">weak matches</div>
+      {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <div
         class="result-row"
         class:selected={i === selectedIndex}
+        class:weak={result.tier === 'weak'}
         style={sysColor ? `--system-color: ${sysColor}` : ''}
         bind:this={rowEls[i]}
         on:click={() => handleRowClick(i)}
@@ -181,8 +188,8 @@
         <span
           class="gauge"
           role="img"
-          aria-label="{pct}% match"
-          title="{pct}% match"
+          aria-label={label}
+          title={label}
         >
           {#each [0, 1, 2, 3, 4] as idx (idx)}
             <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
@@ -293,6 +300,46 @@
 
   .result-row.selected .gauge {
     opacity: 1;
+  }
+
+  /* Weak-tier results stay listed (recall) but read as demoted. Selection
+     restores full opacity so keyboard navigation stays legible. */
+  .result-row.weak {
+    opacity: 0.55;
+  }
+
+  .result-row.weak.selected,
+  .result-row.weak:hover {
+    opacity: 1;
+  }
+
+  .weak-divider {
+    margin: 0.35rem 0 0.15rem;
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+    font-variant: small-caps;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .weak-divider::before,
+  .weak-divider::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .weak-callout {
+    margin: 0.35rem 0.5rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--text-muted);
+    border: 1px dashed var(--border-subtle);
+    border-radius: 2px;
   }
 
   .index {

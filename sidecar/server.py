@@ -58,6 +58,26 @@ from reranker import rerank_scores
 RERANK_CANDIDATE_POOL = int(os.getenv("RERANK_CANDIDATES", "50"))
 
 
+# Relevance-tier thresholds (issues #306/#310). Neither score scale is a
+# calibrated probability, so results carry an ordinal tier instead of a
+# raw percentage. Thresholds are scale-specific:
+# - Rerank scale is the cross-encoder sigmoid: logit 0 → 0.5 is the
+#   model's own relevant/irrelevant midpoint; below ~0.1 the model is
+#   confident the pair is irrelevant.
+# - Cosine scale is bge-m3 similarity; defaults calibrated against the
+#   hybrid_retrieval_spike ground truth (V0_h, 200 labeled results):
+#   below 0.50 only 12.5% of results are correct (1 correct result
+#   demoted); at/above 0.60 precision is 66% vs a 53% base rate. bge-m3
+#   cosine lives in a compressed [0.45, 0.76] band — never near 0 or 1.
+# The weak threshold is the "relevance floor": weak results are still
+# returned (recall preserved) but demoted in the UI and flagged to MCP
+# clients so out-of-scope queries stop looking confidently answered.
+RERANK_TIER_STRONG = float(os.getenv("RERANK_TIER_STRONG", "0.5"))
+RERANK_TIER_WEAK = float(os.getenv("RERANK_TIER_WEAK", "0.1"))
+COSINE_TIER_STRONG = float(os.getenv("COSINE_TIER_STRONG", "0.60"))
+COSINE_TIER_WEAK = float(os.getenv("COSINE_TIER_WEAK", "0.50"))
+
+
 # Pinning HNSW space at collection creation makes `relevance = 1 - distance`
 # bounded in [0, 1] for the normalised embeddings bge-m3 produces. Chroma's
 # default is l2, where distances can exceed 1.0 and yield negative relevance.
@@ -128,6 +148,41 @@ def _normalize_for_match(s: str) -> str:
     return "".join(ch for ch in s if ch.isalnum())
 
 
+def _resolve_filter_value(
+    value: str, candidates: list[str]
+) -> tuple[str | None, list[str]]:
+    """Resolve a user/agent-supplied filter value against known candidates.
+
+    MCP agents guess filter values from user vernacular ("dnd 5e",
+    "Players Handbook.pdf"), so exact-match-or-nothing turns every
+    near-miss into a silent empty result (issue #309). Resolution order:
+    exact match; case/accent-insensitive equality; unique normalized
+    substring (either direction, so "D&D" finds "D&D 5E" and
+    "dragonbane monsters" finds "dragonbane_monsters.pdf").
+
+    Returns ``(resolved, matches)``: ``resolved`` is the single
+    unambiguous candidate or ``None``; ``matches`` carries the
+    candidates that partially matched, for building hint messages.
+    """
+    if value in candidates:
+        return value, [value]
+    needle = _normalize_for_match(value)
+    if not needle:
+        return None, []
+    normalized = {c: _normalize_for_match(c) for c in candidates}
+    equal = [c for c, n in normalized.items() if n == needle]
+    if len(equal) == 1:
+        return equal[0], equal
+    if equal:
+        return None, equal
+    substring = [
+        c for c, n in normalized.items() if needle in n or n in needle
+    ]
+    if len(substring) == 1:
+        return substring[0], substring
+    return None, substring
+
+
 def _rerank_safe_for_query(query: str) -> bool:
     """Whether the bundled cross-encoder should be trusted for this query.
 
@@ -141,6 +196,22 @@ def _rerank_safe_for_query(query: str) -> bool:
     behaviour (issue #305).
     """
     return query.isascii()
+
+
+def _tier_for(relevance: float, reranked: bool) -> str:
+    """Ordinal relevance tier for a result, on its own score scale.
+
+    ``relevance`` is the response-shape value (1 - distance, clamped to
+    [0, 1]): the cross-encoder sigmoid when the result was reranked,
+    bge-m3 cosine similarity otherwise.
+    """
+    strong = RERANK_TIER_STRONG if reranked else COSINE_TIER_STRONG
+    weak = RERANK_TIER_WEAK if reranked else COSINE_TIER_WEAK
+    if relevance >= strong:
+        return "strong"
+    if relevance >= weak:
+        return "good"
+    return "weak"
 
 
 def detect_game_systems(
@@ -655,18 +726,19 @@ def get_merged_systems(
     return merged, known
 
 
-def resolve_collection_filenames(
+def resolve_collection_paths(
     coll: Collection, manifest: IndexManifest
 ) -> list[str]:
-    """Resolve a collection's file_paths to filenames in the manifest.
+    """Resolve a collection's file_paths to the indexed subset.
 
-    Filters out paths no longer indexed (graceful degradation).
+    Filters out paths no longer indexed (graceful degradation). Returns
+    exact source paths — chunk metadata stores the full path, and
+    filtering by bare filename would leak same-named PDFs from other
+    folders into the collection scope (issue #308; the '/5e/Monster
+    Manual.pdf' vs '/pf2e/Monster Manual.pdf' case chunk_id_prefix
+    already guards against).
     """
-    filenames = []
-    for file_path in coll.file_paths:
-        if file_path in manifest.files:
-            filenames.append(manifest.files[file_path].filename)
-    return filenames
+    return [p for p in coll.file_paths if p in manifest.files]
 
 
 # ---------------------------------------------------------------------------
@@ -942,7 +1014,12 @@ def _extract_and_chunk(
                 pdf_path, flat_text, known_systems=known_systems
             )
             resolved_system = resolved_systems[0] if resolved_systems else "unknown"
-        chunks = structure_aware(pages, source_pdf=pdf_path.name)
+        # Full path, not .name: source_pdf seeds _make_parent_id, and two
+        # same-named PDFs in different folders would otherwise generate
+        # colliding parent_ids — the second file dies on the parents-store
+        # UNIQUE constraint and never indexes (issue #308 family). The
+        # parents store itself is already keyed by full path.
+        chunks = structure_aware(pages, source_pdf=str(pdf_path))
         return chunks, resolved_system, resolved_systems, None
     except Exception as e:
         return [], "unknown", [], f"{pdf_path.name}: {str(e)}"
@@ -2350,8 +2427,12 @@ def create_app(
             sources_info = {}
             for metadata in results["metadatas"]:
                 filename = metadata["filename"]
-                if filename not in sources_info:
-                    source_path = metadata.get("source", "")
+                source_path = metadata.get("source", "")
+                # Key by source path, not filename: same-named PDFs in
+                # different folders are distinct sources and would
+                # otherwise merge into one entry (issue #308 family).
+                key = source_path or filename
+                if key not in sources_info:
                     entry = manifest.files.get(source_path)
                     primary = metadata.get("game_system", "unknown")
                     if entry and entry.game_systems:
@@ -2360,7 +2441,7 @@ def create_app(
                         systems = [primary]
                     else:
                         systems = []
-                    sources_info[filename] = {
+                    sources_info[key] = {
                         "filename": filename,
                         "source": source_path,
                         "chunks": 0,
@@ -2370,10 +2451,10 @@ def create_app(
                         "indexed_at": entry.indexed_at if entry else None,
                         "file_size_bytes": entry.file_size if entry else None,
                     }
-                sources_info[filename]["chunks"] += 1
+                sources_info[key]["chunks"] += 1
                 page_end = metadata.get("page_end")
-                if isinstance(page_end, int) and page_end > sources_info[filename]["pages"]:
-                    sources_info[filename]["pages"] = page_end
+                if isinstance(page_end, int) and page_end > sources_info[key]["pages"]:
+                    sources_info[key]["pages"] = page_end
 
             sources_list = sorted(sources_info.values(), key=lambda x: x["filename"])
             return {"sources": sources_list, "count": len(sources_list)}
@@ -2913,19 +2994,89 @@ def create_app(
                         detail=f"Collection not found: {effective_collection}",
                     )
                 manifest = load_manifest(data_dir)
-                filenames = resolve_collection_filenames(
+                coll_paths = resolve_collection_paths(
                     store.collections[effective_collection], manifest
                 )
-                if not filenames:
+                if not coll_paths:
                     return {
                         "results": [],
                         "message": "Collection has no indexed files.",
                         "effective_collection": effective_collection,
                         "auto_scoped": auto_scoped,
                     }
-                where_clauses.append({"filename": {"$in": filenames}})
+                where_clauses.append({"source": {"$in": coll_paths}})
             if request.source_paths:
                 where_clauses.append({"source": {"$in": request.source_paths}})
+
+            # source_filter / game_system arrive as guesses over user
+            # vernacular ("dnd 5e", "Players Handbook.pdf") — mostly from
+            # MCP agents. Exact-match-or-nothing turned every near-miss
+            # into a silent empty result indistinguishable from a true
+            # semantic miss (issue #309): resolve unambiguous near-misses
+            # (noted in `message`), and turn unresolvable values into an
+            # actionable message naming what is actually available.
+            filter_notes: list[str] = []
+            if data_dir and (request.source_filter or request.game_system):
+                filt_manifest = load_manifest(data_dir)
+                if request.source_filter:
+                    known_files = sorted(
+                        {e.filename for e in filt_manifest.files.values()}
+                    )
+                    if request.source_filter not in known_files:
+                        resolved, matches = _resolve_filter_value(
+                            request.source_filter, known_files
+                        )
+                        if resolved is not None:
+                            filter_notes.append(
+                                f'source_filter "{request.source_filter}" '
+                                f'matched "{resolved}".'
+                            )
+                            request.source_filter = resolved
+                        else:
+                            hint = (
+                                f"Closest indexed filenames: "
+                                f"{', '.join(sorted(matches))}."
+                                if matches
+                                else "Use the sources list for exact filenames."
+                            )
+                            return {
+                                "results": [],
+                                "message": (
+                                    f'No indexed file matches source_filter '
+                                    f'"{request.source_filter}". {hint}'
+                                ),
+                                "effective_collection": effective_collection,
+                                "auto_scoped": auto_scoped,
+                            }
+                if request.game_system:
+                    known_tags = sorted({
+                        t for e in filt_manifest.files.values()
+                        for t in {e.game_system, *e.game_systems} if t
+                    })
+                    if request.game_system not in known_tags:
+                        resolved, matches = _resolve_filter_value(
+                            request.game_system, known_tags
+                        )
+                        if resolved is not None:
+                            filter_notes.append(
+                                f'game_system "{request.game_system}" '
+                                f'matched "{resolved}".'
+                            )
+                            request.game_system = resolved
+                        else:
+                            pool = sorted(matches) if matches else known_tags
+                            return {
+                                "results": [],
+                                "message": (
+                                    f'game_system "{request.game_system}" is '
+                                    f'not in the library. Available: '
+                                    f'{", ".join(pool)}. Retry with an exact '
+                                    f'value or without the filter.'
+                                ),
+                                "effective_collection": effective_collection,
+                                "auto_scoped": auto_scoped,
+                            }
+
             if request.source_filter:
                 where_clauses.append({"filename": request.source_filter})
             if request.game_system or request.game_systems:
@@ -2937,26 +3088,28 @@ def create_app(
                 # whose `game_systems` includes a requested tag but whose
                 # primary `game_system` (the one stored in chunk metadata)
                 # does not. Chroma metadata is scalar-only, so secondary
-                # matches must be folded in as a filename `$in` clause.
-                secondary_filenames: list[str] = []
+                # matches must be folded in as a source-path `$in` clause —
+                # exact paths, not filenames, so an untagged same-named
+                # file in another folder can't ride along (issue #308).
+                secondary_paths: list[str] = []
                 if data_dir:
                     search_manifest = load_manifest(data_dir)
-                    for entry in search_manifest.files.values():
+                    for path, entry in search_manifest.files.items():
                         if entry.game_system in requested:
                             continue
                         if any(t in requested for t in entry.game_systems):
-                            secondary_filenames.append(entry.filename)
+                            secondary_paths.append(path)
 
                 if request.game_system:
                     primary_clause: dict = {"game_system": request.game_system}
                 else:
                     primary_clause = {"game_system": {"$in": list(requested)}}
 
-                if secondary_filenames:
+                if secondary_paths:
                     where_clauses.append({
                         "$or": [
                             primary_clause,
-                            {"filename": {"$in": secondary_filenames}},
+                            {"source": {"$in": secondary_paths}},
                         ]
                     })
                 else:
@@ -2972,7 +3125,7 @@ def create_app(
             if not results["documents"][0]:
                 return {
                     "results": [],
-                    "message": "No results found.",
+                    "message": " ".join([*filter_notes, "No results found."]),
                     "effective_collection": effective_collection,
                     "auto_scoped": auto_scoped,
                 }
@@ -2992,9 +3145,12 @@ def create_app(
             # ("Combat > Grappling") versus a creature card with the same
             # keyword ("Goblin > Actions"), and tends to over-rank the
             # keyword-dense action text.
+            ordered_docs = results["documents"][0]
+            rerank_applied = False
+            pool = 0
             if request.rerank and _rerank_safe_for_query(request.query):
                 pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
-                pool_docs = results["documents"][0][:pool]
+                pool_docs = ordered_docs[:pool]
                 pool_meta = ordered_metadatas[:pool]
                 rerank_inputs = [
                     f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
@@ -3002,6 +3158,7 @@ def create_app(
                 ]
                 scores = rerank_scores(request.query, rerank_inputs)
                 if scores is not None:
+                    rerank_applied = True
                     order = sorted(
                         range(pool), key=lambda i: scores[i], reverse=True
                     )
@@ -3009,37 +3166,69 @@ def create_app(
                     # Use 1 - rerank_score so 1 - distance = rerank score
                     # downstream, keeping the response shape unchanged.
                     head_distances = [1.0 - scores[i] for i in order]
+                    head_docs = [ordered_docs[i] for i in order]
                     ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
                     ordered_distances = head_distances + ordered_distances[pool:]
+                    ordered_docs = head_docs + ordered_docs[pool:]
 
             # Dedupe by parent_id, keeping the first hit per parent (the
             # iteration order is the re-ranked-then-cosine order from above).
             seen: set[str] = set()
-            picked: list[tuple[dict, float]] = []   # (metadata, distance)
-            for metadata, distance in zip(ordered_metadatas, ordered_distances):
+            picked: list[dict] = []
+            for i, (metadata, distance) in enumerate(
+                zip(ordered_metadatas, ordered_distances)
+            ):
                 pid = metadata.get("parent_id")
                 if not pid or pid in seen:
                     continue
                 seen.add(pid)
-                picked.append((metadata, distance))
+                picked.append({
+                    "metadata": metadata,
+                    "distance": distance,
+                    "doc": ordered_docs[i],
+                    "reranked": rerank_applied and i < pool,
+                })
                 if len(picked) >= request.n_results:
                     break
 
+            # Single-scale page (issue #306): when the reranker ran, picked
+            # results that came from the cosine tail are rescored with the
+            # cross-encoder in one small batch (≤ n_results pairs), so every
+            # returned relevance is on the same scale. On failure the tail
+            # keeps its cosine score and an honest reranked=False flag.
+            if rerank_applied:
+                stragglers = [p for p in picked if not p["reranked"]]
+                if stragglers:
+                    straggler_inputs = [
+                        f"{p['metadata']['section_heading']}\n\n{p['doc']}"
+                        if p["metadata"].get("section_heading") else p["doc"]
+                        for p in stragglers
+                    ]
+                    straggler_scores = rerank_scores(
+                        request.query, straggler_inputs
+                    )
+                    if straggler_scores is not None:
+                        for p, s in zip(stragglers, straggler_scores):
+                            p["distance"] = 1.0 - s
+                            p["reranked"] = True
+                        # All picked distances are now cross-encoder scale;
+                        # stable sort keeps head order, interleaves the
+                        # rescored tail where it belongs.
+                        picked.sort(key=lambda p: p["distance"])
+
             parent_docs = fetch_parents_extended(
-                data_dir, [m["parent_id"] for m, _ in picked]
+                data_dir, [p["metadata"]["parent_id"] for p in picked]
             ) if data_dir else {}
 
             formatted = []
-            for metadata, distance in picked:
+            for p in picked:
+                metadata = p["metadata"]
+                distance = p["distance"]
                 pid = metadata["parent_id"]
                 parent = parent_docs.get(pid)
                 # Fall back to the embed unit text if the parent row is
                 # missing (shouldn't happen post-reindex; defensive).
-                text = parent.text if parent else next(
-                    (d for d, m in zip(results["documents"][0], results["metadatas"][0])
-                     if m.get("parent_id") == pid),
-                    "",
-                )
+                text = parent.text if parent else p["doc"]
                 # ParentDoc.section_heading is Optional[str] (granularity.py),
                 # so the chain "" or parent.section_heading can leak None into
                 # the response. Trailing `or ""` coerces back to a string —
@@ -3050,6 +3239,7 @@ def create_app(
                     or (parent.section_heading if parent else None)
                     or ""
                 )
+                relevance = round(max(0.0, min(1.0, 1 - distance)), 3)
                 formatted.append({
                     "text": text,
                     "filename": metadata["filename"],
@@ -3058,14 +3248,19 @@ def create_app(
                     "page_start": parent.page_start if parent else metadata.get("page_start", 0),
                     "page_end": parent.page_end if parent else metadata.get("page_end", 0),
                     "game_system": metadata.get("game_system") or "unknown",
-                    "relevance": round(max(0.0, min(1.0, 1 - distance)), 3),
+                    "relevance": relevance,
+                    "tier": _tier_for(relevance, p["reranked"]),
+                    "reranked": p["reranked"],
                 })
 
-            return {
+            response: dict = {
                 "results": formatted,
                 "effective_collection": effective_collection,
                 "auto_scoped": auto_scoped,
             }
+            if filter_notes:
+                response["message"] = " ".join(filter_notes)
+            return response
         except HTTPException:
             raise
         except Exception as e:

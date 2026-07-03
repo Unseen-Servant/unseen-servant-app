@@ -274,9 +274,16 @@ async def search_library(
                "fire drake stats", "healing potions")
         n_results: How many results to return (default 15)
         source_filter: Optional PDF filename to restrict search
-                       to one book (e.g., "dragonbane_core.pdf")
+                       to one book (e.g., "dragonbane_core.pdf").
+                       Matched case/accent-insensitively; an unambiguous
+                       near-miss resolves automatically (noted in the
+                       output), otherwise the closest indexed filenames
+                       are suggested.
         game_system: Optional game system to filter by
-                     (e.g., "D&D 5E", "Dragonbane", "Pathfinder 2E")
+                     (e.g., "D&D 5E", "Dragonbane", "Pathfinder 2E").
+                     Matched case/accent-insensitively like
+                     source_filter; unknown values return the list of
+                     available systems.
         collection: Optional collection name to search within
                     (see list_collections for available collections).
                     Overrides any active context.
@@ -299,13 +306,46 @@ async def search_library(
     if data.get("auto_scoped") and data.get("effective_collection"):
         notice = f"[Active context: {data['effective_collection']}]\n\n"
 
+    # The server's `message` explains empty results (bad filter value,
+    # empty collection) and carries filter-resolution notes — surface it
+    # instead of swallowing it into a generic line (issue #309).
+    server_note = data.get("message")
+
     results = data.get("results", [])
     if not results:
+        if server_note:
+            return f"{notice}{server_note}"
         return f"{notice}No results found for: {query}"
 
+    # Ordinal tiers, not raw scores (issues #306/#310): the underlying
+    # numbers come from two different scales (cross-encoder sigmoid vs
+    # cosine similarity) and neither is a calibrated probability — printing
+    # them invites over-reading. Weak results are still included (recall),
+    # but flagged so the model doesn't synthesize an answer from noise.
+    all_weak = all(r.get("tier") == "weak" for r in results)
+
     lines = [f"{notice}Found {len(results)} result(s) for \"{query}\":\n"]
+    if server_note:
+        lines.insert(1, f"[{server_note}]\n")
+    if all_weak:
+        lines.insert(0, (
+            "No strong matches — every result below scored poorly. The "
+            "content may not be indexed, or may be outside the current "
+            "scope (active context, game_system, or source filters). "
+            "Consider retrying with search_all=True or without filters.\n"
+        ))
+
+    weak_divider_emitted = False
     for i, r in enumerate(results, 1):
-        lines.append(f"--- Result {i} (relevance: {r['relevance']}) ---")
+        tier = r.get("tier")
+        if tier == "weak" and not all_weak and not weak_divider_emitted:
+            lines.append(
+                "--- Results below this line scored poorly (weak matches; "
+                "likely not relevant) ---\n"
+            )
+            weak_divider_emitted = True
+        match_tag = f" (match: {tier})" if tier else ""
+        lines.append(f"--- Result {i}{match_tag} ---")
         system_tag = r.get('game_system', 'unknown')
         lines.append(f"Source: {r['filename']} [{system_tag}]")
         heading = _strip_bold(r.get("section_heading") or "") or "(no section)"

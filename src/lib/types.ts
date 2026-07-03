@@ -136,6 +136,10 @@ export interface SearchResultItem {
   page_end: number;
   game_system: string;
   relevance: number;
+  /** Ordinal relevance tier computed server-side on the result's own
+   * score scale; absent only for responses from an older sidecar. */
+  tier?: 'strong' | 'good' | 'weak';
+  reranked?: boolean;
 }
 
 export interface SearchResponse {

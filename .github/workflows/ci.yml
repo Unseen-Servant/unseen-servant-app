@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
   push:
-    branches: [main]
+    branches: [main, 'release/**']
 
 # dorny/paths-filter calls the PR Files API to detect which surfaces a
 # PR touches. The repo's default GITHUB_TOKEN doesn't grant that, so

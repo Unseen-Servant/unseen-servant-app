@@ -11,6 +11,7 @@
   export let excludedSystems: Set<string> = new Set();
   export let soloedSystems: Set<string> = new Set();
   export let availableSystems: { name: string; count: number }[] = [];
+  export let untaggedCount: number = 0;
   export let showHidden: boolean = false;
   export let hiddenCount: number = 0;
   export let collectionFilterAvailable: boolean = false;
@@ -220,6 +221,7 @@
           {excludedSystems}
           {soloedSystems}
           systems={availableSystems}
+          {untaggedCount}
           showSystemFilter={systemsFilterRelevant}
           onToggleSystem={onToggleSystemFilter}
           onToggleSolo={onToggleSystemSolo}
