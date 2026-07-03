@@ -38,12 +38,12 @@ The default `Xenova/ms-marco-MiniLM-L-12-v2` cross-encoder ([reranker.py](../../
 
 ## Tier 2 — Highest accuracy leverage (evidence-backed)
 
-### 8 — Ship table row-linearization *(largest unadopted win)*
-`table_retrieval_spike` measured **+0.152 MRR@5** on table queries with **reference code ready to copy** (`linearize_tables.py`), zero LLM cost, embed-side only (re-index, no schema/retrieval change). It also resolves two other confirmed findings:
-- Large tables embed as a **single diluted vector** ([granularity.py:196](../../sidecar/granularity.py)) — a query for one row loses to prose that merely mentions the term.
-- **Silent ~2048-token embedding truncation** — verified live, the effective Ollama context is ~2048 (not the documented 8192), so big tables have their tail unsearchable regardless of query.
+### 8 — Ship table row-linearization ✅ *(shipped in [PR #335](https://github.com/Unseen-Servant/unseen-legend-lore/pull/335), closes #327)*
+**Status: SHIPPED 2026-07-02.** `table_retrieval_spike` measured **+0.152 MRR@5** on table queries, zero LLM cost, embed-side only (re-index, no schema/retrieval change). Implemented as [linearize.py](../../sidecar/linearize.py) + per-row units in `granularity.build()`, with a coverage guard, a hard-cap splitter that falls back to row boundaries (never cuts mid-row), and a startup probe for silent Ollama embed truncation. Design spec: [2026-07-02-table-linearization-design.md](../specs/retrieval/2026-07-02-table-linearization-design.md). It also resolved two other confirmed findings:
+- Large tables embed as a **single diluted vector** ([granularity.py](../../sidecar/granularity.py)) — a query for one row loses to prose that merely mentions the term.
+- **Silent ~2048-token embedding truncation** — verified live, the effective Ollama context is ~2048 (not the documented 8192); now detected by the startup probe, and row-level units keep table tails searchable.
 
-Targets the signature live-play lookup ("what's on roll 96–00"). **Effort: M. Do this as its own focused piece — it's the reason the tool exists.**
+Targets the signature live-play lookup ("what's on roll 96–00"). **Remaining: post-reindex manual validation against the 14 spike table queries.**
 
 ### 9 — Fix heading-promotion quality
 Live probe showed **junk breadcrumbs actively outranking real content**: a stale never-closed "Level 5 Cleric Spells" heading covers most of Wight-Box and its parents beat OSRIC's real wandering-monster tables at 0.999; OSRIC roots everything at "**CONTENTS**"; stat-lines and table captions get promoted as headings. Breadcrumbs are prepended to **both the embedding and the rerank input** ([server.py:712](../../sidecar/server.py:712)), so bad headings poison ranking, not just display. Reject stat-line/caption headings, cap heading staleness, add the flagged **R4** running-header strip, assign distinct sub-modal heading levels (not all → level 3), and synthesize headings for bold body-size entry names. [promote_headings.py](../../sidecar/promote_headings.py). **Effort: M.**
