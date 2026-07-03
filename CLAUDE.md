@@ -91,13 +91,15 @@ Solo dev project on the GitHub Pro tier: **3000 billable minutes/month**. macOS 
 ### Rules for changing CI
 
 1. **No macOS/Windows jobs on PR or push-to-main.** If you're tempted to add one, the question is "what will this catch that Linux + the next release tag won't?" — and the answer needs to justify the billable-min cost.
-2. **Estimate billable minutes before adding any job.** Include the multiplier. Note it in the PR description.
+2. **Estimate billable minutes before adding any job.** Include the multiplier. Note it in the commit message.
 3. **Release-time regressions are acceptable.** If a cross-platform bug only surfaces at tag push, fix forward and bump the patch version. Re-tagging an unpublished draft once is fine; if a second fix lands, bump the patch.
 4. **Local validation is the dev's responsibility.** Before tagging a release that touches build config, `src-tauri/`, sidecar deps, or the build scripts, run `npm run tauri build` and `bash scripts/build-sidecar.sh` locally.
 
-### PR cadence
+### Commit workflow
 
-Many tiny same-area PRs multiplied by post-merge runs is the cost pattern that drained the budget originally. With expensive jobs gone from main, per-merge cost is near zero — but it's still worth bundling **2–3 related small fixes** into one branch when they're naturally co-located (same file, same area, same sitting). Don't stack PRs; don't bundle unrelated work. The goal is fewer artificial separations, not big mixed PRs.
+Solo dev, trunk-based without PRs (since 2026-07-03): commit directly to `main` and push. CI runs the full Linux suite on every push to main — check that it's green before tagging a release. Releases are `v*` tags cut from main whenever the tree is in a good state.
+
+PRs are the exception, not the rule — reserve them for changes that benefit from a review pass or CI-before-merge (e.g. risky CI or build-config changes). When a PR is used, keep it single-purpose and don't stack it on another open PR.
 
 ---
 
