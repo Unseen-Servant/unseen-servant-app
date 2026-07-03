@@ -10,6 +10,7 @@ from chunker import (
     HARD_CAP,
     Chunk,
     PageMarkdown,
+    _enforce_hard_cap,
     structure_aware,
 )
 from promote_headings import promote_markdown
@@ -179,6 +180,27 @@ def test_chunks_before_first_heading_have_no_breadcrumb():
     chunks = structure_aware([_page(1, md)], source_pdf="x.pdf")
     assert len(chunks) == 1
     assert chunks[0].section_heading is None
+
+
+# ─────────────────── promotion → chunker integration ───────────────────
+
+
+def test_hard_cap_falls_back_to_single_newline_for_tables():
+    """Table text has no \\n\\n boundaries (rows joined by \\n). The cap
+    splitter must cut on a row boundary, not mid-row at exactly HARD_CAP."""
+    row = "|" + "x" * 96 + "|yy|"
+    table = "\n".join(row for _ in range(250))  # ~25k chars, no \n\n anywhere
+    chunk = Chunk(
+        text=table, page_start=1, page_end=1, chunk_type="table",
+        section_heading="Big Table", source_pdf="test.pdf",
+        chunker="structure_aware-v2", ordinal=0,
+    )
+    out = _enforce_hard_cap([chunk], HARD_CAP)
+    assert len(out) >= 2
+    for c in out:
+        assert len(c.text) <= HARD_CAP
+        for line in c.text.splitlines():
+            assert line.startswith("|") and line.endswith("|")  # no mid-row cut
 
 
 # ─────────────────── promotion → chunker integration ───────────────────
