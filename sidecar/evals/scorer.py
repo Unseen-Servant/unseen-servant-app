@@ -168,3 +168,37 @@ def format_report(summary: dict[str, dict]) -> str:
             + "".join(f"{row[m]:>14.3f}" for m in METRIC_NAMES)
         )
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Search latency
+# ---------------------------------------------------------------------------
+
+def latency_stats(latencies_ms: list[float]) -> dict[str, float]:
+    """Mean / median / p95 over per-query search latencies (milliseconds).
+
+    p95 uses the nearest-rank method: the value at ceil(0.95 * n) in the
+    sorted sample, so it is always an observed latency, not an
+    interpolation. Returns zeros for an empty sample.
+    """
+    n = len(latencies_ms)
+    if n == 0:
+        return {"count": 0, "mean_ms": 0.0, "median_ms": 0.0, "p95_ms": 0.0}
+    ordered = sorted(latencies_ms)
+    mid = n // 2
+    median = ordered[mid] if n % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+    p95 = ordered[math.ceil(0.95 * n) - 1]
+    return {
+        "count": n,
+        "mean_ms": sum(ordered) / n,
+        "median_ms": median,
+        "p95_ms": p95,
+    }
+
+
+def format_latency(stats: dict[str, float]) -> str:
+    return (
+        f"search latency over {stats['count']} queries: "
+        f"mean {stats['mean_ms']:.0f}ms, median {stats['median_ms']:.0f}ms, "
+        f"p95 {stats['p95_ms']:.0f}ms"
+    )

@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -96,6 +97,17 @@ def ensure_indexed(client, corpus_dir: Path, data_dir: Path) -> None:
     print(f"indexed {body['indexed']}/{body['total']} PDFs")
 
 
+def warmup(client, rerank: bool, hybrid: bool, spell_correction: bool) -> None:
+    """Fire one untimed search so lazy one-time loads (cross-encoder,
+    Ollama embed session, spell-correction vocab) don't pollute the first
+    query's latency."""
+    client.post("/api/search", json={
+        "query": "warmup", "n_results": 1, "search_all": True,
+        "rerank": rerank, "hybrid": hybrid,
+        "spell_correction": spell_correction,
+    }).raise_for_status()
+
+
 def run(
     client, queries: list[dict], rerank: bool, hybrid: bool,
     spell_correction: bool,
@@ -114,7 +126,9 @@ def run(
             payload["source_filter"] = next(
                 n for n in EXPECTED_PDFS if n.startswith(q["source"])
             )
+        t0 = time.perf_counter()
         resp = client.post("/api/search", json=payload)
+        latency_ms = (time.perf_counter() - t0) * 1000
         resp.raise_for_status()
         results = resp.json()["results"]
         rels = [scorer.is_relevant(r, q) for r in results]
@@ -123,6 +137,7 @@ def run(
             "category": q["category"],
             "metrics": scorer.score_query(rels),
             "relevance": [int(r) for r in rels],
+            "latency_ms": round(latency_ms, 1),
             "results": [
                 {
                     "filename": r["filename"],
@@ -135,7 +150,10 @@ def run(
             ],
         })
         first_hit = rels.index(True) + 1 if True in rels else "-"
-        print(f"  [{q['category']:<12}] first_hit@{first_hit!s:>2}  {q['text']}")
+        print(
+            f"  [{q['category']:<12}] first_hit@{first_hit!s:>2}"
+            f"  {latency_ms:>6.0f}ms  {q['text']}"
+        )
     return per_query
 
 
@@ -169,12 +187,18 @@ def main() -> None:
         f"retrieval={'hybrid' if args.hybrid else 'dense'}, "
         f"spell_correction={'on' if spell_correction else 'off'})..."
     )
+    warmup(client, rerank, args.hybrid, spell_correction)
     per_query = run(client, queries, rerank, args.hybrid, spell_correction)
     summary = scorer.aggregate(per_query)
 
     report = scorer.format_report(summary)
     print("\n=== Retrieval metrics (answer-chunk graded) ===")
     print(report)
+
+    latency = scorer.latency_stats([q["latency_ms"] for q in per_query])
+    print(f"\n{scorer.format_latency(latency)}")
+    print("(in-process /api/search wall clock after one warmup query — "
+          "excludes HTTP transport the Tauri app / MCP client adds)")
 
     if args.write_baseline:
         out_dir = EVALS_DIR / "baselines"
@@ -187,6 +211,7 @@ def main() -> None:
             "corpus": EXPECTED_PDFS,
             "queries": len(queries),
             "top_k": TOP_K,
+            "latency_ms": {k: round(v, 1) for k, v in latency.items()},
         }
         json_path = out_dir / f"{args.write_baseline}.json"
         json_path.write_text(json.dumps(
@@ -200,7 +225,8 @@ def main() -> None:
             f"Queries: {len(queries)} (graded on the specific answer chunk)\n"
             f"Rerank: {'on' if rerank else 'off'}\n"
             f"Retrieval: {meta['retrieval']}\n"
-            f"Spell correction: {'on' if spell_correction else 'off'}\n\n"
+            f"Spell correction: {'on' if spell_correction else 'off'}\n"
+            f"{scorer.format_latency(latency)} (in-process, post-warmup)\n\n"
             "```\n" + report + "\n```\n"
         )
         print(f"\nwrote {json_path.relative_to(EVALS_DIR.parent)} and {md_path.relative_to(EVALS_DIR.parent)}")

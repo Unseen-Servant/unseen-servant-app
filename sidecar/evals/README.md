@@ -48,6 +48,13 @@ experimental BM25+RRF candidate fusion — see `lexical.py`). Reported per categ
 - **recall@5 / recall@10** — hit rate: did *any* relevant result appear in
   the top k. The full set of relevant chunks per query is unknown, so
   set-recall is not computable; this matches the spike's recall definition.
+- **search latency** — per-query `/api/search` wall clock (mean / median /
+  p95, nearest-rank), printed after the metrics table and stored per query
+  and in baseline meta. Measured in-process through TestClient after one
+  untimed warmup query (which absorbs the lazy cross-encoder / Ollama
+  loads), so it captures embed + retrieval + rerank but not the HTTP
+  transport the Tauri app or MCP client adds — compare configurations with
+  it, don't quote it as end-to-end user latency.
 
 **Relevance judgment** (the Phase 2 change): a result counts only if it
 (a) comes from the expected source PDF, (b) overlaps a declared

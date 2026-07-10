@@ -172,6 +172,39 @@ def test_format_report_has_all_metrics_and_categories():
 
 
 # ---------------------------------------------------------------------------
+# latency stats
+# ---------------------------------------------------------------------------
+
+def test_latency_stats_basic():
+    stats = scorer.latency_stats([100.0, 200.0, 300.0, 400.0])
+    assert stats["count"] == 4
+    assert stats["mean_ms"] == 250.0
+    assert stats["median_ms"] == 250.0
+    # nearest-rank p95 of n=4: ceil(0.95*4)=4 → 4th value.
+    assert stats["p95_ms"] == 400.0
+
+
+def test_latency_stats_odd_median_and_p95_is_observed_value():
+    values = [50.0, 10.0, 30.0]  # unsorted on purpose
+    stats = scorer.latency_stats(values)
+    assert stats["median_ms"] == 30.0
+    assert stats["p95_ms"] in values
+
+
+def test_latency_stats_empty():
+    stats = scorer.latency_stats([])
+    assert stats == {"count": 0, "mean_ms": 0.0, "median_ms": 0.0, "p95_ms": 0.0}
+
+
+def test_format_latency_mentions_all_stats():
+    line = scorer.format_latency(scorer.latency_stats([100.0, 900.0]))
+    assert "mean 500ms" in line
+    assert "median 500ms" in line
+    assert "p95 900ms" in line
+    assert "2 queries" in line
+
+
+# ---------------------------------------------------------------------------
 # queries.yaml ground truth sanity
 # ---------------------------------------------------------------------------
 
