@@ -53,10 +53,10 @@ from reranker import rerank_scores
 from spelling import SpellCorrector
 
 
-# Number of top ChromaDB candidates to feed into the cross-encoder. Set
-# to balance re-rank latency against the size of the candidate pool the
-# parent-dedupe loop sees in re-ranked order. Trailing candidates beyond
-# this still appear (in cosine order) so dedupe never starves.
+# Hard cap on the unique parents fed into the cross-encoder (issue
+# #340). The scored pool is 3 × n_results unique parents, capped here,
+# but never fewer than n_results so a returned page is always on a
+# single score scale.
 RERANK_CANDIDATE_POOL = int(os.getenv("RERANK_CANDIDATES", "50"))
 
 
@@ -3391,107 +3391,111 @@ def create_app(
                     if ordering_scores is not None:
                         ordering_scores = [ordering_scores[i] for i in order]
 
-            # Re-rank the top of the candidate pool with a cross-encoder.
-            # Scoring (query, chunk-text) jointly is more accurate than raw
-            # cosine, especially when several candidates are topically
-            # adjacent. Trailing candidates stay in cosine order so the
-            # dedupe loop never starves if a section has many slices.
-            #
-            # Section_heading is prepended to mirror what the embedder saw
-            # (`_embed_text`). Without the breadcrumb the cross-encoder is
-            # blind to whether a chunk is from a rule definition
-            # ("Combat > Grappling") versus a creature card with the same
-            # keyword ("Goblin > Actions"), and tends to over-rank the
-            # keyword-dense action text.
-            rerank_applied = False
-            pool = 0
-            if request.rerank and _rerank_safe_for_query(query_text):
-                pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
-                pool_docs = ordered_docs[:pool]
-                pool_meta = ordered_metadatas[:pool]
-                rerank_inputs = [
-                    f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
-                    for m, d in zip(pool_meta, pool_docs)
-                ]
-                scores = rerank_scores(query_text, rerank_inputs)
-                if scores is not None:
-                    rerank_applied = True
-                    # The soft-boost weighs the cross-encoder scores the
-                    # same way it weighed cosine similarity; the stored
-                    # distances stay raw either way.
-                    if boost_factors is not None:
-                        order = sorted(
-                            range(pool),
-                            key=lambda i: scores[i] * boost_factors[i],
-                            reverse=True,
-                        )
-                        boost_factors = (
-                            [boost_factors[i] for i in order]
-                            + boost_factors[pool:]
-                        )
-                    else:
-                        order = sorted(
-                            range(pool), key=lambda i: scores[i], reverse=True
-                        )
-                    head_metadatas = [ordered_metadatas[i] for i in order]
-                    # Use 1 - rerank_score so 1 - distance = rerank score
-                    # downstream, keeping the response shape unchanged.
-                    head_distances = [1.0 - scores[i] for i in order]
-                    head_docs = [ordered_docs[i] for i in order]
-                    ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
-                    ordered_distances = head_distances + ordered_distances[pool:]
-                    ordered_docs = head_docs + ordered_docs[pool:]
+            # Dedupe by parent_id *before* reranking (issue #340). The
+            # iteration order is the boosted cosine (or RRF) order from
+            # above, so the kept slice is the parent's best-ranked
+            # representative; the second-best slice is remembered as a
+            # backup representative for the rerank input. Large sections
+            # produce many slices; deduping first means the cross-encoder
+            # pays for at most two slices per parent, and — because the
+            # scored pool is floored at n_results parents — every returned
+            # result is on the cross-encoder scale from a single pass (the
+            # straggler rescore of #306 is gone by construction).
+            def rerank_input(metadata: dict, doc: str) -> str:
+                # Section_heading is prepended to mirror what the embedder
+                # saw (`_embed_text`). Without the breadcrumb the
+                # cross-encoder is blind to whether a chunk is from a rule
+                # definition ("Combat > Grappling") versus a creature card
+                # with the same keyword ("Goblin > Actions"), and tends to
+                # over-rank the keyword-dense action text.
+                heading = metadata.get("section_heading")
+                return f"{heading}\n\n{doc}" if heading else doc
 
-            # Dedupe by parent_id, keeping the first hit per parent (the
-            # iteration order is the re-ranked-then-cosine order from above).
             seen: set[str] = set()
-            picked: list[dict] = []
+            second_slice: dict[str, str] = {}
+            unique: list[dict] = []
             for i, (metadata, distance) in enumerate(
                 zip(ordered_metadatas, ordered_distances)
             ):
                 pid = metadata.get("parent_id")
-                if not pid or pid in seen:
+                if not pid:
+                    continue
+                if pid in seen:
+                    if pid not in second_slice:
+                        second_slice[pid] = rerank_input(
+                            metadata, ordered_docs[i]
+                        )
                     continue
                 seen.add(pid)
-                picked.append({
+                unique.append({
                     "metadata": metadata,
                     "distance": distance,
                     "doc": ordered_docs[i],
-                    "reranked": rerank_applied and i < pool,
+                    "reranked": False,
                     "boost": boost_factors[i] if boost_factors is not None else 1.0,
                 })
-                if len(picked) >= request.n_results:
-                    break
 
-            # Single-scale page (issue #306): when the reranker ran, picked
-            # results that came from the cosine tail are rescored with the
-            # cross-encoder in one small batch (≤ n_results pairs), so every
-            # returned relevance is on the same scale. On failure the tail
-            # keeps its cosine score and an honest reranked=False flag.
-            if rerank_applied:
-                stragglers = [p for p in picked if not p["reranked"]]
-                if stragglers:
-                    straggler_inputs = [
-                        f"{p['metadata']['section_heading']}\n\n{p['doc']}"
-                        if p["metadata"].get("section_heading") else p["doc"]
-                        for p in stragglers
-                    ]
-                    straggler_scores = rerank_scores(
-                        query_text, straggler_inputs
+            # Re-rank the top unique parents with a cross-encoder. Scoring
+            # (query, chunk-text) jointly is more accurate than raw cosine,
+            # especially when several candidates are topically adjacent.
+            # ~3× the page size gives the cross-encoder headroom to promote
+            # cosine-tail parents while keeping latency proportional to the
+            # page actually requested (~37 ms/doc on CPU).
+            #
+            # A parent is scored as the max over its (up to two) slice
+            # representatives. Cross-encoder scores on near-duplicate
+            # slices are noisy — e.g. the 13th-level row of a class table
+            # can outscore the 5th-level row on a "level 5" query — and
+            # the pre-#340 pipeline, which scored every slice, effectively
+            # max-pooled over that noise. Two slices recover most of that
+            # headroom without paying for whole sections row by row.
+            if request.rerank and _rerank_safe_for_query(query_text):
+                # Total inputs never exceed RERANK_CANDIDATE_POOL (the
+                # pre-#340 worst case), floored at n_results so the whole
+                # page is always scored on one scale. Primary slices are
+                # allocated first — parent coverage is never sacrificed
+                # for backups — then backups fill the remainder head-first
+                # (the top-ranked parents are the likeliest page members).
+                max_inputs = max(request.n_results, RERANK_CANDIDATE_POOL)
+                pool = min(
+                    len(unique),
+                    max(request.n_results,
+                        min(3 * request.n_results, max_inputs)),
+                )
+                rerank_inputs: list[str] = []
+                owners: list[int] = []
+                for idx, u in enumerate(unique[:pool]):
+                    rerank_inputs.append(rerank_input(u["metadata"], u["doc"]))
+                    owners.append(idx)
+                for idx, u in enumerate(unique[:pool]):
+                    if len(rerank_inputs) >= max_inputs:
+                        break
+                    backup = second_slice.get(u["metadata"]["parent_id"])
+                    if backup is not None:
+                        rerank_inputs.append(backup)
+                        owners.append(idx)
+                scores = rerank_scores(query_text, rerank_inputs)
+                if scores is not None:
+                    head = unique[:pool]
+                    best: dict[int, float] = {}
+                    for idx, s in zip(owners, scores):
+                        best[idx] = max(best.get(idx, 0.0), s)
+                    for idx, u in enumerate(head):
+                        # Use 1 - rerank_score so 1 - distance = rerank
+                        # score downstream, keeping the response shape
+                        # unchanged.
+                        u["distance"] = 1.0 - best[idx]
+                        u["reranked"] = True
+                    # The soft-boost weighs the cross-encoder scores the
+                    # same way it weighed cosine similarity; the stored
+                    # distances stay raw either way.
+                    head.sort(
+                        key=lambda u: (1.0 - u["distance"]) * u["boost"],
+                        reverse=True,
                     )
-                    if straggler_scores is not None:
-                        for p, s in zip(stragglers, straggler_scores):
-                            p["distance"] = 1.0 - s
-                            p["reranked"] = True
-                        # All picked distances are now cross-encoder scale;
-                        # stable sort keeps head order, interleaves the
-                        # rescored tail where it belongs — by the boosted
-                        # ordering score when the soft-boost is active.
-                        picked.sort(
-                            key=lambda p: -(
-                                max(0.0, 1.0 - p["distance"]) * p["boost"]
-                            )
-                        )
+                    unique[:pool] = head
+
+            picked = unique[:request.n_results]
 
             parent_docs = fetch_parents_extended(
                 data_dir, [p["metadata"]["parent_id"] for p in picked]

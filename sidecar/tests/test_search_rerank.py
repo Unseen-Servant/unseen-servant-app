@@ -133,6 +133,206 @@ def test_rerank_relevance_uses_score_when_reranked(indexed_client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Rerank after parent-dedupe (issue #340): the candidate pool is deduped
+# to unique parents *before* the cross-encoder runs, scores a pool
+# proportional to n_results, and every returned result is on the
+# cross-encoder scale from a single pass — no straggler rescore. Each
+# parent is represented by up to two slices (cross-encoder scores on
+# near-duplicate slices are noisy; the parent takes its best slice's
+# score) instead of every slice.
+# ---------------------------------------------------------------------------
+
+def _upsert_synthetic(collection, entries):
+    """Upsert synthetic chunks. entries = [(parent_id, text), ...]."""
+    collection.upsert(
+        ids=[f"synth_{i}" for i in range(len(entries))],
+        documents=[text for _, text in entries],
+        metadatas=[{
+            "source": "/lib/synth.pdf",
+            "filename": "synth.pdf",
+            "chunk": i,
+            "game_system": "5e",
+            "chunk_type": "prose",
+            "section_heading": "",
+            "page_start": i + 1,
+            "page_end": i + 1,
+            "parent_id": pid,
+            "chunker_version": "test",
+            "embedding_model": "test",
+        } for i, (pid, _) in enumerate(entries)],
+    )
+
+
+def test_rerank_scores_at_most_two_slices_per_parent(client, test_collection, monkeypatch):
+    """The cross-encoder input holds at most two slices per parent — the
+    two best-ranked ones stand in for the whole parent."""
+    import server
+
+    _upsert_synthetic(test_collection, [
+        ("p_multi", "fire drake breathes fire in a cone MULTI one"),
+        ("p_multi", "fire drake breathes fire in a cone MULTI two"),
+        ("p_multi", "fire drake breathes fire in a cone MULTI three"),
+        ("p_multi", "fire drake breathes fire in a cone MULTI four"),
+        ("p_a", "goblin ambush tactics in the deep forest"),
+        ("p_b", "healing potion prices at the village market"),
+    ])
+
+    captured = {}
+
+    def fake_scores(query, docs):
+        captured["docs"] = list(docs)
+        return [0.5] * len(docs)
+
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    response = client.post("/api/search", json={
+        "query": "fire drake breath", "n_results": 3, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    docs = captured.get("docs", [])
+    assert docs, "rerank_scores should have been called"
+    multi_slices = [d for d in docs if "MULTI" in d]
+    assert len(multi_slices) == 2, (
+        f"expected exactly two representative slices for p_multi, "
+        f"got {len(multi_slices)}: {docs}"
+    )
+
+
+def test_parent_ranked_by_its_best_slice(client, test_collection, monkeypatch):
+    """A parent whose best-cosine slice scores poorly must still win when
+    its second slice scores high (max-pool over the representatives)."""
+    import server
+
+    # The DULL slice nearly restates the query, so it is deterministically
+    # the parent's best-cosine representative; SHARP is semantically
+    # related but lexically distant, so it can only enter the rerank input
+    # as the parent's second slice.
+    _upsert_synthetic(test_collection, [
+        ("p_two", "fire drake breath attack DULL cone of flame"),
+        ("p_two", "the ancient wyrm exhales a scorching SHARP torrent"),
+        ("p_one", "fire drake breath attack OTHER entry"),
+    ])
+
+    def fake_scores(query, docs):
+        return [
+            0.9 if "SHARP" in d else 0.1 if "DULL" in d else 0.5
+            for d in docs
+        ]
+
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    response = client.post("/api/search", json={
+        "query": "fire drake breath", "n_results": 2, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    results = response.json()["results"]
+    assert len(results) == 2
+    # p_two's best slice (0.9) beats p_one (0.5); its relevance reflects
+    # the best slice, not the best-cosine one.
+    assert results[0]["relevance"] == pytest.approx(0.9, abs=0.005)
+    assert results[1]["relevance"] == pytest.approx(0.5, abs=0.005)
+
+
+def test_rerank_single_pass_covers_all_results(client, test_collection, monkeypatch):
+    """One rerank call per search, even when the slice pool is dominated by
+    a single parent and the cap is small: unique parents are deduped first,
+    so no picked result can come from beyond the scored pool (the straggler
+    rescore of #306 is gone by construction)."""
+    import server
+
+    _upsert_synthetic(test_collection, [
+        ("p_big", f"fire drake breathes fire in a cone variant {i}")
+        for i in range(4)
+    ] + [
+        ("p_a", "goblin ambush tactics in the deep forest"),
+        ("p_b", "healing potion prices at the village market"),
+        ("p_c", "sailing ship cargo manifest and port fees"),
+    ])
+
+    calls = []
+
+    def fake_scores(query, docs):
+        calls.append(list(docs))
+        return [0.8] * len(docs)
+
+    # Old behavior: pool=2 covered only slices of p_big, so picked tail
+    # parents needed a second straggler call. New behavior must floor the
+    # parent pool at n_results and finish in one pass.
+    monkeypatch.setattr(server, "RERANK_CANDIDATE_POOL", 2)
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    response = client.post("/api/search", json={
+        "query": "fire drake breath", "n_results": 3, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    results = response.json()["results"]
+    assert len(results) == 3
+    assert len(calls) == 1, f"expected a single rerank pass, got {len(calls)}"
+    for r in results:
+        assert r["reranked"] is True
+
+
+def test_rerank_inputs_capped_primaries_first(client, test_collection, monkeypatch):
+    """RERANK_CANDIDATE_POOL caps *total* cross-encoder inputs (the old
+    worst case). When it binds, primary slices win over second slices, so
+    parent coverage is never sacrificed for backups."""
+    import server
+
+    _upsert_synthetic(test_collection, [
+        (f"p_{i}", f"dragon lore text variant {i} slice {s}")
+        for i in range(6) for s in range(2)
+    ])
+
+    captured = {}
+
+    def fake_scores(query, docs):
+        captured["docs"] = list(docs)
+        return [0.5] * len(docs)
+
+    monkeypatch.setattr(server, "RERANK_CANDIDATE_POOL", 4)
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    response = client.post("/api/search", json={
+        "query": "dragon", "n_results": 3, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    docs = captured.get("docs", [])
+    assert docs, "rerank_scores should have been called"
+    assert len(docs) == 4, (
+        f"expected the input cap (4) to bind, got {len(docs)} inputs"
+    )
+    # All four slots go to primaries of distinct parents — no backups.
+    assert len({d.split(" slice ")[0] for d in docs}) == 4
+
+
+def test_rerank_pool_scales_with_n_results(client, test_collection, monkeypatch):
+    """The scored pool is ~3× n_results unique parents, not a flat 50."""
+    import server
+
+    _upsert_synthetic(test_collection, [
+        (f"p_{i}", f"dragon lore text variant {i}") for i in range(12)
+    ])
+
+    captured = {}
+
+    def fake_scores(query, docs):
+        captured["docs"] = list(docs)
+        return [0.5] * len(docs)
+
+    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+
+    response = client.post("/api/search", json={
+        "query": "dragon", "n_results": 3, "rerank": True,
+    })
+    assert response.status_code == 200, response.text
+    docs = captured.get("docs", [])
+    assert docs, "rerank_scores should have been called"
+    assert len(docs) == 9, (
+        f"expected 3 * n_results = 9 unique parents scored, got {len(docs)}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Non-English guard (issue #305): the bundled cross-encoder is English-only
 # and inverts bge-m3's multilingual cosine order on non-English queries, so
 # a non-ASCII query must bypass the reranker entirely.

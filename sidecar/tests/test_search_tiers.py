@@ -2,14 +2,13 @@
 
 Every /api/search result carries a ``tier`` (strong/good/weak) computed
 from scale-appropriate thresholds, plus a ``reranked`` flag naming the
-scale. When the reranker ran, results that were picked from the cosine
-tail (beyond the rerank pool) are rescored with the cross-encoder in a
-small second batch, so the returned page is single-scale by construction;
-the tail-rescore failing falls back to honestly mixed flags.
+scale. Since #340 the candidate pool is deduped to unique parents before
+the cross-encoder runs and the scored pool is floored at n_results, so a
+returned page is single-scale from one rerank pass — there is no cosine
+tail to rescore; the reranker failing falls back to honest cosine flags.
 
 Mutation-verified 2026-07-09: collapsing ``_tier_for`` to a constant
-"strong" fails the tier tests, and disabling the straggler rescore fails
-``test_picked_tail_stragglers_are_rescored``.
+"strong" fails the tier tests.
 """
 
 import pytest
@@ -99,7 +98,7 @@ def test_non_ascii_query_gets_cosine_tiers(indexed_client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Single-scale by construction: tail stragglers get cross-encoded
+# Single-scale by construction: one rerank pass covers the whole page (#340)
 # ---------------------------------------------------------------------------
 
 def _upsert_parents(collection, n: int) -> None:
@@ -124,9 +123,10 @@ def _upsert_parents(collection, n: int) -> None:
     )
 
 
-def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatch):
-    """With a tiny rerank pool, picked results beyond the pool must be
-    rescored by a second rerank_scores call so the page is single-scale."""
+def test_page_is_single_scale_from_one_pass(client, test_collection, monkeypatch):
+    """Even with the pool cap below n_results, the scored pool is floored
+    at n_results parents: one rerank call, every result reranked, page
+    sorted by relevance."""
     import server
 
     _upsert_parents(test_collection, 4)
@@ -134,7 +134,7 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
 
     def fake_scores(query, docs):
         calls.append(list(docs))
-        return [0.8] * len(docs)
+        return [0.8 - 0.1 * i for i in range(len(docs))]
 
     monkeypatch.setattr(server, "RERANK_CANDIDATE_POOL", 1)
     monkeypatch.setattr(server, "rerank_scores", fake_scores)
@@ -144,12 +144,11 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
     })
     assert response.status_code == 200
     results = response.json()["results"]
-    assert len(results) > 1, "need >1 parent for a meaningful straggler test"
+    assert len(results) > 1, "need >1 parent for a meaningful single-scale test"
 
-    # One head batch (pool=1) + one straggler batch for the picked tail.
-    assert len(calls) == 2
-    assert len(calls[0]) == 1
-    assert len(calls[1]) == len(results) - 1
+    # One pass covering every picked result — no straggler batch.
+    assert len(calls) == 1
+    assert len(calls[0]) >= len(results)
 
     for r in results:
         assert r["reranked"] is True
@@ -159,19 +158,12 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
     assert relevances == sorted(relevances, reverse=True)
 
 
-def test_straggler_rescore_failure_keeps_honest_mixed_flags(client, test_collection, monkeypatch):
-    """If the straggler batch fails (None), tail results stay cosine-flagged."""
+def test_rerank_failure_keeps_honest_cosine_flags(client, test_collection, monkeypatch):
+    """If the rerank pass fails (None), the whole page stays cosine-flagged."""
     import server
 
     _upsert_parents(test_collection, 4)
-    calls = []
-
-    def fake_scores(query, docs):
-        calls.append(list(docs))
-        return [0.8] * len(docs) if len(calls) == 1 else None
-
-    monkeypatch.setattr(server, "RERANK_CANDIDATE_POOL", 1)
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(server, "rerank_scores", lambda q, d: None)
 
     response = client.post("/api/search", json={
         "query": "dragon", "n_results": 5, "rerank": True,
@@ -179,5 +171,4 @@ def test_straggler_rescore_failure_keeps_honest_mixed_flags(client, test_collect
     assert response.status_code == 200
     results = response.json()["results"]
     assert len(results) > 1
-    assert results[0]["reranked"] is True
-    assert all(r["reranked"] is False for r in results[1:])
+    assert all(r["reranked"] is False for r in results)
