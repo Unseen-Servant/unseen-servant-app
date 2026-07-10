@@ -115,12 +115,13 @@ def warmup(
 def run(
     client, queries: list[dict], rerank: bool, hybrid: bool,
     spell_correction: bool, variant_expansion: bool,
+    page_size: int = TOP_K,
 ) -> list[dict]:
     per_query = []
     for q in queries:
         payload = {
             "query": q["text"],
-            "n_results": TOP_K,
+            "n_results": page_size,
             "search_all": True,
             "rerank": rerank,
             "hybrid": hybrid,
@@ -178,6 +179,12 @@ def main() -> None:
                     help="search spacing variants of the query and fuse "
                          "via RRF (experimental /api/search "
                          "variant_expansion flag)")
+    ap.add_argument("--page-size", type=int, default=TOP_K,
+                    help="n_results per search request (default 10). "
+                         "Metrics are still graded @10; pass 25 to mirror "
+                         "the UI page size — the rerank pool scales with "
+                         "n_results, so quality must be gated at the page "
+                         "size the app actually sends.")
     ap.add_argument("--write-baseline", metavar="NAME",
                     help="write evals/baselines/NAME.json and NAME.md")
     args = ap.parse_args()
@@ -195,12 +202,13 @@ def main() -> None:
         f"(rerank={'on' if rerank else 'off'}, "
         f"retrieval={'hybrid' if args.hybrid else 'dense'}, "
         f"spell_correction={'on' if spell_correction else 'off'}, "
-        f"variant_expansion={'on' if args.variant_expansion else 'off'})..."
+        f"variant_expansion={'on' if args.variant_expansion else 'off'}, "
+        f"page_size={args.page_size})..."
     )
     warmup(client, rerank, args.hybrid, spell_correction,
            args.variant_expansion)
     per_query = run(client, queries, rerank, args.hybrid, spell_correction,
-                    args.variant_expansion)
+                    args.variant_expansion, page_size=args.page_size)
     summary = scorer.aggregate(per_query)
 
     report = scorer.format_report(summary)
@@ -224,6 +232,7 @@ def main() -> None:
             "corpus": EXPECTED_PDFS,
             "queries": len(queries),
             "top_k": TOP_K,
+            "page_size": args.page_size,
             "latency_ms": {k: round(v, 1) for k, v in latency.items()},
         }
         json_path = out_dir / f"{args.write_baseline}.json"
@@ -240,6 +249,7 @@ def main() -> None:
             f"Retrieval: {meta['retrieval']}\n"
             f"Spell correction: {'on' if spell_correction else 'off'}\n"
             f"Variant expansion: {'on' if args.variant_expansion else 'off'}\n"
+            f"Page size: {args.page_size} (metrics graded @{TOP_K})\n"
             f"{scorer.format_latency(latency)} (in-process, post-warmup)\n\n"
             "```\n" + report + "\n```\n"
         )
