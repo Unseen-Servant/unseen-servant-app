@@ -1,3 +1,6 @@
+// Mutation-verified 2026-07-09: dropping the UNTAGGED_KEY push from
+// searchGameSystemsFilter's mute branch fails the untagged-bucket test
+// below — the #307 regression it exists to catch.
 import { describe, expect, it } from 'vitest';
 import { searchGameSystemsFilter, UNTAGGED_KEY } from './searchScope';
 

@@ -6,6 +6,10 @@ scale. When the reranker ran, results that were picked from the cosine
 tail (beyond the rerank pool) are rescored with the cross-encoder in a
 small second batch, so the returned page is single-scale by construction;
 the tail-rescore failing falls back to honestly mixed flags.
+
+Mutation-verified 2026-07-09: collapsing ``_tier_for`` to a constant
+"strong" fails the tier tests, and disabling the straggler rescore fails
+``test_picked_tail_stragglers_are_rescored``.
 """
 
 import pytest

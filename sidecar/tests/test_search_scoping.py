@@ -6,6 +6,10 @@ filter by bare *filename*, so two same-named PDFs in different folders
 codebase explicitly supports elsewhere via path-hashed chunk IDs) leaked
 into each other's scopes. Both clauses must filter by the exact source
 path stored in chunk metadata.
+
+Mutation-verified 2026-07-09: reverting either clause to a filename
+filter fails the corresponding test below. The two clauses are
+independent fix sites and were reverted separately.
 """
 
 import pytest
