@@ -9,7 +9,7 @@
 
 ## Phase 1 — Fix what's broken today — **SHIPPED**
 
-Roadmap Tier 0 + Tier 1, issues [#304](https://github.com/Unseen-Servant/unseen-legend-lore/issues/304)–[#310](https://github.com/Unseen-Servant/unseen-legend-lore/issues/310). All seven are closed and on `main`, each with a repro test. For #304, #305 and #309 the repros were mutation-verified on 2026-07-09 (reverting the fix makes them fail); the other four carry the repro tests written alongside their fix, not re-verified since.
+Roadmap Tier 0 + Tier 1, issues [#304](https://github.com/Unseen-Servant/unseen-legend-lore/issues/304)–[#310](https://github.com/Unseen-Servant/unseen-legend-lore/issues/310). All seven are closed and on `main`, each with a repro test. All seven repros are mutation-verified as of 2026-07-09 — reverting the fix makes the covering test fail. #304, #305 and #309 were verified first; #306, #307, #308 and #310 followed, via five mutations (#308's collection and secondary-tag clauses are independent fix sites and were reverted separately).
 
 1. **MCP search timeout** — explicit generous timeout, catch `TimeoutException`, surface a real error ([#304](https://github.com/Unseen-Servant/unseen-legend-lore/issues/304)) — `81eeb17`, `sidecar/tests/test_mcp_timeout.py`
 2. **Reranker safety** — skip rerank for non-English queries; cosine fallback is already a tested path ([#305](https://github.com/Unseen-Servant/unseen-legend-lore/issues/305)) — `81eeb17`, `sidecar/tests/test_search_rerank.py`
