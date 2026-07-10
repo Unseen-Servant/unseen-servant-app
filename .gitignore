@@ -20,6 +20,7 @@ __pycache__
 *.pyc
 chroma_db
 .pytest_cache
+sidecar/evals/.eval_data/
 sidecar/dist/
 sidecar/build/
 *.spec

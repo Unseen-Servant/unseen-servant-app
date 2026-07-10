@@ -1,0 +1,239 @@
+# Pre-registered retrieval queries — ground truth for the eval harness.
+#
+# Ported from unseen-legend-lore-experiments/hybrid_retrieval_spike/queries.yaml
+# (30 locked chunker_spike queries + 10 cross-system queries), keeping the
+# GT-fixed page ranges. New in this port: per-query `answer` anchors so the
+# scorer grades on the specific answer chunk instead of page overlap (see
+# evals/README.md and docs/roadmap/2026-07-09-search-quality-goal.md).
+# Lines marked "GT-fix (port)" add page ranges where locating the literal
+# answer text showed it lives outside the originally declared range — same
+# practice as the spike's own GT-fixes.
+#
+# Fields:
+#   text     — the query, verbatim from the spike (locked; do not edit)
+#   source   — PDF filename prefix, or `any` (no source filter at search time)
+#   pages    — 1-indexed physical page range(s); `|` separates alternatives
+#   category — stat_block | table | prose | cross_page | cross_system
+#   answer   — anchors that must ALL appear in the retrieved chunk text after
+#              normalization (lowercase, punctuation/layout collapsed to
+#              single spaces). A list element that is itself a list means
+#              "any one of these alternatives". Anchors are verbatim phrases
+#              from the answer passage in the source PDF. Some alternatives
+#              encode extraction artifacts (table cells losing spaces, e.g.
+#              "1d6 or byweapon") — calibrated against the indexed chunks.
+
+queries:
+  # ───────── Basic-Fantasy-RPG-Rules-r142.pdf ─────────
+  - text: "Hit dice and armor class of a Cloud Dragon"
+    source: Basic-Fantasy
+    pages: "85-86"
+    category: stat_block
+    answer: [["dragon cloud", "cloud dragon"], "armor class 22", "hit dice 11"]
+  - text: "What is the morale and number appearing of a skeleton"
+    source: Basic-Fantasy
+    pages: "135-145|149-149"
+    category: stat_block
+    answer: ["skeleton", ["3d6 wild 3d10", "morale 12"]]
+  - text: "Goblin attack bonus and damage"
+    source: Basic-Fantasy
+    pages: "115-130|108-109"
+    category: stat_block
+    answer: ["goblin", ["1d6 or by weapon", "1d6 or byweapon"]]
+  - text: "Giant rat hit dice and save as"
+    source: Basic-Fantasy
+    pages: "110-140"
+    category: stat_block
+    answer: [["rat and rat giant", "giant rat", "rat giant"], ["1d4 hit points", "1d4 hitpoints"]]
+
+  - text: "Cloud Dragon age category breath weapon dimensions"
+    source: Basic-Fantasy
+    pages: "85-85"
+    category: table
+    answer: ["cloud dragon age table", "age category"]
+  - text: "Movement rate for medium load beast of burden horse"
+    source: Basic-Fantasy
+    pages: "67-67"
+    category: table
+    answer: [["riding horse", "draft horse", "war horse"], ["light load", "heavy load"]]
+  - text: "Armor class bonus and weight for chain mail"
+    source: Basic-Fantasy
+    pages: "40-55|15-15"
+    category: table
+    answer: ["chain mail", ["60 gp", "60gp"]]
+  - text: "Thief skill percentages at level 3"
+    source: Basic-Fantasy
+    pages: "15-30|13-14"
+    category: table
+    answer: ["thief abilities", "open locks"]
+  - text: "Cleric saving throws at level 5"
+    source: Basic-Fantasy
+    pages: "10-30|65-65"                      # GT-fix (port): 'Saving Throw Tables by Class' is at p65
+    category: table
+    answer: ["cleric", "death ray or poison"]
+  - text: "Experience needed to reach fighter level 4"
+    source: Basic-Fantasy
+    pages: "10-30"
+    category: table
+    answer: ["fighter", "8 000"]              # Fighter table p11: level 4 = 8,000 XP
+
+  - text: "How does surprise work in combat"
+    source: Basic-Fantasy
+    pages: "54-75"
+    category: prose
+    answer: ["surprised on a roll of 1 2"]
+  - text: "What happens when a character reaches zero hit points"
+    source: Basic-Fantasy
+    pages: "55-75"
+    category: prose
+    answer: ["0 hit points is generally dead"]
+  - text: "Rules for climbing and falling damage"
+    source: Basic-Fantasy
+    pages: "60-80"
+    category: prose
+    answer: ["falling damage", "1d6 points of damage per 10"]
+  - text: "How to resolve a saving throw against petrification"
+    source: Basic-Fantasy
+    pages: "55-75"
+    category: cross_page
+    answer: ["paralysis or petrify", "saving throw"]
+
+  # ───────── Black-Flag-Roleplaying.pdf ─────────
+  - text: "Fighter class features at level 1"
+    source: Black-Flag
+    pages: "20-60"
+    category: prose
+    answer: ["fighter", ["hit dice 1d10 per fighter level", "1st level fighter feature"]]
+  - text: "Spell slots for a level 5 wizard"
+    source: Black-Flag
+    pages: "40-80"
+    category: table
+    answer: ["arcane spell slots by circle"]
+  - text: "Armor class calculation for a character wearing studded leather"
+    source: Black-Flag
+    pages: "40-80"
+    category: prose
+    answer: ["studded leather", "12 dex modifier"]
+  # NOTE: Black Flag (a reference doc) never defines the advantage/
+  # disadvantage core rule — no chunk in the book fully answers this.
+  # Anchors below are the best proxy; expect a structural near-zero.
+  - text: "How does advantage and disadvantage work"
+    source: Black-Flag
+    pages: "5-30"
+    category: prose
+    answer: ["advantage", "disadvantage", "d20"]
+  - text: "Initiative roll and turn order"
+    source: Black-Flag
+    pages: "10-40|132-132"
+    category: prose
+    answer: ["determining initiative order"]
+  - text: "Range and damage of a longbow"
+    source: Black-Flag
+    pages: "50-90|139-139|298-298"
+    category: table
+    answer: ["longbow", ["1d8 piercing", "range 150 600", "150 600 ft"]]
+  - text: "Languages available to a half-elf"
+    source: Black-Flag
+    pages: "20-60|62-63"                      # GT-fix (port): no half-elf in Black Flag; heritage Languages traits are at p62-63
+    category: cross_page
+    answer: ["languages", "you know common and"]
+  - text: "How does the ranger's favored enemy feature work"
+    source: Black-Flag
+    pages: "20-60"
+    category: prose
+    answer: ["favored foe", "choose a type of enemy"]
+
+  # ───────── SRD_CC_v5.1.pdf ─────────
+  - text: "Bless spell duration and effect"
+    source: SRD_CC
+    pages: "100-200"
+    category: prose
+    answer: ["bless", "roll a d4 and add the number rolled"]
+  - text: "Fireball damage and area of effect"
+    source: SRD_CC
+    pages: "100-200"
+    category: prose
+    answer: ["fireball", "8d6 fire damage"]
+  - text: "Hit dice and armor class of an adult red dragon"
+    source: SRD_CC
+    pages: "250-350"
+    category: stat_block
+    answer: ["adult red dragon", "armor class 19"]
+  - text: "Challenge rating of an owlbear"
+    source: SRD_CC
+    pages: "250-400"
+    category: stat_block
+    answer: ["owlbear", ["challenge 3 700 xp", "armor class 13"]]
+  - text: "Proficiency bonus by character level"
+    source: SRD_CC
+    pages: "5-30|57-57"
+    category: table
+    answer: ["proficiency bonus"]
+  - text: "Cost and weight of a rope of climbing"
+    source: SRD_CC
+    pages: "40-80|241-241"                    # GT-fix (port): 'Rope of Climbing' magic item is at p241; equipment rope rows at p68-69
+    category: table
+    answer: [["rope hempen 50 feet", "rope silk 50 feet", "rope of climbing"]]
+  - text: "Rules for grappling and shoving"
+    source: SRD_CC
+    pages: "60-100"
+    category: prose
+    answer: ["grappling", "grapple check"]
+  - text: "How does the Monk's Flurry of Blows work at level 5"
+    source: SRD_CC
+    pages: "27-120"
+    category: cross_page
+    answer: ["flurry of blows", "ki"]
+
+  # ───────── cross_system queries ─────────
+  # source: any → no source filter at search time; the query text names the
+  # system. Pages locate the answer in the named system's book.
+  - text: "Cloud Dragon stats in Basic Fantasy"
+    source: any
+    pages: "85-86"
+    category: cross_system
+    answer: [["dragon cloud", "cloud dragon"], "armor class 22", "hit dice 11"]
+  - text: "Fireball damage in 5E SRD"
+    source: any
+    pages: "144-145"
+    category: cross_system
+    answer: ["fireball", "8d6 fire damage"]
+  - text: "Wizard spell slots progression in Black Flag"
+    source: any
+    pages: "46-57"
+    category: cross_system
+    answer: ["arcane spell slots by circle"]
+  - text: "Owlbear stats in 5E SRD"
+    source: any
+    pages: "339-340"
+    category: cross_system
+    answer: ["owlbear", ["challenge 3 700 xp", "armor class 13"]]
+  - text: "Goblin attack damage in Basic Fantasy"
+    source: any
+    pages: "108-109"
+    category: cross_system
+    answer: ["goblin", ["1d6 or by weapon", "1d6 or byweapon"]]
+  - text: "Bless spell in 5E SRD"
+    source: any
+    pages: "122-122"
+    category: cross_system
+    answer: ["bless", "roll a d4 and add the number rolled"]
+  - text: "Initiative roll in Black Flag"
+    source: any
+    pages: "132-132"
+    category: cross_system
+    answer: ["determining initiative order"]
+  - text: "Fighter class features in Black Flag"
+    source: any
+    pages: "23-23"
+    category: cross_system
+    answer: ["fighter", ["hit dice 1d10 per fighter level", "1st level fighter feature"]]
+  - text: "Surprise rules in Basic Fantasy"
+    source: any
+    pages: "54-54"
+    category: cross_system
+    answer: ["surprised on a roll of 1 2"]
+  - text: "Adult red dragon stats in 5E SRD"
+    source: any
+    pages: "287-287"
+    category: cross_system
+    answer: ["adult red dragon", "armor class 19"]
