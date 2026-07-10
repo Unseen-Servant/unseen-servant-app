@@ -1,11 +1,10 @@
 """Unit tests for spelling.py — library-derived vocabulary + spell correction.
 
 Covers the spec's unit surface (docs/specs/retrieval/2026-07-10-typo-
-tolerance-design.md, section A + Vocabulary): vocabulary build
-(frequencies, junk-term thresholding), OOV detection, correction rules
-(typos corrected; proper nouns, digit tokens, short tokens, and
-non-ASCII untouched), and query-span reconstruction. Variant expansion
-(section B split/join) is deliberately absent — out of scope.
+tolerance-design.md): vocabulary build (frequencies, junk-term
+thresholding), OOV detection, correction rules (typos corrected; proper
+nouns, digit tokens, short tokens, and non-ASCII untouched), query-span
+reconstruction, and section B split/join variant generation.
 """
 
 import pytest
@@ -164,3 +163,113 @@ def test_english_protection_wins_over_plausible_typo(corrector):
 
 def test_min_vocab_freq_constant():
     assert MIN_VOCAB_FREQ == 3
+
+
+# ---------------------------------------------------------------------------
+# Variant expansion (section B: split/join)
+# ---------------------------------------------------------------------------
+
+EXPANSION_VOCAB = {
+    "owl": 10, "bear": 20, "owlbear": 8,
+    "chain": 50, "mail": 40, "chainmail": 12,
+    "cloud": 20, "dragon": 30,
+    "fire": 40, "ball": 15, "fireball": 25,
+    "armor": 60, "class": 60, "damage": 80, "challenge": 10,
+    "rating": 10, "of": 100, "an": 100, "and": 100, "the": 100,
+    "s": 200, "word": 30, "sword": 15,
+    # junk under MIN_VOCAB_FREQ
+    "spellslots": 2, "slots": 2,
+}
+
+
+@pytest.fixture
+def expander():
+    return SpellCorrector(EXPANSION_VOCAB)
+
+
+def test_join_variant_when_concatenation_in_vocab(expander):
+    assert expander.expand("challenge rating of an owl bear") == [
+        "challenge rating of an owlbear"
+    ]
+
+
+def test_split_variant_when_both_parts_in_vocab(expander):
+    # "clouddragon" is OOV but splits into two in-vocab parts.
+    assert expander.expand("clouddragon armor class") == [
+        "cloud dragon armor class"
+    ]
+
+
+def test_split_applies_to_in_vocab_token_too(expander):
+    # "chainmail" is itself in-vocab (freq 12) — the split variant is
+    # still generated (the design: token t, in-vocab or not).
+    assert expander.expand("chainmail damage") == ["chain mail damage"]
+
+
+def test_split_boundary_maximizes_min_part_freq():
+    # "dragonfire" = dragon+fire (min 30) or drag+onfire (min 3):
+    # the boundary with the higher min-frequency wins.
+    vocab = {"dragon": 30, "fire": 40, "drag": 100, "onfire": 3}
+    assert SpellCorrector(vocab).expand("dragonfire") == ["dragon fire"]
+
+
+def test_one_edit_per_variant(expander):
+    # A join spot and a split spot yield two variants, each applying
+    # exactly one edit; scan order (left to right) is preserved.
+    assert expander.expand("owl bear chainmail") == [
+        "owlbear chainmail",
+        "owl bear chain mail",
+    ]
+
+
+def test_at_most_two_variants(expander):
+    assert (
+        expander.expand("owl bear chainmail fireball") == [
+            "owlbear chainmail fireball",
+            "owl bear chain mail fireball",
+        ]
+    )
+
+
+def test_no_variants_for_plain_query(expander):
+    assert expander.expand("armor class and damage") == []
+
+
+def test_join_requires_in_vocab_concatenation(expander):
+    # "armorclass" is not a corpus term — adjacency alone never joins.
+    assert expander.expand("armor class") == []
+
+
+def test_junk_frequency_blocks_join_and_split(expander):
+    # "spellslots"/"slots" sit under MIN_VOCAB_FREQ: "spell slots" must
+    # not join, and "spellslots" must not split into a junk part.
+    vocab = {**EXPANSION_VOCAB, "spell": 30}
+    expander = SpellCorrector(vocab)
+    assert expander.expand("spell slots") == []
+    assert expander.expand("spellslots") == []
+
+
+def test_split_parts_must_be_at_least_three_chars(expander):
+    # "sword" = s+word with both "parts" frequent in the vocab ("s" from
+    # possessive tokenization) — single/double-letter parts are
+    # artifacts, never split evidence.
+    assert expander.expand("sword damage") == []
+
+
+def test_join_only_across_pure_whitespace(expander):
+    # Punctuation between the tokens means they are not one term.
+    assert expander.expand("owl, bear") == []
+
+
+def test_join_preserves_casing_and_surroundings(expander):
+    assert expander.expand("Fire ball damage!") == ["Fireball damage!"]
+
+
+def test_split_preserves_casing_and_surroundings(expander):
+    assert expander.expand("the Clouddragon's lair") == [
+        "the Cloud dragon's lair"
+    ]
+
+
+def test_non_ascii_query_has_no_variants(expander):
+    assert expander.expand("dégâts chainmail") == []

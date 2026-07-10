@@ -97,7 +97,10 @@ def ensure_indexed(client, corpus_dir: Path, data_dir: Path) -> None:
     print(f"indexed {body['indexed']}/{body['total']} PDFs")
 
 
-def warmup(client, rerank: bool, hybrid: bool, spell_correction: bool) -> None:
+def warmup(
+    client, rerank: bool, hybrid: bool, spell_correction: bool,
+    variant_expansion: bool,
+) -> None:
     """Fire one untimed search so lazy one-time loads (cross-encoder,
     Ollama embed session, spell-correction vocab) don't pollute the first
     query's latency."""
@@ -105,12 +108,13 @@ def warmup(client, rerank: bool, hybrid: bool, spell_correction: bool) -> None:
         "query": "warmup", "n_results": 1, "search_all": True,
         "rerank": rerank, "hybrid": hybrid,
         "spell_correction": spell_correction,
+        "variant_expansion": variant_expansion,
     }).raise_for_status()
 
 
 def run(
     client, queries: list[dict], rerank: bool, hybrid: bool,
-    spell_correction: bool,
+    spell_correction: bool, variant_expansion: bool,
 ) -> list[dict]:
     per_query = []
     for q in queries:
@@ -121,6 +125,7 @@ def run(
             "rerank": rerank,
             "hybrid": hybrid,
             "spell_correction": spell_correction,
+            "variant_expansion": variant_expansion,
         }
         if q["source"] not in (None, "", "any"):
             payload["source_filter"] = next(
@@ -169,6 +174,10 @@ def main() -> None:
     ap.add_argument("--no-spell-correction", action="store_true",
                     help="disable query spell correction "
                          "(production default is on)")
+    ap.add_argument("--variant-expansion", action="store_true",
+                    help="search spacing variants of the query and fuse "
+                         "via RRF (experimental /api/search "
+                         "variant_expansion flag)")
     ap.add_argument("--write-baseline", metavar="NAME",
                     help="write evals/baselines/NAME.json and NAME.md")
     args = ap.parse_args()
@@ -185,10 +194,13 @@ def main() -> None:
         f"running {len(queries)} queries "
         f"(rerank={'on' if rerank else 'off'}, "
         f"retrieval={'hybrid' if args.hybrid else 'dense'}, "
-        f"spell_correction={'on' if spell_correction else 'off'})..."
+        f"spell_correction={'on' if spell_correction else 'off'}, "
+        f"variant_expansion={'on' if args.variant_expansion else 'off'})..."
     )
-    warmup(client, rerank, args.hybrid, spell_correction)
-    per_query = run(client, queries, rerank, args.hybrid, spell_correction)
+    warmup(client, rerank, args.hybrid, spell_correction,
+           args.variant_expansion)
+    per_query = run(client, queries, rerank, args.hybrid, spell_correction,
+                    args.variant_expansion)
     summary = scorer.aggregate(per_query)
 
     report = scorer.format_report(summary)
@@ -208,6 +220,7 @@ def main() -> None:
             "rerank": rerank,
             "retrieval": "hybrid" if args.hybrid else "dense",
             "spell_correction": spell_correction,
+            "variant_expansion": args.variant_expansion,
             "corpus": EXPECTED_PDFS,
             "queries": len(queries),
             "top_k": TOP_K,
@@ -226,6 +239,7 @@ def main() -> None:
             f"Rerank: {'on' if rerank else 'off'}\n"
             f"Retrieval: {meta['retrieval']}\n"
             f"Spell correction: {'on' if spell_correction else 'off'}\n"
+            f"Variant expansion: {'on' if args.variant_expansion else 'off'}\n"
             f"{scorer.format_latency(latency)} (in-process, post-warmup)\n\n"
             "```\n" + report + "\n```\n"
         )

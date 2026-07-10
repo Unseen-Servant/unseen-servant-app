@@ -242,10 +242,12 @@ queries:
   # Misspelled variants of 10 locked queries above (typo-tolerance design,
   # docs/specs/retrieval/2026-07-10-typo-tolerance-design.md): one
   # character-deletion and one adjacent-transposition each, keeping the
-  # original source/pages/answer anchors. Spacing variants land with the
-  # design's section B (variant expansion) — not here.
+  # original source/pages/answer anchors. Spacing variants (section B,
+  # variant expansion) exist for the 5 originals with a natural compound
+  # term — both directions: query joins what the corpus splits
+  # ("chainmail") and query splits what the corpus joins ("owl bear").
   #   variant_of — the locked original's text (for clean-vs-typo gap analysis)
-  #   variant    — deletion | transposition
+  #   variant    — deletion | transposition | spacing
   - text: "Hit dice and armor class of a Cloud Dragn"
     source: Basic-Fantasy
     pages: "85-86"
@@ -386,3 +388,38 @@ queries:
     variant_of: "Rules for grappling and shoving"
     variant: transposition
     answer: ["grappling", "grapple check"]
+  - text: "Hit dice and armor class of a Clouddragon"
+    source: Basic-Fantasy
+    pages: "85-86"
+    category: typo_variant
+    variant_of: "Hit dice and armor class of a Cloud Dragon"
+    variant: spacing
+    answer: [["dragon cloud", "cloud dragon"], "armor class 22", "hit dice 11"]
+  - text: "Armor class bonus and weight for chainmail"
+    source: Basic-Fantasy
+    pages: "40-55|15-15"
+    category: typo_variant
+    variant_of: "Armor class bonus and weight for chain mail"
+    variant: spacing
+    answer: ["chain mail", ["60 gp", "60gp"]]
+  - text: "Spellslots for a level 5 wizard"
+    source: Black-Flag
+    pages: "40-80"
+    category: typo_variant
+    variant_of: "Spell slots for a level 5 wizard"
+    variant: spacing
+    answer: ["arcane spell slots by circle"]
+  - text: "Fire ball damage and area of effect"
+    source: SRD_CC
+    pages: "100-200"
+    category: typo_variant
+    variant_of: "Fireball damage and area of effect"
+    variant: spacing
+    answer: ["fireball", "8d6 fire damage"]
+  - text: "Challenge rating of an owl bear"
+    source: SRD_CC
+    pages: "250-400"
+    category: typo_variant
+    variant_of: "Challenge rating of an owlbear"
+    variant: spacing
+    answer: ["owlbear", ["challenge 3 700 xp", "armor class 13"]]

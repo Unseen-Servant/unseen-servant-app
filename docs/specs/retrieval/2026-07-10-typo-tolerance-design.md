@@ -4,8 +4,11 @@
 **Status:** Section A + Vocabulary implemented 2026-07-10, **default-on**
 (gate passed after adding general-English word protection — the design
 as first specced rewrote clean queries whose words the corpus lacks).
-Section B (variant expansion) not implemented. Findings:
-docs/roadmap/2026-07-10-spell-correction-eval.md
+Section A findings: docs/roadmap/2026-07-10-spell-correction-eval.md.
+Section B (variant expansion) implemented 2026-07-10 behind the
+**default-off** `variant_expansion` flag — the gate for default-on
+**failed**: spacing variants gained nothing and clean queries regressed
+(findings at the end of this doc).
 **Related:** docs/roadmap/2026-07-09-search-quality-goal.md, docs/roadmap/2026-07-09-bm25-hybrid-retest.md
 
 ## Problem
@@ -166,4 +169,51 @@ Applied to the corrected query, direct vocab checks (no symspell):
   measured fallback to persistence (explicitly deferred).
 - **Correction to OCR junk** — mitigated by `MIN_VOCAB_FREQ`; tune with eval.
 - **Clean-query regression from variant expansion** — the eval gate exists
-  precisely for this; the flag is the fallback.
+  precisely for this; the flag is the fallback. *(This is exactly how it
+  played out — see below.)*
+
+## Section B eval findings (2026-07-10): NO-GO for default-on
+
+Implemented as designed — `SpellCorrector.expand()` split/join over the
+shared vocabulary (plus a ≥3-char guard on split parts: possessive
+tokenization puts a high-frequency bare "s" in every vocabulary, which
+would otherwise split "sword" into "s word"), multi-query Chroma call,
+`rrf_fuse` across the variant rankings with minimum distance reported,
+BM25 joining the same fusion under `hybrid`. Gate run against the post-A
+baseline with 5 new `variant: spacing` eval queries (both directions;
+the 5 of 10 locked originals with a natural compound term). Baselines:
+`2026-07-10-pre-variant-expansion.*` (A only) vs
+`2026-07-10-variant-expansion.*` (A + B).
+
+| subset | nDCG@10 | MRR@5 | recall@10 |
+|---|---|---|---|
+| spacing variants (5) | 0.826 → 0.826 | 0.767 → 0.767 | 1.000 → 1.000 |
+| misspellings (20) | 0.611 → 0.598 | 0.525 → 0.508 | 0.850 → 0.850 |
+| clean suite (40) | 0.644 → 0.641 | 0.584 → 0.580 | 0.850 → 0.850 |
+
+- **There was almost no gap to close.** Pre-B, the spacing set already
+  sat at 0.826 nDCG vs 0.852 for its clean originals (+0.026): bge-m3's
+  subword tokenization absorbs spacing variance on its own ("chainmail"
+  and "chain mail" share subword pieces; recall@10 was already 1.000).
+  The premise that spacing variants materially diverge — true for BM25 —
+  does not hold for the dense retriever that actually serves results.
+- **Expansion moved no spacing query by any metric.** Every one of the
+  5 spacing queries scored identically with and without fusion.
+- **Clean queries regressed.** "Fireball damage and area of effect"
+  0.631 → 0.500 nDCG: its own "Fire ball" split variant fused
+  lower-quality neighbors above the answer chunk. "Fireball damage in
+  5E SRD" 0.356 → 0.333. One small gain ("Goblin attack damage",
+  +0.014). Net clean prose −0.012 nDCG / −0.015 MRR — deterministic
+  per-query regressions, not noise.
+- **Misspellings regressed too** (−0.013 nDCG / −0.017 MRR): expansion
+  runs after correction, and RRF gives the variant ranking equal say —
+  diluting rankings the corrected primary already had right.
+
+**Decision:** section A stays default-on, untouched. Section B ships
+behind `variant_expansion` (default **off**, independent of
+`spell_correction`, same vocabulary; `--variant-expansion` in
+`run_eval`). The spacing eval queries stay in `typo_variant` so any
+re-test measures the same thing. A re-test would only be warranted with
+a retriever whose tokenization does not already absorb spacing (e.g. if
+the BM25 hybrid regime is ever revisited — there the lexical side is
+exactly where spacing variants diverge).

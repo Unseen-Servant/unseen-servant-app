@@ -214,16 +214,18 @@ def _queries():
 
 def test_queries_yaml_schema():
     queries = _queries()
-    assert len(queries) == 60
+    assert len(queries) == 65
     locked_texts = {
         q["text"] for q in queries if q["category"] != "typo_variant"
     }
     for q in queries:
-        # typo_variant queries are misspelled copies of locked originals
-        # (typo-tolerance design); each must name its original.
+        # typo_variant queries are misspelled or respaced copies of locked
+        # originals (typo-tolerance design); each must name its original.
         if q["category"] == "typo_variant":
             assert q["variant_of"] in locked_texts, q["text"]
-            assert q["variant"] in {"deletion", "transposition"}, q["text"]
+            assert q["variant"] in {
+                "deletion", "transposition", "spacing"
+            }, q["text"]
         assert q["category"] in CATEGORIES, q["text"]
         assert isinstance(q["text"], str) and q["text"]
         ranges = scorer.parse_pages(q["pages"])
@@ -243,5 +245,5 @@ def test_queries_yaml_category_counts_match_spike():
         counts[q["category"]] = counts.get(q["category"], 0) + 1
     assert counts == {
         "stat_block": 6, "table": 10, "prose": 11,
-        "cross_page": 3, "cross_system": 10, "typo_variant": 20,
+        "cross_page": 3, "cross_system": 10, "typo_variant": 25,
     }

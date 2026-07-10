@@ -1,10 +1,12 @@
 """Library-derived vocabulary + spell correction for search queries.
 
-Section A + Vocabulary of the typo-tolerance design
+Sections A and B + Vocabulary of the typo-tolerance design
 (docs/specs/retrieval/2026-07-10-typo-tolerance-design.md): out-of-
 vocabulary query tokens are rewritten to the closest in-vocabulary term
 before embedding, so a misspelled query returns (approximately) the
-results of its corrected form.
+results of its corrected form. ``expand()`` (section B, behind the
+default-off ``variant_expansion`` search flag — its eval gate failed)
+derives spacing-variant queries from the same vocabulary.
 
 The vocabulary is a term → frequency map over the indexed chunks —
 lowercased, unstemmed, same ``[A-Za-z0-9]+`` token alphabet as
@@ -24,6 +26,16 @@ from symspellpy import SymSpell, Verbosity
 # A term is in-vocab (protected, and a valid correction target) only at
 # this frequency or above. Start 3 per the design; tune during eval.
 MIN_VOCAB_FREQ = 3
+
+# Variant expansion (section B): at most this many variant queries
+# beyond the primary — realistic queries have one or two candidate
+# spots; the cap bounds the fan-out.
+MAX_VARIANTS = 2
+
+# A split part shorter than this is a tokenization artifact, not a
+# word: possessives ("player's") put a bare high-frequency "s" in every
+# library vocabulary, which would otherwise split "sword" into "s word".
+MIN_SPLIT_PART_LEN = 3
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 
@@ -134,3 +146,47 @@ class SpellCorrector:
             prev = end
         out.append(query[prev:])
         return "".join(out)
+
+    def _in_vocab(self, term: str) -> bool:
+        return self._vocab.get(term, 0) >= self._min_freq
+
+    def expand(self, query: str) -> list[str]:
+        """Spacing-variant queries (section B), each one edit, capped.
+
+        Direct vocabulary checks, no symspell. Join: an adjacent token
+        pair separated by pure whitespace whose concatenation is
+        in-vocab. Split: a token (in-vocab or not) writable as two
+        in-vocab parts — when several boundaries qualify, the one
+        maximizing ``min(freq(a), freq(b))`` wins. Variants are
+        collected left to right and capped at ``MAX_VARIANTS``.
+        """
+        if not query.isascii():
+            return []
+        matches = list(_TOKEN_RE.finditer(query))
+        variants: list[str] = []
+        for i, match in enumerate(matches):
+            token = match.group()
+            if i + 1 < len(matches):
+                nxt = matches[i + 1]
+                gap = query[match.end():nxt.start()]
+                if gap.isspace() and self._in_vocab(
+                    (token + nxt.group()).lower()
+                ):
+                    variants.append(query[:match.end()] + query[nxt.start():])
+            best_split: tuple[int, int] | None = None  # (min_freq, boundary)
+            for k in range(
+                MIN_SPLIT_PART_LEN, len(token) - MIN_SPLIT_PART_LEN + 1
+            ):
+                a, b = token[:k].lower(), token[k:].lower()
+                if self._in_vocab(a) and self._in_vocab(b):
+                    score = min(self._vocab[a], self._vocab[b])
+                    if best_split is None or score > best_split[0]:
+                        best_split = (score, k)
+            if best_split is not None:
+                k = best_split[1]
+                variants.append(
+                    query[:match.start()]
+                    + token[:k] + " " + token[k:]
+                    + query[match.end():]
+                )
+        return variants[:MAX_VARIANTS]

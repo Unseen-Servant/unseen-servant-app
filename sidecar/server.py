@@ -538,6 +538,13 @@ class SearchRequest(BaseModel):
     # gap (evals/baselines/2026-07-10-spellfix-en-guard.md). Off-switch
     # for eval ablation and as an escape hatch.
     spell_correction: bool = True
+    # Search spacing variants of the query ("chainmail" ↔ "chain mail")
+    # alongside it and fuse via RRF (typo-tolerance design, section B).
+    # Default off — the 2026-07-10 eval gate failed: spacing variants
+    # gained nothing (bge-m3 subwords already absorb spacing) and clean
+    # queries regressed (evals/baselines/2026-07-10-variant-expansion.md,
+    # findings in the design doc). Flag retained for re-tests.
+    variant_expansion: bool = False
 
 class SetGameSystemRequest(BaseModel):
     filename: str
@@ -3096,6 +3103,11 @@ def create_app(
             # consumes the query text — the dense embed, the reranker,
             # system detection, and the BM25 side all see the corrected
             # form. A clean query is a strict no-op (corrected is None).
+            # Variant expansion (section B, default-off flag) then derives
+            # spacing variants ("chainmail" ↔ "chain mail") of the
+            # corrected query; they ride the same Chroma call and fuse
+            # below via RRF. Without them this is the single-query path —
+            # zero overhead for the common case.
             corrected_query: str | None = None
             if request.spell_correction:
                 corrected_query = _get_spell_corrector().correct(request.query)
@@ -3103,10 +3115,13 @@ def create_app(
                 corrected_query if corrected_query is not None
                 else request.query
             )
+            variant_queries: list[str] = []
+            if request.variant_expansion:
+                variant_queries = _get_spell_corrector().expand(query_text)
 
             # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
             query_kwargs = {
-                "query_texts": [query_text],
+                "query_texts": [query_text, *variant_queries],
                 "n_results": request.n_results * 10,
             }
 
@@ -3273,7 +3288,7 @@ def create_app(
 
             results = collection.query(**query_kwargs)
 
-            if not results["documents"][0]:
+            if not any(results["documents"]):
                 return {
                     "results": [],
                     "message": " ".join([*filter_notes, "No results found."]),
@@ -3286,33 +3301,48 @@ def create_app(
             ordered_distances = results["distances"][0]
             ordered_docs = results["documents"][0]
 
-            # Experimental lexical hybrid (default-off): fuse the dense
-            # candidate ranking with a BM25 ranking over the same chunks
-            # via reciprocal-rank fusion, then hand the fused pool to the
+            # Multi-ranking fusion: the spacing-variant rankings (section
+            # B) and — under the experimental default-off `hybrid` flag —
+            # a BM25 ranking over the same chunks join the dense primary
+            # via reciprocal-rank fusion, then the fused pool feeds the
             # boost/rerank/dedupe pipeline unchanged. The BM25 side
             # mirrors the dense query's scope via its `where` clause.
-            # BM25-only candidates carry no cosine distance — they get a
-            # sentinel 1.0 (relevance 0.0) that the reranker replaces
-            # with a real cross-encoder score when rerank is on.
+            # A candidate seen by several dense rankings reports its
+            # minimum cosine distance; BM25-only candidates carry no
+            # cosine distance — they get a sentinel 1.0 (relevance 0.0)
+            # that the reranker replaces with a real cross-encoder score
+            # when rerank is on.
             ordering_scores: list[float] | None = None
-            if request.hybrid:
-                lex = _get_lexical_index()
-                lex_where = query_kwargs.get("where")
-                bm25_ids = lex.search(
-                    query_text,
-                    k=request.n_results * 10,
-                    allowed=lambda m: matches_where(m, lex_where),
-                )
-                dense_ids = results["ids"][0]
-                dense_pos = {cid: i for i, cid in enumerate(dense_ids)}
+            if variant_queries or request.hybrid:
+                rankings = list(results["ids"])
+                dense_best: dict[str, tuple[dict, float, str]] = {}
+                for ids, metas, dists, docs in zip(
+                    results["ids"], results["metadatas"],
+                    results["distances"], results["documents"],
+                ):
+                    for cid, meta, dist, doc in zip(ids, metas, dists, docs):
+                        if (
+                            cid not in dense_best
+                            or dist < dense_best[cid][1]
+                        ):
+                            dense_best[cid] = (meta, dist, doc)
+                lex = None
+                if request.hybrid:
+                    lex = _get_lexical_index()
+                    lex_where = query_kwargs.get("where")
+                    rankings.append(lex.search(
+                        query_text,
+                        k=request.n_results * 10,
+                        allowed=lambda m: matches_where(m, lex_where),
+                    ))
                 fused_metadatas, fused_distances = [], []
                 fused_docs, fused_scores = [], []
-                for cid, score in rrf_fuse([dense_ids, bm25_ids]):
-                    if cid in dense_pos:
-                        i = dense_pos[cid]
-                        fused_metadatas.append(ordered_metadatas[i])
-                        fused_distances.append(ordered_distances[i])
-                        fused_docs.append(ordered_docs[i])
+                for cid, score in rrf_fuse(rankings):
+                    if cid in dense_best:
+                        meta, dist, doc = dense_best[cid]
+                        fused_metadatas.append(meta)
+                        fused_distances.append(dist)
+                        fused_docs.append(doc)
                     else:
                         fused_metadatas.append(lex.metadatas[cid])
                         fused_distances.append(1.0)
