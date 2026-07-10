@@ -1,0 +1,3912 @@
+{
+  "meta": {
+    "date": "2026-07-10T03:05:47+00:00",
+    "rerank": true,
+    "retrieval": "dense",
+    "corpus": [
+      "Basic-Fantasy-RPG-Rules-r142.pdf",
+      "Black-Flag-Roleplaying.pdf",
+      "SRD_CC_v5.1.pdf"
+    ],
+    "queries": 40,
+    "top_k": 10
+  },
+  "summary": {
+    "stat_block": {
+      "queries": 6,
+      "ndcg@10": 0.9677622660637882,
+      "mrr@5": 1.0,
+      "precision@5": 0.20000000000000004,
+      "precision@10": 0.11666666666666668,
+      "recall@5": 1.0,
+      "recall@10": 1.0
+    },
+    "all": {
+      "queries": 40,
+      "ndcg@10": 0.644256104682353,
+      "mrr@5": 0.5841666666666667,
+      "precision@5": 0.195,
+      "precision@10": 0.1275,
+      "recall@5": 0.775,
+      "recall@10": 0.85
+    },
+    "table": {
+      "queries": 10,
+      "ndcg@10": 0.6479444614299522,
+      "mrr@5": 0.5833333333333333,
+      "precision@5": 0.18,
+      "precision@10": 0.13999999999999999,
+      "recall@5": 0.8,
+      "recall@10": 0.9
+    },
+    "prose": {
+      "queries": 11,
+      "ndcg@10": 0.45896633563699857,
+      "mrr@5": 0.3212121212121212,
+      "precision@5": 0.16363636363636364,
+      "precision@10": 0.09090909090909091,
+      "recall@5": 0.7272727272727273,
+      "recall@10": 0.8181818181818182
+    },
+    "cross_page": {
+      "queries": 3,
+      "ndcg@10": 0.8769765845238192,
+      "mrr@5": 0.8333333333333334,
+      "precision@5": 0.6,
+      "precision@10": 0.39999999999999997,
+      "recall@5": 1.0,
+      "recall@10": 1.0
+    },
+    "cross_system": {
+      "queries": 10,
+      "ndcg@10": 0.5804666531033424,
+      "mrr@5": 0.55,
+      "precision@5": 0.12000000000000002,
+      "precision@10": 0.08,
+      "recall@5": 0.6,
+      "recall@10": 0.7
+    }
+  },
+  "per_query": [
+    {
+      "text": "Hit dice and armor class of a Cloud Dragon",
+      "category": "stat_block",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "85-85",
+          "section_heading": "PART 6:  MONSTERS > Dragon, Cloud",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "85-86",
+          "section_heading": "PART 6:  MONSTERS > **Cloud Dragon Age Table**",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "102-103",
+          "section_heading": "PART 6:  MONSTERS > Giant, Cloud",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "103-103",
+          "section_heading": "PART 6:  MONSTERS > Giant, Cloud > BASIC FANTASY RPG",
+          "relevance_score": 0.997,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "89-90",
+          "section_heading": "PART 6:  MONSTERS > Dragon Turtle",
+          "relevance_score": 0.985,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "86-87",
+          "section_heading": "PART 6:  MONSTERS > **Forest Dragon Age Table**",
+          "relevance_score": 0.984,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "82-82",
+          "section_heading": "PART 6:  MONSTERS > Djinni",
+          "relevance_score": 0.978,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "87-89",
+          "section_heading": "PART 6:  MONSTERS > **Mountain Dragon Age Table**",
+          "relevance_score": 0.97,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "86-86",
+          "section_heading": "PART 6:  MONSTERS > **Desert Dragon Age Table**",
+          "relevance_score": 0.969,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "117-117",
+          "section_heading": "PART 6:  MONSTERS > Hobgoblin",
+          "relevance_score": 0.968,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "What is the morale and number appearing of a skeleton",
+      "category": "stat_block",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "149-149",
+          "section_heading": "PART 6:  MONSTERS > Skeleton",
+          "relevance_score": 0.788,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "150-150",
+          "section_heading": "PART 6:  MONSTERS > Skeleton > MONSTERS",
+          "relevance_score": 0.339,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "66-67",
+          "section_heading": "PART 6:  MONSTERS",
+          "relevance_score": 0.015,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "61-61",
+          "section_heading": "How to Attack > Morale",
+          "relevance_score": 0.007,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "82-82",
+          "section_heading": "PART 6:  MONSTERS > Djinni",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "166-167",
+          "section_heading": "PART 6:  MONSTERS > Zombraire (and Skeletaire)",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "21-21",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "141-142",
+          "section_heading": "PART 6:  MONSTERS > Roc",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "110-113",
+          "section_heading": "PART 6:  MONSTERS > Golem, Bone",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "112-113",
+          "section_heading": "PART 6:  MONSTERS > Golem, Bone",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Goblin attack bonus and damage",
+      "category": "stat_block",
+      "metrics": {
+        "ndcg@10": 0.8065735963827293,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.2,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "108-109",
+          "section_heading": "PART 6:  MONSTERS > Goblin",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "75-75",
+          "section_heading": "PART 6:  MONSTERS > Bugbear > MONSTERS",
+          "relevance_score": 0.996,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "57-57",
+          "section_heading": "How to Attack",
+          "relevance_score": 0.839,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "59-59",
+          "section_heading": "How to Attack > Damage",
+          "relevance_score": 0.826,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "75-76",
+          "section_heading": "PART 6:  MONSTERS > Caecilia, Giant",
+          "relevance_score": 0.69,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "21-21",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order",
+          "relevance_score": 0.344,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "58-58",
+          "section_heading": "How to Attack > Monster Attack Bonus",
+          "relevance_score": 0.321,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "107-108",
+          "section_heading": "PART 6:  MONSTERS > Gnoll > BASIC FANTASY RPG",
+          "relevance_score": 0.26,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "56-57",
+          "section_heading": "PART 5:  THE ENCOUNTER > Evasion and Pursuit",
+          "relevance_score": 0.167,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "207-207",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Alphabetical Index",
+          "relevance_score": 0.1,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Giant rat hit dice and save as",
+      "category": "stat_block",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "140-141",
+          "section_heading": "PART 6:  MONSTERS > Rat (and Rat, Giant)",
+          "relevance_score": 0.983,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "68-68",
+          "section_heading": "PART 6:  MONSTERS > Ant, Giant (and Huge, Large)",
+          "relevance_score": 0.407,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "70-71",
+          "section_heading": "PART 6:  MONSTERS > Bat (and Bat, Giant)",
+          "relevance_score": 0.308,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "126-127",
+          "section_heading": "PART 6:  MONSTERS > Lizard, Monitor",
+          "relevance_score": 0.296,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "98-99",
+          "section_heading": "PART 6:  MONSTERS > Fish, Giant Barracuda",
+          "relevance_score": 0.29,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "72-72",
+          "section_heading": "PART 6:  MONSTERS > Bee, Giant",
+          "relevance_score": 0.278,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "141-142",
+          "section_heading": "PART 6:  MONSTERS > Roc",
+          "relevance_score": 0.172,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "79-79",
+          "section_heading": "PART 6:  MONSTERS > Crocodile",
+          "relevance_score": 0.141,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "115-115",
+          "section_heading": "PART 6:  MONSTERS > Hawk",
+          "relevance_score": 0.071,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "76-77",
+          "section_heading": "PART 6:  MONSTERS > Cave Locust, Giant",
+          "relevance_score": 0.061,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Cloud Dragon age category breath weapon dimensions",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.5,
+        "mrr@5": 0.3333333333333333,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "84-84",
+          "section_heading": "PART 6:  MONSTERS > Dragon > MONSTERS",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "85-85",
+          "section_heading": "PART 6:  MONSTERS > Dragon, Cloud",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "85-86",
+          "section_heading": "PART 6:  MONSTERS > **Cloud Dragon Age Table**",
+          "relevance_score": 0.996,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "86-87",
+          "section_heading": "PART 6:  MONSTERS > **Forest Dragon Age Table**",
+          "relevance_score": 0.991,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "89-90",
+          "section_heading": "PART 6:  MONSTERS > Dragon Turtle",
+          "relevance_score": 0.991,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "87-89",
+          "section_heading": "PART 6:  MONSTERS > **Mountain Dragon Age Table**",
+          "relevance_score": 0.986,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "86-86",
+          "section_heading": "PART 6:  MONSTERS > **Desert Dragon Age Table**",
+          "relevance_score": 0.97,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "89-89",
+          "section_heading": "PART 6:  MONSTERS > **<u>Swamp Dragon Age Table</u>**",
+          "relevance_score": 0.961,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "116-116",
+          "section_heading": "PART 6:  MONSTERS > Hellhound",
+          "relevance_score": 0.883,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "102-103",
+          "section_heading": "PART 6:  MONSTERS > Giant, Cloud",
+          "relevance_score": 0.063,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Movement rate for medium load beast of burden horse",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "67-68",
+          "section_heading": "PART 6:  MONSTERS > Beasts of Burden",
+          "relevance_score": 0.988,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "15-15",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Beasts of Burden",
+          "relevance_score": 0.157,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "46-47",
+          "section_heading": "PART 4:  THE ADVENTURE > Movement and Encumbrance",
+          "relevance_score": 0.076,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "114-114",
+          "section_heading": "PART 6:  MONSTERS > Griffon",
+          "relevance_score": 0.04,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "138-139",
+          "section_heading": "PART 6:  MONSTERS > Pegasus",
+          "relevance_score": 0.004,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "116-117",
+          "section_heading": "PART 6:  MONSTERS > Hippogriff",
+          "relevance_score": 0.004,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "108-109",
+          "section_heading": "PART 6:  MONSTERS > Goblin",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "49-49",
+          "section_heading": "PART 4:  THE ADVENTURE > Wilderness Movement Rates",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "41-41",
+          "section_heading": "PART 3:  SPELLS > **Speak with Monsters**",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "82-83",
+          "section_heading": "PART 6:  MONSTERS > Dog",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Armor class bonus and weight for chain mail",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "15-15",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Armor and Shields",
+          "relevance_score": 0.995,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "170-171",
+          "section_heading": "PART 7:  TREASURE > Magic Armor",
+          "relevance_score": 0.995,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "175-175",
+          "section_heading": "PART 7:  TREASURE > Magic Armor",
+          "relevance_score": 0.216,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "110-113",
+          "section_heading": "PART 6:  MONSTERS > Golem, Bone",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "119-119",
+          "section_heading": "PART 6:  MONSTERS > Ironbane",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "112-113",
+          "section_heading": "PART 6:  MONSTERS > Golem, Bone",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "104-105",
+          "section_heading": "PART 6:  MONSTERS > Giant, Hill",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "98-99",
+          "section_heading": "PART 6:  MONSTERS > Fish, Giant Barracuda",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "91-91",
+          "section_heading": "PART 6:  MONSTERS > Eagle, Giant",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "146-146",
+          "section_heading": "PART 6:  MONSTERS > Shadow",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Thief skill percentages at level 3",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "194-194",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Thief Abilities",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "13-13",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Thief Abilities",
+          "relevance_score": 0.996,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "12-13",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Thief",
+          "relevance_score": 0.97,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "65-65",
+          "section_heading": "Turning the Undead > **Thief**",
+          "relevance_score": 0.853,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "47-47",
+          "section_heading": "PART 4:  THE ADVENTURE > Traps",
+          "relevance_score": 0.662,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "180-181",
+          "section_heading": "PART 7:  TREASURE > Miscellaneous Item Effects > BASIC FANTASY RPG",
+          "relevance_score": 0.101,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "176-177",
+          "section_heading": "PART 7:  TREASURE > **Spell Scrolls:  Spell Level**",
+          "relevance_score": 0.093,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "207-207",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Alphabetical Index",
+          "relevance_score": 0.088,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "170-170",
+          "section_heading": "PART 7:  TREASURE > Magic Weapons",
+          "relevance_score": 0.005,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "169-169",
+          "section_heading": "PART 7:  TREASURE > Unguarded Treasures",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Cleric saving throws at level 5",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.0,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "61-61",
+          "section_heading": "Turning the Undead",
+          "relevance_score": 0.953,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "21-21",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order",
+          "relevance_score": 0.951,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "56-57",
+          "section_heading": "PART 5:  THE ENCOUNTER > Evasion and Pursuit",
+          "relevance_score": 0.93,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "64-64",
+          "section_heading": "Turning the Undead > Saving Throws",
+          "relevance_score": 0.742,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "24-25",
+          "section_heading": "PART 3:  SPELLS > **Cure Serious Wounds***",
+          "relevance_score": 0.639,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "36-37",
+          "section_heading": "PART 3:  SPELLS > **Purify Food and Water**",
+          "relevance_score": 0.564,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "22-23",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order > SPELLS",
+          "relevance_score": 0.351,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "41-41",
+          "section_heading": "PART 3:  SPELLS > **Speak with Monsters**",
+          "relevance_score": 0.177,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "66-67",
+          "section_heading": "PART 6:  MONSTERS",
+          "relevance_score": 0.151,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "23-23",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order > BASIC FANTASY RPG",
+          "relevance_score": 0.12,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Experience needed to reach fighter level 4",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "53-54",
+          "section_heading": "PART 4:  THE ADVENTURE > Experience Points (XP)",
+          "relevance_score": 0.416,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "11-12",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Fighter",
+          "relevance_score": 0.19,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "52-53",
+          "section_heading": "PART 4:  THE ADVENTURE > Mercenaries",
+          "relevance_score": 0.066,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "56-57",
+          "section_heading": "PART 5:  THE ENCOUNTER > Evasion and Pursuit",
+          "relevance_score": 0.054,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "193-193",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Ability Rolls",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "191-192",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Weapon and Armor Restrictions",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "65-65",
+          "section_heading": "Turning the Undead > **Thief**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "187-188",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > City, Town or Village Encounters > GAME MASTER INFORMATION",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "12-13",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Thief",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "51-51",
+          "section_heading": "PART 4:  THE ADVENTURE > Specialists",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "How does surprise work in combat",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "54-54",
+          "section_heading": "PART 5:  THE ENCOUNTER > Order of Play",
+          "relevance_score": 0.985,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "54-54",
+          "section_heading": "PART 5:  THE ENCOUNTER > Surprise",
+          "relevance_score": 0.841,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "127-127",
+          "section_heading": "PART 6:  MONSTERS > Lizard Man",
+          "relevance_score": 0.129,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "54-54",
+          "section_heading": "PART 5:  THE ENCOUNTER",
+          "relevance_score": 0.075,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "55-55",
+          "section_heading": "PART 5:  THE ENCOUNTER > Combat",
+          "relevance_score": 0.037,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "28-29",
+          "section_heading": "PART 3:  SPELLS > **Hallucinatory Terrain**",
+          "relevance_score": 0.034,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "156-156",
+          "section_heading": "PART 6:  MONSTERS > Treant > MONSTERS",
+          "relevance_score": 0.014,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "174-174",
+          "section_heading": "PART 7:  TREASURE > Magic Weapons",
+          "relevance_score": 0.012,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "109-109",
+          "section_heading": "PART 6:  MONSTERS > Golem",
+          "relevance_score": 0.009,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "59-59",
+          "section_heading": "How to Attack > Damage",
+          "relevance_score": 0.003,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "What happens when a character reaches zero hit points",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.3562071871080222,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.1,
+        "recall@5": 0.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "8-8",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Hit Points and Hit Dice",
+          "relevance_score": 1.0,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "59-59",
+          "section_heading": "How to Attack > Subduing Damage",
+          "relevance_score": 1.0,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "62-63",
+          "section_heading": "Turning the Undead > Energy Drain",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "193-193",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Death and Dying > BASIC FANTASY RPG",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "192-192",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Death and Dying",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "59-59",
+          "section_heading": "How to Attack > Damage",
+          "relevance_score": 0.991,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "63-63",
+          "section_heading": "Turning the Undead > Constitution Point Losses",
+          "relevance_score": 0.919,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "156-157",
+          "section_heading": "PART 6:  MONSTERS > Troll (and Trollwife)",
+          "relevance_score": 0.634,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "48-49",
+          "section_heading": "PART 4:  THE ADVENTURE > Dungeon Survival",
+          "relevance_score": 0.595,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "140-141",
+          "section_heading": "PART 6:  MONSTERS > Rat (and Rat, Giant)",
+          "relevance_score": 0.509,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Rules for climbing and falling damage",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.5,
+        "mrr@5": 0.3333333333333333,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "13-13",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Thief Abilities",
+          "relevance_score": 0.968,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "3-5",
+          "section_heading": "TABLE OF CONTENTS",
+          "relevance_score": 0.94,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "63-63",
+          "section_heading": "Turning the Undead > Falling Damage",
+          "relevance_score": 0.9,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "27-27",
+          "section_heading": "PART 3:  SPELLS > **Cure Serious Wounds*** > BASIC FANTASY RPG",
+          "relevance_score": 0.345,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "201-201",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Traps",
+          "relevance_score": 0.219,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "201-202",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Traps > GAME MASTER INFORMATION",
+          "relevance_score": 0.117,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "156-156",
+          "section_heading": "PART 6:  MONSTERS > Treant > BASIC FANTASY RPG",
+          "relevance_score": 0.055,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "56-56",
+          "section_heading": "PART 5:  THE ENCOUNTER > Climbing and Diving",
+          "relevance_score": 0.013,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "59-59",
+          "section_heading": "How to Attack > Damage",
+          "relevance_score": 0.004,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "42-43",
+          "section_heading": "PART 3:  SPELLS > **Teleport** Range: self Magic-User 5 Duration: instantaneous > BASIC FANTASY RPG",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "How to resolve a saving throw against petrification",
+      "category": "cross_page",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "26-27",
+          "section_heading": "PART 3:  SPELLS > **Cure Serious Wounds*** > BASIC FANTASY RPG",
+          "relevance_score": 0.962,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "64-64",
+          "section_heading": "Turning the Undead > Saving Throws",
+          "relevance_score": 0.634,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "36-37",
+          "section_heading": "PART 3:  SPELLS > **Purify Food and Water**",
+          "relevance_score": 0.548,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "39-40",
+          "section_heading": "PART 3:  SPELLS > **Reincarnate** > SPELLS",
+          "relevance_score": 0.213,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "64-65",
+          "section_heading": "Turning the Undead > Item Saving Throws",
+          "relevance_score": 0.206,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "9-10",
+          "section_heading": "PART 2:  PLAYER CHARACTERS > Elves",
+          "relevance_score": 0.078,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "59-59",
+          "section_heading": "How to Attack > Oil",
+          "relevance_score": 0.078,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "22-23",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order > SPELLS",
+          "relevance_score": 0.064,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "26-26",
+          "section_heading": "PART 3:  SPELLS > **Cure Serious Wounds*** > SPELLS",
+          "relevance_score": 0.051,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "41-41",
+          "section_heading": "PART 3:  SPELLS > **Speak with Monsters**",
+          "relevance_score": 0.045,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Fighter class features at level 1",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "24-24",
+          "section_heading": "**CHARACTER CLASSES** > _3rd, 7th, 11th, and 15th-Level Fighter Feature_",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "23-23",
+          "section_heading": "**CHARACTER CLASSES** > _1st-Level Fighter Feature_",
+          "relevance_score": 0.997,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "24-24",
+          "section_heading": "**CHARACTER CLASSES** > _3rd, 7th, 11th, and 15th-Level Fighter Feature_ > **IMPROVEMENT**",
+          "relevance_score": 0.994,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "24-24",
+          "section_heading": "**CHARACTER CLASSES** > _5th, 9th, and 17th-Level Fighter Feature_",
+          "relevance_score": 0.994,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "23-23",
+          "section_heading": "**CHARACTER CLASSES** > **FIGHTER PROGRESSION**",
+          "relevance_score": 0.992,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "24-24",
+          "section_heading": "**CHARACTER CLASSES** > _2nd, 13th, and 18th-Level Fighter Feature_",
+          "relevance_score": 0.984,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "23-23",
+          "section_heading": "**CHARACTER CLASSES** > **CLASS FEATURES**",
+          "relevance_score": 0.982,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "24-24",
+          "section_heading": "**CHARACTER CLASSES** > **WEAPON MASTER PROGRESSION**",
+          "relevance_score": 0.978,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "5-5",
+          "section_heading": "**CHARACTER CREATION & LEVELING** > **MULTICLASSING PROFICIENCIES**",
+          "relevance_score": 0.924,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "5-5",
+          "section_heading": "**CHARACTER CREATION & LEVELING** > **MULTICLASSING PREREQUISITES**",
+          "relevance_score": 0.864,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Spell slots for a level 5 wizard",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "6-6",
+          "section_heading": "**CHARACTER CREATION & LEVELING** > **SPELLCASTING**",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "57-57",
+          "section_heading": "_Prerequisite: None_ > **WIZARD PROGRESSION**",
+          "relevance_score": 0.985,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "58-58",
+          "section_heading": "_Prerequisite: None_ > **Casting Spells**",
+          "relevance_score": 0.983,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "36-36",
+          "section_heading": "_Requires a Shield_ > **DIVINE SPELL SLOTS BY CIRCLE**",
+          "relevance_score": 0.972,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "143-143",
+          "section_heading": "**SPELLCASTING** > SPELL SLOTS",
+          "relevance_score": 0.97,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "57-57",
+          "section_heading": "_Prerequisite: None_ > **ARCANE RECOVERY**",
+          "relevance_score": 0.965,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "52-52",
+          "section_heading": "_Requires a Shield_ > **Casting Spells**",
+          "relevance_score": 0.965,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "58-58",
+          "section_heading": "_Prerequisite: None_ > **Learning Spells of 1st Circle and Higher**",
+          "relevance_score": 0.964,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "65-65",
+          "section_heading": "MAGIC TALENTS > _Prerequisite: Spellcasting Class Feature_",
+          "relevance_score": 0.96,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "14-15",
+          "section_heading": "**CHARACTER CLASSES** > **DIVINE SPELL SLOTS BY CIRCLE**",
+          "relevance_score": 0.955,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Armor class calculation for a character wearing studded leather",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.0,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "72-72",
+          "section_heading": "Equipment > **CALCULATING ARMOR CLASS (AC)**",
+          "relevance_score": 0.994,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "73-73",
+          "section_heading": "Equipment > **ARMOR**",
+          "relevance_score": 0.986,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "377-377",
+          "section_heading": "_Medium Beast_ > NPCS > CR 5",
+          "relevance_score": 0.965,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "378-378",
+          "section_heading": "_Medium Beast_ > NPCS > Cultist CR 1/8",
+          "relevance_score": 0.948,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "381-381",
+          "section_heading": "_Medium Beast_ > NPCS > CR 7",
+          "relevance_score": 0.937,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "376-376",
+          "section_heading": "_Medium Beast_ > NPCS > CR 2",
+          "relevance_score": 0.935,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "379-379",
+          "section_heading": "_Medium Beast_ > NPCS > Gladiator",
+          "relevance_score": 0.815,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "333-333",
+          "section_heading": "_Medium Humanoid_",
+          "relevance_score": 0.594,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "309-309",
+          "section_heading": "_Small Humanoid_",
+          "relevance_score": 0.543,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "8-8",
+          "section_heading": "**CHARACTER CLASSES** > _1st-Level Barbarian Feature_",
+          "relevance_score": 0.382,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "How does advantage and disadvantage work",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.0,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "206-207",
+          "section_heading": "**W** > **Components:** V",
+          "relevance_score": 0.359,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "136-136",
+          "section_heading": "**PLAYING THE GAME** > **DODGE**",
+          "relevance_score": 0.346,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "191-191",
+          "section_heading": "**N** > <mark>PROTECTION FROM EVIL AND GOOD</mark>",
+          "relevance_score": 0.185,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "348-348",
+          "section_heading": "_Small Plant_ > **REACTIONS**",
+          "relevance_score": 0.061,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "43-44",
+          "section_heading": "_Requires a Shield_ > _1st-Level Rogue Feature_",
+          "relevance_score": 0.048,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "156-157",
+          "section_heading": "**B** > <mark>BESTOW CURSE</mark>",
+          "relevance_score": 0.047,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "346-347",
+          "section_heading": "_Medium Undead_ > **BONUS ACTIONS**",
+          "relevance_score": 0.026,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "170-170",
+          "section_heading": "**E** > <mark>EYEBITE</mark>",
+          "relevance_score": 0.024,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "385-385",
+          "section_heading": "**CONDITIONS** > INVISIBLE",
+          "relevance_score": 0.019,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "122-122",
+          "section_heading": "**PLAYING THE GAME** > **WORKING TOGETHER**",
+          "relevance_score": 0.018,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Initiative roll and turn order",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "132-132",
+          "section_heading": "**PLAYING THE GAME** > **ROUNDS AND TURNS**",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "132-132",
+          "section_heading": "**PLAYING THE GAME** > **DETERMINING INITIATIVE ORDER**",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "134-134",
+          "section_heading": "**PLAYING THE GAME** > **3. ROLL INITIATIVE**",
+          "relevance_score": 0.985,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "8-8",
+          "section_heading": "**CHARACTER CLASSES** > _6th-Level Barbarian Feature_",
+          "relevance_score": 0.934,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "133-133",
+          "section_heading": "**PLAYING THE GAME** > **Complex Traps**",
+          "relevance_score": 0.803,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "68-68",
+          "section_heading": "MAGIC TALENTS > Aware",
+          "relevance_score": 0.571,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "84-84",
+          "section_heading": "Equipment > **VEHICLE MOVEMENT**",
+          "relevance_score": 0.554,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "35-35",
+          "section_heading": "_Requires a Shield_ > _7th-Level Open Hand Feature_",
+          "relevance_score": 0.509,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "28-28",
+          "section_heading": "_Requires a Shield_ > _13th-Level Mechanist Feature_",
+          "relevance_score": 0.448,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "134-134",
+          "section_heading": "**PLAYING THE GAME** > **1. DETERMINE SURPRISE**",
+          "relevance_score": 0.437,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Range and damage of a longbow",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.4508533838815827,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.3,
+        "recall@5": 0.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "316-316",
+          "section_heading": "_Medium Humanoid_ > LYCANTHROPES > Weretiger",
+          "relevance_score": 0.997,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "327-328",
+          "section_heading": "_Large Giant_ > _Medium Humanoid_ > **ACTIONS**",
+          "relevance_score": 0.997,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "243-243",
+          "section_heading": "_Large Monstrosity_ > **ACTIONS**",
+          "relevance_score": 0.996,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "345-345",
+          "section_heading": "_Medium Undead_ > **ACTIONS**",
+          "relevance_score": 0.996,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "256-256",
+          "section_heading": "_Medium Undead_ > DEVILS > **ACTIONS**",
+          "relevance_score": 0.995,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "74-76",
+          "section_heading": "Equipment > **WEAPON OPTIONS** > **PINNING SHOT**",
+          "relevance_score": 0.994,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "318-318",
+          "section_heading": "_Large Monstrosity_ > **ACTIONS**",
+          "relevance_score": 0.991,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "298-298",
+          "section_heading": "_Medium Humanoid_ > **ACTIONS**",
+          "relevance_score": 0.99,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "287-287",
+          "section_heading": "_Large Giant_ > **ACTIONS**",
+          "relevance_score": 0.99,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "298-298",
+          "section_heading": "_Medium Humanoid_ > **ACTIONS**",
+          "relevance_score": 0.989,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Languages available to a half-elf",
+      "category": "cross_page",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 1.0,
+        "precision@10": 0.8,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **COTTAGE HERITAGE**",
+          "relevance_score": 0.919,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **SUPPLICANT HERITAGE**",
+          "relevance_score": 0.598,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "62-62",
+          "section_heading": "**ELF LINEAGE TRAITS** > **COSMOPOLITAN HERITAGE**",
+          "relevance_score": 0.224,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **SLAYER HERITAGE**",
+          "relevance_score": 0.167,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **GROVE HERITAGE**",
+          "relevance_score": 0.113,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **DIASPORA HERITAGE**",
+          "relevance_score": 0.095,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **WILDLANDS HERITAGE**",
+          "relevance_score": 0.041,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "63-63",
+          "section_heading": "**ELF LINEAGE TRAITS** > **NOMADIC HERITAGE**",
+          "relevance_score": 0.023,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "62-62",
+          "section_heading": "**ELF LINEAGE TRAITS** > **SMALLFOLK LINEAGE TRAITS**",
+          "relevance_score": 0.005,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "286-286",
+          "section_heading": "_Medium Humanoid_ > ELF",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "How does the ranger's favored enemy feature work",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.38685280723454163,
+        "mrr@5": 0.2,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "40-41",
+          "section_heading": "_Requires a Shield_ > _1st, 6th, 13th, and 17th-Level Ranger Feature_",
+          "relevance_score": 0.991,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "42-42",
+          "section_heading": "_Requires a Shield_ > _20th-Level Ranger Feature_",
+          "relevance_score": 0.831,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "42-42",
+          "section_heading": "_Requires a Shield_ > _6th-Level Ranger Feature_",
+          "relevance_score": 0.689,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "42-42",
+          "section_heading": "_Requires a Shield_ > _10th-Level Ranger Feature_",
+          "relevance_score": 0.505,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "43-43",
+          "section_heading": "_Requires a Shield_ > _7th-Level Hunter Feature_",
+          "relevance_score": 0.281,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "42-42",
+          "section_heading": "_Requires a Shield_ > _18th-Level Ranger Feature_",
+          "relevance_score": 0.21,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "40-40",
+          "section_heading": "_Requires a Shield_ > _1st-Level Ranger Feature_",
+          "relevance_score": 0.064,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "42-42",
+          "section_heading": "_Requires a Shield_ > _9th-Level Ranger Feature_",
+          "relevance_score": 0.018,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "41-41",
+          "section_heading": "_Requires a Shield_ > _3rd, 7th, 11th, and 15th-Level Ranger Feature_",
+          "relevance_score": 0.017,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "40-40",
+          "section_heading": "_Requires a Shield_ > **CLASS FEATURES**",
+          "relevance_score": 0.006,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Bless spell duration and effect",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "234-234",
+          "section_heading": "**Paired Items** > _Potion, rare_",
+          "relevance_score": 0.989,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "122-122",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Bless**",
+          "relevance_score": 0.982,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "102-102",
+          "section_heading": "**Spellcasting** > **Duration**",
+          "relevance_score": 0.955,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "119-119",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Arcanist’s Magic Aura**",
+          "relevance_score": 0.767,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "121-121",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Bestow Curse**",
+          "relevance_score": 0.638,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "164-164",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Mind Blank**",
+          "relevance_score": 0.514,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "163-163",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Mass Suggestion**",
+          "relevance_score": 0.366,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "170-170",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Prayer of Healing**",
+          "relevance_score": 0.362,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "174-174",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Regenerate**",
+          "relevance_score": 0.351,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "168-168",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Planar Binding**",
+          "relevance_score": 0.328,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Fireball damage and area of effect",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "133-134",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Delayed Blast Fireball**",
+          "relevance_score": 0.979,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "144-144",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Fireball**",
+          "relevance_score": 0.952,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "117-117",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Antimagic Field**",
+          "relevance_score": 0.899,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "96-96",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Damage and Healing**",
+          "relevance_score": 0.764,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "96-96",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Dama e Rolls** **<u>g</u>**",
+          "relevance_score": 0.332,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "329-329",
+          "section_heading": "**S eed** **<u>p</u>** > **Magmin** > **Actions**",
+          "relevance_score": 0.316,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "190-190",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Wall of Fire**",
+          "relevance_score": 0.251,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "187-187",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Thunderwave**",
+          "relevance_score": 0.249,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "164-164",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Meteor Swarm**",
+          "relevance_score": 0.214,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "66-68",
+          "section_heading": "**Equipment** > **Adventuring Gear**",
+          "relevance_score": 0.193,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Hit dice and armor class of an adult red dragon",
+      "category": "stat_block",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "287-287",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Red Dragon**",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "288-288",
+          "section_heading": "**S eed** **<u>p</u>** > **Young Red Dragon**",
+          "relevance_score": 0.994,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "286-286",
+          "section_heading": "**S eed** **<u>p</u>** > **Ancient Red Dragon**",
+          "relevance_score": 0.993,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "288-288",
+          "section_heading": "**S eed** **<u>p</u>** > **Red Dragon Wyrmling**",
+          "relevance_score": 0.992,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "283-283",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Blue Dragon**",
+          "relevance_score": 0.99,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "285-285",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Green Dragon**",
+          "relevance_score": 0.989,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "321-321",
+          "section_heading": "**S eed** **<u>p</u>** > **Half-­‐Red Dragon Veteran**",
+          "relevance_score": 0.986,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "291-291",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Brass Dragon**",
+          "relevance_score": 0.986,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "302-302",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Silver Dragon**",
+          "relevance_score": 0.986,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "289-289",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult White Dragon**",
+          "relevance_score": 0.985,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Challenge rating of an owlbear",
+      "category": "stat_block",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "339-340",
+          "section_heading": "**Me hits** **<u>p</u>** > **Owlbear**",
+          "relevance_score": 0.997,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "385-385",
+          "section_heading": "**Creatures** > **Owl**",
+          "relevance_score": 0.84,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "258-258",
+          "section_heading": "**S eed** **<u>p</u>** > **Challenge**",
+          "relevance_score": 0.704,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "258-258",
+          "section_heading": "**S eed** **<u>p</u>** > **Experience Points by Challenge Rating**",
+          "relevance_score": 0.296,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "340-340",
+          "section_heading": "**Me hits** **<u>p</u>** > **Owlbear** > **Actions**",
+          "relevance_score": 0.176,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "256-256",
+          "section_heading": "**S eed** **<u>p</u>** > **Proficiency Bonus by Challenge Rating**",
+          "relevance_score": 0.135,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "326-327",
+          "section_heading": "**S eed** **<u>p</u>** > **Werebear**",
+          "relevance_score": 0.025,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "369-369",
+          "section_heading": "**Creatures** > **Brown Bear**",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "266-266",
+          "section_heading": "**S eed** **<u>p</u>** > **Bugbear**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "377-377",
+          "section_heading": "**Creatures** > **Giant Owl**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Proficiency bonus by character level",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.758586654365518,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.3,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "57-57",
+          "section_heading": "**Beyond 1st Level** > **Proficienc Bonus** **<u>y</u>**",
+          "relevance_score": 1.0,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "77-77",
+          "section_heading": "**Ability Scores and Modifiers** > **Proficiency Bonus**",
+          "relevance_score": 1.0,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "56-56",
+          "section_heading": "**Beyond 1st Level** > **Character Advancement**",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "56-56",
+          "section_heading": "**Beyond 1st Level**",
+          "relevance_score": 0.999,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "78-78",
+          "section_heading": "**Ability Scores and Modifiers** > **Charisma**",
+          "relevance_score": 0.998,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "256-256",
+          "section_heading": "**S eed** **<u>p</u>** > **Proficiency Bonus by Challenge Rating**",
+          "relevance_score": 0.989,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "256-257",
+          "section_heading": "**S eed** **<u>p</u>** > **Skills**",
+          "relevance_score": 0.986,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "13-13",
+          "section_heading": "**The Bard** > **Expertise**",
+          "relevance_score": 0.976,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "12-12",
+          "section_heading": "**The Bard** > **<u>Jack of All Trades</u>**",
+          "relevance_score": 0.973,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "39-39",
+          "section_heading": "**The Rogue** > **Expertise**",
+          "relevance_score": 0.969,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Cost and weight of a rope of climbing",
+      "category": "table",
+      "metrics": {
+        "ndcg@10": 0.8772153153380493,
+        "mrr@5": 1.0,
+        "precision@5": 0.4,
+        "precision@10": 0.2,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "241-241",
+          "section_heading": "**Paired Items** > **Rope of Climbing**",
+          "relevance_score": 0.991,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "241-241",
+          "section_heading": "**Paired Items** > **Rope of Entanglement** > _Wondrous item, rare_",
+          "relevance_score": 0.137,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "66-68",
+          "section_heading": "**Equipment** > **Adventuring Gear**",
+          "relevance_score": 0.128,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "69-70",
+          "section_heading": "**Equipment** > **Adventuring Gear**",
+          "relevance_score": 0.059,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "240-240",
+          "section_heading": "**Paired Items** > **Rod of Lordly Might**",
+          "relevance_score": 0.019,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "70-71",
+          "section_heading": "**Equipment** > **Tools**",
+          "relevance_score": 0.017,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "85-85",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Climbing, Swimming, and Crawling**",
+          "relevance_score": 0.015,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "72-72",
+          "section_heading": "**Equipment** > **Tack, Harness, and Drawn Vehicles**",
+          "relevance_score": 0.007,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "71-72",
+          "section_heading": "**Equipment** > **Mounts and Other Animals**",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "196-196",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Collapsing Roof** > _Mechanical trap_",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Rules for grappling and shoving",
+      "category": "prose",
+      "metrics": {
+        "ndcg@10": 0.6509209298071326,
+        "mrr@5": 0.5,
+        "precision@5": 0.4,
+        "precision@10": 0.2,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "96-96",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Grappling** > **Contests in Combat**",
+          "relevance_score": 0.978,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "95-96",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Grappling**",
+          "relevance_score": 0.141,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "96-96",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Shoving a Creature**",
+          "relevance_score": 0.04,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "75-75",
+          "section_heading": "**Feats** > **Gra ler** **<u>pp</u>**",
+          "relevance_score": 0.018,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "259-259",
+          "section_heading": "**S eed** **<u>p</u>** > **Limited Usage** > **Grapple Rules for Monsters**",
+          "relevance_score": 0.005,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "358-358",
+          "section_heading": "**Appendix PH-A: Conditions** > **Grappled**",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "343-343",
+          "section_heading": "**Me hits** **<u>p</u>** > **Roper** > **Actions**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "307-307",
+          "section_heading": "**S eed** **<u>p</u>** > **Water Elemental** > **Actions**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "118-118",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Arcane Hand**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "269-269",
+          "section_heading": "**S eed** **<u>p</u>** > **Couatl** > **Actions**",
+          "relevance_score": 0.0,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "How does the Monk's Flurry of Blows work at level 5",
+      "category": "cross_page",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.6,
+        "precision@10": 0.3,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "28-28",
+          "section_heading": "**The Monk** > **Open Hand Technique**",
+          "relevance_score": 0.981,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "27-27",
+          "section_heading": "**The Monk** > **Flurry of Blows**",
+          "relevance_score": 0.904,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "27-27",
+          "section_heading": "**The Monk** > **Ki**",
+          "relevance_score": 0.845,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "28-28",
+          "section_heading": "**The Monk** > **Stunnin Strike** **<u>g</u>**",
+          "relevance_score": 0.785,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "29-29",
+          "section_heading": "**The Monk** > **Quivering Palm**",
+          "relevance_score": 0.526,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "27-27",
+          "section_heading": "**The Monk** > **Deflect Missiles**",
+          "relevance_score": 0.384,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "28-28",
+          "section_heading": "**The Monk** > **Evasion**",
+          "relevance_score": 0.372,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "27-27",
+          "section_heading": "**The Monk** > **Extra Attack**",
+          "relevance_score": 0.248,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "26-26",
+          "section_heading": "**The Monk**",
+          "relevance_score": 0.215,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "27-27",
+          "section_heading": "**The Monk** > **Slow Fall**",
+          "relevance_score": 0.177,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Cloud Dragon stats in Basic Fantasy",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 0.0,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "273-273",
+          "section_heading": "_Gargantuan Dragon_",
+          "relevance_score": 0.033,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "273-274",
+          "section_heading": "_Medium Dragon_ > **BONUS ACTIONS**",
+          "relevance_score": 0.027,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "286-286",
+          "section_heading": "**S eed** **<u>p</u>** > **Ancient Red Dragon**",
+          "relevance_score": 0.022,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "284-284",
+          "section_heading": "**S eed** **<u>p</u>** > **Ancient Green Dragon**",
+          "relevance_score": 0.017,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "285-285",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Green Dragon**",
+          "relevance_score": 0.015,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "302-302",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Silver Dragon**",
+          "relevance_score": 0.014,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "263-263",
+          "section_heading": "_Huge Dragon_",
+          "relevance_score": 0.013,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "276-276",
+          "section_heading": "_Huge Dragon_",
+          "relevance_score": 0.012,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "275-276",
+          "section_heading": "_Large Dragon_ > **LEGENDARY ACTIONS**",
+          "relevance_score": 0.011,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "263-263",
+          "section_heading": "_Medium Dragon_",
+          "relevance_score": 0.011,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Fireball damage in 5E SRD",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 0.3562071871080222,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.1,
+        "recall@5": 0.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "190-190",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Wall of Fire**",
+          "relevance_score": 0.965,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "133-134",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Delayed Blast Fireball**",
+          "relevance_score": 0.945,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "306-307",
+          "section_heading": "**S eed** **<u>p</u>** > **Fire Elemental**",
+          "relevance_score": 0.882,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "109-109",
+          "section_heading": "Equipment > **BALL LIGHTNING DAMAGE**",
+          "relevance_score": 0.854,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "172-172",
+          "section_heading": "**F** > <mark>FIRE BOLT</mark> > <mark>FIREBALL</mark>",
+          "relevance_score": 0.654,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "144-144",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Fireball**",
+          "relevance_score": 0.637,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "172-172",
+          "section_heading": "**F** > <mark>FIRE BOLT</mark>",
+          "relevance_score": 0.629,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "329-329",
+          "section_heading": "**S eed** **<u>p</u>** > **Magmin** > **Actions**",
+          "relevance_score": 0.611,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "172-172",
+          "section_heading": "**F** > <mark>FLAME STRIKE</mark>",
+          "relevance_score": 0.534,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "144-144",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Fire Bolt**",
+          "relevance_score": 0.515,
+          "tier": "strong"
+        }
+      ]
+    },
+    {
+      "text": "Wizard spell slots progression in Black Flag",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "57-57",
+          "section_heading": "_Prerequisite: None_ > **WIZARD PROGRESSION**",
+          "relevance_score": 0.955,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "59-59",
+          "section_heading": "_Prerequisite: None_ > _20th-Level Wizard Feature_",
+          "relevance_score": 0.297,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "60-60",
+          "section_heading": "_Prerequisite: None_ > **BATTLE MAGE PROGRESSION**",
+          "relevance_score": 0.198,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "52-52",
+          "section_heading": "**The Wizard**",
+          "relevance_score": 0.151,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "53-53",
+          "section_heading": "**The Wizard** > **Learning Spells of 1st Level and Higher**",
+          "relevance_score": 0.128,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "348-348",
+          "section_heading": "**S hinxes** **<u>p</u>** > **Gynosphinx**",
+          "relevance_score": 0.016,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "204-204",
+          "section_heading": "**W** > <mark>WALL OF FIRE</mark>",
+          "relevance_score": 0.01,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "395-396",
+          "section_heading": "**Appendix MM-B: Nonplayer Characters** > **Archmage**",
+          "relevance_score": 0.008,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "325-326",
+          "section_heading": "**S eed** **<u>p</u>** > **Lich**",
+          "relevance_score": 0.008,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "204-204",
+          "section_heading": "**W** > <mark>WALL OF FORCE</mark>",
+          "relevance_score": 0.006,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Owlbear stats in 5E SRD",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "339-340",
+          "section_heading": "**Me hits** **<u>p</u>** > **Owlbear**",
+          "relevance_score": 0.649,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "328-328",
+          "section_heading": "_Large Giant_ > _Medium Humanoid_ > **ACTIONS**",
+          "relevance_score": 0.471,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "340-340",
+          "section_heading": "**Me hits** **<u>p</u>** > **Owlbear** > **Actions**",
+          "relevance_score": 0.46,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "328-329",
+          "section_heading": "_Large Giant_ > _Medium Humanoid_ > **BONUS ACTIONS**",
+          "relevance_score": 0.332,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "21-21",
+          "section_heading": "**CHARACTER CLASSES** > **POTENT FORMS**",
+          "relevance_score": 0.069,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "266-266",
+          "section_heading": "**S eed** **<u>p</u>** > **Bugbear**",
+          "relevance_score": 0.048,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "385-385",
+          "section_heading": "**Creatures** > **Owl**",
+          "relevance_score": 0.021,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "327-327",
+          "section_heading": "**S eed** **<u>p</u>** > **Werebear** > **Actions**",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "365-365",
+          "section_heading": "_Huge Beast_ > Owl                                                               CR 0",
+          "relevance_score": 0.002,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "326-327",
+          "section_heading": "**S eed** **<u>p</u>** > **Werebear**",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Goblin attack damage in Basic Fantasy",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 0.8175295903539445,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.2,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "108-109",
+          "section_heading": "PART 6:  MONSTERS > Goblin",
+          "relevance_score": 0.8,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "75-76",
+          "section_heading": "PART 6:  MONSTERS > Caecilia, Giant",
+          "relevance_score": 0.728,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "73-73",
+          "section_heading": "PART 6:  MONSTERS > Beetle, Giant Bombardier > BASIC FANTASY RPG",
+          "relevance_score": 0.538,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "297-298",
+          "section_heading": "_Small Humanoid_ > _Medium Humanoid_ > **ACTIONS**",
+          "relevance_score": 0.918,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "315-315",
+          "section_heading": "**S eed** **<u>p</u>** > **Goblin** > **Actions**",
+          "relevance_score": 0.885,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "322-322",
+          "section_heading": "**S eed** **<u>p</u>** > **Hippogriff**",
+          "relevance_score": 0.721,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "107-108",
+          "section_heading": "PART 6:  MONSTERS > Gnoll > BASIC FANTASY RPG",
+          "relevance_score": 0.286,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "121-121",
+          "section_heading": "PART 6:  MONSTERS > Jelly, Black (Black Pudding) > BASIC FANTASY RPG",
+          "relevance_score": 0.22,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "266-266",
+          "section_heading": "**S eed** **<u>p</u>** > **Bugbear**",
+          "relevance_score": 0.025,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "100-101",
+          "section_heading": "PART 6:  MONSTERS > Ghost",
+          "relevance_score": 0.007,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Bless spell in 5E SRD",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 0.5,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "108-108",
+          "section_heading": "**Spellcasting** > **1st Level**",
+          "relevance_score": 0.202,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "122-122",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Bless**",
+          "relevance_score": 0.147,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "106-106",
+          "section_heading": "**Spellcasting** > **1st Level**",
+          "relevance_score": 0.114,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "17-17",
+          "section_heading": "**The Cleric** > **Life Domain Spells**",
+          "relevance_score": 0.041,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "149-149",
+          "section_heading": "**SPELLCASTING** > **1ST CIRCLE**",
+          "relevance_score": 0.02,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "157-157",
+          "section_heading": "**B** > **Casting Time:** 1 action",
+          "relevance_score": 0.013,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "157-157",
+          "section_heading": "**B** > <mark>BLESS</mark>",
+          "relevance_score": 0.009,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "193-193",
+          "section_heading": "**S** > <mark>SACRED FLAME</mark>",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "176-176",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Sacred Flame**",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "122-122",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Blight**",
+          "relevance_score": 0.001,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Initiative roll in Black Flag",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 0.0,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "80-80",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Initiative**",
+          "relevance_score": 0.656,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "90-90",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Combat Step by Step**",
+          "relevance_score": 0.523,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "134-134",
+          "section_heading": "**PLAYING THE GAME** > **3. ROLL INITIATIVE**",
+          "relevance_score": 0.383,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "8-8",
+          "section_heading": "**CHARACTER CLASSES** > _6th-Level Barbarian Feature_",
+          "relevance_score": 0.248,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "90-90",
+          "section_heading": "**Dexterit** **<u>y</u>** > **Initiative**",
+          "relevance_score": 0.202,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "68-68",
+          "section_heading": "MAGIC TALENTS > Aware",
+          "relevance_score": 0.18,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "9-9",
+          "section_heading": "**The Barbarian** > **Feral Instinct**",
+          "relevance_score": 0.158,
+          "tier": "good"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "35-35",
+          "section_heading": "_Requires a Shield_ > _7th-Level Open Hand Feature_",
+          "relevance_score": 0.143,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "127-128",
+          "section_heading": "**Ran er S ells** **<u>g p</u>** > **Conjure Celestial**",
+          "relevance_score": 0.138,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "13-13",
+          "section_heading": "**The Bard** > **Superior Inspiration**",
+          "relevance_score": 0.121,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Fighter class features in Black Flag",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 0.0,
+        "mrr@5": 0.0,
+        "precision@5": 0.0,
+        "precision@10": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.0
+      },
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "24-24",
+          "section_heading": "**Fighter** > **Class Features**",
+          "relevance_score": 0.911,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "23-23",
+          "section_heading": "**CHARACTER CLASSES** > **CLASS FEATURES**",
+          "relevance_score": 0.778,
+          "tier": "strong"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "24-24",
+          "section_heading": "**CHARACTER CLASSES** > _3rd, 7th, 11th, and 15th-Level Fighter Feature_",
+          "relevance_score": 0.728,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "71-71",
+          "section_heading": "PART 6:  MONSTERS > Bear, Black",
+          "relevance_score": 0.322,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "120-120",
+          "section_heading": "PART 6:  MONSTERS > Jelly, Black (Black Pudding)",
+          "relevance_score": 0.236,
+          "tier": "good"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "57-57",
+          "section_heading": "**Beyond 1st Level** > **Multiclassing Proficiencies**",
+          "relevance_score": 0.096,
+          "tier": "weak"
+        },
+        {
+          "filename": "Black-Flag-Roleplaying.pdf",
+          "pages": "5-5",
+          "section_heading": "**CHARACTER CREATION & LEVELING** > **MULTICLASSING PROFICIENCIES**",
+          "relevance_score": 0.092,
+          "tier": "weak"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "121-122",
+          "section_heading": "PART 6:  MONSTERS > Jelly, Black (Black Pudding) > MONSTERS",
+          "relevance_score": 0.132,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "121-121",
+          "section_heading": "PART 6:  MONSTERS > Jelly, Black (Black Pudding) > BASIC FANTASY RPG",
+          "relevance_score": 0.066,
+          "tier": "weak"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "24-24",
+          "section_heading": "**The Fighter**",
+          "relevance_score": 0.027,
+          "tier": "weak"
+        }
+      ]
+    },
+    {
+      "text": "Surprise rules in Basic Fantasy",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "54-54",
+          "section_heading": "PART 5:  THE ENCOUNTER > Surprise",
+          "relevance_score": 0.882,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "5-5",
+          "section_heading": "PART 1:  INTRODUCTION > What is This?",
+          "relevance_score": 0.855,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "191-191",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Hopeless Characters > BASIC FANTASY RPG",
+          "relevance_score": 0.626,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "198-198",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Other Magic Items > BASIC FANTASY RPG",
+          "relevance_score": 0.594,
+          "tier": "strong"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "156-156",
+          "section_heading": "PART 6:  MONSTERS > Treant > BASIC FANTASY RPG",
+          "relevance_score": 0.494,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "39-39",
+          "section_heading": "PART 3:  SPELLS > **Reincarnate** > BASIC FANTASY RPG",
+          "relevance_score": 0.459,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "23-23",
+          "section_heading": "PART 3:  SPELLS > All Spells, in Alphabetical Order > BASIC FANTASY RPG",
+          "relevance_score": 0.429,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "204-204",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Strongholds > BASIC FANTASY RPG",
+          "relevance_score": 0.363,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "27-27",
+          "section_heading": "PART 3:  SPELLS > **Cure Serious Wounds*** > BASIC FANTASY RPG",
+          "relevance_score": 0.36,
+          "tier": "good"
+        },
+        {
+          "filename": "Basic-Fantasy-RPG-Rules-r142.pdf",
+          "pages": "208-208",
+          "section_heading": "PART 8:  GAME MASTER INFORMATION > Getting Started with Basic Fantasy RPG",
+          "relevance_score": 0.347,
+          "tier": "good"
+        }
+      ]
+    },
+    {
+      "text": "Adult red dragon stats in 5E SRD",
+      "category": "cross_system",
+      "metrics": {
+        "ndcg@10": 1.0,
+        "mrr@5": 1.0,
+        "precision@5": 0.2,
+        "precision@10": 0.1,
+        "recall@5": 1.0,
+        "recall@10": 1.0
+      },
+      "relevance": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "results": [
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "287-287",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Red Dragon**",
+          "relevance_score": 0.996,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "287-287",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Red Dragon** > **Actions**",
+          "relevance_score": 0.973,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "285-285",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Green Dragon**",
+          "relevance_score": 0.851,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "283-283",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Blue Dragon**",
+          "relevance_score": 0.835,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "288-288",
+          "section_heading": "**S eed** **<u>p</u>** > **Young Red Dragon**",
+          "relevance_score": 0.809,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "281-281",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Black Dragon**",
+          "relevance_score": 0.789,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "302-302",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Silver Dragon**",
+          "relevance_score": 0.737,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "291-291",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Brass Dragon**",
+          "relevance_score": 0.71,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "286-286",
+          "section_heading": "**S eed** **<u>p</u>** > **Ancient Red Dragon**",
+          "relevance_score": 0.634,
+          "tier": "strong"
+        },
+        {
+          "filename": "SRD_CC_v5.1.pdf",
+          "pages": "299-299",
+          "section_heading": "**S eed** **<u>p</u>** > **Adult Gold Dragon**",
+          "relevance_score": 0.603,
+          "tier": "strong"
+        }
+      ]
+    }
+  ]
+}

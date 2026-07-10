@@ -12,6 +12,7 @@ specific answer chunk.
 cd sidecar
 uv run python -m evals.run_eval                          # print metrics
 uv run python -m evals.run_eval --write-baseline NAME    # also write baselines/NAME.{json,md}
+uv run python -m evals.run_eval --hybrid                 # BM25+RRF ablation (experimental search flag)
 ```
 
 Prerequisites:
@@ -35,7 +36,8 @@ index-time changes don't show up in the metrics until you do.
 
 40 pre-registered queries (30 locked from `chunker_spike`, 10 cross-system
 from `hybrid_retrieval_spike`) run through the production `/api/search`
-endpoint (rerank on unless `--no-rerank`). Reported per category —
+endpoint (rerank on unless `--no-rerank`; `--hybrid` turns on the
+experimental BM25+RRF candidate fusion — see `lexical.py`). Reported per category —
 `stat_block`, `table`, `prose`, `cross_page`, `cross_system` — and overall:
 
 - **nDCG@10** — binary gains, normalized by the ideal ordering of the

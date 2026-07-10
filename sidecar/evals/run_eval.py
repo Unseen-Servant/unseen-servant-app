@@ -96,7 +96,7 @@ def ensure_indexed(client, corpus_dir: Path, data_dir: Path) -> None:
     print(f"indexed {body['indexed']}/{body['total']} PDFs")
 
 
-def run(client, queries: list[dict], rerank: bool) -> list[dict]:
+def run(client, queries: list[dict], rerank: bool, hybrid: bool) -> list[dict]:
     per_query = []
     for q in queries:
         payload = {
@@ -104,6 +104,7 @@ def run(client, queries: list[dict], rerank: bool) -> list[dict]:
             "n_results": TOP_K,
             "search_all": True,
             "rerank": rerank,
+            "hybrid": hybrid,
         }
         if q["source"] not in (None, "", "any"):
             payload["source_filter"] = next(
@@ -140,6 +141,9 @@ def main() -> None:
     ap.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     ap.add_argument("--no-rerank", action="store_true",
                     help="disable the reranker (production default is on)")
+    ap.add_argument("--hybrid", action="store_true",
+                    help="fuse BM25 into the candidate pool via RRF "
+                         "(experimental /api/search hybrid flag)")
     ap.add_argument("--write-baseline", metavar="NAME",
                     help="write evals/baselines/NAME.json and NAME.md")
     args = ap.parse_args()
@@ -151,8 +155,12 @@ def main() -> None:
     ensure_indexed(client, args.corpus, args.data_dir)
 
     rerank = not args.no_rerank
-    print(f"running {len(queries)} queries (rerank={'on' if rerank else 'off'})...")
-    per_query = run(client, queries, rerank)
+    print(
+        f"running {len(queries)} queries "
+        f"(rerank={'on' if rerank else 'off'}, "
+        f"retrieval={'hybrid' if args.hybrid else 'dense'})..."
+    )
+    per_query = run(client, queries, rerank, args.hybrid)
     summary = scorer.aggregate(per_query)
 
     report = scorer.format_report(summary)
@@ -165,6 +173,7 @@ def main() -> None:
         meta = {
             "date": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "rerank": rerank,
+            "retrieval": "hybrid" if args.hybrid else "dense",
             "corpus": EXPECTED_PDFS,
             "queries": len(queries),
             "top_k": TOP_K,
@@ -179,7 +188,8 @@ def main() -> None:
             f"# Retrieval eval baseline — {meta['date']}\n\n"
             f"Corpus: {', '.join(EXPECTED_PDFS)}\n"
             f"Queries: {len(queries)} (graded on the specific answer chunk)\n"
-            f"Rerank: {'on' if rerank else 'off'}\n\n"
+            f"Rerank: {'on' if rerank else 'off'}\n"
+            f"Retrieval: {meta['retrieval']}\n\n"
             "```\n" + report + "\n```\n"
         )
         print(f"\nwrote {json_path.relative_to(EVALS_DIR.parent)} and {md_path.relative_to(EVALS_DIR.parent)}")

@@ -48,6 +48,7 @@ from parents_store import (
     delete_parents_for_source,
     clear_all_parents,
 )
+from lexical import LexicalIndex, matches_where, rrf_fuse
 from reranker import rerank_scores
 
 
@@ -523,6 +524,11 @@ class SearchRequest(BaseModel):
     source_paths: list[str] | None = None
     search_all: bool = False
     rerank: bool = True
+    # Experimental (BM25 re-test, 2026-07-01 roadmap REOPEN item): fuse a
+    # BM25 ranking over the same chunks into the dense candidate pool via
+    # reciprocal-rank fusion. Default off — does not change production
+    # search behavior.
+    hybrid: bool = False
 
 class SetGameSystemRequest(BaseModel):
     filename: str
@@ -3038,6 +3044,19 @@ def create_app(
         save_collections(data_dir, store)
         return {"active_context": None}
 
+    # Experimental BM25 hybrid (default-off `hybrid` search flag): the
+    # lexical index is built lazily on the first hybrid search and rebuilt
+    # whenever the chunk count changes (reindex/delete). Held in memory —
+    # acceptable for the experimental flag, revisit before any default-on.
+    lexical_cache: dict = {"count": None, "index": None}
+
+    def _get_lexical_index() -> LexicalIndex:
+        count = collection.count()
+        if lexical_cache["index"] is None or lexical_cache["count"] != count:
+            lexical_cache["index"] = LexicalIndex.from_collection(collection)
+            lexical_cache["count"] = count
+        return lexical_cache["index"]
+
     @app.post("/api/search")
     async def search(request: SearchRequest, http_req: Request):
         """Parent-document semantic search.
@@ -3230,6 +3249,43 @@ def create_app(
             ordered_distances = results["distances"][0]
             ordered_docs = results["documents"][0]
 
+            # Experimental lexical hybrid (default-off): fuse the dense
+            # candidate ranking with a BM25 ranking over the same chunks
+            # via reciprocal-rank fusion, then hand the fused pool to the
+            # boost/rerank/dedupe pipeline unchanged. The BM25 side
+            # mirrors the dense query's scope via its `where` clause.
+            # BM25-only candidates carry no cosine distance — they get a
+            # sentinel 1.0 (relevance 0.0) that the reranker replaces
+            # with a real cross-encoder score when rerank is on.
+            ordering_scores: list[float] | None = None
+            if request.hybrid:
+                lex = _get_lexical_index()
+                lex_where = query_kwargs.get("where")
+                bm25_ids = lex.search(
+                    request.query,
+                    k=request.n_results * 10,
+                    allowed=lambda m: matches_where(m, lex_where),
+                )
+                dense_ids = results["ids"][0]
+                dense_pos = {cid: i for i, cid in enumerate(dense_ids)}
+                fused_metadatas, fused_distances = [], []
+                fused_docs, fused_scores = [], []
+                for cid, score in rrf_fuse([dense_ids, bm25_ids]):
+                    if cid in dense_pos:
+                        i = dense_pos[cid]
+                        fused_metadatas.append(ordered_metadatas[i])
+                        fused_distances.append(ordered_distances[i])
+                        fused_docs.append(ordered_docs[i])
+                    else:
+                        fused_metadatas.append(lex.metadatas[cid])
+                        fused_distances.append(1.0)
+                        fused_docs.append(lex.documents[cid])
+                    fused_scores.append(score)
+                ordered_metadatas = fused_metadatas
+                ordered_distances = fused_distances
+                ordered_docs = fused_docs
+                ordering_scores = fused_scores
+
             # Game-system soft-boost: when the query names a system and
             # the request isn't already scoped to one (or to a single
             # file), reorder the over-fetched candidate pool by
@@ -3250,10 +3306,13 @@ def create_app(
                         ordered_metadatas, target_systems,
                         data_dir, _merged["known"],
                     )
+                    # Hybrid candidates are ordered by RRF score, not
+                    # cosine — boost whichever scale ordered the pool.
                     order = sorted(
                         range(len(boost_factors)),
                         key=lambda i: (
-                            max(0.0, 1.0 - ordered_distances[i])
+                            (ordering_scores[i] if ordering_scores is not None
+                             else max(0.0, 1.0 - ordered_distances[i]))
                             * boost_factors[i]
                         ),
                         reverse=True,
@@ -3262,6 +3321,8 @@ def create_app(
                     ordered_distances = [ordered_distances[i] for i in order]
                     ordered_docs = [ordered_docs[i] for i in order]
                     boost_factors = [boost_factors[i] for i in order]
+                    if ordering_scores is not None:
+                        ordering_scores = [ordering_scores[i] for i in order]
 
             # Re-rank the top of the candidate pool with a cross-encoder.
             # Scoring (query, chunk-text) jointly is more accurate than raw

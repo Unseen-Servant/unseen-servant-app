@@ -94,6 +94,14 @@ These were tested and rejected by the project's own spikes; don't re-propose:
 
 ### ⚠️ REOPEN (do not treat as closed) — BM25 / lexical hybrid search
 
+> **Re-test run 2026-07-09 → NO-GO for default-on; flag retained.** Heading-prepended
+> BM25 + RRF against the production path, graded on the answer chunk: real
+> complementary recall (cross_system recall@5 0.600 → 0.900 rerank-on) but
+> aggregate nDCG@10/MRR@5 regress in both rerank configs. The English-only
+> corpus still can't test the French/OOV regime — that follow-up now needs
+> only item 16's French queries plus `run_eval --hybrid`. Numbers and
+> analysis: [2026-07-09-bm25-hybrid-retest.md](2026-07-09-bm25-hybrid-retest.md).
+
 **Verdict: reopen-with-caveats.** A dedicated adversarial re-validation (three evidence readers → a two-sided juror panel → neutral chair) re-derived the scorer from `score_retrieval.py` and recomputed every headline from `outputs/retrieval.full.raw.json`. **Both jurors — including the one assigned to defend the rejection — concluded the prior NO-GO does not settle the question for this library.** Expected value of a proper re-test: **high**.
 
 **What the spike genuinely established (and reproduces exactly):** untuned uniform-RRF plain-BM25 fused into an already-strong heading-dense baseline is a wash-to-slight-loss *on that corpus*. V0_h MRR@5 = 0.851, V2_h = 0.723 (Δ −0.128) reproduce to the digit; bge-m3 native sparse (V3 = 0.550) failed the same way; and on this corpus BM25 added **zero** complementary top-5 recall (0 unique answers found vs 10 the other way). That narrow finding is real — **the reopen case rests on generalization, not on latent BM25 wins hiding in this data.**
