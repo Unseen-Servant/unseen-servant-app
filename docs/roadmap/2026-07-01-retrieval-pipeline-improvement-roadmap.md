@@ -75,7 +75,7 @@ The Dragonbane FALLING rule comes back with sentences interleaved out of order �
 
 ## Quick wins worth batching
 
-- **Game-system soft-boost** — `hybrid_retrieval_spike` measured **+0.042 cross-system MRR**, ~30 lines, "never hurts"; blocked only on a `KNOWN_SYSTEMS` keyword gap (`game_systems.py`).
+- **Game-system soft-boost** ✅ *(shipped 2026-07-09)* — `hybrid_retrieval_spike` measured **+0.042 cross-system MRR**, ~30 lines, "never hurts"; was blocked only on a `KNOWN_SYSTEMS` keyword gap (`game_systems.py`). Shipped query-side (no re-index): keyword gap filled, boost in `/api/search`, covered by `tests/test_search_boost.py`. Measured on the eval harness: cross_system MRR@5 0.433 → 0.550, nDCG@10 0.514 → 0.580, every other category unchanged ([baseline](../../sidecar/evals/baselines/2026-07-09-system-boost.md)).
 - **Printed page-labels in citations** — surface `doc[i].get_label()` so "p.167" matches the book's printed page, not the physical index.
 - **Debounce min-query-length** — the full embed+rerank pipeline fires per keystroke-pause on 1-char queries ([Header.svelte](../../src/lib/Header.svelte)).
 - **Tighten prose page-spans** — heading-sparse sections stamp every chunk with the whole run's span, so "pp.33–41" is a 9-page scan ([chunker.py:139](../../sidecar/chunker.py:139)).

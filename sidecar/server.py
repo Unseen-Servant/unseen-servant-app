@@ -274,6 +274,72 @@ def detect_game_system(
     return hits[0] if hits else "unknown"
 
 
+# Game-system soft-boost (hybrid_retrieval_spike V8: +0.042 cross-system
+# MRR@5). When the query names a system, matching-system candidates get
+# ×1.5 and the rest ×0.7 on the ordering score — a reweight, not a hard
+# filter, so a strong wrong-system hit can still surface.
+SYSTEM_BOOST_MATCH = 1.5
+SYSTEM_BOOST_NONMATCH = 0.7
+
+
+def detect_systems_in_query(
+    query: str,
+    known_systems: dict[str, list[str]] | None = None,
+) -> set[str]:
+    """Game systems named in the query text ("Fireball damage in 5E SRD").
+
+    Same normalized-substring matching as ``detect_game_systems`` uses
+    for paths, so keyword hygiene (no ≤3-char keywords) carries over.
+    """
+    systems = known_systems if known_systems is not None else KNOWN_SYSTEMS
+    query_norm = _normalize_for_match(query)
+    return {
+        tag for tag, keywords in systems.items()
+        if any(_normalize_for_match(k) in query_norm for k in keywords if k)
+    }
+
+
+def _system_boost_factors(
+    metadatas: list[dict],
+    target_systems: set[str],
+    data_dir: Path | None,
+    known_systems: dict[str, list[str]],
+) -> list[float]:
+    """Per-candidate boost factor by system-match against the query.
+
+    A candidate's systems are resolved query-side: the chunk's metadata
+    tag, plus the manifest tags for its source (which carry user
+    overrides and secondary systems), falling back to keyword detection
+    on the source path. The fallback is what makes the boost work
+    without a re-index on libraries whose chunks were stamped "unknown"
+    before a KNOWN_SYSTEMS keyword existed.
+    """
+    manifest_files = load_manifest(data_dir).files if data_dir else {}
+    by_source: dict[str, float] = {}
+    factors: list[float] = []
+    for meta in metadatas:
+        src = meta.get("source", "")
+        if src not in by_source:
+            systems: set[str] = set()
+            tag = meta.get("game_system")
+            if tag and tag != "unknown":
+                systems.add(tag)
+            entry = manifest_files.get(src)
+            if entry:
+                systems.update(
+                    t for t in (entry.game_system, *entry.game_systems)
+                    if t and t != "unknown"
+                )
+            if not systems:
+                systems = set(detect_game_systems(Path(src), None, known_systems))
+            by_source[src] = (
+                SYSTEM_BOOST_MATCH if systems & target_systems
+                else SYSTEM_BOOST_NONMATCH
+            )
+        factors.append(by_source[src])
+    return factors
+
+
 _BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
 
 
@@ -3162,6 +3228,40 @@ def create_app(
 
             ordered_metadatas = results["metadatas"][0]
             ordered_distances = results["distances"][0]
+            ordered_docs = results["documents"][0]
+
+            # Game-system soft-boost: when the query names a system and
+            # the request isn't already scoped to one (or to a single
+            # file), reorder the over-fetched candidate pool by
+            # boosted cosine similarity. Ordering only — distances (and
+            # therefore reported relevance/tier) stay on the raw scale.
+            # All distances are cosine at this point, so one sort key is
+            # safe; ties keep chroma's order (sorted() is stable).
+            boost_factors: list[float] | None = None
+            if not (
+                request.game_system or request.game_systems
+                or request.source_filter
+            ):
+                target_systems = detect_systems_in_query(
+                    request.query, _merged["known"]
+                )
+                if target_systems:
+                    boost_factors = _system_boost_factors(
+                        ordered_metadatas, target_systems,
+                        data_dir, _merged["known"],
+                    )
+                    order = sorted(
+                        range(len(boost_factors)),
+                        key=lambda i: (
+                            max(0.0, 1.0 - ordered_distances[i])
+                            * boost_factors[i]
+                        ),
+                        reverse=True,
+                    )
+                    ordered_metadatas = [ordered_metadatas[i] for i in order]
+                    ordered_distances = [ordered_distances[i] for i in order]
+                    ordered_docs = [ordered_docs[i] for i in order]
+                    boost_factors = [boost_factors[i] for i in order]
 
             # Re-rank the top of the candidate pool with a cross-encoder.
             # Scoring (query, chunk-text) jointly is more accurate than raw
@@ -3175,7 +3275,6 @@ def create_app(
             # ("Combat > Grappling") versus a creature card with the same
             # keyword ("Goblin > Actions"), and tends to over-rank the
             # keyword-dense action text.
-            ordered_docs = results["documents"][0]
             rerank_applied = False
             pool = 0
             if request.rerank and _rerank_safe_for_query(request.query):
@@ -3189,9 +3288,23 @@ def create_app(
                 scores = rerank_scores(request.query, rerank_inputs)
                 if scores is not None:
                     rerank_applied = True
-                    order = sorted(
-                        range(pool), key=lambda i: scores[i], reverse=True
-                    )
+                    # The soft-boost weighs the cross-encoder scores the
+                    # same way it weighed cosine similarity; the stored
+                    # distances stay raw either way.
+                    if boost_factors is not None:
+                        order = sorted(
+                            range(pool),
+                            key=lambda i: scores[i] * boost_factors[i],
+                            reverse=True,
+                        )
+                        boost_factors = (
+                            [boost_factors[i] for i in order]
+                            + boost_factors[pool:]
+                        )
+                    else:
+                        order = sorted(
+                            range(pool), key=lambda i: scores[i], reverse=True
+                        )
                     head_metadatas = [ordered_metadatas[i] for i in order]
                     # Use 1 - rerank_score so 1 - distance = rerank score
                     # downstream, keeping the response shape unchanged.
@@ -3217,6 +3330,7 @@ def create_app(
                     "distance": distance,
                     "doc": ordered_docs[i],
                     "reranked": rerank_applied and i < pool,
+                    "boost": boost_factors[i] if boost_factors is not None else 1.0,
                 })
                 if len(picked) >= request.n_results:
                     break
@@ -3243,8 +3357,13 @@ def create_app(
                             p["reranked"] = True
                         # All picked distances are now cross-encoder scale;
                         # stable sort keeps head order, interleaves the
-                        # rescored tail where it belongs.
-                        picked.sort(key=lambda p: p["distance"])
+                        # rescored tail where it belongs — by the boosted
+                        # ordering score when the soft-boost is active.
+                        picked.sort(
+                            key=lambda p: -(
+                                max(0.0, 1.0 - p["distance"]) * p["boost"]
+                            )
+                        )
 
             parent_docs = fetch_parents_extended(
                 data_dir, [p["metadata"]["parent_id"] for p in picked]

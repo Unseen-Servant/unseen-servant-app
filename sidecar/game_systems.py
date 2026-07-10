@@ -32,7 +32,15 @@ GAME_SYSTEMS: list[dict] = [
         # "5e srd" is the safest short form (won't collide with "5e" in 3.5E
         # or 4E folder names). "5th edition" catches content that names the
         # edition prose-style.
-        "keywords": ["d&d 5e", "dnd 5e", "5e srd", "5th edition"],
+        #
+        # "black flag" (Kobold Press's 5E-compatible Black Flag Roleplaying /
+        # ToV SRD) and the WotC CC SRD filename forms ("SRD_CC_v5.1" →
+        # "srd cc", "SRD5.1" → "srd 5.1") don't name the edition anywhere
+        # in their filenames and previously fell through to "unknown".
+        "keywords": [
+            "d&d 5e", "dnd 5e", "5e srd", "5th edition",
+            "black flag", "srd cc", "srd 5.1",
+        ],
         "color": "#c75450",
     },
     {
