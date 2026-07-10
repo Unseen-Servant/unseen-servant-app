@@ -531,12 +531,13 @@ class SearchRequest(BaseModel):
     # search behavior.
     hybrid: bool = False
     # Rewrite out-of-vocabulary query tokens to the closest library term
-    # before embedding (typo-tolerance design, section A). Default off —
-    # NO-GO for default-on per the 2026-07-10 eval: clean queries with
-    # tokens the corpus lacks ("stats", "Black Flag") get rewritten
-    # (evals/baselines/2026-07-10-spellfix.md). Retained for eval
-    # ablation and opt-in use.
-    spell_correction: bool = False
+    # before embedding (typo-tolerance design, section A). Default on —
+    # the 2026-07-10 eval gate passed once general-English words were
+    # protected from rewriting: clean queries reproduce the no-correction
+    # baseline to the digit, and the typo set closes >half its nDCG/MRR
+    # gap (evals/baselines/2026-07-10-spellfix-en-guard.md). Off-switch
+    # for eval ablation and as an escape hatch.
+    spell_correction: bool = True
 
 class SetGameSystemRequest(BaseModel):
     filename: str

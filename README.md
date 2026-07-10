@@ -65,6 +65,8 @@ Legend Lore is built around three ideas:
 ### Search
 
 - Semantic search across indexed PDFs with page citations
+- Misspelled queries are corrected against your library's own vocabulary
+  ("owlber" → "owlbear") before searching; results say what was corrected
 - Local cross-encoder reranking (ONNX, CPU-only) sharpens the top results
 - Results carry a relevance tier — **strong / good / weak** — instead of a raw "% match";
   weak matches are dimmed below a divider so noise reads as noise
@@ -295,7 +297,7 @@ PDF files on disk
   → chunking (1000 chars, 200 overlap; tables linearized into per-row units)
   → embedding (Ollama bge-m3, 1024-dim)
   → storage (ChromaDB)
-  → search (query embed → nearest neighbors → cross-encoder rerank → relevance tiers)
+  → search (spell-correct query → embed → nearest neighbors → cross-encoder rerank → relevance tiers)
   → results to UI or Claude via MCP
 ```
 

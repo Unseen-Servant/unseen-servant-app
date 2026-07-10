@@ -1,12 +1,14 @@
 """/api/search spell correction (typo-tolerance design, section A).
 
-Default-off after the 2026-07-10 eval (NO-GO for default-on: clean
-queries were rewritten — see evals/baselines/2026-07-10-spellfix.md).
-With the flag on, the corrected query must drive every downstream
-consumer of the query text — the dense embed, the BM25 side when
-`hybrid` is on — and surface in the response as `corrected_query` plus
-a note in the `message` channel. The vocabulary rebuilds when the chunk
-count changes (same trigger as the lexical index).
+Default-on since the 2026-07-10 eval gate passed with the
+general-English protection in place (clean suite reproduces the
+baseline to the digit; see evals/baselines/2026-07-10-spellfix-en-guard.md).
+The corrected query must drive every downstream consumer of the query
+text — the dense embed, the BM25 side when `hybrid` is on — and surface
+in the response as `corrected_query` plus a note in the `message`
+channel. `spell_correction: false` bypasses everything; the vocabulary
+rebuilds when the chunk count changes (same trigger as the lexical
+index).
 """
 
 import pytest
@@ -57,7 +59,6 @@ def _search(client, **overrides):
         "n_results": 5,
         "rerank": False,
         "search_all": True,
-        "spell_correction": True,
         **overrides,
     }
     resp = client.post("/api/search", json=payload)
@@ -84,19 +85,9 @@ def test_clean_query_is_untouched(capture_client):
     assert "message" not in body
 
 
-def test_spell_correction_defaults_off(capture_client):
-    """NO-GO for default-on (2026-07-10 eval): without the flag the
-    query must pass through verbatim."""
+def test_spell_correction_false_bypasses_everything(capture_client):
     client, captured = capture_client
-    payload = {
-        "query": "owlber claws",
-        "n_results": 5,
-        "rerank": False,
-        "search_all": True,
-    }
-    resp = client.post("/api/search", json=payload)
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
+    body = _search(client, spell_correction=False)
     assert captured["query_texts"] == ["owlber claws"]
     assert body["corrected_query"] is None
     assert "message" not in body

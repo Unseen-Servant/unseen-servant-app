@@ -17,6 +17,7 @@ loaded into the dictionary as correction targets.
 from __future__ import annotations
 
 import re
+from importlib.resources import files
 
 from symspellpy import SymSpell, Verbosity
 
@@ -25,6 +26,25 @@ from symspellpy import SymSpell, Verbosity
 MIN_VOCAB_FREQ = 3
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+# General-English protection (2026-07-10 eval finding): query words the
+# library never prints ("stats", "flag") are real words, not typos —
+# without this list they get rewritten to library terms ("starts",
+# "flat") and clean queries stop being a no-op. English words are only
+# protected, never correction targets.
+_english_words_cache: frozenset[str] | None = None
+
+
+def _english_words() -> frozenset[str]:
+    global _english_words_cache
+    if _english_words_cache is None:
+        text = files("symspellpy").joinpath(
+            "frequency_dictionary_en_82_765.txt"
+        ).read_text()
+        _english_words_cache = frozenset(
+            line.split()[0] for line in text.splitlines() if line.strip()
+        )
+    return _english_words_cache
 
 
 def build_vocabulary(collection, batch_size: int = 1000) -> dict[str, int]:
@@ -90,6 +110,8 @@ class SpellCorrector:
             if len(token) <= 2 or any(c.isdigit() for c in token):
                 continue
             if self._vocab.get(token.lower(), 0) >= self._min_freq:
+                continue
+            if token.lower() in _english_words():
                 continue
             max_distance = 1 if len(token) <= 4 else 2
             suggestions = self._symspell.lookup(

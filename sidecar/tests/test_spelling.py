@@ -82,7 +82,7 @@ def test_clean_query_is_a_strict_noop(corrector):
 
 
 def test_deletion_typo_corrected(corrector):
-    assert corrector.correct("chan mail bonus") == "chain mail bonus"
+    assert corrector.correct("dragn stats") == "dragon stats"
 
 
 def test_transposition_typo_corrected(corrector):
@@ -95,8 +95,8 @@ def test_corrected_token_keeps_query_casing(corrector):
 
 def test_reconstruction_preserves_punctuation_and_other_tokens(corrector):
     assert (
-        corrector.correct("Armor class: chan MAIL!")
-        == "Armor class: chain MAIL!"
+        corrector.correct("Armor class: dragn MAIL!")
+        == "Armor class: dragon MAIL!"
     )
 
 
@@ -146,6 +146,20 @@ def test_edit_distance_2_for_longer_tokens(corrector):
 
 def test_oov_with_no_near_match_stays(corrector):
     assert corrector.correct("xyzzt stats") is None
+
+
+def test_english_word_missing_from_library_is_protected(corrector):
+    # "classes" is real English the library may simply never print
+    # (2026-07-10 eval: "stats" -> "starts", "Black Flag" -> "Black
+    # Flat"). Words in the general-English list are never rewritten,
+    # even with a near library term ("class").
+    assert corrector.correct("classes of armor") is None
+
+
+def test_english_protection_wins_over_plausible_typo(corrector):
+    # The trade-off, pinned: "chan" reads as a "chain" typo but is in
+    # the English list (proper name), so it stays.
+    assert corrector.correct("chan mail") is None
 
 
 def test_min_vocab_freq_constant():

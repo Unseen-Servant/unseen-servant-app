@@ -148,10 +148,9 @@ def main() -> None:
     ap.add_argument("--hybrid", action="store_true",
                     help="fuse BM25 into the candidate pool via RRF "
                          "(experimental /api/search hybrid flag)")
-    ap.add_argument("--spell-correction", action="store_true",
-                    help="rewrite OOV query tokens to the closest library "
-                         "term before embedding (experimental /api/search "
-                         "spell_correction flag)")
+    ap.add_argument("--no-spell-correction", action="store_true",
+                    help="disable query spell correction "
+                         "(production default is on)")
     ap.add_argument("--write-baseline", metavar="NAME",
                     help="write evals/baselines/NAME.json and NAME.md")
     args = ap.parse_args()
@@ -163,7 +162,7 @@ def main() -> None:
     ensure_indexed(client, args.corpus, args.data_dir)
 
     rerank = not args.no_rerank
-    spell_correction = args.spell_correction
+    spell_correction = not args.no_spell_correction
     print(
         f"running {len(queries)} queries "
         f"(rerank={'on' if rerank else 'off'}, "

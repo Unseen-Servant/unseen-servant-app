@@ -1,8 +1,9 @@
 # Search Typo Tolerance — Design
 
 **Date:** 2026-07-10
-**Status:** Section A + Vocabulary implemented 2026-07-10 — eval gate
-**NO-GO for default-on**; `spell_correction` flag retained default-off.
+**Status:** Section A + Vocabulary implemented 2026-07-10, **default-on**
+(gate passed after adding general-English word protection — the design
+as first specced rewrote clean queries whose words the corpus lacks).
 Section B (variant expansion) not implemented. Findings:
 docs/roadmap/2026-07-10-spell-correction-eval.md
 **Related:** docs/roadmap/2026-07-09-search-quality-goal.md, docs/roadmap/2026-07-09-bm25-hybrid-retest.md

@@ -68,7 +68,7 @@ PDF files on disk
   → chunking (1000 chars, 200 overlap; tables linearized into per-row units)
   → embedding (Ollama bge-m3, 1024-dim)
   → storage (ChromaDB)
-  → search (query embed → nearest neighbors → cross-encoder rerank → relevance tiers)
+  → search (spell-correct query → embed → nearest neighbors → cross-encoder rerank → relevance tiers)
   → results to UI or Claude via MCP
 ```
 
