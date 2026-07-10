@@ -21,8 +21,9 @@
    OLLAMA_CONTEXT_LENGTH=8192 ollama serve
    ```
 
-   `OLLAMA_CONTEXT_LENGTH` is required for the embedder to ingest full chunks —
-   without it Ollama silently truncates at 2048 tokens.
+   `OLLAMA_CONTEXT_LENGTH` is required — without it Ollama silently truncates
+   embeddings at 2048 tokens. The app probes for this at startup and warns in
+   the sidecar logs if truncation is detected.
 
 4. Launch Legend Lore
    - The app runs in the menu bar / system tray — click the tray icon to show the window
@@ -56,12 +57,19 @@ Legend Lore is built around three ideas:
 ### Indexing and sync
 
 - Indexes selected PDFs into ChromaDB via a local Python sidecar (PyMuPDF4LLM + Ollama embeddings)
+- Tables are split into per-row embed units, so a lookup lands on the exact row of a spell or
+  equipment table — with a coverage tripwire that flags lossy table parses
 - Detects added, removed, and modified files; syncs incrementally with real-time progress
 - Configurable sync behavior: background polling, disk event handling, per-event policies
 
 ### Search
 
-- Semantic full-text search across indexed PDFs with relevance scoring and page citations
+- Semantic search across indexed PDFs with page citations
+- Local cross-encoder reranking (ONNX, CPU-only) sharpens the top results
+- Results carry a relevance tier — **strong / good / weak** — instead of a raw "% match";
+  weak matches are dimmed below a divider so noise reads as noise
+- Naming a game system in the query ("fireball in 5e") soft-boosts results from that system
+  without hiding the rest of the library
 - Scope search to a folder, file, game system, or collection
 
 ### Collections
@@ -91,6 +99,9 @@ Legend Lore is built around three ideas:
 - `list_sources` — indexed PDFs with chunk counts; respects active collection
 - `list_collections` — curated collections with active-context marker
 - `list_game_systems` — game systems detected across the library
+- Results report match tiers (strong/good/weak) so Claude knows when to trust them, and
+  near-miss filter values (typos, partial names) resolve to the closest match instead of
+  failing silently
 
 ---
 
@@ -102,14 +113,16 @@ The MCP server lets Claude Desktop search your indexed library during a conversa
 Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP :8420) ←→ ChromaDB
 ```
 
-**Step 1 — Start the sidecar.** It starts automatically with `npm run tauri dev`. To start it manually:
+**Step 1 — Install sidecar dependencies** (once): `uv sync` in `sidecar/` — installs from `pyproject.toml`, notably `mcp` and `httpx`.
+
+**Step 2 — Start the sidecar.** It starts automatically with `npm run tauri dev`. To start it manually:
 
 ```bash
 cd sidecar
 uv run python server.py --port 8420
 ```
 
-**Step 2 — Configure Claude Desktop.** Click **"Copy MCP Config"** in the app to copy a ready-to-paste JSON snippet with the correct absolute paths. Paste it into:
+**Step 3 — Configure Claude Desktop.** Click **"Copy MCP Config"** in the app to copy a ready-to-paste JSON snippet with the correct absolute paths. Paste it into:
 
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
@@ -132,8 +145,6 @@ Manual config:
 
 > Use the **full path** to your Python interpreter — Claude Desktop has a limited PATH and won't find pyenv shims or virtualenvs.
 
-**Step 3 — Install Python dependencies** with `uv sync` in `sidecar/` (installs from `pyproject.toml`, notably `mcp` and `httpx`).
-
 ---
 
 ## Tech Stack
@@ -146,6 +157,7 @@ Manual config:
 | Indexing sidecar  | Python + [FastAPI](https://fastapi.tiangolo.com) + PyMuPDF4LLM | Mature PDF/ML ecosystem, managed by Tauri        |
 | Vector DB         | [ChromaDB](https://www.trychroma.com)                           | Semantic search for PDF content                 |
 | Embeddings        | [Ollama](https://ollama.com) (bge-m3)                           | Local embeddings, no API keys needed            |
+| Reranker          | [fastembed](https://github.com/qdrant/fastembed) cross-encoder | Sharper top results; ONNX on CPU, no PyTorch    |
 | AI integration    | Claude via [MCP](https://modelcontextprotocol.io)               | Query your library in natural language          |
 
 ---
@@ -183,7 +195,7 @@ See the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/) for 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Unseen-Servant/unseen-legend-lore.git
-cd legend-lore
+cd unseen-legend-lore
 
 # 2. Install frontend dependencies
 npm install
@@ -211,12 +223,17 @@ npm run check                    # TypeScript + Svelte type checking
 bash scripts/bump-version.sh 1.2.0  # Bump version across package.json, tauri.conf.json, Cargo.toml
 ```
 
-### Sidecar Tests
+### Sidecar Tests and Evals
 
 ```bash
 cd sidecar
-uv run pytest tests/ -v                # Run all tests (no Ollama needed)
+uv run pytest tests/ -v          # Unit tests (no Ollama needed)
+uv run python -m evals.run_eval  # Retrieval quality eval (needs Ollama + eval corpus)
 ```
+
+The eval harness runs 40 pre-registered queries against the production search
+pipeline and reports MRR/nDCG per category. See [sidecar/evals/README.md](sidecar/evals/README.md)
+for the corpus setup and how to record baselines.
 
 ---
 
@@ -235,7 +252,7 @@ Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe`
 ## Project Structure
 
 ```text
-legend-lore/
+unseen-legend-lore/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
 │   │   ├── +page.svelte        # Main UI: folder picker, file tree, indexing
@@ -254,8 +271,11 @@ legend-lore/
 │   └── Cargo.toml              # Rust dependencies
 │
 ├── sidecar/                    # Python indexing sidecar
-│   ├── server.py               # FastAPI server (ChromaDB + PDF extraction)
+│   ├── server.py               # FastAPI server (indexing, search, tiers, boost)
 │   ├── mcp_server.py           # MCP tool definitions for Claude Desktop
+│   ├── reranker.py             # Cross-encoder reranking (fastembed/ONNX)
+│   ├── linearize.py            # Table row-linearization for embed units
+│   ├── evals/                  # Retrieval eval harness (queries, scorer, baselines)
 │   ├── pyproject.toml          # Dependencies (runtime + dev/build groups)
 │   ├── uv.lock                 # Locked dependency versions
 │   └── tests/                  # Pytest suite
@@ -271,11 +291,11 @@ legend-lore/
 
 ```text
 PDF files on disk
-  → text extraction (PyMuPDF)
-  → chunking (1000 chars, 200 overlap)
+  → text extraction (PyMuPDF4LLM)
+  → chunking (1000 chars, 200 overlap; tables linearized into per-row units)
   → embedding (Ollama bge-m3, 1024-dim)
   → storage (ChromaDB)
-  → semantic search (query → embed → nearest neighbors)
+  → search (query embed → nearest neighbors → cross-encoder rerank → relevance tiers)
   → results to UI or Claude via MCP
 ```
 
@@ -287,7 +307,7 @@ PDF files on disk
 
 - [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode)
 - [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
-- [rust-analyzer](https://marketplace.visualstudio.com/items?rust-lang.rust-analyzer)
+- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
 ---
 
