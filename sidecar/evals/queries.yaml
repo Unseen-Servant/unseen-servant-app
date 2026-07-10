@@ -237,3 +237,152 @@ queries:
     pages: "287-287"
     category: cross_system
     answer: ["adult red dragon", "armor class 19"]
+
+  # ───────── typo_variant queries ─────────
+  # Misspelled variants of 10 locked queries above (typo-tolerance design,
+  # docs/specs/retrieval/2026-07-10-typo-tolerance-design.md): one
+  # character-deletion and one adjacent-transposition each, keeping the
+  # original source/pages/answer anchors. Spacing variants land with the
+  # design's section B (variant expansion) — not here.
+  #   variant_of — the locked original's text (for clean-vs-typo gap analysis)
+  #   variant    — deletion | transposition
+  - text: "Hit dice and armor class of a Cloud Dragn"
+    source: Basic-Fantasy
+    pages: "85-86"
+    category: typo_variant
+    variant_of: "Hit dice and armor class of a Cloud Dragon"
+    variant: deletion
+    answer: [["dragon cloud", "cloud dragon"], "armor class 22", "hit dice 11"]
+  - text: "Hit dice and armor class of a Cloud Dargon"
+    source: Basic-Fantasy
+    pages: "85-86"
+    category: typo_variant
+    variant_of: "Hit dice and armor class of a Cloud Dragon"
+    variant: transposition
+    answer: [["dragon cloud", "cloud dragon"], "armor class 22", "hit dice 11"]
+  - text: "Armor class bonus and weight for chan mail"
+    source: Basic-Fantasy
+    pages: "40-55|15-15"
+    category: typo_variant
+    variant_of: "Armor class bonus and weight for chain mail"
+    variant: deletion
+    answer: ["chain mail", ["60 gp", "60gp"]]
+  - text: "Armor class bonus and weight for chian mail"
+    source: Basic-Fantasy
+    pages: "40-55|15-15"
+    category: typo_variant
+    variant_of: "Armor class bonus and weight for chain mail"
+    variant: transposition
+    answer: ["chain mail", ["60 gp", "60gp"]]
+  - text: "Thif skill percentages at level 3"
+    source: Basic-Fantasy
+    pages: "15-30|13-14"
+    category: typo_variant
+    variant_of: "Thief skill percentages at level 3"
+    variant: deletion
+    answer: ["thief abilities", "open locks"]
+  - text: "Theif skill percentages at level 3"
+    source: Basic-Fantasy
+    pages: "15-30|13-14"
+    category: typo_variant
+    variant_of: "Thief skill percentages at level 3"
+    variant: transposition
+    answer: ["thief abilities", "open locks"]
+  - text: "How does surprse work in combat"
+    source: Basic-Fantasy
+    pages: "54-75"
+    category: typo_variant
+    variant_of: "How does surprise work in combat"
+    variant: deletion
+    answer: ["surprised on a roll of 1 2"]
+  - text: "How does surpirse work in combat"
+    source: Basic-Fantasy
+    pages: "54-75"
+    category: typo_variant
+    variant_of: "How does surprise work in combat"
+    variant: transposition
+    answer: ["surprised on a roll of 1 2"]
+  - text: "Rules for climbng and falling damage"
+    source: Basic-Fantasy
+    pages: "60-80"
+    category: typo_variant
+    variant_of: "Rules for climbing and falling damage"
+    variant: deletion
+    answer: ["falling damage", "1d6 points of damage per 10"]
+  - text: "Rules for clmibing and falling damage"
+    source: Basic-Fantasy
+    pages: "60-80"
+    category: typo_variant
+    variant_of: "Rules for climbing and falling damage"
+    variant: transposition
+    answer: ["falling damage", "1d6 points of damage per 10"]
+  - text: "Figher class features at level 1"
+    source: Black-Flag
+    pages: "20-60"
+    category: typo_variant
+    variant_of: "Fighter class features at level 1"
+    variant: deletion
+    answer: ["fighter", ["hit dice 1d10 per fighter level", "1st level fighter feature"]]
+  - text: "Fighetr class features at level 1"
+    source: Black-Flag
+    pages: "20-60"
+    category: typo_variant
+    variant_of: "Fighter class features at level 1"
+    variant: transposition
+    answer: ["fighter", ["hit dice 1d10 per fighter level", "1st level fighter feature"]]
+  - text: "Spell slots for a level 5 wizrd"
+    source: Black-Flag
+    pages: "40-80"
+    category: typo_variant
+    variant_of: "Spell slots for a level 5 wizard"
+    variant: deletion
+    answer: ["arcane spell slots by circle"]
+  - text: "Spell slots for a level 5 wizrad"
+    source: Black-Flag
+    pages: "40-80"
+    category: typo_variant
+    variant_of: "Spell slots for a level 5 wizard"
+    variant: transposition
+    answer: ["arcane spell slots by circle"]
+  - text: "Firebll damage and area of effect"
+    source: SRD_CC
+    pages: "100-200"
+    category: typo_variant
+    variant_of: "Fireball damage and area of effect"
+    variant: deletion
+    answer: ["fireball", "8d6 fire damage"]
+  - text: "Fireabll damage and area of effect"
+    source: SRD_CC
+    pages: "100-200"
+    category: typo_variant
+    variant_of: "Fireball damage and area of effect"
+    variant: transposition
+    answer: ["fireball", "8d6 fire damage"]
+  - text: "Challenge rating of an owlber"
+    source: SRD_CC
+    pages: "250-400"
+    category: typo_variant
+    variant_of: "Challenge rating of an owlbear"
+    variant: deletion
+    answer: ["owlbear", ["challenge 3 700 xp", "armor class 13"]]
+  - text: "Challenge rating of an owlbaer"
+    source: SRD_CC
+    pages: "250-400"
+    category: typo_variant
+    variant_of: "Challenge rating of an owlbear"
+    variant: transposition
+    answer: ["owlbear", ["challenge 3 700 xp", "armor class 13"]]
+  - text: "Rules for grapling and shoving"
+    source: SRD_CC
+    pages: "60-100"
+    category: typo_variant
+    variant_of: "Rules for grappling and shoving"
+    variant: deletion
+    answer: ["grappling", "grapple check"]
+  - text: "Rules for grapplnig and shoving"
+    source: SRD_CC
+    pages: "60-100"
+    category: typo_variant
+    variant_of: "Rules for grappling and shoving"
+    variant: transposition
+    answer: ["grappling", "grapple check"]

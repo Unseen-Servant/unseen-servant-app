@@ -1,0 +1,152 @@
+"""Unit tests for spelling.py — library-derived vocabulary + spell correction.
+
+Covers the spec's unit surface (docs/specs/retrieval/2026-07-10-typo-
+tolerance-design.md, section A + Vocabulary): vocabulary build
+(frequencies, junk-term thresholding), OOV detection, correction rules
+(typos corrected; proper nouns, digit tokens, short tokens, and
+non-ASCII untouched), and query-span reconstruction. Variant expansion
+(section B split/join) is deliberately absent — out of scope.
+"""
+
+import pytest
+
+from spelling import MIN_VOCAB_FREQ, SpellCorrector, build_vocabulary
+
+
+class FakeCollection:
+    """Minimal stand-in for a ChromaDB collection's batched get()."""
+
+    def __init__(self, rows):
+        self._rows = rows  # list of (id, document, metadata)
+
+    def get(self, include=None, limit=None, offset=0):
+        batch = self._rows[offset:offset + limit]
+        return {
+            "ids": [r[0] for r in batch],
+            "documents": [r[1] for r in batch],
+            "metadatas": [r[2] for r in batch],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Vocabulary build
+# ---------------------------------------------------------------------------
+
+def test_build_vocabulary_counts_lowercased_frequencies():
+    collection = FakeCollection([
+        ("c1", "Chain mail armor", {}),
+        ("c2", "chain MAIL", {}),
+    ])
+    vocab = build_vocabulary(collection)
+    assert vocab["chain"] == 2
+    assert vocab["mail"] == 2
+    assert vocab["armor"] == 1
+
+
+def test_build_vocabulary_includes_section_heading_terms():
+    collection = FakeCollection([
+        ("c1", "AC 22, HD 11", {"section_heading": "Cloud Dragon"}),
+    ])
+    vocab = build_vocabulary(collection)
+    assert vocab["cloud"] == 1
+    assert vocab["dragon"] == 1
+
+
+def test_build_vocabulary_batches_past_first_page():
+    rows = [(f"c{i}", "goblin", {}) for i in range(7)]
+    vocab = build_vocabulary(FakeCollection(rows), batch_size=3)
+    assert vocab["goblin"] == 7
+
+
+# ---------------------------------------------------------------------------
+# Correction
+# ---------------------------------------------------------------------------
+
+VOCAB = {
+    "armor": 60, "class": 60, "bonus": 20, "and": 100, "weight": 20,
+    "for": 100, "chain": 50, "mail": 40, "dragon": 30, "cloud": 20,
+    "appears": 10, "stats": 10, "damage": 80, "the": 100, "of": 100,
+    "tiamat": 5,
+    # junk under MIN_VOCAB_FREQ: neither protected nor a correction target
+    "dragonx": 2,
+}
+
+
+@pytest.fixture
+def corrector():
+    return SpellCorrector(VOCAB)
+
+
+def test_clean_query_is_a_strict_noop(corrector):
+    assert corrector.correct("Armor class bonus and weight for chain mail") is None
+
+
+def test_deletion_typo_corrected(corrector):
+    assert corrector.correct("chan mail bonus") == "chain mail bonus"
+
+
+def test_transposition_typo_corrected(corrector):
+    assert corrector.correct("dargon stats") == "dragon stats"
+
+
+def test_corrected_token_keeps_query_casing(corrector):
+    assert corrector.correct("Cloud Dragn appears") == "Cloud Dragon appears"
+
+
+def test_reconstruction_preserves_punctuation_and_other_tokens(corrector):
+    assert (
+        corrector.correct("Armor class: chan MAIL!")
+        == "Armor class: chain MAIL!"
+    )
+
+
+def test_in_vocab_token_never_rewritten(corrector):
+    # "tiamat" is rare (freq 5) but in-vocab — proper nouns stay.
+    assert corrector.correct("tiamat stats") is None
+
+
+def test_junk_vocab_term_is_not_a_correction_target(corrector):
+    # "dragonxx" is distance 1 from junk "dragonx" (freq 2 < MIN_VOCAB_FREQ)
+    # and distance 2 from "dragon" — the junk term must not win.
+    assert corrector.correct("dragonxx stats") == "dragon stats"
+
+
+def test_junk_vocab_term_is_itself_correctable(corrector):
+    # freq < MIN_VOCAB_FREQ does not protect a token from correction.
+    assert corrector.correct("dragonx stats") == "dragon stats"
+
+
+def test_digit_tokens_untouched(corrector):
+    assert corrector.correct("1d6 damage for d20 5e") is None
+
+
+def test_short_tokens_untouched(corrector):
+    # len <= 2 tokens are never corrected, even when OOV.
+    assert corrector.correct("ac of xy chain") is None
+
+
+def test_non_ascii_query_untouched(corrector):
+    # Non-ASCII queries skip correction entirely (the ASCII token regex
+    # would otherwise see fragments like "caf" for "café"), consistent
+    # with _rerank_safe_for_query.
+    assert corrector.correct("dégâts chan mail") is None
+
+
+def test_edit_distance_capped_at_1_for_short_tokens(corrector):
+    # len <= 4: max edit distance 1. "chab" is distance 2 from "chain".
+    assert corrector.correct("chab damage") is None
+    # ...but distance 1 still corrects: "mal" -> "mail".
+    assert corrector.correct("mal damage") == "mail damage"
+
+
+def test_edit_distance_2_for_longer_tokens(corrector):
+    # "draggin" is distance 2 from "dragon" and long enough to allow it.
+    assert corrector.correct("draggin stats") == "dragon stats"
+
+
+def test_oov_with_no_near_match_stays(corrector):
+    assert corrector.correct("xyzzt stats") is None
+
+
+def test_min_vocab_freq_constant():
+    assert MIN_VOCAB_FREQ == 3

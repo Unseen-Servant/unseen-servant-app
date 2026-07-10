@@ -14,7 +14,10 @@ from evals import scorer
 
 QUERIES_PATH = Path(__file__).parent.parent / "evals" / "queries.yaml"
 
-CATEGORIES = {"stat_block", "table", "prose", "cross_page", "cross_system"}
+CATEGORIES = {
+    "stat_block", "table", "prose", "cross_page", "cross_system",
+    "typo_variant",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -178,8 +181,16 @@ def _queries():
 
 def test_queries_yaml_schema():
     queries = _queries()
-    assert len(queries) == 40
+    assert len(queries) == 60
+    locked_texts = {
+        q["text"] for q in queries if q["category"] != "typo_variant"
+    }
     for q in queries:
+        # typo_variant queries are misspelled copies of locked originals
+        # (typo-tolerance design); each must name its original.
+        if q["category"] == "typo_variant":
+            assert q["variant_of"] in locked_texts, q["text"]
+            assert q["variant"] in {"deletion", "transposition"}, q["text"]
         assert q["category"] in CATEGORIES, q["text"]
         assert isinstance(q["text"], str) and q["text"]
         ranges = scorer.parse_pages(q["pages"])
@@ -199,5 +210,5 @@ def test_queries_yaml_category_counts_match_spike():
         counts[q["category"]] = counts.get(q["category"], 0) + 1
     assert counts == {
         "stat_block": 6, "table": 10, "prose": 11,
-        "cross_page": 3, "cross_system": 10,
+        "cross_page": 3, "cross_system": 10, "typo_variant": 20,
     }

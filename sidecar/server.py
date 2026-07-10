@@ -50,6 +50,7 @@ from parents_store import (
 )
 from lexical import LexicalIndex, matches_where, rrf_fuse
 from reranker import rerank_scores
+from spelling import SpellCorrector
 
 
 # Number of top ChromaDB candidates to feed into the cross-encoder. Set
@@ -529,6 +530,13 @@ class SearchRequest(BaseModel):
     # reciprocal-rank fusion. Default off — does not change production
     # search behavior.
     hybrid: bool = False
+    # Rewrite out-of-vocabulary query tokens to the closest library term
+    # before embedding (typo-tolerance design, section A). Default off —
+    # NO-GO for default-on per the 2026-07-10 eval: clean queries with
+    # tokens the corpus lacks ("stats", "Black Flag") get rewritten
+    # (evals/baselines/2026-07-10-spellfix.md). Retained for eval
+    # ablation and opt-in use.
+    spell_correction: bool = False
 
 class SetGameSystemRequest(BaseModel):
     filename: str
@@ -3057,6 +3065,18 @@ def create_app(
             lexical_cache["count"] = count
         return lexical_cache["index"]
 
+    # Spell-correction vocabulary: same lifecycle as the lexical index —
+    # built lazily on first use, rebuilt when the chunk count changes
+    # (reindex/delete).
+    spell_cache: dict = {"count": None, "corrector": None}
+
+    def _get_spell_corrector() -> SpellCorrector:
+        count = collection.count()
+        if spell_cache["corrector"] is None or spell_cache["count"] != count:
+            spell_cache["corrector"] = SpellCorrector.from_collection(collection)
+            spell_cache["count"] = count
+        return spell_cache["corrector"]
+
     @app.post("/api/search")
     async def search(request: SearchRequest, http_req: Request):
         """Parent-document semantic search.
@@ -3070,9 +3090,22 @@ def create_app(
         if http_req.headers.get("X-Source") == "mcp":
             app.state.mcp_last_query = datetime.now(timezone.utc)
         try:
+            # Spell correction (typo-tolerance design, section A): rewrite
+            # OOV tokens to the closest library term before anything
+            # consumes the query text — the dense embed, the reranker,
+            # system detection, and the BM25 side all see the corrected
+            # form. A clean query is a strict no-op (corrected is None).
+            corrected_query: str | None = None
+            if request.spell_correction:
+                corrected_query = _get_spell_corrector().correct(request.query)
+            query_text = (
+                corrected_query if corrected_query is not None
+                else request.query
+            )
+
             # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
             query_kwargs = {
-                "query_texts": [request.query],
+                "query_texts": [query_text],
                 "n_results": request.n_results * 10,
             }
 
@@ -3131,6 +3164,8 @@ def create_app(
             # (noted in `message`), and turn unresolvable values into an
             # actionable message naming what is actually available.
             filter_notes: list[str] = []
+            if corrected_query is not None:
+                filter_notes.append(f'Query corrected to "{corrected_query}".')
             if data_dir and (request.source_filter or request.game_system):
                 filt_manifest = load_manifest(data_dir)
                 if request.source_filter:
@@ -3241,6 +3276,7 @@ def create_app(
                 return {
                     "results": [],
                     "message": " ".join([*filter_notes, "No results found."]),
+                    "corrected_query": corrected_query,
                     "effective_collection": effective_collection,
                     "auto_scoped": auto_scoped,
                 }
@@ -3262,7 +3298,7 @@ def create_app(
                 lex = _get_lexical_index()
                 lex_where = query_kwargs.get("where")
                 bm25_ids = lex.search(
-                    request.query,
+                    query_text,
                     k=request.n_results * 10,
                     allowed=lambda m: matches_where(m, lex_where),
                 )
@@ -3299,7 +3335,7 @@ def create_app(
                 or request.source_filter
             ):
                 target_systems = detect_systems_in_query(
-                    request.query, _merged["known"]
+                    query_text, _merged["known"]
                 )
                 if target_systems:
                     boost_factors = _system_boost_factors(
@@ -3338,7 +3374,7 @@ def create_app(
             # keyword-dense action text.
             rerank_applied = False
             pool = 0
-            if request.rerank and _rerank_safe_for_query(request.query):
+            if request.rerank and _rerank_safe_for_query(query_text):
                 pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
                 pool_docs = ordered_docs[:pool]
                 pool_meta = ordered_metadatas[:pool]
@@ -3346,7 +3382,7 @@ def create_app(
                     f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
                     for m, d in zip(pool_meta, pool_docs)
                 ]
-                scores = rerank_scores(request.query, rerank_inputs)
+                scores = rerank_scores(query_text, rerank_inputs)
                 if scores is not None:
                     rerank_applied = True
                     # The soft-boost weighs the cross-encoder scores the
@@ -3410,7 +3446,7 @@ def create_app(
                         for p in stragglers
                     ]
                     straggler_scores = rerank_scores(
-                        request.query, straggler_inputs
+                        query_text, straggler_inputs
                     )
                     if straggler_scores is not None:
                         for p, s in zip(stragglers, straggler_scores):
@@ -3465,6 +3501,7 @@ def create_app(
 
             response: dict = {
                 "results": formatted,
+                "corrected_query": corrected_query,
                 "effective_collection": effective_collection,
                 "auto_scoped": auto_scoped,
             }

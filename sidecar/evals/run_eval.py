@@ -96,7 +96,10 @@ def ensure_indexed(client, corpus_dir: Path, data_dir: Path) -> None:
     print(f"indexed {body['indexed']}/{body['total']} PDFs")
 
 
-def run(client, queries: list[dict], rerank: bool, hybrid: bool) -> list[dict]:
+def run(
+    client, queries: list[dict], rerank: bool, hybrid: bool,
+    spell_correction: bool,
+) -> list[dict]:
     per_query = []
     for q in queries:
         payload = {
@@ -105,6 +108,7 @@ def run(client, queries: list[dict], rerank: bool, hybrid: bool) -> list[dict]:
             "search_all": True,
             "rerank": rerank,
             "hybrid": hybrid,
+            "spell_correction": spell_correction,
         }
         if q["source"] not in (None, "", "any"):
             payload["source_filter"] = next(
@@ -144,6 +148,10 @@ def main() -> None:
     ap.add_argument("--hybrid", action="store_true",
                     help="fuse BM25 into the candidate pool via RRF "
                          "(experimental /api/search hybrid flag)")
+    ap.add_argument("--spell-correction", action="store_true",
+                    help="rewrite OOV query tokens to the closest library "
+                         "term before embedding (experimental /api/search "
+                         "spell_correction flag)")
     ap.add_argument("--write-baseline", metavar="NAME",
                     help="write evals/baselines/NAME.json and NAME.md")
     args = ap.parse_args()
@@ -155,12 +163,14 @@ def main() -> None:
     ensure_indexed(client, args.corpus, args.data_dir)
 
     rerank = not args.no_rerank
+    spell_correction = args.spell_correction
     print(
         f"running {len(queries)} queries "
         f"(rerank={'on' if rerank else 'off'}, "
-        f"retrieval={'hybrid' if args.hybrid else 'dense'})..."
+        f"retrieval={'hybrid' if args.hybrid else 'dense'}, "
+        f"spell_correction={'on' if spell_correction else 'off'})..."
     )
-    per_query = run(client, queries, rerank, args.hybrid)
+    per_query = run(client, queries, rerank, args.hybrid, spell_correction)
     summary = scorer.aggregate(per_query)
 
     report = scorer.format_report(summary)
@@ -174,6 +184,7 @@ def main() -> None:
             "date": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "rerank": rerank,
             "retrieval": "hybrid" if args.hybrid else "dense",
+            "spell_correction": spell_correction,
             "corpus": EXPECTED_PDFS,
             "queries": len(queries),
             "top_k": TOP_K,
@@ -189,7 +200,8 @@ def main() -> None:
             f"Corpus: {', '.join(EXPECTED_PDFS)}\n"
             f"Queries: {len(queries)} (graded on the specific answer chunk)\n"
             f"Rerank: {'on' if rerank else 'off'}\n"
-            f"Retrieval: {meta['retrieval']}\n\n"
+            f"Retrieval: {meta['retrieval']}\n"
+            f"Spell correction: {'on' if spell_correction else 'off'}\n\n"
             "```\n" + report + "\n```\n"
         )
         print(f"\nwrote {json_path.relative_to(EVALS_DIR.parent)} and {md_path.relative_to(EVALS_DIR.parent)}")
