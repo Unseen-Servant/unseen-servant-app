@@ -64,11 +64,11 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 
 ```text
 PDF files on disk
-  → text extraction (PyMuPDF)
-  → chunking (1000 chars, 200 overlap)
+  → text extraction (PyMuPDF4LLM)
+  → chunking (1000 chars, 200 overlap; tables linearized into per-row units)
   → embedding (Ollama bge-m3, 1024-dim)
   → storage (ChromaDB)
-  → semantic search (query → embed → nearest neighbors)
+  → search (query embed → nearest neighbors → cross-encoder rerank → relevance tiers)
   → results to UI or Claude via MCP
 ```
 
