@@ -4,9 +4,7 @@
   import type { SearchSettings } from './searchSettings';
   import {
     DEFAULT_SEARCH_SETTINGS,
-    RERANK_POOL_MAX,
-    RERANK_POOL_MIN,
-    clampPoolSize,
+    RERANK_POOL_PRESETS,
     normalizeSearchSettings,
   } from './searchSettings';
 
@@ -48,13 +46,17 @@
   }
 
   function commitPoolSize(e: Event) {
-    const input = e.currentTarget as HTMLInputElement;
-    const clamped = clampPoolSize(Number(input.value));
-    input.value = String(clamped);
-    if (settings && clamped !== settings.rerank_candidates) {
-      update({ rerank_candidates: clamped });
+    const value = Number((e.currentTarget as HTMLSelectElement).value);
+    if (settings && value !== settings.rerank_candidates) {
+      update({ rerank_candidates: value });
     }
   }
+
+  // The stored value can be a non-preset number (set directly over the
+  // API) — surface it honestly as "Custom (N)" instead of rewriting it.
+  $: poolIsCustom = settings
+    ? !RERANK_POOL_PRESETS.some((p) => p.value === settings!.rerank_candidates)
+    : false;
 
   function restoreDefaults() {
     update({ ...DEFAULT_SEARCH_SETTINGS });
@@ -106,20 +108,27 @@
         <div class="setting-row-head">
           <div class="setting-row-title">Re-rank pool size</div>
           <div class="setting-row-desc">
-            How many candidates the re-ranker rescores
-            ({RERANK_POOL_MIN}–{RERANK_POOL_MAX}). Larger pools reach deeper
-            into the library but slow every search down.
+            How many candidates the re-ranker rescores. Deeper reaches
+            further into the library but slows every search down.
           </div>
         </div>
-        <input
-          type="number"
-          class="setting-number"
-          min={RERANK_POOL_MIN}
-          max={RERANK_POOL_MAX}
-          value={settings.rerank_candidates}
+        <select
+          class="setting-select"
+          value={String(settings.rerank_candidates)}
           disabled={!settings.rerank}
           on:change={commitPoolSize}
-        />
+        >
+          {#if poolIsCustom}
+            <option value={String(settings.rerank_candidates)}>
+              Custom ({settings.rerank_candidates})
+            </option>
+          {/if}
+          {#each RERANK_POOL_PRESETS as preset}
+            <option value={String(preset.value)}>
+              {preset.label} ({preset.value})
+            </option>
+          {/each}
+        </select>
       </div>
 
       <div class="setting-row">
@@ -272,24 +281,7 @@
     outline: 1px solid var(--text-accent);
     outline-offset: -1px;
   }
-
-  .setting-number {
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.8rem;
-    padding: 0.3rem 0.5rem;
-    background: var(--bg-focused);
-    color: var(--text-primary);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    width: 5.5rem;
-    box-sizing: border-box;
-    font-variant-numeric: tabular-nums;
-  }
-  .setting-number:focus {
-    outline: 1px solid var(--text-accent);
-    outline-offset: -1px;
-  }
-  .setting-number:disabled {
+  .setting-select:disabled {
     cursor: not-allowed;
   }
 

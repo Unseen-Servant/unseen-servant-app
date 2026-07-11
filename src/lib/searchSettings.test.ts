@@ -3,6 +3,7 @@ import {
   DEFAULT_SEARCH_SETTINGS,
   RERANK_POOL_MAX,
   RERANK_POOL_MIN,
+  RERANK_POOL_PRESETS,
   clampPoolSize,
   normalizeSearchSettings,
 } from './searchSettings';
@@ -38,6 +39,24 @@ describe('normalizeSearchSettings', () => {
       .toBe(RERANK_POOL_MIN);
     expect(normalizeSearchSettings({ rerank_candidates: 9999 }).rerank_candidates)
       .toBe(RERANK_POOL_MAX);
+  });
+});
+
+describe('RERANK_POOL_PRESETS', () => {
+  it('stays within the clamp bounds so a preset never round-trips modified', () => {
+    for (const preset of RERANK_POOL_PRESETS) {
+      expect(clampPoolSize(preset.value)).toBe(preset.value);
+      expect(preset.value).toBeGreaterThanOrEqual(RERANK_POOL_MIN);
+      expect(preset.value).toBeLessThanOrEqual(RERANK_POOL_MAX);
+    }
+  });
+
+  it('includes the default so the dropdown never shows Custom out of the box', () => {
+    expect(
+      RERANK_POOL_PRESETS.some(
+        (p) => p.value === DEFAULT_SEARCH_SETTINGS.rerank_candidates
+      )
+    ).toBe(true);
   });
 });
 

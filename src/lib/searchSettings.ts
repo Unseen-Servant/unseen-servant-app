@@ -22,6 +22,17 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   variant_expansion: false,
 };
 
+// Preset pool sizes offered by the General tab. The API accepts any
+// clamped 10-200 value (e.g. set directly over HTTP); the dropdown adds a
+// "Custom (N)" entry for such values rather than silently rewriting them.
+export const RERANK_POOL_PRESETS: ReadonlyArray<{ value: number; label: string }> = [
+  { value: 10, label: 'Fastest' },
+  { value: 25, label: 'Fast' },
+  { value: 50, label: 'Balanced' },
+  { value: 100, label: 'Thorough' },
+  { value: 200, label: 'Exhaustive' },
+];
+
 export function clampPoolSize(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_SEARCH_SETTINGS.rerank_candidates;
   return Math.max(RERANK_POOL_MIN, Math.min(RERANK_POOL_MAX, Math.round(value)));
