@@ -524,14 +524,16 @@ class SearchRequest(BaseModel):
     collection: str | None = None
     source_paths: list[str] | None = None
     search_all: bool = False
-    # Cross-encoder rerank of the candidate pool. Default off — the
-    # 2026-07-10 ablation showed the reranker makes aggregate ordering
-    # *worse* (nDCG@10 0.727 off vs 0.655 on at the UI page size) at 7x
-    # the latency, buying back only 2/65 recall@10 queries and the
-    # 3-query cross_page category
-    # (evals/baselines/2026-07-10-rerank-off-p25.md). Opt-in per request
-    # for callers who want that trade; tiers are dual-scale either way.
-    rerank: bool = False
+    # Cross-encoder rerank of the candidate pool. Default on. The
+    # 2026-07-10 eval ablation favored rerank-off (nDCG@10 0.727 vs
+    # 0.655, 7x faster — evals/baselines/2026-07-10-rerank-off-p25.md),
+    # and the default was briefly flipped, but real-library search
+    # quality regressed visibly and the flip was reverted same day: the
+    # 3-book eval corpus underrepresents the many-similar-candidates
+    # regime of a real library, which is where cross-encoders earn
+    # their cost. Treat the harness as necessary-not-sufficient for
+    # rerank decisions until the corpus grows.
+    rerank: bool = True
     # Experimental (BM25 re-test, 2026-07-01 roadmap REOPEN item): fuse a
     # BM25 ranking over the same chunks into the dense candidate pool via
     # reciprocal-rank fusion. Default off — does not change production

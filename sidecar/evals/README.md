@@ -36,9 +36,12 @@ index-time changes don't show up in the metrics until you do.
 
 40 pre-registered queries (30 locked from `chunker_spike`, 10 cross-system
 from `hybrid_retrieval_spike`) run through the production `/api/search`
-endpoint (production defaults — rerank off since the 2026-07-10 ablation,
-`--rerank` opts the cross-encoder back in; `--hybrid` turns on the
-experimental BM25+RRF candidate fusion — see `lexical.py`). Reported per category —
+endpoint (rerank on unless `--no-rerank`; `--hybrid` turns on the
+experimental BM25+RRF candidate fusion — see `lexical.py`). Caveat from
+the 2026-07-10 rerank ablation: this 3-book corpus favored rerank-off,
+but real-library quality visibly disagreed — the corpus underrepresents
+the many-similar-candidates regime. Treat rerank verdicts here as
+necessary-not-sufficient. Reported per category —
 `stat_block`, `table`, `prose`, `cross_page`, `cross_system` — and overall:
 
 **The harness mimics the application experience**: requests send

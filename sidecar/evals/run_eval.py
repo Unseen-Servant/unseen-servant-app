@@ -7,8 +7,7 @@ One command, from sidecar/:
 Indexes the eval corpus (once — reruns reuse the persisted index) with the
 production indexing pipeline into a dedicated ChromaDB under
 ``evals/.eval_data``, runs every query in ``evals/queries.yaml`` through
-the production ``/api/search`` endpoint (production defaults; rerank off
-since the 2026-07-10 ablation, ``--rerank`` opts back in),
+the production ``/api/search`` endpoint (rerank on, production defaults),
 judges each result against the answer-chunk ground truth, and prints
 nDCG@10, MRR@5, precision@k, and recall@k per query category.
 
@@ -175,9 +174,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     ap.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
-    ap.add_argument("--rerank", action="store_true",
-                    help="enable the cross-encoder reranker (production "
-                         "default is off since the 2026-07-10 ablation)")
+    ap.add_argument("--no-rerank", action="store_true",
+                    help="disable the reranker (production default is on)")
     ap.add_argument("--hybrid", action="store_true",
                     help="fuse BM25 into the candidate pool via RRF "
                          "(experimental /api/search hybrid flag)")
@@ -204,7 +202,7 @@ def main() -> None:
     client = build_client(args.data_dir)
     ensure_indexed(client, args.corpus, args.data_dir)
 
-    rerank = args.rerank
+    rerank = not args.no_rerank
     spell_correction = not args.no_spell_correction
     print(
         f"running {len(queries)} queries "
