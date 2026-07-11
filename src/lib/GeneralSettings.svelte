@@ -276,8 +276,9 @@
     border-radius: 4px;
     cursor: pointer;
     /* Fixed width so every control in the pane lines up regardless of
-       its longest option ("Off" vs "Exhaustive (200)"). */
-    width: 11rem;
+       its longest option — sized to just fit "Exhaustive (200)" plus
+       the native dropdown arrow. */
+    width: 9rem;
   }
   .setting-select:focus {
     outline: 1px solid var(--text-accent);
