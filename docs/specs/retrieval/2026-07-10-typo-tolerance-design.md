@@ -209,6 +209,16 @@ the 5 of 10 locked originals with a natural compound term). Baselines:
   runs after correction, and RRF gives the variant ranking equal say —
   diluting rankings the corrected primary already had right.
 
+**Re-test at production page size (same day):** after the harness moved
+to the UI's page size (`n_results=25`, the #340 lesson), the gate was
+re-run — `*-p25` baselines. NO-GO confirmed and slightly amplified:
+spacing variants still moved zero on every metric; misspellings
+regressed further (−0.031 nDCG, and recall@10 −0.050 — with 250-deep
+rankings the RRF dilution now pushes answers out of the top 10, not
+just down it). The clean suite nets +0.003 nDCG but that is two
+offsetting single-query moves ("Goblin attack damage" +0.245, the same
+"Fireball" −0.131), not a signal.
+
 **Decision:** section A stays default-on, untouched. Section B ships
 behind `variant_expansion` (default **off**, independent of
 `spell_correction`, same vocabulary; `--variant-expansion` in
