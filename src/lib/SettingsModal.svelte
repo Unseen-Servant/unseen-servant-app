@@ -3,6 +3,7 @@
   import { DEFAULT_SYNC_PREFERENCES } from './types';
   import Modal from './Modal.svelte';
   import GameSystemsSettings from './GameSystemsSettings.svelte';
+  import GeneralSettings from './GeneralSettings.svelte';
   import LibrarySettings from './LibrarySettings.svelte';
   import GuidesPane from './help/GuidesPane.svelte';
   import ReferencePane from './help/ReferencePane.svelte';
@@ -37,10 +38,10 @@
   export let filesIndexed: boolean = false;
   export let collectionsCreated: boolean = false;
   export let mcpConnected: boolean = false;
-  export let initialTab: 'library' | 'game-systems' | 'help' = 'library';
+  export let initialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
   export let initialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
 
-  let activeTab: 'library' | 'game-systems' | 'help' = initialTab;
+  let activeTab: 'general' | 'library' | 'game-systems' | 'help' = initialTab;
   let activeHelpSubTab: 'guides' | 'reference' | 'about' = initialHelpSubTab;
   $: if (visible) {
     activeTab = initialTab;
@@ -48,6 +49,7 @@
   }
 
   const tabs = [
+    { id: 'general' as const, label: 'General' },
     { id: 'library' as const, label: 'Library' },
     { id: 'game-systems' as const, label: 'Game Systems' },
     { id: 'help' as const, label: 'Help' },
@@ -74,7 +76,9 @@
       {/each}
     </nav>
     <div class="tab-body">
-      {#if activeTab === 'game-systems'}
+      {#if activeTab === 'general'}
+        <GeneralSettings />
+      {:else if activeTab === 'game-systems'}
         <GameSystemsSettings {knownSystems} {onSystemsChanged} />
       {:else if activeTab === 'library'}
         <LibrarySettings

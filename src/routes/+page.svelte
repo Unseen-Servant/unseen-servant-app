@@ -169,7 +169,7 @@
   let showHelpOverlay = false;
   let showSplash = true;
   let splashTimer: ReturnType<typeof setTimeout> | null = null;
-  let settingsInitialTab: 'library' | 'game-systems' | 'help' = 'library';
+  let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
   let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
@@ -1804,7 +1804,7 @@
     // Cmd/Ctrl+,: open Settings (always available).
     if (meta && !event.shiftKey && event.key === ',') {
       event.preventDefault();
-      settingsInitialTab = 'library';
+      settingsInitialTab = 'general';
       showSettings = true;
       return;
     }
@@ -3076,7 +3076,7 @@
     {lastSyncTime}
     onSync={handleManualSync}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
-    onOpenSettings={() => { settingsInitialTab = 'library'; showSettings = true; }}
+    onOpenSettings={() => { settingsInitialTab = 'general'; showSettings = true; }}
     onShowHelp={() => { showHelpOverlay = true; }}
   />
 </main>

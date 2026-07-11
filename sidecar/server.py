@@ -30,7 +30,7 @@ import pymupdf4llm
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import uvicorn
 
 from chunker import (
@@ -58,6 +58,12 @@ from spelling import SpellCorrector
 # parent-dedupe loop sees in re-ranked order. Trailing candidates beyond
 # this still appear (in cosine order) so dedupe never starves.
 RERANK_CANDIDATE_POOL = int(os.getenv("RERANK_CANDIDATES", "50"))
+
+# Bounds for the user-tunable rerank pool size (search settings / per-request
+# override). Below 10 the reranker can't reorder a first page; above 200 the
+# per-doc cross-encoder cost makes search unusably slow.
+RERANK_POOL_MIN = 10
+RERANK_POOL_MAX = 200
 
 
 # Relevance-tier thresholds (issues #306/#310). Neither score scale is a
@@ -524,7 +530,14 @@ class SearchRequest(BaseModel):
     collection: str | None = None
     source_paths: list[str] | None = None
     search_all: bool = False
-    # Cross-encoder rerank of the candidate pool. Default on. The
+    # Pipeline knobs. ``None`` means "use the persisted search settings"
+    # (search_settings.json in the data dir; see SearchSettings below) —
+    # resolution order is request field > persisted setting > built-in
+    # default. The desktop UI and MCP omit these, so the settings modal
+    # governs both; the eval harness passes them explicitly so it stays
+    # pinned to the configuration it claims to measure.
+    #
+    # rerank: cross-encoder rerank of the candidate pool. Default on. The
     # 2026-07-10 eval ablation favored rerank-off (nDCG@10 0.727 vs
     # 0.655, 7x faster — evals/baselines/2026-07-10-rerank-off-p25.md),
     # and the default was briefly flipped, but real-library search
@@ -533,27 +546,106 @@ class SearchRequest(BaseModel):
     # regime of a real library, which is where cross-encoders earn
     # their cost. Treat the harness as necessary-not-sufficient for
     # rerank decisions until the corpus grows.
+    rerank: bool | None = None
+    # rerank_candidates: cross-encoder pool size (clamped to
+    # RERANK_POOL_MIN..RERANK_POOL_MAX). Built-in default is
+    # RERANK_CANDIDATE_POOL (env RERANK_CANDIDATES, 50).
+    rerank_candidates: int | None = None
+    # hybrid: experimental (BM25 re-test, 2026-07-01 roadmap REOPEN
+    # item): fuse a BM25 ranking over the same chunks into the dense
+    # candidate pool via reciprocal-rank fusion. Default off — does not
+    # change production search behavior.
+    hybrid: bool | None = None
+    # spell_correction: rewrite out-of-vocabulary query tokens to the
+    # closest library term before embedding (typo-tolerance design,
+    # section A). Default on — the 2026-07-10 eval gate passed once
+    # general-English words were protected from rewriting: clean queries
+    # reproduce the no-correction baseline to the digit, and the typo set
+    # closes >half its nDCG/MRR gap
+    # (evals/baselines/2026-07-10-spellfix-en-guard.md).
+    spell_correction: bool | None = None
+    # variant_expansion: search spacing variants of the query
+    # ("chainmail" ↔ "chain mail") alongside it and fuse via RRF
+    # (typo-tolerance design, section B). Default off — the 2026-07-10
+    # eval gate failed: spacing variants gained nothing (bge-m3 subwords
+    # already absorb spacing) and clean queries regressed
+    # (evals/baselines/2026-07-10-variant-expansion.md).
+    variant_expansion: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Search settings — user-tunable pipeline knobs, persisted in the data dir
+# (docs/specs/retrieval/2026-07-11-search-settings-design.md). These are the
+# sidecar-wide defaults: every caller (desktop UI, MCP) inherits them unless
+# the request sets the corresponding SearchRequest field.
+# ---------------------------------------------------------------------------
+
+SEARCH_SETTINGS_FILENAME = "search_settings.json"
+
+
+class SearchSettings(BaseModel):
     rerank: bool = True
-    # Experimental (BM25 re-test, 2026-07-01 roadmap REOPEN item): fuse a
-    # BM25 ranking over the same chunks into the dense candidate pool via
-    # reciprocal-rank fusion. Default off — does not change production
-    # search behavior.
-    hybrid: bool = False
-    # Rewrite out-of-vocabulary query tokens to the closest library term
-    # before embedding (typo-tolerance design, section A). Default on —
-    # the 2026-07-10 eval gate passed once general-English words were
-    # protected from rewriting: clean queries reproduce the no-correction
-    # baseline to the digit, and the typo set closes >half its nDCG/MRR
-    # gap (evals/baselines/2026-07-10-spellfix-en-guard.md). Off-switch
-    # for eval ablation and as an escape hatch.
+    rerank_candidates: int = RERANK_CANDIDATE_POOL
     spell_correction: bool = True
-    # Search spacing variants of the query ("chainmail" ↔ "chain mail")
-    # alongside it and fuse via RRF (typo-tolerance design, section B).
-    # Default off — the 2026-07-10 eval gate failed: spacing variants
-    # gained nothing (bge-m3 subwords already absorb spacing) and clean
-    # queries regressed (evals/baselines/2026-07-10-variant-expansion.md,
-    # findings in the design doc). Flag retained for re-tests.
+    hybrid: bool = False
     variant_expansion: bool = False
+
+    @field_validator("rerank_candidates")
+    @classmethod
+    def _clamp_pool(cls, v: int) -> int:
+        return max(RERANK_POOL_MIN, min(RERANK_POOL_MAX, v))
+
+
+class SearchSettingsUpdate(BaseModel):
+    """Partial update for PUT /api/search-settings — None fields untouched."""
+    rerank: bool | None = None
+    rerank_candidates: int | None = None
+    spell_correction: bool | None = None
+    hybrid: bool | None = None
+    variant_expansion: bool | None = None
+
+
+def load_search_settings(data_dir: Path) -> SearchSettings:
+    """Load persisted settings; missing file, unknown keys, or a corrupt
+    file all resolve to defaults — search must keep working regardless."""
+    path = data_dir / SEARCH_SETTINGS_FILENAME
+    if not path.exists():
+        return SearchSettings()
+    try:
+        raw = json.loads(path.read_text())
+        known = {k: raw[k] for k in SearchSettings.model_fields if k in raw}
+        return SearchSettings(**known)
+    except Exception as e:
+        print(f"Unreadable {SEARCH_SETTINGS_FILENAME} ({e}); using default search settings")
+        return SearchSettings()
+
+
+def save_search_settings(data_dir: Path, settings: SearchSettings) -> None:
+    """Write search settings to disk atomically."""
+    path = data_dir / SEARCH_SETTINGS_FILENAME
+    tmp_path = path.with_suffix(".json.tmp")
+    tmp_path.write_text(settings.model_dump_json(indent=2))
+    os.replace(tmp_path, path)
+
+
+def resolve_search_knobs(
+    request: SearchRequest, data_dir: Path | None
+) -> SearchSettings:
+    """Effective knobs for one search: request field > persisted > default.
+
+    Returns a validated SearchSettings (pool size clamped), so the search
+    handler reads every knob from one object regardless of its origin.
+    """
+    base = load_search_settings(data_dir) if data_dir else SearchSettings()
+    overrides = {
+        k: getattr(request, k)
+        for k in SearchSettings.model_fields
+        if getattr(request, k) is not None
+    }
+    if not overrides:
+        return base
+    return SearchSettings(**{**base.model_dump(), **overrides})
+
 
 class SetGameSystemRequest(BaseModel):
     filename: str
@@ -2541,6 +2633,34 @@ def create_app(
             "reclaimed": sqlite_reclaimed + orphan_reclaimed,
         }
 
+    @app.get("/api/search-settings")
+    async def get_search_settings():
+        """Current sidecar-wide search-pipeline settings."""
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+        return load_search_settings(data_dir).model_dump()
+
+    @app.put("/api/search-settings")
+    async def put_search_settings(update: SearchSettingsUpdate):
+        """Merge a partial update into the persisted search settings.
+
+        Values are validated/clamped by SearchSettings and echoed back so
+        the UI can adopt what was actually stored.
+        """
+        if not data_dir:
+            raise HTTPException(
+                status_code=500, detail="No data directory configured"
+            )
+        current = load_search_settings(data_dir).model_dump()
+        current.update(
+            {k: v for k, v in update.model_dump().items() if v is not None}
+        )
+        settings = SearchSettings(**current)
+        save_search_settings(data_dir, settings)
+        return settings.model_dump()
+
     @app.get("/api/sources")
     async def get_sources():
         """List all indexed PDFs with per-source stats."""
@@ -3117,15 +3237,20 @@ def create_app(
             # corrected query; they ride the same Chroma call and fuse
             # below via RRF. Without them this is the single-query path —
             # zero overhead for the common case.
+            # Effective pipeline knobs for this request: explicit request
+            # fields win, then the persisted search settings, then the
+            # built-in defaults.
+            knobs = resolve_search_knobs(request, data_dir)
+
             corrected_query: str | None = None
-            if request.spell_correction:
+            if knobs.spell_correction:
                 corrected_query = _get_spell_corrector().correct(request.query)
             query_text = (
                 corrected_query if corrected_query is not None
                 else request.query
             )
             variant_queries: list[str] = []
-            if request.variant_expansion:
+            if knobs.variant_expansion:
                 variant_queries = _get_spell_corrector().expand(query_text)
 
             # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
@@ -3322,7 +3447,7 @@ def create_app(
             # that the reranker replaces with a real cross-encoder score
             # when rerank is on.
             ordering_scores: list[float] | None = None
-            if variant_queries or request.hybrid:
+            if variant_queries or knobs.hybrid:
                 rankings = list(results["ids"])
                 dense_best: dict[str, tuple[dict, float, str]] = {}
                 for ids, metas, dists, docs in zip(
@@ -3336,7 +3461,7 @@ def create_app(
                         ):
                             dense_best[cid] = (meta, dist, doc)
                 lex = None
-                if request.hybrid:
+                if knobs.hybrid:
                     lex = _get_lexical_index()
                     lex_where = query_kwargs.get("where")
                     rankings.append(lex.search(
@@ -3414,8 +3539,8 @@ def create_app(
             # keyword-dense action text.
             rerank_applied = False
             pool = 0
-            if request.rerank and _rerank_safe_for_query(query_text):
-                pool = min(RERANK_CANDIDATE_POOL, len(ordered_metadatas))
+            if knobs.rerank and _rerank_safe_for_query(query_text):
+                pool = min(knobs.rerank_candidates, len(ordered_metadatas))
                 pool_docs = ordered_docs[:pool]
                 pool_meta = ordered_metadatas[:pool]
                 rerank_inputs = [

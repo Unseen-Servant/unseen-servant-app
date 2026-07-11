@@ -958,6 +958,55 @@ async fn search_index(
 }
 
 #[tauri::command]
+async fn get_search_settings() -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/api/search-settings", sidecar_url()))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Loading search settings failed ({}): {}",
+            status, body
+        ));
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))
+}
+
+#[tauri::command]
+async fn update_search_settings(partial: serde_json::Value) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .put(format!("{}/api/search-settings", sidecar_url()))
+        .json(&partial)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Saving search settings failed ({}): {}",
+            status, body
+        ));
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response from indexer: {}", e))
+}
+
+#[tauri::command]
 async fn create_collection(
     name: String,
     file_paths: Vec<String>,
@@ -1631,7 +1680,9 @@ pub fn run() {
             get_active_context,
             set_active_context,
             clear_active_context,
-            search_index
+            search_index,
+            get_search_settings,
+            update_search_settings
         ])
         .setup(|app| {
             // Determine where ChromaDB should store data
