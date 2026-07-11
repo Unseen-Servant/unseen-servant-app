@@ -524,7 +524,14 @@ class SearchRequest(BaseModel):
     collection: str | None = None
     source_paths: list[str] | None = None
     search_all: bool = False
-    rerank: bool = True
+    # Cross-encoder rerank of the candidate pool. Default off — the
+    # 2026-07-10 ablation showed the reranker makes aggregate ordering
+    # *worse* (nDCG@10 0.727 off vs 0.655 on at the UI page size) at 7x
+    # the latency, buying back only 2/65 recall@10 queries and the
+    # 3-query cross_page category
+    # (evals/baselines/2026-07-10-rerank-off-p25.md). Opt-in per request
+    # for callers who want that trade; tiers are dual-scale either way.
+    rerank: bool = False
     # Experimental (BM25 re-test, 2026-07-01 roadmap REOPEN item): fuse a
     # BM25 ranking over the same chunks into the dense candidate pool via
     # reciprocal-rank fusion. Default off — does not change production

@@ -28,8 +28,10 @@ PORT_FILENAME = "sidecar.port"
 SIDECAR_URL_DISCOVERY_TIMEOUT = 30.0  # seconds; covers a slow sidecar boot
 
 # Per-request timeout for sidecar HTTP calls. httpx defaults to 5s, but a
-# warm reranked search takes 5-7s (the cross-encoder is the whole budget),
-# so the default silently times out a search the sidecar answers 200 OK.
+# warm reranked search takes 5-7s (the cross-encoder is the whole budget;
+# rerank is opt-in since 2026-07-10, but a cold Ollama embed load can be
+# just as slow), so the default silently times out a search the sidecar
+# answers 200 OK.
 SIDECAR_REQUEST_TIMEOUT_SECONDS = 60.0
 
 
