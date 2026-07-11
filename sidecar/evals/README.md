@@ -40,6 +40,18 @@ endpoint (rerank on unless `--no-rerank`; `--hybrid` turns on the
 experimental BM25+RRF candidate fusion — see `lexical.py`). Reported per category —
 `stat_block`, `table`, `prose`, `cross_page`, `cross_system` — and overall:
 
+**The harness mimics the application experience**: requests send
+`n_results=25` by default — the UI's first page (`PAGE_SIZE_INITIAL` in
+`src/routes/+page.svelte`, pinned by `tests/test_eval_config.py`) — while
+metrics stay graded on the top 10. Search behavior can depend on the
+requested page size (the rerank candidate pool may scale with it), so
+gating at a size the app never sends validates the wrong config: the
+2026-07-10 #340 restructure passed at `n_results=10` and regressed the UI
+at 25. Use `--page-size` for ablations at other sizes (e.g. 15, the MCP
+default). Baselines record `page_size` in their meta; baselines written
+before 2026-07-10 predate the flag and were measured at 10 — compare
+like with like.
+
 - **nDCG@10** — binary gains, normalized by the ideal ordering of the
   retrieved relevant results; 0 when nothing relevant is retrieved.
 - **MRR@5** — reciprocal rank of the first relevant result in the top 5.

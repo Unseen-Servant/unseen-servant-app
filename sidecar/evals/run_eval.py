@@ -51,6 +51,13 @@ EXPECTED_PDFS = [
 
 TOP_K = 10  # nDCG@10 needs 10 results
 
+# Default n_results per request. Mirrors PAGE_SIZE_INITIAL in
+# src/routes/+page.svelte (pinned by tests/test_eval_config.py): the
+# rerank pool can scale with n_results, so quality must be gated at the
+# page size the app actually sends — requesting TOP_K let the #340
+# restructure pass a gate the UI then failed. Metrics stay graded @TOP_K.
+DEFAULT_PAGE_SIZE = 25
+
 
 def build_client(data_dir: Path):
     from fastapi.testclient import TestClient
@@ -115,7 +122,7 @@ def warmup(
 def run(
     client, queries: list[dict], rerank: bool, hybrid: bool,
     spell_correction: bool, variant_expansion: bool,
-    page_size: int = TOP_K,
+    page_size: int = DEFAULT_PAGE_SIZE,
 ) -> list[dict]:
     per_query = []
     for q in queries:
@@ -179,12 +186,12 @@ def main() -> None:
                     help="search spacing variants of the query and fuse "
                          "via RRF (experimental /api/search "
                          "variant_expansion flag)")
-    ap.add_argument("--page-size", type=int, default=TOP_K,
-                    help="n_results per search request (default 10). "
-                         "Metrics are still graded @10; pass 25 to mirror "
-                         "the UI page size — the rerank pool scales with "
-                         "n_results, so quality must be gated at the page "
-                         "size the app actually sends.")
+    ap.add_argument("--page-size", type=int, default=DEFAULT_PAGE_SIZE,
+                    help="n_results per search request (default "
+                         f"{DEFAULT_PAGE_SIZE}, the UI's first page — "
+                         "quality is gated at the page size the app "
+                         "actually sends). Metrics are still graded "
+                         f"@{TOP_K}.")
     ap.add_argument("--write-baseline", metavar="NAME",
                     help="write evals/baselines/NAME.json and NAME.md")
     args = ap.parse_args()
