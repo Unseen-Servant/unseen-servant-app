@@ -326,7 +326,7 @@
     font-family: var(--font-body);
     font-size: 0.8rem;
     cursor: pointer;
-    transition: background var(--transition-fast), filter var(--transition-fast);
+    transition: background var(--transition-fast);
   }
 
   .open-btn svg {
@@ -335,9 +335,10 @@
     display: block;
   }
 
+  /* Grey step only — glows are reserved for activated states, and hover
+     never introduces hue (see Design Conventions in CLAUDE.md). */
   .open-btn:hover {
-    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
-    filter: var(--glow-accent);
+    background: var(--bg-focused);
   }
 
   .open-btn:focus-visible {
