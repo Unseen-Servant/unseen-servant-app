@@ -335,8 +335,8 @@ def test_known_systems_include_default_colors(client):
     known = client.get("/api/known-game-systems").json()
     dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
     pf = next(s for s in known["systems"] if s["tag"] == "PF2E")
-    assert dnd["color"] == "#c75450"
-    assert pf["color"] == "#5fb068"
+    assert dnd["color"] == "#c2736d"
+    assert pf["color"] == "#6b9b60"
 
 
 def test_create_custom_with_color(client, tmp_path):
@@ -344,14 +344,14 @@ def test_create_custom_with_color(client, tmp_path):
     response = client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
         "keywords": ["cairn"],
-        "color": "#4fa896",
+        "color": "#2fa094",
     })
     assert response.status_code == 200
-    assert response.json()["color"] == "#4fa896"
+    assert response.json()["color"] == "#2fa094"
 
     known = client.get("/api/known-game-systems").json()
     cairn = next(s for s in known["systems"] if s["tag"] == "Cairn")
-    assert cairn["color"] == "#4fa896"
+    assert cairn["color"] == "#2fa094"
 
 
 def test_create_custom_without_color_stays_unset(client):
@@ -372,20 +372,20 @@ def test_update_custom_changes_color(client):
     client.post("/api/custom-game-systems", json={
         "tag": "Cairn",
         "keywords": ["cairn"],
-        "color": "#4fa896",
+        "color": "#2fa094",
     })
     response = client.put("/api/custom-game-systems/Cairn", json={
         "tag": "Cairn",
         "keywords": ["cairn"],
-        "color": "#9b6cb6",
+        "color": "#b5739f",
     })
     assert response.status_code == 200
-    assert response.json()["color"] == "#9b6cb6"
+    assert response.json()["color"] == "#b5739f"
 
 
 def test_builtin_override_inherits_color_when_unset(client):
     """Customizing a built-in without picking a color preserves the built-in default."""
-    # Built-in D&D 5E ships as red.
+    # Built-in D&D 5E ships as Madder.
     client.post("/api/custom-game-systems", json={
         "tag": "D&D 5E",
         "keywords": ["dnd5e", "my own keyword"],
@@ -394,5 +394,5 @@ def test_builtin_override_inherits_color_when_unset(client):
 
     known = client.get("/api/known-game-systems").json()
     dnd = next(s for s in known["systems"] if s["tag"] == "D&D 5E")
-    assert dnd["color"] == "#c75450"
+    assert dnd["color"] == "#c2736d"
     assert dnd["is_customized"] is True

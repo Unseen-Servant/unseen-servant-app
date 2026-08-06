@@ -22,11 +22,12 @@ Two pitfalls when adding keywords:
    English phrases ("5th edition") match content but rarely paths.
 """
 
-# Palette mirrors the collection picker in CollectionEditDialog.svelte:
-#   #c75450 red    #d49449 orange  #caa84b amber  #5fb068 green
-#   #4fa896 teal   #5a8dc4 blue    #9b6cb6 purple #b69f81 tan
+# Colors come from the manuscript-pigment palette; src/lib/palette.ts is
+# the source of truth (keep hexes in sync by hand — no shared codegen):
+#   #c2736d Madder  #bb7b4e Ember      #9f8b3e Gilt  #6b9b60 Moss
+#   #2fa094 Verdigris  #5b90c7 Woad    #b5739f Plum
 GAME_SYSTEMS: list[dict] = [
-    # --- Dungeons & Dragons (red family) ---
+    # --- Dungeons & Dragons (Madder) ---
     {
         "tag": "D&D 5E",
         # "5e srd" is the safest short form (won't collide with "5e" in 3.5E
@@ -41,71 +42,71 @@ GAME_SYSTEMS: list[dict] = [
             "d&d 5e", "dnd 5e", "5e srd", "5th edition",
             "black flag", "srd cc", "srd 5.1",
         ],
-        "color": "#c75450",
+        "color": "#c2736d",
     },
     {
         "tag": "D&D 3.5E",
         "keywords": ["d&d 3.5", "dnd 3.5", "3.5 edition"],
-        "color": "#c75450",
+        "color": "#c2736d",
     },
     {
         "tag": "D&D 4E",
         "keywords": ["d&d 4e", "dnd 4e", "4e srd", "4th edition"],
-        "color": "#c75450",
+        "color": "#c2736d",
     },
     {
         "tag": "AD&D 2E",
         "keywords": ["ad&d 2e", "advanced d&d 2", "2nd edition"],
-        "color": "#c75450",
+        "color": "#c2736d",
     },
     {
         "tag": "AD&D",
         "keywords": ["ad&d 1e", "advanced d&d", "1st edition"],
-        "color": "#c75450",
+        "color": "#c2736d",
     },
-    # --- Pathfinder (green family) ---
+    # --- Pathfinder (Moss) ---
     {
         "tag": "PF1E",
         "keywords": ["pathfinder 1e", "pf1e", "pfrpg"],
-        "color": "#5fb068",
+        "color": "#6b9b60",
     },
     {
         "tag": "PF2E",
         "keywords": ["pathfinder 2e", "pf2e"],
-        "color": "#5fb068",
+        "color": "#6b9b60",
     },
-    # --- Free League (teal) ---
+    # --- Free League (Verdigris) ---
     {
         "tag": "Dragonbane",
         "keywords": ["dragonbane", "drakar och demoner"],
-        "color": "#4fa896",
+        "color": "#2fa094",
     },
     {
         "tag": "MORK BORG",
         # Normalization strips the umlaut, so "Mörk Borg" matches via
         # "mork borg" naturally.
         "keywords": ["mork borg"],
-        "color": "#4fa896",
+        "color": "#2fa094",
     },
-    # --- Horror (purple) ---
+    # --- Horror (Plum) ---
     {
         "tag": "CoC 7E",
         # Plain "coc" alone risks colliding with "cocoa" / "cocoon"; keep
         # the qualified forms.
         "keywords": ["call of cthulhu", "coc 7e", "coc 7th"],
-        "color": "#9b6cb6",
+        "color": "#b5739f",
     },
-    # --- Cyberpunk (blue) ---
+    # --- Cyberpunk (Woad) ---
     {
         "tag": "CP RED",
         "keywords": ["cyberpunk red", "cp red"],
-        "color": "#5a8dc4",
+        "color": "#5b90c7",
     },
-    # --- Warhammer (orange) ---
+    # --- Warhammer (Ember) ---
     {
         "tag": "WFRP 4E",
         "keywords": ["warhammer fantasy roleplay", "wfrp"],
-        "color": "#d49449",
+        "color": "#bb7b4e",
     },
     {
         "tag": "W40KRP",
@@ -116,38 +117,39 @@ GAME_SYSTEMS: list[dict] = [
             "dark heresy", "rogue trader", "deathwatch",
             "black crusade", "only war", "wrath & glory",
         ],
-        "color": "#d49449",
+        "color": "#bb7b4e",
     },
-    # --- Schwalb (purple — adjacent to horror in tone) ---
+    # --- Schwalb (Plum — adjacent to horror in tone) ---
     {
         "tag": "SotDL",
         "keywords": ["shadow of the demon lord", "sotdl"],
-        "color": "#9b6cb6",
+        "color": "#b5739f",
     },
     {
         "tag": "SotWW",
         "keywords": ["shadow of the weird wizard", "sotww"],
-        "color": "#9b6cb6",
+        "color": "#b5739f",
     },
-    # --- Generic / universal (tan) ---
+    # --- Generic / universal (Ember — the palette has no tan; Ember is the
+    #     nearest hue and keeps already-crowded Gilt to the OSR family) ---
     {
         "tag": "SWADE",
         # "swade" is the common abbreviation for the current edition.
         "keywords": ["savage worlds", "swade"],
-        "color": "#b69f81",
+        "color": "#bb7b4e",
     },
     {
         "tag": "GURPS",
         "keywords": ["gurps"],
-        "color": "#b69f81",
+        "color": "#bb7b4e",
     },
     {
         "tag": "Fate",
         # Bare "fate" would match too much English prose; keep qualified.
         "keywords": ["fate core", "fate accelerated", "fate condensed", "fate rpg"],
-        "color": "#b69f81",
+        "color": "#bb7b4e",
     },
-    # --- Old-school renaissance (amber family) ---
+    # --- Old-school renaissance (Gilt) ---
     {
         "tag": "OSR",
         # Dropped from the previous catalog because they false-positive
@@ -162,29 +164,29 @@ GAME_SYSTEMS: list[dict] = [
             "swords & wizardry",
             "osric",
         ],
-        "color": "#caa84b",
+        "color": "#9f8b3e",
     },
     {
         "tag": "SD",
         "keywords": ["shadowdark"],
-        "color": "#caa84b",
+        "color": "#9f8b3e",
     },
     {
         "tag": "LotFP",
         "keywords": ["lamentations of the flame princess", "lotfp"],
-        "color": "#caa84b",
+        "color": "#9f8b3e",
     },
     {
         "tag": "DCC",
         "keywords": ["dungeon crawl classics", "dcc rpg"],
-        "color": "#caa84b",
+        "color": "#9f8b3e",
     },
     {
         "tag": "C&C",
         # Normalization folds ``&`` to ``n``: ``c&c`` and ``cnc`` collapse
         # to the same needle.
         "keywords": ["castles & crusades", "c&c"],
-        "color": "#caa84b",
+        "color": "#9f8b3e",
     }
 ]
 
