@@ -319,7 +319,7 @@
     font-size: 0.7rem;
     font-variant: small-caps;
     letter-spacing: 0.08em;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -337,7 +337,7 @@
     padding: 0.35rem 0.5rem;
     font-size: 0.8rem;
     font-style: italic;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     border: 1px dashed var(--border-subtle);
     border-radius: 2px;
   }
@@ -424,7 +424,7 @@
     flex-shrink: 0;
     padding: 0.05rem 0.35rem;
     border: 1px solid var(--border-subtle);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.6rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;

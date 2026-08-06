@@ -223,7 +223,7 @@
   .input {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     font-family: var(--font-body);
     font-size: 0.85rem;
     background: var(--bg-focused);
@@ -257,7 +257,7 @@
     padding: 0;
     background: var(--bg-focused);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: border-color var(--transition-fast);
   }
@@ -268,7 +268,7 @@
   .color-swatch {
     width: 14px;
     height: 14px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -286,7 +286,7 @@
     right: 0;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.5rem;
     display: grid;
@@ -298,7 +298,7 @@
   .swatch {
     width: 22px;
     height: 22px;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     padding: 0;
     border: 1px solid transparent;

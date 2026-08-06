@@ -180,8 +180,8 @@
     padding: 0.3rem 0.55rem;
     background: var(--bg-focused);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--text-primary);
     user-select: all;
@@ -193,7 +193,7 @@
     background: transparent;
     border: none;
     padding: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-accent);
     cursor: pointer;

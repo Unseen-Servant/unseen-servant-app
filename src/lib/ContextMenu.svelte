@@ -386,7 +386,7 @@
     z-index: 200;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     min-width: 200px;
     padding: 0.15rem 0;
@@ -446,7 +446,7 @@
     top: -0.15rem;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     min-width: 180px;
     max-height: 320px;

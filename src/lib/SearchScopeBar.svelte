@@ -173,7 +173,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.1rem 0.4rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     border: 1px solid transparent;
     color: var(--text-secondary);
   }
@@ -209,7 +209,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.1rem 0.4rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border-subtle);
     background: var(--bg-container);
     color: var(--text-secondary);

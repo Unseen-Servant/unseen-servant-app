@@ -330,7 +330,7 @@
     display: flex;
     align-items: center;
     padding: 0 0.4rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     transition: background var(--transition-fast);
   }
   .row-container:hover {
@@ -344,7 +344,7 @@
     padding: 0;
     cursor: pointer;
     border: 1.5px solid var(--text-tertiary);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: transparent;
     position: relative;
     flex-shrink: 0;
@@ -405,7 +405,7 @@
     cursor: pointer;
     background: none;
     border: none;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     flex: 1;
     text-align: left;
     font-size: 0.95rem;
@@ -434,7 +434,7 @@
     background: var(--bg-container);
     color: var(--text-primary);
     border: 1px solid var(--text-accent);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     padding: 0.1rem 0.3rem;
     font-size: 0.95rem;
     font-family: var(--font-body);
@@ -459,7 +459,7 @@
     --badge-color: var(--text-accent);
     display: inline-block;
     padding: 0.1rem 0.4rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.75rem;
     font-family: var(--font-body);
     background: color-mix(in srgb, var(--badge-color) 18%, transparent);
@@ -479,7 +479,7 @@
     display: inline-block;
     padding: 0.1rem 0.55rem;
     margin-left: 0.5rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.8rem;
     background: transparent;
     color: var(--text-secondary);
@@ -500,7 +500,7 @@
     z-index: 200;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     max-height: 320px;
     overflow-y: auto;

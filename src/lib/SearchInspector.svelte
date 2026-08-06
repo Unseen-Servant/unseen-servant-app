@@ -156,7 +156,7 @@
     flex-shrink: 0;
     padding: 0.05rem 0.35rem;
     border: 1px solid var(--border-subtle);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.65rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -249,7 +249,7 @@
   .snippet :global(ol) { margin: 0.4em 0; padding-left: 1.25em; }
   .snippet :global(li) { margin: 0.1em 0; }
   .snippet :global(code) {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.9em;
     padding: 0 0.25em;
     background: var(--bg-app);
@@ -259,7 +259,7 @@
     margin: 0.45em 0;
     padding: 0.4em 0.6em;
     background: var(--bg-app);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     overflow-x: auto;
   }
   .snippet :global(pre code) { background: transparent; padding: 0; }
@@ -313,7 +313,7 @@
     padding: 0.3rem 0.55rem;
     background: transparent;
     border: 1px solid var(--text-accent);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--text-accent);
     font-family: var(--font-body);
     font-size: 0.8rem;

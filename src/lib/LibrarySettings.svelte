@@ -442,13 +442,13 @@
   .path-input {
     flex: 1;
     min-width: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     padding: 0.4rem 0.6rem;
     background: var(--bg-focused);
     color: var(--text-primary);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
   }
   .path-input:focus {
     outline: 1px solid var(--text-accent);
@@ -484,7 +484,7 @@
   }
 
   .stat-value {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
@@ -527,7 +527,7 @@
   }
 
   .meta-value {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
@@ -547,7 +547,7 @@
     background: transparent;
     border: none;
     padding: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-accent);
     cursor: pointer;
@@ -614,7 +614,7 @@
     background: var(--bg-focused);
     color: var(--text-primary);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     min-width: 11rem;
   }
@@ -628,7 +628,7 @@
 
   .policy-group {
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     padding: 0.4rem 0.6rem 0.6rem;
     margin: 0;
     width: 100%;
@@ -659,7 +659,7 @@
     font-family: var(--font-body);
     font-size: 0.85rem;
     padding: 0.4rem 0.75rem;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
   }

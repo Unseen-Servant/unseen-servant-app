@@ -137,7 +137,7 @@
     text-transform: uppercase;
   }
   .stat-value {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;

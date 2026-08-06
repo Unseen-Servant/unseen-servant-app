@@ -371,7 +371,7 @@
     line-height: 1;
     width: 1.5rem;
     height: 1.5rem;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -442,7 +442,7 @@
   .label {
     font-size: 0.65rem;
     padding: 0.1rem 0.3rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
   }
 
   .builtin-label {
@@ -477,7 +477,7 @@
   .input {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     font-family: var(--font-body);
     font-size: 0.85rem;
     background: var(--bg-focused);
@@ -512,7 +512,7 @@
     padding: 0;
     background: var(--bg-focused);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: border-color var(--transition-fast);
   }
@@ -523,7 +523,7 @@
   .color-swatch {
     width: 14px;
     height: 14px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -541,7 +541,7 @@
     right: 0;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.5rem;
     display: grid;
@@ -552,7 +552,7 @@
   .swatch {
     width: 22px;
     height: 22px;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     padding: 0;
     border: 1px solid transparent;
@@ -619,7 +619,7 @@
     font-family: var(--font-body);
     font-size: 0.8rem;
     padding: 0.3rem 0.75rem;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     border: 1px solid var(--border-subtle);
     background: none;

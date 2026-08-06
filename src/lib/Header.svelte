@@ -315,7 +315,7 @@
     height: 28px;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     color: var(--text-secondary);
     cursor: pointer;
     padding: 0;
@@ -378,7 +378,7 @@
     padding: 0 0.7rem;
     background: var(--bg-container);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     transition: border-color var(--transition-fast);
   }
 
@@ -444,7 +444,7 @@
     margin-right: 0.4rem;
     background: rgba(146, 92, 203, 0.12);
     border: 1px solid var(--text-active);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--text-active);
     font-size: 0.75rem;
     line-height: 1.2;

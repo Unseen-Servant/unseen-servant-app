@@ -635,7 +635,7 @@
     padding: 0;
     cursor: pointer;
     border: 1.5px solid var(--text-tertiary);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: transparent;
     position: relative;
     flex-shrink: 0;
@@ -684,7 +684,7 @@
     gap: 0.4rem;
     padding: 0.25rem 0.75rem 0.25rem 1.5rem;
     margin: 0 0.25rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background var(--transition-fast);
     -webkit-user-select: none;
@@ -739,7 +739,7 @@
     background: var(--bg-container);
     color: var(--text-primary);
     border: 1px solid var(--text-accent);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     padding: 0.1rem 0.3rem;
     font-size: 0.85rem;
     font-family: var(--font-body);
@@ -761,7 +761,7 @@
   }
   .file-meta {
     flex-shrink: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;

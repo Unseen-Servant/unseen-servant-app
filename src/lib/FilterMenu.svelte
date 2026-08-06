@@ -361,7 +361,7 @@
     left: 0;
     background: var(--bg-focused);
     border: 1px solid var(--bg-category);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.4rem 0;
     min-width: 220px;
@@ -481,7 +481,7 @@
     justify-content: center;
     background: transparent;
     border: 1px solid var(--border-subtle);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--text-tertiary);
     font-family: var(--font-body);
     font-size: 0.65rem;

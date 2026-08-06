@@ -125,12 +125,12 @@
   }
 
   .kbd {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.85em;
     padding: 0.05em 0.3em;
     background: var(--bg-focused);
     border: 1px solid var(--border-subtle);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--text-primary);
   }
 
@@ -165,7 +165,7 @@
 
   .chord {
     margin: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     color: var(--text-primary);
     white-space: nowrap;
   }

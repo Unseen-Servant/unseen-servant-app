@@ -273,7 +273,7 @@
     background: var(--bg-focused);
     color: var(--text-primary);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     /* Fixed width so every control in the pane lines up regardless of
        its longest option ("Exhaustive (200)"). */
@@ -289,7 +289,7 @@
 
   .experimental-group {
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     padding: 0.4rem 0.6rem 0.6rem;
     margin: 0;
     width: 100%;
@@ -323,7 +323,7 @@
     background: transparent;
     border: none;
     padding: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-accent);
     cursor: pointer;

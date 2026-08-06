@@ -263,7 +263,7 @@
   }
 
   .inline-code {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.85em;
     padding: 0 0.25em;
     background: var(--bg-focused);
@@ -278,7 +278,7 @@
     background: transparent;
     border: none;
     padding: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-accent);
     cursor: pointer;

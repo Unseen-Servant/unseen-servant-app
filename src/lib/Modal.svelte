@@ -104,9 +104,9 @@
     background: var(--bg-container);
     color: var(--text-primary);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-modal);
     /* Override the UA default that stretches a dialog to fill its
        inset region — without this, modals without an explicit height
        prop balloon to the viewport height. */
@@ -155,7 +155,7 @@
     font-size: 1.4rem;
     line-height: 1;
     padding: 0.1rem 0.4rem;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: color var(--transition-fast);
   }

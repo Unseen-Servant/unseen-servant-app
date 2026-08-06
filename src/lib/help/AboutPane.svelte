@@ -136,7 +136,7 @@
   }
 
   .path {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-primary);
     overflow: hidden;
@@ -173,7 +173,7 @@
     background: transparent;
     border: none;
     padding: 0;
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-accent);
     cursor: pointer;
