@@ -128,6 +128,7 @@
   }
 
   dialog.modal::backdrop {
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- pure-black scrim; ::backdrop can't see :root tokens */
     background: rgba(0, 0, 0, 0.6);
   }
 

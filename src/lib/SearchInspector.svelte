@@ -299,9 +299,11 @@
   }
   .snippet :global(td:empty),
   .snippet :global(th:empty) {
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- neutral 20% black recess for empty table cells */
     background: rgba(0, 0, 0, 0.2);
   }
   .snippet :global(tbody tr:nth-child(even) td) {
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- neutral 2% white zebra stripe */
     background: rgba(255, 255, 255, 0.02);
   }
 
@@ -328,7 +330,7 @@
   }
 
   .open-btn:hover {
-    background: rgba(182, 159, 129, 0.08);
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
     filter: var(--glow-accent);
   }
 

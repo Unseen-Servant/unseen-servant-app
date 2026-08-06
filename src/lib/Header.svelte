@@ -442,7 +442,7 @@
     max-width: 240px;
     padding: 0.1rem 0.25rem 0.1rem 0.4rem;
     margin-right: 0.4rem;
-    background: rgba(146, 92, 203, 0.12);
+    background: color-mix(in srgb, var(--text-active) 12%, transparent);
     border: 1px solid var(--text-active);
     border-radius: var(--radius-sm);
     color: var(--text-active);
@@ -457,7 +457,7 @@
      the next Backspace will clear the scope. Type, Escape, click away, or
      external clear all disarm. */
   .scope-chip.armed {
-    background: rgba(146, 92, 203, 0.32);
+    background: color-mix(in srgb, var(--text-active) 32%, transparent);
     filter: var(--glow-active);
   }
   .scope-kind {
@@ -483,6 +483,6 @@
     flex-shrink: 0;
   }
   .scope-clear:hover {
-    background: rgba(146, 92, 203, 0.2);
+    background: color-mix(in srgb, var(--text-active) 20%, transparent);
   }
 </style>

@@ -708,7 +708,7 @@
   /* Mirrors FileTree's highlighted treatment so a collection's members
      read the same way regardless of view mode. */
   .file.highlighted {
-    background: rgba(182, 159, 129, 0.12);
+    background: color-mix(in srgb, var(--text-accent) 12%, transparent);
     box-shadow: inset 3px 0 0 var(--text-accent);
   }
   .file-icon {

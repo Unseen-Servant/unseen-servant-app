@@ -391,7 +391,7 @@
     font-style: italic;
   }
   .highlighted {
-    background: rgba(182, 159, 129, 0.12);
+    background: color-mix(in srgb, var(--text-accent) 12%, transparent);
     border-left: 3px solid var(--text-accent);
     margin-left: -3px;
   }
@@ -473,7 +473,7 @@
   }
   .game-system-badge.overflow {
     color: var(--text-secondary);
-    background: rgba(182, 159, 129, 0.08);
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
   }
   .add-tag-btn {
     display: inline-block;
@@ -490,7 +490,7 @@
     transition: all var(--transition-fast);
   }
   .add-tag-btn:hover {
-    background: rgba(182, 159, 129, 0.1);
+    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
     color: var(--text-accent);
     border-color: var(--text-accent);
     border-style: solid;

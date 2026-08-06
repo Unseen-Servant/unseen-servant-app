@@ -499,7 +499,7 @@
   .solo-btn.active {
     color: var(--text-active);
     border-color: var(--text-active);
-    background: rgba(146, 92, 203, 0.15);
+    background: color-mix(in srgb, var(--text-active) 15%, transparent);
     filter: var(--glow-active);
   }
   .solo-btn:focus-visible {

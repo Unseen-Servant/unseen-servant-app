@@ -87,6 +87,7 @@
     color: var(--text-primary);
   }
   dialog.confirm-dialog::backdrop {
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- pure-black scrim; ::backdrop can't see :root tokens */
     background: rgba(0, 0, 0, 0.5);
   }
   .title {

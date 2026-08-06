@@ -180,7 +180,7 @@
 
   .scope-readout.narrowed {
     border-color: var(--text-active);
-    background: rgba(146, 92, 203, 0.1);
+    background: color-mix(in srgb, var(--text-active) 10%, transparent);
     color: var(--text-active);
   }
 
@@ -217,7 +217,7 @@
   }
 
   .chip.exclusion {
-    border-color: rgba(239, 68, 68, 0.3);
+    border-color: color-mix(in srgb, var(--text-danger) 30%, transparent);
     color: var(--text-secondary);
   }
 
@@ -226,7 +226,7 @@
      filter menu. */
   .chip.solo {
     border-color: var(--text-active);
-    background: rgba(146, 92, 203, 0.12);
+    background: color-mix(in srgb, var(--text-active) 12%, transparent);
     color: var(--text-active);
   }
   .chip.solo .chip-prefix {
@@ -249,7 +249,7 @@
   }
 
   .chip.hidden-on {
-    border-color: rgba(182, 159, 129, 0.35);
+    border-color: color-mix(in srgb, var(--text-accent) 35%, transparent);
     color: var(--text-accent);
   }
 
@@ -267,6 +267,7 @@
 
   .chip-clear:hover {
     opacity: 1;
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- neutral 6% white brighten step, hue-free by design */
     background: rgba(255, 255, 255, 0.06);
   }
 

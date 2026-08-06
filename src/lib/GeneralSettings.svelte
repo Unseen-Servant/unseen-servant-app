@@ -231,7 +231,7 @@
   }
 
   .error-text {
-    color: var(--text-danger, #c0392b);
+    color: var(--text-danger);
   }
 
   .setting-row {

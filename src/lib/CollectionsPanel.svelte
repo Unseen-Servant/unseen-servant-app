@@ -569,13 +569,13 @@
   }
   .row:hover,
   .row.kb-focused { background: var(--bg-focused); }
-  .row.active { background: rgba(182, 159, 129, 0.15); }
+  .row.active { background: color-mix(in srgb, var(--text-accent) 15%, transparent); }
   .row.kb-focused .row-actions,
   .row.active .row-actions { display: flex; }
   /* Armed-for-edit state: warmer background + accent stripe on the leading
      edge — DAW-style "this track is record-armed" affordance. */
   .row.editing {
-    background: rgba(182, 159, 129, 0.25);
+    background: color-mix(in srgb, var(--text-accent) 25%, transparent);
     border-left-color: var(--text-active, var(--text-accent));
   }
   /* Draft row — same armed treatment, italic name to telegraph "unsaved".

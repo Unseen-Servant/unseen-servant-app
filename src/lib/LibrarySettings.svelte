@@ -671,17 +671,17 @@
 
   .btn-danger-outline {
     background: transparent;
-    border: 1px solid var(--text-danger, #c0392b);
-    color: var(--text-danger, #c0392b);
+    border: 1px solid var(--text-danger);
+    color: var(--text-danger);
   }
   .btn-danger-outline:hover:not(:disabled) {
-    background: var(--text-danger, #c0392b);
+    background: var(--text-danger);
     color: var(--bg-container);
   }
 
   .btn-danger-solid {
-    background: var(--text-danger, #c0392b);
-    border: 1px solid var(--text-danger, #c0392b);
+    background: var(--text-danger);
+    border: 1px solid var(--text-danger);
     color: var(--bg-container);
   }
   .btn-danger-solid:hover:not(:disabled) {
@@ -689,7 +689,7 @@
   }
 
   .danger-zone {
-    border: 1px solid var(--text-danger, #c0392b);
+    border: 1px solid var(--text-danger);
     border-radius: 6px;
     margin-top: 0.25rem;
     display: flex;
@@ -698,7 +698,7 @@
 
   .danger-title {
     font-size: 0.9rem;
-    color: var(--text-danger, #c0392b);
+    color: var(--text-danger);
     margin: 0;
     padding: 0.6rem 0.85rem;
     border-bottom: 1px solid var(--border-subtle);

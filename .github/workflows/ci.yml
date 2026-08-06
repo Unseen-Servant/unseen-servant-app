@@ -49,6 +49,7 @@ jobs:
               - 'static/**'
               - 'package.json'
               - 'package-lock.json'
+              - '.stylelintrc.json'
               - 'svelte.config.js'
               - 'vite.config.ts'
               - 'tsconfig.json'
@@ -131,6 +132,9 @@ jobs:
 
       - name: svelte-check
         run: npm run check
+
+      - name: stylelint (design tokens)
+        run: npm run lint:css
 
       - name: vitest
         run: npm test
