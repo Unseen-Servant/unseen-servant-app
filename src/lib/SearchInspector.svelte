@@ -48,7 +48,7 @@
           {/if}
         </div>
         <div class="sub">
-          {#if result.game_system}<span>{result.game_system}</span>{/if}
+          {#if result.game_system}<span class="sysname">{result.game_system}</span>{/if}
           {#if span}<span class="dot">·</span><span>{span}</span>{/if}
           <span class="dot">·</span>
           <span class="gauge" role="img" aria-label={label} title={label}>
@@ -117,7 +117,7 @@
     justify-content: space-between;
     gap: 0.7rem;
     padding: 1rem 1.1rem 0.6rem;
-    border-bottom: 2px solid color-mix(in srgb, var(--system-color, var(--text-accent)) 40%, var(--border-subtle));
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .body {
@@ -170,6 +170,12 @@
     gap: 0.35rem;
     font-size: 0.8rem;
     color: var(--text-secondary);
+  }
+
+  /* The system-color cue lives on the system name; the results list
+     already carries it on the index cell and selection stripe. */
+  .sysname {
+    color: var(--system-color, var(--text-secondary));
   }
 
   .dot {
