@@ -2,6 +2,7 @@
   import type { CollectionInfo } from './types';
   import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
+  import { PALETTE } from './palette';
 
   export let collection: CollectionInfo;
   export let onSave: (changes: {
@@ -16,17 +17,6 @@
   let description = collection.description;
   let color = collection.color ?? '';
   let archived = collection.archived;
-
-  const PALETTE: string[] = [
-    '#c75450', // red
-    '#d49449', // orange
-    '#caa84b', // amber
-    '#5fb068', // green
-    '#4fa896', // teal
-    '#5a8dc4', // blue
-    '#9b6cb6', // purple
-    '#b69f81', // tan (matches accent)
-  ];
 
   let nameInput: HTMLInputElement;
   let colorBtn: HTMLButtonElement;
@@ -290,7 +280,7 @@
     box-shadow: var(--shadow-dropdown);
     padding: 0.5rem;
     display: grid;
-    grid-template-columns: repeat(3, auto);
+    grid-template-columns: repeat(4, auto);
     gap: 0.4rem;
     z-index: 50;
   }

@@ -3,22 +3,10 @@
   import type { KnownGameSystem } from './types';
   import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
+  import { PALETTE } from './palette';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
-
-  // Mirrors the collection palette in CollectionEditDialog so users get the
-  // same eight choices across the app.
-  const PALETTE: string[] = [
-    '#c75450', // red
-    '#d49449', // orange
-    '#caa84b', // amber
-    '#5fb068', // green
-    '#4fa896', // teal
-    '#5a8dc4', // blue
-    '#9b6cb6', // purple
-    '#b69f81', // tan (matches accent)
-  ];
 
   // Sort state
   let sortDirection: 'asc' | 'desc' = 'asc';
@@ -545,7 +533,7 @@
     box-shadow: var(--shadow-dropdown);
     padding: 0.5rem;
     display: grid;
-    grid-template-columns: repeat(3, auto);
+    grid-template-columns: repeat(4, auto);
     gap: 0.4rem;
     z-index: 50;
   }
