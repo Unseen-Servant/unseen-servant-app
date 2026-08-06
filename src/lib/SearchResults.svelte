@@ -165,7 +165,7 @@
         aria-selected={i === selectedIndex}
         tabindex="-1"
       >
-        <span class="index" aria-hidden="true">{i + 1}</span>
+        <span class="index-cell" aria-hidden="true">{i + 1}</span>
         <div class="row-body">
           {#if segments.length > 0}
             <div class="breadcrumb">
@@ -256,17 +256,17 @@
     pointer-events: none;
   }
 
-  /* DAW track-color stripe at the left edge: always-on system color,
-     widens with a soft glow on selection. Falls back to parchment when
-     the row's system has no color so selection still reads. */
+  /* Selection stripe at the left edge: system color with a soft glow,
+     parchment fallback when the row's system has no color. The per-row
+     system color cue lives on the index cell instead. */
   .result-row::before {
     content: '';
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 3px;
-    background: var(--system-color, transparent);
+    width: 4px;
+    background: transparent;
     transition: width var(--transition-fast), filter var(--transition-fast), background var(--transition-fast);
     pointer-events: none;
   }
@@ -280,7 +280,6 @@
   }
 
   .result-row.selected::before {
-    width: 4px;
     background: var(--system-color, var(--text-accent));
     filter: drop-shadow(0 0 4px color-mix(in srgb, var(--system-color, var(--text-accent)) 65%, transparent));
   }
@@ -294,8 +293,9 @@
     outline: none;
   }
 
-  .result-row.selected .index {
-    color: var(--text-accent);
+  .result-row.selected .index-cell {
+    background: var(--system-color, var(--text-accent));
+    color: var(--text-inverse);
   }
 
   .result-row.selected .gauge {
@@ -342,17 +342,22 @@
     border-radius: 2px;
   }
 
-  .index {
+  .index-cell {
     flex-shrink: 0;
-    width: 1.2rem;
-    text-align: right;
+    width: 1.35rem;
+    height: 1.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
     font-family: var(--font-body);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-variant-numeric: tabular-nums;
-    color: var(--text-tertiary);
-    line-height: 1.5;
+    background: color-mix(in srgb, var(--system-color, var(--text-tertiary)) 22%, transparent);
+    color: var(--system-color, var(--text-tertiary));
     -webkit-user-select: none;
     user-select: none;
+    margin-top: 0.05rem;
   }
 
   .row-body {
