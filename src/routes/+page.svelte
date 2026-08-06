@@ -117,8 +117,9 @@
 
   // Library filter (next to the search bar). DAW-style mute + solo:
   //   - filterExcludedSystems: muted rows (checkbox unchecked).
-  //   - soloedSystems:         solo'd rows. When non-empty, mute state is
-  //                            overridden — only solo'd systems pass.
+  //   - soloedSystems:         the solo'd row (at most one — solo is
+  //                            exclusive). When non-empty, mute state is
+  //                            overridden — only the solo'd system passes.
   // Both Sets are session-scoped: they reset on app launch (no Tauri
   // store persistence), so each session starts with a clean library.
   let filterExcludedSystems = new Set<string>();
@@ -686,13 +687,11 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
+  // Solo is exclusive: engaging it on one system releases any other, so
+  // the set never holds more than one entry. Clicking the active solo
+  // clears it.
   function toggleSystemSolo(system: string) {
-    if (soloedSystems.has(system)) {
-      soloedSystems.delete(system);
-    } else {
-      soloedSystems.add(system);
-    }
-    soloedSystems = soloedSystems;
+    soloedSystems = soloedSystems.has(system) ? new Set() : new Set([system]);
     if (committedQuery) runSearch(committedQuery);
   }
 
