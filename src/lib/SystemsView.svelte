@@ -452,7 +452,7 @@
       {@const groupColor = colorFor(group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
       <section class="group">
-        <div class="group-head-row" style={groupColor ? `--group-color: ${groupColor}` : ''}>
+        <div class="group-head-row" class:untagged={group.tag === 'Untagged'} style={groupColor ? `--group-color: ${groupColor}` : ''}>
           {#if isCollectionEditMode}
             <button
               class="checkbox group-checkbox"
@@ -474,6 +474,15 @@
                 <!-- Font Awesome "dice-d6" -->
                 <svg viewBox="0 0 640 640" fill="currentColor">
                   <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+                </svg>
+              </span>
+            {:else}
+              <span class="group-icon" aria-hidden="true">
+                <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
+                <svg viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round">
+                  <path d="M320 76 L548 206 L548 434 L320 564 L92 434 L92 206 Z"/>
+                  <path d="M92 206 L320 336 L548 206"/>
+                  <path d="M320 336 L320 564"/>
                 </svg>
               </span>
             {/if}
@@ -567,7 +576,12 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--group-color) 35%, var(--border-subtle));
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  /* The untagged bucket is a bucket, not an identity: grey, never the
+     parchment fallback that uncolored real systems get. */
+  .group-head-row.untagged {
+    --group-color: var(--text-tertiary);
   }
   .group-head {
     flex: 1;

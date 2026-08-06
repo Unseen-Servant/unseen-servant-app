@@ -7,6 +7,11 @@
 
 export const UNTAGGED_KEY = 'unknown';
 
+/** Display name for the untagged bucket. The backend key stays 'unknown'. */
+export function displaySystem(tag: string): string {
+  return tag === UNTAGGED_KEY ? 'untagged' : tag;
+}
+
 /** Resolve solo/mute state to the backend's `game_systems` include-list.
  *
  * DAW semantics: solo active → only solo'd systems pass (mute is

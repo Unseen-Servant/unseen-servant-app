@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import Modal from './Modal.svelte';
+  import { displaySystem } from './searchScope';
 
   export let path: string;
   export let onClose: () => void;
@@ -86,7 +87,7 @@
         </div>
         <div class="stat-cell">
           <div class="stat-label">SYSTEM</div>
-          <div class="stat-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : (stats.game_system || 'unknown')}</div>
+          <div class="stat-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</div>
         </div>
       </div>
     {/if}

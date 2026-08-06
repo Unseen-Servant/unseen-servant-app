@@ -4,6 +4,7 @@
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
   import { tierCells, tierLabel } from './searchTiers';
+  import { displaySystem } from './searchScope';
 
   export let result: SearchResultItem | null = null;
   export let hiddenPaths: Set<string> = new Set();
@@ -48,7 +49,7 @@
           {/if}
         </div>
         <div class="sub">
-          {#if result.game_system}<span class="sysname">{result.game_system}</span>{/if}
+          {#if result.game_system}<span class="sysname">{displaySystem(result.game_system)}</span>{/if}
           {#if span}<span class="dot">·</span><span>{span}</span>{/if}
           <span class="dot">·</span>
           <span class="gauge" role="img" aria-label={label} title={label}>

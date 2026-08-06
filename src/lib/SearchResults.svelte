@@ -4,6 +4,7 @@
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
   import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
+  import { displaySystem } from './searchScope';
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
@@ -181,7 +182,7 @@
               <span class="hidden-badge" title="This file is hidden in the tree.">hidden</span>
             {/if}
             <span class="meta-text">
-              {result.filename}{result.game_system ? ` · ${result.game_system}` : ''}{span ? ` · ${span}` : ''}
+              {result.filename}{result.game_system ? ` · ${displaySystem(result.game_system)}` : ''}{span ? ` · ${span}` : ''}
             </span>
           </div>
         </div>
