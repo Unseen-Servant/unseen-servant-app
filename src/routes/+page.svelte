@@ -2923,7 +2923,9 @@
                 result={selectedResult}
                 {hiddenPaths}
                 {knownSystems}
+                gameSystemMap={effectiveGameSystemMap}
                 onOpenResult={handleOpenResult}
+                onSetGameSystems={handleSetGameSystems}
               />
             </div>
           </div>

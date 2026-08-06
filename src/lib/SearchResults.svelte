@@ -354,7 +354,7 @@
     font-family: var(--font-body);
     font-size: 0.7rem;
     font-variant-numeric: tabular-nums;
-    background: color-mix(in srgb, var(--system-color, var(--text-tertiary)) 22%, transparent);
+    background: color-mix(in srgb, var(--system-color, var(--text-tertiary)) 20%, transparent);
     color: var(--system-color, var(--text-tertiary));
     -webkit-user-select: none;
     user-select: none;
