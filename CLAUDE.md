@@ -165,3 +165,34 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+## Design Conventions
+
+Tokens live in `src/app.css` `:root`; the app code is the source of truth (the claude.ai/design "Legend Lore" project follows it). The look is an old-school instrument panel, not SaaS.
+
+### Color semantics
+
+- **Purple** (`--text-active`, `--bg-active`) — a mode the user switched on.
+- **Parchment/brass** (`--text-accent`) — content or data.
+- **Amber** (`--text-connected`) — hardware-style "lamp on" connectivity.
+
+### Glows and hover
+
+- LED glows (`--glow-active`, `--glow-accent`) are reserved for activated states only.
+- Hover never glows and never introduces new hues — it brightens or fills with a grey step.
+
+### Buttons and press feedback
+
+- No filled-rectangle buttons: actions are text or icons that gain color, glow, or brackets. Danger is a hue swap (`--text-danger`), not a new shape.
+- Press feedback is a 0.97 scale tick.
+
+### Typography
+
+- All serif: Crimson Text body, Almendra headings, Cinzel display.
+- Numeric readouts use `tabular-nums`; code-flavored affordances use `--font-mono`.
+
+### Tokens only
+
+- Every color/radius/shadow value in components must come from a token in `src/app.css`; add a token rather than a raw value. Tint washes use `color-mix(in srgb, var(--token) N%, transparent)`. CI enforces the color rule via stylelint (`npm run lint:css`).
