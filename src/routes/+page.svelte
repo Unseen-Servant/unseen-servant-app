@@ -2887,6 +2887,7 @@
         {#if searchActive}
           <SearchScopeBar
             {scopeChip}
+            {knownSystems}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
             {showHidden}

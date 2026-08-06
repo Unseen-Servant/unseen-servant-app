@@ -247,20 +247,18 @@
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
     {#if scopeChip}
-      <span
+      <button
+        type="button"
         class="scope-chip"
         class:armed={scopeChipArmed}
+        on:click|stopPropagation={onClearScope}
         title={scopeChip.tooltip ?? `${scopeChip.kind}: ${scopeChip.label}`}
+        aria-label="Clear search scope"
       >
         <span class="scope-kind">in {scopeChip.kind}:</span>
         <span class="scope-label">{scopeChip.label}</span>
-        <button
-          type="button"
-          class="scope-clear"
-          on:click|stopPropagation={onClearScope}
-          aria-label="Clear search scope"
-        >✕</button>
-      </span>
+        <span class="scope-clear" aria-hidden="true">✕</span>
+      </button>
     {/if}
     <input
       bind:this={inputEl}
@@ -446,11 +444,30 @@
     border: 1px solid var(--text-active);
     border-radius: var(--radius-sm);
     color: var(--text-active);
+    /* button reset (the whole chip is the clear button) */
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
     font-size: 0.75rem;
     line-height: 1.2;
     flex-shrink: 0;
     min-width: 0;
     transition: background var(--transition-fast), filter var(--transition-fast);
+  }
+
+  /* Hover signals removal, like the scope-bar chips. A grey fill step
+     doesn't read on the purple fill, so the fill step is a brightness
+     lift; strikethrough + danger ✕ carry the intent. (Kept above .armed
+     so the armed glow wins when both apply.) */
+  .scope-chip:hover {
+    filter: brightness(1.15);
+  }
+  .scope-chip:hover .scope-label {
+    text-decoration: line-through;
+  }
+  .scope-chip:hover .scope-clear {
+    opacity: 1;
+    color: var(--text-danger);
   }
 
   /* First Backspace on the empty input arms the chip — visual signal that
@@ -472,17 +489,12 @@
     font-weight: 600;
   }
   .scope-clear {
-    background: none;
-    border: none;
     color: var(--text-active);
-    cursor: pointer;
     font-size: 0.75rem;
     padding: 0 0.15rem;
     line-height: 1;
-    border-radius: 2px;
     flex-shrink: 0;
-  }
-  .scope-clear:hover {
-    background: color-mix(in srgb, var(--text-active) 20%, transparent);
+    opacity: 0.7;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
   }
 </style>
