@@ -6,7 +6,6 @@
   export let disabled: boolean = false;
   export let panelOpen: boolean = false;
   export let panelToggleVisible: boolean = true;
-  export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
   export let filterVisible: boolean = false;
   export let excludedSystems: Set<string> = new Set();
   export let soloedSystems: Set<string> = new Set();
@@ -25,7 +24,6 @@
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
-  export let onClearScope: () => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onToggleSystemSolo: (system: string) => void = () => {};
   export let onClearSystemFilter: () => void = () => {};
@@ -73,13 +71,6 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let inputEl: HTMLInputElement | null = null;
 
-  // Two-press backspace on the scope chip: first press arms the chip
-  // (visual highlight, no removal yet — gives the user a chance to back
-  // out), second press clears it. Disarmed by typing, by Escape, by the
-  // chip being externally cleared, or by the input losing focus.
-  let scopeChipArmed = false;
-  $: if (!scopeChip) scopeChipArmed = false;
-
   export function focus() {
     inputEl?.focus();
   }
@@ -97,7 +88,6 @@
   }
 
   function handleInput() {
-    scopeChipArmed = false;
     clearDebounce();
     const current = searchQuery;
     debounceTimer = setTimeout(() => {
@@ -107,35 +97,18 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Backspace' && searchQuery === '' && scopeChip) {
-      e.preventDefault();
-      if (scopeChipArmed) {
-        scopeChipArmed = false;
-        onClearScope();
-      } else {
-        scopeChipArmed = true;
-      }
-      return;
-    }
     if (e.key === 'Enter') {
       e.preventDefault();
       clearDebounce();
       onSubmit(searchQuery);
     } else if (e.key === 'Escape') {
-      if (scopeChipArmed) {
-        e.preventDefault();
-        scopeChipArmed = false;
-      } else if (searchQuery.length > 0) {
+      if (searchQuery.length > 0) {
         e.preventDefault();
         clearDebounce();
         searchQuery = '';
         onClear();
       }
     }
-  }
-
-  function handleBlur() {
-    scopeChipArmed = false;
   }
 
   function handleClear() {
@@ -246,20 +219,8 @@
   </div>
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
-    {#if scopeChip}
-      <button
-        type="button"
-        class="scope-chip"
-        class:armed={scopeChipArmed}
-        on:click|stopPropagation={onClearScope}
-        title={scopeChip.tooltip ?? `${scopeChip.kind}: ${scopeChip.label}`}
-        aria-label="Clear search scope"
-      >
-        <span class="scope-kind">in {scopeChip.kind}:</span>
-        <span class="scope-label">{scopeChip.label}</span>
-        <span class="scope-clear" aria-hidden="true">✕</span>
-      </button>
-    {/if}
+    <!-- The search field only ever holds the query — narrowings (solos
+         and mutes on either axis) live as chips in the scope bar. -->
     <input
       bind:this={inputEl}
       bind:value={searchQuery}
@@ -269,7 +230,6 @@
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
-      on:blur={handleBlur}
       aria-label="Search library"
     />
     {#if searchQuery.length > 0}
@@ -431,70 +391,5 @@
 
   .clear-btn:hover {
     color: var(--text-primary);
-  }
-
-  .scope-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    max-width: 240px;
-    padding: 0.1rem 0.25rem 0.1rem 0.4rem;
-    margin-right: 0.4rem;
-    background: color-mix(in srgb, var(--text-active) 12%, transparent);
-    border: 1px solid var(--text-active);
-    border-radius: var(--radius-sm);
-    color: var(--text-active);
-    /* button reset (the whole chip is the clear button) */
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    font-size: 0.75rem;
-    line-height: 1.2;
-    flex-shrink: 0;
-    min-width: 0;
-    transition: background var(--transition-fast), filter var(--transition-fast);
-  }
-
-  /* Hover signals removal, like the scope-bar chips. A grey fill step
-     doesn't read on the purple fill, so the fill step is a brightness
-     lift; strikethrough + danger ✕ carry the intent. (Kept above .armed
-     so the armed glow wins when both apply.) */
-  .scope-chip:hover {
-    filter: brightness(1.15);
-  }
-  .scope-chip:hover .scope-label {
-    text-decoration: line-through;
-  }
-  .scope-chip:hover .scope-clear {
-    opacity: 1;
-    color: var(--text-danger);
-  }
-
-  /* First Backspace on the empty input arms the chip — visual signal that
-     the next Backspace will clear the scope. Type, Escape, click away, or
-     external clear all disarm. */
-  .scope-chip.armed {
-    background: color-mix(in srgb, var(--text-active) 32%, transparent);
-    filter: var(--glow-active);
-  }
-  .scope-kind {
-    color: var(--text-secondary);
-    flex-shrink: 0;
-  }
-  .scope-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-    font-weight: 600;
-  }
-  .scope-clear {
-    color: var(--text-active);
-    font-size: 0.75rem;
-    padding: 0 0.15rem;
-    line-height: 1;
-    flex-shrink: 0;
-    opacity: 0.7;
-    transition: opacity var(--transition-fast), color var(--transition-fast);
   }
 </style>

@@ -47,6 +47,18 @@
   export let hiddenPaths: Set<string> = new Set();
   export let showHidden: boolean = false;
 
+  // Collection-axis S/M (folders are collections). Soloed rows take the
+  // highlight treatment via highlightPaths; muted rows dim in place —
+  // descendants of a muted folder inherit via prefix match.
+  export let soloedScopePaths: Set<string> = new Set();
+  export let mutedScopePaths: Set<string> = new Set();
+  export let onToggleScopeSolo: (item: FileItem) => void = () => {};
+  export let onToggleScopeMute: (item: FileItem) => void = () => {};
+
+  $: isSoloedScope = soloedScopePaths.has(item.path);
+  $: isMutedHere = mutedScopePaths.has(item.path);
+  $: isMutedScope = isPathOrAncestorIn(item.path, mutedScopePaths);
+
   $: isHiddenItem = isPathOrAncestorIn(item.path, hiddenPaths);
   $: hidden = (displayPaths !== null && !displayPaths.has(item.path)) ||
               (isHiddenItem && !showHidden);
@@ -207,7 +219,7 @@
 <svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
-<div class="item" class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
+<div class="item" class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} class:muted-scope={isMutedScope} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
   <div class="row-container">
     <button
       class="checkbox"
@@ -235,6 +247,27 @@
         <span class="name">{item.name}</span>
       {/if}
     </button>
+
+    {#if item.is_dir}
+      <span class="sm" class:engaged={isSoloedScope || isMutedHere}>
+        <button
+          type="button"
+          class="sm-btn"
+          class:solo-on={isSoloedScope}
+          on:click|stopPropagation={() => onToggleScopeSolo(item)}
+          aria-pressed={isSoloedScope}
+          title={isSoloedScope ? `Stop soloing ${item.name} (S)` : `Solo ${item.name} (S)`}
+        >S</button>
+        <button
+          type="button"
+          class="sm-btn"
+          class:mute-on={isMutedHere}
+          on:click|stopPropagation={() => onToggleScopeMute(item)}
+          aria-pressed={isMutedHere}
+          title={isMutedHere ? `Unmute ${item.name} (M)` : `Mute ${item.name} (M)`}
+        >M</button>
+      </span>
+    {/if}
 
     {#if hasTag}
       <div class="badge-wrapper">
@@ -306,6 +339,10 @@
           {displayPaths}
           {hiddenPaths}
           {showHidden}
+          {soloedScopePaths}
+          {mutedScopePaths}
+          {onToggleScopeSolo}
+          {onToggleScopeMute}
         />
       {/each}
     </div>
@@ -381,6 +418,32 @@
   }
   .hidden-item .name {
     font-style: italic;
+  }
+  /* Muted on the collection axis — dimmed to 45%, never hidden. Only the
+     row itself dims (each descendant row dims on its own via the prefix
+     match), so nesting doesn't compound the opacity. Hover restores
+     legibility, mirroring the systems view's dimmed groups. */
+  .muted-scope > .row-container {
+    opacity: 0.45;
+  }
+  .muted-scope > .row-container:hover {
+    opacity: 0.7;
+  }
+  /* S/M cluster on folder rows — hidden at rest, revealed on row hover
+     or keyboard focus, always visible while engaged. Button anatomy is
+     the shared .sm-btn in app.css. */
+  .sm {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+  .row-container:hover .sm,
+  .row-container:focus-within .sm,
+  .focused > .row-container .sm,
+  .sm.engaged {
+    opacity: 1;
   }
   .highlighted {
     background: color-mix(in srgb, var(--text-accent) 12%, transparent);

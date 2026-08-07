@@ -28,7 +28,7 @@
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
-  import { searchGameSystemsFilter, UNTAGGED_KEY } from '../lib/searchScope';
+  import { searchGameSystemsFilter, searchSourcePathsFilter, UNTAGGED_KEY, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
   import {
@@ -111,19 +111,21 @@
   let collectionEditName = '';
   let collectionEditDescription = '';
   let activeContextName: string | null = null;
-  let pathScope: { kind: 'file' | 'folder'; path: string; label: string } | null = null;
   let collectionsPanelOpen = true;
   let editingMetadataFor: string | null = null;
 
-  // Library filter (next to the search bar). DAW-style mute + solo:
-  //   - filterExcludedSystems: muted rows (checkbox unchecked).
-  //   - soloedSystems:         the solo'd row (at most one — solo is
-  //                            exclusive). When non-empty, mute state is
-  //                            overridden — only the solo'd system passes.
-  // Both Sets are session-scoped: they reset on app launch (no Tauri
+  // Library narrowing — one model, two axes, DAW semantics on each:
+  // solos union within an axis, axes intersect, solo overrides mute.
+  //   - systems axis:    filterExcludedSystems (muted) + soloedSystems.
+  //   - collection axis: mutedCollections + soloCollections, keyed by
+  //     path (tree folders and files); the active collection joins the
+  //     solo side via its own backend state (activeContextName).
+  // All four are session-scoped: they reset on app launch (no Tauri
   // store persistence), so each session starts with a clean library.
   let filterExcludedSystems = new Set<string>();
   let soloedSystems = new Set<string>();
+  let soloCollections = new Map<string, ScopeRef>();
+  let mutedCollections = new Map<string, ScopeRef>();
 
   // Display-only hidden flag. Stores explicitly-hidden paths (files or
   // folder roots); descendants of a hidden folder are hidden via prefix
@@ -215,30 +217,43 @@
     selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
   }
   $: selectedResult = searchResults.length > 0 ? searchResults[selectedResultIndex] ?? null : null;
-  $: scopeChip = (() => {
-    if (isCollectionEditMode) return null;
-    if (pathScope) {
-      return {
-        kind: pathScope.kind,
-        label: pathScope.label,
-        tooltip: pathScope.path,
-      } as const;
-    }
+  // The active collection surfaces as a solo chip on the collection
+  // axis (its bookmark takes the collection pigment); folder/file solos
+  // and mutes ride along with the tertiary fallback. Clearing the
+  // active-collection chip must clear the backend context, so it gets a
+  // sentinel key that can't collide with an absolute path.
+  const ACTIVE_CONTEXT_CHIP_KEY = 'active-context';
+  $: collectionSolos = (() => {
+    if (isCollectionEditMode) return [];
+    const chips: { key: string; label: string; color: string | null }[] = [];
     if (activeContextName) {
-      return {
-        kind: 'collection' as const,
+      chips.push({
+        key: ACTIVE_CONTEXT_CHIP_KEY,
         label: activeContextName,
-        tooltip: `Collection: ${activeContextName}`,
-      };
+        color: collections[activeContextName]?.color ?? null,
+      });
     }
-    return null;
+    for (const [path, ref] of soloCollections) {
+      chips.push({ key: path, label: ref.label, color: null });
+    }
+    return chips;
   })();
-  function handleClearScope() {
-    if (pathScope) {
-      clearPathScope();
-    } else if (activeContextName) {
+  $: collectionMutes = isCollectionEditMode
+    ? []
+    : [...mutedCollections].map(([path, ref]) => ({ key: path, label: ref.label, color: null as string | null }));
+  function handleClearCollectionSolo(key: string) {
+    if (key === ACTIVE_CONTEXT_CHIP_KEY) {
       clearActiveContext();
+      return;
     }
+    soloCollections.delete(key);
+    soloCollections = soloCollections;
+    if (committedQuery) runSearch(committedQuery);
+  }
+  function handleClearCollectionMute(key: string) {
+    mutedCollections.delete(key);
+    mutedCollections = mutedCollections;
+    if (committedQuery) runSearch(committedQuery);
   }
   $: indexedPathsSet = new Set<string>(
     (indexStatus?.up_to_date ?? []).map((e) => e.path)
@@ -260,16 +275,48 @@
     return m;
   })();
 
+  // Collection-axis narrowing resolved to a backend include-list (null =
+  // no narrowing on this axis). When the active collection is the only
+  // narrowing, stay null: the backend auto-scopes search to the active
+  // context on its own, and solo-overrides-mute makes any mutes moot the
+  // moment a solo (which the active collection is) engages.
+  //
+  // Plain function, not just a `$:` value: the S/M toggles call runSearch
+  // synchronously after mutating their Maps, and derived values don't
+  // flush until the end of the microtask — runSearch must compute the
+  // include-list fresh. The reactive mirror below feeds display
+  // consumers (searchableFileCount) with its dependencies spelled out.
+  function computeCollectionAxisInclude(
+    solos: Map<string, ScopeRef>,
+    mutes: Map<string, ScopeRef>,
+    activeName: string | null,
+    cols: Record<string, CollectionInfo>,
+    indexed: Set<string>
+  ): string[] | null {
+    const refFiles = (path: string, kind: 'folder' | 'file') =>
+      kind === 'folder'
+        ? indexedPdfsUnderPath(path)
+        : indexed.has(path) ? [path] : [];
+    const soloSets = [...solos].map(([p, r]) => refFiles(p, r.kind));
+    if (activeName && cols[activeName]) {
+      if (soloSets.length === 0) return null;
+      soloSets.push(cols[activeName].file_paths.filter((p) => indexed.has(p)));
+    }
+    const muteSets = [...mutes].map(([p, r]) => refFiles(p, r.kind));
+    return searchSourcePathsFilter(soloSets, muteSets, indexed);
+  }
+  $: collectionAxisInclude = computeCollectionAxisInclude(
+    soloCollections, mutedCollections, activeContextName, collections, indexedPaths
+  );
+
   // The "of N files" denominator in the SearchScopeBar — mirrors the same
-  // narrowing primitives runSearch passes to the backend (path scope OR
-  // active collection, then system exclusion). When no filters are set,
-  // this collapses to the full indexed-paths count.
+  // narrowing primitives runSearch passes to the backend (collection
+  // axis, then system exclusion). When no filters are set, this collapses
+  // to the full indexed-paths count.
   $: searchableFileCount = (() => {
     let universe: string[];
-    if (pathScope) {
-      universe = pathScope.kind === 'file'
-        ? (indexedPathsSet.has(pathScope.path) ? [pathScope.path] : [])
-        : indexedPdfsUnderPath(pathScope.path);
+    if (collectionAxisInclude !== null) {
+      universe = collectionAxisInclude;
     } else if (activeContextName && collections[activeContextName]) {
       universe = collections[activeContextName].file_paths.filter((p) => indexedPathsSet.has(p));
     } else {
@@ -310,20 +357,20 @@
     // surfaces an accurate connection error in the catch below if the
     // sidecar is genuinely unreachable.
 
-    let sourcePaths: string[] | null = null;
-    if (pathScope) {
-      const paths = pathScope.kind === 'file'
-        ? (indexedPaths.has(pathScope.path) ? [pathScope.path] : [])
-        : indexedPdfsUnderPath(pathScope.path);
-      if (paths.length === 0) {
-        searchError = pathScope.kind === 'folder'
-          ? 'No indexed files in this folder.'
-          : 'This file is not indexed.';
-        searchResults = [];
-        isSearching = false;
-        return;
-      }
-      sourcePaths = paths;
+    // Collection axis (folder/file solos and mutes; the active
+    // collection auto-scopes backend-side when this stays null).
+    // Computed fresh — see computeCollectionAxisInclude for why the
+    // derived value can't be read here.
+    const sourcePaths = computeCollectionAxisInclude(
+      soloCollections, mutedCollections, activeContextName, collections, indexedPaths
+    );
+    if (sourcePaths !== null && sourcePaths.length === 0) {
+      searchError = soloCollections.size > 0 || activeContextName
+        ? 'Nothing indexed under the soloed items.'
+        : 'Everything is muted.';
+      searchResults = [];
+      isSearching = false;
+      return;
     }
 
     // Library filter resolution (DAW semantics): solo overrides mute;
@@ -702,11 +749,38 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Solo is exclusive: engaging it on one system releases any other, so
-  // the set never holds more than one entry. Clicking the active solo
-  // clears it.
+  // Solos union within the axis (solo two systems = files in either),
+  // so toggling one leaves the others engaged. Solo overrides mute.
   function toggleSystemSolo(system: string) {
-    soloedSystems = soloedSystems.has(system) ? new Set() : new Set([system]);
+    if (soloedSystems.has(system)) {
+      soloedSystems.delete(system);
+    } else {
+      soloedSystems.add(system);
+    }
+    soloedSystems = soloedSystems;
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  // Collection-axis S/M for tree folders and files. Union semantics:
+  // soloing does not release other solos or the active collection —
+  // every narrowing stacks as its own chip in the scope bar.
+  function toggleScopeSolo(item: FileItem) {
+    if (soloCollections.has(item.path)) {
+      soloCollections.delete(item.path);
+    } else {
+      soloCollections.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
+    }
+    soloCollections = soloCollections;
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  function toggleScopeMute(item: FileItem) {
+    if (mutedCollections.has(item.path)) {
+      mutedCollections.delete(item.path);
+    } else {
+      mutedCollections.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
+    }
+    mutedCollections = mutedCollections;
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -1238,20 +1312,34 @@
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
-  // Activating a collection highlights its files in the tree rather
-  // than filtering everything else out. Ancestors are included so the
+  // The highlight means "soloed": the active collection's files plus any
+  // folder/file solos take the parchment wash + left rule rather than
+  // filtering everything else out. Ancestors are included so the
   // highlight propagates up through collapsed folders — without that,
   // a scattered collection's files would be invisible until every
   // containing folder was manually expanded. Edit mode handles its own
   // membership UI (checkboxes) and shouldn't compete with highlights.
   $: highlightPaths = (() => {
-    if (isCollectionEditMode || !activeContextName) return new Set<string>();
-    const col = collections[activeContextName];
-    if (!col) return new Set<string>();
-    const files = new Set(col.file_paths);
+    if (isCollectionEditMode) return new Set<string>();
+    const files = new Set<string>();
+    const col = activeContextName ? collections[activeContextName] : undefined;
+    if (col) for (const p of col.file_paths) files.add(p);
+    for (const [path, ref] of soloCollections) {
+      files.add(path);
+      if (ref.kind === 'folder') {
+        const prefix = path + '/';
+        for (const p of indexedPaths) if (p.startsWith(prefix)) files.add(p);
+      }
+    }
     if (files.size === 0) return files;
     return new Set<string>([...files, ...computeAncestorPaths(files)]);
   })();
+
+  // Rows muted on the collection axis dim in the tree (45%, never
+  // hidden). Descendants of a muted folder inherit via prefix match,
+  // same as hiddenPaths.
+  $: mutedScopePaths = new Set(mutedCollections.keys());
+  $: soloedScopePaths = new Set(soloCollections.keys());
 
   // Per-collection count of files currently hidden in the tree. Surfaced
   // in the collections panel so users notice their curated set holds
@@ -1641,7 +1729,7 @@
     return { path: row.path, item: row.item };
   }
 
-  // Action keys on the focused file — R/F/./M/C plus Cmd+O reveal and
+  // Action keys on the focused file — R/S/./M/C plus Cmd+O reveal and
   // Shift+F10 / ContextMenu key. Lifted out of handleTreeNavKey so it
   // runs in both tree and systems modes. The caller already gates on
   // !inAnyInput, !renamingFilePath, !competingMenuOpen.
@@ -1672,11 +1760,13 @@
     // event.key for the numpad period, e.g. ',' on German).
     if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = focused.path; return true; }
-      if (lk === 'f') { event.preventDefault(); setPathScope(focused.item); return true; }
-      // In systems view M belongs to the channel buttons — SystemsView's
-      // own handler mutes the focused row's group (context menu stays on
-      // Shift+F10 / the Menu key there).
-      if (lk === 'm' && viewMode !== 'systems') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
+      // S/M are the one narrowing model on both axes. In tree view they
+      // solo/mute the focused row on the collection axis; in systems
+      // view they fall through to SystemsView's own handler, which
+      // works the systems axis. The context menu moves to Shift+F10 /
+      // the Menu key (M used to open it).
+      if (lk === 's' && viewMode !== 'systems') { event.preventDefault(); toggleScopeSolo(focused.item); return true; }
+      if (lk === 'm' && viewMode !== 'systems') { event.preventDefault(); toggleScopeMute(focused.item); return true; }
       if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
       if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
@@ -1714,7 +1804,7 @@
   //   4. Focused tree row          → clear focus
   //   5. (modal Esc handled by Modal.svelte)
   //   6. (search results → input handled below)
-  //   7. (search input chip/text  handled in Header.svelte)
+  //   7. (search input text handled in Header.svelte)
   function dismissSplash() {
     if (!showSplash) return;
     showSplash = false;
@@ -2084,11 +2174,11 @@
     createCollectionFromItem(item);
   }
 
-  function handleContextSearchInScope() {
+  function handleContextToggleSolo() {
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    setPathScope(item);
+    toggleScopeSolo(item);
   }
 
   function handleContextToggleHidden() {
@@ -2208,7 +2298,6 @@
     try {
       const result = await invoke<ActiveContextResult>('set_active_context', { name });
       activeContextName = result.active_context;
-      pathScope = null;
       // Activating a collection feels best in systems view: a curated
       // subset reads as a list, not a directory tree. The user can still
       // flip back to tree via the toggle if they prefer.
@@ -2254,30 +2343,6 @@
     } else {
       setActiveContext(name);
     }
-  }
-
-  function setPathScope(item: FileItem) {
-    pathScope = {
-      kind: item.is_dir ? 'folder' : 'file',
-      path: item.path,
-      label: item.name,
-    };
-    if (activeContextName) {
-      // Mutually exclusive with collection scope.
-      invoke<ActiveContextResult>('clear_active_context')
-        .then(() => { activeContextName = null; })
-        .catch(() => {});
-    }
-    if (committedQuery) runSearch(committedQuery);
-    // Setting scope is a clear signal of intent to type a query in that
-    // scope — auto-focus the search input so the user doesn't have to
-    // click. Standard "Search in <X>" pattern.
-    headerComponent?.focus();
-  }
-
-  function clearPathScope() {
-    pathScope = null;
-    if (committedQuery) runSearch(committedQuery);
   }
 
   function startEditCollection(name: string) {
@@ -2803,7 +2868,6 @@
     disabled={!selectedFolder || isCollectionEditMode}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
-    {scopeChip}
     filterVisible={!!selectedFolder}
     excludedSystems={filterExcludedSystems}
     {soloedSystems}
@@ -2813,7 +2877,6 @@
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
     onTogglePanel={togglePanel}
-    onClearScope={handleClearScope}
     onToggleSystemFilter={toggleSystemFilter}
     onToggleSystemSolo={toggleSystemSolo}
     onClearSystemFilter={clearSystemFilter}
@@ -2869,14 +2932,16 @@
       <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
         {#if searchActive}
           <SearchScopeBar
-            {scopeChip}
+            {collectionSolos}
+            {collectionMutes}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
             {showHidden}
             resultCount={searchResults.length}
             indexedFileCount={searchableFileCount}
             isLoading={isSearching}
-            onClearScope={handleClearScope}
+            onClearCollectionSolo={handleClearCollectionSolo}
+            onClearCollectionMute={handleClearCollectionMute}
             onToggleSystemFilter={toggleSystemFilter}
             onToggleSystemSolo={toggleSystemSolo}
             onToggleShowHidden={toggleShowHidden}
@@ -2962,6 +3027,10 @@
               {displayPaths}
               {hiddenPaths}
               {showHidden}
+              {soloedScopePaths}
+              {mutedScopePaths}
+              onToggleScopeSolo={toggleScopeSolo}
+              onToggleScopeMute={toggleScopeMute}
             />
           {/each}
         {/if}
@@ -2994,9 +3063,10 @@
       canAddToCollection={contextMenu.item.is_dir
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
-      canScopeSearch={contextMenu.item.is_dir
+      canSolo={contextMenu.item.is_dir
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
+      isSoloed={soloCollections.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
       knownSystems={knownSystems}
       currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
@@ -3009,7 +3079,7 @@
       onDelete={handleContextDelete}
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
-      onSearchInScope={handleContextSearchInScope}
+      onToggleSolo={handleContextToggleSolo}
       onAddToCollection={handleContextAddToCollection}
       onAddToNewCollection={handleContextAddToNewCollection}
       onRemoveFromCollection={handleContextRemoveFromCollection}

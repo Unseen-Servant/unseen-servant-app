@@ -13,7 +13,10 @@
   // a no-op action. Folder partials (some files in, some not) stay visible.
   export let excludeFromAdd: string[] = [];
   export let canAddToCollection: boolean = true;
-  export let canScopeSearch: boolean = false;
+  // Collection-axis solo (folders and files) — replaces the old
+  // "Search in this folder / file" scoping.
+  export let canSolo: boolean = false;
+  export let isSoloed: boolean = false;
   // Hide/show state. `inheritedHidden` means an ancestor folder is hidden,
   // so the toggle is omitted (user must unhide the originally-hidden folder).
   export let directlyHidden: boolean = false;
@@ -33,7 +36,7 @@
   export let onDelete: () => void = () => {};
   export let onReindex: () => void = () => {};
   export let onShowStats: () => void = () => {};
-  export let onSearchInScope: () => void = () => {};
+  export let onToggleSolo: () => void = () => {};
   export let onAddToCollection: (name: string) => void = () => {};
   export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
@@ -252,10 +255,10 @@
     <button class="context-item" data-mi="item" on:click={onOpen}>Open file</button>
   {/if}
   <button class="context-item" data-mi="item" on:click={onReveal}>Reveal in folder</button>
-  {#if canScopeSearch}
+  {#if canSolo}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" on:click={onSearchInScope}>
-      Search in this {item.is_dir ? 'folder' : 'file'}
+    <button class="context-item" data-mi="item" on:click={onToggleSolo}>
+      {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}

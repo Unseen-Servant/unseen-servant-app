@@ -7,46 +7,49 @@
 
   import { displaySystem } from './searchScope';
 
-  export let scopeChip: { kind: 'collection' | 'file' | 'folder'; label: string; tooltip?: string } | null = null;
+  // Chip glyph = axis (pigment bookmark = collection, monochrome die =
+  // system); chip frame = operation (purple solo / danger-edged mute).
+  export let collectionSolos: { key: string; label: string; color: string | null }[] = [];
+  export let collectionMutes: { key: string; label: string; color: string | null }[] = [];
   export let excludedSystems: Set<string> = new Set();
   export let soloedSystems: Set<string> = new Set();
   export let showHidden: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   export let isLoading: boolean = false;
-  export let onClearScope: () => void = () => {};
+  export let onClearCollectionSolo: (key: string) => void = () => {};
+  export let onClearCollectionMute: (key: string) => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onToggleSystemSolo: (system: string) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
 
-  // When a system is solo'd, mute state on other rows is overridden — the
-  // exclusion chips would be misleading, so suppress them. Only the solo
-  // chips remain to communicate the active narrowing.
+  // When anything is solo'd on an axis, mute state on that axis is
+  // overridden — its mute chips would be misleading, so suppress them.
+  // Only the solo chips remain to communicate the active narrowing.
   $: soloedList = Array.from(soloedSystems).sort();
   $: excludedList = soloedList.length > 0 ? [] : Array.from(excludedSystems).sort();
-  $: scopeKindLabel = scopeChip ? scopeChip.kind : 'library';
+  $: shownCollectionMutes = collectionSolos.length > 0 ? [] : collectionMutes;
 </script>
 
 <div class="scope-bar" role="status" aria-live="polite">
   <div class="left">
-    {#if scopeChip}
+    {#each collectionSolos as chip (chip.key)}
       <button
         type="button"
-        class="scope-readout narrowed"
-        on:click|stopPropagation={onClearScope}
-        title={scopeChip.tooltip ?? 'Clear scope'}
-        aria-label="Clear search scope"
+        class="chip solo"
+        on:click|stopPropagation={() => onClearCollectionSolo(chip.key)}
+        title="Stop soloing {chip.label}"
+        aria-label="Stop soloing {chip.label}"
       >
-        <span class="scope-kind">{scopeKindLabel}:</span>
-        <span class="scope-label">{scopeChip.label}</span>
+        <span class="chip-prefix">solo</span>
+        <!-- Bookmark ribbon — the collection axis keeps its pigment -->
+        <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color ?? 'var(--text-tertiary)'} aria-hidden="true">
+          <path d="M5 2h14v20l-7-5.2L5 22z"/>
+        </svg>
+        <span class="chip-label">{chip.label}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
-    {:else}
-      <span class="scope-readout" title="Searching the entire library">
-        <span class="scope-kind">{scopeKindLabel}:</span>
-        <span class="scope-label">all indexed files</span>
-      </span>
-    {/if}
+    {/each}
 
     {#each soloedList as system (system)}
       <button
@@ -62,6 +65,24 @@
           <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
         </svg>
         <span class="chip-label">{displaySystem(system)}</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/each}
+
+    {#each shownCollectionMutes as chip (chip.key)}
+      <button
+        type="button"
+        class="chip exclusion"
+        on:click|stopPropagation={() => onClearCollectionMute(chip.key)}
+        title="Unmute {chip.label}"
+        aria-label="Unmute {chip.label}"
+      >
+        <span class="chip-prefix">mute</span>
+        <!-- Bookmark ribbon — dims with the chip ("removed, still recognizable") -->
+        <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color ?? 'var(--text-tertiary)'} aria-hidden="true">
+          <path d="M5 2h14v20l-7-5.2L5 22z"/>
+        </svg>
+        <span class="chip-label">{chip.label}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/each}
@@ -184,42 +205,6 @@
     }
   }
 
-  .scope-readout {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.1rem 0.4rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid transparent;
-    color: var(--text-secondary);
-  }
-
-  .scope-readout.narrowed {
-    border-color: var(--text-active);
-    background: color-mix(in srgb, var(--text-active) 10%, transparent);
-    color: var(--text-active);
-  }
-
-  .scope-kind {
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    font-size: 0.65rem;
-    letter-spacing: 0.06em;
-  }
-
-  .scope-readout.narrowed .scope-kind {
-    color: var(--text-active);
-    opacity: 0.75;
-  }
-
-  .scope-label {
-    font-weight: 600;
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .chip {
     display: inline-flex;
     align-items: center;
@@ -257,14 +242,16 @@
     letter-spacing: 0.06em;
   }
 
-  .chip-die {
+  .chip-die,
+  .chip-mark {
     width: 11px;
     height: 11px;
     flex-shrink: 0;
   }
 
-  /* Removed, still recognizable — the exclusion's die dims to 60%. */
-  .chip.exclusion .chip-die {
+  /* Removed, still recognizable — the exclusion's glyph dims to 60%. */
+  .chip.exclusion .chip-die,
+  .chip.exclusion .chip-mark {
     opacity: 0.6;
   }
 
@@ -283,8 +270,7 @@
   /* The whole chip is the clear button; the × is just a glyph. Hover
      signals removal: grey fill step, label struck through, × at full
      opacity in danger ("color on intent", like the discard action-btn). */
-  .chip,
-  .scope-readout.narrowed {
+  .chip {
     cursor: pointer;
     transition: background var(--transition-fast);
     /* button reset (font shorthand would zero the chips' line-height): */
@@ -293,18 +279,15 @@
     text-align: left;
   }
 
-  .chip:hover,
-  .scope-readout.narrowed:hover {
+  .chip:hover {
     background: var(--bg-focused);
   }
 
-  .chip:hover .chip-label,
-  .scope-readout.narrowed:hover .scope-label {
+  .chip:hover .chip-label {
     text-decoration: line-through;
   }
 
-  .chip:hover .chip-clear,
-  .scope-readout.narrowed:hover .chip-clear {
+  .chip:hover .chip-clear {
     opacity: 1;
     color: var(--text-danger);
   }

@@ -2,7 +2,7 @@
 // searchGameSystemsFilter's mute branch fails the untagged-bucket test
 // below — the #307 regression it exists to catch.
 import { describe, expect, it } from 'vitest';
-import { searchGameSystemsFilter, UNTAGGED_KEY } from './searchScope';
+import { searchGameSystemsFilter, searchSourcePathsFilter, UNTAGGED_KEY } from './searchScope';
 
 const TAGS = ['D&D 5E', 'Dragonbane', 'Pathfinder 2E'];
 
@@ -46,5 +46,48 @@ describe('searchGameSystemsFilter', () => {
       TAGS
     );
     expect(out).toEqual(['Dragonbane']);
+  });
+});
+
+const ALL = ['/lib/a.pdf', '/lib/b.pdf', '/lib/sub/c.pdf', '/other/d.pdf'];
+
+describe('searchSourcePathsFilter', () => {
+  it('returns null when nothing is soloed or muted (no narrowing)', () => {
+    expect(searchSourcePathsFilter([], [], ALL)).toBeNull();
+  });
+
+  it('solos union within the axis, deduplicated', () => {
+    const out = searchSourcePathsFilter(
+      [['/lib/a.pdf', '/lib/b.pdf'], ['/lib/b.pdf', '/lib/sub/c.pdf']],
+      [],
+      ALL
+    );
+    expect(out?.sort()).toEqual(['/lib/a.pdf', '/lib/b.pdf', '/lib/sub/c.pdf']);
+  });
+
+  it('solo overrides mute — muted files inside a soloed set still pass', () => {
+    const out = searchSourcePathsFilter(
+      [['/lib/a.pdf', '/lib/b.pdf']],
+      [['/lib/b.pdf']],
+      ALL
+    );
+    expect(out).toContain('/lib/b.pdf');
+  });
+
+  it('a solo with no indexed files narrows to nothing, not to everything', () => {
+    expect(searchSourcePathsFilter([[]], [], ALL)).toEqual([]);
+  });
+
+  it('mutes subtract their union from the indexed universe', () => {
+    const out = searchSourcePathsFilter(
+      [],
+      [['/lib/a.pdf'], ['/lib/sub/c.pdf']],
+      ALL
+    );
+    expect(out).toEqual(['/lib/b.pdf', '/other/d.pdf']);
+  });
+
+  it('muting everything returns an empty include-list', () => {
+    expect(searchSourcePathsFilter([], [ALL], ALL)).toEqual([]);
   });
 });

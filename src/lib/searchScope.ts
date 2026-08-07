@@ -30,3 +30,35 @@ export function searchGameSystemsFilter(
   if (!excluded.has(UNTAGGED_KEY)) include.push(UNTAGGED_KEY);
   return include;
 }
+
+/** A folder, file, or collection narrowing on the collection axis. */
+export interface ScopeRef {
+  kind: 'folder' | 'file';
+  label: string;
+}
+
+/** Resolve the collection axis (folder/file/collection solos and mutes)
+ * to the backend's `source_paths` include-list.
+ *
+ * Same DAW semantics as the systems axis: any solo active → the union of
+ * the soloed file-sets passes, mutes overridden (solos union within an
+ * axis; axes intersect because the backend ANDs `source_paths` with the
+ * `game_systems` filter). Mutes only → every indexed file outside the
+ * muted union. No narrowing → null. An empty array means nothing
+ * survives the narrowing. */
+export function searchSourcePathsFilter(
+  soloSets: string[][],
+  muteSets: string[][],
+  allIndexed: Iterable<string>
+): string[] | null {
+  if (soloSets.length > 0) {
+    return [...new Set(soloSets.flat())];
+  }
+  if (muteSets.length === 0) return null;
+  const muted = new Set(muteSets.flat());
+  const out: string[] = [];
+  for (const p of allIndexed) {
+    if (!muted.has(p)) out.push(p);
+  }
+  return out;
+}
