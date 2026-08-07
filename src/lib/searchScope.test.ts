@@ -2,7 +2,13 @@
 // searchGameSystemsFilter's mute branch fails the untagged-bucket test
 // below — the #307 regression it exists to catch.
 import { describe, expect, it } from 'vitest';
-import { searchGameSystemsFilter, searchSourcePathsFilter, UNTAGGED_KEY } from './searchScope';
+import {
+  searchCurationFilter,
+  searchGameSystemsFilter,
+  searchSourcePathsFilter,
+  UNTAGGED_KEY,
+} from './searchScope';
+import type { CurationKey } from './searchScope';
 
 const TAGS = ['D&D 5E', 'Dragonbane', 'Pathfinder 2E'];
 
@@ -89,5 +95,59 @@ describe('searchSourcePathsFilter', () => {
 
   it('muting everything returns an empty include-list', () => {
     expect(searchSourcePathsFilter([], [ALL], ALL)).toEqual([]);
+  });
+});
+
+describe('searchCurationFilter', () => {
+  const COLLECTED = new Set(['/lib/a.pdf', '/lib/sub/c.pdf']);
+  const none = new Set<CurationKey>();
+
+  it('returns null when nothing is soloed or muted (no narrowing)', () => {
+    expect(searchCurationFilter(none, none, COLLECTED, ALL)).toBeNull();
+  });
+
+  it('soloing Collected narrows to files in some collection', () => {
+    const out = searchCurationFilter(new Set<CurationKey>(['collected']), none, COLLECTED, ALL);
+    expect(out?.sort()).toEqual(['/lib/a.pdf', '/lib/sub/c.pdf']);
+  });
+
+  it('soloing Loose narrows to files in no collection', () => {
+    const out = searchCurationFilter(new Set<CurationKey>(['loose']), none, COLLECTED, ALL);
+    expect(out?.sort()).toEqual(['/lib/b.pdf', '/other/d.pdf']);
+  });
+
+  it('soloing both buckets unions to the whole universe', () => {
+    const out = searchCurationFilter(
+      new Set<CurationKey>(['collected', 'loose']),
+      none,
+      COLLECTED,
+      ALL
+    );
+    expect(out?.sort()).toEqual([...ALL].sort());
+  });
+
+  it('muting Loose keeps only collected files', () => {
+    const out = searchCurationFilter(none, new Set<CurationKey>(['loose']), COLLECTED, ALL);
+    expect(out?.sort()).toEqual(['/lib/a.pdf', '/lib/sub/c.pdf']);
+  });
+
+  it('muting both buckets returns an empty include-list', () => {
+    const out = searchCurationFilter(
+      none,
+      new Set<CurationKey>(['collected', 'loose']),
+      COLLECTED,
+      ALL
+    );
+    expect(out).toEqual([]);
+  });
+
+  it('solo overrides mute', () => {
+    const out = searchCurationFilter(
+      new Set<CurationKey>(['loose']),
+      new Set<CurationKey>(['loose']),
+      COLLECTED,
+      ALL
+    );
+    expect(out?.sort()).toEqual(['/lib/b.pdf', '/other/d.pdf']);
   });
 });

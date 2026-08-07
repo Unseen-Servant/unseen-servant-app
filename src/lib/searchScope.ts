@@ -31,6 +31,34 @@ export function searchGameSystemsFilter(
   return include;
 }
 
+/** The curation axis's two-value domain: every indexed file is either in
+ * some collection ('collected') or in none ('loose'). */
+export type CurationKey = 'collected' | 'loose';
+
+/** Resolve the curation axis (Collected/Loose solos and mutes) to a
+ * source-path include-list.
+ *
+ * Same DAW semantics as the other axes: solo active → only files in a
+ * soloed bucket pass, mutes overridden. Mute active → files outside every
+ * muted bucket pass. No narrowing → null. An empty array means nothing
+ * survives. The caller intersects the result with the collection axis
+ * (axes intersect; the backend takes one `source_paths` list). */
+export function searchCurationFilter(
+  soloed: Set<CurationKey>,
+  muted: Set<CurationKey>,
+  collectedPaths: Set<string>,
+  allIndexed: Iterable<string>
+): string[] | null {
+  if (soloed.size === 0 && muted.size === 0) return null;
+  const passes = (bucket: CurationKey) =>
+    soloed.size > 0 ? soloed.has(bucket) : !muted.has(bucket);
+  const out: string[] = [];
+  for (const p of allIndexed) {
+    if (passes(collectedPaths.has(p) ? 'collected' : 'loose')) out.push(p);
+  }
+  return out;
+}
+
 /** A folder, file, or collection narrowing on the collection axis. */
 export interface ScopeRef {
   kind: 'folder' | 'file';

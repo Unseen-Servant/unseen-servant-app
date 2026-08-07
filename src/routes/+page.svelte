@@ -28,7 +28,7 @@
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
-  import { searchGameSystemsFilter, searchSourcePathsFilter, UNTAGGED_KEY, type ScopeRef } from '../lib/searchScope';
+  import { searchCurationFilter, searchGameSystemsFilter, searchSourcePathsFilter, UNTAGGED_KEY, type CurationKey, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
   import {
@@ -114,18 +114,23 @@
   let collectionsPanelOpen = true;
   let editingMetadataFor: string | null = null;
 
-  // Library narrowing — one model, two axes, DAW semantics on each:
+  // Library narrowing — one model, three axes, DAW semantics on each:
   // solos union within an axis, axes intersect, solo overrides mute.
   //   - systems axis:    filterExcludedSystems (muted) + soloedSystems.
   //   - collection axis: mutedCollections + soloCollections, keyed by
   //     path (tree folders and files); the active collection joins the
   //     solo side via its own backend state (activeContextName).
-  // All four are session-scoped: they reset on app launch (no Tauri
+  //   - curation axis:   soloCuration + mutedCuration over the two-value
+  //     collected/loose domain. Soloing Collected is the old "show only
+  //     collection"; soloing Loose the old "show only loose".
+  // All six are session-scoped: they reset on app launch (no Tauri
   // store persistence), so each session starts with a clean library.
   let filterExcludedSystems = new Set<string>();
   let soloedSystems = new Set<string>();
   let soloCollections = new Map<string, ScopeRef>();
   let mutedCollections = new Map<string, ScopeRef>();
+  let soloCuration = new Set<CurationKey>();
+  let mutedCuration = new Set<CurationKey>();
 
   // Display-only hidden flag. Stores explicitly-hidden paths (files or
   // folder roots); descendants of a hidden folder are hidden via prefix
@@ -133,18 +138,6 @@
   // still get indexed, searched, and counted in SystemsView.
   let hiddenPaths = new Set<string>();
   let showHidden = false;
-
-  // Library filter: when on, narrow the tree to files not in any
-  // collection — a curation gap-finder. Inert when the view is already
-  // scoped to a collection (active context or edit mode), since
-  // "uncategorized within a collection" is empty by definition.
-  let showOnlyUncollected = false;
-
-  // Focus mode for the active collection. Default off: activating a
-  // collection just highlights its files in the tree (the library map
-  // stays whole). When on, the tree narrows to that collection — the
-  // pre-highlight focused-view behavior, kept for live-play workflows.
-  let focusActiveCollection = false;
 
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
   // 'systems' = flat list grouped by game system. Forced to 'tree' in
@@ -199,6 +192,7 @@
   let searchSeq = 0;
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
+  let searchScopeBarComponent: SearchScopeBar | undefined;
   let searchResultsComponent: SearchResults | undefined;
   let systemsViewComponent: SystemsView | undefined;
   let collectionsPanelComponent: CollectionsPanel | undefined;
@@ -212,6 +206,15 @@
   let pageSize = PAGE_SIZE_INITIAL;
   let reachedEnd = false;
   $: searchActive = committedQuery.trim() !== '';
+  // Which console sections are meaningful right now. System and curation
+  // narrowing act on file metadata, not disk shape, so they're exposed
+  // where the organizing axis IS the tag (systems view) or where the
+  // filter actually applies (search backend). Tree view intentionally
+  // hides them: narrowing a filesystem-shaped tree by content metadata
+  // breaks the spatial mental model — folders and ancestors would
+  // disappear for reasons the tree itself can't explain.
+  $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
+  $: curationFilterRelevant = viewMode === 'systems' || searchActive;
   // Clamp selection when results shrink (e.g. new query returns fewer hits).
   $: if (selectedResultIndex >= searchResults.length) {
     selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
@@ -311,8 +314,8 @@
 
   // The "of N files" denominator in the SearchScopeBar — mirrors the same
   // narrowing primitives runSearch passes to the backend (collection
-  // axis, then system exclusion). When no filters are set, this collapses
-  // to the full indexed-paths count.
+  // axis, then curation axis, then system exclusion). When no filters
+  // are set, this collapses to the full indexed-paths count.
   $: searchableFileCount = (() => {
     let universe: string[];
     if (collectionAxisInclude !== null) {
@@ -321,6 +324,13 @@
       universe = collections[activeContextName].file_paths.filter((p) => indexedPathsSet.has(p));
     } else {
       universe = Array.from(indexedPathsSet);
+    }
+    const curationInclude = searchCurationFilter(
+      soloCuration, mutedCuration, collectedPaths, indexedPathsSet
+    );
+    if (curationInclude !== null) {
+      const cur = new Set(curationInclude);
+      universe = universe.filter((p) => cur.has(p));
     }
     if (filterExcludedSystems.size === 0 && soloedSystems.size === 0) return universe.length;
     // A file passes when at least one of its tags survives the active
@@ -361,11 +371,32 @@
     // collection auto-scopes backend-side when this stays null).
     // Computed fresh — see computeCollectionAxisInclude for why the
     // derived value can't be read here.
-    const sourcePaths = computeCollectionAxisInclude(
+    let sourcePaths = computeCollectionAxisInclude(
       soloCollections, mutedCollections, activeContextName, collections, indexedPaths
     );
+
+    // Curation axis (Collected/Loose solos and mutes) intersects into
+    // the same list — axes intersect, and the backend takes one
+    // `source_paths` include-list. When the collection axis stayed null
+    // because the active collection is its only narrowing, the
+    // intersection must still honor it, so its files stand in here.
+    const curationInclude = searchCurationFilter(
+      soloCuration, mutedCuration, collectedPaths, indexedPaths
+    );
+    if (curationInclude !== null) {
+      if (sourcePaths === null && activeContextName && collections[activeContextName]) {
+        sourcePaths = collections[activeContextName].file_paths.filter((p) => indexedPaths.has(p));
+      }
+      if (sourcePaths === null) {
+        sourcePaths = curationInclude;
+      } else {
+        const cur = new Set(curationInclude);
+        sourcePaths = sourcePaths.filter((p) => cur.has(p));
+      }
+    }
+
     if (sourcePaths !== null && sourcePaths.length === 0) {
-      searchError = soloCollections.size > 0 || activeContextName
+      searchError = soloCollections.size > 0 || activeContextName || soloCuration.size > 0
         ? 'Nothing indexed under the soloed items.'
         : 'Everything is muted.';
       searchResults = [];
@@ -596,14 +627,22 @@
       if (savedShowHidden !== undefined) {
         showHidden = savedShowHidden;
       }
+      // One-time migration of the old Curation radios into the curation
+      // axis: "show only collection" → solo Collected, "show only loose"
+      // → solo Loose (focus wins if a stray state had both, matching the
+      // old radio's tie-break). The axis is session-scoped like the other
+      // narrowings, so the old keys are deleted rather than re-persisted.
       const savedShowOnlyUncollected = parseBoolean(await store.get('showOnlyUncollected'));
-      if (savedShowOnlyUncollected !== undefined) {
-        showOnlyUncollected = savedShowOnlyUncollected;
-      }
       const savedFocusActiveCollection = parseBoolean(await store.get('focusActiveCollection'));
-      if (savedFocusActiveCollection !== undefined) {
-        focusActiveCollection = savedFocusActiveCollection;
+      if (savedFocusActiveCollection) {
+        soloCuration.add('collected');
+        soloCuration = soloCuration;
+      } else if (savedShowOnlyUncollected) {
+        soloCuration.add('loose');
+        soloCuration = soloCuration;
       }
+      try { await store.delete('showOnlyUncollected'); } catch {}
+      try { await store.delete('focusActiveCollection'); } catch {}
       const savedViewMode = parseEnum(
         await store.get('viewMode'),
         ['tree', 'systems'] as const,
@@ -784,13 +823,21 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Section-level "Reset" link: clears both mute and solo at once. The
-  // user reads "Game systems" as one filter — splitting the two clears
-  // would be more clicks for a single conceptual action.
-  function clearSystemFilter() {
+  // Footer [clear all] in the filter console: resets every solo/mute on
+  // all three axes — the same action as clearing each chip in the scope
+  // bar, including the active-collection chip (which is a solo).
+  function clearAllFilters() {
     filterExcludedSystems = new Set();
     soloedSystems = new Set();
-    if (committedQuery) runSearch(committedQuery);
+    soloCollections = new Map();
+    mutedCollections = new Map();
+    soloCuration = new Set();
+    mutedCuration = new Set();
+    if (activeContextName) {
+      clearActiveContext(); // re-runs the search itself
+    } else if (committedQuery) {
+      runSearch(committedQuery);
+    }
   }
 
   $: hiddenCount = hiddenPaths.size;
@@ -840,34 +887,26 @@
     persistHidden();
   }
 
-  async function persistShowOnlyUncollected() {
-    try {
-      const store = await load('settings.json');
-      await store.set('showOnlyUncollected', showOnlyUncollected);
-      await store.save();
-    } catch (e) {
-      console.log('Could not persist showOnlyUncollected:', e);
+  // Curation-axis S/M over the collected/loose domain. Same union/
+  // intersect/solo-overrides-mute semantics as the other axes.
+  function toggleCurationSolo(key: CurationKey) {
+    if (soloCuration.has(key)) {
+      soloCuration.delete(key);
+    } else {
+      soloCuration.add(key);
     }
+    soloCuration = soloCuration;
+    if (committedQuery) runSearch(committedQuery);
   }
 
-  function toggleShowOnlyUncollected() {
-    showOnlyUncollected = !showOnlyUncollected;
-    persistShowOnlyUncollected();
-  }
-
-  async function persistFocusActiveCollection() {
-    try {
-      const store = await load('settings.json');
-      await store.set('focusActiveCollection', focusActiveCollection);
-      await store.save();
-    } catch (e) {
-      console.log('Could not persist focusActiveCollection:', e);
+  function toggleCurationMute(key: CurationKey) {
+    if (mutedCuration.has(key)) {
+      mutedCuration.delete(key);
+    } else {
+      mutedCuration.add(key);
     }
-  }
-
-  function toggleFocusActiveCollection() {
-    focusActiveCollection = !focusActiveCollection;
-    persistFocusActiveCollection();
+    mutedCuration = mutedCuration;
+    if (committedQuery) runSearch(committedQuery);
   }
 
   async function checkMcpStatus() {
@@ -1390,22 +1429,29 @@
   })();
   $: uncollectedCount = uncollectedFilePaths.size;
 
-  // Whether the Collections section in the filter menu has anything to
-  // show. Three mutually-exclusive radio options live there:
-  //   - Show all              — default, no narrowing
-  //   - Show only collection  — focus mode, requires an active context
-  //   - Show only loose       — uncategorized files, requires that any
-  //                             collection exists (works alongside an
-  //                             active collection — useful when
-  //                             scouting candidates to add)
-  // Edit mode forces its own UI, so the section is hidden there.
+  // Counterpart of uncollectedCount for the Collected channel: on-disk
+  // PDFs that belong to at least one collection. Same universe as
+  // uncollectedFilePaths so the two LED counts partition the library.
+  $: collectedCount = (() => {
+    if (!indexStatus) return 0;
+    let n = 0;
+    const consider = (entries: FileStatusEntry[]) => {
+      for (const e of entries) {
+        if (collectedPaths.has(e.path)) n++;
+      }
+    };
+    consider(indexStatus.up_to_date);
+    consider(indexStatus.to_update);
+    consider(indexStatus.to_add);
+    return n;
+  })();
+
+  // Whether the Curation section in the filter console has anything to
+  // channel: the collected/loose split is meaningless until a collection
+  // exists. Edit mode forces its own UI, so the section is hidden there.
   $: collectionFilterAvailable =
     !isCollectionEditMode &&
     (activeContextName !== null || Object.keys(collections).length > 0);
-  $: uncategorizedFilterAvailable =
-    !isCollectionEditMode && Object.keys(collections).length > 0;
-  $: focusFilterAvailable =
-    collectionFilterAvailable && activeContextName !== null;
 
   // Filter for what the file tree shows. Composes scope + library filters:
   // 1. Edit mode and focus mode pick the base file pool. An active
@@ -1419,41 +1465,30 @@
   // tree is a spatial model that content tags shouldn't reshape. The
   // filter applies to search only.
   $: displayPaths = (() => {
-    // Metadata-based narrowing (collection focus, loose-only) is gated
-    // to systems view. Tree view is a spatial model — folders and
-    // ancestors should never disappear because of collection membership.
-    // Highlight via activeContextName (which composes orthogonally) is
-    // the right tree-view affordance.
-    const inSystemsView = viewMode === 'systems';
-    const focusActive = inSystemsView && focusActiveCollection && focusFilterAvailable;
-    // Focus and loose are radio-mutex through the menu, but a stray
-    // persisted state could in principle have both set. Treat focus as
-    // canonical so the tree never collapses to empty (collection ∩ not-
-    // in-any-collection = ∅).
-    const uncollectedActive =
-      inSystemsView && !focusActive && showOnlyUncollected && uncategorizedFilterAvailable;
-
-    let baseFiles: Set<string> | null;
+    // Metadata-based narrowing (curation solos) is gated to systems view.
+    // Tree view is a spatial model — folders and ancestors should never
+    // disappear because of collection membership. Highlight via
+    // activeContextName (which composes orthogonally) is the right
+    // tree-view affordance.
+    let baseFiles: Set<string>;
     if (isCollectionEditMode) {
       baseFiles = new Set(indexedPaths);
-    } else if (focusActive && activeContextName) {
-      const col = collections[activeContextName];
-      baseFiles = col ? new Set(col.file_paths) : null;
-    } else if (uncollectedActive) {
-      baseFiles = new Set(uncollectedFilePaths);
+    } else if (viewMode === 'systems' && soloCuration.size > 0) {
+      // Curation solos union within the axis: Collected = files in some
+      // collection, Loose = files in none.
+      baseFiles = new Set<string>();
+      if (soloCuration.has('collected')) {
+        for (const p of collectedPaths) baseFiles.add(p);
+      }
+      if (soloCuration.has('loose')) {
+        for (const p of uncollectedFilePaths) baseFiles.add(p);
+      }
     } else {
       return null;
     }
 
-    if (!baseFiles) return null;
-
-    let visible = baseFiles;
-    if (uncollectedActive) {
-      visible = new Set([...visible].filter((p) => !collectedPaths.has(p)));
-    }
-
-    if (visible.size === 0) return new Set<string>();
-    return new Set<string>([...visible, ...computeAncestorPaths(visible)]);
+    if (baseFiles.size === 0) return new Set<string>();
+    return new Set<string>([...baseFiles, ...computeAncestorPaths(baseFiles)]);
   })();
 
   // Flat list of currently-visible tree rows for keyboard nav. Mirrors what
@@ -1952,10 +1987,11 @@
       }
     }
 
-    // Cmd/Ctrl+Shift+F: open the filter menu.
+    // Cmd/Ctrl+Shift+F: toggle the filter console (anchored to the
+    // scope bar's faders button).
     if (meta && event.shiftKey && lk === 'f' && selectedFolder) {
       event.preventDefault();
-      headerComponent?.toggleFilter();
+      searchScopeBarComponent?.toggleConsole();
       return;
     }
 
@@ -2868,38 +2904,16 @@
     disabled={!selectedFolder || isCollectionEditMode}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
-    filterVisible={!!selectedFolder}
-    excludedSystems={filterExcludedSystems}
-    {soloedSystems}
-    availableSystems={gameSystemStats}
-    untaggedCount={untaggedFileCount}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
     onTogglePanel={togglePanel}
-    onToggleSystemFilter={toggleSystemFilter}
-    onToggleSystemSolo={toggleSystemSolo}
-    onClearSystemFilter={clearSystemFilter}
-    {showHidden}
-    {hiddenCount}
-    onToggleShowHidden={toggleShowHidden}
-    onClearHidden={clearHidden}
-    {collectionFilterAvailable}
-    {uncategorizedFilterAvailable}
-    {focusFilterAvailable}
-    {activeContextName}
-    {showOnlyUncollected}
-    {uncollectedCount}
-    {focusActiveCollection}
-    onToggleShowOnlyUncollected={toggleShowOnlyUncollected}
-    onToggleFocusActiveCollection={toggleFocusActiveCollection}
     collapseAllVisible={!!selectedFolder && !searchActive}
     collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
     viewToggleVisible={!!selectedFolder && !searchActive}
     {viewMode}
     onSetViewMode={setViewMode}
-    {searchActive}
   />
 
   {#if selectedFolder}
@@ -2930,22 +2944,40 @@
 
       <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
+        <!-- The scope bar is the filter home in every mode: readout chips
+             plus the console opener at its left edge. The hits meter only
+             appears while a search is active. -->
+        <SearchScopeBar
+          bind:this={searchScopeBarComponent}
+          {collectionSolos}
+          {collectionMutes}
+          excludedSystems={filterExcludedSystems}
+          {soloedSystems}
+          curationSolos={soloCuration}
+          curationMutes={mutedCuration}
+          {showHidden}
+          resultCount={searchResults.length}
+          indexedFileCount={searchableFileCount}
+          isLoading={isSearching}
+          {searchActive}
+          onClearCollectionSolo={handleClearCollectionSolo}
+          onClearCollectionMute={handleClearCollectionMute}
+          onToggleSystemFilter={toggleSystemFilter}
+          onToggleSystemSolo={toggleSystemSolo}
+          onToggleCurationSolo={toggleCurationSolo}
+          onToggleCurationMute={toggleCurationMute}
+          onToggleShowHidden={toggleShowHidden}
+          availableSystems={gameSystemStats}
+          untaggedCount={untaggedFileCount}
+          showSystemFilter={systemsFilterRelevant}
+          showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
+          {collectedCount}
+          {uncollectedCount}
+          {hiddenCount}
+          onClearHidden={clearHidden}
+          onClearAll={clearAllFilters}
+        />
         {#if searchActive}
-          <SearchScopeBar
-            {collectionSolos}
-            {collectionMutes}
-            excludedSystems={filterExcludedSystems}
-            {soloedSystems}
-            {showHidden}
-            resultCount={searchResults.length}
-            indexedFileCount={searchableFileCount}
-            isLoading={isSearching}
-            onClearCollectionSolo={handleClearCollectionSolo}
-            onClearCollectionMute={handleClearCollectionMute}
-            onToggleSystemFilter={toggleSystemFilter}
-            onToggleSystemSolo={toggleSystemSolo}
-            onToggleShowHidden={toggleShowHidden}
-          />
           <div class="search-split">
             <div class="search-list-pane">
               <SearchResults

@@ -1,71 +1,20 @@
 <script lang="ts">
-  import FilterMenu from './FilterMenu.svelte';
   import { chordHint } from './keybindings';
 
   export let searchQuery: string = '';
   export let disabled: boolean = false;
   export let panelOpen: boolean = false;
   export let panelToggleVisible: boolean = true;
-  export let filterVisible: boolean = false;
-  export let excludedSystems: Set<string> = new Set();
-  export let soloedSystems: Set<string> = new Set();
-  export let availableSystems: { name: string; count: number }[] = [];
-  export let untaggedCount: number = 0;
-  export let showHidden: boolean = false;
-  export let hiddenCount: number = 0;
-  export let collectionFilterAvailable: boolean = false;
-  export let uncategorizedFilterAvailable: boolean = false;
-  export let focusFilterAvailable: boolean = false;
-  export let activeContextName: string | null = null;
-  export let showOnlyUncollected: boolean = false;
-  export let uncollectedCount: number = 0;
-  export let focusActiveCollection: boolean = false;
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
-  export let onToggleSystemFilter: (system: string) => void = () => {};
-  export let onToggleSystemSolo: (system: string) => void = () => {};
-  export let onClearSystemFilter: () => void = () => {};
-  export let onToggleShowHidden: () => void = () => {};
-  export let onClearHidden: () => void = () => {};
-  export let onToggleShowOnlyUncollected: () => void = () => {};
-  export let onToggleFocusActiveCollection: () => void = () => {};
   export let collapseAllVisible: boolean = false;
   export let collapseAllDisabled: boolean = false;
   export let onCollapseAll: () => void = () => {};
   export let viewToggleVisible: boolean = false;
   export let viewMode: 'tree' | 'systems' = 'tree';
   export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
-  export let searchActive: boolean = false;
-
-  let filterOpen = false;
-  let filterBtn: HTMLButtonElement | undefined;
-
-  // Indicator lights up only for non-default filter states. The default for
-  // hidden items is "not shown" (showHidden = false), so the dot appears
-  // when the user has flipped it on. System exclusions are dormant in tree
-  // view (they're the organizing axis only in systems view) but are also
-  // applied to the search backend, so they're relevant whenever search is
-  // active too — exposing the filter section in both contexts keeps the
-  // editor reachable wherever the exclusion is taking effect.
-  // Two gates for "filters that act on file metadata, not on disk shape":
-  //   - systemsFilterRelevant: game-system mute/solo. Meaningful where the
-  //     organizing axis IS the system tag (systems view) or where the
-  //     filter actually applies (search backend).
-  //   - curationFilterRelevant: collection focus / loose-only. Same logic.
-  // Both are intentionally hidden in tree view because narrowing a
-  // filesystem-shaped tree by content metadata breaks the spatial mental
-  // model — folders and ancestors disappear for reasons the tree itself
-  // can't explain. Highlighting (e.g., active-collection highlight) is
-  // the right pattern there; explicit narrow controls live elsewhere.
-  $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
-  $: curationFilterRelevant = viewMode === 'systems' || searchActive;
-  $: filterActive =
-    (systemsFilterRelevant && (excludedSystems.size > 0 || soloedSystems.size > 0)) ||
-    (hiddenCount > 0 && showHidden) ||
-    (curationFilterRelevant && uncategorizedFilterAvailable && showOnlyUncollected) ||
-    (curationFilterRelevant && focusFilterAvailable && focusActiveCollection);
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,11 +22,6 @@
 
   export function focus() {
     inputEl?.focus();
-  }
-
-  export function toggleFilter() {
-    if (!filterVisible) return;
-    filterOpen = !filterOpen;
   }
 
   function clearDebounce() {
@@ -168,54 +112,6 @@
         </svg>
       </button>
     {/if}
-    {#if filterVisible}
-      <div class="filter-anchor">
-        <button
-          class="panel-toggle filter-btn"
-          class:active={filterOpen}
-          class:has-filter={filterActive}
-          on:click|stopPropagation={() => { filterOpen = !filterOpen; }}
-          bind:this={filterBtn}
-          title={`Filter library${chordHint('filter.toggle')}`}
-          aria-label="Filter library"
-          aria-haspopup="menu"
-          aria-expanded={filterOpen}
-        >
-          <!-- Font Awesome "filter" — viewBox padded so the glyph density
-               matches the 640-viewBox panel-toggle icon next to it. -->
-          <svg viewBox="-64 -64 640 640" fill="currentColor" class="toggle-icon">
-            <path d="M3.9 22.9C10.5 8.9 24.5 0 40 0L472 0c15.5 0 29.5 8.9 36.1 22.9s4.6 30.5-5.2 42.5L320 290.7 320 448c0 12.1-6.8 23.2-17.7 28.6s-23.8 4.3-33.5-3l-64-48c-8.1-6-12.8-15.5-12.8-25.6l0-109.3L9 65.4C-.7 53.4-2.8 36.8 3.9 22.9z"/>
-          </svg>
-          {#if filterActive}<span class="filter-dot" aria-hidden="true"></span>{/if}
-        </button>
-        <FilterMenu
-          open={filterOpen}
-          anchorEl={filterBtn}
-          {excludedSystems}
-          {soloedSystems}
-          systems={availableSystems}
-          {untaggedCount}
-          showSystemFilter={systemsFilterRelevant}
-          onToggleSystem={onToggleSystemFilter}
-          onToggleSolo={onToggleSystemSolo}
-          onClearSystems={onClearSystemFilter}
-          {showHidden}
-          {hiddenCount}
-          {onToggleShowHidden}
-          {onClearHidden}
-          showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
-          {uncategorizedFilterAvailable}
-          {focusFilterAvailable}
-          {activeContextName}
-          {showOnlyUncollected}
-          {uncollectedCount}
-          {focusActiveCollection}
-          {onToggleShowOnlyUncollected}
-          {onToggleFocusActiveCollection}
-          onClose={() => { filterOpen = false; }}
-        />
-      </div>
-    {/if}
   </div>
   <div class="search-wrapper" class:disabled>
     <span class="search-icon" aria-hidden="true">⌕</span>
@@ -303,29 +199,6 @@
     width: 14px;
     height: 14px;
     display: block;
-  }
-
-  .filter-anchor {
-    position: relative;
-    flex-shrink: 0;
-  }
-  .filter-btn {
-    position: relative;
-  }
-  .filter-btn.has-filter {
-    color: var(--text-accent);
-  }
-  .filter-btn.has-filter .toggle-icon {
-    filter: var(--glow-accent);
-  }
-  .filter-dot {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--text-active);
   }
 
   .search-wrapper {

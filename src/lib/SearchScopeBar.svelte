@@ -1,27 +1,62 @@
 <script lang="ts">
-  // Persistent readout of every narrowing the user has applied to a search.
-  // Sits above the result list so a surprising hit count ("only 2?") always
-  // has a visible cause. Each chip is a clear-affordance — the whole chip
-  // is the button; click to undo that single narrowing without touching
-  // the others.
+  // Persistent readout of every narrowing the user has applied, and the
+  // home of the filter console. The faders button at the left edge opens
+  // the console (FilterMenu) right below the bar; each chip is a
+  // clear-affordance — the whole chip is the button; click to undo that
+  // single narrowing without touching the others.
 
+  import FilterMenu from './FilterMenu.svelte';
+  import { chordHint } from './keybindings';
   import { displaySystem } from './searchScope';
+  import type { CurationKey } from './searchScope';
 
-  // Chip glyph = axis (pigment bookmark = collection, monochrome die =
-  // system); chip frame = operation (purple solo / danger-edged mute).
+  // Chip glyph = axis (pigment bookmark = collection, outline bookmark =
+  // curation bucket, monochrome die = system); chip frame = operation
+  // (purple solo / danger-edged mute).
   export let collectionSolos: { key: string; label: string; color: string | null }[] = [];
   export let collectionMutes: { key: string; label: string; color: string | null }[] = [];
   export let excludedSystems: Set<string> = new Set();
   export let soloedSystems: Set<string> = new Set();
+  export let curationSolos: Set<CurationKey> = new Set();
+  export let curationMutes: Set<CurationKey> = new Set();
   export let showHidden: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   export let isLoading: boolean = false;
+  export let searchActive: boolean = false;
   export let onClearCollectionSolo: (key: string) => void = () => {};
   export let onClearCollectionMute: (key: string) => void = () => {};
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onToggleSystemSolo: (system: string) => void = () => {};
+  export let onToggleCurationSolo: (key: CurationKey) => void = () => {};
+  export let onToggleCurationMute: (key: CurationKey) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
+
+  // Console (FilterMenu) pass-through — the menu and the chips read and
+  // write the same narrowing state, so engaging S in the console
+  // materializes a chip here, and clearing a chip resets the menu row.
+  export let availableSystems: { name: string; count: number }[] = [];
+  export let untaggedCount: number = 0;
+  export let showSystemFilter: boolean = true;
+  export let showCollectionFilter: boolean = false;
+  export let collectedCount: number = 0;
+  export let uncollectedCount: number = 0;
+  export let hiddenCount: number = 0;
+  export let onClearHidden: () => void = () => {};
+  export let onClearAll: () => void = () => {};
+
+  let consoleOpen = false;
+  let consoleBtn: HTMLButtonElement | undefined;
+
+  export function toggleConsole() {
+    consoleOpen = !consoleOpen;
+  }
+
+  const CURATION_LABELS: Record<CurationKey, string> = {
+    collected: 'In a collection',
+    loose: 'Loose',
+  };
+  const CURATION_ORDER: CurationKey[] = ['collected', 'loose'];
 
   // When anything is solo'd on an axis, mute state on that axis is
   // overridden — its mute chips would be misleading, so suppress them.
@@ -29,9 +64,58 @@
   $: soloedList = Array.from(soloedSystems).sort();
   $: excludedList = soloedList.length > 0 ? [] : Array.from(excludedSystems).sort();
   $: shownCollectionMutes = collectionSolos.length > 0 ? [] : collectionMutes;
+  $: curationSoloList = CURATION_ORDER.filter((k) => curationSolos.has(k));
+  $: curationMuteList =
+    curationSoloList.length > 0 ? [] : CURATION_ORDER.filter((k) => curationMutes.has(k));
 </script>
 
-<div class="scope-bar" role="status" aria-live="polite">
+<div class="scope-bar">
+  <div class="console-anchor">
+    <button
+      type="button"
+      class="console-btn"
+      class:open={consoleOpen}
+      bind:this={consoleBtn}
+      on:click|stopPropagation={() => { consoleOpen = !consoleOpen; }}
+      title={`Filter console${chordHint('filter.toggle')}`}
+      aria-label="Filter console"
+      aria-haspopup="menu"
+      aria-expanded={consoleOpen}
+    >
+      <!-- Faders — three channel lines with offset knobs -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <path d="M5 4v16M12 4v16M19 4v16"/>
+        <circle class="knob" cx="5" cy="15" r="2.6"/>
+        <circle class="knob" cx="12" cy="8" r="2.6"/>
+        <circle class="knob" cx="19" cy="12" r="2.6"/>
+      </svg>
+    </button>
+    <FilterMenu
+      open={consoleOpen}
+      anchorEl={consoleBtn}
+      {excludedSystems}
+      {soloedSystems}
+      systems={availableSystems}
+      {untaggedCount}
+      {showSystemFilter}
+      onToggleSystem={onToggleSystemFilter}
+      onToggleSolo={onToggleSystemSolo}
+      {showHidden}
+      {hiddenCount}
+      {onToggleShowHidden}
+      {onClearHidden}
+      {showCollectionFilter}
+      {collectedCount}
+      {uncollectedCount}
+      {curationSolos}
+      {curationMutes}
+      {onToggleCurationSolo}
+      {onToggleCurationMute}
+      {onClearAll}
+      onClose={() => { consoleOpen = false; }}
+    />
+  </div>
+
   <div class="left">
     {#each collectionSolos as chip (chip.key)}
       <button
@@ -47,6 +131,26 @@
           <path d="M5 2h14v20l-7-5.2L5 22z"/>
         </svg>
         <span class="chip-label">{chip.label}</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/each}
+
+    {#each curationSoloList as key (key)}
+      <button
+        type="button"
+        class="chip solo"
+        on:click|stopPropagation={() => onToggleCurationSolo(key)}
+        title="Stop soloing {CURATION_LABELS[key]}"
+        aria-label="Stop soloing {CURATION_LABELS[key]}"
+      >
+        <span class="chip-prefix">solo</span>
+        {#if key === 'collected'}
+          <!-- Outline bookmark — the curation bucket, not a specific collection -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+          </svg>
+        {/if}
+        <span class="chip-label">{CURATION_LABELS[key]}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/each}
@@ -87,6 +191,25 @@
       </button>
     {/each}
 
+    {#each curationMuteList as key (key)}
+      <button
+        type="button"
+        class="chip exclusion"
+        on:click|stopPropagation={() => onToggleCurationMute(key)}
+        title="Unmute {CURATION_LABELS[key]}"
+        aria-label="Unmute {CURATION_LABELS[key]}"
+      >
+        <span class="chip-prefix">mute</span>
+        {#if key === 'collected'}
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+          </svg>
+        {/if}
+        <span class="chip-label">{CURATION_LABELS[key]}</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/each}
+
     {#each excludedList as system (system)}
       <button
         type="button"
@@ -119,17 +242,19 @@
     {/if}
   </div>
 
-  <div class="right">
-    {#if isLoading}
-      <span class="meter searching" aria-live="polite">
-        Searching<span class="searching-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
-      </span>
-    {:else}
-      <span class="meter" title="Across {indexedFileCount} file{indexedFileCount === 1 ? '' : 's'} matching the active scope and filters">
-        {resultCount} {resultCount === 1 ? 'hit' : 'hits'} <span class="meter-of">of {indexedFileCount} files</span>
-      </span>
-    {/if}
-  </div>
+  {#if searchActive}
+    <div class="right" role="status" aria-live="polite">
+      {#if isLoading}
+        <span class="meter searching">
+          Searching<span class="searching-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+        </span>
+      {:else}
+        <span class="meter" title="Across {indexedFileCount} file{indexedFileCount === 1 ? '' : 's'} matching the active scope and filters">
+          {resultCount} {resultCount === 1 ? 'hit' : 'hits'} <span class="meter-of">of {indexedFileCount} files</span>
+        </span>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -144,7 +269,51 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
     flex-shrink: 0;
-    overflow: hidden;
+  }
+
+  /* Anchor for the console dropdown — the menu positions itself below
+     the faders button (FilterMenu is absolute against this wrapper). */
+  .console-anchor {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+  }
+
+  .console-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    padding: 0;
+    cursor: pointer;
+    transition: color var(--transition-fast), background var(--transition-fast);
+  }
+  .console-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-container);
+  }
+  .console-btn:active {
+    transform: scale(0.97);
+  }
+  /* Open = a mode the user switched on: purple + LED glow. */
+  .console-btn.open {
+    color: var(--text-active);
+    filter: var(--glow-active);
+  }
+  .console-btn svg {
+    width: 13px;
+    height: 13px;
+    display: block;
+  }
+  /* Knobs punch out of the channel lines by taking the bar's background. */
+  .console-btn .knob {
+    fill: var(--bg-app);
   }
 
   .left {

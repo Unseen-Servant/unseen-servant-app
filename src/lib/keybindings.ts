@@ -44,7 +44,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.revert',           keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Revert pending sync changes',  scope: 'global' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global' },
   { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
-  { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Open filter menu',            scope: 'global' },
+  { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Open filter console',         scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
   { id: 'help.overlay',          keys: { mac: '?',    other: '?' },             label: 'Show keyboard shortcuts',     scope: 'global' },
@@ -88,11 +88,12 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
   { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
 
-  // Filter menu (when open)
+  // Filter console (when open)
   { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
   { id: 'filterMenu.prev',       keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterMenu' },
   { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle mute on focused row',   scope: 'filterMenu' },
-  { id: 'filterMenu.solo',       keys: { mac: 'S',    other: 'S' },             label: 'Solo / unsolo focused system', scope: 'filterMenu' },
+  { id: 'filterMenu.solo',       keys: { mac: 'S',    other: 'S' },             label: 'Solo / unsolo focused channel', scope: 'filterMenu' },
+  { id: 'filterMenu.mute',       keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterMenu' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

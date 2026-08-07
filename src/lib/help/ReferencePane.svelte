@@ -19,7 +19,7 @@
     collections: 'Collections',
     searchInput: 'Search input',
     searchResults: 'Search results',
-    filterMenu: 'Filter menu',
+    filterMenu: 'Filter console',
     contextMenu: 'Context menu',
     modal: 'Modal',
   };
