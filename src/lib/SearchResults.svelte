@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { SearchResultItem, KnownGameSystem } from './types';
+  import type { SearchResultItem } from './types';
   import { pageHint } from './pdfUrl';
   import { isPathOrAncestorIn } from './selectionUtils';
   import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
@@ -21,7 +21,9 @@
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
   export let hiddenPaths: Set<string> = new Set();
-  export let knownSystems: KnownGameSystem[] = [];
+  // File path → collection pigment, resolved by the parent. Color is
+  // reserved for collections — systems are monochrome (die + parchment).
+  export let collectionColorByPath: Map<string, string> = new Map();
   export let selectedIndex: number = 0;
   export let canLoadMore: boolean = false;
   export let onSelect: (index: number) => void = () => {};
@@ -39,19 +41,6 @@
     if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
       onLoadMore();
     }
-  }
-
-  // Tag → color lookup. Matches the pattern in FileTree.svelte and
-  // SystemsView.svelte so the system color cue is consistent across views.
-  $: tagColors = (() => {
-    const m = new Map<string, string>();
-    for (const sys of knownSystems) {
-      if (sys.color) m.set(sys.tag, sys.color);
-    }
-    return m;
-  })();
-  function colorFor(tag: string): string | null {
-    return tagColors.get(tag) ?? null;
   }
 
   let rowEls: (HTMLElement | null)[] = [];
@@ -149,7 +138,7 @@
       {@const label = tierLabel(result.tier, result.relevance)}
       {@const span = pageSpan(result.page_start, result.page_end)}
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
-      {@const sysColor = colorFor(result.game_system)}
+      {@const collColor = collectionColorByPath.get(result.source) ?? null}
       {#if i === dividerAt}
         <div class="weak-divider" role="separator">weak matches</div>
       {/if}
@@ -158,7 +147,7 @@
         class="result-row"
         class:selected={i === selectedIndex}
         class:weak={result.tier === 'weak'}
-        style={sysColor ? `--system-color: ${sysColor}` : ''}
+        style={collColor ? `--collection-color: ${collColor}` : ''}
         bind:this={rowEls[i]}
         on:click={() => handleRowClick(i)}
         on:dblclick={() => handleRowDblClick(i, result)}
@@ -257,9 +246,9 @@
     pointer-events: none;
   }
 
-  /* Selection stripe at the left edge: system color with a soft glow,
-     parchment fallback when the row's system has no color. The per-row
-     system color cue lives on the index cell instead. */
+  /* Selection stripe at the left edge: collection pigment with a soft
+     glow, parchment fallback when the file is in no colored collection.
+     The per-row collection cue lives on the index cell instead. */
   .result-row::before {
     content: '';
     position: absolute;
@@ -281,8 +270,8 @@
   }
 
   .result-row.selected::before {
-    background: var(--system-color, var(--text-accent));
-    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--system-color, var(--text-accent)) 65%, transparent));
+    background: var(--collection-color, var(--text-accent));
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--collection-color, var(--text-accent)) 65%, transparent));
   }
 
   /* Selection state is the visual cue for "current row"; click-focus on a
@@ -295,7 +284,7 @@
   }
 
   .result-row.selected .index-cell {
-    background: var(--system-color, var(--text-accent));
+    background: var(--collection-color, var(--text-accent));
     color: var(--text-inverse);
   }
 
@@ -354,8 +343,8 @@
     font-family: var(--font-body);
     font-size: 0.7rem;
     font-variant-numeric: tabular-nums;
-    background: color-mix(in srgb, var(--system-color, var(--text-tertiary)) 20%, transparent);
-    color: var(--system-color, var(--text-tertiary));
+    background: color-mix(in srgb, var(--collection-color, var(--text-tertiary)) 20%, transparent);
+    color: var(--collection-color, var(--text-tertiary));
     -webkit-user-select: none;
     user-select: none;
     margin-top: 0.05rem;

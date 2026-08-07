@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { openPath } from '@tauri-apps/plugin-opener';
-  import type { FileItem, FileStatusEntry, KnownGameSystem } from './types';
+  import type { FileItem, FileStatusEntry } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
@@ -31,9 +31,6 @@
   // Library root path — used to render parent folders relative rather than
   // absolute. Empty string falls back to absolute paths.
   export let libraryRoot: string = '';
-
-  // Known systems — used to look up each tag's accent color for group headers.
-  export let knownSystems: KnownGameSystem[] = [];
 
   export let focusedFilePath: string | null = null;
   // Collections panel claims arrow keys when a collection row is focused —
@@ -72,17 +69,6 @@
   // never crosses tag boundaries (would feel arbitrary in this view).
   let lastClickedPath: string | null = null;
   let lastClickedGroup: string | null = null;
-
-  $: tagColors = (() => {
-    const m = new Map<string, string>();
-    for (const sys of knownSystems) {
-      if (sys.color) m.set(sys.tag, sys.color);
-    }
-    return m;
-  })();
-  function colorFor(tag: string): string | null {
-    return tagColors.get(tag) ?? null;
-  }
 
   // Section collapse state — transient (not persisted).
   let collapsed = new Set<string>();
@@ -449,10 +435,9 @@
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="systems-view" on:mousedown={handleViewMousedown}>
     {#each groups as group (group.tag)}
-      {@const groupColor = colorFor(group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
       <section class="group">
-        <div class="group-head-row" class:untagged={group.tag === 'Untagged'} style={groupColor ? `--group-color: ${groupColor}` : ''}>
+        <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
           {#if isCollectionEditMode}
             <button
               class="checkbox group-checkbox"
@@ -470,7 +455,7 @@
           >
             <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
             {#if group.tag !== 'Untagged'}
-              <span class="group-icon" class:unset={!groupColor} aria-hidden="true">
+              <span class="group-icon" aria-hidden="true">
                 <!-- Font Awesome "dice-d6" -->
                 <svg viewBox="0 0 640 640" fill="currentColor">
                   <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
@@ -571,6 +556,8 @@
     flex-direction: column;
   }
 
+  /* Headers are monochrome — parchment name + die sigil; color belongs
+     to collections. */
   .group-head-row {
     --group-color: var(--text-accent);
     display: flex;
@@ -613,9 +600,6 @@
     flex-shrink: 0;
     color: var(--group-color);
     align-self: center;
-  }
-  .group-icon.unset {
-    color: var(--text-tertiary);
   }
   .group-icon svg {
     width: 0.85rem;

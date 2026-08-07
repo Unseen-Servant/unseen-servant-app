@@ -3,7 +3,6 @@
   import type { KnownGameSystem } from './types';
   import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
-  import { PALETTE } from './palette';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
@@ -25,18 +24,16 @@
   let modalMode: 'add' | 'edit' = 'add';
   let modalTag = '';
   let modalKeywords = '';
+  // Stored color rides along untouched on edit — nothing in the UI reads
+  // or writes system colors anymore (color belongs to collections).
   let modalColor: string | null = null;
   let modalError = '';
   let editOriginalTag = '';
   let editOriginalKeywords = '';
-  let editOriginalColor: string | null = null;
   let editIsBuiltin = false;
   let editIsCustomized = false;
 
   let tagInput: HTMLInputElement;
-  let colorBtn: HTMLButtonElement;
-  let colorMenuEl: HTMLDivElement;
-  let colorMenuOpen = false;
 
   // Auto-focus the first input when the modal opens.
   $: if (showModal && tagInput) tagInput.focus();
@@ -46,8 +43,7 @@
   // Collection modal.
   $: dirty = modalMode === 'add' || (
     modalTag.trim() !== editOriginalTag ||
-    modalKeywords !== editOriginalKeywords ||
-    (modalColor ?? null) !== (editOriginalColor ?? null)
+    modalKeywords !== editOriginalKeywords
   );
   $: canSave = modalTag.trim().length > 0 && dirty;
 
@@ -59,10 +55,8 @@
     modalError = '';
     editOriginalTag = '';
     editOriginalKeywords = '';
-    editOriginalColor = null;
     editIsBuiltin = false;
     editIsCustomized = false;
-    colorMenuOpen = false;
     showModal = true;
   }
 
@@ -74,38 +68,18 @@
     modalError = '';
     editOriginalTag = sys.tag;
     editOriginalKeywords = modalKeywords;
-    editOriginalColor = sys.color ?? null;
     editIsBuiltin = sys.is_builtin ?? false;
     editIsCustomized = sys.is_customized ?? false;
-    colorMenuOpen = false;
     showModal = true;
   }
 
   function closeModal() {
     showModal = false;
-    colorMenuOpen = false;
     modalError = '';
-  }
-
-  function handleColorPick(c: string | null) {
-    modalColor = c;
-    colorMenuOpen = false;
-  }
-
-  function handleWindowClick(event: MouseEvent) {
-    if (!colorMenuOpen) return;
-    const target = event.target as Node;
-    if (colorBtn && (colorBtn === target || colorBtn.contains(target))) return;
-    if (colorMenuEl && colorMenuEl.contains(target)) return;
-    colorMenuOpen = false;
   }
 
   function handleWindowKey(event: KeyboardEvent) {
     if (!showModal) return;
-    if (event.key === 'Escape' && colorMenuOpen) {
-      colorMenuOpen = false;
-      return;
-    }
     if (event.key !== 'Enter' || !canSave) return;
     // Plain Enter saves from any text input (matches the rest of the
     // app's "Enter commits" feel); Cmd/Ctrl+Enter still works globally.
@@ -162,7 +136,7 @@
   }
 </script>
 
-<svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
+<svelte:window on:keydown={handleWindowKey} />
 
 <div class="game-systems-settings">
   <div class="list-header">
@@ -174,7 +148,7 @@
     {#each sorted as sys}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
       <div class="system-row" on:click={() => openEditModal(sys)}>
-        <span class="system-icon" style={sys.color ? `color: ${sys.color}` : ''} class:unset={!sys.color} aria-hidden="true">
+        <span class="system-icon" aria-hidden="true">
           <!-- Font Awesome "dice-d6" -->
           <svg viewBox="0 0 640 640" fill="currentColor">
             <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
@@ -203,59 +177,14 @@
   <div class="body">
     <div class="field">
       <span class="label">Tag</span>
-      <div class="name-row">
-        <input
-          id="sys-tag"
-          type="text"
-          class="input"
-          bind:value={modalTag}
-          bind:this={tagInput}
-          placeholder="e.g. Cairn"
-        />
-        <div class="color-wrapper">
-          <button
-            type="button"
-            class="color-trigger"
-            class:open={colorMenuOpen}
-            on:click|stopPropagation={() => { colorMenuOpen = !colorMenuOpen; }}
-            bind:this={colorBtn}
-            title={modalColor || 'No color'}
-            aria-label="Game system color"
-            aria-haspopup="menu"
-            aria-expanded={colorMenuOpen}
-          >
-            {#if modalColor}
-              <span class="color-swatch" style="background: {modalColor}" aria-hidden="true"></span>
-            {:else}
-              <span class="color-swatch none" aria-hidden="true">&times;</span>
-            {/if}
-          </button>
-          {#if colorMenuOpen}
-            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-            <div class="color-menu" bind:this={colorMenuEl} on:click|stopPropagation>
-              <button
-                type="button"
-                class="swatch none"
-                class:selected={!modalColor}
-                on:click={() => handleColorPick(null)}
-                title="No color"
-                aria-label="No color"
-              >&times;</button>
-              {#each PALETTE as c}
-                <button
-                  type="button"
-                  class="swatch"
-                  class:selected={modalColor === c}
-                  style="background: {c}"
-                  on:click={() => handleColorPick(c)}
-                  title={c}
-                  aria-label={`Color ${c}`}
-                ></button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </div>
+      <input
+        id="sys-tag"
+        type="text"
+        class="input"
+        bind:value={modalTag}
+        bind:this={tagInput}
+        placeholder="e.g. Cairn"
+      />
     </div>
 
     <div class="field">
@@ -394,9 +323,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-  }
-  .system-icon.unset {
-    color: var(--text-tertiary);
+    color: var(--text-accent);
   }
   .system-icon svg {
     width: 0.85rem;
@@ -475,97 +402,6 @@
     outline: 1px solid var(--text-accent);
     outline-offset: -1px;
     border-color: var(--border-subtle);
-  }
-
-  .name-row {
-    display: flex;
-    align-items: stretch;
-    gap: 0.4rem;
-  }
-  .name-row .input {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .color-wrapper {
-    position: relative;
-    flex-shrink: 0;
-  }
-  .color-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 100%;
-    padding: 0;
-    background: var(--bg-focused);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: border-color var(--transition-fast);
-  }
-  .color-trigger:hover,
-  .color-trigger.open {
-    border-color: var(--text-accent);
-  }
-  .color-swatch {
-    width: 14px;
-    height: 14px;
-    border-radius: var(--radius-sm);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .color-swatch.none {
-    background: transparent;
-    border: 1px dashed var(--text-tertiary);
-    color: var(--text-tertiary);
-    font-size: 0.85rem;
-    line-height: 1;
-  }
-  .color-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-dropdown);
-    padding: 0.5rem;
-    display: grid;
-    grid-template-columns: repeat(4, auto);
-    gap: 0.4rem;
-    z-index: 50;
-  }
-  .swatch {
-    width: 22px;
-    height: 22px;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    padding: 0;
-    border: 1px solid transparent;
-    transition: transform var(--transition-fast), border-color var(--transition-fast);
-  }
-  .swatch:hover {
-    transform: scale(1.08);
-  }
-  .swatch.selected {
-    border-color: var(--text-primary);
-  }
-  .swatch.none {
-    background: transparent;
-    border: 1px dashed var(--text-secondary);
-    color: var(--text-secondary);
-    font-size: 1rem;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .swatch.none.selected {
-    border-color: var(--text-primary);
-    border-style: solid;
-    color: var(--text-primary);
   }
 
   .hint {

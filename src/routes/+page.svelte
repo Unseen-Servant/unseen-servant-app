@@ -245,6 +245,21 @@
       .concat((indexStatus?.to_update ?? []).map((e) => e.path))
   );
 
+  // File path → collection pigment for the search-result index cells.
+  // Color is reserved for collections; a file in several colored
+  // collections takes the alphabetically-first one for determinism.
+  $: collectionColorByPath = (() => {
+    const m = new Map<string, string>();
+    const sorted = Object.values(collections).sort((a, b) => a.name.localeCompare(b.name));
+    for (const col of sorted) {
+      if (!col.color) continue;
+      for (const p of col.file_paths) {
+        if (!m.has(p)) m.set(p, col.color);
+      }
+    }
+    return m;
+  })();
+
   // The "of N files" denominator in the SearchScopeBar — mirrors the same
   // narrowing primitives runSearch passes to the backend (path scope OR
   // active collection, then system exclusion). When no filters are set,
@@ -2912,7 +2927,7 @@
                 selectedIndex={selectedResultIndex}
                 canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
                 {hiddenPaths}
-                {knownSystems}
+                {collectionColorByPath}
                 onSelect={(i) => { selectedResultIndex = i; }}
                 onLoadMore={loadMoreResults}
                 onOpenResult={handleOpenResult}
@@ -2939,7 +2954,6 @@
             {showHidden}
             {highlightPaths}
             libraryRoot={selectedFolder}
-            {knownSystems}
             {focusedFilePath}
             {focusedCollectionName}
             onFocusFile={setFocusedFilePath}
