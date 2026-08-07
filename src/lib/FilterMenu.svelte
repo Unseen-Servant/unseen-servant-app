@@ -313,8 +313,8 @@
                 />
                 <button
                   type="button"
-                  class="solo-btn"
-                  class:active={soloedSystems.has(name)}
+                  class="sm-btn"
+                  class:solo-on={soloedSystems.has(name)}
                   on:click|preventDefault|stopPropagation={() => onToggleSolo(name)}
                   aria-pressed={soloedSystems.has(name)}
                   aria-label={soloedSystems.has(name) ? `Stop soloing ${name}` : `Solo ${name}`}
@@ -461,7 +461,7 @@
        CSS `order` separates the two without forcing an unnatural DOM. */
     gap: 0.4rem;
   }
-  .system-row .solo-btn { order: 1; }
+  .system-row :global(.sm-btn) { order: 1; }
   .system-row .row-name { order: 2; }
   .system-row .row-count { order: 3; }
   /* No solo button on the Untagged row — pad its name so the columns
@@ -472,40 +472,8 @@
   }
   .system-row .app-checkbox { order: 4; }
 
-  .solo-btn {
-    flex-shrink: 0;
-    width: 18px;
-    height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    color: var(--text-tertiary);
-    font-family: var(--font-body);
-    font-size: 0.65rem;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0;
-    transition: color var(--transition-fast), border-color var(--transition-fast),
-                background var(--transition-fast), filter var(--transition-fast);
-  }
-  .solo-btn:hover {
-    color: var(--text-secondary);
-    border-color: var(--text-secondary);
-  }
-  .solo-btn.active {
-    color: var(--text-active);
-    border-color: var(--text-active);
-    background: color-mix(in srgb, var(--text-active) 15%, transparent);
-    filter: var(--glow-active);
-  }
-  .solo-btn:focus-visible {
-    outline: 1px solid var(--text-accent);
-    outline-offset: 1px;
-  }
+  /* S button anatomy lives in app.css (.sm-btn) — shared with the
+     systems-view group headers and tree folder rows. */
 
   .section-divider {
     margin: 0.3rem 0;

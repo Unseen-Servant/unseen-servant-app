@@ -3,6 +3,7 @@
   import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, FileStatusEntry } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
+  import { UNTAGGED_KEY } from './searchScope';
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -13,9 +14,13 @@
   // Same scope/filter narrowing as the tree view. null = no narrowing.
   export let displayPaths: Set<string> | null = null;
 
-  // Tags excluded by the library filter. A multi-system file stays visible
-  // under its non-excluded tags, but the excluded section itself is hidden.
+  // DAW-style channel state, shared with the filter menu. Muted (excluded)
+  // groups stay visible but dim — hiding them would take the M button with
+  // them. The untagged bucket mutes under UNTAGGED_KEY.
   export let excludedSystems: Set<string> = new Set();
+  export let soloedSystems: Set<string> = new Set();
+  export let onToggleSystemFilter: (system: string) => void = () => {};
+  export let onToggleSystemSolo: (system: string) => void = () => {};
 
   // User-hidden paths (same set as the tree). Entries whose path is hidden
   // are dropped when `showHidden` is false; rendered with dimmed/italic
@@ -81,10 +86,9 @@
       const tags = e.game_systems && e.game_systems.length > 0
         ? e.game_systems
         : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : ['Untagged']);
-      // A multi-tagged file appears under every group it belongs to,
-      // minus any systems hidden by the library filter.
+      // A multi-tagged file appears under every group it belongs to.
+      // Muted groups are kept (marked, dimmed below) — never hidden.
       for (const tag of tags) {
-        if (excludedSystems.has(tag)) continue;
         const list = byTag.get(tag) ?? [];
         list.push(e);
         byTag.set(tag, list);
@@ -94,9 +98,11 @@
       list.sort((a, b) => a.filename.localeCompare(b.filename));
     }
     const known = [...byTag.keys()].filter((k) => k !== 'Untagged').sort();
-    const out: { tag: string; entries: FileStatusEntry[] }[] = [];
-    for (const tag of known) out.push({ tag, entries: byTag.get(tag)! });
-    if (byTag.has('Untagged')) out.push({ tag: 'Untagged', entries: byTag.get('Untagged')! });
+    const out: { tag: string; entries: FileStatusEntry[]; muted: boolean }[] = [];
+    for (const tag of known) out.push({ tag, entries: byTag.get(tag)!, muted: excludedSystems.has(tag) });
+    if (byTag.has('Untagged')) {
+      out.push({ tag: 'Untagged', entries: byTag.get('Untagged')!, muted: excludedSystems.has(UNTAGGED_KEY) });
+    }
     return out;
   })();
 
@@ -311,6 +317,20 @@
     const focused = visibleEntries[focusedIdx];
     if (!focused) return;
 
+    // S / M toggle solo / mute for the focused row's group — same
+    // bare-letter guard as j/k. Untagged gets no solo (untagged files
+    // never pass under solos) and mutes under the backend's key.
+    if (bareLetter && lk === 's' && focused.tag !== 'Untagged') {
+      event.preventDefault();
+      onToggleSystemSolo(focused.tag);
+      return;
+    }
+    if (bareLetter && lk === 'm') {
+      event.preventDefault();
+      onToggleSystemFilter(focused.tag === 'Untagged' ? UNTAGGED_KEY : focused.tag);
+      return;
+    }
+
     if (event.key === 'Enter' && !isCollectionEditMode) {
       event.preventDefault();
       handleDoubleClick(focused.entry);
@@ -436,6 +456,7 @@
   <div class="systems-view" on:mousedown={handleViewMousedown}>
     {#each groups as group (group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
+      {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
       <section class="group">
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
           {#if isCollectionEditMode}
@@ -472,11 +493,34 @@
               </span>
             {/if}
             <span class="group-name">{group.tag}</span>
-            <span class="group-count">{group.entries.length}</span>
           </button>
+          <span class="sm" class:engaged={soloedSystems.has(group.tag) || group.muted}>
+            {#if group.tag !== 'Untagged'}
+              <button
+                type="button"
+                class="sm-btn"
+                class:solo-on={soloedSystems.has(group.tag)}
+                on:click|stopPropagation={() => onToggleSystemSolo(group.tag)}
+                aria-pressed={soloedSystems.has(group.tag)}
+                title={soloedSystems.has(group.tag) ? `Stop soloing ${group.tag} (S)` : `Solo ${group.tag} (S)`}
+              >S</button>
+            {/if}
+            <button
+              type="button"
+              class="sm-btn"
+              class:mute-on={group.muted}
+              on:click|stopPropagation={() => onToggleSystemFilter(group.tag === 'Untagged' ? UNTAGGED_KEY : group.tag)}
+              aria-pressed={group.muted}
+              title={group.muted ? `Unmute ${smLabel} (M)` : `Mute ${smLabel} (M)`}
+            >M</button>
+          </span>
+          <span class="group-count">{group.entries.length}</span>
         </div>
         {#if !collapsed.has(group.tag)}
-          <ul class="group-files">
+          <ul
+            class="group-files"
+            class:dimmed={group.muted || (soloedSystems.size > 0 && !soloedSystems.has(group.tag))}
+          >
             {#each group.entries as entry (entry.path)}
               {@const relParent = relativeParent(entry.path)}
               {@const isChecked = isCollectionEditMode && collectionPaths.has(entry.path)}
@@ -612,16 +656,60 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
+
+  /* S/M cluster — hidden at rest, revealed on header hover or keyboard
+     focus, always visible while engaged. Button anatomy is the shared
+     .sm-btn in app.css. */
+  .sm {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-self: center;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+  .group-head-row:hover .sm,
+  .group-head-row:focus-within .sm,
+  .sm.engaged {
+    opacity: 1;
+  }
+
+  /* The count is the cluster's LED readout: same 18px height as the S/M
+     buttons but inverted anatomy (filled, borderless) so it can't be
+     mistaken for a third switch. */
   .group-count {
-    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 0.3rem;
+    margin-right: 0.25rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
     color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 
   .group-files {
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  /* Muted groups (and non-soloed groups while a solo is active) dim but
+     stay visible — a muted channel never disappears from the mixer.
+     Hover restores legibility, mirroring the filter menu's row-dimmed. */
+  .group-files.dimmed {
+    opacity: 0.45;
+    transition: opacity var(--transition-fast);
+  }
+  .group-files.dimmed:hover {
+    opacity: 0.7;
   }
 
   /* Edit-mode selection checkboxes — same visual language as the tree's

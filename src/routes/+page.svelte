@@ -1232,19 +1232,6 @@
     return n;
   })();
 
-  // SystemsView and any view-narrowing consumers want a single "what to
-  // hide" set. When solos are active, every non-solo'd system (plus the
-  // Untagged bucket) is effectively excluded — that's how solo dominates
-  // mute. When no solos, this just mirrors filterExcludedSystems.
-  $: effectiveExcludedSystems = (() => {
-    if (soloedSystems.size === 0) return filterExcludedSystems;
-    const eff = new Set<string>();
-    for (const { name } of gameSystemStats) {
-      if (!soloedSystems.has(name)) eff.add(name);
-    }
-    if (!soloedSystems.has('Untagged')) eff.add('Untagged');
-    return eff;
-  })();
   $: topGameSystem = gameSystemStats.length > 0
     ? `Top system: ${gameSystemStats[0].name} with ${gameSystemStats[0].count} file${gameSystemStats[0].count === 1 ? '' : 's'}`
     : '';
@@ -1336,24 +1323,20 @@
   // 1. Edit mode and focus mode pick the base file pool. An active
   //    collection without focus mode just highlights — the tree shows
   //    the whole library so users can see those files in context.
-  // 2. Systems filter (excludedSystems) narrows to indexed files whose
-  //    system isn't excluded — implies indexed-only since only indexed
-  //    files carry system tags. Scoped to systems view: tags are that
-  //    view's organizing axis, but in tree view they'd silently filter a
-  //    filesystem-shaped structure that wasn't organized around them.
-  // 3. Uncategorized filter narrows to files not in any collection.
-  // 4. Add ancestor folders so the tree structure stays intact.
+  // 2. Uncategorized filter narrows to files not in any collection.
+  // 3. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
+  // System mute/solo never narrows a view: muted groups dim in place in
+  // the systems view (a muted channel never leaves the mixer), and the
+  // tree is a spatial model that content tags shouldn't reshape. The
+  // filter applies to search only.
   $: displayPaths = (() => {
-    // All metadata-based narrowing (system filter, collection focus,
-    // loose-only) is gated to systems view. Tree view is a spatial model
-    // — folders and ancestors should never disappear because of content
-    // tags or collection membership. Highlight via activeContextName
-    // (which composes orthogonally) is the right tree-view affordance;
-    // narrow controls live in systems view.
+    // Metadata-based narrowing (collection focus, loose-only) is gated
+    // to systems view. Tree view is a spatial model — folders and
+    // ancestors should never disappear because of collection membership.
+    // Highlight via activeContextName (which composes orthogonally) is
+    // the right tree-view affordance.
     const inSystemsView = viewMode === 'systems';
-    const systemsFilterActive =
-      (filterExcludedSystems.size > 0 || soloedSystems.size > 0) && inSystemsView;
     const focusActive = inSystemsView && focusActiveCollection && focusFilterAvailable;
     // Focus and loose are radio-mutex through the menu, but a stray
     // persisted state could in principle have both set. Treat focus as
@@ -1368,8 +1351,6 @@
     } else if (focusActive && activeContextName) {
       const col = collections[activeContextName];
       baseFiles = col ? new Set(col.file_paths) : null;
-    } else if (systemsFilterActive) {
-      baseFiles = new Set(indexedPaths);
     } else if (uncollectedActive) {
       baseFiles = new Set(uncollectedFilePaths);
     } else {
@@ -1379,21 +1360,6 @@
     if (!baseFiles) return null;
 
     let visible = baseFiles;
-    if (systemsFilterActive) {
-      visible = new Set([...visible].filter((p) => indexedPaths.has(p)));
-      visible = new Set([...visible].filter((p) => {
-        const tags = effectiveGameSystemMap.get(p) ?? [];
-        // Solo branch: only files with at least one solo'd tag pass.
-        // Untagged files don't pass — solo means "focus on these systems".
-        if (soloedSystems.size > 0) {
-          return tags.some((t) => soloedSystems.has(t));
-        }
-        if (tags.length === 0) {
-          return !filterExcludedSystems.has('unknown');
-        }
-        return tags.some((t) => !filterExcludedSystems.has(t));
-      }));
-    }
     if (uncollectedActive) {
       visible = new Set([...visible].filter((p) => !collectedPaths.has(p)));
     }
@@ -1707,7 +1673,10 @@
     if (bareLetter) {
       if (lk === 'r') { event.preventDefault(); renamingFilePath = focused.path; return true; }
       if (lk === 'f') { event.preventDefault(); setPathScope(focused.item); return true; }
-      if (lk === 'm') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
+      // In systems view M belongs to the channel buttons — SystemsView's
+      // own handler mutes the focused row's group (context menu stays on
+      // Shift+F10 / the Menu key there).
+      if (lk === 'm' && viewMode !== 'systems') { event.preventDefault(); openContextMenuAtFocusedRow(); return true; }
       if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
       if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
@@ -2948,7 +2917,10 @@
             bind:this={systemsViewComponent}
             entries={indexedEntries}
             {displayPaths}
-            excludedSystems={effectiveExcludedSystems}
+            excludedSystems={filterExcludedSystems}
+            {soloedSystems}
+            onToggleSystemFilter={toggleSystemFilter}
+            onToggleSystemSolo={toggleSystemSolo}
             {hiddenPaths}
             {showHidden}
             {highlightPaths}

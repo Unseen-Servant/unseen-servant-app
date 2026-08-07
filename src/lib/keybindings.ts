@@ -9,6 +9,7 @@
 export type KeyScope =
   | 'global'
   | 'fileTree'
+  | 'systemsView'
   | 'collections'
   | 'searchInput'
   | 'searchResults'
@@ -70,6 +71,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.scope',            keys: { mac: 'F',    other: 'F' },             label: 'Set as search scope (find here)', scope: 'fileTree' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
   { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree' },
+
+  // Systems view (when a row is focused)
+  { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView' },
+  { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView' },
 
   // Collections panel (when a row is focused)
   { id: 'collections.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'collections' },

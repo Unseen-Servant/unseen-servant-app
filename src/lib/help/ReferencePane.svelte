@@ -4,6 +4,7 @@
   const SCOPE_ORDER: KeyScope[] = [
     'global',
     'fileTree',
+    'systemsView',
     'collections',
     'searchInput',
     'searchResults',
@@ -14,6 +15,7 @@
   const SCOPE_LABELS: Record<KeyScope, string> = {
     global: 'Global',
     fileTree: 'File tree',
+    systemsView: 'Systems view',
     collections: 'Collections',
     searchInput: 'Search input',
     searchResults: 'Search results',
