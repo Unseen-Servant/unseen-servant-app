@@ -1965,18 +1965,18 @@
 
     // Cmd/Ctrl+J: switch to Systems view; Cmd/Ctrl+T: switch to Tree view,
     // or collapse the whole tree when already there (the view switch's
-    // repeat action). Both match the visible switch: hidden during search,
-    // so the chords no-op there too. 'J' was chosen over '\' because
-    // backslash isn't a single key on Canadian CSA and several other ISO
-    // layouts.
-    if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
+    // repeat action). Both match the visible switch and double as search-
+    // view exits — during search the repeat action never fires (the tree
+    // isn't on screen). 'J' was chosen over '\' because backslash isn't a
+    // single key on Canadian CSA and several other ISO layouts.
+    if (meta && !event.shiftKey && lk === 'j' && selectedFolder) {
       event.preventDefault();
-      if (viewMode !== 'systems') setViewMode('systems');
+      if (searchViewOpen || viewMode !== 'systems') setViewMode('systems');
       return;
     }
-    if (meta && !event.shiftKey && lk === 't' && selectedFolder && !searchActive) {
+    if (meta && !event.shiftKey && lk === 't' && selectedFolder) {
       event.preventDefault();
-      if (viewMode === 'tree') collapseAll();
+      if (!searchViewOpen && viewMode === 'tree') collapseAll();
       else setViewMode('tree');
       return;
     }
@@ -2922,7 +2922,8 @@
     onFocus={handleSearchFocus}
     onTogglePanel={togglePanel}
     onCollapseAll={collapseAll}
-    viewToggleVisible={!!selectedFolder && !searchActive}
+    viewToggleVisible={!!selectedFolder}
+    {searchViewOpen}
     {viewMode}
     onSetViewMode={setViewMode}
   />
