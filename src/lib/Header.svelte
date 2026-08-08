@@ -61,7 +61,9 @@
     clearDebounce();
     searchQuery = '';
     onClear();
-    inputEl?.focus();
+    // Refocus only inside the search view — ✕ on a leftover query from a
+    // browse view is a tidy-up, not an entry (focus would reopen the view).
+    if (searchViewOpen) inputEl?.focus();
   }
 </script>
 

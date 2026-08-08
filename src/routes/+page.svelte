@@ -2105,9 +2105,8 @@
     }
 
     // ── Tree-row navigation ─────────────────────────────────────────────
-    // Active when a library is loaded, search is not active, no menu/rename
-    // is open. ArrowDown from an empty search input also enters the tree
-    // (parallel to the search-results combobox).
+    // Active when a library is loaded, the search view is closed, no
+    // menu/rename is open.
     // Other popovers (filter menu, sort menu, dropdowns) attach their own
     // keydown listeners but they fire AFTER this one — so we have to skip
     // here when the DOM tells us a competing menu is open. Querying by
