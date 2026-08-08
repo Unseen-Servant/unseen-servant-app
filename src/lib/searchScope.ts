@@ -192,3 +192,22 @@ export function resolveScopeSet(
   }
   return out;
 }
+
+/** The three empty-scope messages, in doctrine priority order: the mix
+ * resolves empty → the narrowing has nothing → everything is muted.
+ * `anyLivePlaying` must count only playing names whose collection still
+ * exists (resolveMix's ghost rule) — a persisted ghost play-name must
+ * not claim "Nothing indexed is playing." over a live mute. Returns
+ * null when the scope isn't empty. */
+export function emptyScopeMessage(args: {
+  mixEmpty: boolean;
+  anyLivePlaying: boolean;
+  pathScopeEmpty: boolean;
+  anySolosEngaged: boolean;
+  systemsEmpty: boolean;
+}): string | null {
+  if (args.mixEmpty) return args.anyLivePlaying ? 'Nothing indexed is playing.' : 'Everything is muted.';
+  if (args.pathScopeEmpty) return args.anySolosEngaged ? 'Nothing under the soloed items.' : 'Everything is muted.';
+  if (args.systemsEmpty) return 'Everything is muted.';
+  return null;
+}

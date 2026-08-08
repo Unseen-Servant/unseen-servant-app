@@ -9,6 +9,7 @@ import {
   resolveMix,
   passesSystemsAxis,
   resolveScopeSet,
+  emptyScopeMessage,
   UNTAGGED_KEY,
 } from './searchScope';
 import type { CurationKey } from './searchScope';
@@ -331,5 +332,70 @@ describe('resolveScopeSet', () => {
   it('with empty system sets and an untagged file, the file survives (runSearch mode)', () => {
     const out = resolve(null, [], [['/lib/strahd/map.pdf']]);
     expect(out!.has('/lib/loose.pdf')).toBe(true);
+  });
+});
+
+describe('emptyScopeMessage', () => {
+  const NONE_EMPTY = {
+    mixEmpty: false,
+    anyLivePlaying: false,
+    pathScopeEmpty: false,
+    anySolosEngaged: false,
+    systemsEmpty: false,
+  };
+
+  it('returns null when the scope is not empty anywhere', () => {
+    expect(emptyScopeMessage(NONE_EMPTY)).toBeNull();
+  });
+
+  it('mix empty + a live playing collection → "Nothing indexed is playing."', () => {
+    expect(
+      emptyScopeMessage({ ...NONE_EMPTY, mixEmpty: true, anyLivePlaying: true })
+    ).toBe('Nothing indexed is playing.');
+  });
+
+  it('mix empty + no live playing collection → "Everything is muted." (the ghost-name case: a stale play-name must not claim playing over a live mute)', () => {
+    expect(
+      emptyScopeMessage({ ...NONE_EMPTY, mixEmpty: true, anyLivePlaying: false })
+    ).toBe('Everything is muted.');
+  });
+
+  it('path scope empty + a solo engaged → "Nothing under the soloed items."', () => {
+    expect(
+      emptyScopeMessage({ ...NONE_EMPTY, pathScopeEmpty: true, anySolosEngaged: true })
+    ).toBe('Nothing under the soloed items.');
+  });
+
+  it('path scope empty + no solo engaged → "Everything is muted."', () => {
+    expect(
+      emptyScopeMessage({ ...NONE_EMPTY, pathScopeEmpty: true, anySolosEngaged: false })
+    ).toBe('Everything is muted.');
+  });
+
+  it('systems empty → "Everything is muted."', () => {
+    expect(emptyScopeMessage({ ...NONE_EMPTY, systemsEmpty: true })).toBe('Everything is muted.');
+  });
+
+  it('priority: mixEmpty wins over pathScopeEmpty and systemsEmpty when all are true', () => {
+    expect(
+      emptyScopeMessage({
+        mixEmpty: true,
+        anyLivePlaying: true,
+        pathScopeEmpty: true,
+        anySolosEngaged: true,
+        systemsEmpty: true,
+      })
+    ).toBe('Nothing indexed is playing.');
+  });
+
+  it('priority: pathScopeEmpty wins over systemsEmpty when both are true', () => {
+    expect(
+      emptyScopeMessage({
+        ...NONE_EMPTY,
+        pathScopeEmpty: true,
+        anySolosEngaged: true,
+        systemsEmpty: true,
+      })
+    ).toBe('Nothing under the soloed items.');
   });
 });

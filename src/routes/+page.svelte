@@ -28,7 +28,7 @@
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
-  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, type CurationKey, type ScopeRef } from '../lib/searchScope';
+  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
   import {
@@ -385,18 +385,13 @@
     // Computed fresh (not from the deriveds) — toggles call runSearch
     // synchronously after mutating state; see scopeRefSets.
     const mix = resolveMix(playingCollections, mutedCollectionNames, collections, indexedPaths);
-    if (mix !== null && mix.size === 0) {
-      searchError = playingCollections.size > 0
-        ? 'Nothing indexed is playing.'
-        : 'Everything is muted.';
-      searchResults = [];
-      isSearching = false;
-      return;
-    }
+    const mixEmpty = mix !== null && mix.size === 0;
 
     // Path + curation axes narrow within the mix. Systems stay out of
     // this resolution (empty sets) — the backend applies game_systems
-    // per chunk.
+    // per chunk. resolveScopeSet handles an empty mix fine (an empty
+    // set in, an empty set out), so this runs unconditionally — the
+    // empty-scope priority below picks the one message that wins.
     const { soloSets, muteSets } = scopeRefSets(scopeSolos, scopeMutes);
     const pathScope = resolveScopeSet(
       mix, soloSets, muteSets,
@@ -404,15 +399,7 @@
       EMPTY_SYSTEMS, EMPTY_SYSTEMS, EMPTY_TAGS, indexedPaths
     );
     const sourcePaths = pathScope === null ? null : [...pathScope];
-
-    if (sourcePaths !== null && sourcePaths.length === 0) {
-      searchError = scopeSolos.size > 0 || soloCuration.size > 0
-        ? 'Nothing under the soloed items.'
-        : 'Everything is muted.';
-      searchResults = [];
-      isSearching = false;
-      return;
-    }
+    const pathScopeEmpty = sourcePaths !== null && sourcePaths.length === 0;
 
     // Systems axis → backend game_systems include-list (issue #307:
     // the untagged bucket must be named explicitly under mutes).
@@ -421,8 +408,17 @@
       filterExcludedSystems,
       gameSystemStats.map((s) => s.name)
     );
-    if (gameSystems !== null && gameSystems.length === 0) {
-      searchError = 'Everything is muted.';
+    const systemsEmpty = gameSystems !== null && gameSystems.length === 0;
+
+    const emptyMsg = emptyScopeMessage({
+      mixEmpty,
+      anyLivePlaying: [...playingCollections].some((n) => Object.hasOwn(collections, n)),
+      pathScopeEmpty,
+      anySolosEngaged: scopeSolos.size > 0 || soloCuration.size > 0,
+      systemsEmpty,
+    });
+    if (emptyMsg !== null) {
+      searchError = emptyMsg;
       searchResults = [];
       isSearching = false;
       return;
@@ -650,22 +646,6 @@
       if (savedShowHidden !== undefined) {
         showHidden = savedShowHidden;
       }
-      // One-time migration of the old Curation radios into the curation
-      // axis: "show only collection" → solo Collected, "show only loose"
-      // → solo Loose (focus wins if a stray state had both, matching the
-      // old radio's tie-break). The axis is session-scoped like the other
-      // narrowings, so the old keys are deleted rather than re-persisted.
-      const savedShowOnlyUncollected = parseBoolean(await store.get('showOnlyUncollected'));
-      const savedFocusActiveCollection = parseBoolean(await store.get('focusActiveCollection'));
-      if (savedFocusActiveCollection) {
-        soloCuration.add('collected');
-        soloCuration = soloCuration;
-      } else if (savedShowOnlyUncollected) {
-        soloCuration.add('loose');
-        soloCuration = soloCuration;
-      }
-      try { await store.delete('showOnlyUncollected'); } catch {}
-      try { await store.delete('focusActiveCollection'); } catch {}
       const savedViewMode = parseEnum(
         await store.get('viewMode'),
         ['tree', 'systems'] as const,
@@ -675,7 +655,10 @@
       }
       await loadCollections();
 
-      // Full console recall — the session reopens as it was left.
+      // Full console recall — the session reopens as it was left. Read
+      // first: if a console was ever persisted, it wins outright and the
+      // one-time radio migration below is moot (its legacy keys are
+      // deleted either way).
       const savedConsole = parseScopeConsoleState(await store.get('scopeConsole'));
       if (savedConsole) {
         playingCollections = new Set(savedConsole.playing);
@@ -687,7 +670,27 @@
         soloCuration = new Set(savedConsole.curationSolos);
         mutedCuration = new Set(savedConsole.curationMutes);
         hideOutOfScope = savedConsole.hideOutOfScope;
+      } else {
+        // One-time migration of the old Curation radios into the curation
+        // axis: "show only collection" → solo Collected, "show only loose"
+        // → solo Loose (focus wins if a stray state had both, matching the
+        // old radio's tie-break). Only reachable pre-console: persist the
+        // result immediately so it survives a quit with no further toggle,
+        // rather than evaporating as session-only state used to.
+        const savedShowOnlyUncollected = parseBoolean(await store.get('showOnlyUncollected'));
+        const savedFocusActiveCollection = parseBoolean(await store.get('focusActiveCollection'));
+        if (savedFocusActiveCollection) {
+          soloCuration.add('collected');
+          soloCuration = soloCuration;
+          persistScopeConsole();
+        } else if (savedShowOnlyUncollected) {
+          soloCuration.add('loose');
+          soloCuration = soloCuration;
+          persistScopeConsole();
+        }
       }
+      try { await store.delete('showOnlyUncollected'); } catch {}
+      try { await store.delete('focusActiveCollection'); } catch {}
     } catch (e) {
       // No saved state on first run — that's fine
       console.log('No saved state:', e);
@@ -3074,6 +3077,7 @@
                 error={searchError}
                 {ollamaRunning}
                 indexedFileCount={searchableFileCount}
+                libraryEmpty={indexedPaths.size === 0}
                 selectedIndex={selectedResultIndex}
                 canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
                 {hiddenPaths}

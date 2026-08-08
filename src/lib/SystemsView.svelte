@@ -604,6 +604,9 @@
       </section>
       {/if}
     {/each}
+    {#if hideOutOfScope && groups.length > 0 && groups.every((g) => isGroupDimmed(g, soloedSystems, scopeBrightPaths))}
+      <div class="empty">Everything is out of scope.</div>
+    {/if}
   </div>
 {/if}
 

@@ -20,6 +20,9 @@
   export let query: string = '';
   export let error: string | null = null;
   export let indexedFileCount: number = 0;
+  // True when the whole library has nothing indexed — distinct from a
+  // scope narrowed down to zero files, which reads as "Nothing in scope."
+  export let libraryEmpty: boolean = false;
   export let hiddenPaths: Set<string> = new Set();
   // File path → collection pigment, resolved by the parent. Color is
   // reserved for collections — systems are monochrome (die + parchment).
@@ -123,7 +126,7 @@
     <div class="state-msg state-error">{error}</div>
   {:else if results.length === 0 && query}
     {#if indexedFileCount === 0}
-      <div class="state-msg">Nothing in scope.</div>
+      <div class="state-msg">{libraryEmpty ? 'No indexed files.' : 'Nothing in scope.'}</div>
     {:else}
       <div class="state-msg">0 results for &ldquo;{query}&rdquo;</div>
     {/if}
