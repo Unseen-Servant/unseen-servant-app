@@ -123,7 +123,7 @@
     <div class="state-msg state-error">{error}</div>
   {:else if results.length === 0 && query}
     {#if indexedFileCount === 0}
-      <div class="state-msg">No indexed files.</div>
+      <div class="state-msg">Nothing in scope.</div>
     {:else}
       <div class="state-msg">0 results for &ldquo;{query}&rdquo;</div>
     {/if}

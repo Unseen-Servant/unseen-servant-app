@@ -115,8 +115,8 @@ export function resolveMix(
   collections: Record<string, { file_paths: string[] }>,
   allIndexed: Set<string>
 ): Set<string> | null {
-  const livePlaying = [...playing].filter((n) => collections[n]);
-  const liveMuted = [...mutedNames].filter((n) => collections[n]);
+  const livePlaying = [...playing].filter((n) => Object.hasOwn(collections, n));
+  const liveMuted = [...mutedNames].filter((n) => Object.hasOwn(collections, n));
   if (livePlaying.length === 0 && liveMuted.length === 0) return null;
   const base = new Set<string>();
   if (livePlaying.length > 0) {

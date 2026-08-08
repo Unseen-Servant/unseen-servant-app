@@ -3043,7 +3043,7 @@
             entries={indexedEntries}
             {displayPaths}
             {scopeBrightPaths}
-            {hideOutOfScope}
+            hideOutOfScope={hideOutOfScope && !isCollectionEditMode}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
             onToggleSystemFilter={toggleSystemFilter}
@@ -3065,7 +3065,7 @@
             onCollectionRemove={handleCollectionRemove}
           />
         {:else}
-          {#if hideOutOfScope && resolvedScopeSet !== null && resolvedScopeSet.size === 0}
+          {#if hideOutOfScope && scopeBrightPaths !== null && scopeBrightPaths.size === 0}
             <div class="scope-empty">Everything is out of scope.</div>
           {/if}
           {#each files as file (file.path)}
