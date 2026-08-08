@@ -634,7 +634,7 @@
             </div>
           {/each}
           {#if col.file_paths.length === 0}
-            <div class="child-row child-empty" class:washed={playing}>
+            <div class="child-row child-empty" class:washed={playing && !muted}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">No files yet</span>
             </div>
