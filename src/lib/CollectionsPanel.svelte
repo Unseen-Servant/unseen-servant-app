@@ -652,12 +652,12 @@
         {/if}
       </li>
     {/each}
-    {#if !draftName}
-      <li class="add-coll-item">
-        <button class="add-coll" on:click={onCreate}>+ collection</button>
-      </li>
-    {/if}
   </ul>
+  {#if !draftName}
+    <!-- Outside the scroll container: trails the last row while the
+         list is short, stays visible once the list overflows. -->
+    <button class="add-coll" on:click={onCreate}>+ collection</button>
+  {/if}
 </aside>
 
 {#if ctxMenu}
@@ -841,7 +841,9 @@
     margin: 0;
     padding: 0;
     overflow-y: auto;
-    flex: 1;
+    /* Content-sized, shrinkable: the list only scrolls once it runs out
+       of room, and the "+ collection" row below it never leaves view. */
+    flex: 0 1 auto;
     min-height: 0;
   }
   .item {
@@ -1055,10 +1057,8 @@
   }
 
   /* Dashed create affordance — same family as the tree's "+ tag". */
-  .add-coll-item {
-    list-style: none;
-  }
   .add-coll {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 0.35rem;
