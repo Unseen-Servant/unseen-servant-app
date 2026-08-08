@@ -287,11 +287,13 @@
   function handleClearCollectionSolo(key: string) {
     scopeSolos.delete(key);
     scopeSolos = scopeSolos;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
   function handleClearCollectionMute(key: string) {
     scopeMutes.delete(key);
     scopeMutes = scopeMutes;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -2741,6 +2743,7 @@
       if (archived && playingCollections.has(name)) {
         playingCollections.delete(name);
         playingCollections = playingCollections;
+        persistScopeConsole();
         if (committedQuery) runSearch(committedQuery);
       }
       await loadCollections();
