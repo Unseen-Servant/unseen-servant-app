@@ -1049,7 +1049,7 @@
     gap: 0.3rem;
     padding: 0.18rem 0.4rem 0.18rem 0.75rem;
     border-left: 3px solid transparent;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: var(--text-primary);
   }
   .child-row.washed {
