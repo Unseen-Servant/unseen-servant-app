@@ -28,7 +28,7 @@
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
-  import { searchCurationFilter, searchGameSystemsFilter, searchSourcePathsFilter, UNTAGGED_KEY, type CurationKey, type ScopeRef } from '../lib/searchScope';
+  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, type CurationKey, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
   import {
@@ -142,25 +142,30 @@
     persistCollectionsSort();
   }
 
-  // Library narrowing — one model, three axes, DAW semantics on each:
-  // solos union within an axis, axes intersect, solo overrides mute.
+  // Library narrowing — the scope doctrine (docs/specs/scope/
+  // 2026-08-08-solo-mute-play-doctrine-design.md): the transport arms
+  // material into the mix; S narrows within what's armed; M carves out
+  // of it. playingCollections ∪-minus-mutedCollectionNames resolve to
+  // the mix (the universe); three axes narrow within it by
+  // intersection, each with DAW semantics (solos union within the
+  // axis, solo overrides mute):
   //   - systems axis:    filterExcludedSystems (muted) + soloedSystems.
-  //   - collection axis: scopeMutes + scopeSolos, keyed by
-  //     path (tree folders and files), plus playingCollections — names
-  //     armed by the panel's play/stop transport, which join the solo
-  //     side (play = "this track is in the scope").
-  //   - curation axis:   soloCuration + mutedCuration over the two-value
-  //     collected/loose domain. Soloing Collected is the old "show only
-  //     collection"; soloing Loose the old "show only loose".
-  // All seven are session-scoped: they reset on app launch (no Tauri
-  // store persistence), so each session starts with a clean library.
+  //   - path axis:       scopeSolos + scopeMutes, keyed by tree
+  //     folder/file path.
+  //   - curation axis:   soloCuration + mutedCuration over the
+  //     collected/loose domain.
+  // The whole console persists across launches ("full console recall")
+  // via the scopeConsole store key.
   let filterExcludedSystems = new Set<string>();
   let soloedSystems = new Set<string>();
   let scopeSolos = new Map<string, ScopeRef>();
   let scopeMutes = new Map<string, ScopeRef>();
   let playingCollections = new Set<string>();
+  let mutedCollectionNames = new Set<string>();
   let soloCuration = new Set<CurationKey>();
   let mutedCuration = new Set<CurationKey>();
+  // Focus lens — hide out-of-scope rows on browsing surfaces.
+  let hideOutOfScope = false;
 
   // Display-only hidden flag. Stores explicitly-hidden paths (files or
   // folder roots); descendants of a hidden folder are hidden via prefix
@@ -268,6 +273,15 @@
   $: collectionMutes = isCollectionEditMode
     ? []
     : [...scopeMutes].map(([key, ref]) => ({ key, label: ref.label, color: null }));
+  // Collection-track mutes chip like plays — pigment ribbon, mute
+  // dressing. Never suppressed: mute wins over play on the mix layer.
+  $: collectionTrackMutes = isCollectionEditMode
+    ? []
+    : [...mutedCollectionNames].map((name) => ({
+        key: name,
+        label: name,
+        color: collections[name]?.color || null,
+      }));
   function handleClearCollectionSolo(key: string) {
     scopeSolos.delete(key);
     scopeSolos = scopeSolos;
@@ -298,71 +312,53 @@
     return m;
   })();
 
-  // Collection-axis narrowing resolved to a backend include-list (null =
-  // no narrowing on this axis).
+  // Path-axis solo/mute Maps resolved to raw file-path arrays. The
+  // universe restriction (solo ∩ mix) happens inside resolveScopeSet.
   //
-  // Plain function, not just a `$:` value: the S/M and play toggles call
-  // runSearch synchronously after mutating their state, and derived
-  // values don't flush until the end of the microtask — runSearch must
-  // compute the include-list fresh. The reactive mirror below feeds
-  // display consumers (searchableFileCount) with its dependencies
-  // spelled out.
-  function computeCollectionAxisInclude(
-    solos: Map<string, ScopeRef>,
-    mutes: Map<string, ScopeRef>,
-    playing: Set<string>,
-    cols: Record<string, CollectionInfo>,
-    indexed: Set<string>
-  ): string[] | null {
+  // Plain function, not a `$:` value: the S/M and transport toggles
+  // call runSearch synchronously after mutating their state, and
+  // derived values don't flush until the end of the microtask.
+  function scopeRefSets(solos: Map<string, ScopeRef>, mutes: Map<string, ScopeRef>) {
     const refFiles = (key: string, kind: ScopeRef['kind']) =>
       kind === 'folder'
         ? indexedPdfsUnderPath(key)
-        : indexed.has(key) ? [key] : [];
-    const soloSets = [...solos].map(([p, r]) => refFiles(p, r.kind));
-    // Playing collections join the solo side: several playing tracks
-    // union together, and any play overrides the mutes.
-    for (const name of playing) {
-      if (cols[name]) soloSets.push(cols[name].file_paths.filter((p) => indexed.has(p)));
-    }
-    const muteSets = [...mutes].map(([p, r]) => refFiles(p, r.kind));
-    return searchSourcePathsFilter(soloSets, muteSets, indexed);
+        : indexedPaths.has(key) ? [key] : [];
+    return {
+      soloSets: [...solos].map(([p, r]) => refFiles(p, r.kind)),
+      muteSets: [...mutes].map(([p, r]) => refFiles(p, r.kind)),
+    };
   }
-  $: collectionAxisInclude = computeCollectionAxisInclude(
-    scopeSolos, scopeMutes, playingCollections, collections, indexedPaths
-  );
 
-  // The "of N files" denominator in the SearchScopeBar — mirrors the same
-  // narrowing primitives runSearch passes to the backend (collection
-  // axis, then curation axis, then system exclusion). When no filters
-  // are set, this collapses to the full indexed-paths count.
-  $: searchableFileCount = (() => {
-    let universe = collectionAxisInclude ?? Array.from(indexedPathsSet);
-    const curationInclude = searchCurationFilter(
-      soloCuration, mutedCuration, collectedPaths, indexedPathsSet
+  const EMPTY_SYSTEMS = new Set<string>();
+  const EMPTY_TAGS = new Map<string, string[]>();
+
+  // The resolved scope — mix ∩ all three axes — as the display sees it.
+  // null = nothing engaged, every indexed file is in scope. Drives the
+  // scope-bar denominator and every surface's out-of-scope dimming.
+  $: resolvedScopeSet = (() => {
+    const { soloSets, muteSets } = scopeRefSets(scopeSolos, scopeMutes);
+    return resolveScopeSet(
+      resolveMix(playingCollections, mutedCollectionNames, collections, indexedPaths),
+      soloSets,
+      muteSets,
+      soloCuration,
+      mutedCuration,
+      collectedPaths,
+      soloedSystems,
+      filterExcludedSystems,
+      effectiveGameSystemMap,
+      indexedPaths
     );
-    if (curationInclude !== null) {
-      const cur = new Set(curationInclude);
-      universe = universe.filter((p) => cur.has(p));
-    }
-    if (filterExcludedSystems.size === 0 && soloedSystems.size === 0) return universe.length;
-    // A file passes when at least one of its tags survives the active
-    // filter — matches the include-list semantics of `gameSystems` in
-    // runSearch. Solo overrides mute when active; under solos, untagged
-    // files (no tags) never pass. Under mute, untagged files pass unless
-    // the Untagged bucket itself is muted (issue #307).
-    let count = 0;
-    for (const path of universe) {
-      const tags = effectiveGameSystemMap.get(path) ?? [];
-      if (soloedSystems.size > 0) {
-        if (tags.some((t) => soloedSystems.has(t))) count++;
-      } else if (tags.length === 0) {
-        if (!filterExcludedSystems.has(UNTAGGED_KEY)) count++;
-      } else if (tags.some((t) => !filterExcludedSystems.has(t))) {
-        count++;
-      }
-    }
-    return count;
   })();
+  $: searchableFileCount = resolvedScopeSet !== null ? resolvedScopeSet.size : indexedPathsSet.size;
+  // In-scope files plus their ancestor folders — the tree rows that
+  // stay bright. null = no scope engaged, nothing dims.
+  $: scopeBrightPaths = resolvedScopeSet === null
+    ? null
+    : new Set<string>([...resolvedScopeSet, ...computeAncestorPaths(resolvedScopeSet)]);
+  // Folders containing at least one indexed file — the rows the dim
+  // predicate is allowed to speak about.
+  $: indexedFolderPaths = computeAncestorPaths(indexedPaths);
 
   async function runSearch(q: string) {
     const trimmed = q.trim();
@@ -379,48 +375,48 @@
     // surfaces an accurate connection error in the catch below if the
     // sidecar is genuinely unreachable.
 
-    // Collection axis (folder/file solos and mutes, playing
-    // collections). Computed fresh — see computeCollectionAxisInclude
-    // for why the derived value can't be read here.
-    let sourcePaths = computeCollectionAxisInclude(
-      scopeSolos, scopeMutes, playingCollections, collections, indexedPaths
-    );
-
-    // Curation axis (Collected/Loose solos and mutes) intersects into
-    // the same list — axes intersect, and the backend takes one
-    // `source_paths` include-list.
-    const curationInclude = searchCurationFilter(
-      soloCuration, mutedCuration, collectedPaths, indexedPaths
-    );
-    if (curationInclude !== null) {
-      if (sourcePaths === null) {
-        sourcePaths = curationInclude;
-      } else {
-        const cur = new Set(curationInclude);
-        sourcePaths = sourcePaths.filter((p) => cur.has(p));
-      }
-    }
-
-    if (sourcePaths !== null && sourcePaths.length === 0) {
-      searchError = scopeSolos.size > 0 || playingCollections.size > 0 || soloCuration.size > 0
-        ? 'Nothing indexed under the soloed or playing items.'
+    // Mix first: the transport layer resolves before any narrowing.
+    // Computed fresh (not from the deriveds) — toggles call runSearch
+    // synchronously after mutating state; see scopeRefSets.
+    const mix = resolveMix(playingCollections, mutedCollectionNames, collections, indexedPaths);
+    if (mix !== null && mix.size === 0) {
+      searchError = playingCollections.size > 0
+        ? 'Nothing indexed is playing.'
         : 'Everything is muted.';
       searchResults = [];
       isSearching = false;
       return;
     }
 
-    // Library filter resolution (DAW semantics): solo overrides mute;
-    // mute keeps every non-muted system plus the untagged bucket unless
-    // it was muted itself (issue #307 — untagged chunks store
-    // game_system "unknown", so the include-list must name it).
+    // Path + curation axes narrow within the mix. Systems stay out of
+    // this resolution (empty sets) — the backend applies game_systems
+    // per chunk.
+    const { soloSets, muteSets } = scopeRefSets(scopeSolos, scopeMutes);
+    const pathScope = resolveScopeSet(
+      mix, soloSets, muteSets,
+      soloCuration, mutedCuration, collectedPaths,
+      EMPTY_SYSTEMS, EMPTY_SYSTEMS, EMPTY_TAGS, indexedPaths
+    );
+    const sourcePaths = pathScope === null ? null : [...pathScope];
+
+    if (sourcePaths !== null && sourcePaths.length === 0) {
+      searchError = scopeSolos.size > 0 || soloCuration.size > 0
+        ? 'Nothing under the soloed items.'
+        : 'Everything is muted.';
+      searchResults = [];
+      isSearching = false;
+      return;
+    }
+
+    // Systems axis → backend game_systems include-list (issue #307:
+    // the untagged bucket must be named explicitly under mutes).
     const gameSystems = searchGameSystemsFilter(
       soloedSystems,
       filterExcludedSystems,
       gameSystemStats.map((s) => s.name)
     );
     if (gameSystems !== null && gameSystems.length === 0) {
-      searchError = 'All game systems are filtered out.';
+      searchError = 'Everything is muted.';
       searchResults = [];
       isSearching = false;
       return;
@@ -858,15 +854,34 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
+  // Mute a collection — carve its files from the mix (or from the
+  // whole library while the transport is idle). Mute wins over play;
+  // the armed state survives and unmuting restores the contribution.
+  function toggleCollectionMute(name: string) {
+    if (mutedCollectionNames.has(name)) {
+      mutedCollectionNames.delete(name);
+    } else {
+      mutedCollectionNames.add(name);
+    }
+    mutedCollectionNames = mutedCollectionNames;
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  function toggleHideOutOfScope() {
+    hideOutOfScope = !hideOutOfScope;
+  }
+
   // Footer [clear all] in the filter console: resets every solo/mute on
-  // all three axes and stops every playing collection — the same action
-  // as clearing each chip in the scope bar.
+  // all three axes, stops every playing collection, and unmutes every
+  // muted one — the same action as clearing each chip in the scope bar.
+  // The focus lens is a view mode, not a narrowing, so it stays as-is.
   function clearAllFilters() {
     filterExcludedSystems = new Set();
     soloedSystems = new Set();
     scopeSolos = new Map();
     scopeMutes = new Map();
     playingCollections = new Set();
+    mutedCollectionNames = new Set();
     soloCuration = new Set();
     mutedCuration = new Set();
     if (committedQuery) runSearch(committedQuery);
@@ -1383,34 +1398,8 @@
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
-  // The highlight means "in the scope": playing collections' files plus
-  // any folder/file solos take the parchment wash + left rule rather
-  // than filtering everything else out. Ancestors are included so the
-  // highlight propagates up through collapsed folders — without that,
-  // a scattered collection's files would be invisible until every
-  // containing folder was manually expanded. Edit mode handles its own
-  // membership UI (checkboxes) and shouldn't compete with highlights.
-  $: highlightPaths = (() => {
-    if (isCollectionEditMode) return new Set<string>();
-    const files = new Set<string>();
-    for (const name of playingCollections) {
-      const col = collections[name];
-      if (col) for (const p of col.file_paths) files.add(p);
-    }
-    for (const [path, ref] of scopeSolos) {
-      files.add(path);
-      if (ref.kind === 'folder') {
-        const prefix = path + '/';
-        for (const p of indexedPaths) if (p.startsWith(prefix)) files.add(p);
-      }
-    }
-    if (files.size === 0) return files;
-    return new Set<string>([...files, ...computeAncestorPaths(files)]);
-  })();
-
-  // Rows muted on the collection axis dim in the tree (45%, never
-  // hidden). Descendants of a muted folder inherit via prefix match,
-  // same as hiddenPaths.
+  // Lit states for the tree's S/M buttons. The dim itself comes from
+  // scopeBrightPaths (out-of-scope membership), not from these.
   $: mutedScopePaths = new Set(scopeMutes.keys());
   $: soloedScopePaths = new Set(scopeSolos.keys());
 
@@ -1510,7 +1499,9 @@
 
   // Flat list of currently-visible tree rows for keyboard nav. Mirrors what
   // FileTree renders, so consecutive entries here are visually adjacent.
-  $: visibleTreeRows = computeVisibleRows(files, expandedPaths, displayPaths, hiddenPaths, showHidden);
+  $: visibleTreeRows = computeVisibleRows(files, expandedPaths, displayPaths, hiddenPaths, showHidden, {
+    scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope,
+  });
 
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string[]> {
     const map = new Map<string, string[]>();
@@ -2645,6 +2636,11 @@
         playingCollections.add(newName);
         playingCollections = playingCollections;
       }
+      if (mutedCollectionNames.has(name)) {
+        mutedCollectionNames.delete(name);
+        mutedCollectionNames.add(newName);
+        mutedCollectionNames = mutedCollectionNames;
+      }
       // Custom sort order follows the rename in place.
       if (collectionsCustomOrder.includes(name)) {
         collectionsCustomOrder = collectionsCustomOrder.map((n) => (n === name ? newName : n));
@@ -2926,6 +2922,7 @@
               {draftName}
               editFileCount={collectionEditPaths.size}
               playingNames={playingCollections}
+              mutedNames={mutedCollectionNames}
               gameSystemMap={effectiveGameSystemMap}
               sortKey={collectionsSortKey}
               customOrder={collectionsCustomOrder}
@@ -2939,6 +2936,7 @@
               onRename={renameCollection}
               onSetColor={setCollectionColor}
               onTogglePlay={togglePlayCollection}
+              onToggleMute={toggleCollectionMute}
               onSetSortKey={setCollectionsSortKey}
               onReorder={reorderCollections}
               focusedName={focusedCollectionName}
@@ -2958,6 +2956,8 @@
               {hiddenCount}
               onToggleShowHidden={toggleShowHidden}
               onClearHidden={clearHidden}
+              {hideOutOfScope}
+              onToggleHideOutOfScope={toggleHideOutOfScope}
               showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
               {collectedCount}
               {uncollectedCount}
@@ -2981,6 +2981,7 @@
           {collectionPlays}
           {collectionSolos}
           {collectionMutes}
+          {collectionTrackMutes}
           excludedSystems={filterExcludedSystems}
           {soloedSystems}
           curationSolos={soloCuration}
@@ -2993,6 +2994,7 @@
           onClearCollectionPlay={togglePlayCollection}
           onClearCollectionSolo={handleClearCollectionSolo}
           onClearCollectionMute={handleClearCollectionMute}
+          onClearCollectionTrackMute={toggleCollectionMute}
           onToggleSystemFilter={toggleSystemFilter}
           onToggleSystemSolo={toggleSystemSolo}
           onToggleCurationSolo={toggleCurationSolo}
@@ -3036,6 +3038,8 @@
             bind:this={systemsViewComponent}
             entries={indexedEntries}
             {displayPaths}
+            {scopeBrightPaths}
+            {hideOutOfScope}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
             onToggleSystemFilter={toggleSystemFilter}
@@ -3057,6 +3061,9 @@
             onCollectionRemove={handleCollectionRemove}
           />
         {:else}
+          {#if hideOutOfScope && resolvedScopeSet !== null && resolvedScopeSet.size === 0}
+            <div class="scope-empty">Everything is out of scope.</div>
+          {/if}
           {#each files as file (file.path)}
             <FileTree
               item={file}
@@ -3081,6 +3088,9 @@
               {showHidden}
               {soloedScopePaths}
               {mutedScopePaths}
+              {scopeBrightPaths}
+              {indexedFolderPaths}
+              {hideOutOfScope}
               onToggleScopeSolo={toggleScopeSolo}
               onToggleScopeMute={toggleScopeMute}
             />
@@ -3275,6 +3285,12 @@
     overflow-y: auto;
     overflow-anchor: none;
     padding: 0.25rem 0.75rem;
+  }
+
+  .scope-empty {
+    padding: 1rem 0.8rem;
+    font-style: italic;
+    color: var(--text-tertiary);
   }
 
   /* Search mode replaces the scrollable single column with a fixed scope
