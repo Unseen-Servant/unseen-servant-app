@@ -248,7 +248,23 @@
 
     <button class="row" on:click={handleRowClick} on:dblclick={openFile} on:mousedown={handleMouseDown}>
       {#if item.is_dir}
-        <span class="icon folder-icon">{isExpanded ? '\u25BE' : '\u25B8'}</span>
+        <span class="icon arrow" aria-hidden="true">{isExpanded ? '\u25BE' : '\u25B8'}</span>
+        <span class="icon type-icon folder-glyph" aria-hidden="true">
+          <!-- Font Awesome "folder" \u2014 identity lives on the icon, the arrow
+               carries expand state, mirroring the systems view's headers -->
+          <svg viewBox="0 0 512 512" fill="currentColor">
+            <path d="M64 480H448c35.3 0 64-28.7 64-64V160c0-35.3-28.7-64-64-64H288c-10.1 0-19.6-4.7-25.6-12.8L243.2 57.6C231.1 41.5 212.1 32 192 32H64C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64z"/>
+          </svg>
+        </span>
+      {:else}
+        <!-- Phantom arrow slot so file and folder icons form one column -->
+        <span class="icon gutter" aria-hidden="true"></span>
+        <span class="icon type-icon file-glyph" aria-hidden="true">
+          <!-- Font Awesome "book" \u2014 matches systems-view file rows -->
+          <svg viewBox="0 0 640 640" fill="currentColor">
+            <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
+          </svg>
+        </span>
       {/if}
       {#if isRenaming}
         <input
@@ -488,12 +504,42 @@
     margin-right: 0.3rem;
     flex-shrink: 0;
   }
-  .folder-icon {
-    color: var(--text-accent);
-    font-size: 0.85rem;
-    width: 1rem;
+  .arrow {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    width: 0.8rem;
     display: inline-block;
     text-align: center;
+  }
+  .gutter {
+    width: 0.8rem;
+    display: inline-block;
+  }
+  .type-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+  }
+  .type-icon svg {
+    display: block;
+  }
+  /* Parchment = content identity, same as the systems view's die icon. */
+  .folder-glyph {
+    color: var(--text-accent);
+  }
+  /* The 512-grid folder renders optically larger than 640-grid icons
+     (those pad 64px per side), so it gets a smaller box. */
+  .folder-glyph svg {
+    width: 11px;
+    height: 11px;
+  }
+  .file-glyph {
+    color: var(--text-secondary);
+  }
+  .file-glyph svg {
+    width: 13px;
+    height: 13px;
   }
   .name {
     overflow: hidden;
