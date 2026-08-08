@@ -1042,7 +1042,8 @@
   }
 
   /* Expanded file rows — the collection's contents, indented under the
-     folder row. A playing collection's files take the wash too. */
+     folder row. A playing collection's files take the wash and the
+     purple rule too, so the armed block reads as one track. */
   .child-row {
     display: flex;
     align-items: center;
@@ -1054,6 +1055,7 @@
   }
   .child-row.washed {
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
   }
   .child-row.dimmed {
     opacity: var(--opacity-out-of-scope);
