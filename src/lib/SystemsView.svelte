@@ -331,14 +331,16 @@
       return;
     }
 
-    if (event.key === 'Enter' && !isCollectionEditMode) {
+    // Space is the row's primary action, same grammar as the tree and
+    // the collection transport: open the PDF — or, while editing a
+    // collection, toggle the row's membership checkbox.
+    if (event.key === ' ') {
       event.preventDefault();
-      handleDoubleClick(focused.entry);
-      return;
-    }
-    if (event.key === ' ' && isCollectionEditMode) {
-      event.preventDefault();
-      handleCheckboxClick({ shiftKey: false, stopPropagation: () => {} } as MouseEvent, focused.entry, focused.tag, groups.find((g) => g.tag === focused.tag)?.entries ?? []);
+      if (isCollectionEditMode) {
+        handleCheckboxClick({ shiftKey: false, stopPropagation: () => {} } as MouseEvent, focused.entry, focused.tag, groups.find((g) => g.tag === focused.tag)?.entries ?? []);
+      } else {
+        handleDoubleClick(focused.entry);
+      }
       return;
     }
   }

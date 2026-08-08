@@ -356,8 +356,15 @@
     }
     if (bareLetter) {
       if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
-      // A shelved track has no transport — unarchive to play.
-      if (lk === 'p' && !col.archived) { event.preventDefault(); onTogglePlay(col.name); return; }
+      // P or Space toggle the transport — Space is the DAW play/stop
+      // convention, shared with file rows (where it opens). A shelved
+      // track has no transport, so both are inert until unarchived
+      // (Space still swallowed so the list doesn't scroll).
+      if (lk === 'p' || lk === ' ') {
+        event.preventDefault();
+        if (!col.archived) onTogglePlay(col.name);
+        return;
+      }
       if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
     }
   }

@@ -1749,15 +1749,19 @@
       return true;
     }
 
+    // Space is the row's primary action, same grammar as the collection
+    // transport: open the focused file / toggle the focused folder.
+    // Enter takes the indexing checkbox (the old Space role) so the
+    // selection toggle keeps a key.
     if (event.key === ' ') {
       event.preventDefault();
-      toogleSelection(row.path, row.item.is_dir, row.item, false);
+      activateFocusedTreeRow();
       return true;
     }
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      activateFocusedTreeRow();
+      toogleSelection(row.path, row.item.is_dir, row.item, false);
       return true;
     }
 

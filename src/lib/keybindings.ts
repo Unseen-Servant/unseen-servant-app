@@ -62,8 +62,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.end',              keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
   { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
-  { id: 'tree.toggleSelect',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
-  { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
+  { id: 'tree.activate',         keys: { mac: 'Space',other: 'Space' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
+  { id: 'tree.toggleSelect',     keys: { mac: '↵',    other: 'Enter' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
   { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Reveal row in OS file explorer', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
@@ -73,6 +73,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree' },
 
   // Systems view (when a row is focused)
+  { id: 'systems.activate',      keys: { mac: 'Space',other: 'Space' },         label: 'Open file (toggle membership while editing)', scope: 'systemsView' },
   { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView' },
   { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView' },
 
@@ -81,7 +82,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'collections' },
   { id: 'collections.home',      keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'collections' },
   { id: 'collections.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
-  { id: 'collections.play',      keys: { mac: 'P',    other: 'P' },             label: 'Play / stop focused collection', scope: 'collections' },
+  { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections' },
   { id: 'collections.rename',    keys: { mac: 'F2',   other: 'F2' },            label: 'Rename collection',            scope: 'collections' },
   { id: 'collections.editFiles', keys: { mac: 'F',    other: 'F' },             label: 'Edit collection files',        scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
