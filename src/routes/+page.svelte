@@ -2355,15 +2355,44 @@
     return updated;
   }
 
+  // Path solo/mute migration for renames — unlike updatePathPrefix (which
+  // only re-keys descendants), a scope ref can be keyed exactly at the
+  // renamed path itself, so that entry moves too and picks up the new
+  // basename as its label. Descendant entries (folder rename only) keep
+  // their own basename — only their ancestor's segment of the path changed.
+  function updateScopeRefMap(
+    map: Map<string, ScopeRef>,
+    oldPath: string,
+    newPath: string,
+    newLabel: string
+  ): { result: Map<string, ScopeRef>; changed: boolean } {
+    const childPrefix = oldPath + '/';
+    let changed = false;
+    const updated = new Map<string, ScopeRef>();
+    for (const [path, ref] of map) {
+      if (path === oldPath) {
+        updated.set(newPath, { ...ref, label: newLabel });
+        changed = true;
+      } else if (path.startsWith(childPrefix)) {
+        updated.set(newPath + path.slice(oldPath.length), ref);
+        changed = true;
+      } else {
+        updated.set(path, ref);
+      }
+    }
+    return { result: updated, changed };
+  }
+
   async function handleRenameSubmit(oldPath: string, newName: string, isDir: boolean = false) {
     try {
+      let newPath: string;
       if (isDir) {
-        const newPath = await invoke<string>('rename_folder', { oldPath, newName });
+        newPath = await invoke<string>('rename_folder', { oldPath, newName });
         selectedPaths = updatePathPrefix(selectedPaths, oldPath, newPath);
         syncedPaths = updatePathPrefix(syncedPaths, oldPath, newPath);
         expandedPaths = updatePathPrefix(expandedPaths, oldPath, newPath);
       } else {
-        const newPath = await invoke<string>('rename_file', { oldPath, newName });
+        newPath = await invoke<string>('rename_file', { oldPath, newName });
         if (focusedFilePath === oldPath) focusedFilePath = newPath;
         // Swap the path in selectedPaths so compute_diff can match old→new by content hash
         if (selectedPaths.has(oldPath)) {
@@ -2371,6 +2400,18 @@
           selectedPaths.add(newPath);
           selectedPaths = selectedPaths;
         }
+      }
+      // Scope solos/mutes follow the rename too — same treatment
+      // renameCollection gives its name sets. Without this, a soloed
+      // folder renamed in-app leaves a stale ref that empties the scope
+      // on a path that's still live.
+      const soloUpdate = updateScopeRefMap(scopeSolos, oldPath, newPath, newName);
+      const muteUpdate = updateScopeRefMap(scopeMutes, oldPath, newPath, newName);
+      if (soloUpdate.changed) scopeSolos = soloUpdate.result;
+      if (muteUpdate.changed) scopeMutes = muteUpdate.result;
+      if (soloUpdate.changed || muteUpdate.changed) {
+        persistScopeConsole();
+        if (committedQuery) runSearch(committedQuery);
       }
       renamingFilePath = null;
       if (selectedFolder) await loadFiles(selectedFolder);
