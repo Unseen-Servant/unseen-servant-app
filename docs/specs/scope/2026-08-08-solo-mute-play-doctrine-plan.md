@@ -1349,7 +1349,7 @@ Add near the other persist helpers (e.g. after `persistHidden`, ~line 890):
 
 Add a `persistScopeConsole();` call (fire-and-forget, before the `runSearch` line where one exists) at the end of each of: `toggleSystemFilter`, `toggleSystemSolo`, `toggleScopeSolo`, `toggleScopeMute`, `togglePlayCollection`, `toggleCollectionMute`, `toggleCurationSolo`, `toggleCurationMute`, `toggleHideOutOfScope`, `clearAllFilters`, and in `renameCollection` directly after the two migration blocks.
 
-In `onMount`, **after** the old curation-radio migration block (~line 666, so recall wins over the one-time migration) and before `await loadCollections();`, add:
+In `onMount`, **after** `await loadCollections();` (Task 11 review: `resolveMix` lets names with no matching collection resolve away, so restoring the console before collections load would make every restored name briefly a ghost — restore after the collections are in), and in any case after the old curation-radio migration block so recall wins over the one-time migration, add:
 
 ```ts
       // Full console recall — the session reopens as it was left.
@@ -1367,15 +1367,29 @@ In `onMount`, **after** the old curation-radio migration block (~line 666, so re
       }
 ```
 
-- [ ] **Step 6: Verify**
+- [ ] **Step 6: Lens indicator chip** (added after Task 11 review)
 
-Run: `npm run check && npm test`
+A persisted lens is a trap without a visible indicator: launch with the
+lens on and the filter console closed, and part of the tree is silently
+missing. Mirror the existing `showHidden` chip in
+`src/lib/SearchScopeBar.svelte` (the `chip hidden-on` block): add props
+`hideOutOfScope: boolean = false` / `onToggleHideOutOfScope: () => void = () => {}`,
+and next to the showHidden chip render, when `hideOutOfScope` is true, a
+`chip lens-on` button labeled `lens on` (title "Show out-of-scope items
+again") that calls `onToggleHideOutOfScope`. Style `.chip.lens-on` like
+`.chip.hidden-on` but with `--text-active` (purple — a mode) instead of
+that chip's hue. Wire both props at the `<SearchScopeBar>` call site in
+`+page.svelte`.
+
+- [ ] **Step 7: Verify**
+
+Run: `npm run check && npm test && npm run lint:css`
 Expected: clean, all tests green.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/lib/scopeConsole.ts src/lib/scopeConsole.test.ts src/routes/+page.svelte
+git add src/lib/scopeConsole.ts src/lib/scopeConsole.test.ts src/lib/SearchScopeBar.svelte src/routes/+page.svelte
 git commit -m "feat(scope): full console recall — solo/mute/play/lens persist across launches"
 ```
 
