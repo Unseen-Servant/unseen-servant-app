@@ -487,7 +487,7 @@
   .row {
     display: flex;
     align-items: center;
-    padding: 0.2rem 0.25rem;
+    padding: 0.25rem;
     cursor: pointer;
     background: none;
     border: none;
@@ -495,6 +495,9 @@
     flex: 1;
     text-align: left;
     font-size: 0.95rem;
+    /* Buttons don't inherit body line-height; set it so rows share the
+       systems view's vertical rhythm. */
+    line-height: 1.5;
     font-family: var(--font-body);
     color: var(--text-primary);
     -webkit-user-select: none;
