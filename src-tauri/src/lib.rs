@@ -181,7 +181,6 @@ struct CollectionInfo {
 struct CollectionsResult {
     collections: std::collections::HashMap<String, CollectionInfo>,
     count: u32,
-    active_context: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -193,11 +192,6 @@ struct CollectionMutationResult {
 #[derive(Serialize, Deserialize, Debug)]
 struct CollectionDeleteResult {
     message: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ActiveContextResult {
-    active_context: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1137,76 +1131,6 @@ async fn delete_collection(name: String) -> Result<CollectionDeleteResult, Strin
     Ok(result)
 }
 
-#[tauri::command]
-async fn get_active_context() -> Result<ActiveContextResult, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .get(format!("{}/api/active-context", sidecar_url()))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Sidecar error ({}): {}", status, body));
-    }
-
-    let result: ActiveContextResult = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
-
-    Ok(result)
-}
-
-#[tauri::command]
-async fn set_active_context(name: String) -> Result<ActiveContextResult, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{}/api/active-context", sidecar_url()))
-        .json(&serde_json::json!({ "name": name }))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Sidecar error ({}): {}", status, body));
-    }
-
-    let result: ActiveContextResult = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
-
-    Ok(result)
-}
-
-#[tauri::command]
-async fn clear_active_context() -> Result<ActiveContextResult, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .delete(format!("{}/api/active-context", sidecar_url()))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Sidecar error ({}): {}", status, body));
-    }
-
-    let result: ActiveContextResult = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
-
-    Ok(result)
-}
-
 // ---------------------------------------------------------------------------
 // Tauri commands — file management
 // ---------------------------------------------------------------------------
@@ -1677,9 +1601,6 @@ pub fn run() {
             rename_collection,
             delete_collection,
             get_sidecar_failure,
-            get_active_context,
-            set_active_context,
-            clear_active_context,
             search_index,
             get_search_settings,
             update_search_settings

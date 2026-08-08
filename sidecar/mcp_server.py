@@ -239,14 +239,10 @@ async def list_collections() -> str:
     if not collections:
         return "No collections defined yet. Create one in the Legend Lore desktop app."
 
-    active = data.get("active_context")
     lines = [f"Collections ({data['count']}):\n"]
     for name, c in collections.items():
         desc = f" — {c['description']}" if c.get("description") else ""
-        marker = "  ★ " if name == active else "  - "
-        lines.append(f"{marker}{name} ({c['file_count']} files){desc}")
-    if active:
-        lines.append(f"\nActive context: {active} (★)")
+        lines.append(f"  - {name} ({c['file_count']} files){desc}")
     return "\n".join(lines)
 
 
@@ -257,17 +253,12 @@ async def search_library(
     source_filter: str | None = None,
     game_system: str | None = None,
     collection: str | None = None,
-    search_all: bool = False,
 ) -> str:
     """Search your TTRPG PDF library for relevant content.
 
     This should be your FIRST action when the user asks about any rules,
     lore, or game content. Always search before telling the user something
     isn't available.
-
-    If the user has set an active context in the desktop app, this tool
-    auto-scopes to that collection unless `collection` is passed explicitly
-    or `search_all=True`.
 
     Args:
         query: What to search for (e.g., "grappling rules",
@@ -286,11 +277,8 @@ async def search_library(
                      available systems.
         collection: Optional collection name to search within
                     (see list_collections for available collections).
-                    Overrides any active context.
-        search_all: Set to True to bypass the active context and
-                    search the entire library.
     """
-    payload = {"query": query, "n_results": n_results, "search_all": search_all}
+    payload = {"query": query, "n_results": n_results}
     if source_filter:
         payload["source_filter"] = source_filter
     if game_system:
@@ -302,10 +290,6 @@ async def search_library(
     if isinstance(data, str):
         return data  # Error message
 
-    notice = ""
-    if data.get("auto_scoped") and data.get("effective_collection"):
-        notice = f"[Active context: {data['effective_collection']}]\n\n"
-
     # The server's `message` explains empty results (bad filter value,
     # empty collection) and carries filter-resolution notes — surface it
     # instead of swallowing it into a generic line (issue #309).
@@ -314,8 +298,8 @@ async def search_library(
     results = data.get("results", [])
     if not results:
         if server_note:
-            return f"{notice}{server_note}"
-        return f"{notice}No results found for: {query}"
+            return server_note
+        return f"No results found for: {query}"
 
     # Ordinal tiers, not raw scores (issues #306/#310): the underlying
     # numbers come from two different scales (cross-encoder sigmoid vs
@@ -324,15 +308,15 @@ async def search_library(
     # but flagged so the model doesn't synthesize an answer from noise.
     all_weak = all(r.get("tier") == "weak" for r in results)
 
-    lines = [f"{notice}Found {len(results)} result(s) for \"{query}\":\n"]
+    lines = [f"Found {len(results)} result(s) for \"{query}\":\n"]
     if server_note:
         lines.insert(1, f"[{server_note}]\n")
     if all_weak:
         lines.insert(0, (
             "No strong matches — every result below scored poorly. The "
             "content may not be indexed, or may be outside the current "
-            "scope (active context, game_system, or source filters). "
-            "Consider retrying with search_all=True or without filters.\n"
+            "scope (collection, game_system, or source filters). "
+            "Consider retrying without filters.\n"
         ))
 
     weak_divider_emitted = False
@@ -363,19 +347,12 @@ async def search_library(
 
 
 @mcp.tool()
-async def list_sources(show_all: bool = False) -> str:
+async def list_sources() -> str:
     """List all indexed TTRPG sourcebooks in the library.
 
     Shows every PDF that has been indexed, along with how many
     text chunks each one contains. Use this to see what's available
     before searching.
-
-    If the user has set an active context, output is scoped to that
-    collection's files unless `show_all=True`.
-
-    Args:
-        show_all: Set to True to bypass the active context and
-                  list every indexed source.
     """
     data = await sidecar.get("/api/sources")
     if isinstance(data, str):
@@ -385,20 +362,7 @@ async def list_sources(show_all: bool = False) -> str:
     if not sources:
         return "No documents indexed yet. Open the Legend Lore app and index some PDFs first."
 
-    notice = ""
-    if not show_all:
-        cdata = await sidecar.get("/api/collections")
-        if isinstance(cdata, dict):
-            active = cdata.get("active_context")
-            if active and active in cdata.get("collections", {}):
-                allowed_paths = set(cdata["collections"][active].get("file_paths", []))
-                sources = [s for s in sources if s.get("source") in allowed_paths]
-                notice = f"[Active context: {active}]\n\n"
-
-    if not sources:
-        return f"{notice}No sources match the active context."
-
-    lines = [f"{notice}Indexed library: {len(sources)} document(s)\n"]
+    lines = [f"Indexed library: {len(sources)} document(s)\n"]
     for s in sources:
         systems = s.get("game_systems") or ([s["game_system"]] if s.get("game_system") else [])
         system_tag = f" [{', '.join(systems)}]" if systems else ""

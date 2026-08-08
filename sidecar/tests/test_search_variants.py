@@ -70,7 +70,6 @@ def _search(client, **overrides):
         "query": "owl bear",
         "n_results": 5,
         "rerank": False,
-        "search_all": True,
         "variant_expansion": True,
         **overrides,
     }
@@ -109,7 +108,7 @@ def test_expansion_defaults_off(capture_client):
     client, captured = capture_client
     payload = {
         "query": "owl bear", "n_results": 5,
-        "rerank": False, "search_all": True,
+        "rerank": False,
     }
     resp = client.post("/api/search", json=payload)
     assert resp.status_code == 200, resp.text

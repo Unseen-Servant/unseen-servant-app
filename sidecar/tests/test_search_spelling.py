@@ -58,7 +58,6 @@ def _search(client, **overrides):
         "query": "owlber claws",
         "n_results": 5,
         "rerank": False,
-        "search_all": True,
         **overrides,
     }
     resp = client.post("/api/search", json=payload)

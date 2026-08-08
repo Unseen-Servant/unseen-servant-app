@@ -115,7 +115,6 @@ def _search(client, **overrides):
         "query": "Fireball damage in 5E SRD",
         "n_results": 2,
         "rerank": False,
-        "search_all": True,
         **overrides,
     }
     resp = client.post("/api/search", json=payload)

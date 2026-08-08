@@ -98,8 +98,8 @@ Legend Lore is built around three ideas:
 ### MCP integration (Claude Desktop)
 
 - `search_library` — semantic search scoped by system, source, or collection
-- `list_sources` — indexed PDFs with chunk counts; respects active collection
-- `list_collections` — curated collections with active-context marker
+- `list_sources` — indexed PDFs with chunk counts
+- `list_collections` — curated collections with file counts and descriptions
 - `list_game_systems` — game systems detected across the library
 - Results report match tiers (strong/good/weak) so Claude knows when to trust them, and
   near-miss filter values (typos, partial names) resolve to the closest match instead of

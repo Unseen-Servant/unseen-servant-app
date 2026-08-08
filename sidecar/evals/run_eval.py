@@ -112,7 +112,7 @@ def warmup(
     Ollama embed session, spell-correction vocab) don't pollute the first
     query's latency."""
     client.post("/api/search", json={
-        "query": "warmup", "n_results": 1, "search_all": True,
+        "query": "warmup", "n_results": 1,
         "rerank": rerank, "hybrid": hybrid,
         "spell_correction": spell_correction,
         "variant_expansion": variant_expansion,
@@ -129,7 +129,6 @@ def run(
         payload = {
             "query": q["text"],
             "n_results": page_size,
-            "search_all": True,
             "rerank": rerank,
             "hybrid": hybrid,
             "spell_correction": spell_correction,

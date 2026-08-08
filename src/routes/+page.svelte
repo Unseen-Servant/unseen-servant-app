@@ -2344,18 +2344,6 @@
     try {
       const result = await invoke<CollectionsResult>('get_collections');
       collections = result.collections;
-      // The star/active-context UX is gone — play/stop is the only
-      // collection scoping in the app. A context persisted by an older
-      // version would still auto-scope backend and MCP searches with
-      // nothing in the UI showing it, so convert it once: the old star
-      // starts playing, and the backend pointer clears.
-      if (result.active_context) {
-        playingCollections.add(result.active_context);
-        playingCollections = playingCollections;
-        invoke('clear_active_context').catch((e) =>
-          console.log('Could not clear legacy active context:', e)
-        );
-      }
     } catch (e) {
       console.log('Could not fetch collections:', e);
     }

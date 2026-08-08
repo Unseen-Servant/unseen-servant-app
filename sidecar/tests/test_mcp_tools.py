@@ -172,56 +172,6 @@ async def test_search_library_with_game_system(mock_sidecar):
     assert captured.get("game_system") == "D&D 5E"
 
 
-@pytest.mark.asyncio
-async def test_search_library_prepends_notice_when_auto_scoped(mock_sidecar):
-    """When sidecar reports auto_scoped=true, the result starts with the notice."""
-    mock_sidecar.set_post("/api/search", {
-        "results": [{
-            "text": "Strahd is a vampire lord.",
-            "filename": "cos.pdf",
-            "source": "/cos.pdf",
-            "game_system": "D&D 5E",
-            "relevance": 0.9,
-        }],
-        "effective_collection": "Curse of Strahd",
-        "auto_scoped": True,
-    })
-    result = await search_library("strahd")
-    assert result.startswith("[Active context: Curse of Strahd]")
-
-
-@pytest.mark.asyncio
-async def test_search_library_no_notice_when_explicit_collection(mock_sidecar):
-    """No notice when the caller passed an explicit collection."""
-    mock_sidecar.set_post("/api/search", {
-        "results": [{
-            "text": "x",
-            "filename": "x.pdf",
-            "source": "/x.pdf",
-            "game_system": "D&D 5E",
-            "relevance": 0.5,
-        }],
-        "effective_collection": "Strahd",
-        "auto_scoped": False,
-    })
-    result = await search_library("anything", collection="Strahd")
-    assert "Active context" not in result
-
-
-@pytest.mark.asyncio
-async def test_search_library_passes_search_all(mock_sidecar):
-    """search_all=True is forwarded to the sidecar."""
-    captured = {}
-
-    def capture_payload(json_data):
-        captured.update(json_data)
-        return {"results": []}
-
-    mock_sidecar.set_post("/api/search", capture_payload)
-    await search_library("anything", search_all=True)
-    assert captured.get("search_all") is True
-
-
 # ---------------------------------------------------------------------------
 # search_library — tiers instead of raw scores (issues #306/#310)
 # ---------------------------------------------------------------------------
@@ -278,7 +228,7 @@ async def test_search_library_all_weak_prefaces_warning(mock_sidecar):
     result = await search_library("eldritch blast")
     head = result[:250]
     assert "No strong matches" in head
-    assert "search_all" in result
+    assert "without filters" in result
 
 
 @pytest.mark.asyncio
@@ -295,22 +245,22 @@ async def test_search_library_no_divider_when_all_strong(mock_sidecar):
 
 
 # ---------------------------------------------------------------------------
-# list_collections — active context marker
+# list_collections
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_list_collections_marks_active(mock_sidecar):
+async def test_list_collections_plain_listing(mock_sidecar):
     mock_sidecar.set_get("/api/collections", {
         "collections": {
             "Strahd": {"name": "Strahd", "file_count": 3, "description": ""},
-            "Pathfinder": {"name": "Pathfinder", "file_count": 5, "description": ""},
+            "Pathfinder": {"name": "Pathfinder", "file_count": 5, "description": "PF2e books"},
         },
         "count": 2,
-        "active_context": "Strahd",
     })
     result = await list_collections()
-    assert "★" in result
-    assert "Active context: Strahd" in result
+    assert "Strahd (3 files)" in result
+    assert "Pathfinder (5 files) — PF2e books" in result
+    assert "★" not in result
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ export interface VisibleRow {
 }
 
 // Flattens the file tree into the rows the user can actually navigate to,
-// respecting expansion state, the optional active-context filter, and the
+// respecting expansion state, the optional collection filter, and the
 // hidden-paths rule (descendants of a hidden ancestor stay hidden unless
 // `showHidden` is on). Order matches the rendered DOM order, so consecutive
 // rows here are visually adjacent.
