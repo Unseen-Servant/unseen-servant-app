@@ -7,7 +7,7 @@
   import { pdfFileUrl } from '../lib/pdfUrl';
   import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, ActiveContextResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
+  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
   import FileTree from '../lib/FileTree.svelte';
   import ContextMenu from '../lib/ContextMenu.svelte';
@@ -110,7 +110,6 @@
   let collectionEditPaths = new Set<string>();
   let collectionEditName = '';
   let collectionEditDescription = '';
-  let activeContextName: string | null = null;
   let collectionsPanelOpen = true;
   // The filter panel docks below the collections panel in the left pane;
   // both persist across launches independently.
@@ -147,17 +146,19 @@
   // solos union within an axis, axes intersect, solo overrides mute.
   //   - systems axis:    filterExcludedSystems (muted) + soloedSystems.
   //   - collection axis: mutedCollections + soloCollections, keyed by
-  //     path (tree folders and files); the active collection joins the
-  //     solo side via its own backend state (activeContextName).
+  //     path (tree folders and files), plus playingCollections — names
+  //     armed by the panel's play/stop transport, which join the solo
+  //     side (play = "this track is in the scope").
   //   - curation axis:   soloCuration + mutedCuration over the two-value
   //     collected/loose domain. Soloing Collected is the old "show only
   //     collection"; soloing Loose the old "show only loose".
-  // All six are session-scoped: they reset on app launch (no Tauri
+  // All seven are session-scoped: they reset on app launch (no Tauri
   // store persistence), so each session starts with a clean library.
   let filterExcludedSystems = new Set<string>();
   let soloedSystems = new Set<string>();
   let soloCollections = new Map<string, ScopeRef>();
   let mutedCollections = new Map<string, ScopeRef>();
+  let playingCollections = new Set<string>();
   let soloCuration = new Set<CurationKey>();
   let mutedCuration = new Set<CurationKey>();
 
@@ -248,47 +249,26 @@
     selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
   }
   $: selectedResult = searchResults.length > 0 ? searchResults[selectedResultIndex] ?? null : null;
-  // The active collection surfaces as a solo chip on the collection
-  // axis (its bookmark takes the collection pigment); folder/file solos
-  // and mutes ride along with the tertiary fallback. Clearing the
-  // active-collection chip must clear the backend context, so it gets a
-  // sentinel key that can't collide with an absolute path.
-  const ACTIVE_CONTEXT_CHIP_KEY = 'active-context';
-  $: collectionSolos = (() => {
-    if (isCollectionEditMode) return [];
-    const chips: { key: string; label: string; color: string | null }[] = [];
-    if (activeContextName) {
-      chips.push({
-        key: ACTIVE_CONTEXT_CHIP_KEY,
-        label: activeContextName,
+  // A playing collection materializes a chip exactly as a solo does —
+  // its bookmark takes the collection pigment — with the "play" prefix
+  // naming the transport that armed it. Clicking the chip stops the
+  // track. Folder/file solos and mutes stay on the tertiary fallback.
+  $: collectionPlays = isCollectionEditMode
+    ? []
+    : [...playingCollections].map((name) => ({
+        key: name,
+        label: name,
         // `|| null` (not ??): a cleared pigment is stored as '', which
         // must not reach the chip as a fill value.
-        color: collections[activeContextName]?.color || null,
-      });
-    }
-    // Collection-kind narrowings carry the collection's pigment on their
-    // chip bookmark; folder/file narrowings stay on the tertiary fallback.
-    for (const [key, ref] of soloCollections) {
-      chips.push({
-        key,
-        label: ref.label,
-        color: ref.kind === 'collection' ? collections[key]?.color || null : null,
-      });
-    }
-    return chips;
-  })();
+        color: collections[name]?.color || null,
+      }));
+  $: collectionSolos = isCollectionEditMode
+    ? []
+    : [...soloCollections].map(([key, ref]) => ({ key, label: ref.label, color: null }));
   $: collectionMutes = isCollectionEditMode
     ? []
-    : [...mutedCollections].map(([key, ref]) => ({
-        key,
-        label: ref.label,
-        color: ref.kind === 'collection' ? collections[key]?.color || null : null,
-      }));
+    : [...mutedCollections].map(([key, ref]) => ({ key, label: ref.label, color: null }));
   function handleClearCollectionSolo(key: string) {
-    if (key === ACTIVE_CONTEXT_CHIP_KEY) {
-      clearActiveContext();
-      return;
-    }
     soloCollections.delete(key);
     soloCollections = soloCollections;
     if (committedQuery) runSearch(committedQuery);
@@ -319,39 +299,36 @@
   })();
 
   // Collection-axis narrowing resolved to a backend include-list (null =
-  // no narrowing on this axis). When the active collection is the only
-  // narrowing, stay null: the backend auto-scopes search to the active
-  // context on its own, and solo-overrides-mute makes any mutes moot the
-  // moment a solo (which the active collection is) engages.
+  // no narrowing on this axis).
   //
-  // Plain function, not just a `$:` value: the S/M toggles call runSearch
-  // synchronously after mutating their Maps, and derived values don't
-  // flush until the end of the microtask — runSearch must compute the
-  // include-list fresh. The reactive mirror below feeds display
-  // consumers (searchableFileCount) with its dependencies spelled out.
+  // Plain function, not just a `$:` value: the S/M and play toggles call
+  // runSearch synchronously after mutating their state, and derived
+  // values don't flush until the end of the microtask — runSearch must
+  // compute the include-list fresh. The reactive mirror below feeds
+  // display consumers (searchableFileCount) with its dependencies
+  // spelled out.
   function computeCollectionAxisInclude(
     solos: Map<string, ScopeRef>,
     mutes: Map<string, ScopeRef>,
-    activeName: string | null,
+    playing: Set<string>,
     cols: Record<string, CollectionInfo>,
     indexed: Set<string>
   ): string[] | null {
     const refFiles = (key: string, kind: ScopeRef['kind']) =>
-      kind === 'collection'
-        ? (cols[key]?.file_paths ?? []).filter((p) => indexed.has(p))
-        : kind === 'folder'
-          ? indexedPdfsUnderPath(key)
-          : indexed.has(key) ? [key] : [];
+      kind === 'folder'
+        ? indexedPdfsUnderPath(key)
+        : indexed.has(key) ? [key] : [];
     const soloSets = [...solos].map(([p, r]) => refFiles(p, r.kind));
-    if (activeName && cols[activeName]) {
-      if (soloSets.length === 0) return null;
-      soloSets.push(cols[activeName].file_paths.filter((p) => indexed.has(p)));
+    // Playing collections join the solo side: several playing tracks
+    // union together, and any play overrides the mutes.
+    for (const name of playing) {
+      if (cols[name]) soloSets.push(cols[name].file_paths.filter((p) => indexed.has(p)));
     }
     const muteSets = [...mutes].map(([p, r]) => refFiles(p, r.kind));
     return searchSourcePathsFilter(soloSets, muteSets, indexed);
   }
   $: collectionAxisInclude = computeCollectionAxisInclude(
-    soloCollections, mutedCollections, activeContextName, collections, indexedPaths
+    soloCollections, mutedCollections, playingCollections, collections, indexedPaths
   );
 
   // The "of N files" denominator in the SearchScopeBar — mirrors the same
@@ -359,14 +336,7 @@
   // axis, then curation axis, then system exclusion). When no filters
   // are set, this collapses to the full indexed-paths count.
   $: searchableFileCount = (() => {
-    let universe: string[];
-    if (collectionAxisInclude !== null) {
-      universe = collectionAxisInclude;
-    } else if (activeContextName && collections[activeContextName]) {
-      universe = collections[activeContextName].file_paths.filter((p) => indexedPathsSet.has(p));
-    } else {
-      universe = Array.from(indexedPathsSet);
-    }
+    let universe = collectionAxisInclude ?? Array.from(indexedPathsSet);
     const curationInclude = searchCurationFilter(
       soloCuration, mutedCuration, collectedPaths, indexedPathsSet
     );
@@ -409,26 +379,20 @@
     // surfaces an accurate connection error in the catch below if the
     // sidecar is genuinely unreachable.
 
-    // Collection axis (folder/file solos and mutes; the active
-    // collection auto-scopes backend-side when this stays null).
-    // Computed fresh — see computeCollectionAxisInclude for why the
-    // derived value can't be read here.
+    // Collection axis (folder/file solos and mutes, playing
+    // collections). Computed fresh — see computeCollectionAxisInclude
+    // for why the derived value can't be read here.
     let sourcePaths = computeCollectionAxisInclude(
-      soloCollections, mutedCollections, activeContextName, collections, indexedPaths
+      soloCollections, mutedCollections, playingCollections, collections, indexedPaths
     );
 
     // Curation axis (Collected/Loose solos and mutes) intersects into
     // the same list — axes intersect, and the backend takes one
-    // `source_paths` include-list. When the collection axis stayed null
-    // because the active collection is its only narrowing, the
-    // intersection must still honor it, so its files stand in here.
+    // `source_paths` include-list.
     const curationInclude = searchCurationFilter(
       soloCuration, mutedCuration, collectedPaths, indexedPaths
     );
     if (curationInclude !== null) {
-      if (sourcePaths === null && activeContextName && collections[activeContextName]) {
-        sourcePaths = collections[activeContextName].file_paths.filter((p) => indexedPaths.has(p));
-      }
       if (sourcePaths === null) {
         sourcePaths = curationInclude;
       } else {
@@ -438,8 +402,8 @@
     }
 
     if (sourcePaths !== null && sourcePaths.length === 0) {
-      searchError = soloCollections.size > 0 || activeContextName || soloCuration.size > 0
-        ? 'Nothing indexed under the soloed items.'
+      searchError = soloCollections.size > 0 || playingCollections.size > 0 || soloCuration.size > 0
+        ? 'Nothing indexed under the soloed or playing items.'
         : 'Everything is muted.';
       searchResults = [];
       isSearching = false;
@@ -880,51 +844,32 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Collection-kind S/M from the collections panel — same axis and
-  // union semantics as folder/file scope refs, keyed by collection name.
-  function toggleCollectionSolo(name: string) {
-    if (soloCollections.has(name)) {
-      soloCollections.delete(name);
+  // Play/stop from the collections panel — same axis and union
+  // semantics as folder/file solos, keyed by collection name. The scope
+  // bar's play chips call this too: a chip only exists while its track
+  // plays, so toggling is always "stop".
+  function togglePlayCollection(name: string) {
+    if (playingCollections.has(name)) {
+      playingCollections.delete(name);
     } else {
-      soloCollections.set(name, { kind: 'collection', label: name });
+      playingCollections.add(name);
     }
-    soloCollections = soloCollections;
+    playingCollections = playingCollections;
     if (committedQuery) runSearch(committedQuery);
   }
-
-  function toggleCollectionMute(name: string) {
-    if (mutedCollections.has(name)) {
-      mutedCollections.delete(name);
-    } else {
-      mutedCollections.set(name, { kind: 'collection', label: name });
-    }
-    mutedCollections = mutedCollections;
-    if (committedQuery) runSearch(committedQuery);
-  }
-
-  // The panel's S/M lamps read from these views over the shared maps.
-  $: soloedCollectionNames = new Set(
-    [...soloCollections].filter(([, r]) => r.kind === 'collection').map(([k]) => k)
-  );
-  $: mutedCollectionNames = new Set(
-    [...mutedCollections].filter(([, r]) => r.kind === 'collection').map(([k]) => k)
-  );
 
   // Footer [clear all] in the filter console: resets every solo/mute on
-  // all three axes — the same action as clearing each chip in the scope
-  // bar, including the active-collection chip (which is a solo).
+  // all three axes and stops every playing collection — the same action
+  // as clearing each chip in the scope bar.
   function clearAllFilters() {
     filterExcludedSystems = new Set();
     soloedSystems = new Set();
     soloCollections = new Map();
     mutedCollections = new Map();
+    playingCollections = new Set();
     soloCuration = new Set();
     mutedCuration = new Set();
-    if (activeContextName) {
-      clearActiveContext(); // re-runs the search itself
-    } else if (committedQuery) {
-      runSearch(committedQuery);
-    }
+    if (committedQuery) runSearch(committedQuery);
   }
 
   $: hiddenCount = hiddenPaths.size;
@@ -1438,9 +1383,9 @@
 
   // Collection mode derived state
   $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
-  // The highlight means "soloed": the active collection's files plus any
-  // folder/file solos take the parchment wash + left rule rather than
-  // filtering everything else out. Ancestors are included so the
+  // The highlight means "in the scope": playing collections' files plus
+  // any folder/file solos take the parchment wash + left rule rather
+  // than filtering everything else out. Ancestors are included so the
   // highlight propagates up through collapsed folders — without that,
   // a scattered collection's files would be invisible until every
   // containing folder was manually expanded. Edit mode handles its own
@@ -1448,8 +1393,10 @@
   $: highlightPaths = (() => {
     if (isCollectionEditMode) return new Set<string>();
     const files = new Set<string>();
-    const col = activeContextName ? collections[activeContextName] : undefined;
-    if (col) for (const p of col.file_paths) files.add(p);
+    for (const name of playingCollections) {
+      const col = collections[name];
+      if (col) for (const p of col.file_paths) files.add(p);
+    }
     for (const [path, ref] of soloCollections) {
       files.add(path);
       if (ref.kind === 'folder') {
@@ -1521,13 +1468,12 @@
   // channel: the collected/loose split is meaningless until a collection
   // exists. Edit mode forces its own UI, so the section is hidden there.
   $: collectionFilterAvailable =
-    !isCollectionEditMode &&
-    (activeContextName !== null || Object.keys(collections).length > 0);
+    !isCollectionEditMode && Object.keys(collections).length > 0;
 
   // Filter for what the file tree shows. Composes scope + library filters:
-  // 1. Edit mode and focus mode pick the base file pool. An active
-  //    collection without focus mode just highlights — the tree shows
-  //    the whole library so users can see those files in context.
+  // 1. Edit mode and focus mode pick the base file pool. A playing
+  //    collection just highlights — the tree shows the whole library so
+  //    users can see those files in context.
   // 2. Uncategorized filter narrows to files not in any collection.
   // 3. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
@@ -1538,9 +1484,9 @@
   $: displayPaths = (() => {
     // Metadata-based narrowing (curation solos) is gated to systems view.
     // Tree view is a spatial model — folders and ancestors should never
-    // disappear because of collection membership. Highlight via
-    // activeContextName (which composes orthogonally) is the right
-    // tree-view affordance.
+    // disappear because of collection membership. Highlight via playing
+    // collections (which compose orthogonally) is the right tree-view
+    // affordance.
     let baseFiles: Set<string>;
     if (isCollectionEditMode) {
       baseFiles = new Set(indexedPaths);
@@ -1684,7 +1630,7 @@
 
   // Cmd+Alt+← target. Opens the collections panel if it's collapsed, then
   // hands off to the panel's claim() so the rendering details (sort,
-  // archive filter, draft row) stay encapsulated there.
+  // draft row) stay encapsulated there.
   async function focusCollectionsRegion() {
     if (focusedCollectionName !== null) return;
     if (!collectionsPanelOpen) await togglePanel();
@@ -2398,60 +2344,20 @@
     try {
       const result = await invoke<CollectionsResult>('get_collections');
       collections = result.collections;
-      activeContextName = result.active_context;
+      // The star/active-context UX is gone — play/stop is the only
+      // collection scoping in the app. A context persisted by an older
+      // version would still auto-scope backend and MCP searches with
+      // nothing in the UI showing it, so convert it once: the old star
+      // starts playing, and the backend pointer clears.
+      if (result.active_context) {
+        playingCollections.add(result.active_context);
+        playingCollections = playingCollections;
+        invoke('clear_active_context').catch((e) =>
+          console.log('Could not clear legacy active context:', e)
+        );
+      }
     } catch (e) {
       console.log('Could not fetch collections:', e);
-    }
-  }
-
-  async function setActiveContext(name: string) {
-    try {
-      const result = await invoke<ActiveContextResult>('set_active_context', { name });
-      activeContextName = result.active_context;
-      // Activating a collection feels best in systems view: a curated
-      // subset reads as a list, not a directory tree. The user can still
-      // flip back to tree via the toggle if they prefer.
-      setViewMode('systems');
-      jobNotification.show({
-        type: 'info',
-        message: `Active context: ${name}`,
-        duration: 3000,
-      });
-      await loadCollections();
-      if (committedQuery) runSearch(committedQuery);
-    } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Couldn't set active context: ${e}`,
-        duration: 5000,
-      });
-    }
-  }
-
-  async function clearActiveContext() {
-    try {
-      await invoke<ActiveContextResult>('clear_active_context');
-      activeContextName = null;
-      jobNotification.show({
-        type: 'info',
-        message: 'Active context cleared',
-        duration: 3000,
-      });
-      if (committedQuery) runSearch(committedQuery);
-    } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Couldn't clear active context: ${e}`,
-        duration: 5000,
-      });
-    }
-  }
-
-  function toggleActiveContext(name: string) {
-    if (activeContextName === name) {
-      clearActiveContext();
-    } else {
-      setActiveContext(name);
     }
   }
 
@@ -2529,18 +2435,16 @@
     try {
       await invoke('delete_collection', { name });
       cancelCollectionEdit();
-      // Any solo/mute on the deleted collection clears with it — its
-      // chip disappears rather than narrowing on a ghost.
-      const hadSolo = soloCollections.delete(name);
-      const hadMute = mutedCollections.delete(name);
-      if (hadSolo) soloCollections = soloCollections;
-      if (hadMute) mutedCollections = mutedCollections;
+      // A playing state on the deleted collection clears with it — its
+      // chip disappears rather than scoping on a ghost.
+      const wasPlaying = playingCollections.delete(name);
+      if (wasPlaying) playingCollections = playingCollections;
       if (collectionsCustomOrder.includes(name)) {
         collectionsCustomOrder = collectionsCustomOrder.filter((n) => n !== name);
         persistCollectionsSort();
       }
       await loadCollections();
-      if ((hadSolo || hadMute) && committedQuery) runSearch(committedQuery);
+      if (wasPlaying && committedQuery) runSearch(committedQuery);
       jobNotification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
     } catch (e) {
       jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
@@ -2734,17 +2638,12 @@
         name,
         newName,
       });
-      // Migrate any narrowing keyed by the old name so an engaged S/M
-      // (and its chip) follows the rename instead of going stale.
-      if (soloCollections.has(name)) {
-        soloCollections.delete(name);
-        soloCollections.set(newName, { kind: 'collection', label: newName });
-        soloCollections = soloCollections;
-      }
-      if (mutedCollections.has(name)) {
-        mutedCollections.delete(name);
-        mutedCollections.set(newName, { kind: 'collection', label: newName });
-        mutedCollections = mutedCollections;
+      // Migrate any playing state keyed by the old name so an armed
+      // track (and its chip) follows the rename instead of going stale.
+      if (playingCollections.has(name)) {
+        playingCollections.delete(name);
+        playingCollections.add(newName);
+        playingCollections = playingCollections;
       }
       // Custom sort order follows the rename in place.
       if (collectionsCustomOrder.includes(name)) {
@@ -2777,27 +2676,6 @@
       jobNotification.show({
         type: 'error',
         message: `Could not set pigment: ${String(e)}`,
-        duration: 5000,
-      });
-    }
-  }
-
-  async function toggleArchived(name: string, archived: boolean) {
-    try {
-      await invoke('update_collection', { name, archived });
-      if (archived && activeContextName === name) {
-        await invoke('clear_active_context');
-      }
-      await loadCollections();
-      jobNotification.show({
-        type: 'success',
-        message: archived ? `Archived "${name}"` : `Unarchived "${name}"`,
-        duration: 3000,
-      });
-    } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Could not ${archived ? 'archive' : 'unarchive'} "${name}": ${String(e)}`,
         duration: 5000,
       });
     }
@@ -3021,28 +2899,22 @@
             <CollectionsPanel
               bind:this={collectionsPanelComponent}
               {collections}
-              activeName={activeContextName}
               editingName={editingCollectionName}
               {draftName}
               editFileCount={collectionEditPaths.size}
-              soloedNames={soloedCollectionNames}
-              mutedNames={mutedCollectionNames}
+              playingNames={playingCollections}
               gameSystemMap={effectiveGameSystemMap}
               sortKey={collectionsSortKey}
               customOrder={collectionsCustomOrder}
-              onSetActive={setActiveContext}
-              onClearActive={clearActiveContext}
               onEditFiles={startEditCollection}
               onDelete={requestDeleteCollection}
-              onToggleArchived={toggleArchived}
               onCreate={inlineCreateCollection}
               onSaveFiles={saveCollection}
               onCancelFiles={cancelCollectionEdit}
               onDraftRename={handleDraftRename}
               onRename={renameCollection}
               onSetColor={setCollectionColor}
-              onToggleSolo={toggleCollectionSolo}
-              onToggleMute={toggleCollectionMute}
+              onTogglePlay={togglePlayCollection}
               onSetSortKey={setCollectionsSortKey}
               onReorder={reorderCollections}
               focusedName={focusedCollectionName}
@@ -3082,6 +2954,7 @@
              narrowing, plus the hits meter while a search is active. The
              console itself is the docked FilterPanel. -->
         <SearchScopeBar
+          {collectionPlays}
           {collectionSolos}
           {collectionMutes}
           excludedSystems={filterExcludedSystems}
@@ -3093,6 +2966,7 @@
           indexedFileCount={searchableFileCount}
           isLoading={isSearching}
           {searchActive}
+          onClearCollectionPlay={togglePlayCollection}
           onClearCollectionSolo={handleClearCollectionSolo}
           onClearCollectionMute={handleClearCollectionMute}
           onToggleSystemFilter={toggleSystemFilter}

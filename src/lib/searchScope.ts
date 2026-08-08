@@ -59,17 +59,16 @@ export function searchCurationFilter(
   return out;
 }
 
-/** A folder, file, or collection narrowing on the collection axis.
- * Folder/file refs are keyed by absolute path; collection refs by the
- * collection's name (names never start with a path separator, so the
- * key spaces can't collide). */
+/** A folder or file narrowing on the collection axis, keyed by absolute
+ * path. Collections themselves narrow through the play/stop transport,
+ * which is a plain name-set, not a ScopeRef. */
 export interface ScopeRef {
-  kind: 'folder' | 'file' | 'collection';
+  kind: 'folder' | 'file';
   label: string;
 }
 
-/** Resolve the collection axis (folder/file/collection solos and mutes)
- * to the backend's `source_paths` include-list.
+/** Resolve the collection axis (folder/file solos and mutes, playing
+ * collections' file-sets) to the backend's `source_paths` include-list.
  *
  * Same DAW semantics as the systems axis: any solo active → the union of
  * the soloed file-sets passes, mutes overridden (solos union within an

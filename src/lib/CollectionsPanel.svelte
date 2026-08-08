@@ -10,7 +10,6 @@
   // focusedFilePath (only one region claims arrow keys at a time).
   export let focusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
-  export let activeName: string | null = null;
   export let editingName: string | null = null;
   // Proposed name of an in-progress draft (new collection that hasn't been
   // saved yet). When set, the panel renders a synthetic top row carrying
@@ -19,27 +18,24 @@
   // Live count of paths currently selected in the in-progress edit/draft.
   // Shown on the row being edited.
   export let editFileCount: number = 0;
-  // Collection-axis S/M — names engaged in the shared narrowing maps.
-  export let soloedNames: Set<string> = new Set();
-  export let mutedNames: Set<string> = new Set();
+  // Collection transport — names currently playing (armed into the
+  // search scope). Several can play at once; while any plays, the
+  // stopped rows dim out of scope.
+  export let playingNames: Set<string> = new Set();
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
   // Sort state is lifted to +page for per-vault persistence.
   export let sortKey: 'custom' | 'name' | 'size' | 'created' = 'custom';
   export let customOrder: string[] = [];
-  export let onSetActive: (name: string) => void = () => {};
-  export let onClearActive: () => void = () => {};
   export let onEditFiles: (name: string) => void = () => {};
   export let onDelete: (name: string) => void = () => {};
-  export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
   export let onSaveFiles: () => void = () => {};
   export let onCancelFiles: () => void = () => {};
   export let onDraftRename: (name: string) => void = () => {};
   export let onRename: (name: string, newName: string) => void = () => {};
   export let onSetColor: (name: string, color: string | null) => void = () => {};
-  export let onToggleSolo: (name: string) => void = () => {};
-  export let onToggleMute: (name: string) => void = () => {};
+  export let onTogglePlay: (name: string) => void = () => {};
   export let onSetSortKey: (key: 'custom' | 'name' | 'size' | 'created') => void = () => {};
   export let onReorder: (order: string[]) => void = () => {};
 
@@ -49,7 +45,6 @@
     { value: 'size', label: 'File count' },
     { value: 'created', label: 'Recently added' },
   ];
-  let showArchived = false;
 
   let sortMenuOpen = false;
   let sortBtn: HTMLButtonElement;
@@ -144,8 +139,7 @@
   // Sorting + drag reorder
   // ------------------------------------------------------------------
   $: rows = (() => {
-    const list = Object.values(collections);
-    const visible = showArchived ? list : list.filter(c => !c.archived);
+    const visible = Object.values(collections);
     if (sortKey === 'name') {
       visible.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortKey === 'size') {
@@ -166,9 +160,9 @@
     return visible;
   })();
 
-  $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
   $: canDrag = sortKey === 'custom' && rows.length > 1 && !editingName && !draftName;
+  $: anyPlaying = playingNames.size > 0;
 
   let draggingName: string | null = null;
   // Insertion index into `rows` while dragging (rows.length = after last).
@@ -204,12 +198,7 @@
       const insertAt = dropInsertIndex > from ? dropInsertIndex - 1 : dropInsertIndex;
       names.splice(from, 1);
       names.splice(insertAt, 0, draggingName);
-      // Persist the full order: the visible sequence first, then any
-      // collections the current view hides (archived), so their slots
-      // aren't forgotten.
-      const inVisible = new Set(names);
-      const rest = Object.values(collections).map(c => c.name).filter(n => !inVisible.has(n));
-      onReorder([...names, ...rest]);
+      onReorder(names);
     }
     draggingName = null;
     dropInsertIndex = null;
@@ -222,14 +211,14 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): Rename / Pigment ▸ /
-  // Add files… / Archive / Delete. Same visual family as the file
-  // tree's ContextMenu, scoped to what a collection can do.
+  // Add files… / Delete. Same visual family as the file tree's
+  // ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
   let ctxPigmentOpen = false;
 
   const CTX_WIDTH = 190;
-  const CTX_HEIGHT = 200;
+  const CTX_HEIGHT = 175;
 
   function openContextMenu(e: MouseEvent, name: string) {
     e.preventDefault();
@@ -256,36 +245,6 @@
     const name = ctxMenu.name;
     closeContextMenu();
     fn(name);
-  }
-
-  // ------------------------------------------------------------------
-  // Row activation — click toggles the active context, but only after a
-  // beat so a double-click can land as "rename" without churning the
-  // active state twice on the way in.
-  // ------------------------------------------------------------------
-  let clickTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function handleRowClick(name: string) {
-    onFocusCollection(name);
-    if (clickTimer !== null) {
-      // Second click of a double-click — swallow it; dblclick decides.
-      clearTimeout(clickTimer);
-      clickTimer = null;
-      return;
-    }
-    clickTimer = setTimeout(() => {
-      clickTimer = null;
-      if (activeName === name) onClearActive();
-      else onSetActive(name);
-    }, 250);
-  }
-
-  function handleRowDblClick(name: string) {
-    if (clickTimer !== null) {
-      clearTimeout(clickTimer);
-      clickTimer = null;
-    }
-    startRename(name);
   }
 
   // Scroll the focused row into view whenever focus changes.
@@ -367,12 +326,6 @@
     if (idx < 0) return;
     const col = rows[idx];
 
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      if (activeName === col.name) onClearActive();
-      else onSetActive(col.name);
-      return;
-    }
     if (event.key === 'F2') {
       event.preventDefault();
       startRename(col.name);
@@ -390,9 +343,7 @@
     }
     if (bareLetter) {
       if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
-      if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
-      if (lk === 's') { event.preventDefault(); onToggleSolo(col.name); return; }
-      if (lk === 'm') { event.preventDefault(); onToggleMute(col.name); return; }
+      if (lk === 'p') { event.preventDefault(); onTogglePlay(col.name); return; }
     }
   }
 
@@ -489,13 +440,6 @@
               <span>{opt.label}</span>
             </button>
           {/each}
-          {#if archivedCount > 0}
-            <hr class="menu-divider" />
-            <label class="sort-toggle">
-              <span>Show archived</span>
-              <input class="app-checkbox" type="checkbox" bind:checked={showArchived} />
-            </label>
-          {/if}
         </div>
       {/if}
     </div>
@@ -504,10 +448,6 @@
   {#if hasNone && !draftName}
     <div class="empty">
       <span class="empty-label">No collections yet</span>
-    </div>
-  {:else if rows.length === 0 && !draftName}
-    <div class="empty">
-      <span class="empty-label">All archived</span>
     </div>
   {/if}
 
@@ -546,19 +486,16 @@
     {#each rows as col, i (col.name)}
       {@const isEditing = editingName === col.name}
       {@const isExpanded = expandedNames.has(col.name)}
-      {@const soloed = soloedNames.has(col.name)}
-      {@const muted = mutedNames.has(col.name)}
+      {@const playing = playingNames.has(col.name)}
       {@const isRenamingRow = renamingName === col.name}
       <li class="item">
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
         <div
           class="row-container"
-          class:active={activeName === col.name}
           class:editing={isEditing}
-          class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
-          class:soloed
-          class:dimmed={muted && !soloed}
+          class:playing
+          class:dimmed={anyPlaying && !playing}
           class:dragging={draggingName === col.name}
           class:drop-before={dropInsertIndex === i}
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
@@ -569,8 +506,8 @@
           on:dragover={(e) => handleDragOver(e, i)}
           on:drop={handleDrop}
           on:dragend={handleDragEnd}
-          on:click={() => { if (!isEditing && !isRenamingRow) handleRowClick(col.name); }}
-          on:dblclick={() => { if (!isEditing && !isRenamingRow) handleRowDblClick(col.name); }}
+          on:click={() => { if (!isEditing && !isRenamingRow) onFocusCollection(col.name); }}
+          on:dblclick={() => { if (!isEditing && !isRenamingRow) startRename(col.name); }}
           on:contextmenu={(e) => { if (!isEditing) openContextMenu(e, col.name); }}
         >
           {#if sortKey === 'custom'}
@@ -607,9 +544,6 @@
           {:else}
             <span class="row-name">{col.name}</span>
           {/if}
-          {#if activeName === col.name && !isRenamingRow}
-            <span class="row-marker" title="Active">&#9733;</span>
-          {/if}
           {#if isEditing}
             <span class="editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -618,29 +552,27 @@
               <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
             </div>
           {:else if !isRenamingRow}
-            <span class="sm" class:engaged={soloed || muted}>
+            <span class="tr" class:engaged={playing}>
               <button
                 type="button"
-                class="sm-btn"
-                class:solo-on={soloed}
-                on:click|stopPropagation={() => onToggleSolo(col.name)}
-                aria-pressed={soloed}
-                title={soloed ? `Stop soloing ${col.name} (S)` : `Solo ${col.name} (S)`}
-              >S</button>
-              <button
-                type="button"
-                class="sm-btn"
-                class:mute-on={muted}
-                on:click|stopPropagation={() => onToggleMute(col.name)}
-                aria-pressed={muted}
-                title={muted ? `Unmute ${col.name} (M)` : `Mute ${col.name} (M)`}
-              >M</button>
+                class="tr-btn"
+                class:playing
+                on:click|stopPropagation={() => onTogglePlay(col.name)}
+                aria-pressed={playing}
+                title={playing ? `Stop ${col.name} (P)` : `Play ${col.name} (P)`}
+              >
+                {#if playing}
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5h14v14H5z"/></svg>
+                {:else}
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4.2v15.6L20 12z"/></svg>
+                {/if}
+              </button>
             </span>
           {/if}
         </div>
         {#if isExpanded}
           {#each childFiles(col) as f (f.path)}
-            <div class="child-row" class:washed={soloed} class:dimmed={muted && !soloed} title={f.path}>
+            <div class="child-row" class:washed={playing} class:dimmed={anyPlaying && !playing} title={f.path}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">{f.base}</span>
               {#if f.tag}
@@ -649,7 +581,7 @@
             </div>
           {/each}
           {#if col.file_paths.length === 0}
-            <div class="child-row child-empty" class:washed={soloed}>
+            <div class="child-row child-empty" class:washed={playing}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">No files yet</span>
             </div>
@@ -717,9 +649,6 @@
     </div>
     <hr class="menu-divider" />
     <button class="context-item" on:click={() => ctxAction(onEditFiles)}>Add files&hellip;</button>
-    <button class="context-item" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
-      {col?.archived ? 'Unarchive' : 'Archive'}
-    </button>
     <hr class="menu-divider" />
     <button class="context-item danger" on:click={() => ctxAction(onDelete)}>Delete collection</button>
   </div>
@@ -822,24 +751,6 @@
     border: none;
     border-top: 1px solid var(--bg-category);
   }
-  .sort-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    padding: 0.35rem 0.6rem;
-    font-size: 0.8rem;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-  }
-  .sort-toggle:hover {
-    background: var(--bg-category);
-  }
-  .sort-toggle input {
-    cursor: pointer;
-    margin: 0;
-  }
 
   .rows {
     list-style: none;
@@ -871,23 +782,20 @@
   .row-container.kb-focused {
     background: var(--bg-focused);
   }
-  .row-container.soloed {
+  /* Playing — armed into the search scope: parchment wash + purple rule,
+     the same "this track is in the mix" grammar as the tree's solo. */
+  .row-container.playing {
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
     border-left-color: var(--text-active);
   }
-  .row-container.active {
-    background: color-mix(in srgb, var(--text-accent) 15%, transparent);
-  }
-  /* Muted on the collection axis — dimmed to 45%, never hidden. Hover
-     restores legibility, mirroring the tree's muted rows. */
-  .row-container.dimmed > :not(.sm) {
+  /* While any collection plays, stopped rows dim to 45% (out of scope),
+     never hidden. Hover restores legibility, mirroring the tree's muted
+     rows. The transport stays full-strength — it's the way back in. */
+  .row-container.dimmed > :not(.tr) {
     opacity: 0.45;
   }
-  .row-container.dimmed:hover > :not(.sm) {
+  .row-container.dimmed:hover > :not(.tr) {
     opacity: 0.7;
-  }
-  .row-container.archived {
-    opacity: 0.55;
   }
   .row-container.dragging {
     opacity: 0.4;
@@ -957,16 +865,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .row-container.active .row-name {
-    color: var(--text-accent);
-    font-weight: 600;
-  }
-  .row-marker {
-    color: var(--text-accent);
-    font-size: 0.75rem;
-    flex-shrink: 0;
-  }
-
   /* The name doubles as a click-to-rename button on the draft row. */
   .draft-name {
     background: none;
@@ -1011,25 +909,57 @@
     flex-shrink: 0;
   }
 
-  /* S/M cluster — hidden at rest, revealed on row hover or keyboard
-     focus, always visible while engaged. Button anatomy is the shared
-     .sm-btn in app.css. */
-  .sm {
+  /* Transport — hidden at rest, revealed on row hover or keyboard
+     focus, always visible while playing. One button per track: ▶ arms
+     the collection into the search scope, the lit ■ stops it. */
+  .tr {
     display: inline-flex;
-    gap: 0.25rem;
     margin-left: auto;
     flex-shrink: 0;
     opacity: 0;
     transition: opacity var(--transition-fast);
   }
-  .row-container:hover .sm,
-  .row-container.kb-focused .sm,
-  .sm.engaged {
+  .row-container:hover .tr,
+  .row-container.kb-focused .tr,
+  .tr.engaged {
     opacity: 1;
+  }
+  .tr-btn {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .tr-btn svg {
+    width: 9px;
+    height: 9px;
+    display: block;
+  }
+  .tr-btn:hover {
+    color: var(--text-secondary);
+    border-color: var(--text-secondary);
+  }
+  .tr-btn:active {
+    transform: scale(0.97);
+  }
+  .tr-btn.playing {
+    color: var(--text-active);
+    border-color: var(--text-active);
+    background: color-mix(in srgb, var(--text-active) 15%, transparent);
+    filter: var(--glow-active);
   }
 
   /* Expanded file rows — the collection's contents, indented under the
-     folder row. A soloed collection's files take the wash too. */
+     folder row. A playing collection's files take the wash too. */
   .child-row {
     display: flex;
     align-items: center;

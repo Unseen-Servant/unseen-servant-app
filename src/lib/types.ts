@@ -110,10 +110,6 @@ export interface CollectionsResult {
   active_context: string | null;
 }
 
-export interface ActiveContextResult {
-  active_context: string | null;
-}
-
 export interface StatsResult {
   total_chunks: number;
   total_documents: number;
