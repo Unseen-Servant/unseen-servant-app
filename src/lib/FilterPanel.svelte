@@ -46,6 +46,12 @@
   export let onToggleShowHidden: () => void = () => {};
   export let onClearHidden: () => void = () => {};
 
+  // Focus lens (spec: scope doctrine) — hide out-of-scope rows on the
+  // browsing surfaces (tree, systems view). Console surfaces — this
+  // panel, the collections panel, the scope bar — never hide.
+  export let hideOutOfScope: boolean = false;
+  export let onToggleHideOutOfScope: () => void = () => {};
+
   // Curation section: two channels over the collected/loose domain,
   // the third narrowing axis (same union/intersect/solo-overrides-mute
   // semantics as systems and collections). Soloing Collected is the old
@@ -203,6 +209,20 @@
         checked={showHidden}
         disabled={!hasHidden}
         on:change={onToggleShowHidden}
+      />
+    </label>
+
+    <label
+      class="row lens-row"
+      title="Hide dimmed out-of-scope rows in the tree and systems view"
+      data-fm="row"
+    >
+      <span class="row-name muted-name">Hide out-of-scope items</span>
+      <input
+        class="app-checkbox lens-checkbox"
+        type="checkbox"
+        checked={hideOutOfScope}
+        on:change={onToggleHideOutOfScope}
       />
     </label>
 
@@ -555,5 +575,12 @@
     padding: 0.3rem 0.75rem 0.5rem 1.1rem;
     font-size: 0.75rem;
     color: var(--text-tertiary);
+  }
+
+  /* The lens is a mode the user switched on — checked wears purple,
+     not the parchment content accent. */
+  .lens-checkbox:checked {
+    background-color: var(--text-active);
+    border-color: var(--text-active);
   }
 </style>
