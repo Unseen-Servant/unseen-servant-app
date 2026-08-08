@@ -1869,13 +1869,14 @@
   }
 
   // Escape ladder (closing precedence, top-most first):
-  //   1. Open context menu        → close
-  //   2. Inline rename in flight   → cancel
-  //   3. Empty search input        → blur and hand focus to tree
-  //   4. Focused tree row          → clear focus
-  //   5. (modal Esc handled by Modal.svelte)
-  //   6. (search results → input handled below)
-  //   7. (search input text handled in Header.svelte)
+  //   1. Open context menu               → close
+  //   2. Inline rename in flight         → cancel
+  //   3. Competing popover               → its own handler
+  //   4. Search view, focus not in bar   → focus the search bar
+  //   5. Search view, focus in bar       → leave to the browse view
+  //   6. Focused tree row                → clear focus
+  //   (modal Esc handled by Modal.svelte; the docked filter panel claims
+  //   its own Esc while focus is inside it)
   function dismissSplash() {
     if (!showSplash) return;
     showSplash = false;
@@ -1919,20 +1920,23 @@
       if (renamingFilePath) { renamingFilePath = null; return; }
       // A competing popover (sort menu / dropdown / the collections
       // panel's context menu) handles its own Esc. Don't reach the
-      // focus-clear branch below — that would wipe the user's tree
-      // highlight as a side effect of closing a menu. The docked filter
-      // panel handles its own Esc element-side (it only claims keys
-      // while focus is inside it).
+      // branches below — that would close the search view or wipe the
+      // tree highlight as a side effect of closing a menu.
       if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
-      // Empty search input: blur and place keyboard focus in the tree so
-      // arrows immediately navigate. If a tree row was already focused,
-      // we leave it where it is.
-      if (inSearchInput && searchQuery === '' && !searchActive) {
-        (target as HTMLInputElement).blur();
-        if (!focusedFilePath && visibleTreeRows.length > 0) {
-          focusTreeRow(visibleTreeRows[0].path);
-        }
+      // Search-view ladder: anywhere in the view funnels focus to the
+      // bar; the bar steps out to the browse view. The query is never
+      // cleared here — ✕ is the only clear, and it isn't an exit.
+      if (searchViewOpen) {
         event.preventDefault();
+        if (inSearchInput) {
+          searchViewOpen = false;
+          (target as HTMLInputElement).blur();
+          // The browse view isn't in the DOM until Svelte flushes the
+          // swap; focusFileRegion queries rows / the SystemsView binding.
+          void tick().then(() => focusFileRegion());
+        } else {
+          headerComponent?.focus();
+        }
         return;
       }
       if (focusedFilePath) { focusedFilePath = null; }
@@ -2126,7 +2130,10 @@
       if (!inAnyInput && handleTreeNavKey(event)) return;
     }
 
-    if (!searchActive || searchResults.length === 0) return;
+    // Gate on the view being on screen, not on the committed query —
+    // after exiting, query and results persist while tree/systems is
+    // visible, and Cmd+1–9 must not jump to rows that aren't rendered.
+    if (!searchViewOpen || searchResults.length === 0) return;
 
     const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
@@ -2146,7 +2153,8 @@
     // Combobox flow: ArrowDown from the input pops focus into the list at
     // the current selection. Arrow nav within the list moves both
     // selection and focus together. ArrowUp from the first row pops back
-    // to the input. Enter on a focused row opens; Escape returns to input.
+    // to the input. Enter on a focused row opens; Escape is handled by
+    // the ladder above.
     if (event.key === 'ArrowDown') {
       if (inInput) {
         event.preventDefault();
@@ -2168,9 +2176,6 @@
       event.preventDefault();
       const sel = searchResults[selectedResultIndex];
       if (sel) handleOpenResult(sel.filename, sel.page_start);
-    } else if (event.key === 'Escape' && inList) {
-      event.preventDefault();
-      headerComponent?.focus();
     }
   }
 

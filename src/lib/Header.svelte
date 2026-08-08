@@ -52,14 +52,9 @@
       e.preventDefault();
       clearDebounce();
       onSubmit(searchQuery);
-    } else if (e.key === 'Escape') {
-      if (searchQuery.length > 0) {
-        e.preventDefault();
-        clearDebounce();
-        searchQuery = '';
-        onClear();
-      }
     }
+    // Escape is handled by the page-level ladder: it steps the search
+    // view closed and never clears the query — ✕ is the only clear.
   }
 
   function handleClear() {
