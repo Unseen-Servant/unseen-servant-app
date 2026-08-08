@@ -211,6 +211,11 @@
   // In-app search state
   let searchQuery = '';
   let committedQuery = '';
+  // The search view is stateful, not derived: entered by focusing the
+  // search bar, left only explicitly (view switch, Cmd+J/T, or the
+  // Escape ladder). Never persisted — the app launches into the browse
+  // view. searchActive (committed query) keeps meaning "has a query".
+  let searchViewOpen = false;
   let searchResults: SearchResultItem[] = [];
   // Tracks which query produced the rows currently in `searchResults`.
   // Used to distinguish a fresh search-in-flight (committedQuery !==
@@ -242,8 +247,8 @@
   // hides them: narrowing a filesystem-shaped tree by content metadata
   // breaks the spatial mental model — folders and ancestors would
   // disappear for reasons the tree itself can't explain.
-  $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
-  $: curationFilterRelevant = viewMode === 'systems' || searchActive;
+  $: systemsFilterRelevant = viewMode === 'systems' || searchViewOpen;
+  $: curationFilterRelevant = viewMode === 'systems' || searchViewOpen;
   // Clamp selection when results shrink (e.g. new query returns fewer hits).
   $: if (selectedResultIndex >= searchResults.length) {
     selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
@@ -505,6 +510,10 @@
     searchSeq += 1;
     selectedResultIndex = 0;
     resetPageSize();
+  }
+
+  function handleSearchFocus() {
+    searchViewOpen = true;
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -782,6 +791,12 @@
   }
 
   async function setViewMode(mode: 'tree' | 'systems') {
+    // Selecting a view is also the exit from the search view. Blur the
+    // bar if it holds focus — Cmd+J/T can fire from inside it, and a
+    // focused input would keep feeding a view no longer on screen.
+    searchViewOpen = false;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae?.classList.contains('search-input')) ae.blur();
     viewMode = mode;
     try {
       const store = await load('settings.json');
@@ -1122,6 +1137,8 @@
     files = [];
     expandedPaths = new Set();
     error = '';
+    // The workspace unmounts with the folder; never re-mount into search.
+    searchViewOpen = false;
     await saveState();
     restartAutoSyncInterval();
   }
@@ -1673,7 +1690,7 @@
   // height of its content, so clicks in the empty area below the last
   // group still land here.
   function handleFileTreeAreaMousedown(event: MouseEvent) {
-    if (searchActive) return;
+    if (searchViewOpen) return;
     if (focusedFilePath !== null) return;
     const target = event.target as HTMLElement | null;
     if (viewMode === 'systems') {
@@ -1854,13 +1871,14 @@
   }
 
   // Escape ladder (closing precedence, top-most first):
-  //   1. Open context menu        → close
-  //   2. Inline rename in flight   → cancel
-  //   3. Empty search input        → blur and hand focus to tree
-  //   4. Focused tree row          → clear focus
-  //   5. (modal Esc handled by Modal.svelte)
-  //   6. (search results → input handled below)
-  //   7. (search input text handled in Header.svelte)
+  //   1. Open context menu               → close
+  //   2. Inline rename in flight         → cancel
+  //   3. Competing popover               → its own handler
+  //   4. Search view, focus not in bar   → focus the search bar
+  //   5. Search view, focus in bar       → leave to the browse view
+  //   6. Focused tree row                → clear focus
+  //   (modal Esc handled by Modal.svelte; the docked filter panel claims
+  //   its own Esc while focus is inside it)
   function dismissSplash() {
     if (!showSplash) return;
     showSplash = false;
@@ -1904,20 +1922,30 @@
       if (renamingFilePath) { renamingFilePath = null; return; }
       // A competing popover (sort menu / dropdown / the collections
       // panel's context menu) handles its own Esc. Don't reach the
-      // focus-clear branch below — that would wipe the user's tree
-      // highlight as a side effect of closing a menu. The docked filter
-      // panel handles its own Esc element-side (it only claims keys
-      // while focus is inside it).
+      // branches below — that would close the search view or wipe the
+      // tree highlight as a side effect of closing a menu.
       if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
-      // Empty search input: blur and place keyboard focus in the tree so
-      // arrows immediately navigate. If a tree row was already focused,
-      // we leave it where it is.
-      if (inSearchInput && searchQuery === '' && !searchActive) {
-        (target as HTMLInputElement).blur();
-        if (!focusedFilePath && visibleTreeRows.length > 0) {
-          focusTreeRow(visibleTreeRows[0].path);
+      // Escape mid-IME-composition just cancels the composition — never
+      // step the ladder on it.
+      if (event.isComposing) return;
+      // Search-view ladder: anywhere in the view funnels focus to the
+      // bar; the bar steps out to the browse view. The query is never
+      // cleared here — ✕ is the only clear, and it isn't an exit.
+      if (searchViewOpen) {
+        if (inSearchInput) {
+          event.preventDefault();
+          searchViewOpen = false;
+          (target as HTMLInputElement).blur();
+          // The browse view isn't in the DOM until Svelte flushes the
+          // swap; focusFileRegion queries rows / the SystemsView binding.
+          void tick().then(() => focusFileRegion());
+        } else if (focusedCollectionName === null) {
+          event.preventDefault();
+          headerComponent?.focus();
         }
-        event.preventDefault();
+        // A focused collection row keeps the panel's own Esc semantics
+        // (its window handler clears the highlight); the next Esc
+        // funnels to the bar.
         return;
       }
       if (focusedFilePath) { focusedFilePath = null; }
@@ -1950,18 +1978,18 @@
 
     // Cmd/Ctrl+J: switch to Systems view; Cmd/Ctrl+T: switch to Tree view,
     // or collapse the whole tree when already there (the view switch's
-    // repeat action). Both match the visible switch: hidden during search,
-    // so the chords no-op there too. 'J' was chosen over '\' because
-    // backslash isn't a single key on Canadian CSA and several other ISO
-    // layouts.
-    if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
+    // repeat action). Both match the visible switch and double as search-
+    // view exits — during search the repeat action never fires (the tree
+    // isn't on screen). 'J' was chosen over '\' because backslash isn't a
+    // single key on Canadian CSA and several other ISO layouts.
+    if (meta && !event.shiftKey && lk === 'j' && selectedFolder) {
       event.preventDefault();
-      if (viewMode !== 'systems') setViewMode('systems');
+      if (searchViewOpen || viewMode !== 'systems') setViewMode('systems');
       return;
     }
-    if (meta && !event.shiftKey && lk === 't' && selectedFolder && !searchActive) {
+    if (meta && !event.shiftKey && lk === 't' && selectedFolder) {
       event.preventDefault();
-      if (viewMode === 'tree') collapseAll();
+      if (!searchViewOpen && viewMode === 'tree') collapseAll();
       else setViewMode('tree');
       return;
     }
@@ -1971,7 +1999,7 @@
     // in the target region if it's still visible, else lands on the first
     // visible row. Skipped during search (the search input owns ←/→ for
     // text editing).
-    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchActive
+    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchViewOpen
         && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       event.preventDefault();
       if (event.key === 'ArrowLeft') focusCollectionsRegion();
@@ -2077,9 +2105,8 @@
     }
 
     // ── Tree-row navigation ─────────────────────────────────────────────
-    // Active when a library is loaded, search is not active, no menu/rename
-    // is open. ArrowDown from an empty search input also enters the tree
-    // (parallel to the search-results combobox).
+    // Active when a library is loaded, the search view is closed, no
+    // menu/rename is open.
     // Other popovers (filter menu, sort menu, dropdowns) attach their own
     // keydown listeners but they fire AFTER this one — so we have to skip
     // here when the DOM tells us a competing menu is open. Querying by
@@ -2092,26 +2119,20 @@
     // the tree-only nav block so action keys don't fall through to view-
     // specific handlers in either mode.
     const fileActionGate =
-      selectedFolder && !searchActive && !contextMenu && !renamingFilePath &&
+      selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath &&
       !competingMenuOpen && !focusedCollectionName && !inAnyInput;
     if (fileActionGate && handleFocusedFileActionKey(event)) return;
 
     // Tree-row arrow navigation. Systems view owns its own arrow nav,
     // so this block is gated to tree mode only.
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
-      if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
-        if (visibleTreeRows.length > 0) {
-          event.preventDefault();
-          (target as HTMLInputElement).blur();
-          focusTreeRow(visibleTreeRows[0].path);
-        }
-        return;
-      }
-
+    if (selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
       if (!inAnyInput && handleTreeNavKey(event)) return;
     }
 
-    if (!searchActive || searchResults.length === 0) return;
+    // Gate on the view being on screen, not on the committed query —
+    // after exiting, query and results persist while tree/systems is
+    // visible, and Cmd+1–9 must not jump to rows that aren't rendered.
+    if (!searchViewOpen || searchResults.length === 0) return;
 
     const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
@@ -2131,7 +2152,8 @@
     // Combobox flow: ArrowDown from the input pops focus into the list at
     // the current selection. Arrow nav within the list moves both
     // selection and focus together. ArrowUp from the first row pops back
-    // to the input. Enter on a focused row opens; Escape returns to input.
+    // to the input. Enter on a focused row opens; Escape is handled by
+    // the ladder above.
     if (event.key === 'ArrowDown') {
       if (inInput) {
         event.preventDefault();
@@ -2153,9 +2175,6 @@
       event.preventDefault();
       const sel = searchResults[selectedResultIndex];
       if (sel) handleOpenResult(sel.filename, sel.page_start);
-    } else if (event.key === 'Escape' && inList) {
-      event.preventDefault();
-      headerComponent?.focus();
     }
   }
 
@@ -2909,9 +2928,11 @@
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
+    onFocus={handleSearchFocus}
     onTogglePanel={togglePanel}
     onCollapseAll={collapseAll}
-    viewToggleVisible={!!selectedFolder && !searchActive}
+    viewToggleVisible={!!selectedFolder}
+    {searchViewOpen}
     {viewMode}
     onSetViewMode={setViewMode}
   />
@@ -2978,7 +2999,7 @@
       {/if}
 
       <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
+      <div class="file-tree-area" class:search-mode={searchViewOpen} on:mousedown={handleFileTreeAreaMousedown}>
         <!-- The scope bar is the readout in every mode: chips for each
              narrowing, plus the hits meter while a search is active. The
              console itself is the docked FilterPanel. -->
@@ -2994,7 +3015,7 @@
           resultCount={searchResults.length}
           indexedFileCount={searchableFileCount}
           isLoading={isSearching}
-          {searchActive}
+          searchActive={searchViewOpen && searchActive}
           onClearCollectionPlay={togglePlayCollection}
           onClearCollectionSolo={handleClearCollectionSolo}
           onClearCollectionMute={handleClearCollectionMute}
@@ -3004,7 +3025,7 @@
           onToggleCurationMute={toggleCurationMute}
           onToggleShowHidden={toggleShowHidden}
         />
-        {#if searchActive}
+        {#if searchViewOpen}
           <div class="search-split">
             <div class="search-list-pane">
               <SearchResults

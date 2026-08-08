@@ -10,11 +10,18 @@
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
+  export let onFocus: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
   export let onCollapseAll: () => void = () => {};
   export let viewToggleVisible: boolean = false;
   export let viewMode: 'tree' | 'systems' = 'tree';
   export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
+  export let searchViewOpen: boolean = false;
+
+  // Which segment reads as "where you are". None while the search view
+  // is up — search is entered from the bar, not the picker, so both
+  // segments sit idle as exits.
+  $: currentSegment = searchViewOpen ? null : viewMode;
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -45,21 +52,18 @@
       e.preventDefault();
       clearDebounce();
       onSubmit(searchQuery);
-    } else if (e.key === 'Escape') {
-      if (searchQuery.length > 0) {
-        e.preventDefault();
-        clearDebounce();
-        searchQuery = '';
-        onClear();
-      }
     }
+    // Escape is handled by the page-level ladder: it steps the search
+    // view closed and never clears the query — ✕ is the only clear.
   }
 
   function handleClear() {
     clearDebounce();
     searchQuery = '';
     onClear();
-    inputEl?.focus();
+    // Refocus only inside the search view — ✕ on a leftover query from a
+    // browse view is a tidy-up, not an entry (focus would reopen the view).
+    if (searchViewOpen) inputEl?.focus();
   }
 </script>
 
@@ -100,15 +104,16 @@
     {#if viewToggleVisible}
       <!-- View switch — a picker, not a mode: one view is always on, so the
            current segment sits on a raised fill instead of lighting purple.
-           Repeating the tree action collapses the whole tree. -->
+           Repeating the tree action collapses the whole tree. While the
+           search view is up neither segment is current; both act as exits. -->
       <div class="view-switch" role="group" aria-label="Library view">
         <button
           class="view-segment"
-          class:current={viewMode === 'systems'}
-          on:click={() => { if (viewMode !== 'systems') onSetViewMode('systems'); }}
+          class:current={currentSegment === 'systems'}
+          on:click={() => { if (currentSegment !== 'systems') onSetViewMode('systems'); }}
           title={'Shelve by system' + chordHint('view.systems')}
           aria-label="Shelve by system"
-          aria-pressed={viewMode === 'systems'}
+          aria-pressed={currentSegment === 'systems'}
         >
           <!-- Layered stack — shelve by system -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
@@ -119,11 +124,11 @@
         </button>
         <button
           class="view-segment"
-          class:current={viewMode === 'tree'}
-          on:click={() => (viewMode === 'tree' ? onCollapseAll() : onSetViewMode('tree'))}
-          title={(viewMode === 'tree' ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
+          class:current={currentSegment === 'tree'}
+          on:click={() => (currentSegment === 'tree' ? onCollapseAll() : onSetViewMode('tree'))}
+          title={(currentSegment === 'tree' ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
           aria-label="Tree view"
-          aria-pressed={viewMode === 'tree'}
+          aria-pressed={currentSegment === 'tree'}
         >
           <!-- List tree — folder hierarchy -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
@@ -148,6 +153,7 @@
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
+      on:focus={onFocus}
       aria-label="Search library"
     />
     {#if searchQuery.length > 0}
