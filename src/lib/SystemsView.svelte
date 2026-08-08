@@ -114,6 +114,20 @@
     collapsed = collapsed;
   }
 
+  // One source of truth for the channel-dim rule — the template's
+  // groupDimmed and the keyboard-nav model both call this; keep them
+  // in sync through it, never by copy (same pattern as treeNav's
+  // isRowOutOfScope).
+  function isGroupDimmed(
+    group: { muted: boolean; tag: string; entries: FileStatusEntry[] },
+    soloed: Set<string>,
+    bright: Set<string> | null
+  ): boolean {
+    return group.muted
+      || (soloed.size > 0 && !soloed.has(group.tag))
+      || (bright !== null && !group.entries.some((e) => bright.has(e.path)));
+  }
+
   function entryToFileItem(entry: FileStatusEntry): FileItem {
     return { name: entry.filename, path: entry.path, is_dir: false, children: null };
   }
@@ -206,18 +220,13 @@
   // from a non-collapsed group, in display order. A multi-tagged file
   // appears once per group it belongs to — same as the rendered list,
   // so ↓ walks visually adjacent rows. Mirrors the template's lens guard
-  // (duplicated rather than shared via a function — Svelte's reactive-
-  // statement dependency tracking is a textual scan of this block, so a
-  // read hidden inside a called function wouldn't be seen) so nav and
-  // render never drift: a group the lens drops is never focusable.
+  // via isGroupDimmed so nav and render never drift: a group the lens
+  // drops is never focusable.
   $: visibleEntries = (() => {
     const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
     for (const g of groups) {
       if (collapsed.has(g.tag)) continue;
-      const dimmed = g.muted
-        || (soloedSystems.size > 0 && !soloedSystems.has(g.tag))
-        || (scopeBrightPaths !== null && !g.entries.some((e) => scopeBrightPaths!.has(e.path)));
-      if (hideOutOfScope && dimmed) continue;
+      if (hideOutOfScope && isGroupDimmed(g, soloedSystems, scopeBrightPaths)) continue;
       for (const e of g.entries) out.push({ path: e.path, entry: e, tag: g.tag });
     }
     return out;
@@ -469,9 +478,7 @@
     {#each groups as group (group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
-      {@const groupDimmed = group.muted
-        || (soloedSystems.size > 0 && !soloedSystems.has(group.tag))
-        || (scopeBrightPaths !== null && !group.entries.some((e) => scopeBrightPaths.has(e.path)))}
+      {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths)}
       {#if !(hideOutOfScope && groupDimmed)}
       <section class="group">
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
