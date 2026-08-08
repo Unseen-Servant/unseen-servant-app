@@ -136,6 +136,20 @@
       submenu.style.bottom = 'auto';
       submenu.style.maxHeight = `${Math.max(120, Math.min(spaceBelow, 320))}px`;
     }
+
+    // Same idea horizontally: the static CSS opens at left: 100%, which
+    // clips against the right window edge. Flip to the left side of the
+    // menu when it has more room and the right side can't fit the submenu.
+    const menuRect = menuEl.getBoundingClientRect();
+    const spaceRight = window.innerWidth - menuRect.right - padding;
+    const spaceLeft = menuRect.left - padding;
+    if (submenu.offsetWidth > spaceRight && spaceLeft > spaceRight) {
+      submenu.style.left = 'auto';
+      submenu.style.right = '100%';
+    } else {
+      submenu.style.left = '100%';
+      submenu.style.right = 'auto';
+    }
   }
 
   onMount(() => {
@@ -223,6 +237,8 @@
 
   $: addExcludeSet = new Set(excludeFromAdd);
   $: addableCollections = Object.values(collections).filter((c) => !addExcludeSet.has(c.name));
+  // Remove-submenu rows only carry names — resolve their pigment here.
+  $: collectionColorByName = new Map(Object.values(collections).map((c) => [c.name, c.color]));
   $: hasCollections = addableCollections.length > 0;
   $: hasContainingCollections = containingCollections.length > 0;
 
@@ -289,6 +305,10 @@
               on:click={() => toggleGameSystem(sys.tag)}
             >
               <span class="submenu-check">{currentTags.includes(sys.tag) ? '✓' : ''}</span>
+              <!-- Font Awesome "dice-d6" — one fill for every system -->
+              <svg class="submenu-icon" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
+                <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+              </svg>
               <span>{sys.tag}</span>
             </button>
           {/each}
@@ -329,7 +349,18 @@
               data-mi="item"
               on:click={() => onAddToCollection(col.name)}
             >
-              {col.name}
+              {#if col.color}
+                <!-- Bookmark ribbon — the collection keeps its pigment -->
+                <svg class="submenu-icon" viewBox="0 0 24 24" fill={col.color} aria-hidden="true">
+                  <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                </svg>
+              {:else}
+                <!-- No pigment — outline ribbon, same grammar as the chips -->
+                <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M6 3h12v18l-6-4.4L6 21z"/>
+                </svg>
+              {/if}
+              <span>{col.name}</span>
             </button>
           {/each}
           {#if hasCollections}
@@ -362,7 +393,17 @@
                 data-mi="item"
                 on:click={() => onRemoveFromCollection(name)}
               >
-                {name}
+                {#if collectionColorByName.get(name)}
+                  <!-- Bookmark ribbon — the collection keeps its pigment -->
+                  <svg class="submenu-icon" viewBox="0 0 24 24" fill={collectionColorByName.get(name)} aria-hidden="true">
+                    <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                  </svg>
+                {:else}
+                  <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 3h12v18l-6-4.4L6 21z"/>
+                  </svg>
+                {/if}
+                <span>{name}</span>
               </button>
             {/each}
           </div>
@@ -442,6 +483,13 @@
     text-align: center;
     margin-right: 0.25rem;
     color: var(--text-accent);
+  }
+  .submenu-icon {
+    width: 11px;
+    height: 11px;
+    vertical-align: -1px;
+    margin-right: 0.3rem;
+    flex-shrink: 0;
   }
   .submenu {
     position: absolute;
