@@ -63,7 +63,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
   { id: 'tree.activate',         keys: { mac: 'Space',other: 'Space' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
-  { id: 'tree.toggleSelect',     keys: { mac: '↵',    other: 'Enter' },         label: 'Toggle selection checkbox',    scope: 'fileTree' },
+  { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: 'Toggle selection checkbox',    scope: 'fileTree' },
   { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Reveal row in OS file explorer', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },

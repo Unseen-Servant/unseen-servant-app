@@ -1751,15 +1751,15 @@
 
     // Space is the row's primary action, same grammar as the collection
     // transport: open the focused file / toggle the focused folder.
-    // Enter takes the indexing checkbox (the old Space role) so the
-    // selection toggle keeps a key.
+    // X marks the row for indexing — the selection-checkbox toggle
+    // (Space's old role), on its own key like the other row letters.
     if (event.key === ' ') {
       event.preventDefault();
       activateFocusedTreeRow();
       return true;
     }
 
-    if (event.key === 'Enter') {
+    if (bareLetter && lk === 'x') {
       event.preventDefault();
       toogleSelection(row.path, row.item.is_dir, row.item, false);
       return true;
