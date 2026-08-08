@@ -247,8 +247,8 @@
   // hides them: narrowing a filesystem-shaped tree by content metadata
   // breaks the spatial mental model — folders and ancestors would
   // disappear for reasons the tree itself can't explain.
-  $: systemsFilterRelevant = viewMode === 'systems' || searchActive;
-  $: curationFilterRelevant = viewMode === 'systems' || searchActive;
+  $: systemsFilterRelevant = viewMode === 'systems' || searchViewOpen;
+  $: curationFilterRelevant = viewMode === 'systems' || searchViewOpen;
   // Clamp selection when results shrink (e.g. new query returns fewer hits).
   $: if (selectedResultIndex >= searchResults.length) {
     selectedResultIndex = searchResults.length > 0 ? searchResults.length - 1 : 0;
@@ -1690,7 +1690,7 @@
   // height of its content, so clicks in the empty area below the last
   // group still land here.
   function handleFileTreeAreaMousedown(event: MouseEvent) {
-    if (searchActive) return;
+    if (searchViewOpen) return;
     if (focusedFilePath !== null) return;
     const target = event.target as HTMLElement | null;
     if (viewMode === 'systems') {
@@ -1999,7 +1999,7 @@
     // in the target region if it's still visible, else lands on the first
     // visible row. Skipped during search (the search input owns ←/→ for
     // text editing).
-    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchActive
+    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchViewOpen
         && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       event.preventDefault();
       if (event.key === 'ArrowLeft') focusCollectionsRegion();
@@ -2120,22 +2120,13 @@
     // the tree-only nav block so action keys don't fall through to view-
     // specific handlers in either mode.
     const fileActionGate =
-      selectedFolder && !searchActive && !contextMenu && !renamingFilePath &&
+      selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath &&
       !competingMenuOpen && !focusedCollectionName && !inAnyInput;
     if (fileActionGate && handleFocusedFileActionKey(event)) return;
 
     // Tree-row arrow navigation. Systems view owns its own arrow nav,
     // so this block is gated to tree mode only.
-    if (selectedFolder && !searchActive && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
-      if (event.key === 'ArrowDown' && inSearchInput && searchQuery === '') {
-        if (visibleTreeRows.length > 0) {
-          event.preventDefault();
-          (target as HTMLInputElement).blur();
-          focusTreeRow(visibleTreeRows[0].path);
-        }
-        return;
-      }
-
+    if (selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
       if (!inAnyInput && handleTreeNavKey(event)) return;
     }
 
@@ -3020,7 +3011,7 @@
           resultCount={searchResults.length}
           indexedFileCount={searchableFileCount}
           isLoading={isSearching}
-          {searchActive}
+          searchActive={searchViewOpen && searchActive}
           onClearCollectionPlay={togglePlayCollection}
           onClearCollectionSolo={handleClearCollectionSolo}
           onClearCollectionMute={handleClearCollectionMute}
