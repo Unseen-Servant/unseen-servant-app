@@ -1,12 +1,10 @@
 <script lang="ts">
-  // Persistent readout of every narrowing the user has applied, and the
-  // home of the filter console. The faders button at the left edge opens
-  // the console (FilterMenu) right below the bar; each chip is a
+  // Persistent readout of every narrowing the user has applied. The
+  // mixer console lives in the docked FilterPanel (header cluster
+  // toggle); this bar stays the readout — each chip is a
   // clear-affordance — the whole chip is the button; click to undo that
   // single narrowing without touching the others.
 
-  import FilterMenu from './FilterMenu.svelte';
-  import { chordHint } from './keybindings';
   import { displaySystem } from './searchScope';
   import type { CurationKey } from './searchScope';
 
@@ -32,26 +30,6 @@
   export let onToggleCurationMute: (key: CurationKey) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
 
-  // Console (FilterMenu) pass-through — the menu and the chips read and
-  // write the same narrowing state, so engaging S in the console
-  // materializes a chip here, and clearing a chip resets the menu row.
-  export let availableSystems: { name: string; count: number }[] = [];
-  export let untaggedCount: number = 0;
-  export let showSystemFilter: boolean = true;
-  export let showCollectionFilter: boolean = false;
-  export let collectedCount: number = 0;
-  export let uncollectedCount: number = 0;
-  export let hiddenCount: number = 0;
-  export let onClearHidden: () => void = () => {};
-  export let onClearAll: () => void = () => {};
-
-  let consoleOpen = false;
-  let consoleBtn: HTMLButtonElement | undefined;
-
-  export function toggleConsole() {
-    consoleOpen = !consoleOpen;
-  }
-
   const CURATION_LABELS: Record<CurationKey, string> = {
     collected: 'In a collection',
     loose: 'Loose',
@@ -70,52 +48,6 @@
 </script>
 
 <div class="scope-bar">
-  <div class="console-anchor">
-    <button
-      type="button"
-      class="console-btn"
-      class:open={consoleOpen}
-      bind:this={consoleBtn}
-      on:click|stopPropagation={() => { consoleOpen = !consoleOpen; }}
-      title={`Filter console${chordHint('filter.toggle')}`}
-      aria-label="Filter console"
-      aria-haspopup="menu"
-      aria-expanded={consoleOpen}
-    >
-      <!-- Faders — three channel lines with offset knobs -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-        <path d="M5 4v16M12 4v16M19 4v16"/>
-        <circle class="knob" cx="5" cy="15" r="2.6"/>
-        <circle class="knob" cx="12" cy="8" r="2.6"/>
-        <circle class="knob" cx="19" cy="12" r="2.6"/>
-      </svg>
-    </button>
-    <FilterMenu
-      open={consoleOpen}
-      anchorEl={consoleBtn}
-      {excludedSystems}
-      {soloedSystems}
-      systems={availableSystems}
-      {untaggedCount}
-      {showSystemFilter}
-      onToggleSystem={onToggleSystemFilter}
-      onToggleSolo={onToggleSystemSolo}
-      {showHidden}
-      {hiddenCount}
-      {onToggleShowHidden}
-      {onClearHidden}
-      {showCollectionFilter}
-      {collectedCount}
-      {uncollectedCount}
-      {curationSolos}
-      {curationMutes}
-      {onToggleCurationSolo}
-      {onToggleCurationMute}
-      {onClearAll}
-      onClose={() => { consoleOpen = false; }}
-    />
-  </div>
-
   <div class="left">
     {#each collectionSolos as chip (chip.key)}
       <button
@@ -269,51 +201,6 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
     flex-shrink: 0;
-  }
-
-  /* Anchor for the console dropdown — the menu positions itself below
-     the faders button (FilterMenu is absolute against this wrapper). */
-  .console-anchor {
-    position: relative;
-    flex-shrink: 0;
-    display: flex;
-  }
-
-  .console-btn {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    padding: 0;
-    cursor: pointer;
-    transition: color var(--transition-fast), background var(--transition-fast);
-  }
-  .console-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-container);
-  }
-  .console-btn:active {
-    transform: scale(0.97);
-  }
-  /* Open = a mode the user switched on: purple + LED glow. */
-  .console-btn.open {
-    color: var(--text-active);
-    filter: var(--glow-active);
-  }
-  .console-btn svg {
-    width: 13px;
-    height: 13px;
-    display: block;
-  }
-  /* Knobs punch out of the channel lines by taking the bar's background. */
-  .console-btn .knob {
-    fill: var(--bg-app);
   }
 
   .left {

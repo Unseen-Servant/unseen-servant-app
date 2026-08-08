@@ -23,7 +23,7 @@
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
-  import CollectionEditDialog from '../lib/CollectionEditDialog.svelte';
+  import FilterPanel from '../lib/FilterPanel.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
@@ -112,7 +112,36 @@
   let collectionEditDescription = '';
   let activeContextName: string | null = null;
   let collectionsPanelOpen = true;
-  let editingMetadataFor: string | null = null;
+  // The filter panel docks below the collections panel in the left pane;
+  // both persist across launches independently.
+  let filterPanelOpen = false;
+  // Collections-panel sort. 'custom' is the DAW default — collections
+  // are tracks, drag-reorderable; the order (a name array) persists with
+  // the sort choice. Names missing from the array sort after it.
+  type CollectionsSortKey = 'custom' | 'name' | 'size' | 'created';
+  let collectionsSortKey: CollectionsSortKey = 'custom';
+  let collectionsCustomOrder: string[] = [];
+
+  async function persistCollectionsSort() {
+    try {
+      const store = await load('settings.json');
+      await store.set('collectionsSortKey', collectionsSortKey);
+      await store.set('collectionsCustomOrder', collectionsCustomOrder);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist collections sort:', e);
+    }
+  }
+
+  function setCollectionsSortKey(key: CollectionsSortKey) {
+    collectionsSortKey = key;
+    persistCollectionsSort();
+  }
+
+  function reorderCollections(order: string[]) {
+    collectionsCustomOrder = order;
+    persistCollectionsSort();
+  }
 
   // Library narrowing — one model, three axes, DAW semantics on each:
   // solos union within an axis, axes intersect, solo overrides mute.
@@ -192,7 +221,6 @@
   let searchSeq = 0;
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
-  let searchScopeBarComponent: SearchScopeBar | undefined;
   let searchResultsComponent: SearchResults | undefined;
   let systemsViewComponent: SystemsView | undefined;
   let collectionsPanelComponent: CollectionsPanel | undefined;
@@ -236,14 +264,24 @@
         color: collections[activeContextName]?.color ?? null,
       });
     }
-    for (const [path, ref] of soloCollections) {
-      chips.push({ key: path, label: ref.label, color: null });
+    // Collection-kind narrowings carry the collection's pigment on their
+    // chip bookmark; folder/file narrowings stay on the tertiary fallback.
+    for (const [key, ref] of soloCollections) {
+      chips.push({
+        key,
+        label: ref.label,
+        color: ref.kind === 'collection' ? collections[key]?.color || null : null,
+      });
     }
     return chips;
   })();
   $: collectionMutes = isCollectionEditMode
     ? []
-    : [...mutedCollections].map(([path, ref]) => ({ key: path, label: ref.label, color: null as string | null }));
+    : [...mutedCollections].map(([key, ref]) => ({
+        key,
+        label: ref.label,
+        color: ref.kind === 'collection' ? collections[key]?.color || null : null,
+      }));
   function handleClearCollectionSolo(key: string) {
     if (key === ACTIVE_CONTEXT_CHIP_KEY) {
       clearActiveContext();
@@ -296,10 +334,12 @@
     cols: Record<string, CollectionInfo>,
     indexed: Set<string>
   ): string[] | null {
-    const refFiles = (path: string, kind: 'folder' | 'file') =>
-      kind === 'folder'
-        ? indexedPdfsUnderPath(path)
-        : indexed.has(path) ? [path] : [];
+    const refFiles = (key: string, kind: ScopeRef['kind']) =>
+      kind === 'collection'
+        ? (cols[key]?.file_paths ?? []).filter((p) => indexed.has(p))
+        : kind === 'folder'
+          ? indexedPdfsUnderPath(key)
+          : indexed.has(key) ? [key] : [];
     const soloSets = [...solos].map(([p, r]) => refFiles(p, r.kind));
     if (activeName && cols[activeName]) {
       if (soloSets.length === 0) return null;
@@ -614,6 +654,21 @@
       if (savedPanelOpen !== undefined) {
         collectionsPanelOpen = savedPanelOpen;
       }
+      const savedFilterPanelOpen = parseBoolean(await store.get('filterPanelOpen'));
+      if (savedFilterPanelOpen !== undefined) {
+        filterPanelOpen = savedFilterPanelOpen;
+      }
+      const savedCollectionsSort = parseEnum(
+        await store.get('collectionsSortKey'),
+        ['custom', 'name', 'size', 'created'] as const,
+      );
+      if (savedCollectionsSort) {
+        collectionsSortKey = savedCollectionsSort;
+      }
+      const savedCustomOrder = parseStringArray(await store.get('collectionsCustomOrder'));
+      if (savedCustomOrder) {
+        collectionsCustomOrder = savedCustomOrder;
+      }
       // libraryFilter persistence intentionally removed: filter state is
       // session-scoped now. We delete the old key to avoid confusion if a
       // user inspects settings.json — and so older versions don't reload
@@ -822,6 +877,36 @@
     mutedCollections = mutedCollections;
     if (committedQuery) runSearch(committedQuery);
   }
+
+  // Collection-kind S/M from the collections panel — same axis and
+  // union semantics as folder/file scope refs, keyed by collection name.
+  function toggleCollectionSolo(name: string) {
+    if (soloCollections.has(name)) {
+      soloCollections.delete(name);
+    } else {
+      soloCollections.set(name, { kind: 'collection', label: name });
+    }
+    soloCollections = soloCollections;
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  function toggleCollectionMute(name: string) {
+    if (mutedCollections.has(name)) {
+      mutedCollections.delete(name);
+    } else {
+      mutedCollections.set(name, { kind: 'collection', label: name });
+    }
+    mutedCollections = mutedCollections;
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  // The panel's S/M lamps read from these views over the shared maps.
+  $: soloedCollectionNames = new Set(
+    [...soloCollections].filter(([, r]) => r.kind === 'collection').map(([k]) => k)
+  );
+  $: mutedCollectionNames = new Set(
+    [...mutedCollections].filter(([, r]) => r.kind === 'collection').map(([k]) => k)
+  );
 
   // Footer [clear all] in the filter console: resets every solo/mute on
   // all three axes — the same action as clearing each chip in the scope
@@ -1380,22 +1465,6 @@
   $: mutedScopePaths = new Set(mutedCollections.keys());
   $: soloedScopePaths = new Set(soloCollections.keys());
 
-  // Per-collection count of files currently hidden in the tree. Surfaced
-  // in the collections panel so users notice their curated set holds
-  // tucked-away items even when the tree is compressed.
-  $: hiddenCountByCollection = (() => {
-    const out: Record<string, number> = {};
-    if (hiddenPaths.size === 0) return out;
-    for (const col of Object.values(collections)) {
-      let n = 0;
-      for (const p of col.file_paths) {
-        if (isPathOrAncestorIn(p, hiddenPaths)) n++;
-      }
-      if (n > 0) out[col.name] = n;
-    }
-    return out;
-  })();
-
   // Union of every collection's file paths. Powers the "uncategorized"
   // filter and any membership check that's library-wide rather than
   // single-collection.
@@ -1881,10 +1950,13 @@
       // left intact across menu open/close.
       if (contextMenu) return;
       if (renamingFilePath) { renamingFilePath = null; return; }
-      // A competing popover (filter / sort / dropdown) handles its own Esc.
-      // Don't reach the focus-clear branch below — that would wipe the
-      // user's tree highlight as a side effect of closing a menu.
-      if (document.querySelector('.filter-menu, .sort-menu, .dropdown')) return;
+      // A competing popover (sort menu / dropdown / the collections
+      // panel's context menu) handles its own Esc. Don't reach the
+      // focus-clear branch below — that would wipe the user's tree
+      // highlight as a side effect of closing a menu. The docked filter
+      // panel handles its own Esc element-side (it only claims keys
+      // while focus is inside it).
+      if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
       // Empty search input: blur and place keyboard focus in the tree so
       // arrows immediately navigate. If a tree row was already focused,
       // we leave it where it is.
@@ -1987,11 +2059,11 @@
       }
     }
 
-    // Cmd/Ctrl+Shift+F: toggle the filter console (anchored to the
-    // scope bar's faders button).
-    if (meta && event.shiftKey && lk === 'f' && selectedFolder) {
+    // Cmd/Ctrl+E: toggle the Filters panel (docked below the collections
+    // panel in the left pane).
+    if (meta && !event.shiftKey && lk === 'e' && selectedFolder) {
       event.preventDefault();
-      searchScopeBarComponent?.toggleConsole();
+      toggleFilterPanel();
       return;
     }
 
@@ -2455,7 +2527,18 @@
     try {
       await invoke('delete_collection', { name });
       cancelCollectionEdit();
+      // Any solo/mute on the deleted collection clears with it — its
+      // chip disappears rather than narrowing on a ghost.
+      const hadSolo = soloCollections.delete(name);
+      const hadMute = mutedCollections.delete(name);
+      if (hadSolo) soloCollections = soloCollections;
+      if (hadMute) mutedCollections = mutedCollections;
+      if (collectionsCustomOrder.includes(name)) {
+        collectionsCustomOrder = collectionsCustomOrder.filter((n) => n !== name);
+        persistCollectionsSort();
+      }
       await loadCollections();
+      if ((hadSolo || hadMute) && committedQuery) runSearch(committedQuery);
       jobNotification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
     } catch (e) {
       jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
@@ -2610,6 +2693,17 @@
     }
   }
 
+  async function toggleFilterPanel() {
+    filterPanelOpen = !filterPanelOpen;
+    try {
+      const store = await load('settings.json');
+      await store.set('filterPanelOpen', filterPanelOpen);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist panel state:', e);
+    }
+  }
+
   // Panel "+" handler — opens a fresh draft with an auto-generated name.
   // CollectionsPanel auto-enters rename mode when the draft appears, so
   // the user can immediately type a name. Focusing the draft also lets
@@ -2629,62 +2723,58 @@
     collectionEditName = name;
   }
 
-  function startEditMetadata(name: string) {
-    editingMetadataFor = name;
-  }
-
-  async function saveMetadata(changes: {
-    name: string;
-    description: string;
-    color: string;
-    archived: boolean;
-  }) {
-    const original = editingMetadataFor;
-    if (!original) return;
-    const col = collections[original];
-    if (!col) {
-      editingMetadataFor = null;
-      return;
-    }
-    editingMetadataFor = null;
-
-    const renaming = changes.name !== original;
-    const metadataChanged =
-      changes.description !== col.description ||
-      (changes.color || null) !== col.color ||
-      changes.archived !== col.archived;
-
+  // Inline rename of an existing collection (F2 / double-click on the
+  // panel row). Collisions surface as a notification; the row snaps back.
+  async function renameCollection(name: string, newName: string) {
+    if (newName === name) return;
     try {
-      let effectiveName = original;
-      if (renaming) {
-        await invoke<CollectionMutationResult>('rename_collection', {
-          name: original,
-          newName: changes.name,
-        });
-        effectiveName = changes.name;
+      await invoke<CollectionMutationResult>('rename_collection', {
+        name,
+        newName,
+      });
+      // Migrate any narrowing keyed by the old name so an engaged S/M
+      // (and its chip) follows the rename instead of going stale.
+      if (soloCollections.has(name)) {
+        soloCollections.delete(name);
+        soloCollections.set(newName, { kind: 'collection', label: newName });
+        soloCollections = soloCollections;
       }
-      if (metadataChanged) {
-        await invoke('update_collection', {
-          name: effectiveName,
-          description: changes.description,
-          color: changes.color,
-          archived: changes.archived,
-        });
+      if (mutedCollections.has(name)) {
+        mutedCollections.delete(name);
+        mutedCollections.set(newName, { kind: 'collection', label: newName });
+        mutedCollections = mutedCollections;
+      }
+      // Custom sort order follows the rename in place.
+      if (collectionsCustomOrder.includes(name)) {
+        collectionsCustomOrder = collectionsCustomOrder.map((n) => (n === name ? newName : n));
+        persistCollectionsSort();
       }
       jobNotification.show({
         type: 'success',
-        message: renaming ? `Renamed to "${changes.name}"` : `Updated "${changes.name}"`,
+        message: `Renamed to "${newName}"`,
         duration: 4000,
       });
-      // If the user archived the active context, clear it.
-      if (changes.archived && activeContextName === original) {
-        await invoke('clear_active_context');
-      }
+      await loadCollections();
+      if (committedQuery) runSearch(committedQuery);
+    } catch (e) {
+      jobNotification.show({
+        type: 'error',
+        message: `Rename failed: ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  // Pigment change from the panel's context menu — bookmarks, chips, and
+  // index cells all derive from `collections`, so a reload updates them.
+  async function setCollectionColor(name: string, color: string | null) {
+    try {
+      await invoke('update_collection', { name, color: color ?? '' });
       await loadCollections();
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Save failed: ${String(e)}`,
+        message: `Could not set pigment: ${String(e)}`,
         duration: 5000,
       });
     }
@@ -2904,6 +2994,8 @@
     disabled={!selectedFolder || isCollectionEditMode}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
+    {filterPanelOpen}
+    onToggleFilterPanel={toggleFilterPanel}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
@@ -2918,37 +3010,76 @@
 
   {#if selectedFolder}
     <div class="workspace">
-      {#if collectionsPanelOpen}
-        <CollectionsPanel
-          bind:this={collectionsPanelComponent}
-          {collections}
-          {hiddenCountByCollection}
-          activeName={activeContextName}
-          editingName={editingCollectionName}
-          {draftName}
-          editFileCount={collectionEditPaths.size}
-          onSetActive={setActiveContext}
-          onClearActive={clearActiveContext}
-          onEdit={startEditMetadata}
-          onEditFiles={startEditCollection}
-          onDelete={requestDeleteCollection}
-          onToggleArchived={toggleArchived}
-          onCreate={inlineCreateCollection}
-          onSaveFiles={saveCollection}
-          onCancelFiles={cancelCollectionEdit}
-          onDraftRename={handleDraftRename}
-          focusedName={focusedCollectionName}
-          onFocusCollection={setFocusedCollectionName}
-        />
+      {#if collectionsPanelOpen || filterPanelOpen}
+        <!-- Left dock: collections on top, filters below. Each panel
+             scrolls its own rows; the dock owns the width and the
+             dividing rules. -->
+        <div class="left-dock">
+          {#if collectionsPanelOpen}
+            <CollectionsPanel
+              bind:this={collectionsPanelComponent}
+              {collections}
+              activeName={activeContextName}
+              editingName={editingCollectionName}
+              {draftName}
+              editFileCount={collectionEditPaths.size}
+              soloedNames={soloedCollectionNames}
+              mutedNames={mutedCollectionNames}
+              gameSystemMap={effectiveGameSystemMap}
+              sortKey={collectionsSortKey}
+              customOrder={collectionsCustomOrder}
+              onSetActive={setActiveContext}
+              onClearActive={clearActiveContext}
+              onEditFiles={startEditCollection}
+              onDelete={requestDeleteCollection}
+              onToggleArchived={toggleArchived}
+              onCreate={inlineCreateCollection}
+              onSaveFiles={saveCollection}
+              onCancelFiles={cancelCollectionEdit}
+              onDraftRename={handleDraftRename}
+              onRename={renameCollection}
+              onSetColor={setCollectionColor}
+              onToggleSolo={toggleCollectionSolo}
+              onToggleMute={toggleCollectionMute}
+              onSetSortKey={setCollectionsSortKey}
+              onReorder={reorderCollections}
+              focusedName={focusedCollectionName}
+              onFocusCollection={setFocusedCollectionName}
+            />
+          {/if}
+          {#if filterPanelOpen}
+            <FilterPanel
+              excludedSystems={filterExcludedSystems}
+              {soloedSystems}
+              systems={gameSystemStats}
+              untaggedCount={untaggedFileCount}
+              showSystemFilter={systemsFilterRelevant}
+              onToggleSystem={toggleSystemFilter}
+              onToggleSolo={toggleSystemSolo}
+              {showHidden}
+              {hiddenCount}
+              onToggleShowHidden={toggleShowHidden}
+              onClearHidden={clearHidden}
+              showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
+              {collectedCount}
+              {uncollectedCount}
+              curationSolos={soloCuration}
+              curationMutes={mutedCuration}
+              onToggleCurationSolo={toggleCurationSolo}
+              onToggleCurationMute={toggleCurationMute}
+              onClearAll={clearAllFilters}
+              onClose={toggleFilterPanel}
+            />
+          {/if}
+        </div>
       {/if}
 
       <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
-        <!-- The scope bar is the filter home in every mode: readout chips
-             plus the console opener at its left edge. The hits meter only
-             appears while a search is active. -->
+        <!-- The scope bar is the readout in every mode: chips for each
+             narrowing, plus the hits meter while a search is active. The
+             console itself is the docked FilterPanel. -->
         <SearchScopeBar
-          bind:this={searchScopeBarComponent}
           {collectionSolos}
           {collectionMutes}
           excludedSystems={filterExcludedSystems}
@@ -2967,15 +3098,6 @@
           onToggleCurationSolo={toggleCurationSolo}
           onToggleCurationMute={toggleCurationMute}
           onToggleShowHidden={toggleShowHidden}
-          availableSystems={gameSystemStats}
-          untaggedCount={untaggedFileCount}
-          showSystemFilter={systemsFilterRelevant}
-          showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
-          {collectedCount}
-          {uncollectedCount}
-          {hiddenCount}
-          onClearHidden={clearHidden}
-          onClearAll={clearAllFilters}
         />
         {#if searchActive}
           <div class="search-split">
@@ -3133,19 +3255,11 @@
   {#if pendingDeleteCollection}
     <ConfirmDialog
       title="Delete collection"
-      message={`Delete "${pendingDeleteCollection}"? Files in your library are not affected.`}
+      message={`Delete "${pendingDeleteCollection}"? Its files are freed to Loose — nothing in your library is deleted.`}
       confirmLabel="Delete"
       danger
       onConfirm={confirmDeleteCollection}
       onCancel={() => { pendingDeleteCollection = null; }}
-    />
-  {/if}
-
-  {#if editingMetadataFor && collections[editingMetadataFor]}
-    <CollectionEditDialog
-      collection={collections[editingMetadataFor]}
-      onSave={saveMetadata}
-      onCancel={() => { editingMetadataFor = null; }}
     />
   {/if}
 
@@ -3224,6 +3338,37 @@
     display: flex;
     flex-direction: row;
     overflow: hidden;
+  }
+
+  /* Left dock — the two panels stack vertically and share the column.
+     Collections takes the free space; the filter panel keeps to its
+     content height (capped so a long systems list can't crowd the
+     collections out) and scrolls internally past the cap. */
+  .left-dock {
+    width: 280px;
+    flex-shrink: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-app);
+    border-right: 1px solid var(--border-subtle);
+  }
+  .left-dock > :global(.panel) {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .left-dock > :global(.filter-panel) {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 60%;
+  }
+  /* When the filter panel is alone in the dock it may grow. */
+  .left-dock > :global(.filter-panel:only-child) {
+    flex: 1 1 auto;
+    max-height: none;
+  }
+  .left-dock > :global(* + *) {
+    border-top: 1px solid var(--border-subtle);
   }
 
   .file-tree-area {

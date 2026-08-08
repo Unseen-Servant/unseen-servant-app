@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
   import ActionButton from './ActionButton.svelte';
+  import SystemBadge from './SystemBadge.svelte';
+  import { PIGMENTS } from './palette';
   import { tick } from 'svelte';
 
   export let collections: Record<string, CollectionInfo> = {};
@@ -8,10 +10,6 @@
   // focusedFilePath (only one region claims arrow keys at a time).
   export let focusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
-  // Per-collection count of files currently hidden in the tree. Only
-  // entries with count > 0 are shown alongside the file-count chip as a
-  // muted reminder that the collection holds tucked-away items.
-  export let hiddenCountByCollection: Record<string, number> = {};
   export let activeName: string | null = null;
   export let editingName: string | null = null;
   // Proposed name of an in-progress draft (new collection that hasn't been
@@ -19,11 +17,18 @@
   // the inline Save/Cancel controls just like an editing row.
   export let draftName: string | null = null;
   // Live count of paths currently selected in the in-progress edit/draft.
-  // Shown in place of the persisted file_count on the row being edited.
+  // Shown on the row being edited.
   export let editFileCount: number = 0;
+  // Collection-axis S/M — names engaged in the shared narrowing maps.
+  export let soloedNames: Set<string> = new Set();
+  export let mutedNames: Set<string> = new Set();
+  // File path → game-system tags, for the badge on expanded file rows.
+  export let gameSystemMap: Map<string, string[]> = new Map();
+  // Sort state is lifted to +page for per-vault persistence.
+  export let sortKey: 'custom' | 'name' | 'size' | 'created' = 'custom';
+  export let customOrder: string[] = [];
   export let onSetActive: (name: string) => void = () => {};
   export let onClearActive: () => void = () => {};
-  export let onEdit: (name: string) => void = () => {};
   export let onEditFiles: (name: string) => void = () => {};
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
@@ -31,23 +36,42 @@
   export let onSaveFiles: () => void = () => {};
   export let onCancelFiles: () => void = () => {};
   export let onDraftRename: (name: string) => void = () => {};
+  export let onRename: (name: string, newName: string) => void = () => {};
+  export let onSetColor: (name: string, color: string | null) => void = () => {};
+  export let onToggleSolo: (name: string) => void = () => {};
+  export let onToggleMute: (name: string) => void = () => {};
+  export let onSetSortKey: (key: 'custom' | 'name' | 'size' | 'created') => void = () => {};
+  export let onReorder: (order: string[]) => void = () => {};
 
-  type SortKey = 'last_used' | 'name' | 'size';
-  const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-    { value: 'last_used', label: 'Last used' },
+  const SORT_OPTIONS: { value: typeof sortKey; label: string }[] = [
+    { value: 'custom', label: 'Custom order' },
     { value: 'name', label: 'Name' },
-    { value: 'size', label: 'Size' },
+    { value: 'size', label: 'File count' },
+    { value: 'created', label: 'Recently added' },
   ];
-  let sortKey: SortKey = 'last_used';
   let showArchived = false;
-
-  // Draft name editing — when the user clicks the draft row's name, swap
-  // it for an inline text input. Esc reverts, Enter / blur commits.
-  let renamingDraft = false;
-  let draftRenameValue = '';
 
   let sortMenuOpen = false;
   let sortBtn: HTMLButtonElement;
+
+  // Disclosure state — which collections show their file rows.
+  let expandedNames = new Set<string>();
+
+  function toggleExpand(name: string) {
+    if (expandedNames.has(name)) expandedNames.delete(name);
+    else expandedNames.add(name);
+    expandedNames = expandedNames;
+  }
+
+  // ------------------------------------------------------------------
+  // Inline rename — draft rows (unsaved) and existing rows (F2 or
+  // double-click) share the input treatment; drafts rename locally,
+  // existing rows commit through the backend via onRename.
+  // ------------------------------------------------------------------
+  let renamingDraft = false;
+  let draftRenameValue = '';
+  let renamingName: string | null = null;
+  let renameValue = '';
 
   // Reset rename mode when the draft itself goes away.
   $: if (!draftName) renamingDraft = false;
@@ -88,31 +112,175 @@
     }
   }
 
+  function startRename(name: string) {
+    renamingName = name;
+    renameValue = name;
+  }
+
+  function commitRename() {
+    if (renamingName === null) return;
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== renamingName) onRename(renamingName, trimmed);
+    renamingName = null;
+  }
+
+  function handleRenameKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      renamingName = null;
+    }
+  }
+
   function autofocusInput(node: HTMLInputElement) {
     node.focus();
     node.select();
   }
 
+  // ------------------------------------------------------------------
+  // Sorting + drag reorder
+  // ------------------------------------------------------------------
   $: rows = (() => {
     const list = Object.values(collections);
     const visible = showArchived ? list : list.filter(c => !c.archived);
-    visible.sort((a, b) => {
-      if (sortKey === 'name') return a.name.localeCompare(b.name);
-      if (sortKey === 'size') return b.file_count - a.file_count;
-      const ta = a.last_used_at ? Date.parse(a.last_used_at) : -Infinity;
-      const tb = b.last_used_at ? Date.parse(b.last_used_at) : -Infinity;
-      return tb - ta;
-    });
+    if (sortKey === 'name') {
+      visible.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortKey === 'size') {
+      visible.sort((a, b) => b.file_count - a.file_count);
+    } else if (sortKey === 'created') {
+      visible.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    } else {
+      // Custom order — persisted name array; names it doesn't know yet
+      // (created since the last drag) sort after it, alphabetically.
+      const idx = new Map(customOrder.map((n, i) => [n, i]));
+      visible.sort((a, b) => {
+        const ia = idx.has(a.name) ? idx.get(a.name)! : Infinity;
+        const ib = idx.has(b.name) ? idx.get(b.name)! : Infinity;
+        if (ia !== ib) return ia - ib;
+        return a.name.localeCompare(b.name);
+      });
+    }
     return visible;
   })();
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
+  $: canDrag = sortKey === 'custom' && rows.length > 1 && !editingName && !draftName;
+
+  let draggingName: string | null = null;
+  // Insertion index into `rows` while dragging (rows.length = after last).
+  let dropInsertIndex: number | null = null;
+
+  function handleDragStart(e: DragEvent, name: string) {
+    if (!canDrag) {
+      e.preventDefault();
+      return;
+    }
+    draggingName = name;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', name);
+    }
+  }
+
+  function handleDragOver(e: DragEvent, index: number) {
+    if (draggingName === null) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    dropInsertIndex = e.clientY < rect.top + rect.height / 2 ? index : index + 1;
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    if (draggingName === null || dropInsertIndex === null) return;
+    const names = rows.map(r => r.name);
+    const from = names.indexOf(draggingName);
+    if (from >= 0) {
+      const insertAt = dropInsertIndex > from ? dropInsertIndex - 1 : dropInsertIndex;
+      names.splice(from, 1);
+      names.splice(insertAt, 0, draggingName);
+      // Persist the full order: the visible sequence first, then any
+      // collections the current view hides (archived), so their slots
+      // aren't forgotten.
+      const inVisible = new Set(names);
+      const rest = Object.values(collections).map(c => c.name).filter(n => !inVisible.has(n));
+      onReorder([...names, ...rest]);
+    }
+    draggingName = null;
+    dropInsertIndex = null;
+  }
+
+  function handleDragEnd() {
+    draggingName = null;
+    dropInsertIndex = null;
+  }
+
+  // ------------------------------------------------------------------
+  // Context menu (right-click a collection row): Rename / Pigment ▸ /
+  // Add files… / Archive / Delete. Same visual family as the file
+  // tree's ContextMenu, scoped to what a collection can do.
+  // ------------------------------------------------------------------
+  let ctxMenu: { x: number; y: number; name: string } | null = null;
+  let ctxPigmentOpen = false;
+
+  const CTX_WIDTH = 190;
+  const CTX_HEIGHT = 200;
+
+  function openContextMenu(e: MouseEvent, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    onFocusCollection(name);
+    ctxPigmentOpen = false;
+    ctxMenu = {
+      x: Math.min(e.clientX, window.innerWidth - CTX_WIDTH - 4),
+      y: Math.min(e.clientY, window.innerHeight - CTX_HEIGHT - 4),
+      name,
+    };
+  }
+
+  function closeContextMenu() {
+    ctxMenu = null;
+    ctxPigmentOpen = false;
+  }
+
+  function ctxAction(fn: () => void) {
+    closeContextMenu();
+    fn();
+  }
+
+  // ------------------------------------------------------------------
+  // Row activation — click toggles the active context, but only after a
+  // beat so a double-click can land as "rename" without churning the
+  // active state twice on the way in.
+  // ------------------------------------------------------------------
+  let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleRowClick(name: string) {
     onFocusCollection(name);
-    if (activeName === name) onClearActive();
-    else onSetActive(name);
+    if (clickTimer !== null) {
+      // Second click of a double-click — swallow it; dblclick decides.
+      clearTimeout(clickTimer);
+      clickTimer = null;
+      return;
+    }
+    clickTimer = setTimeout(() => {
+      clickTimer = null;
+      if (activeName === name) onClearActive();
+      else onSetActive(name);
+    }, 250);
+  }
+
+  function handleRowDblClick(name: string) {
+    if (clickTimer !== null) {
+      clearTimeout(clickTimer);
+      clickTimer = null;
+    }
+    startRename(name);
   }
 
   // Scroll the focused row into view whenever focus changes.
@@ -124,11 +292,17 @@
   }
 
   function handleWindowKey(event: KeyboardEvent) {
+    // The context menu claims Esc before anything else.
+    if (ctxMenu && event.key === 'Escape') {
+      event.preventDefault();
+      closeContextMenu();
+      return;
+    }
     if (focusedName === null) return;
-    // Yield to inline draft rename, the sort menu, and any other popover
-    // that may be claiming keys.
-    if (renamingDraft || sortMenuOpen) return;
-    if (document.querySelector('.filter-menu, .dropdown, .context-menu')) return;
+    // Yield to inline renames, the sort menu, the context menu, and any
+    // other popover that may be claiming keys.
+    if (renamingDraft || renamingName !== null || sortMenuOpen || ctxMenu) return;
+    if (document.querySelector('.dropdown, .context-menu')) return;
     // Yield to any open <dialog> — the browser inerts the page but
     // window-level keydown still bubbles, so we'd otherwise navigate
     // collections behind the modal.
@@ -194,10 +368,26 @@
       else onSetActive(col.name);
       return;
     }
+    if (event.key === 'F2') {
+      event.preventDefault();
+      startRename(col.name);
+      return;
+    }
+    if (bareLetter && (event.key === 'ArrowRight' || lk === 'l') && !expandedNames.has(col.name)) {
+      event.preventDefault();
+      toggleExpand(col.name);
+      return;
+    }
+    if (bareLetter && (event.key === 'ArrowLeft' || lk === 'h') && expandedNames.has(col.name)) {
+      event.preventDefault();
+      toggleExpand(col.name);
+      return;
+    }
     if (bareLetter) {
-      if (lk === 'e') { event.preventDefault(); onEdit(col.name); return; }
       if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
       if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
+      if (lk === 's') { event.preventDefault(); onToggleSolo(col.name); return; }
+      if (lk === 'm') { event.preventDefault(); onToggleMute(col.name); return; }
     }
   }
 
@@ -205,12 +395,15 @@
     sortMenuOpen = !sortMenuOpen;
   }
 
-  function pickSort(value: SortKey) {
-    sortKey = value;
+  function pickSort(value: typeof sortKey) {
+    onSetSortKey(value);
     sortMenuOpen = false;
   }
 
   function handleWindowClick(event: MouseEvent) {
+    if (ctxMenu) {
+      closeContextMenu();
+    }
     if (!sortMenuOpen) return;
     const target = event.target as Node;
     if (sortBtn && (sortBtn === target || sortBtn.contains(target))) return;
@@ -243,58 +436,63 @@
     }
     if (rows.length > 0) onFocusCollection(rows[0].name);
   }
+
+  function basename(path: string): string {
+    return path.split('/').pop() ?? path;
+  }
+
+  // Expanded file rows: name + first system badge, alphabetical.
+  function childFiles(col: CollectionInfo): { path: string; base: string; tag: string | null }[] {
+    return col.file_paths
+      .map((p) => ({ path: p, base: basename(p), tag: gameSystemMap.get(p)?.[0] ?? null }))
+      .sort((a, b) => a.base.localeCompare(b.base));
+  }
 </script>
 
 <svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 <aside class="panel" on:mousedown={handlePanelMousedown}>
-  <header class="panel-header">
+  <header class="panel-head">
     <span class="panel-title">Collections</span>
-    <div class="header-actions">
-      <button class="header-btn" on:click={onCreate} title="New collection" aria-label="New collection">
-        <!-- Font Awesome "plus" (static/icons/plus-solid-full.svg) -->
-        <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-          <path d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"/>
+    <div class="sort-wrapper">
+      <button
+        class="sort-btn"
+        class:on={sortMenuOpen}
+        on:click|stopPropagation={toggleSortMenu}
+        bind:this={sortBtn}
+        title="Sort collections"
+        aria-label="Sort collections"
+        aria-haspopup="menu"
+        aria-expanded={sortMenuOpen}
+      >
+        <!-- Arrow + shrinking lines — sort -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+          <path d="M11 5h10M11 9h7M11 13h4"/>
+          <path d="M5 5v14M5 19l-2.5-3M5 19l2.5-3"/>
         </svg>
       </button>
-      <div class="sort-wrapper">
-        <button
-          class="header-btn"
-          class:on={sortMenuOpen}
-          on:click|stopPropagation={toggleSortMenu}
-          bind:this={sortBtn}
-          title="Sort"
-          aria-label="Sort collections"
-          aria-haspopup="menu"
-          aria-expanded={sortMenuOpen}
-        >
-          <!-- Font Awesome "sort" (static/icons/sort-solid-full.svg) -->
-          <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-            <path d="M130.4 268.2C135.4 280.2 147 288 160 288L480 288C492.9 288 504.6 280.2 509.6 268.2C514.6 256.2 511.8 242.5 502.7 233.3L342.7 73.3C330.2 60.8 309.9 60.8 297.4 73.3L137.4 233.3C128.2 242.5 125.5 256.2 130.5 268.2zM130.4 371.7C125.4 383.7 128.2 397.4 137.3 406.6L297.3 566.6C309.8 579.1 330.1 579.1 342.6 566.6L502.6 406.6C511.8 397.4 514.5 383.7 509.5 371.7C504.5 359.7 492.9 352 480 352L160 352C147.1 352 135.4 359.8 130.4 371.8z"/>
-          </svg>
-        </button>
-        {#if sortMenuOpen}
-          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-          <div class="sort-menu" on:click|stopPropagation>
-            <div class="sort-section-label">Sort by</div>
-            {#each SORT_OPTIONS as opt}
-              <button
-                class="sort-item"
-                class:selected={sortKey === opt.value}
-                on:click={() => pickSort(opt.value)}
-              >{opt.label}</button>
-            {/each}
-            {#if archivedCount > 0}
-              <hr class="sort-divider" />
-              <label class="sort-toggle">
-                <span>Show archived</span>
-                <input class="app-checkbox" type="checkbox" bind:checked={showArchived} />
-              </label>
-            {/if}
-          </div>
-        {/if}
-      </div>
+      {#if sortMenuOpen}
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+        <div class="sort-menu" on:click|stopPropagation>
+          {#each SORT_OPTIONS as opt}
+            <button
+              class="sort-item"
+              on:click={() => pickSort(opt.value)}
+            >
+              <span class="check">{sortKey === opt.value ? '✓' : ''}</span>
+              <span>{opt.label}</span>
+            </button>
+          {/each}
+          {#if archivedCount > 0}
+            <hr class="menu-divider" />
+            <label class="sort-toggle">
+              <span>Show archived</span>
+              <input class="app-checkbox" type="checkbox" bind:checked={showArchived} />
+            </label>
+          {/if}
+        </div>
+      {/if}
     </div>
   </header>
 
@@ -306,184 +504,276 @@
     <div class="empty">
       <span class="empty-label">All archived</span>
     </div>
-  {:else}
-    <ul class="rows">
-      {#if draftName}
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-        <li class="row editing draft" title="New collection (unsaved) — click name to rename">
-          <span class="row-icon none" aria-hidden="true">
-            <!-- "books" — three rounded spines, collection of books -->
-            <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-              <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
-            </svg>
-          </span>
-          {#if renamingDraft}
-            <input
-              class="draft-name-input"
-              bind:value={draftRenameValue}
-              on:keydown={handleDraftRenameKeydown}
-              on:blur={commitDraftRename}
-              use:autofocusInput
-            />
-          {:else}
-            <button class="row-name draft-name" on:click={startDraftRename} title="Rename">{draftName}</button>
-          {/if}
-          <span class="row-count editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
-          <div class="row-actions">
-            <ActionButton kind="discard" compact title="Discard draft" onClick={onCancelFiles} />
-            <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
-          </div>
-        </li>
-      {/if}
-      {#each rows as col (col.name)}
-        {@const isEditing = editingName === col.name}
-        {@const displayCount = isEditing ? editFileCount : col.file_count}
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-        <li
-          class="row"
+  {/if}
+
+  <ul class="rows">
+    {#if draftName}
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <li
+        class="row-container editing draft"
+        class:kb-focused={focusedName === draftName}
+        title="New collection (unsaved) — click name to rename"
+        data-cp-row={draftName}
+      >
+        <span class="arrow-spacer" aria-hidden="true"></span>
+        <!-- Outline bookmark — no pigment chosen yet -->
+        <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 3h12v18l-6-4.4L6 21z"/>
+        </svg>
+        {#if renamingDraft}
+          <input
+            class="rename-input"
+            bind:value={draftRenameValue}
+            on:keydown={handleDraftRenameKeydown}
+            on:blur={commitDraftRename}
+            use:autofocusInput
+          />
+        {:else}
+          <button class="row-name draft-name" on:click={startDraftRename} title="Rename">{draftName}</button>
+        {/if}
+        <span class="editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
+        <div class="row-actions">
+          <ActionButton kind="discard" compact title="Discard draft" onClick={onCancelFiles} />
+          <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
+        </div>
+      </li>
+    {/if}
+    {#each rows as col, i (col.name)}
+      {@const isEditing = editingName === col.name}
+      {@const isExpanded = expandedNames.has(col.name)}
+      {@const soloed = soloedNames.has(col.name)}
+      {@const muted = mutedNames.has(col.name)}
+      {@const isRenamingRow = renamingName === col.name}
+      <li class="item">
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
+        <div
+          class="row-container"
           class:active={activeName === col.name}
           class:editing={isEditing}
           class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
+          class:soloed
+          class:dimmed={muted && !soloed}
+          class:dragging={draggingName === col.name}
+          class:drop-before={dropInsertIndex === i}
+          class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
           title={col.description || col.name}
           data-cp-row={col.name}
-          on:click={() => { if (!isEditing) handleRowClick(col.name); }}
+          draggable={canDrag && !isRenamingRow}
+          on:dragstart={(e) => handleDragStart(e, col.name)}
+          on:dragover={(e) => handleDragOver(e, i)}
+          on:drop={handleDrop}
+          on:dragend={handleDragEnd}
+          on:click={() => { if (!isEditing && !isRenamingRow) handleRowClick(col.name); }}
+          on:dblclick={() => { if (!isEditing && !isRenamingRow) handleRowDblClick(col.name); }}
+          on:contextmenu={(e) => { if (!isEditing) openContextMenu(e, col.name); }}
         >
-          <span
-            class="row-icon"
-            class:none={!col.color}
-            style={col.color ? `color: ${col.color}` : ''}
-            aria-hidden="true"
-          >
-            <!-- "books" — three rounded spines, collection of books -->
-            <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-              <path d="M96 96 C96 78.3 110.3 64 128 64L192 64 C209.7 64 224 78.3 224 96L224 544 C224 561.7 209.7 576 192 576L128 576 C110.3 576 96 561.7 96 544L96 96zM256 96 C256 78.3 270.3 64 288 64L352 64 C369.7 64 384 78.3 384 96L384 544 C384 561.7 369.7 576 352 576L288 576 C270.3 576 256 561.7 256 544L256 96zM416 96 C416 78.3 430.3 64 448 64L512 64 C529.7 64 544 78.3 544 96L544 544 C544 561.7 529.7 576 512 576L448 576 C430.3 576 416 561.7 416 544L416 96z"/>
+          {#if sortKey === 'custom'}
+            <span class="grip" title="Drag to reorder" aria-hidden="true">⠿</span>
+          {/if}
+          <button
+            class="arrow"
+            on:click|stopPropagation={() => toggleExpand(col.name)}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            aria-expanded={isExpanded}
+          >{isExpanded ? '▼' : '▶'}</button>
+          {#if col.color}
+            <!-- Pigment bookmark — this is where the color↔collection
+                 mapping is taught; the same ribbon reappears in scope
+                 chips and search-result index cells. -->
+            <svg class="bkm" style={`color: ${col.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M5 2h14v20l-7-5.2L5 22z"/>
             </svg>
-          </span>
-          <span class="row-name">{col.name}</span>
-          {#if activeName === col.name}
+          {:else}
+            <!-- Outline ribbon — uncolored, same grammar as the untagged die -->
+            <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 3h12v18l-6-4.4L6 21z"/>
+            </svg>
+          {/if}
+          {#if isRenamingRow}
+            <input
+              class="rename-input"
+              bind:value={renameValue}
+              on:keydown={handleRenameKeydown}
+              on:blur={commitRename}
+              on:click|stopPropagation
+              use:autofocusInput
+            />
+          {:else}
+            <span class="row-name">{col.name}</span>
+          {/if}
+          {#if activeName === col.name && !isRenamingRow}
             <span class="row-marker" title="Active">&#9733;</span>
           {/if}
-          <span
-            class="row-count"
-            class:editing-count={isEditing}
-            title={hiddenCountByCollection[col.name] && !isEditing
-              ? `${col.file_count} file${col.file_count === 1 ? '' : 's'} (${hiddenCountByCollection[col.name]} hidden in the tree)`
-              : `${displayCount} file${displayCount === 1 ? '' : 's'}`}
-          >
-            {displayCount}{#if !isEditing && hiddenCountByCollection[col.name]}<span class="row-hidden-count">&nbsp;&nbsp;({hiddenCountByCollection[col.name]})</span>{/if}
-          </span>
-          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-          <div class="row-actions" on:click|stopPropagation>
-            {#if isEditing}
+          {#if isEditing}
+            <span class="editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+            <div class="row-actions" on:click|stopPropagation>
               <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
               <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
-            {:else}
+            </div>
+          {:else if !isRenamingRow}
+            <span class="sm" class:engaged={soloed || muted}>
               <button
-                class="row-btn"
-                on:click|stopPropagation={() => onEditFiles(col.name)}
-                title="Edit files"
-                aria-label="Edit files"
-              >
-                <!-- Font Awesome "file-circle-check" (static/icons/file-circle-check-solid-full.svg) -->
-                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                  <path d="M128 64C92.7 64 64 92.7 64 128L64 512C64 547.3 92.7 576 128 576L308 576C285.3 544.5 272 505.8 272 464C272 363.4 349.4 280.8 448 272.7L448 234.6C448 217.6 441.3 201.3 429.3 189.3L322.7 82.7C310.7 70.7 294.5 64 277.5 64L128 64zM389.5 240L296 240C282.7 240 272 229.3 272 216L272 122.5L389.5 240zM608 464C608 384.5 543.5 320 464 320C384.5 320 320 384.5 320 464C320 543.5 384.5 608 464 608C543.5 608 608 543.5 608 464zM521.4 403.1C528.5 408.3 530.1 418.3 524.9 425.4L460.9 513.4C458.1 517.2 453.9 519.6 449.2 519.9C444.5 520.2 439.9 518.6 436.6 515.3L396.6 475.3C390.4 469.1 390.4 458.9 396.6 452.7C402.8 446.5 413 446.5 419.2 452.7L446 479.5L499 406.6C504.2 399.5 514.2 397.9 521.4 403.1z"/>
-                </svg>
-              </button>
+                type="button"
+                class="sm-btn"
+                class:solo-on={soloed}
+                on:click|stopPropagation={() => onToggleSolo(col.name)}
+                aria-pressed={soloed}
+                title={soloed ? `Stop soloing ${col.name} (S)` : `Solo ${col.name} (S)`}
+              >S</button>
               <button
-                class="row-btn"
-                on:click|stopPropagation={() => onEdit(col.name)}
-                title="Edit info"
-                aria-label="Edit info"
-              >
-                <!-- Font Awesome "pen-to-square" -->
-                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                  <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
-                </svg>
-              </button>
-              <button
-                class="row-btn"
-                on:click|stopPropagation={() => onToggleArchived(col.name, !col.archived)}
-                title={col.archived ? 'Unarchive' : 'Archive'}
-                aria-label={col.archived ? 'Unarchive' : 'Archive'}
-              >
-                <!-- Font Awesome "box-archive" (static/icons/box-archive-solid-full.svg) -->
-                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                  <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
-                </svg>
-              </button>
-              <button
-                class="row-btn danger"
-                on:click|stopPropagation={() => onDelete(col.name)}
-                title="Delete"
-                aria-label="Delete"
-              >
-                <!-- Font Awesome "trash" (static/icons/trash-solid-full.svg) -->
-                <svg viewBox="0 0 640 640" fill="currentColor" class="icon">
-                  <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
-                </svg>
-              </button>
-            {/if}
-          </div>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+                type="button"
+                class="sm-btn"
+                class:mute-on={muted}
+                on:click|stopPropagation={() => onToggleMute(col.name)}
+                aria-pressed={muted}
+                title={muted ? `Unmute ${col.name} (M)` : `Mute ${col.name} (M)`}
+              >M</button>
+            </span>
+          {/if}
+        </div>
+        {#if isExpanded}
+          {#each childFiles(col) as f (f.path)}
+            <div class="child-row" class:washed={soloed} class:dimmed={muted && !soloed} title={f.path}>
+              <span class="indent" aria-hidden="true"></span>
+              <span class="child-name">{f.base}</span>
+              {#if f.tag}
+                <SystemBadge tag={f.tag} />
+              {/if}
+            </div>
+          {/each}
+          {#if col.file_paths.length === 0}
+            <div class="child-row child-empty" class:washed={soloed}>
+              <span class="indent" aria-hidden="true"></span>
+              <span class="child-name">No files yet</span>
+            </div>
+          {/if}
+        {/if}
+      </li>
+    {/each}
+    {#if !draftName}
+      <li class="add-coll-item">
+        <button class="add-coll" on:click={onCreate}>+ collection</button>
+      </li>
+    {/if}
+  </ul>
 </aside>
+
+{#if ctxMenu}
+  {@const col = collections[ctxMenu.name]}
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <div
+    class="context-menu"
+    style={`left: ${ctxMenu.x}px; top: ${ctxMenu.y}px`}
+    on:click|stopPropagation
+    on:contextmenu|preventDefault|stopPropagation
+  >
+    <button class="context-item" on:click={() => ctxAction(() => startRename(ctxMenu!.name))}>Rename</button>
+    <div
+      class="context-item has-submenu"
+      class:open={ctxPigmentOpen}
+      on:mouseenter={() => { ctxPigmentOpen = true; }}
+      on:click={() => { ctxPigmentOpen = !ctxPigmentOpen; }}
+      role="menuitem"
+      tabindex="-1"
+      aria-haspopup="menu"
+      aria-expanded={ctxPigmentOpen}
+    >
+      <span>Pigment&hellip;</span>
+      <span class="submenu-caret" aria-hidden="true">&#9656;</span>
+      {#if ctxPigmentOpen}
+        <div class="submenu">
+          {#each PIGMENTS as pig (pig.hex)}
+            <button
+              class="context-item"
+              on:click|stopPropagation={() => ctxAction(() => onSetColor(ctxMenu!.name, pig.hex))}
+            >
+              <span class="pig-check">{col?.color === pig.hex ? '✓' : ''}</span>
+              <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M5 2h14v20l-7-5.2L5 22z"/>
+              </svg>
+              <span>{pig.name}</span>
+            </button>
+          {/each}
+          <hr class="menu-divider" />
+          <button
+            class="context-item"
+            on:click|stopPropagation={() => ctxAction(() => onSetColor(ctxMenu!.name, null))}
+          >
+            <span class="pig-check">{!col?.color ? '✓' : ''}</span>
+            <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 3h12v18l-6-4.4L6 21z"/>
+            </svg>
+            <span>None</span>
+          </button>
+        </div>
+      {/if}
+    </div>
+    <hr class="menu-divider" />
+    <button class="context-item" on:click={() => ctxAction(() => onEditFiles(ctxMenu!.name))}>Add files&hellip;</button>
+    <button class="context-item" on:click={() => ctxAction(() => onToggleArchived(ctxMenu!.name, !col?.archived))}>
+      {col?.archived ? 'Unarchive' : 'Archive'}
+    </button>
+    <hr class="menu-divider" />
+    <button class="context-item danger" on:click={() => ctxAction(() => onDelete(ctxMenu!.name))}>Delete collection</button>
+  </div>
+{/if}
 
 <style>
   .panel {
-    width: 240px;
-    flex-shrink: 0;
-    background: var(--bg-container);
-    border-right: 1px solid var(--bg-category);
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    background: var(--bg-app);
     font-family: var(--font-body);
     overflow: hidden;
   }
-  .panel-header {
+  .panel-head {
     display: flex;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--bg-category);
-    gap: 0.4rem;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem 0.4rem;
+    flex-shrink: 0;
   }
   .panel-title {
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--text-accent);
     flex: 1;
   }
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.15rem;
+
+  .sort-wrapper {
+    position: relative;
+    align-self: center;
   }
-  .header-btn {
-    display: flex;
+  .sort-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 22px;
     height: 22px;
     padding: 0;
-    background: transparent;
-    border: 1px solid transparent;
+    background: none;
+    border: none;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
-  .header-btn:hover {
+  .sort-btn:hover {
     color: var(--text-primary);
+    background: var(--bg-container);
   }
-  .header-btn.on {
+  .sort-btn.on {
     color: var(--text-accent);
   }
-
-  .sort-wrapper {
-    position: relative;
+  .sort-btn .icon {
+    width: 13px;
+    height: 13px;
+    display: block;
   }
   .sort-menu {
     position: absolute;
@@ -494,13 +784,15 @@
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.15rem 0;
-    min-width: 130px;
+    min-width: 150px;
     z-index: 50;
   }
   .sort-item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     width: 100%;
-    padding: 0.3rem 0.6rem;
+    padding: 0.25rem 0.6rem;
     background: none;
     border: none;
     text-align: left;
@@ -513,20 +805,15 @@
   .sort-item:hover {
     background: var(--bg-category);
   }
-  .sort-item.selected {
+  .check,
+  .pig-check {
+    width: 0.9rem;
     color: var(--text-accent);
-    font-weight: 600;
+    font-weight: 700;
+    flex-shrink: 0;
   }
-  .sort-section-label {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    padding: 0.3rem 0.6rem 0.15rem;
-  }
-  .sort-divider {
-    margin: 0.25rem 0;
+  .menu-divider {
+    margin: 0.15rem 0;
     border: none;
     border-top: 1px solid var(--bg-category);
   }
@@ -555,146 +842,308 @@
     padding: 0;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
   }
-  .row {
+  .item {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .row-container {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.3rem 0.75rem;
-    border-bottom: 1px solid var(--bg-container);
-    border-left: 2px solid transparent;
+    gap: 0.3rem;
+    padding: 0.22rem 0.4rem 0.22rem 0.75rem;
+    /* Reserved for the solo rule so engaging S doesn't shift layout. */
+    border-left: 3px solid transparent;
     cursor: pointer;
     transition: background var(--transition-fast);
     min-height: 28px;
   }
-  .row:hover,
-  .row.kb-focused { background: var(--bg-focused); }
-  .row.active { background: color-mix(in srgb, var(--text-accent) 15%, transparent); }
-  .row.kb-focused .row-actions,
-  .row.active .row-actions { display: flex; }
-  /* Armed-for-edit state: warmer background + accent stripe on the leading
-     edge — DAW-style "this track is record-armed" affordance. */
-  .row.editing {
-    background: color-mix(in srgb, var(--text-accent) 25%, transparent);
-    border-left-color: var(--text-active, var(--text-accent));
+  .row-container:hover,
+  .row-container.kb-focused {
+    background: var(--bg-focused);
   }
-  /* Draft row — same armed treatment, italic name to telegraph "unsaved".
-     The name doubles as a click-to-rename button. */
-  .row.draft {
+  .row-container.soloed {
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
+  }
+  .row-container.active {
+    background: color-mix(in srgb, var(--text-accent) 15%, transparent);
+  }
+  /* Muted on the collection axis — dimmed to 45%, never hidden. Hover
+     restores legibility, mirroring the tree's muted rows. */
+  .row-container.dimmed > :not(.sm) {
+    opacity: 0.45;
+  }
+  .row-container.dimmed:hover > :not(.sm) {
+    opacity: 0.7;
+  }
+  .row-container.archived {
+    opacity: 0.55;
+  }
+  .row-container.dragging {
+    opacity: 0.4;
+  }
+  .row-container.drop-before {
+    box-shadow: inset 0 2px 0 var(--text-accent);
+  }
+  .row-container.drop-after {
+    box-shadow: inset 0 -2px 0 var(--text-accent);
+  }
+
+  /* Armed-for-edit state: warmer background + purple stripe on the
+     leading edge — DAW-style "this track is record-armed" affordance. */
+  .row-container.editing {
+    background: color-mix(in srgb, var(--text-accent) 25%, transparent);
+    border-left-color: var(--text-active);
     cursor: default;
   }
-  .row.draft .row-name {
+  .row-container.draft .row-name {
     font-style: italic;
   }
-  .draft-name {
-    flex: 1;
-    min-width: 0;
-    padding: 0.1rem 0.25rem;
-    margin: 0 -0.25rem;
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    text-align: left;
-    color: var(--text-primary);
-    cursor: text;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    transition: border-color var(--transition-fast);
-  }
-  .draft-name:hover {
-    border-color: var(--bg-category);
-  }
-  .draft-name-input {
-    flex: 1;
-    min-width: 0;
-    padding: 0.1rem 0.25rem;
-    margin: 0 -0.25rem;
-    background: var(--bg-app);
-    color: var(--text-primary);
-    border: 1px solid var(--text-active, var(--text-accent));
-    border-radius: var(--radius-sm);
-    font-size: 0.82rem;
-    font-family: var(--font-body);
-    outline: none;
-  }
-  .row.archived { opacity: 0.55; }
-  .row-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+
+  /* Drag grip — fades in at the row's left edge on hover, custom order
+     only (the markup omits it under other sorts). */
+  .grip {
+    width: 0.55rem;
     flex-shrink: 0;
-    color: var(--text-accent);
-    margin-right: 0.15rem;
-  }
-  .row-icon.none {
     color: var(--text-tertiary);
+    font-size: 0.7rem;
+    letter-spacing: -0.05em;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    cursor: grab;
   }
-  .row-icon .icon {
-    width: 13px;
-    height: 13px;
+  .row-container:hover .grip {
+    opacity: 1;
   }
+
+  .arrow {
+    width: 0.8rem;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    text-align: center;
+  }
+  .arrow-spacer {
+    width: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .bkm {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+
   .row-name {
     flex: 1;
-    font-size: 0.82rem;
+    min-width: 0;
+    font-size: 0.9rem;
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .row.active .row-name { color: var(--text-accent); font-weight: 600; }
+  .row-container.active .row-name {
+    color: var(--text-accent);
+    font-weight: 600;
+  }
   .row-marker {
     color: var(--text-accent);
     font-size: 0.75rem;
     flex-shrink: 0;
   }
-  .row-count {
+
+  /* The name doubles as a click-to-rename button on the draft row. */
+  .draft-name {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 0.05rem 0.3rem;
+    margin: 0 -0.3rem;
+    text-align: left;
+    cursor: text;
+    transition: border-color var(--transition-fast);
+  }
+  .draft-name:hover {
+    border-color: var(--bg-category);
+  }
+
+  .rename-input {
+    flex: 1;
+    min-width: 0;
+    -webkit-user-select: text;
+    user-select: text;
+    background: var(--bg-container);
+    border: 1px solid var(--text-accent);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    padding: 0.05rem 0.3rem;
+    outline: none;
+  }
+
+  .editing-count {
     font-size: 0.7rem;
-    color: var(--text-secondary);
-    margin-right: 0.25rem;
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
-  }
-  .row-count.editing-count {
-    color: var(--text-active, var(--text-accent));
+    color: var(--text-active);
     font-weight: 600;
-  }
-  .row-hidden-count {
-    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
   }
   .row-actions {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 0.05rem;
     flex-shrink: 0;
   }
-  .row:hover .row-actions { display: flex; }
-  .row.editing .row-actions { display: flex; }
-  .row-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.15rem 0.3rem;
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    transition: all var(--transition-fast);
+
+  /* S/M cluster — hidden at rest, revealed on row hover or keyboard
+     focus, always visible while engaged. Button anatomy is the shared
+     .sm-btn in app.css. */
+  .sm {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
   }
-  .row-btn:hover {
+  .row-container:hover .sm,
+  .row-container.kb-focused .sm,
+  .sm.engaged {
+    opacity: 1;
+  }
+
+  /* Expanded file rows — the collection's contents, indented under the
+     folder row. A soloed collection's files take the wash too. */
+  .child-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.4rem 0.18rem 0.75rem;
+    border-left: 3px solid transparent;
+    font-size: 0.85rem;
     color: var(--text-primary);
   }
-  .row-btn.danger:hover { color: var(--text-danger); }
-  .icon {
-    width: 11px;
-    height: 11px;
-    display: block;
+  .child-row.washed {
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+  }
+  .child-row.dimmed {
+    opacity: 0.45;
+  }
+  .child-empty .child-name {
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+  .indent {
+    width: 1.1rem;
+    flex-shrink: 0;
+  }
+  .child-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Dashed create affordance — same family as the tree's "+ tag". */
+  .add-coll-item {
+    list-style: none;
+  }
+  .add-coll {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.35rem 0.75rem;
+    padding: 0.18rem 0.55rem;
+    width: calc(100% - 1.5rem);
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px dashed var(--text-tertiary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .add-coll:hover {
+    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
+    color: var(--text-accent);
+    border-color: var(--text-accent);
+    border-style: solid;
+  }
+
+  /* Context menu — same visual family as the file tree's ContextMenu. */
+  .context-menu {
+    position: fixed;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-dropdown);
+    min-width: 180px;
+    padding: 0.15rem 0;
+    z-index: 100;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+  }
+  .context-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.25rem 0.6rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    line-height: 1.3;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    transition: background var(--transition-fast);
+  }
+  .context-item:hover,
+  .context-item.open {
+    background: var(--bg-container);
+  }
+  .context-item.danger {
+    color: var(--text-danger);
+  }
+  .has-submenu {
+    position: relative;
+  }
+  .submenu-caret {
+    margin-left: auto;
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+  .submenu {
+    position: absolute;
+    left: 100%;
+    top: -0.15rem;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-dropdown);
+    padding: 0.15rem 0;
+    min-width: 130px;
+    z-index: 2;
   }
 
   .empty {
-    padding: 0.6rem 0.75rem;
+    padding: 0.3rem 0.75rem 0.5rem;
   }
   .empty-label {
-    font-family: var(--font-heading, var(--font-body));
+    font-family: var(--font-heading);
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;

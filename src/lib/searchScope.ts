@@ -59,9 +59,12 @@ export function searchCurationFilter(
   return out;
 }
 
-/** A folder, file, or collection narrowing on the collection axis. */
+/** A folder, file, or collection narrowing on the collection axis.
+ * Folder/file refs are keyed by absolute path; collection refs by the
+ * collection's name (names never start with a path separator, so the
+ * key spaces can't collide). */
 export interface ScopeRef {
-  kind: 'folder' | 'file';
+  kind: 'folder' | 'file' | 'collection';
   label: string;
 }
 

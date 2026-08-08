@@ -5,12 +5,19 @@
 // UI hues are deliberately excluded so user colors can't impersonate
 // semantics: mode purple (~300°), parchment/brass, pilot-lamp amber,
 // bright danger red.
-export const PALETTE: string[] = [
-  '#c2736d', // Madder    oklch(0.64 0.10 25)
-  '#bb7b4e', // Ember     oklch(0.64 0.10 55)
-  '#9f8b3e', // Gilt      oklch(0.64 0.10 95)
-  '#6b9b60', // Moss      oklch(0.64 0.10 140)
-  '#2fa094', // Verdigris oklch(0.64 0.10 185)
-  '#5b90c7', // Woad      oklch(0.64 0.10 250)
-  '#b5739f', // Plum      oklch(0.64 0.10 340)
+export interface Pigment {
+  name: string;
+  hex: string;
+}
+
+export const PIGMENTS: Pigment[] = [
+  { name: 'Madder',    hex: '#c2736d' }, // oklch(0.64 0.10 25)
+  { name: 'Ember',     hex: '#bb7b4e' }, // oklch(0.64 0.10 55)
+  { name: 'Gilt',      hex: '#9f8b3e' }, // oklch(0.64 0.10 95)
+  { name: 'Moss',      hex: '#6b9b60' }, // oklch(0.64 0.10 140)
+  { name: 'Verdigris', hex: '#2fa094' }, // oklch(0.64 0.10 185)
+  { name: 'Woad',      hex: '#5b90c7' }, // oklch(0.64 0.10 250)
+  { name: 'Plum',      hex: '#b5739f' }, // oklch(0.64 0.10 340)
 ];
+
+export const PALETTE: string[] = PIGMENTS.map((p) => p.hex);

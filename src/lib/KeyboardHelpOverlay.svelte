@@ -26,7 +26,7 @@
     collections: 'Collections',
     searchInput: 'Search input',
     searchResults: 'Search results',
-    filterMenu: 'Filter console',
+    filterMenu: 'Filters panel',
     contextMenu: 'Context menu',
     modal: 'Modal',
   };

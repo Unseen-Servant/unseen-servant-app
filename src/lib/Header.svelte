@@ -5,6 +5,8 @@
   export let disabled: boolean = false;
   export let panelOpen: boolean = false;
   export let panelToggleVisible: boolean = true;
+  export let filterPanelOpen: boolean = false;
+  export let onToggleFilterPanel: () => void = () => {};
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
@@ -77,6 +79,23 @@
         <!-- Font Awesome "table-columns" icon (static/icons/table-columns-solid-full.svg) -->
         <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
           <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
+        </svg>
+      </button>
+      <button
+        class="panel-toggle"
+        class:active={filterPanelOpen}
+        on:click={onToggleFilterPanel}
+        title={(filterPanelOpen ? 'Hide filter panel' : 'Show filter panel') + chordHint('filter.toggle')}
+        aria-label="Toggle filter panel"
+        aria-pressed={filterPanelOpen}
+      >
+        <!-- Faders — three channel lines with offset knobs punched out of
+             the header background -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="toggle-icon">
+          <path d="M5 4v16M12 4v16M19 4v16"/>
+          <circle class="knob" cx="5" cy="15" r="2.6"/>
+          <circle class="knob" cx="12" cy="8" r="2.6"/>
+          <circle class="knob" cx="19" cy="12" r="2.6"/>
         </svg>
       </button>
     {/if}
@@ -199,6 +218,11 @@
     width: 14px;
     height: 14px;
     display: block;
+  }
+  /* Fader knobs are punched out of the header so the channel line reads
+     as passing behind them. */
+  .toggle-icon .knob {
+    fill: var(--bg-header);
   }
 
   .search-wrapper {

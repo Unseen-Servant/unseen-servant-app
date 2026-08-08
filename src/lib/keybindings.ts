@@ -44,7 +44,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.revert',           keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Revert pending sync changes',  scope: 'global' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global' },
   { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
-  { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Open filter console',         scope: 'global' },
+  { id: 'filter.toggle',         keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
   { id: 'help.overlay',          keys: { mac: '?',    other: '?' },             label: 'Show keyboard shortcuts',     scope: 'global' },
@@ -82,13 +82,15 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.home',      keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'collections' },
   { id: 'collections.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
   { id: 'collections.activate',  keys: { mac: '↵',    other: 'Enter' },         label: 'Toggle as active context',     scope: 'collections' },
-  { id: 'collections.editInfo',  keys: { mac: 'E',    other: 'E' },             label: 'Edit collection info',         scope: 'collections' },
+  { id: 'collections.rename',    keys: { mac: 'F2',   other: 'F2' },            label: 'Rename collection',            scope: 'collections' },
   { id: 'collections.editFiles', keys: { mac: 'F',    other: 'F' },             label: 'Edit collection files',        scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
+  { id: 'collections.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo focused collection',      scope: 'collections' },
+  { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute focused collection',      scope: 'collections' },
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
   { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
 
-  // Filter console (when open)
+  // Filters panel (while focus is inside it)
   { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
   { id: 'filterMenu.prev',       keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterMenu' },
   { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle mute on focused row',   scope: 'filterMenu' },
