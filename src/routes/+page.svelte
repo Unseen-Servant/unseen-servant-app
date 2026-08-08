@@ -1137,6 +1137,8 @@
     files = [];
     expandedPaths = new Set();
     error = '';
+    // The workspace unmounts with the folder; never re-mount into search.
+    searchViewOpen = false;
     await saveState();
     restartAutoSyncInterval();
   }
@@ -1923,20 +1925,27 @@
       // branches below — that would close the search view or wipe the
       // tree highlight as a side effect of closing a menu.
       if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
+      // Escape mid-IME-composition just cancels the composition — never
+      // step the ladder on it.
+      if (event.isComposing) return;
       // Search-view ladder: anywhere in the view funnels focus to the
       // bar; the bar steps out to the browse view. The query is never
       // cleared here — ✕ is the only clear, and it isn't an exit.
       if (searchViewOpen) {
-        event.preventDefault();
         if (inSearchInput) {
+          event.preventDefault();
           searchViewOpen = false;
           (target as HTMLInputElement).blur();
           // The browse view isn't in the DOM until Svelte flushes the
           // swap; focusFileRegion queries rows / the SystemsView binding.
           void tick().then(() => focusFileRegion());
-        } else {
+        } else if (focusedCollectionName === null) {
+          event.preventDefault();
           headerComponent?.focus();
         }
+        // A focused collection row keeps the panel's own Esc semantics
+        // (its window handler clears the highlight); the next Esc
+        // funnels to the bar.
         return;
       }
       if (focusedFilePath) { focusedFilePath = null; }

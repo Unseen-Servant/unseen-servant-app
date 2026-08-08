@@ -86,6 +86,8 @@ Removed behaviors superseded by the new model:
 - **Collection edit mode** disables the search input. Entering edit mode also closes the search view for free: `startEditCollection` and `startDraftCollection` already call `setViewMode('systems')`, which is now the universal exit. Query text still survives.
 - **✕ clear button:** clears query and results, refocuses the input — user stays in the (now empty) search view. Unchanged behavior, new framing: clearing ≠ exiting.
 - **App launch:** search view never open at start, regardless of persisted `viewMode`.
+- **Focused collection row:** the collections panel's own Escape (clear the row highlight) wins over the funnel — the ladder skips focusing the bar while `focusedCollectionName` is set; the next Escape funnels. Escape during IME composition (`event.isComposing`) never steps the ladder.
+- **Deselecting the library folder** resets `searchViewOpen`, so re-selecting a folder lands in the browse view, never straight into search.
 
 ## Verification
 
