@@ -791,6 +791,12 @@
   }
 
   async function setViewMode(mode: 'tree' | 'systems') {
+    // Selecting a view is also the exit from the search view. Blur the
+    // bar if it holds focus — Cmd+J/T can fire from inside it, and a
+    // focused input would keep feeding a view no longer on screen.
+    searchViewOpen = false;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae?.classList.contains('search-input')) ae.blur();
     viewMode = mode;
     try {
       const store = await load('settings.json');
