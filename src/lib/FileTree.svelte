@@ -31,11 +31,6 @@
   export let expandedPaths: Set<string> = new Set();
   export let onToggleExpand: (path: string) => void = () => {};
 
-  // Collection-preview prop — paths get an accent stripe when previewing a
-  // collection's contents from the panel (separate from collection-edit,
-  // which now lives entirely in SystemsView).
-  export let highlightPaths: Set<string> = new Set();
-
   // Active-context filter — when set, only paths in this Set render.
   // Includes ancestor folders of every shown file so the tree structure
   // remains intact.
@@ -47,21 +42,38 @@
   export let hiddenPaths: Set<string> = new Set();
   export let showHidden: boolean = false;
 
-  // Collection-axis S/M (folders are collections). Soloed rows take the
-  // highlight treatment via highlightPaths; muted rows dim in place —
-  // descendants of a muted folder inherit via prefix match.
+  // Collection-axis S/M lit states for the folder-row buttons. The dim
+  // itself no longer derives from these: out-of-scope rows dim through
+  // scopeBrightPaths, which already accounts for mutes.
   export let soloedScopePaths: Set<string> = new Set();
   export let mutedScopePaths: Set<string> = new Set();
   export let onToggleScopeSolo: (item: FileItem) => void = () => {};
   export let onToggleScopeMute: (item: FileItem) => void = () => {};
 
+  // Scope membership (spec: docs/specs/scope/2026-08-08-solo-mute-play-
+  // doctrine-design.md). null = no narrowing engaged, nothing dims.
+  // Contains every in-scope indexed file plus its ancestor folders, so
+  // the path to in-scope material stays bright.
+  export let scopeBrightPaths: Set<string> | null = null;
+  // Folders that contain at least one indexed file — a folder with no
+  // indexed descendants has nothing to say about scope and never dims.
+  export let indexedFolderPaths: Set<string> = new Set();
+  // Focus lens: hide (don't render) out-of-scope rows instead of
+  // dimming them. Browsing surfaces only — console surfaces never hide.
+  export let hideOutOfScope: boolean = false;
+
   $: isSoloedScope = soloedScopePaths.has(item.path);
   $: isMutedHere = mutedScopePaths.has(item.path);
-  $: isMutedScope = isPathOrAncestorIn(item.path, mutedScopePaths);
+  // Out-of-scope: dimming only speaks about searchability of indexed
+  // material — unindexed files keep their existing treatments.
+  $: outOfScope = scopeBrightPaths !== null &&
+    (item.is_dir ? indexedFolderPaths.has(item.path) : indexedPaths.has(item.path)) &&
+    !scopeBrightPaths.has(item.path);
 
   $: isHiddenItem = isPathOrAncestorIn(item.path, hiddenPaths);
   $: hidden = (displayPaths !== null && !displayPaths.has(item.path)) ||
-              (isHiddenItem && !showHidden);
+              (isHiddenItem && !showHidden) ||
+              (outOfScope && hideOutOfScope);
 
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let showDropdown: boolean = false;
@@ -91,7 +103,6 @@
 
   $: isChecked = item.is_dir ? isFullySelected : isSelected;
   $: isIndeterminate = item.is_dir && isSelected && !isFullySelected;
-  $: isHighlighted = highlightPaths.size > 0 && highlightPaths.has(item.path);
 
   $: isFocused = item.path === focusedFilePath;
   $: isRenaming = item.path === renamingFilePath;
@@ -219,7 +230,7 @@
 <svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
-<div class="item" class:highlighted={isHighlighted} class:focused={isFocused} class:hidden-item={isHiddenItem} class:muted-scope={isMutedScope} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
+<div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
   <div class="row-container">
     <button
       class="checkbox"
@@ -335,7 +346,6 @@
           {renamingFilePath}
           {onRenameSubmit}
           {onRenameCancel}
-          {highlightPaths}
           {displayPaths}
           {hiddenPaths}
           {showHidden}
@@ -343,6 +353,9 @@
           {mutedScopePaths}
           {onToggleScopeSolo}
           {onToggleScopeMute}
+          {scopeBrightPaths}
+          {indexedFolderPaths}
+          {hideOutOfScope}
         />
       {/each}
     </div>
@@ -419,14 +432,15 @@
   .hidden-item .name {
     font-style: italic;
   }
-  /* Muted on the collection axis — dimmed to 45%, never hidden. Only the
-     row itself dims (each descendant row dims on its own via the prefix
-     match), so nesting doesn't compound the opacity. Hover restores
+  /* Out of the resolved scope — dimmed, never hidden (unless the focus
+     lens is on, which drops the row from the render instead). Only the
+     row itself dims (each descendant row evaluates its own membership),
+     so nesting doesn't compound the opacity. Hover restores
      legibility, mirroring the systems view's dimmed groups. */
-  .muted-scope > .row-container {
+  .out-of-scope > .row-container {
     opacity: var(--opacity-out-of-scope);
   }
-  .muted-scope > .row-container:hover {
+  .out-of-scope > .row-container:hover {
     opacity: var(--opacity-out-of-scope-hover);
   }
   /* S/M cluster on folder rows — hidden at rest, revealed on row hover
@@ -444,11 +458,6 @@
   .focused > .row-container .sm,
   .sm.engaged {
     opacity: 1;
-  }
-  .highlighted {
-    background: color-mix(in srgb, var(--text-accent) 12%, transparent);
-    border-left: 3px solid var(--text-accent);
-    margin-left: -3px;
   }
   .focused > .row-container {
     background: var(--bg-focused);

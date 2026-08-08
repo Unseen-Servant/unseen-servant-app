@@ -3077,7 +3077,6 @@
               {renamingFilePath}
               onRenameSubmit={handleRenameSubmit}
               onRenameCancel={handleRenameCancel}
-              {highlightPaths}
               {displayPaths}
               {hiddenPaths}
               {showHidden}
