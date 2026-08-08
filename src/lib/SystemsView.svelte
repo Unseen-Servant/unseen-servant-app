@@ -828,7 +828,7 @@
     display: block;
   }
   .file-name {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -844,7 +844,7 @@
     border: 1px solid var(--text-accent);
     border-radius: var(--radius-sm);
     padding: 0.1rem 0.3rem;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-family: var(--font-body);
     outline: none;
   }

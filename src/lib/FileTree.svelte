@@ -494,7 +494,7 @@
     border-radius: var(--radius-sm);
     flex: 1;
     text-align: left;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     /* Buttons don't inherit body line-height; set it so rows share the
        systems view's vertical rhythm. */
     line-height: 1.5;
@@ -555,7 +555,7 @@
     border: 1px solid var(--text-accent);
     border-radius: var(--radius-sm);
     padding: 0.1rem 0.3rem;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-family: var(--font-body);
     outline: none;
     width: 100%;
