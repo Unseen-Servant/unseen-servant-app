@@ -201,6 +201,12 @@ describe('resolveMix', () => {
     const idleMuted = resolveMix(new Set(), new Set(['Missing']), COLS, INDEXED);
     expect(idleMuted).toEqual(INDEXED);
   });
+
+  it('a muted collection with some stale file_paths carves only what is still indexed', () => {
+    const cols = { Partial: { file_paths: ['/lib/strahd.pdf', '/gone/stale.pdf'] } };
+    const out = resolveMix(new Set(), new Set(['Partial']), cols, INDEXED);
+    expect([...out!].sort()).toEqual(['/lib/brew.pdf', '/lib/loose.pdf', '/lib/shared.pdf']);
+  });
 });
 
 describe('passesSystemsAxis', () => {
