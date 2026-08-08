@@ -512,7 +512,7 @@
   .row.dimmed .row-name,
   .row.dimmed .row-die,
   .row.dimmed .row-count {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
   }
 
   .untagged-row {

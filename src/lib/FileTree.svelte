@@ -424,10 +424,10 @@
      match), so nesting doesn't compound the opacity. Hover restores
      legibility, mirroring the systems view's dimmed groups. */
   .muted-scope > .row-container {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
   }
   .muted-scope > .row-container:hover {
-    opacity: 0.7;
+    opacity: var(--opacity-out-of-scope-hover);
   }
   /* S/M cluster on folder rows — hidden at rest, revealed on row hover
      or keyboard focus, always visible while engaged. Button anatomy is

@@ -848,10 +848,10 @@
      never hidden. Hover restores legibility, mirroring the tree's muted
      rows. The transport stays full-strength — it's the way back in. */
   .row-container.dimmed > :not(.tr) {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
   }
   .row-container.dimmed:hover > :not(.tr) {
-    opacity: 0.7;
+    opacity: var(--opacity-out-of-scope-hover);
   }
   /* Shelved — quieter than the playing-dim and italic, a track set
      aside rather than one merely out of the current scope. */
@@ -1037,7 +1037,7 @@
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
   }
   .child-row.dimmed {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
   }
   .child-empty .child-name {
     color: var(--text-tertiary);

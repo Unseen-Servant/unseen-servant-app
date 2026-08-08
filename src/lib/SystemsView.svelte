@@ -707,11 +707,11 @@
      stay visible — a muted channel never disappears from the mixer.
      Hover restores legibility, mirroring the filter menu's row-dimmed. */
   .group-files.dimmed {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
     transition: opacity var(--transition-fast);
   }
   .group-files.dimmed:hover {
-    opacity: 0.7;
+    opacity: var(--opacity-out-of-scope-hover);
   }
 
   /* Edit-mode selection checkboxes — same visual language as the tree's
