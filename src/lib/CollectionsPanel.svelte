@@ -248,9 +248,14 @@
     ctxPigmentOpen = false;
   }
 
-  function ctxAction(fn: () => void) {
+  // Runs a menu action against the menu's collection. The name must be
+  // captured before closing — closing nulls `ctxMenu`, so an action
+  // closure reading it afterwards would dereference null.
+  function ctxAction(fn: (name: string) => void) {
+    if (!ctxMenu) return;
+    const name = ctxMenu.name;
     closeContextMenu();
-    fn();
+    fn(name);
   }
 
   // ------------------------------------------------------------------
@@ -669,7 +674,7 @@
     on:click|stopPropagation
     on:contextmenu|preventDefault|stopPropagation
   >
-    <button class="context-item" on:click={() => ctxAction(() => startRename(ctxMenu!.name))}>Rename</button>
+    <button class="context-item" on:click={() => ctxAction(startRename)}>Rename</button>
     <div
       class="context-item has-submenu"
       class:open={ctxPigmentOpen}
@@ -687,7 +692,7 @@
           {#each PIGMENTS as pig (pig.hex)}
             <button
               class="context-item"
-              on:click|stopPropagation={() => ctxAction(() => onSetColor(ctxMenu!.name, pig.hex))}
+              on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
             >
               <span class="pig-check">{col?.color === pig.hex ? '✓' : ''}</span>
               <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -699,7 +704,7 @@
           <hr class="menu-divider" />
           <button
             class="context-item"
-            on:click|stopPropagation={() => ctxAction(() => onSetColor(ctxMenu!.name, null))}
+            on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, null))}
           >
             <span class="pig-check">{!col?.color ? '✓' : ''}</span>
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -711,12 +716,12 @@
       {/if}
     </div>
     <hr class="menu-divider" />
-    <button class="context-item" on:click={() => ctxAction(() => onEditFiles(ctxMenu!.name))}>Add files&hellip;</button>
-    <button class="context-item" on:click={() => ctxAction(() => onToggleArchived(ctxMenu!.name, !col?.archived))}>
+    <button class="context-item" on:click={() => ctxAction(onEditFiles)}>Add files&hellip;</button>
+    <button class="context-item" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
       {col?.archived ? 'Unarchive' : 'Archive'}
     </button>
     <hr class="menu-divider" />
-    <button class="context-item danger" on:click={() => ctxAction(() => onDelete(ctxMenu!.name))}>Delete collection</button>
+    <button class="context-item danger" on:click={() => ctxAction(onDelete)}>Delete collection</button>
   </div>
 {/if}
 
