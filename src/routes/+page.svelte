@@ -2590,6 +2590,11 @@
 
   async function togglePanel() {
     collectionsPanelOpen = !collectionsPanelOpen;
+    // Closing unmounts the panel and its window keydown handler, so a
+    // focused row could never release the mutex — and a stale
+    // focusedCollectionName gates off tree nav and file action keys.
+    // An off-screen region must not hold keyboard focus.
+    if (!collectionsPanelOpen) setFocusedCollectionName(null);
     try {
       const store = await load('settings.json');
       await store.set('collectionsPanelOpen', collectionsPanelOpen);
