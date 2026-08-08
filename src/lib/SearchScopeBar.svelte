@@ -21,6 +21,7 @@
   export let curationSolos: Set<CurationKey> = new Set();
   export let curationMutes: Set<CurationKey> = new Set();
   export let showHidden: boolean = false;
+  export let hideOutOfScope: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   export let isLoading: boolean = false;
@@ -33,6 +34,7 @@
   export let onToggleCurationSolo: (key: CurationKey) => void = () => {};
   export let onToggleCurationMute: (key: CurationKey) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
+  export let onToggleHideOutOfScope: () => void = () => {};
 
   const CURATION_LABELS: Record<CurationKey, string> = {
     collected: 'In a collection',
@@ -242,6 +244,19 @@
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
+
+    {#if hideOutOfScope}
+      <button
+        type="button"
+        class="chip lens-on"
+        on:click|stopPropagation={onToggleHideOutOfScope}
+        title="Show out-of-scope items again"
+        aria-label="Show out-of-scope items again"
+      >
+        <span class="chip-label">lens on</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/if}
   </div>
 
   {#if searchActive}
@@ -399,6 +414,11 @@
   .chip.hidden-on {
     border-color: color-mix(in srgb, var(--text-accent) 35%, transparent);
     color: var(--text-accent);
+  }
+
+  .chip.lens-on {
+    border-color: color-mix(in srgb, var(--text-active) 35%, transparent);
+    color: var(--text-active);
   }
 
   /* The whole chip is the clear button; the × is just a glyph. Hover

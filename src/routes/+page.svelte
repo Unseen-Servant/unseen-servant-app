@@ -37,6 +37,8 @@
     parseStringArray,
     parseEnum,
   } from '../lib/storeParsers';
+  import { parseScopeConsoleState } from '../lib/scopeConsole';
+  import type { ScopeConsoleState } from '../lib/scopeConsole';
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -670,6 +672,20 @@
         viewMode = savedViewMode;
       }
       await loadCollections();
+
+      // Full console recall — the session reopens as it was left.
+      const savedConsole = parseScopeConsoleState(await store.get('scopeConsole'));
+      if (savedConsole) {
+        playingCollections = new Set(savedConsole.playing);
+        mutedCollectionNames = new Set(savedConsole.mutedCollections);
+        soloedSystems = new Set(savedConsole.soloedSystems);
+        filterExcludedSystems = new Set(savedConsole.mutedSystems);
+        scopeSolos = new Map(savedConsole.scopeSolos);
+        scopeMutes = new Map(savedConsole.scopeMutes);
+        soloCuration = new Set(savedConsole.curationSolos);
+        mutedCuration = new Set(savedConsole.curationMutes);
+        hideOutOfScope = savedConsole.hideOutOfScope;
+      }
     } catch (e) {
       // No saved state on first run — that's fine
       console.log('No saved state:', e);
@@ -804,6 +820,7 @@
       filterExcludedSystems.add(system);
     }
     filterExcludedSystems = filterExcludedSystems;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -816,6 +833,7 @@
       soloedSystems.add(system);
     }
     soloedSystems = soloedSystems;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -829,6 +847,7 @@
       scopeSolos.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
     }
     scopeSolos = scopeSolos;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -839,6 +858,7 @@
       scopeMutes.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
     }
     scopeMutes = scopeMutes;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -853,6 +873,7 @@
       playingCollections.add(name);
     }
     playingCollections = playingCollections;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -866,11 +887,13 @@
       mutedCollectionNames.add(name);
     }
     mutedCollectionNames = mutedCollectionNames;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
   function toggleHideOutOfScope() {
     hideOutOfScope = !hideOutOfScope;
+    persistScopeConsole();
   }
 
   // Footer [clear all] in the filter console: resets every solo/mute on
@@ -886,6 +909,7 @@
     mutedCollectionNames = new Set();
     soloCuration = new Set();
     mutedCuration = new Set();
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -903,6 +927,30 @@
       await store.save();
     } catch (e) {
       console.log('Could not persist hidden state:', e);
+    }
+  }
+
+  function snapshotScopeConsole(): ScopeConsoleState {
+    return {
+      playing: [...playingCollections],
+      mutedCollections: [...mutedCollectionNames],
+      soloedSystems: [...soloedSystems],
+      mutedSystems: [...filterExcludedSystems],
+      scopeSolos: [...scopeSolos],
+      scopeMutes: [...scopeMutes],
+      curationSolos: [...soloCuration],
+      curationMutes: [...mutedCuration],
+      hideOutOfScope,
+    };
+  }
+
+  async function persistScopeConsole() {
+    try {
+      const store = await load('settings.json');
+      await store.set('scopeConsole', snapshotScopeConsole());
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist scope console:', e);
     }
   }
 
@@ -945,6 +993,7 @@
       soloCuration.add(key);
     }
     soloCuration = soloCuration;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -955,6 +1004,7 @@
       mutedCuration.add(key);
     }
     mutedCuration = mutedCuration;
+    persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -2434,6 +2484,7 @@
       if (wasPlaying) playingCollections = playingCollections;
       const wasMuted = mutedCollectionNames.delete(name);
       if (wasMuted) mutedCollectionNames = mutedCollectionNames;
+      if (wasPlaying || wasMuted) persistScopeConsole();
       if (collectionsCustomOrder.includes(name)) {
         collectionsCustomOrder = collectionsCustomOrder.filter((n) => n !== name);
         persistCollectionsSort();
@@ -2645,6 +2696,7 @@
         mutedCollectionNames.add(newName);
         mutedCollectionNames = mutedCollectionNames;
       }
+      persistScopeConsole();
       // Custom sort order follows the rename in place.
       if (collectionsCustomOrder.includes(name)) {
         collectionsCustomOrder = collectionsCustomOrder.map((n) => (n === name ? newName : n));
@@ -2991,6 +3043,7 @@
           curationSolos={soloCuration}
           curationMutes={mutedCuration}
           {showHidden}
+          {hideOutOfScope}
           resultCount={searchResults.length}
           indexedFileCount={searchableFileCount}
           isLoading={isSearching}
@@ -3004,6 +3057,7 @@
           onToggleCurationSolo={toggleCurationSolo}
           onToggleCurationMute={toggleCurationMute}
           onToggleShowHidden={toggleShowHidden}
+          onToggleHideOutOfScope={toggleHideOutOfScope}
         />
         {#if searchActive}
           <div class="search-split">
