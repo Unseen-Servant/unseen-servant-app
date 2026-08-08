@@ -84,8 +84,8 @@
   --bg-header: rgb(46, 46, 46);
   --bg-category: rgb(71, 71, 71);
   --bg-focused: rgb(50, 50, 50);
-  --bg-active: #6e42a8;
-  --bg-active-focused: #925ccb;
+  --bg-active: #62488c;
+  --bg-active-focused: #7c61a8;
   --bg-selected: rgb(182, 159, 129);
   --bg-selected-focused: rgb(236, 204, 162);
 
@@ -95,8 +95,8 @@
   --text-tertiary: #6e7681;
   --text-inverse: #1a1a1a;
   --text-accent: rgb(182, 159, 129);
-  --text-danger: #ef4444;
-  --text-active: #925ccb;
+  --text-danger: #cf4232;
+  --text-active: #9076be;
   --text-connected: #b08850;
 
   /* Borders & shadows */
@@ -114,7 +114,7 @@
   /* LED-style glows for engaged controls. Purple = mode on,
      brass = content/data armed. Reserved for activated states only —
      hover should not glow. */
-  --glow-active: drop-shadow(0 0 3px rgba(146, 92, 203, 0.45));
+  --glow-active: drop-shadow(0 0 3px rgba(144, 118, 190, 0.5));
   --glow-accent: drop-shadow(0 0 3px rgba(182, 159, 129, 0.4));
 
   /* Layout */
