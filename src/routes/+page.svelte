@@ -261,7 +261,9 @@
       chips.push({
         key: ACTIVE_CONTEXT_CHIP_KEY,
         label: activeContextName,
-        color: collections[activeContextName]?.color ?? null,
+        // `|| null` (not ??): a cleared pigment is stored as '', which
+        // must not reach the chip as a fill value.
+        color: collections[activeContextName]?.color || null,
       });
     }
     // Collection-kind narrowings carry the collection's pigment on their

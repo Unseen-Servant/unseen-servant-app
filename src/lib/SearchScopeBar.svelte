@@ -58,10 +58,17 @@
         aria-label="Stop soloing {chip.label}"
       >
         <span class="chip-prefix">solo</span>
-        <!-- Bookmark ribbon — the collection axis keeps its pigment -->
-        <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color ?? 'var(--text-tertiary)'} aria-hidden="true">
-          <path d="M5 2h14v20l-7-5.2L5 22z"/>
-        </svg>
+        {#if chip.color}
+          <!-- Bookmark ribbon — the collection axis keeps its pigment -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
+            <path d="M5 2h14v20l-7-5.2L5 22z"/>
+          </svg>
+        {:else}
+          <!-- No pigment — outline ribbon, same grammar as the panel -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+          </svg>
+        {/if}
         <span class="chip-label">{chip.label}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
@@ -114,10 +121,17 @@
         aria-label="Unmute {chip.label}"
       >
         <span class="chip-prefix">mute</span>
-        <!-- Bookmark ribbon — dims with the chip ("removed, still recognizable") -->
-        <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color ?? 'var(--text-tertiary)'} aria-hidden="true">
-          <path d="M5 2h14v20l-7-5.2L5 22z"/>
-        </svg>
+        {#if chip.color}
+          <!-- Bookmark ribbon — dims with the chip ("removed, still recognizable") -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
+            <path d="M5 2h14v20l-7-5.2L5 22z"/>
+          </svg>
+        {:else}
+          <!-- No pigment — outline ribbon, same grammar as the panel -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+          </svg>
+        {/if}
         <span class="chip-label">{chip.label}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
