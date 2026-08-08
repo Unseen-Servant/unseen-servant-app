@@ -102,28 +102,32 @@ export function searchSourcePathsFilter(
  * contributes nothing, and a file reached by both a playing and a muted
  * collection is out (mute is a carve on the mix, not a per-track
  * fader). Returns null when the transport is idle and no collection is
- * muted: no mix narrowing, the universe is the whole indexed library. */
+ * muted: no mix narrowing, the universe is the whole indexed library.
+ *
+ * Names with no matching collection (a deleted track whose persisted
+ * play/mute state outlived it) resolve away entirely — including for
+ * the null decision, so a ghost name never engages the mix layer. A
+ * collection that exists but has no indexed files still engages and
+ * yields an empty mix; that's a real "nothing indexed is playing". */
 export function resolveMix(
   playing: Set<string>,
   mutedNames: Set<string>,
   collections: Record<string, { file_paths: string[] }>,
   allIndexed: Set<string>
 ): Set<string> | null {
-  if (playing.size === 0 && mutedNames.size === 0) return null;
+  const livePlaying = [...playing].filter((n) => collections[n]);
+  const liveMuted = [...mutedNames].filter((n) => collections[n]);
+  if (livePlaying.length === 0 && liveMuted.length === 0) return null;
   const base = new Set<string>();
-  if (playing.size > 0) {
-    for (const name of playing) {
-      const col = collections[name];
-      if (!col) continue;
-      for (const p of col.file_paths) if (allIndexed.has(p)) base.add(p);
+  if (livePlaying.length > 0) {
+    for (const name of livePlaying) {
+      for (const p of collections[name].file_paths) if (allIndexed.has(p)) base.add(p);
     }
   } else {
     for (const p of allIndexed) base.add(p);
   }
-  for (const name of mutedNames) {
-    const col = collections[name];
-    if (!col) continue;
-    for (const p of col.file_paths) base.delete(p);
+  for (const name of liveMuted) {
+    for (const p of collections[name].file_paths) base.delete(p);
   }
   return base;
 }

@@ -196,10 +196,9 @@ describe('resolveMix', () => {
     expect(resolveMix(new Set(['Ghost']), new Set(), COLS, INDEXED)).toEqual(new Set());
   });
 
-  it('stale collection names resolve away harmlessly', () => {
-    expect(resolveMix(new Set(['Missing']), new Set(), COLS, INDEXED)).toEqual(new Set());
-    const idleMuted = resolveMix(new Set(), new Set(['Missing']), COLS, INDEXED);
-    expect(idleMuted).toEqual(INDEXED);
+  it('nonexistent collection names resolve away entirely — even for the null decision', () => {
+    expect(resolveMix(new Set(['Missing']), new Set(), COLS, INDEXED)).toBeNull();
+    expect(resolveMix(new Set(), new Set(['Missing']), COLS, INDEXED)).toBeNull();
   });
 
   it('a muted collection with some stale file_paths carves only what is still indexed', () => {

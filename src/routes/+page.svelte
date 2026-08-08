@@ -292,10 +292,6 @@
     scopeMutes = scopeMutes;
     if (committedQuery) runSearch(committedQuery);
   }
-  $: indexedPathsSet = new Set<string>(
-    (indexStatus?.up_to_date ?? []).map((e) => e.path)
-      .concat((indexStatus?.to_update ?? []).map((e) => e.path))
-  );
 
   // File path → collection pigment for the search-result index cells.
   // Color is reserved for collections; a file in several colored
@@ -350,10 +346,16 @@
       indexedPaths
     );
   })();
-  $: searchableFileCount = resolvedScopeSet !== null ? resolvedScopeSet.size : indexedPathsSet.size;
+  // Same universe on both sides of the fallback (indexedPaths, which
+  // includes to_remove entries whose chunks are still searchable), so
+  // the denominator doesn't jump the moment narrowing engages.
+  $: searchableFileCount = resolvedScopeSet !== null ? resolvedScopeSet.size : indexedPaths.size;
   // In-scope files plus their ancestor folders — the tree rows that
-  // stay bright. null = no scope engaged, nothing dims.
-  $: scopeBrightPaths = resolvedScopeSet === null
+  // stay bright. null = no scope engaged, nothing dims. Edit mode is
+  // exempt: it handles its own membership UI (checkboxes) and scope
+  // decoration shouldn't compete with it — same reason the scope-bar
+  // chips suppress there.
+  $: scopeBrightPaths = resolvedScopeSet === null || isCollectionEditMode
     ? null
     : new Set<string>([...resolvedScopeSet, ...computeAncestorPaths(resolvedScopeSet)]);
   // Folders containing at least one indexed file — the rows the dim
@@ -2426,16 +2428,18 @@
     try {
       await invoke('delete_collection', { name });
       cancelCollectionEdit();
-      // A playing state on the deleted collection clears with it — its
-      // chip disappears rather than scoping on a ghost.
+      // Playing and muted state on the deleted collection clear with it
+      // — the chips disappear rather than scoping on a ghost.
       const wasPlaying = playingCollections.delete(name);
       if (wasPlaying) playingCollections = playingCollections;
+      const wasMuted = mutedCollectionNames.delete(name);
+      if (wasMuted) mutedCollectionNames = mutedCollectionNames;
       if (collectionsCustomOrder.includes(name)) {
         collectionsCustomOrder = collectionsCustomOrder.filter((n) => n !== name);
         persistCollectionsSort();
       }
       await loadCollections();
-      if (wasPlaying && committedQuery) runSearch(committedQuery);
+      if ((wasPlaying || wasMuted) && committedQuery) runSearch(committedQuery);
       jobNotification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
     } catch (e) {
       jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
@@ -3012,7 +3016,7 @@
                 query={committedQuery}
                 error={searchError}
                 {ollamaRunning}
-                indexedFileCount={indexedPathsSet.size}
+                indexedFileCount={searchableFileCount}
                 selectedIndex={selectedResultIndex}
                 canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
                 {hiddenPaths}
