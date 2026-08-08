@@ -22,6 +22,12 @@
   // search scope). Several can play at once; while any plays, the
   // stopped rows dim out of scope.
   export let playingNames: Set<string> = new Set();
+  // Collection mutes — names carved out of the mix (or the library,
+  // when the transport is idle). Mute wins over play while lit; a
+  // muted, playing row keeps its armed transport and contributes
+  // nothing until unmuted. Archived rows keep M (no transport).
+  export let mutedNames: Set<string> = new Set();
+  export let onToggleMute: (name: string) => void = () => {};
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
   // Sort state is lifted to +page for per-vault persistence.
@@ -365,6 +371,7 @@
         if (!col.archived) onTogglePlay(col.name);
         return;
       }
+      if (lk === 'm') { event.preventDefault(); onToggleMute(col.name); return; }
       if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
     }
   }
@@ -520,6 +527,7 @@
       {@const isEditing = editingName === col.name}
       {@const isExpanded = expandedNames.has(col.name)}
       {@const playing = playingNames.has(col.name)}
+      {@const muted = mutedNames.has(col.name)}
       {@const isRenamingRow = renamingName === col.name}
       <li class="item">
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
@@ -529,7 +537,7 @@
           class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
           class:playing
-          class:dimmed={anyPlaying && !playing && !col.archived}
+          class:dimmed={!col.archived && (muted || (anyPlaying && !playing))}
           class:dragging={draggingName === col.name}
           class:drop-before={dropInsertIndex === i}
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
@@ -585,29 +593,39 @@
               <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
               <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
             </div>
-          {:else if !isRenamingRow && !col.archived}
-            <!-- Archived rows carry no transport — unarchive to play. -->
-            <span class="tr" class:engaged={playing}>
+          {:else if !isRenamingRow}
+            <span class="tr" class:engaged={playing || muted}>
+              {#if !col.archived}
+                <!-- Archived rows carry no transport — unarchive to play. -->
+                <button
+                  type="button"
+                  class="tr-btn"
+                  class:playing
+                  on:click|stopPropagation={() => onTogglePlay(col.name)}
+                  aria-pressed={playing}
+                  title={playing ? `Stop ${col.name} (P)` : `Play ${col.name} (P)`}
+                >
+                  {#if playing}
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5h14v14H5z"/></svg>
+                  {:else}
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4.2v15.6L20 12z"/></svg>
+                  {/if}
+                </button>
+              {/if}
               <button
                 type="button"
-                class="tr-btn"
-                class:playing
-                on:click|stopPropagation={() => onTogglePlay(col.name)}
-                aria-pressed={playing}
-                title={playing ? `Stop ${col.name} (P)` : `Play ${col.name} (P)`}
-              >
-                {#if playing}
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5h14v14H5z"/></svg>
-                {:else}
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4.2v15.6L20 12z"/></svg>
-                {/if}
-              </button>
+                class="sm-btn"
+                class:mute-on={muted}
+                on:click|stopPropagation={() => onToggleMute(col.name)}
+                aria-pressed={muted}
+                title={muted ? `Unmute ${col.name} (M)` : `Mute ${col.name} (M)`}
+              >M</button>
             </span>
           {/if}
         </div>
         {#if isExpanded}
           {#each childFiles(col) as f (f.path)}
-            <div class="child-row" class:washed={playing} class:dimmed={anyPlaying && !playing} title={f.path}>
+            <div class="child-row" class:washed={playing && !muted} class:dimmed={muted || (anyPlaying && !playing)} title={f.path}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">{f.base}</span>
               {#if f.tag}
@@ -616,7 +634,7 @@
             </div>
           {/each}
           {#if col.file_paths.length === 0}
-            <div class="child-row child-empty" class:washed={playing}>
+            <div class="child-row child-empty" class:washed={playing && !muted} class:dimmed={muted || (anyPlaying && !playing)}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">No files yet</span>
             </div>
@@ -848,10 +866,10 @@
      never hidden. Hover restores legibility, mirroring the tree's muted
      rows. The transport stays full-strength — it's the way back in. */
   .row-container.dimmed > :not(.tr) {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
   }
   .row-container.dimmed:hover > :not(.tr) {
-    opacity: 0.7;
+    opacity: var(--opacity-out-of-scope-hover);
   }
   /* Shelved — quieter than the playing-dim and italic, a track set
      aside rather than one merely out of the current scope. */
@@ -978,6 +996,7 @@
      the collection into the search scope, the lit ■ stops it. */
   .tr {
     display: inline-flex;
+    gap: 0.25rem;
     margin-left: auto;
     flex-shrink: 0;
     opacity: 0;
@@ -1037,7 +1056,7 @@
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
   }
   .child-row.dimmed {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
   }
   .child-empty .child-name {
     color: var(--text-tertiary);

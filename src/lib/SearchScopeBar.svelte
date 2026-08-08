@@ -14,11 +14,14 @@
   export let collectionPlays: { key: string; label: string; color: string | null }[] = [];
   export let collectionSolos: { key: string; label: string; color: string | null }[] = [];
   export let collectionMutes: { key: string; label: string; color: string | null }[] = [];
+  export let collectionTrackMutes: { key: string; label: string; color: string | null }[] = [];
+  export let onClearCollectionTrackMute: (key: string) => void = () => {};
   export let excludedSystems: Set<string> = new Set();
   export let soloedSystems: Set<string> = new Set();
   export let curationSolos: Set<CurationKey> = new Set();
   export let curationMutes: Set<CurationKey> = new Set();
   export let showHidden: boolean = false;
+  export let hideOutOfScope: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   export let isLoading: boolean = false;
@@ -31,6 +34,7 @@
   export let onToggleCurationSolo: (key: CurationKey) => void = () => {};
   export let onToggleCurationMute: (key: CurationKey) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
+  export let onToggleHideOutOfScope: () => void = () => {};
 
   const CURATION_LABELS: Record<CurationKey, string> = {
     collected: 'In a collection',
@@ -43,8 +47,10 @@
   // Only the solo chips remain to communicate the active narrowing.
   $: soloedList = Array.from(soloedSystems).sort();
   $: excludedList = soloedList.length > 0 ? [] : Array.from(excludedSystems).sort();
-  $: shownCollectionMutes =
-    collectionPlays.length > 0 || collectionSolos.length > 0 ? [] : collectionMutes;
+  // Folder/file solos override folder/file mutes within their axis, so
+  // those mute chips would mislead and are suppressed. Playing no
+  // longer suppresses them: S/M narrows within the mix, both apply.
+  $: shownCollectionMutes = collectionSolos.length > 0 ? [] : collectionMutes;
   $: curationSoloList = CURATION_ORDER.filter((k) => curationSolos.has(k));
   $: curationMuteList =
     curationSoloList.length > 0 ? [] : CURATION_ORDER.filter((k) => curationMutes.has(k));
@@ -68,6 +74,30 @@
           </svg>
         {:else}
           <!-- No pigment — outline ribbon, same grammar as the panel -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+          </svg>
+        {/if}
+        <span class="chip-label">{chip.label}</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/each}
+
+    {#each collectionTrackMutes as chip (chip.key)}
+      <button
+        type="button"
+        class="chip exclusion"
+        on:click|stopPropagation={() => onClearCollectionTrackMute(chip.key)}
+        title="Unmute {chip.label}"
+        aria-label="Unmute {chip.label}"
+      >
+        <span class="chip-prefix">mute</span>
+        {#if chip.color}
+          <!-- Bookmark ribbon — the collection keeps its pigment even muted -->
+          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
+            <path d="M5 2h14v20l-7-5.2L5 22z"/>
+          </svg>
+        {:else}
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 3h12v18l-6-4.4L6 21z"/>
           </svg>
@@ -211,6 +241,19 @@
         aria-label="Hide hidden items again"
       >
         <span class="chip-label">hidden shown</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/if}
+
+    {#if hideOutOfScope}
+      <button
+        type="button"
+        class="chip lens-on"
+        on:click|stopPropagation={onToggleHideOutOfScope}
+        title="Show out-of-scope items again"
+        aria-label="Show out-of-scope items again"
+      >
+        <span class="chip-label">lens on</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
@@ -371,6 +414,11 @@
   .chip.hidden-on {
     border-color: color-mix(in srgb, var(--text-accent) 35%, transparent);
     color: var(--text-accent);
+  }
+
+  .chip.lens-on {
+    border-color: color-mix(in srgb, var(--text-active) 35%, transparent);
+    color: var(--text-active);
   }
 
   /* The whole chip is the clear button; the × is just a glyph. Hover

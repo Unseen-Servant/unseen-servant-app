@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FileItem } from './types';
-import { computeVisibleRows, indexOfPath } from './treeNav';
+import { computeVisibleRows, indexOfPath, isRowOutOfScope, type ScopeVisibility } from './treeNav';
 
 // --- Helpers (mirroring selectionUtils.test.ts style) ---
 
@@ -151,6 +151,76 @@ describe('computeVisibleRows', () => {
       const rowsOn = computeVisibleRows(nestedTree(), expanded, null, hidden, true);
       expect(rowsOn.map(r => r.path)).toContain('/root/parent/sub/x.pdf');
     });
+  });
+
+  describe('focus lens (scope)', () => {
+    // /root/parent/sub holds the only indexed files and is out of scope;
+    // /root/parent and /root/parent/sibling.pdf are not indexed material
+    // and so never dim/hide regardless of scope.
+    function scope(hideOutOfScope: boolean): ScopeVisibility {
+      return {
+        scopeBrightPaths: new Set(['/root/parent', '/root/parent/sibling.pdf']),
+        indexedFolderPaths: new Set(['/root/parent/sub']),
+        indexedPaths: new Set(['/root/parent/sub/x.pdf', '/root/parent/sub/y.pdf']),
+        hideOutOfScope,
+      };
+    }
+
+    it('skips an out-of-scope folder subtree entirely when hideOutOfScope is true', () => {
+      const expanded = new Set(['/root/parent', '/root/parent/sub']);
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, scope(true));
+      expect(rows.map(r => r.path)).toEqual([
+        '/root/parent',
+        '/root/parent/sibling.pdf',
+      ]);
+    });
+
+    it('keeps an out-of-scope folder subtree visible when hideOutOfScope is false', () => {
+      const expanded = new Set(['/root/parent', '/root/parent/sub']);
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, scope(false));
+      expect(rows.map(r => r.path)).toEqual([
+        '/root/parent',
+        '/root/parent/sub',
+        '/root/parent/sub/x.pdf',
+        '/root/parent/sub/y.pdf',
+        '/root/parent/sibling.pdf',
+      ]);
+    });
+  });
+});
+
+// --- isRowOutOfScope ---
+
+describe('isRowOutOfScope', () => {
+  const baseScope: ScopeVisibility = {
+    scopeBrightPaths: new Set(['/root/A']),
+    indexedFolderPaths: new Set(['/root/B']),
+    indexedPaths: new Set(['/root/A/a.pdf']),
+    hideOutOfScope: false,
+  };
+
+  it('is true for an indexed file outside the resolved scope', () => {
+    expect(isRowOutOfScope('/root/A/a.pdf', false, { ...baseScope, scopeBrightPaths: new Set() })).toBe(true);
+  });
+
+  it('is false for an unindexed file', () => {
+    expect(isRowOutOfScope('/root/A/unindexed.pdf', false, { ...baseScope, scopeBrightPaths: new Set() })).toBe(false);
+  });
+
+  it('is true for a folder with indexed descendants when none are in scope', () => {
+    expect(isRowOutOfScope('/root/B', true, baseScope)).toBe(true);
+  });
+
+  it('is false for a folder with no indexed descendants', () => {
+    expect(isRowOutOfScope('/root/C', true, baseScope)).toBe(false);
+  });
+
+  it('is false when scopeBrightPaths is null (no narrowing engaged)', () => {
+    expect(isRowOutOfScope('/root/B', true, { ...baseScope, scopeBrightPaths: null })).toBe(false);
+  });
+
+  it('is false when scope itself is null', () => {
+    expect(isRowOutOfScope('/root/B', true, null)).toBe(false);
   });
 });
 

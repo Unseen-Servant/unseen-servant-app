@@ -15,23 +15,25 @@
   export let displayPaths: Set<string> | null = null;
 
   // DAW-style channel state, shared with the filter menu. Muted (excluded)
-  // groups stay visible but dim — hiding them would take the M button with
-  // them. The untagged bucket mutes under UNTAGGED_KEY.
+  // groups stay visible but dim — hiding them would take the M button
+  // with them. The opt-in focus lens is the exception: it drops dimmed
+  // groups entirely; recovery lives in the filter console and the
+  // scope-bar chips (console surfaces never hide).
   export let excludedSystems: Set<string> = new Set();
   export let soloedSystems: Set<string> = new Set();
   export let onToggleSystemFilter: (system: string) => void = () => {};
   export let onToggleSystemSolo: (system: string) => void = () => {};
+
+  // Scope membership — see FileTree. null = no narrowing engaged.
+  export let scopeBrightPaths: Set<string> | null = null;
+  // Focus lens: dimmed groups drop from the render entirely.
+  export let hideOutOfScope: boolean = false;
 
   // User-hidden paths (same set as the tree). Entries whose path is hidden
   // are dropped when `showHidden` is false; rendered with dimmed/italic
   // styling when `showHidden` is true.
   export let hiddenPaths: Set<string> = new Set();
   export let showHidden: boolean = false;
-
-  // Paths to visually highlight (e.g. files in the active collection).
-  // Mirrors FileTree's treatment so highlighting works the same way
-  // regardless of view mode.
-  export let highlightPaths: Set<string> = new Set();
 
   // Library root path — used to render parent folders relative rather than
   // absolute. Empty string falls back to absolute paths.
@@ -110,6 +112,20 @@
     if (collapsed.has(tag)) collapsed.delete(tag);
     else collapsed.add(tag);
     collapsed = collapsed;
+  }
+
+  // One source of truth for the channel-dim rule — the template's
+  // groupDimmed and the keyboard-nav model both call this; keep them
+  // in sync through it, never by copy (same pattern as treeNav's
+  // isRowOutOfScope).
+  function isGroupDimmed(
+    group: { muted: boolean; tag: string; entries: FileStatusEntry[] },
+    soloed: Set<string>,
+    bright: Set<string> | null
+  ): boolean {
+    return group.muted
+      || (soloed.size > 0 && !soloed.has(group.tag))
+      || (bright !== null && !group.entries.some((e) => bright.has(e.path)));
   }
 
   function entryToFileItem(entry: FileStatusEntry): FileItem {
@@ -203,11 +219,14 @@
   // Flat list of entries the user can keyboard-navigate to: every entry
   // from a non-collapsed group, in display order. A multi-tagged file
   // appears once per group it belongs to — same as the rendered list,
-  // so ↓ walks visually adjacent rows.
+  // so ↓ walks visually adjacent rows. Mirrors the template's lens guard
+  // via isGroupDimmed so nav and render never drift: a group the lens
+  // drops is never focusable.
   $: visibleEntries = (() => {
     const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
     for (const g of groups) {
       if (collapsed.has(g.tag)) continue;
+      if (hideOutOfScope && isGroupDimmed(g, soloedSystems, scopeBrightPaths)) continue;
       for (const e of g.entries) out.push({ path: e.path, entry: e, tag: g.tag });
     }
     return out;
@@ -459,6 +478,8 @@
     {#each groups as group (group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
+      {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths)}
+      {#if !(hideOutOfScope && groupDimmed)}
       <section class="group">
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
           {#if isCollectionEditMode}
@@ -519,10 +540,7 @@
           <span class="group-count">{group.entries.length}</span>
         </div>
         {#if !collapsed.has(group.tag)}
-          <ul
-            class="group-files"
-            class:dimmed={group.muted || (soloedSystems.size > 0 && !soloedSystems.has(group.tag))}
-          >
+          <ul class="group-files" class:dimmed={groupDimmed}>
             {#each group.entries as entry (entry.path)}
               {@const relParent = relativeParent(entry.path)}
               {@const isChecked = isCollectionEditMode && collectionPaths.has(entry.path)}
@@ -531,7 +549,6 @@
                 class="file"
                 class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
-                class:highlighted={highlightPaths.has(entry.path)}
                 data-sv-row={entry.path}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
@@ -585,7 +602,11 @@
           </ul>
         {/if}
       </section>
+      {/if}
     {/each}
+    {#if hideOutOfScope && groups.length > 0 && groups.every((g) => isGroupDimmed(g, soloedSystems, scopeBrightPaths))}
+      <div class="empty">Everything is out of scope.</div>
+    {/if}
   </div>
 {/if}
 
@@ -707,11 +728,11 @@
      stay visible — a muted channel never disappears from the mixer.
      Hover restores legibility, mirroring the filter menu's row-dimmed. */
   .group-files.dimmed {
-    opacity: 0.45;
+    opacity: var(--opacity-out-of-scope);
     transition: opacity var(--transition-fast);
   }
   .group-files.dimmed:hover {
-    opacity: 0.7;
+    opacity: var(--opacity-out-of-scope-hover);
   }
 
   /* Edit-mode selection checkboxes — same visual language as the tree's
@@ -792,12 +813,6 @@
   }
   .file.hidden-item .file-name {
     font-style: italic;
-  }
-  /* Mirrors FileTree's highlighted treatment so a collection's members
-     read the same way regardless of view mode. */
-  .file.highlighted {
-    background: color-mix(in srgb, var(--text-accent) 12%, transparent);
-    box-shadow: inset 3px 0 0 var(--text-accent);
   }
   .file-icon {
     display: inline-flex;
