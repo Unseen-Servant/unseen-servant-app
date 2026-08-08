@@ -53,7 +53,7 @@ Rejected alternatives: making `'search'` a third `viewMode` (touches store persi
   - `.search-mode` class on `.file-tree-area`
   - `systemsFilterRelevant` / `curationFilterRelevant` (`viewMode === 'systems' || searchViewOpen`)
   - `fileActionGate`, tree-nav gate, Cmd+Alt+←/→ region-jump gate (tree/systems rows aren't on screen during search view)
-- Gates that keep `searchActive` (they mean "a query has results"): scope bar hits meter wiring, `stale` computation, `loadMoreResults`, Cmd+1–9 / results-list handlers (already guarded by `searchResults.length`).
+- Gates that keep `searchActive` (they mean "a query has results"): `stale` computation, `loadMoreResults`. The scope bar hits meter needs **both** (`searchViewOpen && searchActive`) — query and results now outlive the view, so raw `searchActive` would paint the meter over the tree after an exit. The results-list key block (Cmd+1–9, arrows) gates on `searchViewOpen` for the same reason: it must not act on rows that aren't rendered.
 
 ## View switch
 
@@ -83,7 +83,7 @@ Removed behaviors superseded by the new model:
 
 ## Edge cases
 
-- **Collection edit mode** disables the search input. Entering edit mode while the search view is open also closes the search view (one line in the edit-mode entry path); otherwise a disabled bar would strand the user in an un-leavable view. Query text still survives.
+- **Collection edit mode** disables the search input. Entering edit mode also closes the search view for free: `startEditCollection` and `startDraftCollection` already call `setViewMode('systems')`, which is now the universal exit. Query text still survives.
 - **✕ clear button:** clears query and results, refocuses the input — user stays in the (now empty) search view. Unchanged behavior, new framing: clearing ≠ exiting.
 - **App launch:** search view never open at start, regardless of persisted `viewMode`.
 
