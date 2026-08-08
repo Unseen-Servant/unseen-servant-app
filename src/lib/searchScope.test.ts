@@ -6,6 +6,7 @@ import {
   searchCurationFilter,
   searchGameSystemsFilter,
   searchSourcePathsFilter,
+  resolveMix,
   UNTAGGED_KEY,
 } from './searchScope';
 import type { CurationKey } from './searchScope';
@@ -149,5 +150,53 @@ describe('searchCurationFilter', () => {
       ALL
     );
     expect(out?.sort()).toEqual(['/lib/b.pdf', '/other/d.pdf']);
+  });
+});
+
+describe('resolveMix', () => {
+  const COLS = {
+    Strahd: { file_paths: ['/lib/strahd.pdf', '/lib/shared.pdf'] },
+    Homebrew: { file_paths: ['/lib/brew.pdf', '/lib/shared.pdf'] },
+    Ghost: { file_paths: ['/gone/x.pdf'] },
+  };
+  const INDEXED = new Set([
+    '/lib/strahd.pdf',
+    '/lib/shared.pdf',
+    '/lib/brew.pdf',
+    '/lib/loose.pdf',
+  ]);
+
+  it('returns null when the transport is idle and nothing is muted', () => {
+    expect(resolveMix(new Set(), new Set(), COLS, INDEXED)).toBeNull();
+  });
+
+  it('playing collections union their indexed files', () => {
+    const out = resolveMix(new Set(['Strahd', 'Homebrew']), new Set(), COLS, INDEXED);
+    expect([...out!].sort()).toEqual(['/lib/brew.pdf', '/lib/shared.pdf', '/lib/strahd.pdf']);
+  });
+
+  it('idle transport with a muted collection carves it from the whole library', () => {
+    const out = resolveMix(new Set(), new Set(['Homebrew']), COLS, INDEXED);
+    expect([...out!].sort()).toEqual(['/lib/loose.pdf', '/lib/strahd.pdf']);
+  });
+
+  it('mute wins over play — a playing, muted collection contributes nothing', () => {
+    const out = resolveMix(new Set(['Strahd']), new Set(['Strahd']), COLS, INDEXED);
+    expect(out).toEqual(new Set());
+  });
+
+  it('a file in both a playing and a muted collection is carved out', () => {
+    const out = resolveMix(new Set(['Strahd']), new Set(['Homebrew']), COLS, INDEXED);
+    expect([...out!]).toEqual(['/lib/strahd.pdf']);
+  });
+
+  it('playing a collection with no indexed files yields an empty mix, not the library', () => {
+    expect(resolveMix(new Set(['Ghost']), new Set(), COLS, INDEXED)).toEqual(new Set());
+  });
+
+  it('stale collection names resolve away harmlessly', () => {
+    expect(resolveMix(new Set(['Missing']), new Set(), COLS, INDEXED)).toEqual(new Set());
+    const idleMuted = resolveMix(new Set(), new Set(['Missing']), COLS, INDEXED);
+    expect(idleMuted).toEqual(INDEXED);
   });
 });

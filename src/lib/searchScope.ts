@@ -92,3 +92,38 @@ export function searchSourcePathsFilter(
   }
   return out;
 }
+
+/** Resolve the transport layer to the mix — the universe every
+ * narrowing axis filters within.
+ *
+ * base = union of playing collections' indexed files (the whole library
+ * when the transport is idle); muted collections' files subtract from
+ * the base. Mute wins over play while lit — a playing, muted collection
+ * contributes nothing, and a file reached by both a playing and a muted
+ * collection is out (mute is a carve on the mix, not a per-track
+ * fader). Returns null when the transport is idle and no collection is
+ * muted: no mix narrowing, the universe is the whole indexed library. */
+export function resolveMix(
+  playing: Set<string>,
+  mutedNames: Set<string>,
+  collections: Record<string, { file_paths: string[] }>,
+  allIndexed: Set<string>
+): Set<string> | null {
+  if (playing.size === 0 && mutedNames.size === 0) return null;
+  const base = new Set<string>();
+  if (playing.size > 0) {
+    for (const name of playing) {
+      const col = collections[name];
+      if (!col) continue;
+      for (const p of col.file_paths) if (allIndexed.has(p)) base.add(p);
+    }
+  } else {
+    for (const p of allIndexed) base.add(p);
+  }
+  for (const name of mutedNames) {
+    const col = collections[name];
+    if (!col) continue;
+    for (const p of col.file_paths) base.delete(p);
+  }
+  return base;
+}
