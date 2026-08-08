@@ -1630,7 +1630,7 @@
 
   // Cmd+Alt+← target. Opens the collections panel if it's collapsed, then
   // hands off to the panel's claim() so the rendering details (sort,
-  // draft row) stay encapsulated there.
+  // archive filter, draft row) stay encapsulated there.
   async function focusCollectionsRegion() {
     if (focusedCollectionName !== null) return;
     if (!collectionsPanelOpen) await togglePanel();
@@ -2681,6 +2681,31 @@
     }
   }
 
+  async function toggleArchived(name: string, archived: boolean) {
+    try {
+      await invoke('update_collection', { name, archived });
+      // Archiving a playing collection stops it — a shelved track can't
+      // stay in the search scope, so its chip clears with it.
+      if (archived && playingCollections.has(name)) {
+        playingCollections.delete(name);
+        playingCollections = playingCollections;
+        if (committedQuery) runSearch(committedQuery);
+      }
+      await loadCollections();
+      jobNotification.show({
+        type: 'success',
+        message: archived ? `Archived "${name}"` : `Unarchived "${name}"`,
+        duration: 3000,
+      });
+    } catch (e) {
+      jobNotification.show({
+        type: 'error',
+        message: `Could not ${archived ? 'archive' : 'unarchive'} "${name}": ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
   function handleCollectionAdd(paths: string[]) {
     for (const p of paths) collectionEditPaths.add(p);
     collectionEditPaths = collectionEditPaths;
@@ -2908,6 +2933,7 @@
               customOrder={collectionsCustomOrder}
               onEditFiles={startEditCollection}
               onDelete={requestDeleteCollection}
+              onToggleArchived={toggleArchived}
               onCreate={inlineCreateCollection}
               onSaveFiles={saveCollection}
               onCancelFiles={cancelCollectionEdit}

@@ -84,6 +84,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.play',      keys: { mac: 'P',    other: 'P' },             label: 'Play / stop focused collection', scope: 'collections' },
   { id: 'collections.rename',    keys: { mac: 'F2',   other: 'F2' },            label: 'Rename collection',            scope: 'collections' },
   { id: 'collections.editFiles', keys: { mac: 'F',    other: 'F' },             label: 'Edit collection files',        scope: 'collections' },
+  { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
   { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
 

@@ -29,6 +29,7 @@
   export let customOrder: string[] = [];
   export let onEditFiles: (name: string) => void = () => {};
   export let onDelete: (name: string) => void = () => {};
+  export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
   export let onSaveFiles: () => void = () => {};
   export let onCancelFiles: () => void = () => {};
@@ -45,6 +46,9 @@
     { value: 'size', label: 'File count' },
     { value: 'created', label: 'Recently added' },
   ];
+  // Archive is shelving, not deleting: archived rows hide by default and
+  // keep pigment, files, and their custom-order slot.
+  let showArchived = false;
 
   let sortMenuOpen = false;
   let sortBtn: HTMLButtonElement;
@@ -139,7 +143,8 @@
   // Sorting + drag reorder
   // ------------------------------------------------------------------
   $: rows = (() => {
-    const visible = Object.values(collections);
+    const list = Object.values(collections);
+    const visible = showArchived ? list : list.filter(c => !c.archived);
     if (sortKey === 'name') {
       visible.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortKey === 'size') {
@@ -160,6 +165,7 @@
     return visible;
   })();
 
+  $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
   $: canDrag = sortKey === 'custom' && rows.length > 1 && !editingName && !draftName;
   $: anyPlaying = playingNames.size > 0;
@@ -198,7 +204,12 @@
       const insertAt = dropInsertIndex > from ? dropInsertIndex - 1 : dropInsertIndex;
       names.splice(from, 1);
       names.splice(insertAt, 0, draggingName);
-      onReorder(names);
+      // Persist the full order: the visible sequence first, then any
+      // collections the current view hides (archived), so their slots
+      // aren't forgotten.
+      const inVisible = new Set(names);
+      const rest = Object.values(collections).map(c => c.name).filter(n => !inVisible.has(n));
+      onReorder([...names, ...rest]);
     }
     draggingName = null;
     dropInsertIndex = null;
@@ -211,14 +222,14 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): Rename / Pigment ▸ /
-  // Add files… / Delete. Same visual family as the file tree's
-  // ContextMenu, scoped to what a collection can do.
+  // Add files… / Archive / Delete. Same visual family as the file
+  // tree's ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
   let ctxPigmentOpen = false;
 
   const CTX_WIDTH = 190;
-  const CTX_HEIGHT = 175;
+  const CTX_HEIGHT = 200;
 
   function openContextMenu(e: MouseEvent, name: string) {
     e.preventDefault();
@@ -343,7 +354,9 @@
     }
     if (bareLetter) {
       if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
-      if (lk === 'p') { event.preventDefault(); onTogglePlay(col.name); return; }
+      // A shelved track has no transport — unarchive to play.
+      if (lk === 'p' && !col.archived) { event.preventDefault(); onTogglePlay(col.name); return; }
+      if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
     }
   }
 
@@ -440,6 +453,13 @@
               <span>{opt.label}</span>
             </button>
           {/each}
+          {#if archivedCount > 0}
+            <hr class="menu-divider" />
+            <label class="sort-toggle">
+              <span>Show archived</span>
+              <input class="app-checkbox" type="checkbox" bind:checked={showArchived} />
+            </label>
+          {/if}
         </div>
       {/if}
     </div>
@@ -448,6 +468,10 @@
   {#if hasNone && !draftName}
     <div class="empty">
       <span class="empty-label">No collections yet</span>
+    </div>
+  {:else if rows.length === 0 && !draftName}
+    <div class="empty">
+      <span class="empty-label">All archived</span>
     </div>
   {/if}
 
@@ -493,9 +517,10 @@
         <div
           class="row-container"
           class:editing={isEditing}
+          class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
           class:playing
-          class:dimmed={anyPlaying && !playing}
+          class:dimmed={anyPlaying && !playing && !col.archived}
           class:dragging={draggingName === col.name}
           class:drop-before={dropInsertIndex === i}
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
@@ -551,7 +576,8 @@
               <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
               <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
             </div>
-          {:else if !isRenamingRow}
+          {:else if !isRenamingRow && !col.archived}
+            <!-- Archived rows carry no transport — unarchive to play. -->
             <span class="tr" class:engaged={playing}>
               <button
                 type="button"
@@ -649,6 +675,9 @@
     </div>
     <hr class="menu-divider" />
     <button class="context-item" on:click={() => ctxAction(onEditFiles)}>Add files&hellip;</button>
+    <button class="context-item" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
+      {col?.archived ? 'Unarchive' : 'Archive'}
+    </button>
     <hr class="menu-divider" />
     <button class="context-item danger" on:click={() => ctxAction(onDelete)}>Delete collection</button>
   </div>
@@ -751,6 +780,24 @@
     border: none;
     border-top: 1px solid var(--bg-category);
   }
+  .sort-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .sort-toggle:hover {
+    background: var(--bg-category);
+  }
+  .sort-toggle input {
+    cursor: pointer;
+    margin: 0;
+  }
 
   .rows {
     list-style: none;
@@ -796,6 +843,14 @@
   }
   .row-container.dimmed:hover > :not(.tr) {
     opacity: 0.7;
+  }
+  /* Shelved — quieter than the playing-dim and italic, a track set
+     aside rather than one merely out of the current scope. */
+  .row-container.archived {
+    opacity: 0.55;
+  }
+  .row-container.archived .row-name {
+    font-style: italic;
   }
   .row-container.dragging {
     opacity: 0.4;
