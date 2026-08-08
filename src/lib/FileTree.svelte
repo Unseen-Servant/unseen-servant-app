@@ -5,6 +5,7 @@
   import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
   import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
+  import { isRowOutOfScope } from './treeNav';
   import SystemBadge from './SystemBadge.svelte';
 
   export let item: FileItem;
@@ -65,10 +66,9 @@
   $: isSoloedScope = soloedScopePaths.has(item.path);
   $: isMutedHere = mutedScopePaths.has(item.path);
   // Out-of-scope: dimming only speaks about searchability of indexed
-  // material — unindexed files keep their existing treatments.
-  $: outOfScope = scopeBrightPaths !== null &&
-    (item.is_dir ? indexedFolderPaths.has(item.path) : indexedPaths.has(item.path)) &&
-    !scopeBrightPaths.has(item.path);
+  // material — unindexed files keep their existing treatments. Shared
+  // with keyboard nav's row model via treeNav.ts so the two never drift.
+  $: outOfScope = isRowOutOfScope(item.path, item.is_dir, { scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope });
 
   $: isHiddenItem = isPathOrAncestorIn(item.path, hiddenPaths);
   $: hidden = (displayPaths !== null && !displayPaths.has(item.path)) ||
@@ -84,7 +84,7 @@
   let childrenLoading = false;
   // Auto-fetch children when a folder is expanded but tree data was reloaded
   afterUpdate(() => {
-    if (isExpanded && item.children === null && !childrenLoading) {
+    if (!hidden && isExpanded && item.children === null && !childrenLoading) {
       childrenLoading = true;
       invoke<FileItem[]>('list_files', { folderPath: item.path })
         .then(children => { item = { ...item, children }; childrenLoading = false; })
@@ -230,7 +230,7 @@
 <svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
 
 {#if !hidden}
-<div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
+<div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope && !isHiddenItem} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
   <div class="row-container">
     <button
       class="checkbox"
@@ -436,11 +436,13 @@
      lens is on, which drops the row from the render instead). Only the
      row itself dims (each descendant row evaluates its own membership),
      so nesting doesn't compound the opacity. Hover restores
-     legibility, mirroring the systems view's dimmed groups. */
-  .out-of-scope > .row-container {
+     legibility, mirroring the systems view's dimmed groups. The S/M
+     cluster stays full-strength — it's the way back in, mirroring the
+     collections panel's transport. */
+  .out-of-scope > .row-container > :not(.sm) {
     opacity: var(--opacity-out-of-scope);
   }
-  .out-of-scope > .row-container:hover {
+  .out-of-scope > .row-container:hover > :not(.sm) {
     opacity: var(--opacity-out-of-scope-hover);
   }
   /* S/M cluster on folder rows — hidden at rest, revealed on row hover
