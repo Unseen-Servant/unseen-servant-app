@@ -315,9 +315,17 @@
     line-height: 1.2;
   }
 
+  /* Mute chips wear the lit M button's dressing — 45% danger border,
+     10% danger wash, danger ink. The chip is the button materialized,
+     as the solo chip is the S button's purple. Mirrors .sm-btn.mute-on. */
   .chip.exclusion {
-    border-color: color-mix(in srgb, var(--text-danger) 30%, transparent);
-    color: var(--text-secondary);
+    border-color: color-mix(in srgb, var(--text-danger) 45%, transparent);
+    background: color-mix(in srgb, var(--text-danger) 10%, transparent);
+    color: var(--text-danger);
+  }
+  .chip.exclusion .chip-prefix {
+    color: var(--text-danger);
+    opacity: 0.75;
   }
 
   /* Solo chips use the active accent so they read as a positive
