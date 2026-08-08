@@ -10,6 +10,7 @@
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
+  export let onFocus: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
   export let onCollapseAll: () => void = () => {};
   export let viewToggleVisible: boolean = false;
@@ -148,6 +149,7 @@
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
+      on:focus={onFocus}
       aria-label="Search library"
     />
     {#if searchQuery.length > 0}

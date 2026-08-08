@@ -127,6 +127,9 @@
     {:else}
       <div class="state-msg">0 results for &ldquo;{query}&rdquo;</div>
     {/if}
+  {:else if results.length === 0}
+    <!-- Search view opened from an empty bar (first use, or after ✕) -->
+    <div class="state-msg">Type to search your library.</div>
   {:else}
     {#if allResultsWeak}
       <div class="weak-callout" role="status">

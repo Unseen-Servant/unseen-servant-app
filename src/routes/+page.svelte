@@ -211,6 +211,11 @@
   // In-app search state
   let searchQuery = '';
   let committedQuery = '';
+  // The search view is stateful, not derived: entered by focusing the
+  // search bar, left only explicitly (view switch, Cmd+J/T, or the
+  // Escape ladder). Never persisted — the app launches into the browse
+  // view. searchActive (committed query) keeps meaning "has a query".
+  let searchViewOpen = false;
   let searchResults: SearchResultItem[] = [];
   // Tracks which query produced the rows currently in `searchResults`.
   // Used to distinguish a fresh search-in-flight (committedQuery !==
@@ -505,6 +510,10 @@
     searchSeq += 1;
     selectedResultIndex = 0;
     resetPageSize();
+  }
+
+  function handleSearchFocus() {
+    searchViewOpen = true;
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -2904,6 +2913,7 @@
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
+    onFocus={handleSearchFocus}
     onTogglePanel={togglePanel}
     onCollapseAll={collapseAll}
     viewToggleVisible={!!selectedFolder && !searchActive}
@@ -2973,7 +2983,7 @@
       {/if}
 
       <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div class="file-tree-area" class:search-mode={searchActive} on:mousedown={handleFileTreeAreaMousedown}>
+      <div class="file-tree-area" class:search-mode={searchViewOpen} on:mousedown={handleFileTreeAreaMousedown}>
         <!-- The scope bar is the readout in every mode: chips for each
              narrowing, plus the hits meter while a search is active. The
              console itself is the docked FilterPanel. -->
@@ -2999,7 +3009,7 @@
           onToggleCurationMute={toggleCurationMute}
           onToggleShowHidden={toggleShowHidden}
         />
-        {#if searchActive}
+        {#if searchViewOpen}
           <div class="search-split">
             <div class="search-list-pane">
               <SearchResults
