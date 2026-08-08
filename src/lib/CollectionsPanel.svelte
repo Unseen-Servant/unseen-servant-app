@@ -248,14 +248,16 @@
     ctxPigmentOpen = false;
   }
 
-  // Runs a menu action against the menu's collection. The name must be
-  // captured before closing — closing nulls `ctxMenu`, so an action
-  // closure reading it afterwards would dereference null.
+  // Runs a menu action against the menu's collection, then closes the
+  // menu. The action must run BEFORE closing: Svelte 5 re-evaluates the
+  // template's `{@const col}` lazily at read time, so an action that
+  // reads it after `ctxMenu` is nulled re-derives from the nulled menu
+  // and throws (the Archive item read `col?.archived` exactly there).
   function ctxAction(fn: (name: string) => void) {
     if (!ctxMenu) return;
     const name = ctxMenu.name;
-    closeContextMenu();
     fn(name);
+    closeContextMenu();
   }
 
   // Scroll the focused row into view whenever focus changes.
