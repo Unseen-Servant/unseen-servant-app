@@ -145,7 +145,7 @@
   // Library narrowing — one model, three axes, DAW semantics on each:
   // solos union within an axis, axes intersect, solo overrides mute.
   //   - systems axis:    filterExcludedSystems (muted) + soloedSystems.
-  //   - collection axis: mutedCollections + soloCollections, keyed by
+  //   - collection axis: scopeMutes + scopeSolos, keyed by
   //     path (tree folders and files), plus playingCollections — names
   //     armed by the panel's play/stop transport, which join the solo
   //     side (play = "this track is in the scope").
@@ -156,8 +156,8 @@
   // store persistence), so each session starts with a clean library.
   let filterExcludedSystems = new Set<string>();
   let soloedSystems = new Set<string>();
-  let soloCollections = new Map<string, ScopeRef>();
-  let mutedCollections = new Map<string, ScopeRef>();
+  let scopeSolos = new Map<string, ScopeRef>();
+  let scopeMutes = new Map<string, ScopeRef>();
   let playingCollections = new Set<string>();
   let soloCuration = new Set<CurationKey>();
   let mutedCuration = new Set<CurationKey>();
@@ -264,18 +264,18 @@
       }));
   $: collectionSolos = isCollectionEditMode
     ? []
-    : [...soloCollections].map(([key, ref]) => ({ key, label: ref.label, color: null }));
+    : [...scopeSolos].map(([key, ref]) => ({ key, label: ref.label, color: null }));
   $: collectionMutes = isCollectionEditMode
     ? []
-    : [...mutedCollections].map(([key, ref]) => ({ key, label: ref.label, color: null }));
+    : [...scopeMutes].map(([key, ref]) => ({ key, label: ref.label, color: null }));
   function handleClearCollectionSolo(key: string) {
-    soloCollections.delete(key);
-    soloCollections = soloCollections;
+    scopeSolos.delete(key);
+    scopeSolos = scopeSolos;
     if (committedQuery) runSearch(committedQuery);
   }
   function handleClearCollectionMute(key: string) {
-    mutedCollections.delete(key);
-    mutedCollections = mutedCollections;
+    scopeMutes.delete(key);
+    scopeMutes = scopeMutes;
     if (committedQuery) runSearch(committedQuery);
   }
   $: indexedPathsSet = new Set<string>(
@@ -328,7 +328,7 @@
     return searchSourcePathsFilter(soloSets, muteSets, indexed);
   }
   $: collectionAxisInclude = computeCollectionAxisInclude(
-    soloCollections, mutedCollections, playingCollections, collections, indexedPaths
+    scopeSolos, scopeMutes, playingCollections, collections, indexedPaths
   );
 
   // The "of N files" denominator in the SearchScopeBar — mirrors the same
@@ -383,7 +383,7 @@
     // collections). Computed fresh — see computeCollectionAxisInclude
     // for why the derived value can't be read here.
     let sourcePaths = computeCollectionAxisInclude(
-      soloCollections, mutedCollections, playingCollections, collections, indexedPaths
+      scopeSolos, scopeMutes, playingCollections, collections, indexedPaths
     );
 
     // Curation axis (Collected/Loose solos and mutes) intersects into
@@ -402,7 +402,7 @@
     }
 
     if (sourcePaths !== null && sourcePaths.length === 0) {
-      searchError = soloCollections.size > 0 || playingCollections.size > 0 || soloCuration.size > 0
+      searchError = scopeSolos.size > 0 || playingCollections.size > 0 || soloCuration.size > 0
         ? 'Nothing indexed under the soloed or playing items.'
         : 'Everything is muted.';
       searchResults = [];
@@ -825,22 +825,22 @@
   // soloing does not release other solos or the active collection —
   // every narrowing stacks as its own chip in the scope bar.
   function toggleScopeSolo(item: FileItem) {
-    if (soloCollections.has(item.path)) {
-      soloCollections.delete(item.path);
+    if (scopeSolos.has(item.path)) {
+      scopeSolos.delete(item.path);
     } else {
-      soloCollections.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
+      scopeSolos.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
     }
-    soloCollections = soloCollections;
+    scopeSolos = scopeSolos;
     if (committedQuery) runSearch(committedQuery);
   }
 
   function toggleScopeMute(item: FileItem) {
-    if (mutedCollections.has(item.path)) {
-      mutedCollections.delete(item.path);
+    if (scopeMutes.has(item.path)) {
+      scopeMutes.delete(item.path);
     } else {
-      mutedCollections.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
+      scopeMutes.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
     }
-    mutedCollections = mutedCollections;
+    scopeMutes = scopeMutes;
     if (committedQuery) runSearch(committedQuery);
   }
 
@@ -864,8 +864,8 @@
   function clearAllFilters() {
     filterExcludedSystems = new Set();
     soloedSystems = new Set();
-    soloCollections = new Map();
-    mutedCollections = new Map();
+    scopeSolos = new Map();
+    scopeMutes = new Map();
     playingCollections = new Set();
     soloCuration = new Set();
     mutedCuration = new Set();
@@ -1397,7 +1397,7 @@
       const col = collections[name];
       if (col) for (const p of col.file_paths) files.add(p);
     }
-    for (const [path, ref] of soloCollections) {
+    for (const [path, ref] of scopeSolos) {
       files.add(path);
       if (ref.kind === 'folder') {
         const prefix = path + '/';
@@ -1411,8 +1411,8 @@
   // Rows muted on the collection axis dim in the tree (45%, never
   // hidden). Descendants of a muted folder inherit via prefix match,
   // same as hiddenPaths.
-  $: mutedScopePaths = new Set(mutedCollections.keys());
-  $: soloedScopePaths = new Set(soloCollections.keys());
+  $: mutedScopePaths = new Set(scopeMutes.keys());
+  $: soloedScopePaths = new Set(scopeSolos.keys());
 
   // Union of every collection's file paths. Powers the "uncategorized"
   // filter and any membership check that's library-wide rather than
@@ -3120,7 +3120,7 @@
       canSolo={contextMenu.item.is_dir
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
-      isSoloed={soloCollections.has(contextMenu.item.path)}
+      isSoloed={scopeSolos.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
       knownSystems={knownSystems}
       currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
