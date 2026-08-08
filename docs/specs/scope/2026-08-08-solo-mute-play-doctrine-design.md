@@ -103,8 +103,14 @@ view rows.
 ## Display doctrine
 
 One rule on every surface: **out-of-scope dims — a single level, hover
-restores legibility, never hidden; the control responsible stays lit;
-every engaged narrowing materializes a scope-bar chip.**
+restores legibility, never hidden by default; the control responsible
+stays lit; every engaged narrowing materializes a scope-bar chip.**
+
+Surfaces split into two classes: **browsing surfaces** (file tree,
+systems view) show material and may hide it under the focus lens below;
+**console surfaces** (filter console, collections panel, scope bar) show
+channels and controls and never hide them — the mixer is the recovery
+path, so nothing can disappear from it.
 
 - **Dim predicate:** membership in the final resolved scope (mix ∩ all
   axes), applied at each surface's own granularity:
@@ -134,11 +140,30 @@ The tree gains the two treatments it is missing today (dim outside the
 playing mix, dim outside an active solo); "what's in tonight's mix" then
 reads in the tree as the complement's dimming — no wash needed there.
 
+### Focus lens: "Hide out-of-scope items"
+
+A toggle in the filter console masthead, sibling to "Show hidden items".
+For very large libraries, thousands of dimmed rows are still thousands
+of rows — dimming communicates scope but doesn't shrink the surface
+(DAW mixers have the same lens: hide unused tracks).
+
+- **Engaged**, browsing surfaces hide exactly what the dim predicate
+  would dim — explicit mutes and merely-out-of-scope alike. A folder
+  hides when it has indexed descendants and none are in scope.
+- Console surfaces are unaffected; recovery stays two-deep everywhere
+  (the chip on the scope bar, the channel in the console).
+- The lit toggle wears purple (`--text-active`) — a mode the user
+  switched on. With no narrowing engaged the lens is a harmless no-op.
+- If the scope resolves empty while the lens is on, the tree shows a
+  one-line "everything is out of scope" placeholder so blank doesn't
+  read as broken.
+
 ## Persistence
 
 Full console recall through the existing store plugin: playing set,
 muted collections, system S/M, folder/file S/M maps (path + kind +
-label), curation S/M. Saved on change, loaded before the first search.
+label), curation S/M, and the focus-lens toggle. Saved on change, loaded
+before the first search.
 
 - Collections are keyed by name; the rename action migrates the playing
   and muted sets.
@@ -161,10 +186,14 @@ label), curation S/M. Saved on change, loaded before the first search.
    rows: M only); keyboard M; rename migrates transport/mute sets.
 4. `SearchScopeBar.svelte` — vermilion chips for muted collections.
 5. `FileTree.svelte` — scope-membership dimming (file + folder-subtree
-   predicates) replacing the mute-only prefix dim.
-6. `SystemsView.svelte` — adds the no-files-in-scope dim condition.
-7. `app.css` — the out-of-scope opacity token pair; surfaces adopt it.
-8. New persistence module wiring the store plugin.
+   predicates) replacing the mute-only prefix dim; rows drop from the
+   render under the focus lens, plus the empty-scope placeholder.
+6. `SystemsView.svelte` — adds the no-files-in-scope dim condition;
+   dimmed groups drop under the focus lens.
+7. `FilterPanel.svelte` — "Hide out-of-scope items" toggle row in the
+   masthead beside "Show hidden items".
+8. `app.css` — the out-of-scope opacity token pair; surfaces adopt it.
+9. New persistence module wiring the store plugin.
 
 ## Testing
 
@@ -174,12 +203,15 @@ muted collection with idle transport; shared file in a playing and a
 muted collection (carved); each empty-state branch in priority order;
 stale-path tolerance; mix-as-source-paths fallback. Display predicates
 (file/folder scope membership) get unit tests where they live as pure
-functions; component-level class assertions only where vitest patterns
-already exist. Persistence: round-trip save/load unit test.
+functions — the focus lens reuses the same predicates, so hiding is
+covered by them plus a component assertion where vitest patterns already
+exist. Persistence: round-trip save/load unit test including the lens.
 
 ## Non-goals
 
 - No solo on collections; no play on folders, files, or systems.
-- No two-tier dim; out-of-scope material is never hidden.
+- No two-tier dim. Hiding is opt-in via the focus lens only, and only
+  on browsing surfaces — console surfaces never hide their channels,
+  and there are no per-surface hide toggles.
 - No sidecar/backend changes — the filters API is untouched.
 - No changes to what indexing checkboxes or hidden-item treatments mean.
