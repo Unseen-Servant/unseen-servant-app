@@ -54,7 +54,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Search input
   { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Submit search',                scope: 'searchInput' },
   { id: 'search.intoResults',    keys: { mac: '↓',    other: '↓' },             label: 'Move focus into results',      scope: 'searchInput' },
-  { id: 'search.intoTree',       keys: { mac: '↓',    other: '↓' },             label: 'Move focus into file tree',    scope: 'searchInput' },
+  { id: 'search.exit',           keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave search — back to browse view', scope: 'searchInput' },
 
   // File tree (when a row is focused)
   { id: 'tree.next',             keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'fileTree' },
@@ -109,6 +109,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.prev',          keys: { mac: '↑',    other: '↑' },             label: 'Previous result (or back to input)', scope: 'searchResults' },
   { id: 'results.open',          keys: { mac: '↵',    other: 'Enter' },         label: 'Open focused result',          scope: 'searchResults' },
   { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
+  { id: 'results.toInput',       keys: { mac: 'Esc',  other: 'Esc' },           label: 'Back to search input',         scope: 'searchResults' },
 ];
 
 const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
