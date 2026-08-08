@@ -142,3 +142,49 @@ export function passesSystemsAxis(
   if (tags.length === 0) return !muted.has(UNTAGGED_KEY);
   return tags.some((t) => !muted.has(t));
 }
+
+/** Resolve the full console — mix plus all three narrowing axes — to
+ * the set of indexed files search can currently see.
+ *
+ * Solo sets are intersected with the universe (the mix, or the whole
+ * library when no mix is armed) before the axis resolves: soloing a
+ * folder while a collection plays narrows to the folder's slice of the
+ * mix, never adds material to it. Mute sets need no restriction —
+ * subtraction composes on its own. Callers that want backend-shaped
+ * path filtering (runSearch) pass empty system sets and an empty tag
+ * map; the sidecar applies `game_systems` per chunk.
+ *
+ * Returns null when nothing is engaged anywhere: no narrowing, every
+ * indexed file is in scope. */
+export function resolveScopeSet(
+  mix: Set<string> | null,
+  soloSets: string[][],
+  muteSets: string[][],
+  curationSolos: Set<CurationKey>,
+  curationMutes: Set<CurationKey>,
+  collectedPaths: Set<string>,
+  soloedSystems: Set<string>,
+  mutedSystems: Set<string>,
+  tagsByPath: Map<string, string[]>,
+  allIndexed: Set<string>
+): Set<string> | null {
+  const noAxes =
+    soloSets.length === 0 &&
+    muteSets.length === 0 &&
+    curationSolos.size === 0 &&
+    curationMutes.size === 0 &&
+    soloedSystems.size === 0 &&
+    mutedSystems.size === 0;
+  if (mix === null && noAxes) return null;
+  const universe = mix ?? allIndexed;
+  const soloInUniverse = soloSets.map((s) => s.filter((p) => universe.has(p)));
+  let paths: Iterable<string> =
+    searchSourcePathsFilter(soloInUniverse, muteSets, universe) ?? universe;
+  const curation = searchCurationFilter(curationSolos, curationMutes, collectedPaths, paths);
+  if (curation !== null) paths = curation;
+  const out = new Set<string>();
+  for (const p of paths) {
+    if (passesSystemsAxis(tagsByPath.get(p) ?? [], soloedSystems, mutedSystems)) out.add(p);
+  }
+  return out;
+}

@@ -8,6 +8,7 @@ import {
   searchSourcePathsFilter,
   resolveMix,
   passesSystemsAxis,
+  resolveScopeSet,
   UNTAGGED_KEY,
 } from './searchScope';
 import type { CurationKey } from './searchScope';
@@ -235,5 +236,95 @@ describe('passesSystemsAxis', () => {
     const solo = new Set(['Dragonbane']);
     const muted = new Set(['Dragonbane']);
     expect(passesSystemsAxis(['Dragonbane'], solo, muted)).toBe(true);
+  });
+});
+
+describe('resolveScopeSet', () => {
+  const INDEXED = new Set([
+    '/lib/strahd/map.pdf',
+    '/lib/bestiary/dragons.pdf',
+    '/lib/bestiary/undead.pdf',
+    '/lib/loose.pdf',
+  ]);
+  const TAGS = new Map<string, string[]>([
+    ['/lib/strahd/map.pdf', ['D&D 5E']],
+    ['/lib/bestiary/dragons.pdf', ['D&D 5E']],
+    ['/lib/bestiary/undead.pdf', ['Dragonbane']],
+  ]);
+  const COLLECTED = new Set(['/lib/strahd/map.pdf', '/lib/bestiary/undead.pdf']);
+  const BESTIARY = ['/lib/bestiary/dragons.pdf', '/lib/bestiary/undead.pdf'];
+  const noStr = new Set<string>();
+  const noCur = new Set<CurationKey>();
+
+  const resolve = (
+    mix: Set<string> | null,
+    soloSets: string[][] = [],
+    muteSets: string[][] = [],
+    opts: Partial<{
+      curationSolos: Set<CurationKey>;
+      curationMutes: Set<CurationKey>;
+      soloedSystems: Set<string>;
+      mutedSystems: Set<string>;
+    }> = {}
+  ) =>
+    resolveScopeSet(
+      mix,
+      soloSets,
+      muteSets,
+      opts.curationSolos ?? noCur,
+      opts.curationMutes ?? noCur,
+      COLLECTED,
+      opts.soloedSystems ?? noStr,
+      opts.mutedSystems ?? noStr,
+      TAGS,
+      INDEXED
+    );
+
+  it('returns null when nothing is engaged anywhere', () => {
+    expect(resolve(null)).toBeNull();
+  });
+
+  it('a mix alone IS the scope', () => {
+    const mix = new Set(['/lib/strahd/map.pdf']);
+    expect(resolve(mix)).toEqual(mix);
+  });
+
+  it('a folder solo intersects the playing mix — the Strahd/Bestiary case', () => {
+    const mix = new Set(['/lib/strahd/map.pdf', '/lib/bestiary/undead.pdf']);
+    const out = resolve(mix, [BESTIARY]);
+    expect(out).toEqual(new Set(['/lib/bestiary/undead.pdf']));
+  });
+
+  it('a solo with nothing inside the mix resolves empty, not to the solo', () => {
+    const mix = new Set(['/lib/strahd/map.pdf']);
+    expect(resolve(mix, [BESTIARY])).toEqual(new Set());
+  });
+
+  it('mutes carve within the mix', () => {
+    const mix = new Set(['/lib/strahd/map.pdf', '/lib/bestiary/dragons.pdf']);
+    const out = resolve(mix, [], [['/lib/bestiary/dragons.pdf']]);
+    expect(out).toEqual(new Set(['/lib/strahd/map.pdf']));
+  });
+
+  it('the curation axis intersects within the mix', () => {
+    const mix = new Set(['/lib/strahd/map.pdf', '/lib/bestiary/dragons.pdf']);
+    const out = resolve(mix, [], [], { curationSolos: new Set<CurationKey>(['collected']) });
+    expect(out).toEqual(new Set(['/lib/strahd/map.pdf']));
+  });
+
+  it('the systems axis intersects within the mix', () => {
+    const mix = new Set(['/lib/bestiary/dragons.pdf', '/lib/bestiary/undead.pdf']);
+    const out = resolve(mix, [], [], { soloedSystems: new Set(['Dragonbane']) });
+    expect(out).toEqual(new Set(['/lib/bestiary/undead.pdf']));
+  });
+
+  it('axes narrow the whole library when no mix is armed', () => {
+    const out = resolve(null, [BESTIARY]);
+    expect(out).toEqual(new Set(BESTIARY));
+  });
+
+  it('with empty system sets and an untagged file, the file survives (runSearch mode)', () => {
+    const out = resolve(null, [], [['/lib/strahd/map.pdf']]);
+    expect(out!.has('/lib/loose.pdf')).toBe(true);
   });
 });
