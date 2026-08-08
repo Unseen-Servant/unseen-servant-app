@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FileItem } from './types';
-import { computeVisibleRows, indexOfPath, isRowOutOfScope, type ScopeVisibility } from './treeNav';
+import { computeVisibleRows, indexOfPath, isRowOutOfScope, rowHasIndexedMaterial, type ScopeVisibility } from './treeNav';
 
 // --- Helpers (mirroring selectionUtils.test.ts style) ---
 
@@ -186,6 +186,29 @@ describe('computeVisibleRows', () => {
         '/root/parent/sibling.pdf',
       ]);
     });
+  });
+});
+
+// --- rowHasIndexedMaterial ---
+
+describe('rowHasIndexedMaterial', () => {
+  const indexedPaths = new Set(['/root/A/a.pdf']);
+  const indexedFolderPaths = new Set(['/root', '/root/A']);
+
+  it('is true for an indexed file', () => {
+    expect(rowHasIndexedMaterial('/root/A/a.pdf', false, indexedPaths, indexedFolderPaths)).toBe(true);
+  });
+
+  it('is false for an unindexed file', () => {
+    expect(rowHasIndexedMaterial('/root/A/notes.txt', false, indexedPaths, indexedFolderPaths)).toBe(false);
+  });
+
+  it('is true for a folder with an indexed descendant', () => {
+    expect(rowHasIndexedMaterial('/root/A', true, indexedPaths, indexedFolderPaths)).toBe(true);
+  });
+
+  it('is false for a folder with no indexed descendants', () => {
+    expect(rowHasIndexedMaterial('/root/junk', true, indexedPaths, indexedFolderPaths)).toBe(false);
   });
 });
 

@@ -95,7 +95,7 @@ Three messages, first match wins:
 | ------------------- | --------------- | ------------------------------------------------------------ |
 | Collection          | ▶/⏹ (P/Space), M | No solo — play *is* the focus verb here. Mute wins over play. |
 | Archived collection | M only          | No transport (unarchive to play); muting a shelved collection is the "retired homebrew" carve. |
-| Folder / file       | S, M            | Unchanged.                                                   |
+| Folder / file       | S, M            | Offered wherever the row has indexed material (see Affordance parity below). |
 | Game system         | S, M            | Untagged stays mute-only (never passes under solos, #307).   |
 | Collected / Loose   | S, M            | Unchanged.                                                   |
 
@@ -106,6 +106,32 @@ gesture. Systems are metadata channels, not material you arm.
 Keyboard: M toggles mute on a focused collection row (joining the
 existing P/Space transport binding), matching S/M on tree and systems
 view rows.
+
+### Affordance parity (amended 2026-08-08)
+
+Every input path offers S/M on tree rows under one predicate
+(`rowHasIndexedMaterial` in `treeNav.ts`): the row has indexed material
+to act on — a file in the index, or a folder with an indexed
+descendant — or is already engaged, so stale chips stay toggleable
+where they were set. Concretely: the inline S/M cluster renders on
+indexed file rows as well as folders; the context menu pairs "Mute
+this folder/file" with Solo behind the same gate; and the toggle
+handlers refuse to *create* a narrowing on a row with nothing indexed
+(removal always works). Dead-on-arrival solos are thus impossible from
+any input path — the honest-empty-solo rule now only applies to chips
+that go stale after creation.
+
+### Hide territory (amended 2026-08-08)
+
+Hide stays display-only (hidden files remain indexed, searched, and
+counted) and splits territory with M: **hide is the visibility verb for
+what scope can't speak about** — unindexed files and folders. "Hide
+file" (context menu and the `.` key) is no longer offered for indexed
+files; their disappearing verb is mute plus the focus lens. Unhide
+always remains available, so files hidden before indexing (or indexed
+while hidden) never strand. Folder hide is untouched — junk folders
+are the common clutter case even when a stray indexed file sits
+inside.
 
 ## Display doctrine
 

@@ -27,7 +27,7 @@
   import SystemsView from '../lib/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
-  import { computeVisibleRows, indexOfPath, type VisibleRow } from '../lib/treeNav';
+  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, type VisibleRow } from '../lib/treeNav';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
@@ -863,8 +863,13 @@
   function toggleScopeSolo(item: FileItem) {
     if (scopeSolos.has(item.path)) {
       scopeSolos.delete(item.path);
-    } else {
+    } else if (rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths)) {
       scopeSolos.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
+    } else {
+      // Nothing indexed to act on — a solo here could only empty the
+      // scope. The affordances gate on the same predicate; guard here
+      // too for any other entry point (keyboard S on any focused row).
+      return;
     }
     scopeSolos = scopeSolos;
     persistScopeConsole();
@@ -874,8 +879,12 @@
   function toggleScopeMute(item: FileItem) {
     if (scopeMutes.has(item.path)) {
       scopeMutes.delete(item.path);
-    } else {
+    } else if (rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths)) {
       scopeMutes.set(item.path, { kind: item.is_dir ? 'folder' : 'file', label: item.name });
+    } else {
+      // Same gate as solo — a mute with nothing indexed would only be
+      // a dead chip.
+      return;
     }
     scopeMutes = scopeMutes;
     persistScopeConsole();
@@ -981,6 +990,12 @@
     if (hiddenPaths.has(item.path)) {
       hiddenPaths.delete(item.path);
     } else if (isPathHidden(item.path)) {
+      return;
+    } else if (!item.is_dir && indexedPaths.has(item.path)) {
+      // Indexed files are library material — their disappearing verb is
+      // mute (+ the focus lens). Hide is display-only and would leave
+      // them searchable but invisible. Hide keeps working for unindexed
+      // files and folders; unhide above always works.
       return;
     } else {
       hiddenPaths.add(item.path);
@@ -2316,6 +2331,13 @@
     toggleScopeSolo(item);
   }
 
+  function handleContextToggleMute() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    contextMenu = null;
+    toggleScopeMute(item);
+  }
+
   function handleContextToggleHidden() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -3257,10 +3279,10 @@
       canAddToCollection={contextMenu.item.is_dir
         ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
         : indexedPaths.has(contextMenu.item.path)}
-      canSolo={contextMenu.item.is_dir
-        ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
-        : indexedPaths.has(contextMenu.item.path)}
+      canScope={scopeSolos.has(contextMenu.item.path) || scopeMutes.has(contextMenu.item.path) ||
+        rowHasIndexedMaterial(contextMenu.item.path, contextMenu.item.is_dir, indexedPaths, indexedFolderPaths)}
       isSoloed={scopeSolos.has(contextMenu.item.path)}
+      isMuted={scopeMutes.has(contextMenu.item.path)}
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
       knownSystems={knownSystems}
       currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
@@ -3274,6 +3296,7 @@
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
       onToggleSolo={handleContextToggleSolo}
+      onToggleMute={handleContextToggleMute}
       onAddToCollection={handleContextAddToCollection}
       onAddToNewCollection={handleContextAddToNewCollection}
       onRemoveFromCollection={handleContextRemoveFromCollection}

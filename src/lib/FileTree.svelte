@@ -5,7 +5,7 @@
   import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
   import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
-  import { isRowOutOfScope } from './treeNav';
+  import { isRowOutOfScope, rowHasIndexedMaterial } from './treeNav';
   import SystemBadge from './SystemBadge.svelte';
 
   export let item: FileItem;
@@ -43,7 +43,7 @@
   export let hiddenPaths: Set<string> = new Set();
   export let showHidden: boolean = false;
 
-  // Collection-axis S/M lit states for the folder-row buttons. The dim
+  // Collection-axis S/M lit states for the tree-row buttons. The dim
   // itself no longer derives from these: out-of-scope rows dim through
   // scopeBrightPaths, which already accounts for mutes.
   export let soloedScopePaths: Set<string> = new Set();
@@ -65,6 +65,10 @@
 
   $: isSoloedScope = soloedScopePaths.has(item.path);
   $: isMutedHere = mutedScopePaths.has(item.path);
+  // S/M renders wherever the row has indexed material to act on — or
+  // is already engaged, so a stale solo/mute stays reachable in place.
+  $: canScope = isSoloedScope || isMutedHere ||
+    rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths);
   // Out-of-scope: dimming only speaks about searchability of indexed
   // material — unindexed files keep their existing treatments. Shared
   // with keyboard nav's row model via treeNav.ts so the two never drift.
@@ -259,7 +263,7 @@
       {/if}
     </button>
 
-    {#if item.is_dir}
+    {#if canScope}
       <span class="sm" class:engaged={isSoloedScope || isMutedHere}>
         <button
           type="button"

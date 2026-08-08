@@ -13,10 +13,12 @@
   // a no-op action. Folder partials (some files in, some not) stay visible.
   export let excludeFromAdd: string[] = [];
   export let canAddToCollection: boolean = true;
-  // Collection-axis solo (folders and files) — replaces the old
-  // "Search in this folder / file" scoping.
-  export let canSolo: boolean = false;
+  // Collection-axis S/M (folders and files) — replaces the old
+  // "Search in this folder / file" scoping. Offered only when the row
+  // has indexed material to act on, or is already engaged.
+  export let canScope: boolean = false;
   export let isSoloed: boolean = false;
+  export let isMuted: boolean = false;
   // Hide/show state. `inheritedHidden` means an ancestor folder is hidden,
   // so the toggle is omitted (user must unhide the originally-hidden folder).
   export let directlyHidden: boolean = false;
@@ -37,6 +39,7 @@
   export let onReindex: () => void = () => {};
   export let onShowStats: () => void = () => {};
   export let onToggleSolo: () => void = () => {};
+  export let onToggleMute: () => void = () => {};
   export let onAddToCollection: (name: string) => void = () => {};
   export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
@@ -275,10 +278,13 @@
     <button class="context-item" data-mi="item" on:click={onOpen}>Open file</button>
   {/if}
   <button class="context-item" data-mi="item" on:click={onReveal}>Reveal in folder</button>
-  {#if canSolo}
+  {#if canScope}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" on:click={onToggleSolo}>
       {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
+    </button>
+    <button class="context-item" data-mi="item" on:click={onToggleMute}>
+      {isMuted ? 'Unmute' : 'Mute'} this {item.is_dir ? 'folder' : 'file'}
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
@@ -416,7 +422,11 @@
     {/if}
   {/if}
 
-  {#if !inheritedHidden}
+  <!-- Hide is the visibility verb for what scope can't speak about:
+       indexed files get M instead (hide is display-only and would
+       leave them searchable but invisible). Unhide always stays
+       available so nothing strands. -->
+  {#if !inheritedHidden && (item.is_dir || directlyHidden || !isIndexed)}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}

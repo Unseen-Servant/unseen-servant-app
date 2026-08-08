@@ -18,13 +18,27 @@ export interface ScopeVisibility {
   hideOutOfScope: boolean;
 }
 
+/** A row has indexed material when it is a file in the index or a
+ * folder with at least one indexed descendant. This is the one
+ * predicate for offering S/M on a row — inline buttons, keyboard, and
+ * context menu all gate on it (each ORs in its own already-engaged
+ * check so stale chips stay toggleable where they were set). */
+export function rowHasIndexedMaterial(
+  path: string,
+  isDir: boolean,
+  indexedPaths: Set<string>,
+  indexedFolderPaths: Set<string>,
+): boolean {
+  return isDir ? indexedFolderPaths.has(path) : indexedPaths.has(path);
+}
+
 /** A row is out of scope when it is indexed material (a file in the
  * index; a folder with at least one indexed descendant) outside the
  * resolved scope. FileTree's dim and the keyboard nav's row model both
  * call this — keep them in sync through it, never by copy. */
 export function isRowOutOfScope(path: string, isDir: boolean, scope: ScopeVisibility | null): boolean {
   if (!scope || scope.scopeBrightPaths === null) return false;
-  const speaks = isDir ? scope.indexedFolderPaths.has(path) : scope.indexedPaths.has(path);
+  const speaks = rowHasIndexedMaterial(path, isDir, scope.indexedPaths, scope.indexedFolderPaths);
   return speaks && !scope.scopeBrightPaths.has(path);
 }
 
