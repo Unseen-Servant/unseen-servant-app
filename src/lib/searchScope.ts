@@ -127,3 +127,18 @@ export function resolveMix(
   }
   return base;
 }
+
+/** Frontend mirror of the systems-axis include-list semantics for a
+ * single file's tags: under solos only soloed systems pass (untagged
+ * files never do); under mutes a file passes while it keeps at least
+ * one unmuted tag, and untagged files pass unless the Untagged bucket
+ * itself is muted (issue #307). */
+export function passesSystemsAxis(
+  tags: string[],
+  soloed: Set<string>,
+  muted: Set<string>
+): boolean {
+  if (soloed.size > 0) return tags.some((t) => soloed.has(t));
+  if (tags.length === 0) return !muted.has(UNTAGGED_KEY);
+  return tags.some((t) => !muted.has(t));
+}

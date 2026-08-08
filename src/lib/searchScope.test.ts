@@ -7,6 +7,7 @@ import {
   searchGameSystemsFilter,
   searchSourcePathsFilter,
   resolveMix,
+  passesSystemsAxis,
   UNTAGGED_KEY,
 } from './searchScope';
 import type { CurationKey } from './searchScope';
@@ -198,5 +199,41 @@ describe('resolveMix', () => {
     expect(resolveMix(new Set(['Missing']), new Set(), COLS, INDEXED)).toEqual(new Set());
     const idleMuted = resolveMix(new Set(), new Set(['Missing']), COLS, INDEXED);
     expect(idleMuted).toEqual(INDEXED);
+  });
+});
+
+describe('passesSystemsAxis', () => {
+  const none = new Set<string>();
+
+  it('everything passes when nothing is engaged', () => {
+    expect(passesSystemsAxis(['D&D 5E'], none, none)).toBe(true);
+    expect(passesSystemsAxis([], none, none)).toBe(true);
+  });
+
+  it('under solos only files with a soloed tag pass', () => {
+    const solo = new Set(['D&D 5E']);
+    expect(passesSystemsAxis(['D&D 5E', 'Dragonbane'], solo, none)).toBe(true);
+    expect(passesSystemsAxis(['Dragonbane'], solo, none)).toBe(false);
+  });
+
+  it('untagged files never pass under solos', () => {
+    expect(passesSystemsAxis([], new Set(['D&D 5E']), none)).toBe(false);
+  });
+
+  it('under mutes a file passes while it keeps one unmuted tag', () => {
+    const muted = new Set(['Dragonbane']);
+    expect(passesSystemsAxis(['Dragonbane', 'D&D 5E'], none, muted)).toBe(true);
+    expect(passesSystemsAxis(['Dragonbane'], none, muted)).toBe(false);
+  });
+
+  it('untagged files pass under mutes unless the Untagged bucket is muted (#307)', () => {
+    expect(passesSystemsAxis([], none, new Set(['Dragonbane']))).toBe(true);
+    expect(passesSystemsAxis([], none, new Set([UNTAGGED_KEY]))).toBe(false);
+  });
+
+  it('solo overrides mute', () => {
+    const solo = new Set(['Dragonbane']);
+    const muted = new Set(['Dragonbane']);
+    expect(passesSystemsAxis(['Dragonbane'], solo, muted)).toBe(true);
   });
 });
