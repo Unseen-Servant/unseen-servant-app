@@ -3042,7 +3042,6 @@
             onToggleSystemSolo={toggleSystemSolo}
             {hiddenPaths}
             {showHidden}
-            {highlightPaths}
             libraryRoot={selectedFolder}
             {focusedFilePath}
             {focusedCollectionName}
