@@ -537,7 +537,7 @@
           class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
           class:playing
-          class:dimmed={muted || (anyPlaying && !playing && !col.archived)}
+          class:dimmed={!col.archived && (muted || (anyPlaying && !playing))}
           class:dragging={draggingName === col.name}
           class:drop-before={dropInsertIndex === i}
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
@@ -634,7 +634,7 @@
             </div>
           {/each}
           {#if col.file_paths.length === 0}
-            <div class="child-row child-empty" class:washed={playing && !muted}>
+            <div class="child-row child-empty" class:washed={playing && !muted} class:dimmed={muted || (anyPlaying && !playing)}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">No files yet</span>
             </div>
