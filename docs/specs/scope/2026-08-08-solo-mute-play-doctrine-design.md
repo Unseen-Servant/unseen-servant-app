@@ -1,7 +1,9 @@
 # SOLO / MUTE / PLAY — scope doctrine — design
 
 **Date:** 2026-08-08
-**Status:** Approved design, not yet implemented.
+**Status:** Implemented 2026-08-08 on branch
+claude/unseen-servant-solo-mute-play-02b695 (automated checks green;
+manual QA checklist pending — see the plan's Task 13).
 **Related:** `src/lib/searchScope.ts`, issue #307 (untagged bucket), commits
 5ebde7a (unified solo), 4b04974 (play/stop transport), e61ace2 (filter
 console).
@@ -69,8 +71,13 @@ folder/file and curation axes filter over, and the result is the
 `source_paths` is the mix itself — or `null` when the mix is the whole
 library. No sidecar changes.
 
-The library header count and per-channel counts compute against the same
-resolved scope.
+The scope-bar denominator and the search-results count compute against
+the resolved scope. Per-channel counts (the filter console's system and
+Collected/Loose counts, the status bar's indexed total) deliberately
+stay whole-library: like a DAW channel meter, they describe the
+channel's material — what muting carves or unmuting restores — not its
+post-narrowing contribution. A muted channel showing 0 would erase the
+one number that says what's behind the M.
 
 ### Empty states
 
@@ -166,10 +173,18 @@ label), curation S/M, and the focus-lens toggle. Saved on change, loaded
 before the first search.
 
 - Collections are keyed by name; the rename action migrates the playing
-  and muted sets.
-- Paths that have left the index resolve away harmlessly (resolution
-  already intersects with the indexed set); their chips remain visible
-  and removable, so stale state is seen rather than silently ignored.
+  and muted sets, and deletion clears both. Restored state loads after
+  the collections themselves, so restored names are never transient
+  ghosts.
+- Stale state is seen rather than silently ignored — chips remain
+  visible and removable — but staleness resolves per gesture:
+  collection names with no matching collection resolve away entirely
+  (they engage nothing, not even the mix's null decision); path *mutes*
+  subtract nothing and are harmless; path *solos* keep narrowing — a
+  solo covering nothing indexed narrows the scope to nothing, honestly,
+  with the lit chip and the empty-state message naming the cause. A
+  solo chip must never be lit while contributing nothing to the
+  narrowing.
 - The filter console's [clear all] remains the one-gesture reset.
 
 ## Deltas from current implementation
