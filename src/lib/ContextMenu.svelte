@@ -236,11 +236,15 @@
   }
 
   $: addExcludeSet = new Set(excludeFromAdd);
-  $: addableCollections = Object.values(collections).filter((c) => !addExcludeSet.has(c.name));
+  // Archived collections are shelved and inert — neither submenu offers them.
+  $: addableCollections = Object.values(collections).filter(
+    (c) => !c.archived && !addExcludeSet.has(c.name),
+  );
+  $: removableCollections = containingCollections.filter((n) => !collections[n]?.archived);
   // Remove-submenu rows only carry names — resolve their pigment here.
   $: collectionColorByName = new Map(Object.values(collections).map((c) => [c.name, c.color]));
   $: hasCollections = addableCollections.length > 0;
-  $: hasContainingCollections = containingCollections.length > 0;
+  $: hasContainingCollections = removableCollections.length > 0;
 
   $: canTag = !item.is_dir && isIndexed && knownSystems.length > 0;
 
@@ -387,7 +391,7 @@
         <span class="submenu-caret">&#9656;</span>
         {#if openSubmenu === 'remove'}
           <div class="submenu">
-            {#each containingCollections as name}
+            {#each removableCollections as name}
               <button
                 class="context-item"
                 data-mi="item"
