@@ -11,8 +11,6 @@
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
-  export let collapseAllVisible: boolean = false;
-  export let collapseAllDisabled: boolean = false;
   export let onCollapseAll: () => void = () => {};
   export let viewToggleVisible: boolean = false;
   export let viewMode: 'tree' | 'systems' = 'tree';
@@ -100,36 +98,41 @@
       </button>
     {/if}
     {#if viewToggleVisible}
-      <button
-        class="panel-toggle"
-        class:active={viewMode === 'systems'}
-        on:click={() => onSetViewMode(viewMode === 'systems' ? 'tree' : 'systems')}
-        title={(viewMode === 'systems' ? 'Switch to tree view' : 'Shelve by system') + chordHint('view.toggle')}
-        aria-label="Toggle view mode"
-        aria-pressed={viewMode === 'systems'}
-      >
-        <!-- Layered stack — group by tag -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-          <path d="M12 2 L22 7 L12 12 L2 7 Z" />
-          <path d="M2 12 L12 17 L22 12" />
-          <path d="M2 17 L12 22 L22 17" />
-        </svg>
-      </button>
-    {/if}
-    {#if collapseAllVisible}
-      <button
-        class="panel-toggle"
-        on:click={onCollapseAll}
-        disabled={collapseAllDisabled}
-        title="Collapse all folders"
-        aria-label="Collapse all folders"
-      >
-        <!-- Double chevron up — collapse all -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-          <polyline points="17 11 12 6 7 11" />
-          <polyline points="17 18 12 13 7 18" />
-        </svg>
-      </button>
+      <!-- View switch — a picker, not a mode: one view is always on, so the
+           current segment sits on a raised fill instead of lighting purple.
+           Repeating the tree action collapses the whole tree. -->
+      <div class="view-switch" role="group" aria-label="Library view">
+        <button
+          class="view-segment"
+          class:current={viewMode === 'systems'}
+          on:click={() => { if (viewMode !== 'systems') onSetViewMode('systems'); }}
+          title={'Shelve by system' + chordHint('view.systems')}
+          aria-label="Shelve by system"
+          aria-pressed={viewMode === 'systems'}
+        >
+          <!-- Layered stack — shelve by system -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+            <path d="M12 2 L22 7 L12 12 L2 7 Z" />
+            <path d="M2 12 L12 17 L22 12" />
+            <path d="M2 17 L12 22 L22 17" />
+          </svg>
+        </button>
+        <button
+          class="view-segment"
+          class:current={viewMode === 'tree'}
+          on:click={() => (viewMode === 'tree' ? onCollapseAll() : onSetViewMode('tree'))}
+          title={(viewMode === 'tree' ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
+          aria-label="Tree view"
+          aria-pressed={viewMode === 'tree'}
+        >
+          <!-- List tree — folder hierarchy -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+            <path d="M21 6H9M21 12h-8M21 18h-8" />
+            <path d="M4 4v4c0 1.1.9 2 2 2h3" />
+            <path d="M4 8v8c0 1.1.9 2 2 2h3" />
+          </svg>
+        </button>
+      </div>
     {/if}
   </div>
   <div class="search-wrapper" class:disabled>
@@ -170,9 +173,9 @@
     flex-shrink: 0;
   }
 
-  /* Tighter cluster for icon-button siblings — keeps the panel toggle,
-     filter, and collapse-all close while preserving header gap to the
-     search wrapper. */
+  /* Tighter cluster for icon-button siblings — keeps the panel toggles
+     and the view switch close while preserving header gap to the search
+     wrapper. */
   .header-controls {
     display: flex;
     align-items: center;
@@ -204,16 +207,39 @@
   .panel-toggle.active .toggle-icon {
     filter: var(--glow-active);
   }
-  .panel-toggle:disabled {
+
+  /* View switch — two-segment picker in its own darker well against the
+     header. The current segment reads as a raised fill, never purple. */
+  .view-switch {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-well);
+  }
+  .view-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
     color: var(--text-tertiary);
-    cursor: not-allowed;
+    cursor: pointer;
+    padding: 0;
+    transition: all var(--transition-fast);
   }
-  .panel-toggle:disabled:hover {
-    color: var(--text-tertiary);
+  .view-segment:hover {
+    color: var(--text-primary);
   }
-  .panel-toggle:disabled .toggle-icon {
-    filter: none;
+  .view-segment.current {
+    background: var(--bg-header);
+    color: var(--text-primary);
   }
+
   .toggle-icon {
     width: 14px;
     height: 14px;

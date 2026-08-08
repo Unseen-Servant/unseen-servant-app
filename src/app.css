@@ -108,6 +108,7 @@
   /* Corner radii */
   --radius-sm: 3px;
   --radius-md: 4px;
+  --radius-well: 6px; /* concentric wrap around --radius-md contents + 2px padding */
   --radius-lg: 8px;
 
   /* LED-style glows for engaged controls. Purple = mode on,

@@ -1948,13 +1948,21 @@
       return;
     }
 
-    // Cmd/Ctrl+J: toggle Tree ↔ Systems view (matches the visible button:
-    // hidden during search, so the chord no-ops there too). 'J' was chosen
-    // over '\' because backslash isn't a single key on Canadian CSA and
-    // several other ISO layouts.
+    // Cmd/Ctrl+J: switch to Systems view; Cmd/Ctrl+T: switch to Tree view,
+    // or collapse the whole tree when already there (the view switch's
+    // repeat action). Both match the visible switch: hidden during search,
+    // so the chords no-op there too. 'J' was chosen over '\' because
+    // backslash isn't a single key on Canadian CSA and several other ISO
+    // layouts.
     if (meta && !event.shiftKey && lk === 'j' && selectedFolder && !searchActive) {
       event.preventDefault();
-      setViewMode(viewMode === 'systems' ? 'tree' : 'systems');
+      if (viewMode !== 'systems') setViewMode('systems');
+      return;
+    }
+    if (meta && !event.shiftKey && lk === 't' && selectedFolder && !searchActive) {
+      event.preventDefault();
+      if (viewMode === 'tree') collapseAll();
+      else setViewMode('tree');
       return;
     }
 
@@ -2897,8 +2905,6 @@
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
     onTogglePanel={togglePanel}
-    collapseAllVisible={!!selectedFolder && !searchActive}
-    collapseAllDisabled={viewMode === 'systems' || expandedPaths.size === 0}
     onCollapseAll={collapseAll}
     viewToggleVisible={!!selectedFolder && !searchActive}
     {viewMode}
