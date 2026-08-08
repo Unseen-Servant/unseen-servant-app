@@ -1125,7 +1125,10 @@ In the template:
 - `<FilterPanel …>` (~line 2949): add `{hideOutOfScope}` and `onToggleHideOutOfScope={toggleHideOutOfScope}`.
 - `<SearchScopeBar …>` (~line 2980): add `{collectionTrackMutes}` and `onClearCollectionTrackMute={toggleCollectionMute}`.
 - `<SystemsView …>` (~line 3035): remove `{highlightPaths}`; add `{scopeBrightPaths}` and `{hideOutOfScope}`.
-- `<FileTree …>` (~line 3062): remove `{highlightPaths}`; add `{scopeBrightPaths}`, `{indexedFolderPaths}`, `{hideOutOfScope}`.
+- `<FileTree …>` (~line 3062): add `{scopeBrightPaths}`, `{indexedFolderPaths}`, `{hideOutOfScope}` (its `{highlightPaths}` line was already removed during Task 8).
+- **Keyboard nav** (added after Task 8 review): every `computeVisibleRows(files, expandedPaths, …)` call site in `+page.svelte` must pass the new trailing scope argument so arrow keys skip lens-hidden rows:
+  `{ scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope }`
+  (the `ScopeVisibility` shape from `src/lib/treeNav.ts`). Forgetting this makes keyboard focus land on rows the tree doesn't render while the lens is on. Also beware the half-wired failure mode: passing `scopeBrightPaths` without `indexedFolderPaths` dims files but never folders — wire all three sets together.
 
 - [ ] **Step 9: Tree empty-state placeholder**
 
