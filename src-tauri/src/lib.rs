@@ -584,7 +584,9 @@ async fn reindex_file(path: String) -> Result<ReindexFileResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Sidecar error: {}", response.status()));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
     }
 
     response
@@ -688,7 +690,9 @@ async fn delete_index() -> Result<DeleteIndexResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Sidecar error: {}", response.status()));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
     }
 
     let result: DeleteIndexResult = response
@@ -716,7 +720,9 @@ async fn set_game_system(
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Sidecar error: {}", response.status()));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
     }
 
     let result: SetGameSystemResult = response
@@ -744,7 +750,9 @@ async fn set_game_systems(
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Sidecar error: {}", response.status()));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
     }
 
     let result: SetGameSystemResult = response
