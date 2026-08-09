@@ -1,10 +1,11 @@
 # Menu Affordances — Design
 
 **Date:** 2026-08-09
-**Status:** Approved, not yet implemented. Amended 2026-08-09 — menu
-roles pulled into scope (they are load-bearing for the ARIA change, not
-adjacent polish); focus management and Collections-menu nav tracked in
-#363.
+**Status:** Implemented 2026-08-09 on main, `ad6ecba`…`a56fcbe`. Visual
+and VoiceOver passes still outstanding — see Outcomes. Amended during
+planning: menu roles were pulled into scope (they are load-bearing for
+the ARIA change, not adjacent polish); focus management and
+Collections-menu nav remain deferred to #363.
 
 ## Problem
 
@@ -345,3 +346,54 @@ Recorded so they are not re-litigated.
    systems-view checkbox unchanged in purple, including its
    indeterminate bar — the bar is the piece most likely to shift, moving
    from a hand-positioned pseudo-element to a shared data URI.
+
+## Outcomes
+
+Recorded on completion; the two open questions this spec asked to settle,
+plus what the automated gates could and could not reach.
+
+- **Chord contrast — settled at `--text-secondary`, gap accepted.**
+  Measured 4.17:1 on `--bg-focused`. The spec's original fallback plan
+  was wrong: it assumed tertiary might fail and secondary would rescue
+  it, but tertiary is 3.44:1 and secondary is also under the 4.5:1 AA
+  threshold for small text. Only `--text-primary` clears it (8.31:1),
+  which would make the hint as loud as the command; a token at `#929ba6`
+  would pass at 4.56:1 but sits a hair from secondary and would collapse
+  the text ramp. Accepted on the same grounds as the header-voices
+  tertiary gaps — the chord is supplementary and the `?` overlay repeats
+  every binding on a darker surface.
+- **The sort menu's "Show archived" row did NOT need the button
+  fallback.** It kept the planned `<label role="none">` wrapping an
+  `<input role="menuitemcheckbox" aria-checked>`. Nothing in the role
+  audit or the build gates objected. Note this is a *static* result —
+  the fallback existed for the case where VoiceOver announced the
+  construct badly, and that check has not run yet, so the question is
+  answered structurally but not behaviourally.
+- **Gates that passed:** `npm run check` (418 files, 0 errors, 0
+  warnings), `npm run lint:css`, the frontend suite, the full sidecar
+  suite (594), `cargo fmt --check`, `cargo clippy --all-targets -D
+  warnings`. Verification items 1-3 and the static half of 4 are
+  satisfied by inspection.
+- **Still outstanding, and not reachable by any automated gate:** the
+  VoiceOver spot-checks (items 4), the live keyboard pass (item 5), and
+  the visual pass (item 6). The indeterminate bar is the highest-risk
+  visual item — it moved from a hand-positioned pseudo-element to a
+  shared data URI and is now ~6.25px wide against the old 8px, matched
+  deliberately to the tick's span. The tree checkbox's tick also
+  shrinks ~35-40% and centres, converging it onto the `.app-checkbox`
+  already shipping in FilterPanel.
+
+## Related work found on the way
+
+Neither is part of this spec; both were pre-existing and are recorded
+here because they surfaced while verifying the menus.
+
+- **`29d2954`** — tagging a game system 500'd on any file with more than
+  5461 chunks, Chroma's local write cap, because `_apply_game_systems`
+  rewrote every chunk in one `collection.update()`. Two of six books in
+  a small test library could never be retagged. Now batched.
+- **`0136432`, `8014378`** — that bug was invisible because four Tauri
+  commands discarded the sidecar's response body (reporting only
+  "Sidecar error: 500"), and because `handleSetGameSystems` wrapped both
+  the write and the follow-up refresh in one `try`, so a refresh failure
+  rolled back a tag that had actually saved.
