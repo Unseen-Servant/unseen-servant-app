@@ -381,3 +381,58 @@ input {
 .font-display {
   font-family: var(--font-display);
 }
+
+/* --- Header Voices --- */
+/* One class per header voice; recipe only (font, size, tracking, case,
+   line-height, default color) — layout stays in components.
+   See docs/design/2026-08-09-header-voices-design.md. */
+
+.panel-title {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--text-accent);
+}
+
+.dialog-title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  line-height: 1.2;
+  color: var(--text-accent);
+}
+
+.section-title {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.ledger-label {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--text-tertiary);
+}
+
+.readout-label {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--text-secondary);
+}
+
+.micro-label {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--text-tertiary);
+}
