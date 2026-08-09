@@ -368,6 +368,30 @@ input {
   outline-offset: 2px;
 }
 
+/* --- Menu Vocabulary --- */
+
+/* Menu selection lamp — reports which option is in effect on rows whose whole
+   surface is the click target. Deliberately unlike .app-checkbox: 5px vs 14px
+   and no border, because a panel LED has no bezel you press. Decorative;
+   the announced state is aria-checked on the row. */
+.menu-pip {
+  width: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.menu-pip::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.menu-pip.on::before {
+  background: var(--text-accent);
+  filter: var(--glow-accent);
+}
+
 /* --- Font Utilities --- */
 
 .font-body {

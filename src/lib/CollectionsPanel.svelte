@@ -472,7 +472,7 @@
               aria-checked={sortKey === opt.value}
               on:click={() => pickSort(opt.value)}
             >
-              <span class="check">{sortKey === opt.value ? '✓' : ''}</span>
+              <span class="menu-pip" class:on={sortKey === opt.value} aria-hidden="true"></span>
               <span>{opt.label}</span>
             </button>
           {/each}
@@ -697,7 +697,7 @@
               aria-checked={col?.color === pig.hex}
               on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
             >
-              <span class="pig-check">{col?.color === pig.hex ? '✓' : ''}</span>
+              <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
               <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M5 2h14v20l-7-5.2L5 22z"/>
               </svg>
@@ -711,7 +711,7 @@
             aria-checked={!col?.color}
             on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, null))}
           >
-            <span class="pig-check">{!col?.color ? '✓' : ''}</span>
+            <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
               <path d="M6 3h12v18l-6-4.4L6 21z"/>
             </svg>
@@ -809,13 +809,6 @@
   }
   .sort-item:hover {
     background: var(--bg-container);
-  }
-  .check,
-  .pig-check {
-    width: 0.9rem;
-    color: var(--text-accent);
-    font-weight: 700;
-    flex-shrink: 0;
   }
   .menu-divider {
     margin: 0.15rem 0;
