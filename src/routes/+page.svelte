@@ -1608,6 +1608,8 @@
   // FileTree renders, so consecutive entries here are visually adjacent.
   $: visibleTreeRows = computeVisibleRows(files, expandedPaths, displayPaths, hiddenPaths, showHidden, {
     scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope,
+  }, {
+    indexedPaths, indexedFolderPaths, selectedPaths, foldersWithSelections, hideUnindexed,
   });
 
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string[]> {
@@ -3120,6 +3122,8 @@
               onClearHidden={clearHidden}
               {hideOutOfScope}
               onToggleHideOutOfScope={toggleHideOutOfScope}
+              {hideUnindexed}
+              onToggleHideUnindexed={toggleHideUnindexed}
               showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
               {collectedCount}
               {uncollectedCount}
@@ -3150,6 +3154,7 @@
           curationMutes={mutedCuration}
           {showHidden}
           {hideOutOfScope}
+          {hideUnindexed}
           resultCount={searchResults.length}
           indexedFileCount={searchableFileCount}
           isLoading={isSearching}
@@ -3164,6 +3169,7 @@
           onToggleCurationMute={toggleCurationMute}
           onToggleShowHidden={toggleShowHidden}
           onToggleHideOutOfScope={toggleHideOutOfScope}
+          onToggleHideUnindexed={toggleHideUnindexed}
         />
         {#if searchViewOpen}
           <div class="search-split">
@@ -3228,6 +3234,8 @@
         {:else}
           {#if hideOutOfScope && scopeBrightPaths !== null && scopeBrightPaths.size === 0}
             <div class="scope-empty">Everything is out of scope.</div>
+          {:else if hideUnindexed && indexedPaths.size === 0 && selectedPaths.size === 0}
+            <div class="scope-empty">Nothing in the library yet.</div>
           {/if}
           {#each files as file (file.path)}
             <FileTree
@@ -3256,6 +3264,7 @@
               {scopeBrightPaths}
               {indexedFolderPaths}
               {hideOutOfScope}
+              {hideUnindexed}
               onToggleScopeSolo={toggleScopeSolo}
               onToggleScopeMute={toggleScopeMute}
             />
