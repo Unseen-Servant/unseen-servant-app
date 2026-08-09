@@ -1,7 +1,11 @@
 # Pane focus model — the filter panel joins the keyboard — design
 
 **Date:** 2026-08-09
-**Status:** Designed; not implemented.
+**Status:** Implemented 2026-08-09 on main — 480dd30 (row model), bb0ff52
+(third token), af21ec8 (pane pattern), 4699dae (role=checkbox rows),
+e6186a7 (wiring), a8c7b6a (dock chords), a442ef1 (registry).
+svelte-check, vitest, stylelint and the vite build all green; the plan's
+manual QA checklist is still pending.
 **Related:** `src/lib/FilterPanel.svelte`, `src/lib/CollectionsPanel.svelte`,
 `src/routes/+page.svelte`, `src/lib/keybindings.ts`, commit 3c6ef23 (the
 interim Escape fix this design supersedes).
