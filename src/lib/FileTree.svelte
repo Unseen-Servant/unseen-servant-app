@@ -207,9 +207,7 @@
 <div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope && !isHiddenItem} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
   <div class="row-container">
     <button
-      class="checkbox"
-      class:checked={isChecked}
-      class:indeterminate={isIndeterminate}
+      class="app-checkbox row-checkbox"
       on:click|stopPropagation={handleCheckboxChange}
       role="checkbox"
       aria-label="Select {item.name}"
@@ -350,51 +348,9 @@
   .row-container:hover {
     background: var(--bg-focused);
   }
-  .checkbox {
-    width: 14px;
-    height: 14px;
+  .row-checkbox {
     margin-right: 0.5rem;
     margin-left: 0.2rem;
-    padding: 0;
-    cursor: pointer;
-    border: 1.5px solid var(--text-tertiary);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    position: relative;
-    flex-shrink: 0;
-    transition: border-color var(--transition-fast), background var(--transition-fast);
-  }
-  .checkbox:hover {
-    border-color: var(--text-accent);
-  }
-  .checkbox.checked {
-    background: var(--text-accent);
-    border-color: var(--text-accent);
-  }
-  .checkbox.checked::after {
-    content: '';
-    position: absolute;
-    left: 3px;
-    top: 0px;
-    width: 5px;
-    height: 9px;
-    border: solid var(--bg-app);
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-  }
-  .checkbox.indeterminate {
-    background: var(--text-accent);
-    border-color: var(--text-accent);
-  }
-  .checkbox.indeterminate::after {
-    content: '';
-    position: absolute;
-    left: 2px;
-    top: 5px;
-    width: 8px;
-    height: 2px;
-    background: var(--bg-app);
-    border-radius: 1px;
   }
   /* Hidden via the user's hide flag — only rendered when "Show hidden" is on.
      Italicized + dimmed so it reads as "explicitly suppressed". */
