@@ -190,57 +190,6 @@
   </header>
 
   <div class="panel-body">
-    <div class="sect sect-split ledger-label">
-      <span>Hidden items</span>
-      {#if hasHidden}
-        <button class="reset-link" on:click={onClearHidden}>Clear</button>
-      {/if}
-    </div>
-    <label
-      class="row"
-      class:row-disabled={!hasHidden}
-      title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
-      data-fm={hasHidden ? 'row' : undefined}
-    >
-      <span class="row-name muted-name">Show hidden items</span>
-      <span class="row-count">{hiddenCount}</span>
-      <input
-        class="app-checkbox"
-        type="checkbox"
-        checked={showHidden}
-        disabled={!hasHidden}
-        on:change={onToggleShowHidden}
-      />
-    </label>
-
-    <label
-      class="row lens-row"
-      title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
-      data-fm="row"
-    >
-      <span class="row-name muted-name">Hide unindexed items</span>
-      <input
-        class="app-checkbox lens-checkbox"
-        type="checkbox"
-        checked={hideUnindexed}
-        on:change={onToggleHideUnindexed}
-      />
-    </label>
-
-    <label
-      class="row lens-row"
-      title="Hide dimmed out-of-scope rows in the tree and systems view"
-      data-fm="row"
-    >
-      <span class="row-name muted-name">Hide out-of-scope items</span>
-      <input
-        class="app-checkbox lens-checkbox"
-        type="checkbox"
-        checked={hideOutOfScope}
-        on:change={onToggleHideOutOfScope}
-      />
-    </label>
-
     {#if showCollectionFilter}
       <div class="sect ledger-label">Curation</div>
       {#each curationRows as ch (ch.key)}
@@ -369,6 +318,59 @@
         <div class="empty">No game systems detected yet. Index some files first.</div>
       {/if}
     {/if}
+
+    <!-- View-visibility switches last: they say what the tree shows, not
+         what search sees, so they sit below the narrowing axes. -->
+    <div class="sect sect-split ledger-label">
+      <span>Hidden items</span>
+      {#if hasHidden}
+        <button class="reset-link" on:click={onClearHidden}>Clear</button>
+      {/if}
+    </div>
+    <label
+      class="row"
+      class:row-disabled={!hasHidden}
+      title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
+      data-fm={hasHidden ? 'row' : undefined}
+    >
+      <span class="row-name muted-name">Show hidden items</span>
+      <span class="row-count">{hiddenCount}</span>
+      <input
+        class="app-checkbox"
+        type="checkbox"
+        checked={showHidden}
+        disabled={!hasHidden}
+        on:change={onToggleShowHidden}
+      />
+    </label>
+
+    <label
+      class="row lens-row"
+      title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
+      data-fm="row"
+    >
+      <span class="row-name muted-name">Hide unindexed items</span>
+      <input
+        class="app-checkbox lens-checkbox"
+        type="checkbox"
+        checked={hideUnindexed}
+        on:change={onToggleHideUnindexed}
+      />
+    </label>
+
+    <label
+      class="row lens-row"
+      title="Hide dimmed out-of-scope rows in the tree and systems view"
+      data-fm="row"
+    >
+      <span class="row-name muted-name">Hide out-of-scope items</span>
+      <input
+        class="app-checkbox lens-checkbox"
+        type="checkbox"
+        checked={hideOutOfScope}
+        on:change={onToggleHideOutOfScope}
+      />
+    </label>
   </div>
 </aside>
 
