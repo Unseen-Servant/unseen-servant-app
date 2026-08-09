@@ -5,7 +5,7 @@
   import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
   import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
-  import { isRowOutOfScope, rowHasIndexedMaterial } from './treeNav';
+  import { isRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial } from './treeNav';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -63,6 +63,10 @@
   // Focus lens: hide (don't render) out-of-scope rows instead of
   // dimming them. Browsing surfaces only — console surfaces never hide.
   export let hideOutOfScope: boolean = false;
+  // "Hide unindexed items": drop rows the library knows nothing about —
+  // neither in the index nor selected for it. Tree only; SystemsView
+  // renders indexStatus entries and holds nothing unindexed to hide.
+  export let hideUnindexed: boolean = false;
 
   $: isSoloedScope = soloedScopePaths.has(item.path);
   $: isMutedHere = mutedScopePaths.has(item.path);
@@ -75,10 +79,17 @@
   // with keyboard nav's row model via treeNav.ts so the two never drift.
   $: outOfScope = isRowOutOfScope(item.path, item.is_dir, { scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope });
 
+  // Rows the library knows nothing about. Unlike out-of-scope, this has
+  // no dim tier — the switch off reproduces today's tree exactly.
+  $: outsideLibrary = hideUnindexed && !rowHasLibraryMaterial(item.path, item.is_dir, {
+    indexedPaths, indexedFolderPaths, selectedPaths, foldersWithSelections, hideUnindexed,
+  });
+
   $: isHiddenItem = isPathOrAncestorIn(item.path, hiddenPaths);
   $: hidden = (displayPaths !== null && !displayPaths.has(item.path)) ||
               (isHiddenItem && !showHidden) ||
-              (outOfScope && hideOutOfScope);
+              (outOfScope && hideOutOfScope) ||
+              outsideLibrary;
 
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let tagMenu: SystemTagMenu | undefined;
@@ -326,6 +337,7 @@
           {scopeBrightPaths}
           {indexedFolderPaths}
           {hideOutOfScope}
+          {hideUnindexed}
         />
       {/each}
     </div>
