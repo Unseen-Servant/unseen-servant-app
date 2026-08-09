@@ -76,10 +76,6 @@
   // action as clearing each chip in the scope bar.
   export let onClearAll: () => void = () => {};
 
-  // Escape closes the panel (parent flips its open flag; unmount then
-  // restores focus via onDestroy below).
-  export let onClose: () => void = () => {};
-
   let panelEl: HTMLElement;
   let focusedIdx = 0;
   let rowEls: HTMLElement[] = [];
@@ -97,9 +93,9 @@
 
   onDestroy(() => {
     // Restore focus only when the close path didn't already move focus
-    // somewhere meaningful (Escape leaves it inside the panel, programmatic
-    // closes leave it on body). Outside-clicks land focus on whatever was
-    // clicked — don't yank it back from the user.
+    // somewhere meaningful (the header toggle takes focus itself;
+    // programmatic closes leave it on body). Outside-clicks land focus on
+    // whatever was clicked — don't yank it back from the user.
     const ae = document.activeElement as HTMLElement | null;
     const focusInsidePanel = !!panelEl && (ae === panelEl || panelEl.contains(ae as Node));
     const focusOnBody = ae === document.body || ae === null;
@@ -131,12 +127,11 @@
   // keys while focus is inside it — the tree's and collections panel's
   // window-level handlers keep working otherwise.
   function handleKey(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-      return;
-    }
+    // No Escape branch: the panel is docked furniture whose open state is
+    // persisted, so dismissing it on a reflex Escape would silently rewrite
+    // the dock layout for every future launch. The header toggle is the
+    // close affordance. Escape falls through to the window ladder, where it
+    // means the same thing here as everywhere else.
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
     const bareLetter = !meta && !event.shiftKey && !event.altKey;

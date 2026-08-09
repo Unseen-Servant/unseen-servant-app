@@ -3141,7 +3141,6 @@
               onToggleCurationSolo={toggleCurationSolo}
               onToggleCurationMute={toggleCurationMute}
               onClearAll={clearAllFilters}
-              onClose={toggleFilterPanel}
             />
           {/if}
         </div>
