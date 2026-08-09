@@ -70,7 +70,8 @@ the design conventions.
 
 ### `.ledger-label`
 
-- `FilterPanel.svelte` `.sect` ×2 — **0.72 → 0.7rem, 0.09 → 0.08em**
+- `FilterPanel.svelte` `.sect` ×3 (one is the `sect-split` "Hidden
+  items" variant) — **0.72 → 0.7rem, 0.09 → 0.08em**
 - `help/ReferencePane.svelte` `.kb-group-title` — **0.78 → 0.7rem**
 - `GameSystemsSettings.svelte` `.col-header` ×2 — **Crimson Text 600 →
   Almendra, 0.03 → 0.08em**; keeps local `--text-secondary` override,
