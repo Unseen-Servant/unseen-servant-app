@@ -175,6 +175,10 @@
   // still get indexed, searched, and counted in SystemsView.
   let hiddenPaths = new Set<string>();
   let showHidden = false;
+  // "Hide unindexed items" — a view mode over what the library knows,
+  // not a narrowing, so it lives beside showHidden rather than in the
+  // scope console (and survives [clear all], as the focus lens does).
+  let hideUnindexed = false;
 
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
   // 'systems' = flat list grouped by game system. Forced to 'tree' in
@@ -655,6 +659,10 @@
       if (savedShowHidden !== undefined) {
         showHidden = savedShowHidden;
       }
+      const savedHideUnindexed = parseBoolean(await store.get('hideUnindexed'));
+      if (savedHideUnindexed !== undefined) {
+        hideUnindexed = savedHideUnindexed;
+      }
       const savedViewMode = parseEnum(
         await store.get('viewMode'),
         ['tree', 'systems'] as const,
@@ -953,6 +961,7 @@
       const store = await load('settings.json');
       await store.set('hiddenPaths', Array.from(hiddenPaths));
       await store.set('showHidden', showHidden);
+      await store.set('hideUnindexed', hideUnindexed);
       await store.save();
     } catch (e) {
       console.log('Could not persist hidden state:', e);
@@ -1016,6 +1025,15 @@
 
   function toggleShowHidden() {
     showHidden = !showHidden;
+    persistHidden();
+  }
+
+  // No auto-reset guard of the kind toggleHidden applies to showHidden:
+  // the equivalent check ("is anything unindexed?") would need a
+  // whole-tree scan, and the switch is a harmless no-op when everything
+  // the tree shows is already library material.
+  function toggleHideUnindexed() {
+    hideUnindexed = !hideUnindexed;
     persistHidden();
   }
 
