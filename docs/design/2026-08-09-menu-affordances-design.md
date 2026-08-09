@@ -1,7 +1,10 @@
 # Menu Affordances — Design
 
 **Date:** 2026-08-09
-**Status:** Approved, not yet implemented.
+**Status:** Approved, not yet implemented. Amended 2026-08-09 — menu
+roles pulled into scope (they are load-bearing for the ARIA change, not
+adjacent polish); focus management and Collections-menu nav tracked in
+#363.
 
 ## Problem
 
@@ -106,10 +109,28 @@ Visually the lit pattern already teaches the semantics — three lit pips
 is self-evidently many-of, one lit pip among pigments is self-evidently
 one-of, and the swatches say so too.
 
-Strictly, those roles want `role="menu"` on their containers. The
-containers are plain divs today, with one stray `role="menuitem"` at
-`CollectionsPanel.svelte:672`, so this is already inconsistent.
-Deferred — see Notes.
+**The containers get `role="menu"`, in this pass.** This is not optional
+polish: `menuitemcheckbox` and `menuitemradio` are only valid owned by a
+`role="menu"`, and orphaned, whether `aria-checked` announces is
+AT-dependent. Since the pip is `aria-hidden`, shipping the roles without
+the containers could remove announceable state and put nothing reliable
+back — a regression introduced by this pass, not a deferral.
+
+It is more than the container attribute, because children of
+`role="menu"` must themselves be menu roles:
+
+- `role="menu"` on each menu and each submenu — `ContextMenu`'s outer
+  menu and its three submenus, `SystemTagMenu`'s dropdown, and
+  `CollectionsPanel`'s context menu, pigment submenu and sort menu.
+- `role="menuitem"` on every plain command row.
+- `role="separator"` on the `<hr>` dividers.
+- `menuitemcheckbox` / `menuitemradio` per the table above.
+
+Mechanical and bounded — roughly twenty small edits across three
+components. `ContextMenu` currently has no roles at all; `CollectionsPanel`
+has one stray `role="menuitem"` at `:674` that folds into the same pass.
+
+What this does *not* buy is AT navigability — see Notes.
 
 ### Shared checkbox anatomy
 
@@ -268,12 +289,26 @@ Recorded so they are not re-litigated.
   tertiary on `--bg-focused` at 3.44:1 as an accepted gap for quiet
   chrome. Chord hints may or may not qualify; step to
   `--text-secondary` if not.
-- **`role="menu"` on the four containers is deferred.** It is a
-  correctness improvement the new roles imply, but it is a separate
-  keyboard-semantics pass, and `CollectionsPanel`'s menu needs arrow
-  nav before it is worth doing properly.
-- **Wiring accelerators in `CollectionsPanel`** is deferred with that
-  same nav work.
+- **Labelled, not navigable — the honest limit of this pass.** Tracked
+  in #363. The roles land here; nothing behind them does.
+  `ContextMenu` has no DOM focus management at all: the keyboard cursor
+  is a `.kb-focused` class toggled at `:104` while DOM focus stays
+  wherever it was before the menu opened. So an AT cursor cannot follow
+  the visual one. Roving `tabindex` or `aria-activedescendant` is the
+  fix, and it is deferred for a real reason — the current keyboard
+  implementation works *because* focus never moves. The handler is on
+  `svelte:window` (`:266`) alongside `on:click={onClose}` and an
+  outside-`mousedown` handler; moving focus means rethinking all three
+  at once.
+- **`CollectionsPanel`'s menu will carry roles it cannot honor by
+  keyboard.** It has no keydown handler at all. Recorded as a known gap
+  rather than left implicit. Porting nav means duplicating ~60 lines
+  from `ContextMenu` — a second copy that drifts, which is the failure
+  this pass is fixing on the CSS side — so the right sequence is to
+  extract shared menu machinery first. Also #363.
+- **Wiring accelerators in `CollectionsPanel`** rides along with that
+  nav work. The displayed `F2` / `F` / `A` hints stay accurate meanwhile:
+  those chords act on the focused panel row.
 - **Stale comment.** `+page.svelte:1892` lists the action keys as
   "R/F/./M/C"; the code implements `S`, not `F`. Corrected in passing
   since the block is being edited.
@@ -289,10 +324,15 @@ Recorded so they are not re-litigated.
    scoped CSS.
 3. Contrast check on the chord colour against `--bg-focused`, recorded
    here.
-4. Keyboard pass in the running app: each of the seven chords fires from
+4. Role audit: every `role="menu"` container has only menu-role children
+   (`menuitem`, `menuitemcheckbox`, `menuitemradio`, `separator`), and a
+   VoiceOver spot-check confirms a checked game system and the current
+   pigment both announce their state — the thing the `✓` used to do by
+   accident.
+5. Keyboard pass in the running app: each of the seven chords fires from
    the open menu and matches what clicking the row does; letters stay
    inert inside a submenu; `.` works on the main row and numpad.
-5. Visual pass on all four menus plus both checkbox sites. Expected
+6. Visual pass on all four menus plus both checkbox sites. Expected
    diffs: pips replace checkmarks; tree checkbox unchanged in accent;
    systems-view checkbox unchanged in purple, including its
    indeterminate bar — the bar is the piece most likely to shift, moving
