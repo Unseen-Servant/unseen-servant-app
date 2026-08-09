@@ -333,50 +333,62 @@
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
       {/if}
     </div>
-    <label
+    <div
       class="row"
       class:row-disabled={!hasHidden}
+      class:kb-focused={focusedRow === 'view:showHidden'}
       title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
-      data-fm={hasHidden ? 'row' : undefined}
+      data-fm-key="view:showHidden"
     >
       <span class="row-name muted-name">Show hidden items</span>
       <span class="row-count">{hiddenCount}</span>
-      <input
+      <button
+        type="button"
         class="app-checkbox"
-        type="checkbox"
-        checked={showHidden}
+        role="checkbox"
+        aria-checked={showHidden}
+        aria-label="Show hidden items"
         disabled={!hasHidden}
-        on:change={onToggleShowHidden}
-      />
-    </label>
+        data-fm-action
+        on:click|stopPropagation={onToggleShowHidden}
+      ></button>
+    </div>
 
-    <label
+    <div
       class="row lens-row"
+      class:kb-focused={focusedRow === 'view:hideUnindexed'}
       title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
-      data-fm="row"
+      data-fm-key="view:hideUnindexed"
     >
       <span class="row-name muted-name">Hide unindexed items</span>
-      <input
+      <button
+        type="button"
         class="app-checkbox lens-checkbox"
-        type="checkbox"
-        checked={hideUnindexed}
-        on:change={onToggleHideUnindexed}
-      />
-    </label>
+        role="checkbox"
+        aria-checked={hideUnindexed}
+        aria-label="Hide unindexed items"
+        data-fm-action
+        on:click|stopPropagation={onToggleHideUnindexed}
+      ></button>
+    </div>
 
-    <label
+    <div
       class="row lens-row"
+      class:kb-focused={focusedRow === 'view:hideOutOfScope'}
       title="Hide dimmed out-of-scope rows in the tree and systems view"
-      data-fm="row"
+      data-fm-key="view:hideOutOfScope"
     >
       <span class="row-name muted-name">Hide out-of-scope items</span>
-      <input
+      <button
+        type="button"
         class="app-checkbox lens-checkbox"
-        type="checkbox"
-        checked={hideOutOfScope}
-        on:change={onToggleHideOutOfScope}
-      />
-    </label>
+        role="checkbox"
+        aria-checked={hideOutOfScope}
+        aria-label="Hide out-of-scope items"
+        data-fm-action
+        on:click|stopPropagation={onToggleHideOutOfScope}
+      ></button>
+    </div>
   </div>
 </aside>
 
@@ -423,9 +435,6 @@
   .row:hover,
   .row.kb-focused {
     background: var(--bg-container);
-  }
-  label.row {
-    cursor: pointer;
   }
   .row-disabled {
     color: var(--text-tertiary);
