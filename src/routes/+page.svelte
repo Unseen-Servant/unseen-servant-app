@@ -254,6 +254,7 @@
   let searchResultsComponent: SearchResults | undefined;
   let systemsViewComponent: SystemsView | undefined;
   let collectionsPanelComponent: CollectionsPanel | undefined;
+  let filterPanelComponent: FilterPanel | undefined;
   // Lazy result loading: start with 25, grow by 25 each scroll-to-bottom,
   // hard cap at 100 to keep us out of the long tail of low-relevance hits.
   // reachedEnd flips when the backend returns fewer than requested — we've
@@ -3131,6 +3132,7 @@
           {/if}
           {#if filterPanelOpen}
             <FilterPanel
+              bind:this={filterPanelComponent}
               excludedSystems={filterExcludedSystems}
               {soloedSystems}
               systems={gameSystemStats}
@@ -3154,6 +3156,8 @@
               onToggleCurationSolo={toggleCurationSolo}
               onToggleCurationMute={toggleCurationMute}
               onClearAll={clearAllFilters}
+              focusedRow={focusedFilterRow}
+              onFocusRow={setFocusedFilterRow}
             />
           {/if}
         </div>
