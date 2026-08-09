@@ -1,7 +1,10 @@
 # Header Voices — Design
 
 **Date:** 2026-08-09
-**Status:** Approved (pending implementation)
+**Status:** Implemented 2026-08-09 on main; visual pass done. Tertiary
+contrast amendment landed with it (see Notes). Remaining follow-up:
+DesignSync of the six voices and `--text-tertiary` to the claude.ai
+design project.
 
 ## Problem
 
