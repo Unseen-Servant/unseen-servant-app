@@ -1761,6 +1761,26 @@
     collectionsPanelComponent?.claim(lastFocusedCollectionName);
   }
 
+  // Cmd+Alt+↑/↓ move within the left dock. The dock stacks Collections over
+  // Filters, so the chords are vertical and literal. A closed panel is
+  // skipped; with neither open the chord is a no-op rather than opening one
+  // — a chord that opens panels is hard to undo by accident.
+  function focusFilterRegion() {
+    if (focusedFilterRow !== null) return;
+    if (!filterPanelOpen) return;
+    filterPanelComponent?.claim(lastFocusedFilterRow);
+  }
+
+  // Cmd+Alt+← target: the dock's last-focused panel, not always Collections.
+  // Falls through to focusCollectionsRegion, which still opens the dock when
+  // it is closed — today's behavior for that chord is preserved.
+  async function focusDockRegion() {
+    if (focusedCollectionName !== null || focusedFilterRow !== null) return;
+    const preferFilters = lastFocusedDockPane === 'filters' || !collectionsPanelOpen;
+    if (filterPanelOpen && preferFilters) { focusFilterRegion(); return; }
+    await focusCollectionsRegion();
+  }
+
   // Cmd+Alt+→ target. Tree mode uses the locally-known visibleTreeRows;
   // systems mode delegates so SystemsView can resolve the right entry
   // (multi-tagged files have multiple visible-entries indices).
@@ -2108,8 +2128,25 @@
     if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchViewOpen
         && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       event.preventDefault();
-      if (event.key === 'ArrowLeft') focusCollectionsRegion();
+      if (event.key === 'ArrowLeft') focusDockRegion();
       else focusFileRegion();
+      return;
+    }
+
+    // Cmd+Alt+↑/↓: move between the two panels stacked in the left dock.
+    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchViewOpen
+        && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      if (event.key === 'ArrowDown') {
+        // Collections sits above Filters.
+        if (focusedCollectionName !== null) { setFocusedCollectionName(null); focusFilterRegion(); }
+      } else if (focusedFilterRow !== null && collectionsPanelOpen) {
+        // Guarded on the panel being open: focusCollectionsRegion force-opens
+        // it, and a dock-navigation chord must skip a closed panel rather
+        // than open one — the down direction already does.
+        setFocusedFilterRow(null);
+        void focusCollectionsRegion();
+      }
       return;
     }
 
