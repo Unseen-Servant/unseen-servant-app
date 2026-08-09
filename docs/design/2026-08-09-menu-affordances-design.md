@@ -283,12 +283,19 @@ Recorded so they are not re-litigated.
 
 ## Notes
 
-- **`--text-tertiary` on `--bg-focused` needs checking** before the
-  chord column ships. The token was brightened for WCAG against
-  `--bg-app` in 608caa0, and the header-voices work already records
-  tertiary on `--bg-focused` at 3.44:1 as an accepted gap for quiet
-  chrome. Chord hints may or may not qualify; step to
-  `--text-secondary` if not.
+- **Chord colour: measured and settled — `--text-secondary`, with a
+  recorded gap.** This spec originally assumed tertiary might fail on
+  `--bg-focused` and that secondary would be the fallback. Against
+  `--bg-focused` (`rgb(50, 50, 50)`), tertiary `#7d8590` is 3.44:1 and
+  secondary `#8b949e` is 4.17:1 — *both* under the 4.5:1 AA threshold
+  for small text. Only `--text-primary` clears it (8.31:1), and that
+  would make the hint as loud as the command it annotates. Minting a
+  token at `#929ba6` (4.56:1) was rejected: it sits a hair from
+  secondary and would collapse the text ramp. So secondary, with the
+  gap accepted on the same grounds the header-voices pass accepted its
+  tertiary gaps — the chord is supplementary, the row label names the
+  command, and the `?` overlay repeats every binding on a darker
+  surface.
 - **Labelled, not navigable — the honest limit of this pass.** Tracked
   in #363. The roles land here; nothing behind them does.
   `ContextMenu` has no DOM focus management at all: the keyboard cursor
@@ -309,9 +316,10 @@ Recorded so they are not re-litigated.
 - **Wiring accelerators in `CollectionsPanel`** rides along with that
   nav work. The displayed `F2` / `F` / `A` hints stay accurate meanwhile:
   those chords act on the focused panel row.
-- **Stale comment.** `+page.svelte:1892` lists the action keys as
-  "R/F/./M/C"; the code implements `S`, not `F`. Corrected in passing
-  since the block is being edited.
+- **Stale comment.** `+page.svelte:2180` lists the action keys as
+  "R/F/./M/C"; the code implements `S`, not `F`. Line 1868 describes the
+  same set correctly. Corrected in passing since the block is being
+  edited.
 - **`.app-radio` will not be missed.** Under "no rings in menus" nothing
   in the current design wants it back. If a settings radio group appears
   later it can be restored from git.
