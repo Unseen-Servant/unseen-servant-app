@@ -276,6 +276,12 @@
 
 <style>
   .scope-bar {
+    /* Pins to the top of the scrolling tree/systems container; inert in
+       search mode, whose flex column doesn't scroll. z-index keeps the
+       rows' positioned affordances beneath (fixed dropdowns sit higher). */
+    position: sticky;
+    top: 0;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: 0.5rem;
