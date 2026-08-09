@@ -324,7 +324,10 @@ input {
    tree and systems views use buttons so their rows keep control of focus and
    click handling. The tick and the indeterminate bar are background images
    rather than pseudo-elements: ::after on an appearance:none input is
-   unreliable across WKWebView and WebView2, and this app ships on both. */
+   unreliable across WKWebView and WebView2, and this app ships on both.
+   Their %23191919 stroke hand-mirrors --bg-app — a data URI can't read a
+   custom property, and nothing lints the pair, so retuning --bg-app means
+   editing both glyphs here too. */
 .app-checkbox:checked,
 .app-checkbox[aria-checked="true"],
 .app-checkbox[aria-checked="mixed"] {
