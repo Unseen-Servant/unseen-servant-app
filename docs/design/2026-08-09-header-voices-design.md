@@ -1,0 +1,137 @@
+# Header Voices — Design
+
+**Date:** 2026-08-09
+**Status:** Approved (pending implementation)
+
+## Problem
+
+Header styling drifted into per-component variants: the same visual rank
+appears at three sizes (0.9 / 0.95 / 1rem section headers), small-caps
+group labels exist in five slightly different recipes, one table header
+uses the body font, and one dialog title is the app's only bold header.
+Every recipe is re-declared in scoped component CSS, so drift recurs.
+
+## Decision
+
+Six shared header classes in `src/app.css` (joining the existing Font
+Utilities block), one per voice. A class bundles the full recipe —
+font-family, size, letter-spacing, text-transform, line-height, default
+color. Layout properties (margins, padding, flex) stay in component CSS.
+Components apply the class in markup, like `font-heading` today.
+Precedent: the `.sm-btn` shared button anatomy.
+
+Raw rem values live inside the class definitions — consistent with the
+tokens rule (stylelint enforces colors only) and every header number
+stays in one file.
+
+### The voices
+
+All voices set `line-height: 1.2`. Font is Almendra unless noted.
+
+| Class | Recipe | Use when… |
+|---|---|---|
+| `.panel-title` | Cinzel · 0.8rem · 0.12em · uppercase · `--text-accent` | Naming a fixture of the chassis — a panel nameplate. The display font's only job. |
+| `.dialog-title` | 1rem · `--text-accent` | Titling a modal or dialog. |
+| `.section-title` | 0.95rem · `--text-primary` | Titling a content section inside a surface (settings groups, help blocks). |
+| `.ledger-label` | 0.7rem · 0.08em · uppercase · `--text-tertiary` | Heading a group of rows — quiet, sits below row-text size by design. |
+| `.readout-label` | 0.7rem · 0.08em · uppercase · `--text-secondary` | Labeling a value — the key half of a key/value or stat pair. |
+| `.micro-label` | `--font-body` · 0.65rem · 0.06em · uppercase · `--text-tertiary` | Inline annotation riding on other content (badges, chip prefixes). |
+
+`.ledger-label` and `.readout-label` share metrics deliberately; color
+carries the semantic difference (tertiary = structural grouping,
+secondary = data label). Status lamps adopt `.readout-label` metrics and
+override color per lamp state — color semantics stay token behavior per
+the design conventions.
+
+## Adoption map
+
+### `.panel-title` — no visual change
+
+- `CollectionsPanel.svelte` `.panel-title`
+- `FilterPanel.svelte` `.panel-title`
+
+### `.dialog-title`
+
+- `Modal.svelte` `.modal-title` (shell for all modals) — no change
+- `ConfirmDialog.svelte` `.title` — **drops `font-weight: 600`**
+
+### `.section-title`
+
+- `LibrarySettings.svelte` `.field-title` ×4 — no change
+- `LibrarySettings.svelte` `.danger-title` — **0.9 → 0.95rem**; keeps
+  local `--text-danger` color, padding, border
+- `GeneralSettings.svelte` `.field-title` ×2 — no change
+- `GettingStartedSteps.svelte` `.field-title` ×5 — no change; keeps
+  local `flex: 1`, `min-width: 0`
+- `KeyboardHelpOverlay.svelte` `.group-title` — no change
+- `help/ReferencePane.svelte` `.block-title` ×2 — no change
+- `help/AboutPane.svelte` `.block-title` ×2 — no change
+- `help/GuidesPane.svelte` `.pane-title` — **1 → 0.95rem**
+
+### `.ledger-label`
+
+- `FilterPanel.svelte` `.sect` ×2 — **0.72 → 0.7rem, 0.09 → 0.08em**
+- `help/ReferencePane.svelte` `.kb-group-title` — **0.78 → 0.7rem**
+- `GameSystemsSettings.svelte` `.col-header` ×2 — **Crimson Text 600 →
+  Almendra, 0.03 → 0.08em**; keeps local `--text-secondary` override,
+  sort-button hover, column layout
+- `SystemsView.svelte` `.group-name` — **0.85 → 0.7rem, 0.06 →
+  0.08em**; keeps per-system `--group-color` and hover. Largest visual
+  change in the project; validate in the visual pass — the single knob
+  if it reads over-demoted is this class's font-size.
+
+### `.readout-label` — no visual change
+
+- `LibrarySettings.svelte` `.stat-label`, `.meta-label`, `.policy-legend`
+- `GeneralSettings.svelte` `.experimental-legend`
+- `help/AboutPane.svelte` `.meta-label`
+- `DocumentStatsModal.svelte` `.stat-label`
+- Lamps (keep local rest/state color overrides):
+  `OllamaStatus.svelte` `.badge`, `GettingStartedSteps.svelte`
+  `.field-status`
+
+### `.micro-label`
+
+- `SearchInspector.svelte` `.badge` — no change; pill anatomy (border,
+  italic, padding) stays local
+- `SearchResults.svelte` `.hidden-badge` — **0.6 → 0.65rem**; pill
+  anatomy stays local
+- `SearchScopeBar.svelte` `.chip-prefix` — no change
+
+## Out of scope
+
+- **Hero titles** — `LaunchSplash` (1.6rem) and `GettingStartedPage`
+  (1.25rem): different surfaces, never co-occur.
+- **Settings tabs** — `SettingsModal` `.tab-btn`: a control, not a header.
+- **SystemBadge** — content identity chip with its own documented
+  concept (monochrome parchment, die icon), not a label.
+- **`GettingStartedSteps` `.opt`** — lowercase body-text suffix.
+- Non-header text sizes (row text, descriptions, buttons).
+
+## Notes
+
+- `line-height: 1.2` is new on all voices (previously inherited). Mostly
+  single-line headers; minor vertical-rhythm shifts are possible and are
+  covered by the visual pass.
+- **Contrast check (required during implementation):** compute WCAG
+  contrast of `--text-tertiary` and `--text-secondary` against the real
+  surface tokens these labels sit on, at their small sizes (all count as
+  "normal text", 4.5:1 target). If tertiary fails, that is a token
+  decision handled separately (as with the vermilion amendment), not a
+  voice-structure change.
+- Several components carry a pointless `var(--font-heading,
+  var(--font-body))` fallback; adopting the shared classes removes those
+  declarations as a side effect.
+- After implementation, sync the six voices to the claude.ai
+  design-system project (incremental DesignSync note).
+
+## Verification
+
+1. `npm run lint:css` and `npx svelte-check` pass.
+2. Grep confirms no component still declares font-family / font-size /
+   letter-spacing / text-transform for the adopted header classes.
+3. Contrast check done and recorded (see Notes).
+4. Visual pass by the user in the running app. Expected visible diffs:
+   GuidesPane title −0.05rem, danger title +0.05rem, ConfirmDialog
+   unbolded, col-header font swap, sect/kb-group converge on 0.7rem,
+   group-name demotion, hidden-badge +0.05rem.
