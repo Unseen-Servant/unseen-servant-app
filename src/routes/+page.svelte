@@ -3005,8 +3005,8 @@
     try {
       const result = await runSyncJob<SyncResult>({
         command: 'reindex_all',
-        startMessage: 'Starting reindex...',
-        errorPrefix: 'Reindex failed',
+        startMessage: 'Starting re-index...',
+        errorPrefix: 'Re-index failed',
         streamsProgress: true,
         buildResultMessage: (r) => {
           const parts: string[] = [];
@@ -3016,8 +3016,8 @@
             ? ` ${r.chunks_total.toLocaleString()} chunks.`
             : '';
           const message = parts.length > 0
-            ? `Reindexed: ${parts.join(', ')}.${chunkStr}`
-            : 'Nothing to reindex.';
+            ? `Re-indexed: ${parts.join(', ')}.${chunkStr}`
+            : 'Nothing to re-index.';
           return { message, isError: r.errors.length > 0 };
         },
       }, refreshIndexAndCollections);
