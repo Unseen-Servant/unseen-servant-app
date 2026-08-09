@@ -1,7 +1,11 @@
 # Hide unindexed items — design
 
 **Date:** 2026-08-09
-**Status:** Designed; not implemented.
+**Status:** Implemented 2026-08-09 on main — c15e2ff (predicate), e6cb6d4
+(nav rows), b324831 (FileTree), 3a01743 (console row), c78bb4e (chip),
+a709a2a (persistence), ec6435e (wiring). svelte-check, vitest, stylelint
+and the vite build all green; the plan's manual QA checklist is still
+pending.
 **Related:** `docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md`
 (the focus lens and the hide/mute territory split this amends),
 `src/lib/treeNav.ts`, `src/lib/FileTree.svelte`, `src/lib/FilterPanel.svelte`.
