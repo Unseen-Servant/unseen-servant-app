@@ -227,7 +227,7 @@
     </label>
 
     {#if showCollectionFilter}
-      <div class="sect">Curation</div>
+      <div class="sect ledger-label">Curation</div>
       {#each curationRows as ch (ch.key)}
         {@const soloed = curationSolos.has(ch.key)}
         {@const muted = curationMutes.has(ch.key)}
@@ -277,7 +277,7 @@
     {/if}
 
     {#if showSystemFilter}
-      <div class="sect">Game systems</div>
+      <div class="sect ledger-label">Game systems</div>
       {#if systems.length > 0}
         {#each systems as { name, count } (name)}
           {@const soloed = soloedSystems.has(name)}
@@ -393,11 +393,6 @@
      No rule under them. */
   .sect {
     padding: 0.6rem 0.25rem 0.15rem 0.75rem;
-    font-family: var(--font-heading);
-    font-size: 0.72rem;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
   }
 
   .row {

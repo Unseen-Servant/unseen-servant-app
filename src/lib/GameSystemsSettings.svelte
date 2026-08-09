@@ -140,8 +140,8 @@
 
 <div class="game-systems-settings">
   <div class="list-header">
-    <button class="col-header col-tag" on:click={toggleSort}>Tag</button>
-    <span class="col-header col-keywords">Keywords</span>
+    <button class="col-header col-tag ledger-label" on:click={toggleSort}>Tag</button>
+    <span class="col-header col-keywords ledger-label">Keywords</span>
     <button class="add-btn" title="Add custom system" on:click={openAddModal}>+</button>
   </div>
   <div class="systems-list">
@@ -250,14 +250,9 @@
   .col-header {
     background: none;
     border: none;
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    font-weight: 600;
     color: var(--text-secondary);
     text-align: left;
     padding: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
     transition: color var(--transition-fast);
   }
 

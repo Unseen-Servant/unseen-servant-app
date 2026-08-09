@@ -515,7 +515,7 @@
                 </svg>
               </span>
             {/if}
-            <span class="group-name">{group.tag}</span>
+            <span class="group-name ledger-label">{group.tag}</span>
           </button>
           <span class="sm" class:engaged={soloedSystems.has(group.tag) || group.muted}>
             {#if group.tag !== 'Untagged'}
@@ -675,9 +675,7 @@
   }
   .group-name {
     flex: 1;
-    font-size: 0.85rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    color: inherit;
   }
 
   /* S/M cluster — hidden at rest, revealed on header hover or keyboard

@@ -46,7 +46,7 @@
     <div class="kb-groups">
       {#each grouped as group (group.scope)}
         <section class="kb-group">
-          <h4 class="kb-group-title font-heading">{group.label}</h4>
+          <h4 class="kb-group-title ledger-label">{group.label}</h4>
           <dl class="bindings">
             {#each group.entries as entry (entry.id)}
               <dt class="chord">{chord(entry.id)}</dt>
@@ -148,10 +148,6 @@
 
   .kb-group-title {
     margin: 0;
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
   }
 
   .bindings {
