@@ -1,6 +1,7 @@
 <script lang="ts">
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
+  import { chord, matchKey } from './keybindings';
 
   export let x: number;
   export let y: number;
@@ -278,20 +279,28 @@
   {#if !item.is_dir}
     <button class="context-item" data-mi="item" role="menuitem" on:click={onOpen}>Open file</button>
   {/if}
-  <button class="context-item" data-mi="item" role="menuitem" on:click={onReveal}>Reveal in folder</button>
+  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.openExternal')} on:click={onReveal}>
+    Reveal in folder
+    <span class="menu-chord">{chord('tree.openExternal')}</span>
+  </button>
   {#if canScope}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onToggleSolo}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} on:click={onToggleSolo}>
       {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
+      <span class="menu-chord">{chord('tree.solo')}</span>
     </button>
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onToggleMute}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} on:click={onToggleMute}>
       {isMuted ? 'Unmute' : 'Mute'} this {item.is_dir ? 'folder' : 'file'}
+      <span class="menu-chord">{chord('tree.mute')}</span>
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onShowStats}>Get info</button>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} on:click={onShowStats}>
+      Get info
+      <span class="menu-chord">{chord('info.show')}</span>
+    </button>
   {/if}
 
   {#if canTag}
@@ -348,6 +357,7 @@
       class:open={openSubmenu === 'add'}
       data-mi="submenu-trigger"
       data-submenu="add"
+      data-chord={matchKey('tree.addToCollection')}
       role="menuitem"
       tabindex="-1"
       aria-haspopup="menu"
@@ -355,7 +365,8 @@
       on:mouseenter={() => { openSubmenu = 'add'; }}
       on:mouseleave={() => { openSubmenu = null; }}
     >
-      <span>Add to collection&hellip;</span>
+      <span>Add to collection</span>
+      <span class="menu-chord">{chord('tree.addToCollection')}</span>
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'add'}
         <div class="submenu" role="menu">
@@ -440,13 +451,17 @@
        available so nothing strands. -->
   {#if !inheritedHidden && (item.is_dir || directlyHidden || !isIndexed)}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onToggleHidden}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
+      <span class="menu-chord">{chord('tree.hide')}</span>
     </button>
   {/if}
 
   <hr class="context-divider" />
-  <button class="context-item" data-mi="item" role="menuitem" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
+  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} on:click={onRename}>
+    Rename {item.is_dir ? 'folder' : 'file'}
+    <span class="menu-chord">{chord('tree.rename')}</span>
+  </button>
   <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
 </div>
 
@@ -492,7 +507,6 @@
   .submenu-trigger {
     position: relative;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     user-select: none;
   }
@@ -503,7 +517,7 @@
   .submenu-caret {
     font-size: 0.7rem;
     opacity: 0.6;
-    margin-left: 0.5rem;
+    margin-left: auto;
   }
   .submenu-icon {
     width: 11px;

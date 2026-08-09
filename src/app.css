@@ -370,6 +370,21 @@ input {
   filter: var(--glow-accent);
 }
 
+/* Keyboard hint riding at the trailing edge of a menu row. --text-secondary is
+   4.17:1 on --bg-focused, below AA for small text: an accepted gap, consistent
+   with the tertiary gaps recorded in the header-voices pass. The chord is
+   supplementary — the row label names the command, and the ? overlay repeats
+   every binding on a darker surface. Primary would clear AA but would make the
+   hint as loud as the command. */
+.menu-chord {
+  margin-left: auto;
+  padding-left: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* --- Font Utilities --- */
 
 .font-body {

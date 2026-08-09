@@ -4,6 +4,7 @@
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { tick } from 'svelte';
+  import { chord } from './keybindings';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against
@@ -674,7 +675,10 @@
     on:click|stopPropagation
     on:contextmenu|preventDefault|stopPropagation
   >
-    <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>Rename</button>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
+      Rename
+      <span class="menu-chord">{chord('collections.rename')}</span>
+    </button>
     <div
       class="context-item has-submenu"
       class:open={ctxPigmentOpen}
@@ -721,9 +725,13 @@
       {/if}
     </div>
     <hr class="menu-divider" />
-    <button class="context-item" role="menuitem" on:click={() => ctxAction(onEditFiles)}>Add files&hellip;</button>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(onEditFiles)}>
+      Add files&hellip;
+      <span class="menu-chord">{chord('collections.editFiles')}</span>
+    </button>
     <button class="context-item" role="menuitem" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
       {col?.archived ? 'Unarchive' : 'Archive'}
+      <span class="menu-chord">{chord('collections.archive')}</span>
     </button>
     <hr class="menu-divider" />
     <button class="context-item danger" role="menuitem" on:click={() => ctxAction(onDelete)}>Delete collection</button>
