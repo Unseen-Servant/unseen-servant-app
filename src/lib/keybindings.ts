@@ -145,6 +145,9 @@ export interface ChordEvent {
 // Normalized lookup key for a keydown, matching KeybindingEntry.match. Cmd and
 // Ctrl both fold to `meta+` so one table serves both platforms. Returns null
 // for anything no accelerator uses.
+//
+// Callers must additionally check `!event.isComposing` before calling this —
+// this helper has no DOM access and can't see composition state.
 export function eventMatchKey(event: ChordEvent): string | null {
   if (event.shiftKey || event.altKey) return null;
   // event.code is layout-independent; some layouts report ',' for the numpad

@@ -52,8 +52,18 @@ describe('menu accelerators', () => {
     }
   });
 
+  test('match agrees with the displayed key', () => {
+    for (const entry of KEYBINDINGS.filter((k) => k.match)) {
+      const meta = entry.match!.startsWith('meta+');
+      const base = meta ? entry.match!.slice(5) : entry.match!;
+      const displayed = entry.keys.other.replace(/^Ctrl\+/, '').toLowerCase();
+      expect(displayed).toBe(base);
+    }
+  });
+
   test('matchKey resolves a known id and returns empty for an unknown one', () => {
     expect(matchKey('tree.rename')).toBe('r');
     expect(matchKey('nope.missing')).toBe('');
+    expect(matchKey('sync.run')).toBe('');
   });
 });
