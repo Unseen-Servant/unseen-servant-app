@@ -281,6 +281,11 @@
       closeContextMenu();
       return;
     }
+    if (sortMenuOpen && event.key === 'Escape') {
+      event.preventDefault();
+      sortMenuOpen = false;
+      return;
+    }
     if (focusedName === null) return;
     // Yield to inline renames, the sort menu, the context menu, and any
     // other popover that may be claiming keys.
@@ -664,6 +669,7 @@
       class="context-item has-submenu"
       class:open={ctxPigmentOpen}
       on:mouseenter={() => { ctxPigmentOpen = true; }}
+      on:mouseleave={() => { ctxPigmentOpen = false; }}
       on:click={() => { ctxPigmentOpen = !ctxPigmentOpen; }}
       role="menuitem"
       tabindex="-1"
@@ -775,14 +781,14 @@
     box-shadow: var(--shadow-dropdown);
     padding: 0.15rem 0;
     min-width: 150px;
-    z-index: 50;
+    z-index: 200;
   }
   .sort-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     width: 100%;
-    padding: 0.25rem 0.6rem;
+    padding: 0.2rem 0.6rem;
     background: none;
     border: none;
     text-align: left;
@@ -793,7 +799,7 @@
     transition: background var(--transition-fast);
   }
   .sort-item:hover {
-    background: var(--bg-category);
+    background: var(--bg-container);
   }
   .check,
   .pig-check {
@@ -812,14 +818,14 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
-    padding: 0.35rem 0.6rem;
+    padding: 0.2rem 0.6rem;
     font-size: 0.8rem;
     color: var(--text-primary);
     cursor: pointer;
     transition: background var(--transition-fast);
   }
   .sort-toggle:hover {
-    background: var(--bg-category);
+    background: var(--bg-container);
   }
   .sort-toggle input {
     cursor: pointer;
@@ -1109,7 +1115,7 @@
     box-shadow: var(--shadow-dropdown);
     min-width: 180px;
     padding: 0.15rem 0;
-    z-index: 100;
+    z-index: 200;
     font-family: var(--font-body);
     font-size: 0.8rem;
   }
@@ -1118,7 +1124,7 @@
     align-items: center;
     gap: 0.5rem;
     width: 100%;
-    padding: 0.25rem 0.6rem;
+    padding: 0.2rem 0.6rem;
     border: none;
     background: none;
     cursor: pointer;

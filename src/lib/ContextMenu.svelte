@@ -43,7 +43,6 @@
   export let onAddToCollection: (name: string) => void = () => {};
   export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
-  export let onCreateCollectionFromFolder: () => void = () => {};
   export let onToggleHidden: () => void = () => {};
   export let onClose: () => void = () => {};
 
@@ -319,12 +318,12 @@
               <svg class="submenu-icon" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
                 <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
               </svg>
-              <span>{sys.tag}</span>
+              <span class="submenu-tag">{sys.tag}</span>
             </button>
           {/each}
           {#if currentTags.length > 0}
             <hr class="context-divider" />
-            <button class="context-item" data-mi="item" on:click={clearGameSystems}>
+            <button class="context-item danger" data-mi="item" on:click={clearGameSystems}>
               Clear tags
             </button>
           {/if}
@@ -335,11 +334,6 @@
 
   {#if canAddToCollection}
     <hr class="context-divider" />
-    {#if item.is_dir}
-      <button class="context-item" data-mi="item" on:click={onCreateCollectionFromFolder}>
-        Create collection from folder
-      </button>
-    {/if}
     <!-- svelte-ignore a11y-mouse-events-have-key-events -->
     <div
       class="context-item submenu-trigger"
@@ -450,7 +444,9 @@
     padding: 0.15rem 0;
   }
   .context-item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     width: 100%;
     padding: 0.2rem 0.6rem;
     border: none;
@@ -492,18 +488,20 @@
     margin-left: 0.5rem;
   }
   .submenu-check {
-    display: inline-block;
-    width: 1rem;
-    text-align: center;
-    margin-right: 0.25rem;
+    width: 0.9rem;
     color: var(--text-accent);
+    font-weight: 700;
+    flex-shrink: 0;
   }
   .submenu-icon {
     width: 11px;
     height: 11px;
-    vertical-align: -1px;
-    margin-right: 0.3rem;
     flex-shrink: 0;
+  }
+  .submenu-tag {
+    font-weight: 600;
+    color: var(--text-accent);
+    white-space: nowrap;
   }
   .submenu {
     position: absolute;

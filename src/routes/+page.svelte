@@ -2317,13 +2317,6 @@
     removeFromCollection(name, item);
   }
 
-  function handleContextCreateCollectionFromFolder() {
-    if (!contextMenu) return;
-    const item = contextMenu.item;
-    contextMenu = null;
-    createCollectionFromItem(item);
-  }
-
   function handleContextToggleSolo() {
     if (!contextMenu) return;
     const item = contextMenu.item;
@@ -3300,7 +3293,6 @@
       onAddToCollection={handleContextAddToCollection}
       onAddToNewCollection={handleContextAddToNewCollection}
       onRemoveFromCollection={handleContextRemoveFromCollection}
-      onCreateCollectionFromFolder={handleContextCreateCollectionFromFolder}
       directlyHidden={contextMenu.hideState.directlyHidden}
       inheritedHidden={contextMenu.hideState.inheritedHidden}
       onToggleHidden={handleContextToggleHidden}

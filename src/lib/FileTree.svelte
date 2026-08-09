@@ -327,7 +327,7 @@
       on:mousedown|stopPropagation
     >
       {#each knownSystems as sys}
-        <button class="dropdown-item" class:selected={tags.includes(sys.tag)} on:click={() => toggleSystem(sys.tag)}>
+        <button class="dropdown-item" on:click={() => toggleSystem(sys.tag)}>
           <span class="dropdown-check">{tags.includes(sys.tag) ? '✓' : ''}</span>
           <!-- Font Awesome "dice-d6" — one fill for every system -->
           <svg class="dd-die" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
@@ -640,9 +640,6 @@
     transition: background var(--transition-fast);
   }
   .dropdown-item:hover {
-    background: var(--bg-container);
-  }
-  .dropdown-item.selected {
     background: var(--bg-container);
   }
   .dropdown-check {

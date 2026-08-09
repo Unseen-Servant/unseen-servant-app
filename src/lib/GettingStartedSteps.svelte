@@ -138,7 +138,7 @@
     <p class="field-desc">
       Use the <strong>+</strong> in the collections panel to create
       one, or right-click a folder and choose
-      <em>Create collection from folder</em>.
+      <em>Add to collection&hellip; &rarr; + New collection</em>.
     </p>
   </section>
 
