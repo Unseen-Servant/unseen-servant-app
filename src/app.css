@@ -320,50 +320,25 @@ input {
 .app-checkbox:hover {
   border-color: var(--text-accent);
 }
-.app-checkbox:checked {
+/* Both a native input and a role="checkbox" button drive this recipe — the
+   tree and systems views use buttons so their rows keep control of focus and
+   click handling. The tick and the indeterminate bar are background images
+   rather than pseudo-elements: ::after on an appearance:none input is
+   unreliable across WKWebView and WebView2, and this app ships on both. */
+.app-checkbox:checked,
+.app-checkbox[aria-checked="true"],
+.app-checkbox[aria-checked="mixed"] {
   background-color: var(--text-accent);
   border-color: var(--text-accent);
+}
+.app-checkbox:checked,
+.app-checkbox[aria-checked="true"] {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%23191919' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M3 8 L7 12 L13 4'/></svg>");
 }
+.app-checkbox[aria-checked="mixed"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%23191919' stroke-width='3' stroke-linecap='round' d='M3 8 L13 8'/></svg>");
+}
 .app-checkbox:focus-visible {
-  outline: 2px solid var(--text-accent);
-  outline-offset: 2px;
-}
-
-/* Themed radio button — same parchment border + accent fill as the
-   checkbox, with a circular dot instead of a checkmark. */
-.app-radio {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  padding: 0;
-  border: 1.5px solid var(--text-tertiary);
-  border-radius: 50%;
-  background-color: transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-  position: relative;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
-}
-.app-radio:hover {
-  border-color: var(--text-accent);
-}
-.app-radio:checked {
-  border-color: var(--text-accent);
-}
-.app-radio:checked::after {
-  content: '';
-  position: absolute;
-  inset: 2.5px;
-  border-radius: 50%;
-  background: var(--text-accent);
-}
-.app-radio:disabled {
-  cursor: not-allowed;
-}
-.app-radio:focus-visible {
   outline: 2px solid var(--text-accent);
   outline-offset: 2px;
 }
