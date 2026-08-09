@@ -484,9 +484,7 @@
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
           {#if isCollectionEditMode}
             <button
-              class="checkbox group-checkbox"
-              class:checked={groupState === 'all'}
-              class:indeterminate={groupState === 'some'}
+              class="app-checkbox group-checkbox"
               on:click={(e) => handleGroupCheckboxClick(e, group.entries)}
               role="checkbox"
               aria-label="Select all in {group.tag}"
@@ -556,8 +554,7 @@
               >
                 {#if isCollectionEditMode}
                   <button
-                    class="checkbox row-checkbox"
-                    class:checked={isChecked}
+                    class="app-checkbox row-checkbox"
                     on:click={(e) => handleCheckboxClick(e, entry, group.tag, group.entries)}
                     on:mousedown|stopPropagation
                     on:dblclick|stopPropagation
@@ -733,50 +730,19 @@
     opacity: var(--opacity-out-of-scope-hover);
   }
 
-  /* Edit-mode selection checkboxes — same visual language as the tree's
-     checkbox (var(--text-active) accent) so it reads as "collection scope"
-     rather than "indexing scope". */
-  .checkbox {
-    width: 14px;
-    height: 14px;
-    padding: 0;
-    cursor: pointer;
-    border: 1.5px solid var(--text-tertiary);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    position: relative;
-    flex-shrink: 0;
+  /* Edit-mode selection is a mode the user switched on, so these boxes take
+     --text-active rather than the shared recipe's --text-accent. Anatomy and
+     both knockout glyphs come from .app-checkbox. */
+  .app-checkbox {
     align-self: center;
-    transition: border-color var(--transition-fast), background var(--transition-fast);
   }
-  .checkbox:hover {
+  .app-checkbox:hover {
     border-color: var(--text-active);
   }
-  .checkbox.checked,
-  .checkbox.indeterminate {
-    background: var(--text-active);
+  .app-checkbox[aria-checked="true"],
+  .app-checkbox[aria-checked="mixed"] {
+    background-color: var(--text-active);
     border-color: var(--text-active);
-  }
-  .checkbox.checked::after {
-    content: '';
-    position: absolute;
-    left: 3px;
-    top: 0px;
-    width: 5px;
-    height: 9px;
-    border: solid var(--bg-app);
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-  }
-  .checkbox.indeterminate::after {
-    content: '';
-    position: absolute;
-    left: 2px;
-    top: 5px;
-    width: 8px;
-    height: 2px;
-    background: var(--bg-app);
-    border-radius: 1px;
   }
   .group-checkbox {
     margin-left: 0.25rem;
