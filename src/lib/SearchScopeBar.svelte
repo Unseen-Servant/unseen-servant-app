@@ -22,6 +22,7 @@
   export let curationMutes: Set<CurationKey> = new Set();
   export let showHidden: boolean = false;
   export let hideOutOfScope: boolean = false;
+  export let hideUnindexed: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   export let isLoading: boolean = false;
@@ -35,6 +36,7 @@
   export let onToggleCurationMute: (key: CurationKey) => void = () => {};
   export let onToggleShowHidden: () => void = () => {};
   export let onToggleHideOutOfScope: () => void = () => {};
+  export let onToggleHideUnindexed: () => void = () => {};
 
   const CURATION_LABELS: Record<CurationKey, string> = {
     collected: 'In a collection',
@@ -245,6 +247,19 @@
       </button>
     {/if}
 
+    {#if hideUnindexed}
+      <button
+        type="button"
+        class="chip indexed-only"
+        on:click|stopPropagation={onToggleHideUnindexed}
+        title="Show unindexed items again"
+        aria-label="Show unindexed items again"
+      >
+        <span class="chip-label">indexed only</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/if}
+
     {#if hideOutOfScope}
       <button
         type="button"
@@ -415,7 +430,11 @@
     color: var(--text-accent);
   }
 
-  .chip.lens-on {
+  /* Both are modes the user switched on, so both wear purple. A shared
+     rule rather than a reused class name — "lens-on" would misname the
+     unindexed chip, which is not the focus lens. */
+  .chip.lens-on,
+  .chip.indexed-only {
     border-color: color-mix(in srgb, var(--text-active) 35%, transparent);
     color: var(--text-active);
   }
