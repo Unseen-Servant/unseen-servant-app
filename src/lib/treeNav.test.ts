@@ -187,6 +187,81 @@ describe('computeVisibleRows', () => {
       ]);
     });
   });
+
+  describe('hide unindexed', () => {
+    // nestedTree(): /root/parent/{sub/{x.pdf,y.pdf}, sibling.pdf}
+    // Only /root/parent/sub/x.pdf is indexed. sibling.pdf and y.pdf are
+    // unknown to the library unless a test selects them.
+    function library(over: Partial<LibraryKnowledge> = {}): LibraryKnowledge {
+      return {
+        indexedPaths: new Set(['/root/parent/sub/x.pdf']),
+        indexedFolderPaths: new Set(['/root/parent', '/root/parent/sub']),
+        selectedPaths: new Set(),
+        foldersWithSelections: new Set(),
+        hideUnindexed: true,
+        ...over,
+      };
+    }
+
+    const expanded = new Set(['/root/parent', '/root/parent/sub']);
+
+    it('drops rows the library knows nothing about', () => {
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, null, library());
+      expect(rows.map(r => r.path)).toEqual([
+        '/root/parent',
+        '/root/parent/sub',
+        '/root/parent/sub/x.pdf',
+      ]);
+    });
+
+    it('keeps a selected-but-unindexed file and its folder', () => {
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, null, library({
+        selectedPaths: new Set(['/root/parent/sibling.pdf']),
+        foldersWithSelections: new Set(['/root/parent']),
+      }));
+      expect(rows.map(r => r.path)).toContain('/root/parent/sibling.pdf');
+    });
+
+    it('skips a whole folder subtree when nothing under it is known', () => {
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, null, library({
+        indexedPaths: new Set(['/root/parent/sibling.pdf']),
+        indexedFolderPaths: new Set(['/root/parent']),
+      }));
+      expect(rows.map(r => r.path)).toEqual([
+        '/root/parent',
+        '/root/parent/sibling.pdf',
+      ]);
+    });
+
+    it('is inert when hideUnindexed is false', () => {
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, null, library({ hideUnindexed: false }));
+      expect(rows.map(r => r.path)).toEqual([
+        '/root/parent',
+        '/root/parent/sub',
+        '/root/parent/sub/x.pdf',
+        '/root/parent/sub/y.pdf',
+        '/root/parent/sibling.pdf',
+      ]);
+    });
+
+    it('is inert when library is null', () => {
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, null, null);
+      expect(rows).toHaveLength(5);
+    });
+
+    it('composes with the focus lens — a row dropped by either is absent', () => {
+      // sub/ is indexed material out of scope (lens drops it);
+      // sibling.pdf is unknown to the library (the switch drops it).
+      const scope: ScopeVisibility = {
+        scopeBrightPaths: new Set(['/root/parent']),
+        indexedFolderPaths: new Set(['/root/parent/sub']),
+        indexedPaths: new Set(['/root/parent/sub/x.pdf']),
+        hideOutOfScope: true,
+      };
+      const rows = computeVisibleRows(nestedTree(), expanded, null, new Set(), false, scope, library());
+      expect(rows.map(r => r.path)).toEqual(['/root/parent']);
+    });
+  });
 });
 
 // --- rowHasIndexedMaterial ---
