@@ -1,10 +1,9 @@
 # Header Voices — Design
 
 **Date:** 2026-08-09
-**Status:** Implemented 2026-08-09 on main; visual pass done. Tertiary
-contrast amendment landed with it (see Notes). Remaining follow-up:
-DesignSync of the six voices and `--text-tertiary` to the claude.ai
-design project.
+**Status:** Complete. Implemented 2026-08-09 on main; visual pass done.
+Tertiary contrast amendment landed with it (see Notes). DesignSync to the
+claude.ai design project done the same day (see Notes).
 
 ## Problem
 
@@ -180,8 +179,17 @@ the design conventions.
 - Several components carry a pointless `var(--font-heading,
   var(--font-body))` fallback; adopting the shared classes removes those
   declarations as a side effect.
-- After implementation, sync the six voices to the claude.ai
-  design-system project (incremental DesignSync note).
+- **DesignSync done (2026-08-09), baseline commit 5b40f7f.** New card
+  `foundations/header-voices.html`; the six voices, the font utilities,
+  the shared `.sm-btn` and `--text-tertiary` #7d8590 added to
+  `assets/tokens.css`. Adoption propagated to the systems-view,
+  filter-panel, forms, search-results, scope-bar and collections-panel
+  cards. Two contradictions surfaced and were corrected against code:
+  the collections-panel card had stale pigment names (Ochre / Orpiment /
+  Aegean, Verdigris on the wrong hue — `PIGMENTS` in `palette.ts` is
+  authoritative), and `collection-colors.html` still cited danger as
+  #cf4232 instead of the amended #e15342. Ledger in the project's
+  `github.md`.
 
 ## Verification
 
