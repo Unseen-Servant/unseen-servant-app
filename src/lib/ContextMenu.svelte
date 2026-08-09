@@ -216,7 +216,10 @@
         event.preventDefault();
         const sub = hit.dataset.submenu as 'add' | 'remove' | 'tag' | undefined;
         if (hit.dataset.mi === 'submenu-trigger' && sub) {
-          // Triggers are divs with no click handler — mirror the ArrowRight path.
+          // The ArrowRight path gets this for free — the user had already
+          // navigated onto the row. A chord jumps straight here, so resolve
+          // the cursor too, or ← / Esc lands on no row at all.
+          focusedIdx = mainItems.indexOf(hit);
           openSubmenu = sub;
           focusedSubmenuIdx = 0;
         } else {
