@@ -733,11 +733,6 @@
     flex-shrink: 0;
   }
   .panel-title {
-    font-family: var(--font-display);
-    font-size: 0.8rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-accent);
     flex: 1;
   }
 
