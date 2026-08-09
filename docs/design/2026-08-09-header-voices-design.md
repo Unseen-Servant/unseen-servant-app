@@ -113,12 +113,13 @@ the design conventions.
 - `line-height: 1.2` is new on all voices (previously inherited). Mostly
   single-line headers; minor vertical-rhythm shifts are possible and are
   covered by the visual pass.
-- **Contrast check (required during implementation):** compute WCAG
-  contrast of `--text-tertiary` and `--text-secondary` against the real
-  surface tokens these labels sit on, at their small sizes (all count as
-  "normal text", 4.5:1 target). If tertiary fails, that is a token
-  decision handled separately (as with the vermilion amendment), not a
-  voice-structure change.
+- **Contrast measured (2026-08-09, WCAG 2.1, 4.5:1 normal-text target):**
+  `--text-tertiary` #6e7681 — 3.83:1 on `--bg-app`, 3.42:1 on
+  `--bg-container`, 2.96:1 on `--bg-header` (FAIL on all three).
+  `--text-secondary` #8b949e — 5.72:1 / 5.11:1 / 4.42:1 (PASS, PASS,
+  FAIL on `--bg-header`). Small-caps labels at 0.65–0.7rem count as
+  normal text. Any token change is a separate decision (as with the
+  vermilion amendment), out of scope for this project.
 - Several components carry a pointless `var(--font-heading,
   var(--font-body))` fallback; adopting the shared classes removes those
   declarations as a side effect.
