@@ -58,7 +58,7 @@
   on:keydown={handleKey}
   on:click={handleClick}
 >
-  <div class="title">{title}</div>
+  <div class="title dialog-title">{title}</div>
   {#if message}
     <div class="message">{message}</div>
   {/if}
@@ -91,10 +91,6 @@
     background: rgba(0, 0, 0, 0.5);
   }
   .title {
-    font-family: var(--font-heading);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-accent);
     margin-bottom: 0.5rem;
   }
   .message {

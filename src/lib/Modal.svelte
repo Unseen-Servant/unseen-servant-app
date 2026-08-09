@@ -93,7 +93,7 @@
   on:click={handleClick}
 >
   <div class="modal-header">
-    <span class="modal-title font-heading">{title}</span>
+    <span class="dialog-title">{title}</span>
     <button type="button" class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
   </div>
   <slot />
@@ -142,11 +142,6 @@
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
     flex-shrink: 0;
-  }
-
-  .modal-title {
-    font-size: 1rem;
-    color: var(--text-accent);
   }
 
   .close-btn {
