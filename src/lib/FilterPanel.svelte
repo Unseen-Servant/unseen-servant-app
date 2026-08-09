@@ -189,7 +189,7 @@
   </header>
 
   <div class="panel-body">
-    <div class="sect sect-split">
+    <div class="sect sect-split ledger-label">
       <span>Hidden items</span>
       {#if hasHidden}
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
