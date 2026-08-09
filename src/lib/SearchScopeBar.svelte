@@ -390,7 +390,6 @@
     opacity: 0.75;
   }
 
-
   .chip-die,
   .chip-mark {
     width: 11px;
