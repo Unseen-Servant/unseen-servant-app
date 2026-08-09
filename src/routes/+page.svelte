@@ -68,22 +68,35 @@
   // focusedCollectionName are mutually exclusive — only one region claims
   // the keyboard at a time, which is how arrow keys know where to route.
   let focusedCollectionName: string | null = null;
+  // Third pane: the filter console. Holds a filterRows key, not an index.
+  let focusedFilterRow: string | null = null;
 
   function setFocusedFilePath(path: string | null) {
     focusedFilePath = path;
-    if (path) focusedCollectionName = null;
+    if (path) { focusedCollectionName = null; focusedFilterRow = null; }
   }
   function setFocusedCollectionName(name: string | null) {
     focusedCollectionName = name;
-    if (name) focusedFilePath = null;
+    if (name) { focusedFilePath = null; focusedFilterRow = null; }
   }
-  // Remember the last non-null focus on each side so Cmd+Alt+←/→ can
+  function setFocusedFilterRow(key: string | null) {
+    focusedFilterRow = key;
+    if (key) { focusedFilePath = null; focusedCollectionName = null; }
+  }
+  // Remember the last non-null focus in each pane so Cmd+Alt+←/→/↑/↓ can
   // restore the user to where they were instead of always landing on
   // row 0 of the target region.
   let lastFocusedFilePath: string | null = null;
   let lastFocusedCollectionName: string | null = null;
+  let lastFocusedFilterRow: string | null = null;
   $: if (focusedFilePath !== null) lastFocusedFilePath = focusedFilePath;
   $: if (focusedCollectionName !== null) lastFocusedCollectionName = focusedCollectionName;
+  $: if (focusedFilterRow !== null) lastFocusedFilterRow = focusedFilterRow;
+  // Which of the dock's two panels the user was last in, so Cmd+Alt+←
+  // returns there rather than always landing on Collections.
+  let lastFocusedDockPane: 'collections' | 'filters' = 'collections';
+  $: if (focusedCollectionName !== null) lastFocusedDockPane = 'collections';
+  $: if (focusedFilterRow !== null) lastFocusedDockPane = 'filters';
   // `hideState` snapshots both the directly-hidden flag (path itself in
   // hiddenPaths) and the inherited flag (an ancestor folder is). The menu
   // shows Hide/Show only when `directlyHidden` is true or nothing is
