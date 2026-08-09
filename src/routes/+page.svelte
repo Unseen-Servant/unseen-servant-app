@@ -1651,11 +1651,20 @@
     pendingTagOverrides = pendingTagOverrides;
     try {
       await invoke('set_game_systems', { filename, gameSystems: tags });
-      await refreshIndexStatus();
     } catch (e) {
+      // Only the write failing justifies dropping the optimistic value —
+      // otherwise the menu would keep claiming a tag that was never stored.
       console.error('Failed to set game systems:', e);
       pendingTagOverrides.delete(path);
       pendingTagOverrides = pendingTagOverrides;
+      return;
+    }
+    // The tag is stored. A refresh that fails here must not roll it back:
+    // the override just persists until a later refresh reconciles it.
+    try {
+      await refreshIndexStatus();
+    } catch (e) {
+      console.error('Index status refresh failed after tagging:', e);
     }
   }
 
