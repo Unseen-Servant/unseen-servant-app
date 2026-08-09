@@ -52,6 +52,12 @@
   export let hideOutOfScope: boolean = false;
   export let onToggleHideOutOfScope: () => void = () => {};
 
+  // "Hide unindexed items" — the bulk gesture for material scope can't
+  // speak about, sibling to per-item hide. Spec: docs/specs/scope/
+  // 2026-08-09-hide-unindexed-design.md.
+  export let hideUnindexed: boolean = false;
+  export let onToggleHideUnindexed: () => void = () => {};
+
   // Curation section: two channels over the collected/loose domain,
   // the third narrowing axis (same union/intersect/solo-overrides-mute
   // semantics as systems and collections). Soloing Collected is the old
@@ -209,6 +215,20 @@
         checked={showHidden}
         disabled={!hasHidden}
         on:change={onToggleShowHidden}
+      />
+    </label>
+
+    <label
+      class="row lens-row"
+      title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
+      data-fm="row"
+    >
+      <span class="row-name muted-name">Hide unindexed items</span>
+      <input
+        class="app-checkbox lens-checkbox"
+        type="checkbox"
+        checked={hideUnindexed}
+        on:change={onToggleHideUnindexed}
       />
     </label>
 
