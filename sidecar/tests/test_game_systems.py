@@ -213,6 +213,52 @@ def test_set_game_systems_clear(client, untagged_pdf_path, tmp_path):
     assert entry["game_systems"] == []
 
 
+def test_set_game_systems_batches_the_chunk_update(
+    client, large_text_pdf_path, test_collection, monkeypatch
+):
+    """Tagging a file with more chunks than Chroma's cap still succeeds.
+
+    ChromaDB rejects any single update carrying more records than its max
+    batch size (5461 for a local client), so a rulebook that chunks into
+    six or thirteen thousand pieces cannot have its tags rewritten in one
+    call. Patching the batch size down to 1 exercises the multi-batch path
+    without indexing a 5000-chunk PDF.
+    """
+    import server
+
+    client.post("/api/index-files", json={"paths": [str(large_text_pdf_path)]})
+    total = len(test_collection.get()["ids"])
+    assert total > 1, "fixture must produce several chunks to exercise batching"
+
+    monkeypatch.setattr(server, "METADATA_UPDATE_BATCH_SIZE", 1)
+
+    # Record the size of every update call so the cap is verified directly,
+    # not just inferred from the endpoint returning 200.
+    batch_sizes = []
+    original_update = test_collection.update
+
+    def spy_update(ids, **kwargs):
+        batch_sizes.append(len(ids))
+        return original_update(ids=ids, **kwargs)
+
+    monkeypatch.setattr(test_collection, "update", spy_update)
+
+    response = client.post("/api/set-game-systems", json={
+        "filename": "core_rules.pdf",
+        "game_systems": ["OSR"],
+    })
+
+    assert response.status_code == 200, response.text
+    assert response.json()["chunks_updated"] == total
+
+    assert batch_sizes, "expected at least one update call"
+    assert max(batch_sizes) <= 1, f"a batch exceeded the cap: {batch_sizes}"
+    assert sum(batch_sizes) == total, "every chunk should be covered exactly once"
+
+    results = test_collection.get(include=["metadatas"])
+    assert all(m["game_system"] == "OSR" for m in results["metadatas"])
+
+
 def test_manifest_auto_populates_legacy(tmp_path):
     """A manifest written before multi-tag support backfills game_systems on load."""
     from server import IndexManifest, ManifestEntry, load_manifest, save_manifest

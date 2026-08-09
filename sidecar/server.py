@@ -1026,6 +1026,14 @@ def _embed_text(eu: EmbedUnit) -> str:
 EMBED_BATCH_SIZE = 256
 EMBED_CONCURRENCY = 3
 
+# Chroma refuses any single write carrying more records than its max batch
+# size — 5461 for a local client. Indexing never hits this because it upserts
+# in EMBED_BATCH_SIZE slices, but a metadata rewrite touches every chunk of a
+# file at once, and a big rulebook chunks well past the cap (13k+ is ordinary).
+# Kept below 5461 with headroom rather than read from the client, since the
+# limit is a property of the local Chroma build and not worth a runtime probe.
+METADATA_UPDATE_BATCH_SIZE = 5000
+
 
 def _embed_batch(collection, batch: list[EmbedUnit]) -> list[list[float]]:
     """Heading-prepended embeddings for a batch (no DB writes)."""
@@ -2774,10 +2782,14 @@ def create_app(
             for metadata in results["metadatas"]
         ]
 
-        collection.update(
-            ids=results["ids"],
-            metadatas=updated_metadatas,
-        )
+        # One call per slice: a file's chunk count routinely exceeds Chroma's
+        # per-write cap, and going over it fails the whole update.
+        for start in range(0, len(results["ids"]), METADATA_UPDATE_BATCH_SIZE):
+            end = start + METADATA_UPDATE_BATCH_SIZE
+            collection.update(
+                ids=results["ids"][start:end],
+                metadatas=updated_metadatas[start:end],
+            )
 
         if manifest:
             for entry in manifest.files.values():
