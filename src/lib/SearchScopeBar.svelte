@@ -66,7 +66,7 @@
         title="Stop {chip.label}"
         aria-label="Stop {chip.label}"
       >
-        <span class="chip-prefix">play</span>
+        <span class="chip-prefix micro-label">play</span>
         {#if chip.color}
           <!-- Bookmark ribbon — the collection axis keeps its pigment -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
@@ -91,7 +91,7 @@
         title="Unmute {chip.label}"
         aria-label="Unmute {chip.label}"
       >
-        <span class="chip-prefix">mute</span>
+        <span class="chip-prefix micro-label">mute</span>
         {#if chip.color}
           <!-- Bookmark ribbon — the collection keeps its pigment even muted -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
@@ -115,7 +115,7 @@
         title="Stop soloing {chip.label}"
         aria-label="Stop soloing {chip.label}"
       >
-        <span class="chip-prefix">solo</span>
+        <span class="chip-prefix micro-label">solo</span>
         {#if chip.color}
           <!-- Bookmark ribbon — the collection axis keeps its pigment -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
@@ -140,7 +140,7 @@
         title="Stop soloing {CURATION_LABELS[key]}"
         aria-label="Stop soloing {CURATION_LABELS[key]}"
       >
-        <span class="chip-prefix">solo</span>
+        <span class="chip-prefix micro-label">solo</span>
         {#if key === 'collected'}
           <!-- Outline bookmark — the curation bucket, not a specific collection -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -160,7 +160,7 @@
         title="Stop soloing {displaySystem(system)}"
         aria-label="Stop soloing {displaySystem(system)}"
       >
-        <span class="chip-prefix">solo</span>
+        <span class="chip-prefix micro-label">solo</span>
         <!-- Font Awesome "dice-d6" — monochrome; it marks the axis, the frame marks the operation -->
         <svg class="chip-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
           <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
@@ -178,7 +178,7 @@
         title="Unmute {chip.label}"
         aria-label="Unmute {chip.label}"
       >
-        <span class="chip-prefix">mute</span>
+        <span class="chip-prefix micro-label">mute</span>
         {#if chip.color}
           <!-- Bookmark ribbon — dims with the chip ("removed, still recognizable") -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
@@ -203,7 +203,7 @@
         title="Unmute {CURATION_LABELS[key]}"
         aria-label="Unmute {CURATION_LABELS[key]}"
       >
-        <span class="chip-prefix">mute</span>
+        <span class="chip-prefix micro-label">mute</span>
         {#if key === 'collected'}
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 3h12v18l-6-4.4L6 21z"/>
@@ -222,7 +222,7 @@
         title="Unmute {displaySystem(system)}"
         aria-label="Unmute {displaySystem(system)}"
       >
-        <span class="chip-prefix">mute</span>
+        <span class="chip-prefix micro-label">mute</span>
         <!-- Font Awesome "dice-d6" — monochrome; dims with the chip ("removed, still recognizable") -->
         <svg class="chip-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
           <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
@@ -390,12 +390,6 @@
     opacity: 0.75;
   }
 
-  .chip-prefix {
-    color: var(--text-tertiary);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
 
   .chip-die,
   .chip-mark {

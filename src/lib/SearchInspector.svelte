@@ -57,7 +57,7 @@
         <div class="meta">
           <span class="filename" title={result.source}>{result.filename}</span>
           {#if isPathOrAncestorIn(result.source, hiddenPaths)}
-            <span class="badge" title="This file is hidden in the tree.">hidden</span>
+            <span class="badge micro-label" title="This file is hidden in the tree.">hidden</span>
           {/if}
         </div>
         <div class="sub">
@@ -184,10 +184,6 @@
     padding: 0.05rem 0.35rem;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
-    font-size: 0.65rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
     font-style: italic;
   }
 

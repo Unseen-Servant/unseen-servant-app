@@ -174,7 +174,7 @@
           <div class="snippet">{snippetPreview(result.text)}</div>
           <div class="meta-row">
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
-              <span class="hidden-badge" title="This file is hidden in the tree.">hidden</span>
+              <span class="hidden-badge micro-label" title="This file is hidden in the tree.">hidden</span>
             {/if}
             <span class="meta-text">
               {result.filename}{result.game_system ? ` · ${displaySystem(result.game_system)}` : ''}{span ? ` · ${span}` : ''}
@@ -421,10 +421,6 @@
     padding: 0.05rem 0.35rem;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
-    font-size: 0.6rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
     font-style: italic;
   }
 
