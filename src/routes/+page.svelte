@@ -3439,7 +3439,9 @@
     min-width: 0;
     overflow-y: auto;
     overflow-anchor: none;
-    padding: 0.25rem 0.75rem;
+    /* No top padding: the sticky scope bar must sit flush under the
+       header, or scrolled rows peek through the slit above it. */
+    padding: 0 0.75rem 0.25rem;
   }
 
   .scope-empty {
