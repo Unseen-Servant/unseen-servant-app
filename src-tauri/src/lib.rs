@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
+use tauri_plugin_window_state::StateFlags;
 
 // ---------------------------------------------------------------------------
 // Sidecar state — holds the Python child process handle and any startup
@@ -1575,6 +1576,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        // Remember window geometry across launches. VISIBLE is excluded on
+        // purpose: closing the window hides it to the tray, so saving
+        // visibility would restore a hidden window on the next launch and the
+        // app would look like it failed to start.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             select_folder,
             list_files,

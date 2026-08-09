@@ -19,6 +19,7 @@
     "opener:allow-reveal-item-in-dir",
     "clipboard-manager:allow-write-text",
     "dialog:default",
-    "store:default"
+    "store:default",
+    "window-state:default"
   ]
 }
