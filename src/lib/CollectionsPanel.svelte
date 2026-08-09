@@ -660,7 +660,7 @@
   {#if !draftName}
     <!-- Outside the scroll container: trails the last row while the
          list is short, stays visible once the list overflows. -->
-    <button class="add-coll" on:click={onCreate}>+ collection</button>
+    <button class="add-coll" on:click={onCreate}>+ New collection&hellip;</button>
   {/if}
 </aside>
 
@@ -690,7 +690,7 @@
       aria-haspopup="menu"
       aria-expanded={ctxPigmentOpen}
     >
-      <span>Pigment&hellip;</span>
+      <span>Pigment</span>
       <span class="submenu-caret" aria-hidden="true">&#9656;</span>
       {#if ctxPigmentOpen}
         <div class="submenu" role="menu">
@@ -848,7 +848,7 @@
     padding: 0;
     overflow-y: auto;
     /* Content-sized, shrinkable: the list only scrolls once it runs out
-       of room, and the "+ collection" row below it never leaves view. */
+       of room, and the "+ New collection" row below it never leaves view. */
     flex: 0 1 auto;
     min-height: 0;
   }

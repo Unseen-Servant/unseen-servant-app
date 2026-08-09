@@ -46,7 +46,7 @@
     {
       key: 'modificationPolicy',
       title: 'Files modified on disk',
-      desc: 'Same filename, but the contents are different — needs reindexing.',
+      desc: 'Same filename, but the contents are different — needs re-indexing.',
     },
   ];
 
@@ -155,7 +155,7 @@
       <h3 class="field-title section-title">Library folder</h3>
       <p class="field-desc">
         Legend Lore indexes PDFs from this folder. Changing the folder doesn't
-        remove anything that's already indexed — use Reindex all below to rebuild.
+        remove anything that's already indexed — use Re-index all below to rebuild.
       </p>
     </div>
 
@@ -323,7 +323,7 @@
 
     <div class="danger-row">
       <div class="danger-row-text">
-        <div class="danger-row-title">Reindex all files</div>
+        <div class="danger-row-title">Re-index all files</div>
         <div class="danger-row-desc">
           Re-extracts and re-embeds every file in your index. Use after the
           extractor has been upgraded, or if search results look stale.
@@ -355,7 +355,7 @@
             disabled={isSyncing || indexedFileCount === 0}
             title={indexedFileCount === 0 ? 'No indexed files' : ''}
           >
-            {isSyncing ? 'Sync in progress…' : 'Reindex all'}
+            {isSyncing ? 'Sync in progress…' : 'Re-index all'}
           </button>
         {/if}
       </div>

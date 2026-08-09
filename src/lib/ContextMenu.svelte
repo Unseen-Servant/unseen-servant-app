@@ -343,7 +343,7 @@
       on:mouseenter={() => { openSubmenu = 'tag'; }}
       on:mouseleave={() => { openSubmenu = null; }}
     >
-      <span>Game system&hellip;</span>
+      <span>Game system</span>
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'tag'}
         <div class="submenu" role="menu">
@@ -440,7 +440,7 @@
         on:mouseenter={() => { openSubmenu = 'remove'; }}
         on:mouseleave={() => { openSubmenu = null; }}
       >
-        <span>Remove from collection&hellip;</span>
+        <span>Remove from collection</span>
         <span class="submenu-caret">&#9656;</span>
         {#if openSubmenu === 'remove'}
           <div class="submenu" role="menu">
