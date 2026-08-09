@@ -121,7 +121,7 @@ handlers refuse to *create* a narrowing on a row with nothing indexed
 any input path — the honest-empty-solo rule now only applies to chips
 that go stale after creation.
 
-### Hide territory (amended 2026-08-08)
+### Hide territory (amended 2026-08-08, 2026-08-09)
 
 Hide stays display-only (hidden files remain indexed, searched, and
 counted) and splits territory with M: **hide is the visibility verb for
@@ -132,6 +132,16 @@ always remains available, so files hidden before indexing (or indexed
 while hidden) never strand. Folder hide is untouched — junk folders
 are the common clutter case even when a stray indexed file sits
 inside.
+
+**Two gestures within that territory (2026-08-09).** Per-item hide is
+no longer the only one: the "Hide unindexed items" switch is the bulk
+gesture for the same material, because nobody hides 1700 files one
+gesture at a time. The territory line against M is unchanged — both
+gestures act only on what scope can't speak about, and neither touches
+indexed material. The switch keys on index *and* selection, so a queued
+file (`to_add`) is library material and stays visible. See
+`2026-08-09-hide-unindexed-design.md`, which also records why this is a
+third switch rather than an extension of the focus lens.
 
 ## Display doctrine
 
@@ -187,6 +197,8 @@ of rows — dimming communicates scope but doesn't shrink the surface
   (the chip on the scope bar, the channel in the console).
 - The lit toggle wears purple (`--text-active`) — a mode the user
   switched on. With no narrowing engaged the lens is a harmless no-op.
+  This no-op guarantee is why unindexed material got its own switch
+  instead of being folded in here (2026-08-09).
 - If the scope resolves empty while the lens is on, the tree shows a
   one-line "everything is out of scope" placeholder so blank doesn't
   read as broken.
