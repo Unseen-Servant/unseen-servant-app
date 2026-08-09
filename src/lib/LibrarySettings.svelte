@@ -131,17 +131,17 @@
     {#if indexedFileCount > 0 || totalFilesFound > 0}
       <div class="stat-block" role="group" aria-label="Library stats">
         <div class="stat-cell">
-          <div class="stat-label">INDEXED</div>
+          <div class="readout-label">INDEXED</div>
           <div class="stat-value">
             {indexedFileCount.toLocaleString()}{#if totalFilesFound > 0}&nbsp;<span class="stat-muted">/&nbsp;{totalFilesFound.toLocaleString()}</span>&nbsp;<span class="stat-pct">{coveragePct.toFixed(1)}%</span>{/if}
           </div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">CHUNKS</div>
+          <div class="readout-label">CHUNKS</div>
           <div class="stat-value">{totalChunks.toLocaleString()}</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">SYS</div>
+          <div class="readout-label">SYS</div>
           <div class="stat-value">{gameSystemCount}</div>
         </div>
       </div>
@@ -226,7 +226,7 @@
     </div>
 
     <fieldset class="policy-group" disabled={syncPreferences.backgroundCheckInterval === 0}>
-      <legend class="policy-legend">When changes are detected</legend>
+      <legend class="policy-legend readout-label">When changes are detected</legend>
 
       {#each policyGroups as group}
         <div class="setting-row">
@@ -247,7 +247,7 @@
     </fieldset>
 
     <div class="meta-row">
-      <span class="meta-label">Last sync</span>
+      <span class="meta-label readout-label">Last sync</span>
       <span class="meta-value" title={lastSyncAbsolute}>
         {isSyncing ? 'Syncing…' : lastSyncRelative}
       </span>
@@ -297,7 +297,7 @@
     </div>
 
     <div class="meta-row">
-      <span class="meta-label">Storage</span>
+      <span class="meta-label readout-label">Storage</span>
       <span class="meta-value">
         {storageBytes > 0 ? formatSize(storageBytes) : '—'}
         {#if reclaimableBytes > 0}
@@ -473,14 +473,6 @@
     gap: 0.1rem;
   }
 
-  .stat-label {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-  }
-
   .stat-value {
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -516,11 +508,6 @@
   }
 
   .meta-label {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
     flex-shrink: 0;
   }
 
@@ -645,11 +632,6 @@
   }
 
   .policy-legend {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
     padding: 0 0.3rem;
   }
 

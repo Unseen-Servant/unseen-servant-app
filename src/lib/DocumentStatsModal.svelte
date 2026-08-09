@@ -70,23 +70,23 @@
 
       <div class="stat-block" role="group" aria-label="Document stats">
         <div class="stat-cell">
-          <div class="stat-label">CHUNKS</div>
+          <div class="readout-label">CHUNKS</div>
           <div class="stat-value">{stats.chunks.toLocaleString()}</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">PAGES</div>
+          <div class="readout-label">PAGES</div>
           <div class="stat-value">{stats.pages > 0 ? stats.pages.toLocaleString() : '—'}</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">SIZE</div>
+          <div class="readout-label">SIZE</div>
           <div class="stat-value">{formatBytes(stats.file_size_bytes)}</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">INDEXED</div>
+          <div class="readout-label">INDEXED</div>
           <div class="stat-value" title={indexedAbsolute}>{formatRelative(stats.indexed_at)}</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">SYSTEM</div>
+          <div class="readout-label">SYSTEM</div>
           <div class="stat-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</div>
         </div>
       </div>
@@ -129,13 +129,6 @@
     flex-direction: column;
     align-items: center;
     gap: 0.15rem;
-  }
-  .stat-label {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
   }
   .stat-value {
     font-family: var(--font-mono);

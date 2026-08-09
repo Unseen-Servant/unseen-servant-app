@@ -52,7 +52,7 @@
     <div class="field-head">
       <div class="field-title-row">
         <h3 class="field-title section-title">Library — your PDF folder</h3>
-        <span class="field-status" class:ok={folderSelected}>
+        <span class="field-status readout-label" class:ok={folderSelected}>
           {folderSelected ? 'Selected' : 'Unset'}
         </span>
       </div>
@@ -85,7 +85,7 @@
     <div class="field-head">
       <div class="field-title-row">
         <h3 class="field-title section-title">Index — embed your books</h3>
-        <span class="field-status" class:ok={filesIndexed}>
+        <span class="field-status readout-label" class:ok={filesIndexed}>
           {filesIndexed ? 'Indexed' : 'None yet'}
         </span>
       </div>
@@ -122,7 +122,7 @@
     <div class="field-head">
       <div class="field-title-row">
         <h3 class="field-title section-title">Collections — scope your searches</h3>
-        <span class="field-status" class:ok={collectionsCreated}>
+        <span class="field-status readout-label" class:ok={collectionsCreated}>
           {collectionsCreated ? 'Created' : 'None yet'}
         </span>
       </div>
@@ -149,7 +149,7 @@
         <h3 class="field-title section-title">
           MCP — wire up an AI agent <span class="opt">(optional)</span>
         </h3>
-        <span class="field-status" class:ok={mcpConnected}>
+        <span class="field-status readout-label" class:ok={mcpConnected}>
           {mcpConnected ? 'Connected' : 'Not detected'}
         </span>
       </div>
@@ -229,10 +229,6 @@
 
   .field-status {
     flex-shrink: 0;
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     color: var(--text-tertiary);
   }
   .field-status.ok {

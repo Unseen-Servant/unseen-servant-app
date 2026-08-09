@@ -7,7 +7,7 @@
 
 <div class="ollama-status">
   <span
-    class="badge font-heading"
+    class="badge readout-label"
     class:ok={ready}
     class:partial={ollamaRunning && !ollamaModelReady}
   >
@@ -35,9 +35,6 @@
   }
 
   .badge {
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     color: var(--text-tertiary);
   }
   .badge.ok {

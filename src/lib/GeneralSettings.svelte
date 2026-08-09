@@ -150,7 +150,7 @@
       </div>
 
       <fieldset class="experimental-group">
-        <legend class="experimental-legend">Experimental</legend>
+        <legend class="experimental-legend readout-label">Experimental</legend>
 
         <div class="setting-row">
           <div class="setting-row-head">
@@ -302,11 +302,6 @@
   }
 
   .experimental-legend {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
     padding: 0 0.3rem;
   }
 

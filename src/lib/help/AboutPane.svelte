@@ -35,10 +35,10 @@
     </header>
 
     <dl class="meta">
-      <dt class="meta-label">Version</dt>
+      <dt class="meta-label readout-label">Version</dt>
       <dd class="meta-value">{appVersion ? `v${appVersion}` : '—'}</dd>
 
-      <dt class="meta-label">Data directory</dt>
+      <dt class="meta-label readout-label">Data directory</dt>
       <dd class="meta-value path-cell">
         <span class="path" title={dataDir}>{dataDir || 'Resolving…'}</span>
         <button
@@ -112,11 +112,6 @@
 
   .meta-label {
     margin: 0;
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
   }
 
   .meta-value {
