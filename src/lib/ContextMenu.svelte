@@ -519,6 +519,11 @@
     opacity: 0.6;
     margin-left: auto;
   }
+  /* The chord already claims the row's free space; a second auto margin
+     would split it and strand the chord mid-row. */
+  .menu-chord + .submenu-caret {
+    margin-left: 0;
+  }
   .submenu-icon {
     width: 11px;
     height: 11px;
