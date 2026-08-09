@@ -13,7 +13,7 @@
 
 <div class="pane">
   <header class="pane-head">
-    <h3 class="pane-title font-heading">Setting up Legend Lore</h3>
+    <h3 class="pane-title section-title">Setting up Legend Lore</h3>
     <p class="pane-desc">
       The five pieces that make Legend Lore tick. Status badges reflect your
       current state — refer back here whenever you need to redo a step.
@@ -47,8 +47,6 @@
 
   .pane-title {
     margin: 0;
-    font-size: 1rem;
-    color: var(--text-primary);
   }
 
   .pane-desc {

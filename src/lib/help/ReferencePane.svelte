@@ -36,7 +36,7 @@
 <div class="pane">
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title font-heading">Keyboard shortcuts</h3>
+      <h3 class="block-title section-title">Keyboard shortcuts</h3>
       <p class="block-desc">
         Press <code class="kbd">?</code> anywhere in the app to show these as
         an overlay.
@@ -60,7 +60,7 @@
 
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title font-heading">MCP tools</h3>
+      <h3 class="block-title section-title">MCP tools</h3>
       <p class="block-desc">
         What an AI agent connected via MCP (Claude Desktop, Claude Code, or
         anything else that speaks the Model Context Protocol) can do with your
@@ -114,8 +114,6 @@
 
   .block-title {
     margin: 0;
-    font-size: 0.95rem;
-    color: var(--text-primary);
   }
 
   .block-desc {

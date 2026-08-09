@@ -51,7 +51,7 @@
   <div class="help-body">
     {#each grouped as group (group.scope)}
       <section class="group">
-        <h3 class="group-title font-heading">{group.label}</h3>
+        <h3 class="group-title section-title">{group.label}</h3>
         <dl class="bindings">
           {#each group.entries as entry (entry.id)}
             <dt class="chord">{chord(entry.id)}</dt>
@@ -82,8 +82,6 @@
 
   .group-title {
     margin: 0;
-    font-size: 0.95rem;
-    color: var(--text-primary);
   }
 
   .bindings {

@@ -27,7 +27,7 @@
 <div class="pane">
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title font-heading">About Legend Lore</h3>
+      <h3 class="block-title section-title">About Legend Lore</h3>
       <p class="block-desc">
         Local-first, AI-augmented toolkit for tabletop RPG Gamemasters.
         Distributed by Unseen Servant Games.
@@ -53,7 +53,7 @@
 
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title font-heading">Links</h3>
+      <h3 class="block-title section-title">Links</h3>
     </header>
     <ul class="link-list">
       <li>
@@ -90,8 +90,6 @@
 
   .block-title {
     margin: 0;
-    font-size: 0.95rem;
-    color: var(--text-primary);
   }
 
   .block-desc {

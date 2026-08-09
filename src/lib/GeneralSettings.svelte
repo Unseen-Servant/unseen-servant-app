@@ -67,7 +67,7 @@
   {#if loadError}
     <section class="field">
       <div class="field-head">
-        <h3 class="field-title font-heading">Search pipeline</h3>
+        <h3 class="field-title section-title">Search pipeline</h3>
         <p class="field-desc error-text">
           Could not load search settings — is the sidecar running? ({loadError})
         </p>
@@ -78,7 +78,7 @@
   {:else}
     <section class="field">
       <div class="field-head">
-        <h3 class="field-title font-heading">Search pipeline</h3>
+        <h3 class="field-title section-title">Search pipeline</h3>
         <p class="field-desc">
           How search ranks results. Applies to the app's search bar 
 	  and MCP calls alike.
@@ -217,8 +217,6 @@
   }
 
   .field-title {
-    font-size: 0.95rem;
-    color: var(--text-primary);
     margin: 0 0 0.35rem;
   }
 

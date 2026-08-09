@@ -22,7 +22,7 @@
   <!-- 1. Ollama -->
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title font-heading">Ollama — local AI engine</h3>
+      <h3 class="field-title section-title">Ollama — local AI engine</h3>
       <p class="field-desc">
         Legend Lore runs entirely on your machine. Ollama is the local
         model server that turns your PDFs into vectors — numerical
@@ -51,7 +51,7 @@
   <section class="field">
     <div class="field-head">
       <div class="field-title-row">
-        <h3 class="field-title font-heading">Library — your PDF folder</h3>
+        <h3 class="field-title section-title">Library — your PDF folder</h3>
         <span class="field-status" class:ok={folderSelected}>
           {folderSelected ? 'Selected' : 'Unset'}
         </span>
@@ -84,7 +84,7 @@
   <section class="field">
     <div class="field-head">
       <div class="field-title-row">
-        <h3 class="field-title font-heading">Index — embed your books</h3>
+        <h3 class="field-title section-title">Index — embed your books</h3>
         <span class="field-status" class:ok={filesIndexed}>
           {filesIndexed ? 'Indexed' : 'None yet'}
         </span>
@@ -121,7 +121,7 @@
   <section class="field">
     <div class="field-head">
       <div class="field-title-row">
-        <h3 class="field-title font-heading">Collections — scope your searches</h3>
+        <h3 class="field-title section-title">Collections — scope your searches</h3>
         <span class="field-status" class:ok={collectionsCreated}>
           {collectionsCreated ? 'Created' : 'None yet'}
         </span>
@@ -146,7 +146,7 @@
   <section class="field">
     <div class="field-head">
       <div class="field-title-row">
-        <h3 class="field-title font-heading">
+        <h3 class="field-title section-title">
           MCP — wire up an AI agent <span class="opt">(optional)</span>
         </h3>
         <span class="field-status" class:ok={mcpConnected}>
@@ -216,8 +216,6 @@
   .field-title {
     flex: 1;
     min-width: 0;
-    font-size: 0.95rem;
-    color: var(--text-primary);
     margin: 0;
   }
 

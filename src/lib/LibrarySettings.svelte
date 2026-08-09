@@ -125,7 +125,7 @@
 <div class="library-settings">
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title font-heading">Library stats</h3>
+      <h3 class="field-title section-title">Library stats</h3>
     </div>
 
     {#if indexedFileCount > 0 || totalFilesFound > 0}
@@ -152,7 +152,7 @@
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title font-heading">Library folder</h3>
+      <h3 class="field-title section-title">Library folder</h3>
       <p class="field-desc">
         Legend Lore indexes PDFs from this folder. Changing the folder doesn't
         remove anything that's already indexed — use Reindex all below to rebuild.
@@ -200,7 +200,7 @@
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title font-heading">Sync behavior</h3>
+      <h3 class="field-title section-title">Sync behavior</h3>
       <p class="field-desc">
         How Legend Lore keeps the index in sync with your library folder.
       </p>
@@ -265,7 +265,7 @@
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title font-heading">Database</h3>
+      <h3 class="field-title section-title">Database</h3>
       <p class="field-desc">
         Where the index is stored on disk, and maintenance to reclaim space
         from removed or re-indexed chunks.
@@ -319,7 +319,7 @@
   </section>
 
   <section class="danger-zone" aria-label="Danger Zone">
-    <h3 class="danger-title font-heading">Danger Zone</h3>
+    <h3 class="danger-title section-title">Danger Zone</h3>
 
     <div class="danger-row">
       <div class="danger-row-text">
@@ -420,8 +420,6 @@
   }
 
   .field-title {
-    font-size: 0.95rem;
-    color: var(--text-primary);
     margin: 0 0 0.35rem;
   }
 
@@ -697,7 +695,6 @@
   }
 
   .danger-title {
-    font-size: 0.9rem;
     color: var(--text-danger);
     margin: 0;
     padding: 0.6rem 0.85rem;
