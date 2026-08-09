@@ -385,14 +385,22 @@ Replace the `.app-checkbox:checked` block (~line 323) with:
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%23191919' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M3 8 L7 12 L13 4'/></svg>");
 }
 .app-checkbox[aria-checked="mixed"] {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%23191919' stroke-width='3' stroke-linecap='round' d='M4 8 L12 8'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%23191919' stroke-width='3' stroke-linecap='round' d='M3 8 L13 8'/></svg>");
 }
 ```
 
 `%23191919` is `--bg-app` (`rgb(25, 25, 25)`) URL-encoded; it already appears in
-this file and stays. The bar is redrawn in the `viewBox="0 0 16 16"` /
-`background-size: 10px 10px` frame rather than translated from the old
-hand-positioned 8×2 pseudo-element — check it by eye in Tasks 4 and 5.
+this file and stays.
+
+The bar is redrawn for the `viewBox="0 0 16 16"` / `background-size: 10px 10px`
+frame, not translated from the old hand-positioned 8×2 pseudo-element. The
+frame scales 16 viewBox units to 10px, so `M3 8 L13 8` renders 6.25px wide at
+1.875px thick. That is deliberately matched to the tick's own x-span
+(`M3 8 L7 12 L13 4`, also 3→13) so the two glyphs share a width, rather than
+matched to the old 8px bar — reproducing 8px would need the path to run nearly
+edge to edge in the art box and would read as too wide beside the tick. Expect
+a small visible narrowing on the tree's partial-selection state; confirm by eye
+in Tasks 4 and 5.
 
 - [ ] **Step 2: Delete the unused `.app-radio` recipe**
 
