@@ -22,6 +22,10 @@ export interface KeybindingEntry {
   keys: { mac: string; other: string };
   label: string;
   scope: KeyScope;
+  // Normalized form used to dispatch this chord from inside an open menu.
+  // Present only on bindings a menu re-exposes as an accelerator; the menu
+  // matches on this rather than on the display string in `keys`.
+  match?: string;
 }
 
 const isMac =
@@ -43,7 +47,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
   { id: 'sync.revert',           keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Revert pending sync changes',  scope: 'global' },
-  { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global' },
+  { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global', match: 'meta+i' },
   { id: 'search.focus',          keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Focus search input',          scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
@@ -65,13 +69,13 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
   { id: 'tree.activate',         keys: { mac: 'Space',other: 'Space' },         label: 'Open file / toggle folder',    scope: 'fileTree' },
   { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: 'Toggle selection checkbox',    scope: 'fileTree' },
-  { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Reveal row in OS file explorer', scope: 'fileTree' },
+  { id: 'tree.openExternal',     keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Reveal row in OS file explorer', scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
-  { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree' },
-  { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'fileTree' },
-  { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree' },
-  { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree' },
-  { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree' },
+  { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree', match: 'r' },
+  { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'fileTree', match: 's' },
+  { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree', match: 'm' },
+  { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree', match: '.' },
+  { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree', match: 'c' },
 
   // Systems view (when a row is focused)
   { id: 'systems.activate',      keys: { mac: 'Space',other: 'Space' },         label: 'Open file (toggle membership while editing)', scope: 'systemsView' },
@@ -125,4 +129,32 @@ export function chord(id: string): string {
 export function chordHint(id: string): string {
   const c = chord(id);
   return c ? ` (${c})` : '';
+}
+
+// Structural stand-in for KeyboardEvent so this stays testable under vitest's
+// node environment — a real KeyboardEvent satisfies it.
+export interface ChordEvent {
+  key: string;
+  code: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}
+
+// Normalized lookup key for a keydown, matching KeybindingEntry.match. Cmd and
+// Ctrl both fold to `meta+` so one table serves both platforms. Returns null
+// for anything no accelerator uses.
+export function eventMatchKey(event: ChordEvent): string | null {
+  if (event.shiftKey || event.altKey) return null;
+  // event.code is layout-independent; some layouts report ',' for the numpad
+  // decimal key.
+  const base = event.code === 'NumpadDecimal' ? '.' : event.key.toLowerCase();
+  if (base.length !== 1) return null;
+  return event.metaKey || event.ctrlKey ? `meta+${base}` : base;
+}
+
+// The match key for a binding id, or '' when the binding has no accelerator.
+export function matchKey(id: string): string {
+  return BY_ID.get(id)?.match ?? '';
 }
