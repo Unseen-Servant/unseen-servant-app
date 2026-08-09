@@ -2206,7 +2206,7 @@
     // a small open-menus store instead.
     const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
 
-    // Action keys (R/F/./M/C, Cmd+O reveal, Shift+F10/ContextMenu) work
+    // Action keys (R/S/./M/C, Cmd+O reveal, Shift+F10/ContextMenu) work
     // on the focused file in both tree and systems modes. Runs ahead of
     // the tree-only nav block so action keys don't fall through to view-
     // specific handlers in either mode.

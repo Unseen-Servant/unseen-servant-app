@@ -1,7 +1,7 @@
 <script lang="ts">
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
-  import { chord, matchKey } from './keybindings';
+  import { chord, matchKey, eventMatchKey } from './keybindings';
 
   export let x: number;
   export let y: number;
@@ -202,6 +202,28 @@
       openSubmenu = null;
       focusedSubmenuIdx = null;
       return;
+    }
+    // Accelerators: the same chords that work on a focused tree row, live
+    // inside the menu. The page's fileActionGate switches them off while a
+    // context menu is open (+page.svelte), so nothing else claims them here.
+    // Resolved against the rendered rows rather than a second dispatch table,
+    // so a chord can only fire when its row actually exists — Solo/Mute only
+    // render under canScope, Hide under its own condition.
+    if (!inSub && !event.isComposing) {
+      const mk = eventMatchKey(event);
+      const hit = mk ? mainItems.find((el) => el.dataset.chord === mk) : undefined;
+      if (hit) {
+        event.preventDefault();
+        const sub = hit.dataset.submenu as 'add' | 'remove' | 'tag' | undefined;
+        if (hit.dataset.mi === 'submenu-trigger' && sub) {
+          // Triggers are divs with no click handler — mirror the ArrowRight path.
+          openSubmenu = sub;
+          focusedSubmenuIdx = 0;
+        } else {
+          hit.click();
+        }
+        return;
+      }
     }
     if (event.key === 'Enter') {
       event.preventDefault();
