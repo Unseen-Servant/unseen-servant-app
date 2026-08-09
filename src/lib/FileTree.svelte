@@ -358,7 +358,7 @@
     transition: background var(--transition-fast);
   }
   .row-container:hover {
-    background: var(--bg-focused);
+    background: var(--bg-container);
   }
   .row-checkbox {
     margin-right: 0.5rem;
@@ -402,7 +402,7 @@
     opacity: 1;
   }
   .focused > .row-container {
-    background: var(--bg-focused);
+    box-shadow: var(--ring-focus);
   }
   .row {
     display: flex;

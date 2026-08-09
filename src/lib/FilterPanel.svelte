@@ -432,9 +432,13 @@
     border-left: 3px solid transparent;
     transition: background var(--transition-fast);
   }
-  .row:hover,
-  .row.kb-focused {
+  .row:hover {
     background: var(--bg-container);
+  }
+  /* Keyboard focus rings rather than fills, so the caret stays visible
+     on a soloed row instead of losing the background to it. */
+  .row.kb-focused {
+    box-shadow: var(--ring-focus);
   }
   .row-disabled {
     color: var(--text-tertiary);

@@ -452,7 +452,7 @@
   }
 
   .chip:hover {
-    background: var(--bg-focused);
+    background: var(--bg-container);
   }
 
   .chip:hover .chip-label {

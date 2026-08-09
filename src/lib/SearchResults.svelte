@@ -268,11 +268,14 @@
   }
 
   .result-row:hover {
-    background: var(--bg-focused);
+    background: var(--bg-container);
   }
 
+  /* Selection here *is* the keyboard cursor (selectedIndex, arrow-driven),
+     so it takes the row focus ring rather than a state fill. The stripe,
+     the inverted index cell and the lit gauge below carry the rest. */
   .result-row.selected {
-    background: var(--bg-focused);
+    box-shadow: var(--ring-focus);
   }
 
   .result-row.selected::before {

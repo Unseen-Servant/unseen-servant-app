@@ -868,9 +868,13 @@
     transition: background var(--transition-fast);
     min-height: 28px;
   }
-  .row-container:hover,
+  .row-container:hover {
+    background: var(--bg-container);
+  }
+  /* Keyboard focus rings rather than fills, so the caret stays visible
+     on a playing row instead of losing the background to it. */
   .row-container.kb-focused {
-    background: var(--bg-focused);
+    box-shadow: var(--ring-focus);
   }
   /* Playing — armed into the search scope: parchment wash + purple rule,
      the same "this track is in the mix" grammar as the tree's solo. */

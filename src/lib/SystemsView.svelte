@@ -764,10 +764,10 @@
     user-select: none;
   }
   .file:hover {
-    background: var(--bg-focused);
+    background: var(--bg-container);
   }
   .file.focused {
-    background: var(--bg-focused);
+    box-shadow: var(--ring-focus);
   }
   /* Hidden via the user's hide flag — only rendered when "Show hidden" is on.
      Italic + dimmed so it reads as "explicitly suppressed", matching the
