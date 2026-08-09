@@ -80,6 +80,8 @@ the design conventions.
   0.08em**; keeps per-system `--group-color` and hover. Largest visual
   change in the project; validate in the visual pass — the single knob
   if it reads over-demoted is this class's font-size.
+- `CollectionsPanel.svelte` `.empty-label` ×2 — no change (found in
+  final review; recipe was byte-for-byte `.ledger-label`)
 
 ### `.readout-label` — no visual change
 
@@ -87,6 +89,10 @@ the design conventions.
 - `GeneralSettings.svelte` `.experimental-legend`
 - `help/AboutPane.svelte` `.meta-label`
 - `DocumentStatsModal.svelte` `.stat-label`
+- `GameSystemsSettings.svelte` `.label` ×4 (found in final review) —
+  form labels keep local margin; the built-in/custom badges shared the
+  same colliding selector and already rendered with this recipe, so
+  they adopt too, keeping pill padding/radius and color overrides
 - Lamps (keep local rest/state color overrides):
   `OllamaStatus.svelte` `.badge`, `GettingStartedSteps.svelte`
   `.field-status`

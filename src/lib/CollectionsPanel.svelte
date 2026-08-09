@@ -488,11 +488,11 @@
 
   {#if hasNone && !draftName}
     <div class="empty">
-      <span class="empty-label">No collections yet</span>
+      <span class="ledger-label">No collections yet</span>
     </div>
   {:else if rows.length === 0 && !draftName}
     <div class="empty">
-      <span class="empty-label">All archived</span>
+      <span class="ledger-label">All archived</span>
     </div>
   {/if}
 
@@ -1160,12 +1160,5 @@
 
   .empty {
     padding: 0.3rem 0.75rem 0.5rem;
-  }
-  .empty-label {
-    font-family: var(--font-heading);
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
   }
 </style>

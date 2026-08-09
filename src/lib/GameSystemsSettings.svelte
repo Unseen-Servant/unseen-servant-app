@@ -158,9 +158,9 @@
         <span class="system-keywords">{(sys.keywords || []).slice(0, 3).join(', ')}{(sys.keywords || []).length > 3 ? '...' : ''}</span>
         <div class="system-labels">
           {#if sys.is_builtin}
-            <span class="label builtin-label">{sys.is_customized ? 'customized' : 'built-in'}</span>
+            <span class="label readout-label builtin-label">{sys.is_customized ? 'customized' : 'built-in'}</span>
           {:else}
-            <span class="label custom-label">custom</span>
+            <span class="label readout-label custom-label">custom</span>
           {/if}
         </div>
       </div>
@@ -176,7 +176,7 @@
 >
   <div class="body">
     <div class="field">
-      <span class="label">Tag</span>
+      <span class="label readout-label">Tag</span>
       <input
         id="sys-tag"
         type="text"
@@ -188,7 +188,7 @@
     </div>
 
     <div class="field">
-      <span class="label">Keywords</span>
+      <span class="label readout-label">Keywords</span>
       <input
         id="sys-keywords"
         type="text"
@@ -350,7 +350,6 @@
   }
 
   .label {
-    font-size: 0.65rem;
     padding: 0.1rem 0.3rem;
     border-radius: var(--radius-sm);
   }
@@ -377,11 +376,6 @@
     font-size: 0.85rem;
   }
   .label {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
     margin-bottom: 0.3rem;
   }
   .input {
