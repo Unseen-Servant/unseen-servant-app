@@ -32,6 +32,41 @@ export function rowHasIndexedMaterial(
   return isDir ? indexedFolderPaths.has(path) : indexedPaths.has(path);
 }
 
+/** What the library knows about a row: the index, plus the selection
+ * that feeds it. Selection is part of the picture because
+ * `indexedPaths` is built from up_to_date + to_update + to_remove and
+ * deliberately excludes `to_add` — keying on the index alone would make
+ * a row vanish the moment its box was checked, and keep every queued
+ * file invisible until the run finished. */
+export interface LibraryKnowledge {
+  indexedPaths: Set<string>;
+  indexedFolderPaths: Set<string>;
+  selectedPaths: Set<string>;
+  foldersWithSelections: Set<string>;
+  hideUnindexed: boolean;
+}
+
+/** A row is library material when the index or the selection knows
+ * about it — an indexed or queued file, or a folder with such a
+ * descendant. "Hide unindexed items" drops everything else. FileTree's
+ * render and the keyboard nav's row model both call this — keep them in
+ * sync through it, never by copy.
+ *
+ * Composed from rowHasIndexedMaterial rather than unioning the two path
+ * sets: a union would rebuild a multi-thousand-path Set on every
+ * selection click, which the `reuseIfSame` pattern in +page.svelte
+ * exists to avoid. Two O(1) lookups instead. */
+export function rowHasLibraryMaterial(
+  path: string,
+  isDir: boolean,
+  known: LibraryKnowledge,
+): boolean {
+  return (
+    rowHasIndexedMaterial(path, isDir, known.indexedPaths, known.indexedFolderPaths) ||
+    rowHasIndexedMaterial(path, isDir, known.selectedPaths, known.foldersWithSelections)
+  );
+}
+
 /** A row is out of scope when it is indexed material (a file in the
  * index; a folder with at least one indexed descendant) outside the
  * resolved scope. FileTree's dim and the keyboard nav's row model both

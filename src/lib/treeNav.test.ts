@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FileItem } from './types';
-import { computeVisibleRows, indexOfPath, isRowOutOfScope, rowHasIndexedMaterial, type ScopeVisibility } from './treeNav';
+import { computeVisibleRows, indexOfPath, isRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial, type LibraryKnowledge, type ScopeVisibility } from './treeNav';
 
 // --- Helpers (mirroring selectionUtils.test.ts style) ---
 
@@ -209,6 +209,53 @@ describe('rowHasIndexedMaterial', () => {
 
   it('is false for a folder with no indexed descendants', () => {
     expect(rowHasIndexedMaterial('/root/junk', true, indexedPaths, indexedFolderPaths)).toBe(false);
+  });
+});
+
+// --- rowHasLibraryMaterial ---
+
+describe('rowHasLibraryMaterial', () => {
+  // /root/A/a.pdf is indexed; /root/B/queued.pdf is selected but not yet
+  // indexed (the `to_add` case); /root/junk holds neither.
+  const known: LibraryKnowledge = {
+    indexedPaths: new Set(['/root/A/a.pdf']),
+    indexedFolderPaths: new Set(['/root', '/root/A']),
+    selectedPaths: new Set(['/root/A/a.pdf', '/root/B/queued.pdf']),
+    foldersWithSelections: new Set(['/root', '/root/A', '/root/B']),
+    hideUnindexed: true,
+  };
+
+  it('is true for an indexed file', () => {
+    expect(rowHasLibraryMaterial('/root/A/a.pdf', false, known)).toBe(true);
+  });
+
+  it('is true for a selected-but-unindexed file (to_add stays visible)', () => {
+    expect(rowHasLibraryMaterial('/root/B/queued.pdf', false, known)).toBe(true);
+  });
+
+  it('is false for a file that is neither indexed nor selected', () => {
+    expect(rowHasLibraryMaterial('/root/A/notes.txt', false, known)).toBe(false);
+  });
+
+  it('is true for a folder with an indexed descendant', () => {
+    expect(rowHasLibraryMaterial('/root/A', true, known)).toBe(true);
+  });
+
+  it('is true for a folder whose only descendant is selected, not indexed', () => {
+    expect(rowHasLibraryMaterial('/root/B', true, known)).toBe(true);
+  });
+
+  it('is false for a folder with neither indexed nor selected descendants', () => {
+    expect(rowHasLibraryMaterial('/root/junk', true, known)).toBe(false);
+  });
+
+  it('is true for an indexed file that has been deselected (to_remove stays visible)', () => {
+    const deselected: LibraryKnowledge = {
+      ...known,
+      selectedPaths: new Set(),
+      foldersWithSelections: new Set(),
+    };
+    expect(rowHasLibraryMaterial('/root/A/a.pdf', false, deselected)).toBe(true);
   });
 });
 
