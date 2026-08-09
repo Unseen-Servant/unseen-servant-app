@@ -6,7 +6,8 @@
   // and clearing a chip resets the row. Unlike the old dropdown console,
   // S/M are hover-revealed like the tree's folder rows — the panel is
   // furniture, not a popover.
-  import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
+  import { afterUpdate } from 'svelte';
+  import { computeFilterRows, stepFilterRow } from './filterRows';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
 
@@ -58,6 +59,12 @@
   export let hideUnindexed: boolean = false;
   export let onToggleHideUnindexed: () => void = () => {};
 
+  // Pane focus, owned by +page.svelte and mutually exclusive with the tree
+  // and collections tokens. null means this pane does not hold the keyboard,
+  // and no cursor is drawn.
+  export let focusedRow: string | null = null;
+  export let onFocusRow: (key: string | null) => void = () => {};
+
   // Curation section: two channels over the collected/loose domain,
   // the third narrowing axis (same union/intersect/solo-overrides-mute
   // semantics as systems and collections). Soloing Collected is the old
@@ -77,96 +84,96 @@
   export let onClearAll: () => void = () => {};
 
   let panelEl: HTMLElement;
-  let focusedIdx = 0;
-  let rowEls: HTMLElement[] = [];
 
-  // We capture whatever was focused when the panel opened (typically the
-  // search input or the header toggle) so Escape / close can hand focus
-  // back instead of dropping it on <body>.
-  let previouslyFocused: HTMLElement | null = null;
-
-  onMount(async () => {
-    previouslyFocused = (document.activeElement as HTMLElement) ?? null;
-    await tick();
-    panelEl?.focus();
+  // The navigable row set, derived not queried. Order is the j/k order.
+  $: rows = computeFilterRows({
+    hasHidden,
+    showCollectionFilter,
+    showSystemFilter,
+    systems,
+    untaggedCount,
   });
 
-  onDestroy(() => {
-    // Restore focus only when the close path didn't already move focus
-    // somewhere meaningful (the header toggle takes focus itself;
-    // programmatic closes leave it on body). Outside-clicks land focus on
-    // whatever was clicked — don't yank it back from the user.
-    const ae = document.activeElement as HTMLElement | null;
-    const focusInsidePanel = !!panelEl && (ae === panelEl || panelEl.contains(ae as Node));
-    const focusOnBody = ae === document.body || ae === null;
-    if (previouslyFocused && (focusInsidePanel || focusOnBody)) {
-      previouslyFocused.focus?.();
-    }
-  });
-
-  // Re-query enabled rows after every render and apply .kb-focused. Disabled
-  // rows are skipped because they carry no [data-fm] attribute — keeps the
-  // keyboard cursor away from rows the user can't act on.
-  function refreshRowsAndFocus() {
-    if (!panelEl) {
-      rowEls = [];
-      return;
-    }
-    rowEls = Array.from(panelEl.querySelectorAll('[data-fm]')) as HTMLElement[];
-    if (rowEls.length > 0) {
-      focusedIdx = Math.max(0, Math.min(rowEls.length - 1, focusedIdx));
-    }
-    rowEls.forEach((el, i) => el.classList.toggle('kb-focused', i === focusedIdx));
+  function rowElByKey(key: string): HTMLElement | null {
+    return panelEl?.querySelector<HTMLElement>(`[data-fm-key="${CSS.escape(key)}"]`) ?? null;
   }
 
-  afterUpdate(refreshRowsAndFocus);
+  // The panel body scrolls, and the cursor no longer moves DOM focus, so
+  // nothing scrolls it into view for us any more.
+  let lastScrolled: string | null = null;
+  afterUpdate(() => {
+    if (!focusedRow) { lastScrolled = null; return; }
+    if (focusedRow === lastScrolled) return;
+    lastScrolled = focusedRow;
+    rowElByKey(focusedRow)?.scrollIntoView({ block: 'nearest' });
+  });
 
-  // Keyboard model carried over from the dropdown console: j/k walk the
-  // channels, S/M press the matching button, Space/Enter fall back to M
-  // (the old checkbox gesture). Element-scoped, so the panel only claims
-  // keys while focus is inside it — the tree's and collections panel's
-  // window-level handlers keep working otherwise.
-  function handleKey(event: KeyboardEvent) {
-    // No Escape branch: the panel is docked furniture whose open state is
-    // persisted, so dismissing it on a reflex Escape would silently rewrite
-    // the dock layout for every future launch. The header toggle is the
-    // close affordance. Escape falls through to the window ladder, where it
-    // means the same thing here as everywhere else.
+  /** Claim the pane, restoring `preferred` when that row still exists. */
+  export function claim(preferred: string | null) {
+    if (rows.length === 0) return;
+    const target = preferred && rows.some((r) => r.key === preferred) ? preferred : rows[0].key;
+    onFocusRow(target);
+  }
+
+  // Window-level and gated on the token — the same shape CollectionsPanel
+  // uses, so exactly one pane responds to a keystroke.
+  function handleWindowKey(event: KeyboardEvent) {
+    if (focusedRow === null) return;
+    if (event.isComposing) return;
+    // Yield to popovers and modals that own the keyboard while open.
+    if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
+    if (document.querySelector('dialog[open]')) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
 
+    if (event.key === 'Escape') {
+      // Release the pane. Not a close — the panel is docked furniture whose
+      // open state is persisted, and the header toggle is its close
+      // affordance. Matches CollectionsPanel's onFocusCollection(null).
+      event.preventDefault();
+      onFocusRow(null);
+      return;
+    }
     if (isDown) {
       event.preventDefault();
-      event.stopPropagation();
-      focusedIdx = Math.min(rowEls.length - 1, focusedIdx + 1);
-      refreshRowsAndFocus();
-    } else if (isUp) {
+      onFocusRow(stepFilterRow(rows, focusedRow, 1));
+      return;
+    }
+    if (isUp) {
       event.preventDefault();
-      event.stopPropagation();
-      focusedIdx = Math.max(0, focusedIdx - 1);
-      refreshRowsAndFocus();
-    } else if (event.key === ' ' || event.key === 'Enter') {
-      // A channel row's default action is its M toggle — the same "drop
-      // this from results" gesture the old checkbox carried. Rows without
-      // an M button (the hidden-items label) fall back to the row itself.
-      const row = rowEls[focusedIdx];
-      if (row) {
-        event.preventDefault();
-        event.stopPropagation();
-        const m = row.querySelector<HTMLElement>('[data-sm-m]');
-        (m ?? row).click();
-      }
-    } else if (bareLetter && (lk === 's' || lk === 'm')) {
-      // S / M: press the matching channel button on the focused row.
-      // No-op on rows without one (S on Untagged, either on the hidden
-      // row) so the keystroke doesn't fall through to the search input.
-      const row = rowEls[focusedIdx];
+      onFocusRow(stepFilterRow(rows, focusedRow, -1));
+      return;
+    }
+    if (event.key === 'Home' && !meta && rows.length > 0) {
       event.preventDefault();
-      event.stopPropagation();
-      row?.querySelector<HTMLElement>(lk === 's' ? '[data-sm-s]' : '[data-sm-m]')?.click();
+      onFocusRow(rows[0].key);
+      return;
+    }
+    if (event.key === 'End' && !meta && rows.length > 0) {
+      event.preventDefault();
+      onFocusRow(rows[rows.length - 1].key);
+      return;
+    }
+    if (event.key === ' ' || event.key === 'Enter') {
+      // A channel row's default action is its M toggle. A view row has no
+      // M — its own control is the only button, so click that.
+      event.preventDefault();
+      const el = rowElByKey(focusedRow);
+      const m = el?.querySelector<HTMLElement>('[data-sm-m]');
+      (m ?? el?.querySelector<HTMLElement>('[data-fm-action]'))?.click();
+      return;
+    }
+    if (bareLetter && (lk === 's' || lk === 'm')) {
+      event.preventDefault();
+      rowElByKey(focusedRow)
+        ?.querySelector<HTMLElement>(lk === 's' ? '[data-sm-s]' : '[data-sm-m]')
+        ?.click();
     }
   }
 
@@ -177,13 +184,9 @@
   ];
 </script>
 
-<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-<aside
-  class="filter-panel"
-  bind:this={panelEl}
-  on:keydown={handleKey}
-  tabindex="-1"
->
+<svelte:window on:keydown={handleWindowKey} />
+
+<aside class="filter-panel" bind:this={panelEl}>
   <header class="panel-head">
     <span class="panel-title">Filters</span>
     <button class="btn-link" on:click={onClearAll}>clear all</button>
@@ -199,7 +202,8 @@
           class="row channel-row"
           class:soloed
           class:dimmed={muted && !soloed}
-          data-fm="row"
+          class:kb-focused={focusedRow === `curation:${ch.key}`}
+          data-fm-key="curation:{ch.key}"
         >
           {#if ch.key === 'collected'}
             <!-- Outline bookmark — same ribbon as the chip bookmarks, unfilled:
@@ -250,8 +254,9 @@
             class="row channel-row"
             class:soloed
             class:dimmed={muted && !soloed}
+            class:kb-focused={focusedRow === `system:${name}`}
             title={name}
-            data-fm="row"
+            data-fm-key="system:{name}"
           >
             <!-- Font Awesome "dice-d6" — monochrome; systems don't carry color -->
             <svg class="row-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
@@ -288,8 +293,9 @@
           <div
             class="row channel-row untagged-row"
             class:dimmed={muted}
+            class:kb-focused={focusedRow === `system:${UNTAGGED_KEY}`}
             title="Files with no game-system tag"
-            data-fm="row"
+            data-fm-key="system:{UNTAGGED_KEY}"
           >
             <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
             <svg class="row-die" viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
@@ -383,15 +389,6 @@
     font-family: var(--font-body);
     overflow: hidden;
   }
-  /* The panel holds programmatic focus so the keyboard model works the
-     moment it opens. Per-row keyboard cursor is already drawn via
-     `.kb-focused` on individual rows — a focus ring on the container
-     itself would be redundant noise. */
-  .filter-panel:focus,
-  .filter-panel:focus-visible {
-    outline: none;
-  }
-
   .panel-head {
     display: flex;
     align-items: baseline;
@@ -424,7 +421,7 @@
     transition: background var(--transition-fast);
   }
   .row:hover,
-  .row:global(.kb-focused) {
+  .row.kb-focused {
     background: var(--bg-container);
   }
   label.row {
@@ -521,7 +518,7 @@
   }
   .row:hover .sm,
   .row:focus-within .sm,
-  .row:global(.kb-focused) .sm,
+  .row.kb-focused .sm,
   .sm.engaged {
     opacity: 1;
   }
