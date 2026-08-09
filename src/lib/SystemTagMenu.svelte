@@ -58,12 +58,19 @@
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div
     class="dropdown"
+    role="menu"
+    tabindex="-1"
     style="left: {dropdownX}px; top: {dropdownY}px"
     on:click|stopPropagation
     on:mousedown|stopPropagation
   >
     {#each knownSystems as sys}
-      <button class="dropdown-item" on:click={() => onToggleSystem(sys.tag)}>
+      <button
+        class="dropdown-item"
+        role="menuitemcheckbox"
+        aria-checked={tags.includes(sys.tag)}
+        on:click={() => onToggleSystem(sys.tag)}
+      >
         <span class="dropdown-check">{tags.includes(sys.tag) ? '✓' : ''}</span>
         <!-- Font Awesome "dice-d6" — one fill for every system -->
         <svg class="dd-die" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
@@ -74,7 +81,7 @@
     {/each}
     {#if hasTag}
       <hr class="dropdown-divider" />
-      <button class="dropdown-item dropdown-clear" on:click={clearSystem}>
+      <button class="dropdown-item dropdown-clear" role="menuitem" on:click={clearSystem}>
         Clear tags
       </button>
     {/if}

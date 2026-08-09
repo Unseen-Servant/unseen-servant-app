@@ -464,10 +464,12 @@
       </button>
       {#if sortMenuOpen}
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-        <div class="sort-menu" on:click|stopPropagation>
+        <div class="sort-menu" role="menu" tabindex="-1" on:click|stopPropagation>
           {#each SORT_OPTIONS as opt}
             <button
               class="sort-item"
+              role="menuitemradio"
+              aria-checked={sortKey === opt.value}
               on:click={() => pickSort(opt.value)}
             >
               <span class="check">{sortKey === opt.value ? '✓' : ''}</span>
@@ -476,9 +478,15 @@
           {/each}
           {#if archivedCount > 0}
             <hr class="menu-divider" />
-            <label class="sort-toggle">
+            <label class="sort-toggle" role="none">
               <span>Show archived</span>
-              <input class="app-checkbox" type="checkbox" bind:checked={showArchived} />
+              <input
+                class="app-checkbox"
+                type="checkbox"
+                role="menuitemcheckbox"
+                aria-checked={showArchived}
+                bind:checked={showArchived}
+              />
             </label>
           {/if}
         </div>
@@ -660,11 +668,13 @@
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div
     class="context-menu"
+    role="menu"
+    tabindex="-1"
     style={`left: ${ctxMenu.x}px; top: ${ctxMenu.y}px`}
     on:click|stopPropagation
     on:contextmenu|preventDefault|stopPropagation
   >
-    <button class="context-item" on:click={() => ctxAction(startRename)}>Rename</button>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>Rename</button>
     <div
       class="context-item has-submenu"
       class:open={ctxPigmentOpen}
@@ -679,10 +689,12 @@
       <span>Pigment&hellip;</span>
       <span class="submenu-caret" aria-hidden="true">&#9656;</span>
       {#if ctxPigmentOpen}
-        <div class="submenu">
+        <div class="submenu" role="menu">
           {#each PIGMENTS as pig (pig.hex)}
             <button
               class="context-item"
+              role="menuitemradio"
+              aria-checked={col?.color === pig.hex}
               on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
             >
               <span class="pig-check">{col?.color === pig.hex ? '✓' : ''}</span>
@@ -695,6 +707,8 @@
           <hr class="menu-divider" />
           <button
             class="context-item"
+            role="menuitemradio"
+            aria-checked={!col?.color}
             on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, null))}
           >
             <span class="pig-check">{!col?.color ? '✓' : ''}</span>
@@ -707,12 +721,12 @@
       {/if}
     </div>
     <hr class="menu-divider" />
-    <button class="context-item" on:click={() => ctxAction(onEditFiles)}>Add files&hellip;</button>
-    <button class="context-item" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(onEditFiles)}>Add files&hellip;</button>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
       {col?.archived ? 'Unarchive' : 'Archive'}
     </button>
     <hr class="menu-divider" />
-    <button class="context-item danger" on:click={() => ctxAction(onDelete)}>Delete collection</button>
+    <button class="context-item danger" role="menuitem" on:click={() => ctxAction(onDelete)}>Delete collection</button>
   </div>
 {/if}
 

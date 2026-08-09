@@ -268,28 +268,30 @@
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 <div
   class="context-menu"
+  role="menu"
+  tabindex="-1"
   bind:this={menuEl}
   style="left: {clampedX}px; top: {clampedY}px; visibility: {positioned ? 'visible' : 'hidden'}"
   on:click|stopPropagation
   on:mousedown|stopPropagation
 >
   {#if !item.is_dir}
-    <button class="context-item" data-mi="item" on:click={onOpen}>Open file</button>
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onOpen}>Open file</button>
   {/if}
-  <button class="context-item" data-mi="item" on:click={onReveal}>Reveal in folder</button>
+  <button class="context-item" data-mi="item" role="menuitem" on:click={onReveal}>Reveal in folder</button>
   {#if canScope}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" on:click={onToggleSolo}>
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onToggleSolo}>
       {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
     </button>
-    <button class="context-item" data-mi="item" on:click={onToggleMute}>
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onToggleMute}>
       {isMuted ? 'Unmute' : 'Mute'} this {item.is_dir ? 'folder' : 'file'}
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" on:click={onReindex}>Re-index file</button>
-    <button class="context-item" data-mi="item" on:click={onShowStats}>Get info</button>
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onShowStats}>Get info</button>
   {/if}
 
   {#if canTag}
@@ -300,17 +302,23 @@
       class:open={openSubmenu === 'tag'}
       data-mi="submenu-trigger"
       data-submenu="tag"
+      role="menuitem"
+      tabindex="-1"
+      aria-haspopup="menu"
+      aria-expanded={openSubmenu === 'tag'}
       on:mouseenter={() => { openSubmenu = 'tag'; }}
       on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Game system&hellip;</span>
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'tag'}
-        <div class="submenu">
+        <div class="submenu" role="menu">
           {#each knownSystems as sys}
             <button
               class="context-item"
               data-mi="item"
+              role="menuitemcheckbox"
+              aria-checked={currentTags.includes(sys.tag)}
               on:click={() => toggleGameSystem(sys.tag)}
             >
               <span class="submenu-check">{currentTags.includes(sys.tag) ? '✓' : ''}</span>
@@ -323,7 +331,7 @@
           {/each}
           {#if currentTags.length > 0}
             <hr class="context-divider" />
-            <button class="context-item danger" data-mi="item" on:click={clearGameSystems}>
+            <button class="context-item danger" data-mi="item" role="menuitem" on:click={clearGameSystems}>
               Clear tags
             </button>
           {/if}
@@ -340,17 +348,22 @@
       class:open={openSubmenu === 'add'}
       data-mi="submenu-trigger"
       data-submenu="add"
+      role="menuitem"
+      tabindex="-1"
+      aria-haspopup="menu"
+      aria-expanded={openSubmenu === 'add'}
       on:mouseenter={() => { openSubmenu = 'add'; }}
       on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Add to collection&hellip;</span>
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'add'}
-        <div class="submenu">
+        <div class="submenu" role="menu">
           {#each addableCollections as col}
             <button
               class="context-item"
               data-mi="item"
+              role="menuitem"
               on:click={() => onAddToCollection(col.name)}
             >
               {#if col.color}
@@ -370,7 +383,7 @@
           {#if hasCollections}
             <hr class="context-divider" />
           {/if}
-          <button class="context-item" data-mi="item" on:click={onAddToNewCollection}>
+          <button class="context-item" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
             + New collection&hellip;
           </button>
         </div>
@@ -384,17 +397,22 @@
         class:open={openSubmenu === 'remove'}
         data-mi="submenu-trigger"
         data-submenu="remove"
+        role="menuitem"
+        tabindex="-1"
+        aria-haspopup="menu"
+        aria-expanded={openSubmenu === 'remove'}
         on:mouseenter={() => { openSubmenu = 'remove'; }}
         on:mouseleave={() => { openSubmenu = null; }}
       >
         <span>Remove from collection&hellip;</span>
         <span class="submenu-caret">&#9656;</span>
         {#if openSubmenu === 'remove'}
-          <div class="submenu">
+          <div class="submenu" role="menu">
             {#each removableCollections as name}
               <button
                 class="context-item"
                 data-mi="item"
+                role="menuitem"
                 on:click={() => onRemoveFromCollection(name)}
               >
                 {#if collectionColorByName.get(name)}
@@ -422,14 +440,14 @@
        available so nothing strands. -->
   {#if !inheritedHidden && (item.is_dir || directlyHidden || !isIndexed)}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" on:click={onToggleHidden}>
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
     </button>
   {/if}
 
   <hr class="context-divider" />
-  <button class="context-item" data-mi="item" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
-  <button class="context-item danger" data-mi="item" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
+  <button class="context-item" data-mi="item" role="menuitem" on:click={onRename}>Rename {item.is_dir ? 'folder' : 'file'}</button>
+  <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
 </div>
 
 <style>
