@@ -15,7 +15,7 @@
     'collections',
     'searchInput',
     'searchResults',
-    'filterMenu',
+    'filterPanel',
     'contextMenu',
   ];
 
@@ -26,7 +26,7 @@
     collections: 'Collections',
     searchInput: 'Search input',
     searchResults: 'Search results',
-    filterMenu: 'Filters panel',
+    filterPanel: 'Filters panel',
     contextMenu: 'Context menu',
     modal: 'Modal',
   };

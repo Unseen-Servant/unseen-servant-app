@@ -13,7 +13,7 @@ export type KeyScope =
   | 'collections'
   | 'searchInput'
   | 'searchResults'
-  | 'filterMenu'
+  | 'filterPanel'
   | 'contextMenu'
   | 'modal';
 
@@ -40,8 +40,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Global
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open Settings',               scope: 'global' },
   { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle Collections sidebar',  scope: 'global' },
-  { id: 'focus.collections',     keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Focus left pane',             scope: 'global' },
+  { id: 'focus.dock',            keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Focus the left dock',         scope: 'global' },
   { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Focus right pane',            scope: 'global' },
+  { id: 'focus.dockDown',        keys: { mac: '⌘⌥↓',  other: 'Ctrl+Alt+↓' },    label: 'Dock: Collections → Filters', scope: 'global' },
+  { id: 'focus.dockUp',          keys: { mac: '⌘⌥↑',  other: 'Ctrl+Alt+↑' },    label: 'Dock: Filters → Collections', scope: 'global' },
   { id: 'view.systems',          keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Shelve by system',            scope: 'global' },
   { id: 'view.tree',             keys: { mac: '⌘T',   other: 'Ctrl+T' },        label: 'Tree view (again collapses all)', scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
@@ -94,12 +96,15 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
   { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
 
-  // Filters panel (while focus is inside it)
-  { id: 'filterMenu.next',       keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterMenu' },
-  { id: 'filterMenu.prev',       keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterMenu' },
-  { id: 'filterMenu.toggle',     keys: { mac: 'Space',other: 'Space' },         label: 'Toggle mute on focused row',   scope: 'filterMenu' },
-  { id: 'filterMenu.solo',       keys: { mac: 'S',    other: 'S' },             label: 'Solo / unsolo focused channel', scope: 'filterMenu' },
-  { id: 'filterMenu.mute',       keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterMenu' },
+  // Filters panel (while the pane holds focus)
+  { id: 'filterPanel.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterPanel' },
+  { id: 'filterPanel.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterPanel' },
+  { id: 'filterPanel.home',      keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'filterPanel' },
+  { id: 'filterPanel.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'filterPanel' },
+  { id: 'filterPanel.toggle',    keys: { mac: 'Space',other: 'Space' },         label: 'Toggle mute on focused row',   scope: 'filterPanel' },
+  { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / unsolo focused channel', scope: 'filterPanel' },
+  { id: 'filterPanel.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterPanel' },
+  { id: 'filterPanel.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / leave the panel', scope: 'filterPanel' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

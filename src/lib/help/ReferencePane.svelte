@@ -8,7 +8,7 @@
     'collections',
     'searchInput',
     'searchResults',
-    'filterMenu',
+    'filterPanel',
     'contextMenu',
   ];
 
@@ -19,7 +19,7 @@
     collections: 'Collections',
     searchInput: 'Search input',
     searchResults: 'Search results',
-    filterMenu: 'Filter console',
+    filterPanel: 'Filter console',
     contextMenu: 'Context menu',
     modal: 'Modal',
   };
