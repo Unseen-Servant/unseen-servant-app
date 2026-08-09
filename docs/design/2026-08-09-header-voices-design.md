@@ -127,6 +127,53 @@ the design conventions.
   FAIL on `--bg-header`). Small-caps labels at 0.65–0.7rem count as
   normal text. Any token change is a separate decision (as with the
   vermilion amendment), out of scope for this project.
+- **Tertiary contrast amendment (2026-08-09, follow-up decision):**
+  `--text-tertiary` brightened one step to **#7d8590**
+  (`oklch(0.614 0.019 256.3)`, from `oklch(0.563 …)` — hue and chroma
+  held, ΔL +0.05, the same step size as the vermilion amendment's
+  0.579 → 0.630). `--text-secondary` **unchanged**. Re-measured:
+  tertiary now 4.71:1 on `--bg-app` (PASS), 4.21:1 on `--bg-container`,
+  3.64:1 on `--bg-header`, 3.44:1 on `--bg-focused`.
+
+  Three findings drove it, and they are worth not re-deriving:
+
+  1. **Measure against surfaces the token actually meets.** The
+     `--bg-header` column above is a hypothetical pairing: no
+     tertiary or secondary *text* sits on `--bg-header` anywhere in
+     the app. Its only text use is the `<thead>` of extracted tables
+     in `SearchInspector` snippets, which inherit `--text-primary`
+     (8.80:1). `Header.svelte` `.view-segment` looks like a
+     counter-example but its well is `--bg-app`, and the `.current`
+     segment that does take `--bg-header` switches to
+     `--text-primary`. Secondary's lone recorded failure was against
+     that surface, so it needed no change. The real surfaces for
+     tertiary text are `--bg-app` and `--bg-container` at rest, plus
+     `--bg-focused` on row hover/keyboard focus.
+  2. **The precedent is narrower than "brighten until AA."** Commit
+     1e6e730 brightened vermilion to clear 4.5:1 *on `--bg-app`
+     specifically* and left it at 4.13:1 on `--bg-container` and
+     3.57:1 on `--bg-header`. The house rule is: clear AA on the
+     surface the color lives on, accept the rest, record it. The new
+     tertiary profile (4.71 / 4.21 / 3.64 / 3.44) is deliberately the
+     same shape as the accepted vermilion profile.
+  3. **Full AA on `--bg-container` would cost the voice system.**
+     Tertiary needs ≥ #828b96 (`oklch(0.633 …)`) to reach 4.55:1
+     there — which compresses the tertiary→secondary OKLCH gap from
+     0.099 to 0.029. `.ledger-label` and `.readout-label` are
+     byte-identical apart from that color, so the gap *is* the
+     distinction. At #7d8590 the gap is 0.049 — half the original but
+     still 3× the `--bg-header`/`--bg-focused` delta (0.016) that
+     reads as two distinct surfaces today. That is where the line was
+     drawn.
+
+  The token is used at ~55 sites, not just the two label voices —
+  meta text, empty states, icon strokes, dashed drop targets — so the
+  edit is app-wide "dim chrome gets one step brighter", and belongs in
+  a visual pass. Residual known gaps, accepted: tertiary text on
+  `--bg-container` (4.21:1) and on hovered/focused rows
+  (`--bg-focused`, 3.44:1). Both clear the 3:1 non-text threshold, and
+  the content there is quiet by design (grip glyphs, disabled rows,
+  weak-result callouts).
 - Several components carry a pointless `var(--font-heading,
   var(--font-body))` fallback; adopting the shared classes removes those
   declarations as a side effect.
