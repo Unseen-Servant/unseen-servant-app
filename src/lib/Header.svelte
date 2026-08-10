@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { chordHint } from './keybindings';
+  import { chord, chordHint } from './keybindings';
 
   export let searchQuery: string = '';
   export let disabled: boolean = false;
@@ -18,14 +18,17 @@
   export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
   export let searchViewOpen: boolean = false;
 
-  // Which segment reads as "where you are". None while the search view
-  // is up — search is entered from the bar, not the picker, so both
-  // segments sit idle as exits.
-  $: currentSegment = searchViewOpen ? null : viewMode;
+  // The switch always marks the browse view you came from — while the search
+  // view is up that mark dims rather than clearing, so the view you'd return
+  // to stays readable. Repeating a segment only means "do it again" when you
+  // are actually in that view; from search both segments are plain exits.
+  $: repeatsTree = !searchViewOpen && viewMode === 'tree';
+  $: repeatsSystems = !searchViewOpen && viewMode === 'systems';
 
   const DEBOUNCE_MS = 300;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let inputEl: HTMLInputElement | null = null;
+  let focused = false;
 
   export function focus() {
     inputEl?.focus();
@@ -105,15 +108,16 @@
       <!-- View switch — a picker, not a mode: one view is always on, so the
            current segment sits on a raised fill instead of lighting purple.
            Repeating the tree action collapses the whole tree. While the
-           search view is up neither segment is current; both act as exits. -->
+           search view is up the current segment dims and both act as exits. -->
       <div class="view-switch" role="group" aria-label="Library view">
         <button
           class="view-segment"
-          class:current={currentSegment === 'tree'}
-          on:click={() => (currentSegment === 'tree' ? onCollapseAll() : onSetViewMode('tree'))}
-          title={(currentSegment === 'tree' ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
+          class:current={viewMode === 'tree'}
+          class:dimmed={searchViewOpen}
+          on:click={() => (repeatsTree ? onCollapseAll() : onSetViewMode('tree'))}
+          title={(repeatsTree ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
           aria-label="Tree view"
-          aria-pressed={currentSegment === 'tree'}
+          aria-pressed={viewMode === 'tree'}
         >
           <!-- List tree — folder hierarchy -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
@@ -124,11 +128,12 @@
         </button>
         <button
           class="view-segment"
-          class:current={currentSegment === 'systems'}
-          on:click={() => { if (currentSegment !== 'systems') onSetViewMode('systems'); }}
+          class:current={viewMode === 'systems'}
+          class:dimmed={searchViewOpen}
+          on:click={() => { if (!repeatsSystems) onSetViewMode('systems'); }}
           title={'Shelve by system' + chordHint('view.systems')}
           aria-label="Shelve by system"
-          aria-pressed={currentSegment === 'systems'}
+          aria-pressed={viewMode === 'systems'}
         >
           <!-- Layered stack — shelve by system -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
@@ -153,9 +158,15 @@
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
-      on:focus={onFocus}
+      on:focus={() => { focused = true; onFocus(); }}
+      on:blur={() => (focused = false)}
       aria-label="Search library"
     />
+    <!-- One trailing slot, and a query outranks the hint: ✕ shows whenever
+         there is something to clear, focused or not, so a query left behind
+         in a browse view stays clearable without entering search first. The
+         ⌘F hint fills the slot only while it is idle — unfocused and empty
+         — and stays out when the bar is disabled and the chord is a no-op. -->
     {#if searchQuery.length > 0}
       <button
         class="clear-btn"
@@ -163,6 +174,8 @@
         on:click={handleClear}
         aria-label="Clear search"
       >✕</button>
+    {:else if !focused && !disabled}
+      <span class="search-chord" aria-hidden="true">{chord('search.focus')}</span>
     {/if}
   </div>
 </header>
@@ -245,6 +258,14 @@
     background: var(--bg-header);
     color: var(--text-primary);
   }
+  /* Search takes over the pane but not the picker: the segment you came from
+     keeps its raised fill at half lift and steps down one notch in the text
+     ramp. Still brighter than its idle sibling, so "last view consulted"
+     stays legible without competing with the results. */
+  .view-segment.current.dimmed {
+    background: color-mix(in srgb, var(--bg-header) 55%, var(--bg-app));
+    color: var(--text-secondary);
+  }
 
   .toggle-icon {
     width: 14px;
@@ -304,6 +325,19 @@
 
   .search-input:disabled {
     cursor: not-allowed;
+  }
+
+  /* The hint is supplementary — the placeholder already says what the field
+     is for — so it sits one step below the icon and placeholder voice on
+     --bg-container rather than matching them. */
+  .search-chord {
+    padding-left: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .clear-btn {
