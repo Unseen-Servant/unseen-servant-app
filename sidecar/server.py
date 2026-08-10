@@ -28,6 +28,7 @@ from chromadb.utils import embedding_functions
 import pymupdf
 import pymupdf4llm
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -974,6 +975,44 @@ def probe_embed_truncation(embed_fn=None) -> None:
         print(f"Embed truncation probe skipped: {e}")
 
 
+# Ollama unloads an idle model after ~5 minutes, so the first search after
+# a lull pays a full bge-m3 load — several seconds, and (before #344) on the
+# event loop. Re-embedding a single token well inside that window resets the
+# idle timer for a few milliseconds of work. Issue #341.
+EMBED_KEEPALIVE_INTERVAL_SECONDS = float(
+    os.getenv("OLLAMA_KEEPALIVE_INTERVAL_SECONDS", "240")
+)
+
+
+def keep_embedder_warm(
+    embed_fn=None,
+    interval: float | None = None,
+    stop: threading.Event | None = None,
+) -> None:
+    """Background thread: keep bge-m3 resident by embedding periodically.
+
+    Diagnostics-grade error handling, like ``probe_embed_truncation``: a
+    down or wedged Ollama must never take the sidecar with it, and a failed
+    tick is not worth reporting — the next search will surface the problem
+    with far better context. Set ``OLLAMA_KEEPALIVE_INTERVAL_SECONDS=0`` to
+    disable.
+    """
+    interval = EMBED_KEEPALIVE_INTERVAL_SECONDS if interval is None else interval
+    if interval <= 0:
+        return
+    stop = stop or threading.Event()
+    if embed_fn is None:
+        try:
+            embed_fn = build_ollama_embedding_function()
+        except Exception:
+            return
+    while not stop.wait(interval):
+        try:
+            embed_fn(["ping"])
+        except Exception:
+            pass
+
+
 def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
     """Return a stable, collision-free prefix for chunk IDs.
 
@@ -1655,6 +1694,472 @@ def compute_diff(
         "errors": errors,
         "stale_paths": stale_paths,
     }
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+# Bound on concurrent searches (issue #344). Each search embeds its query
+# through Ollama and may run the cross-encoder, so an unbounded fan-out
+# spikes memory without buying throughput.
+#
+# Chosen by measurement, not intuition — 4 concurrent searches over the
+# 17.8k-chunk eval corpus, best of 2 runs: 1 → 5.63s, 2 → 4.58s, 4 → 3.88s,
+# 8 → 3.95s. Gains flatten at 4, where Ollama and the ONNX reranker
+# saturate. Raise it only with a fresh measurement.
+SEARCH_CONCURRENCY = 4
+_search_semaphore = threading.Semaphore(SEARCH_CONCURRENCY)
+
+
+def _search_sync(
+    request: "SearchRequest",
+    *,
+    collection,
+    data_dir: Path | None,
+    merged: dict,
+    get_spell_corrector,
+    get_lexical_index,
+) -> dict:
+    """Parent-document semantic search. Synchronous by nature.
+
+    Every expensive step here blocks: Chroma's query embeds the text via a
+    blocking HTTP call to Ollama, the cross-encoder is CPU-bound ONNX, and
+    the manifest/parents reads hit SQLite. It therefore must not run on the
+    event loop — ``/api/search`` calls it through ``run_in_threadpool`` so
+    one 5-7s search can't stall health polls, MCP heartbeats, or a streaming
+    chat turn (issue #344).
+
+    Over-fetches small embed units, dedupes by parent_id (keeping the
+    highest-similarity hit per parent), then returns the corresponding
+    parent text from the SQLite parents store. Per chunk_granularity_spike,
+    dedupe-by-parent is a load-bearing part of the retrieval semantics —
+    without it the user sees the same section repeated multiple times.
+    """
+    with _search_semaphore:
+        # Spell correction (typo-tolerance design, section A): rewrite
+        # OOV tokens to the closest library term before anything
+        # consumes the query text — the dense embed, the reranker,
+        # system detection, and the BM25 side all see the corrected
+        # form. A clean query is a strict no-op (corrected is None).
+        # Variant expansion (section B, default-off flag) then derives
+        # spacing variants ("chainmail" ↔ "chain mail") of the
+        # corrected query; they ride the same Chroma call and fuse
+        # below via RRF. Without them this is the single-query path —
+        # zero overhead for the common case.
+        # Effective pipeline knobs for this request: explicit request
+        # fields win, then the persisted search settings, then the
+        # built-in defaults.
+        knobs = resolve_search_knobs(request, data_dir)
+
+        corrected_query: str | None = None
+        if knobs.spell_correction:
+            corrected_query = get_spell_corrector().correct(request.query)
+        query_text = (
+            corrected_query if corrected_query is not None
+            else request.query
+        )
+        variant_queries: list[str] = []
+        if knobs.variant_expansion:
+            variant_queries = get_spell_corrector().expand(query_text)
+
+        # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
+        query_kwargs = {
+            "query_texts": [query_text, *variant_queries],
+            "n_results": request.n_results * 10,
+        }
+
+        where_clauses = []
+        effective_collection = request.collection
+
+        if effective_collection:
+            if not data_dir:
+                raise HTTPException(
+                    status_code=500, detail="No data directory configured"
+                )
+            store = load_collections(data_dir)
+            if effective_collection not in store.collections:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Collection not found: {effective_collection}",
+                )
+            manifest = load_manifest(data_dir)
+            coll_paths = resolve_collection_paths(
+                store.collections[effective_collection], manifest
+            )
+            if not coll_paths:
+                return {
+                    "results": [],
+                    "message": "Collection has no indexed files.",
+                    "effective_collection": effective_collection,
+                }
+            where_clauses.append({"source": {"$in": coll_paths}})
+        if request.source_paths:
+            where_clauses.append({"source": {"$in": request.source_paths}})
+
+        # source_filter / game_system arrive as guesses over user
+        # vernacular ("dnd 5e", "Players Handbook.pdf") — mostly from
+        # MCP agents. Exact-match-or-nothing turned every near-miss
+        # into a silent empty result indistinguishable from a true
+        # semantic miss (issue #309): resolve unambiguous near-misses
+        # (noted in `message`), and turn unresolvable values into an
+        # actionable message naming what is actually available.
+        filter_notes: list[str] = []
+        if corrected_query is not None:
+            filter_notes.append(f'Query corrected to "{corrected_query}".')
+        if data_dir and (request.source_filter or request.game_system):
+            filt_manifest = load_manifest(data_dir)
+            if request.source_filter:
+                known_files = sorted(
+                    {e.filename for e in filt_manifest.files.values()}
+                )
+                if request.source_filter not in known_files:
+                    resolved, matches = _resolve_filter_value(
+                        request.source_filter, known_files
+                    )
+                    if resolved is not None:
+                        filter_notes.append(
+                            f'source_filter "{request.source_filter}" '
+                            f'matched "{resolved}".'
+                        )
+                        request.source_filter = resolved
+                    else:
+                        hint = (
+                            f"Closest indexed filenames: "
+                            f"{', '.join(sorted(matches))}."
+                            if matches
+                            else "Use the sources list for exact filenames."
+                        )
+                        return {
+                            "results": [],
+                            "message": (
+                                f'No indexed file matches source_filter '
+                                f'"{request.source_filter}". {hint}'
+                            ),
+                            "effective_collection": effective_collection,
+                        }
+            if request.game_system:
+                known_tags = sorted({
+                    t for e in filt_manifest.files.values()
+                    for t in {e.game_system, *e.game_systems} if t
+                })
+                if request.game_system not in known_tags:
+                    resolved, matches = _resolve_filter_value(
+                        request.game_system, known_tags
+                    )
+                    if resolved is not None:
+                        filter_notes.append(
+                            f'game_system "{request.game_system}" '
+                            f'matched "{resolved}".'
+                        )
+                        request.game_system = resolved
+                    else:
+                        pool = sorted(matches) if matches else known_tags
+                        return {
+                            "results": [],
+                            "message": (
+                                f'game_system "{request.game_system}" is '
+                                f'not in the library. Available: '
+                                f'{", ".join(pool)}. Retry with an exact '
+                                f'value or without the filter.'
+                            ),
+                            "effective_collection": effective_collection,
+                        }
+
+        if request.source_filter:
+            where_clauses.append({"filename": request.source_filter})
+        if request.game_system or request.game_systems:
+            requested = set(request.game_systems or [])
+            if request.game_system:
+                requested.add(request.game_system)
+
+            # Resolve secondary-tag matches via the manifest: any file
+            # whose `game_systems` includes a requested tag but whose
+            # primary `game_system` (the one stored in chunk metadata)
+            # does not. Chroma metadata is scalar-only, so secondary
+            # matches must be folded in as a source-path `$in` clause —
+            # exact paths, not filenames, so an untagged same-named
+            # file in another folder can't ride along (issue #308).
+            secondary_paths: list[str] = []
+            if data_dir:
+                search_manifest = load_manifest(data_dir)
+                for path, entry in search_manifest.files.items():
+                    if entry.game_system in requested:
+                        continue
+                    if any(t in requested for t in entry.game_systems):
+                        secondary_paths.append(path)
+
+            if request.game_system:
+                primary_clause: dict = {"game_system": request.game_system}
+            else:
+                primary_clause = {"game_system": {"$in": list(requested)}}
+
+            if secondary_paths:
+                where_clauses.append({
+                    "$or": [
+                        primary_clause,
+                        {"source": {"$in": secondary_paths}},
+                    ]
+                })
+            else:
+                where_clauses.append(primary_clause)
+
+        if len(where_clauses) == 1:
+            query_kwargs["where"] = where_clauses[0]
+        elif len(where_clauses) > 1:
+            query_kwargs["where"] = {"$and": where_clauses}
+
+        results = collection.query(**query_kwargs)
+
+        if not any(results["documents"]):
+            return {
+                "results": [],
+                "message": " ".join([*filter_notes, "No results found."]),
+                "corrected_query": corrected_query,
+                "effective_collection": effective_collection,
+            }
+
+        ordered_metadatas = results["metadatas"][0]
+        ordered_distances = results["distances"][0]
+        ordered_docs = results["documents"][0]
+
+        # Multi-ranking fusion: the spacing-variant rankings (section
+        # B) and — under the experimental default-off `hybrid` flag —
+        # a BM25 ranking over the same chunks join the dense primary
+        # via reciprocal-rank fusion, then the fused pool feeds the
+        # boost/rerank/dedupe pipeline unchanged. The BM25 side
+        # mirrors the dense query's scope via its `where` clause.
+        # A candidate seen by several dense rankings reports its
+        # minimum cosine distance; BM25-only candidates carry no
+        # cosine distance — they get a sentinel 1.0 (relevance 0.0)
+        # that the reranker replaces with a real cross-encoder score
+        # when rerank is on.
+        ordering_scores: list[float] | None = None
+        if variant_queries or knobs.hybrid:
+            rankings = list(results["ids"])
+            dense_best: dict[str, tuple[dict, float, str]] = {}
+            for ids, metas, dists, docs in zip(
+                results["ids"], results["metadatas"],
+                results["distances"], results["documents"],
+            ):
+                for cid, meta, dist, doc in zip(ids, metas, dists, docs):
+                    if (
+                        cid not in dense_best
+                        or dist < dense_best[cid][1]
+                    ):
+                        dense_best[cid] = (meta, dist, doc)
+            lex = None
+            if knobs.hybrid:
+                lex = get_lexical_index()
+                lex_where = query_kwargs.get("where")
+                rankings.append(lex.search(
+                    query_text,
+                    k=request.n_results * 10,
+                    allowed=lambda m: matches_where(m, lex_where),
+                ))
+            fused_metadatas, fused_distances = [], []
+            fused_docs, fused_scores = [], []
+            for cid, score in rrf_fuse(rankings):
+                if cid in dense_best:
+                    meta, dist, doc = dense_best[cid]
+                    fused_metadatas.append(meta)
+                    fused_distances.append(dist)
+                    fused_docs.append(doc)
+                else:
+                    fused_metadatas.append(lex.metadatas[cid])
+                    fused_distances.append(1.0)
+                    fused_docs.append(lex.documents[cid])
+                fused_scores.append(score)
+            ordered_metadatas = fused_metadatas
+            ordered_distances = fused_distances
+            ordered_docs = fused_docs
+            ordering_scores = fused_scores
+
+        # Game-system soft-boost: when the query names a system and
+        # the request isn't already scoped to one (or to a single
+        # file), reorder the over-fetched candidate pool by
+        # boosted cosine similarity. Ordering only — distances (and
+        # therefore reported relevance/tier) stay on the raw scale.
+        # All distances are cosine at this point, so one sort key is
+        # safe; ties keep chroma's order (sorted() is stable).
+        boost_factors: list[float] | None = None
+        if not (
+            request.game_system or request.game_systems
+            or request.source_filter
+        ):
+            target_systems = detect_systems_in_query(
+                query_text, merged["known"]
+            )
+            if target_systems:
+                boost_factors = _system_boost_factors(
+                    ordered_metadatas, target_systems,
+                    data_dir, merged["known"],
+                )
+                # Hybrid candidates are ordered by RRF score, not
+                # cosine — boost whichever scale ordered the pool.
+                order = sorted(
+                    range(len(boost_factors)),
+                    key=lambda i: (
+                        (ordering_scores[i] if ordering_scores is not None
+                         else max(0.0, 1.0 - ordered_distances[i]))
+                        * boost_factors[i]
+                    ),
+                    reverse=True,
+                )
+                ordered_metadatas = [ordered_metadatas[i] for i in order]
+                ordered_distances = [ordered_distances[i] for i in order]
+                ordered_docs = [ordered_docs[i] for i in order]
+                boost_factors = [boost_factors[i] for i in order]
+                if ordering_scores is not None:
+                    ordering_scores = [ordering_scores[i] for i in order]
+
+        # Re-rank the top of the candidate pool with a cross-encoder.
+        # Scoring (query, chunk-text) jointly is more accurate than raw
+        # cosine, especially when several candidates are topically
+        # adjacent. Trailing candidates stay in cosine order so the
+        # dedupe loop never starves if a section has many slices.
+        #
+        # Section_heading is prepended to mirror what the embedder saw
+        # (`_embed_text`). Without the breadcrumb the cross-encoder is
+        # blind to whether a chunk is from a rule definition
+        # ("Combat > Grappling") versus a creature card with the same
+        # keyword ("Goblin > Actions"), and tends to over-rank the
+        # keyword-dense action text.
+        rerank_applied = False
+        pool = 0
+        if knobs.rerank and _rerank_safe_for_query(query_text):
+            pool = min(knobs.rerank_candidates, len(ordered_metadatas))
+            pool_docs = ordered_docs[:pool]
+            pool_meta = ordered_metadatas[:pool]
+            rerank_inputs = [
+                f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
+                for m, d in zip(pool_meta, pool_docs)
+            ]
+            scores = rerank_scores(query_text, rerank_inputs)
+            if scores is not None:
+                rerank_applied = True
+                # The soft-boost weighs the cross-encoder scores the
+                # same way it weighed cosine similarity; the stored
+                # distances stay raw either way.
+                if boost_factors is not None:
+                    order = sorted(
+                        range(pool),
+                        key=lambda i: scores[i] * boost_factors[i],
+                        reverse=True,
+                    )
+                    boost_factors = (
+                        [boost_factors[i] for i in order]
+                        + boost_factors[pool:]
+                    )
+                else:
+                    order = sorted(
+                        range(pool), key=lambda i: scores[i], reverse=True
+                    )
+                head_metadatas = [ordered_metadatas[i] for i in order]
+                # Use 1 - rerank_score so 1 - distance = rerank score
+                # downstream, keeping the response shape unchanged.
+                head_distances = [1.0 - scores[i] for i in order]
+                head_docs = [ordered_docs[i] for i in order]
+                ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
+                ordered_distances = head_distances + ordered_distances[pool:]
+                ordered_docs = head_docs + ordered_docs[pool:]
+
+        # Dedupe by parent_id, keeping the first hit per parent (the
+        # iteration order is the re-ranked-then-cosine order from above).
+        seen: set[str] = set()
+        picked: list[dict] = []
+        for i, (metadata, distance) in enumerate(
+            zip(ordered_metadatas, ordered_distances)
+        ):
+            pid = metadata.get("parent_id")
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            picked.append({
+                "metadata": metadata,
+                "distance": distance,
+                "doc": ordered_docs[i],
+                "reranked": rerank_applied and i < pool,
+                "boost": boost_factors[i] if boost_factors is not None else 1.0,
+            })
+            if len(picked) >= request.n_results:
+                break
+
+        # Single-scale page (issue #306): when the reranker ran, picked
+        # results that came from the cosine tail are rescored with the
+        # cross-encoder in one small batch (≤ n_results pairs), so every
+        # returned relevance is on the same scale. On failure the tail
+        # keeps its cosine score and an honest reranked=False flag.
+        if rerank_applied:
+            stragglers = [p for p in picked if not p["reranked"]]
+            if stragglers:
+                straggler_inputs = [
+                    f"{p['metadata']['section_heading']}\n\n{p['doc']}"
+                    if p["metadata"].get("section_heading") else p["doc"]
+                    for p in stragglers
+                ]
+                straggler_scores = rerank_scores(
+                    query_text, straggler_inputs
+                )
+                if straggler_scores is not None:
+                    for p, s in zip(stragglers, straggler_scores):
+                        p["distance"] = 1.0 - s
+                        p["reranked"] = True
+                    # All picked distances are now cross-encoder scale;
+                    # stable sort keeps head order, interleaves the
+                    # rescored tail where it belongs — by the boosted
+                    # ordering score when the soft-boost is active.
+                    picked.sort(
+                        key=lambda p: -(
+                            max(0.0, 1.0 - p["distance"]) * p["boost"]
+                        )
+                    )
+
+        parent_docs = fetch_parents_extended(
+            data_dir, [p["metadata"]["parent_id"] for p in picked]
+        ) if data_dir else {}
+
+        formatted = []
+        for p in picked:
+            metadata = p["metadata"]
+            distance = p["distance"]
+            pid = metadata["parent_id"]
+            parent = parent_docs.get(pid)
+            # Fall back to the embed unit text if the parent row is
+            # missing (shouldn't happen post-reindex; defensive).
+            text = parent.text if parent else p["doc"]
+            # ParentDoc.section_heading is Optional[str] (granularity.py),
+            # so the chain "" or parent.section_heading can leak None into
+            # the response. Trailing `or ""` coerces back to a string —
+            # the Tauri SearchResultItem decoder requires String, not
+            # null, and would otherwise reject the whole response.
+            section_heading = (
+                metadata.get("section_heading")
+                or (parent.section_heading if parent else None)
+                or ""
+            )
+            relevance = round(max(0.0, min(1.0, 1 - distance)), 3)
+            formatted.append({
+                "text": text,
+                "filename": metadata["filename"],
+                "source": metadata.get("source", ""),
+                "section_heading": section_heading,
+                "page_start": parent.page_start if parent else metadata.get("page_start", 0),
+                "page_end": parent.page_end if parent else metadata.get("page_end", 0),
+                "game_system": metadata.get("game_system") or "unknown",
+                "relevance": relevance,
+                "tier": _tier_for(relevance, p["reranked"]),
+                "reranked": p["reranked"],
+            })
+
+        response: dict = {
+            "results": formatted,
+            "corrected_query": corrected_query,
+            "effective_collection": effective_collection,
+        }
+        if filter_notes:
+            response["message"] = " ".join(filter_notes)
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -3150,462 +3655,56 @@ def create_app(
     # lexical index is built lazily on the first hybrid search and rebuilt
     # whenever the chunk count changes (reindex/delete). Held in memory —
     # acceptable for the experimental flag, revisit before any default-on.
+    #
+    # Both lazy caches are guarded by a lock: since #344 the search body
+    # runs in a worker thread, so two concurrent searches can race here on
+    # a cold cache and each pay the full build cost.
     lexical_cache: dict = {"count": None, "index": None}
+    lexical_lock = threading.Lock()
 
     def _get_lexical_index() -> LexicalIndex:
         count = collection.count()
-        if lexical_cache["index"] is None or lexical_cache["count"] != count:
-            lexical_cache["index"] = LexicalIndex.from_collection(collection)
-            lexical_cache["count"] = count
-        return lexical_cache["index"]
+        with lexical_lock:
+            if lexical_cache["index"] is None or lexical_cache["count"] != count:
+                lexical_cache["index"] = LexicalIndex.from_collection(collection)
+                lexical_cache["count"] = count
+            return lexical_cache["index"]
 
     # Spell-correction vocabulary: same lifecycle as the lexical index —
     # built lazily on first use, rebuilt when the chunk count changes
     # (reindex/delete).
     spell_cache: dict = {"count": None, "corrector": None}
+    spell_lock = threading.Lock()
 
     def _get_spell_corrector() -> SpellCorrector:
         count = collection.count()
-        if spell_cache["corrector"] is None or spell_cache["count"] != count:
-            spell_cache["corrector"] = SpellCorrector.from_collection(collection)
-            spell_cache["count"] = count
-        return spell_cache["corrector"]
+        with spell_lock:
+            if spell_cache["corrector"] is None or spell_cache["count"] != count:
+                spell_cache["corrector"] = SpellCorrector.from_collection(collection)
+                spell_cache["count"] = count
+            return spell_cache["corrector"]
 
     @app.post("/api/search")
     async def search(request: SearchRequest, http_req: Request):
         """Parent-document semantic search.
 
-        Over-fetches small embed units, dedupes by parent_id (keeping the
-        highest-similarity hit per parent), then returns the corresponding
-        parent text from the SQLite parents store. Per chunk_granularity_spike,
-        dedupe-by-parent is a load-bearing part of the retrieval semantics —
-        without it the user sees the same section repeated multiple times.
+        Thin async shell: stamp MCP activity, then hand the real work to a
+        worker thread. The body is fully blocking (Ollama embed, ONNX
+        rerank, SQLite reads), so running it inline stalls every other
+        request for the duration — see ``_search_sync`` and issue #344.
         """
         if http_req.headers.get("X-Source") == "mcp":
             app.state.mcp_last_query = datetime.now(timezone.utc)
         try:
-            # Spell correction (typo-tolerance design, section A): rewrite
-            # OOV tokens to the closest library term before anything
-            # consumes the query text — the dense embed, the reranker,
-            # system detection, and the BM25 side all see the corrected
-            # form. A clean query is a strict no-op (corrected is None).
-            # Variant expansion (section B, default-off flag) then derives
-            # spacing variants ("chainmail" ↔ "chain mail") of the
-            # corrected query; they ride the same Chroma call and fuse
-            # below via RRF. Without them this is the single-query path —
-            # zero overhead for the common case.
-            # Effective pipeline knobs for this request: explicit request
-            # fields win, then the persisted search settings, then the
-            # built-in defaults.
-            knobs = resolve_search_knobs(request, data_dir)
-
-            corrected_query: str | None = None
-            if knobs.spell_correction:
-                corrected_query = _get_spell_corrector().correct(request.query)
-            query_text = (
-                corrected_query if corrected_query is not None
-                else request.query
+            return await run_in_threadpool(
+                _search_sync,
+                request,
+                collection=collection,
+                data_dir=data_dir,
+                merged=_merged,
+                get_spell_corrector=_get_spell_corrector,
+                get_lexical_index=_get_lexical_index,
             )
-            variant_queries: list[str] = []
-            if knobs.variant_expansion:
-                variant_queries = _get_spell_corrector().expand(query_text)
-
-            # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
-            query_kwargs = {
-                "query_texts": [query_text, *variant_queries],
-                "n_results": request.n_results * 10,
-            }
-
-            where_clauses = []
-            effective_collection = request.collection
-
-            if effective_collection:
-                if not data_dir:
-                    raise HTTPException(
-                        status_code=500, detail="No data directory configured"
-                    )
-                store = load_collections(data_dir)
-                if effective_collection not in store.collections:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Collection not found: {effective_collection}",
-                    )
-                manifest = load_manifest(data_dir)
-                coll_paths = resolve_collection_paths(
-                    store.collections[effective_collection], manifest
-                )
-                if not coll_paths:
-                    return {
-                        "results": [],
-                        "message": "Collection has no indexed files.",
-                        "effective_collection": effective_collection,
-                    }
-                where_clauses.append({"source": {"$in": coll_paths}})
-            if request.source_paths:
-                where_clauses.append({"source": {"$in": request.source_paths}})
-
-            # source_filter / game_system arrive as guesses over user
-            # vernacular ("dnd 5e", "Players Handbook.pdf") — mostly from
-            # MCP agents. Exact-match-or-nothing turned every near-miss
-            # into a silent empty result indistinguishable from a true
-            # semantic miss (issue #309): resolve unambiguous near-misses
-            # (noted in `message`), and turn unresolvable values into an
-            # actionable message naming what is actually available.
-            filter_notes: list[str] = []
-            if corrected_query is not None:
-                filter_notes.append(f'Query corrected to "{corrected_query}".')
-            if data_dir and (request.source_filter or request.game_system):
-                filt_manifest = load_manifest(data_dir)
-                if request.source_filter:
-                    known_files = sorted(
-                        {e.filename for e in filt_manifest.files.values()}
-                    )
-                    if request.source_filter not in known_files:
-                        resolved, matches = _resolve_filter_value(
-                            request.source_filter, known_files
-                        )
-                        if resolved is not None:
-                            filter_notes.append(
-                                f'source_filter "{request.source_filter}" '
-                                f'matched "{resolved}".'
-                            )
-                            request.source_filter = resolved
-                        else:
-                            hint = (
-                                f"Closest indexed filenames: "
-                                f"{', '.join(sorted(matches))}."
-                                if matches
-                                else "Use the sources list for exact filenames."
-                            )
-                            return {
-                                "results": [],
-                                "message": (
-                                    f'No indexed file matches source_filter '
-                                    f'"{request.source_filter}". {hint}'
-                                ),
-                                "effective_collection": effective_collection,
-                            }
-                if request.game_system:
-                    known_tags = sorted({
-                        t for e in filt_manifest.files.values()
-                        for t in {e.game_system, *e.game_systems} if t
-                    })
-                    if request.game_system not in known_tags:
-                        resolved, matches = _resolve_filter_value(
-                            request.game_system, known_tags
-                        )
-                        if resolved is not None:
-                            filter_notes.append(
-                                f'game_system "{request.game_system}" '
-                                f'matched "{resolved}".'
-                            )
-                            request.game_system = resolved
-                        else:
-                            pool = sorted(matches) if matches else known_tags
-                            return {
-                                "results": [],
-                                "message": (
-                                    f'game_system "{request.game_system}" is '
-                                    f'not in the library. Available: '
-                                    f'{", ".join(pool)}. Retry with an exact '
-                                    f'value or without the filter.'
-                                ),
-                                "effective_collection": effective_collection,
-                            }
-
-            if request.source_filter:
-                where_clauses.append({"filename": request.source_filter})
-            if request.game_system or request.game_systems:
-                requested = set(request.game_systems or [])
-                if request.game_system:
-                    requested.add(request.game_system)
-
-                # Resolve secondary-tag matches via the manifest: any file
-                # whose `game_systems` includes a requested tag but whose
-                # primary `game_system` (the one stored in chunk metadata)
-                # does not. Chroma metadata is scalar-only, so secondary
-                # matches must be folded in as a source-path `$in` clause —
-                # exact paths, not filenames, so an untagged same-named
-                # file in another folder can't ride along (issue #308).
-                secondary_paths: list[str] = []
-                if data_dir:
-                    search_manifest = load_manifest(data_dir)
-                    for path, entry in search_manifest.files.items():
-                        if entry.game_system in requested:
-                            continue
-                        if any(t in requested for t in entry.game_systems):
-                            secondary_paths.append(path)
-
-                if request.game_system:
-                    primary_clause: dict = {"game_system": request.game_system}
-                else:
-                    primary_clause = {"game_system": {"$in": list(requested)}}
-
-                if secondary_paths:
-                    where_clauses.append({
-                        "$or": [
-                            primary_clause,
-                            {"source": {"$in": secondary_paths}},
-                        ]
-                    })
-                else:
-                    where_clauses.append(primary_clause)
-
-            if len(where_clauses) == 1:
-                query_kwargs["where"] = where_clauses[0]
-            elif len(where_clauses) > 1:
-                query_kwargs["where"] = {"$and": where_clauses}
-
-            results = collection.query(**query_kwargs)
-
-            if not any(results["documents"]):
-                return {
-                    "results": [],
-                    "message": " ".join([*filter_notes, "No results found."]),
-                    "corrected_query": corrected_query,
-                    "effective_collection": effective_collection,
-                }
-
-            ordered_metadatas = results["metadatas"][0]
-            ordered_distances = results["distances"][0]
-            ordered_docs = results["documents"][0]
-
-            # Multi-ranking fusion: the spacing-variant rankings (section
-            # B) and — under the experimental default-off `hybrid` flag —
-            # a BM25 ranking over the same chunks join the dense primary
-            # via reciprocal-rank fusion, then the fused pool feeds the
-            # boost/rerank/dedupe pipeline unchanged. The BM25 side
-            # mirrors the dense query's scope via its `where` clause.
-            # A candidate seen by several dense rankings reports its
-            # minimum cosine distance; BM25-only candidates carry no
-            # cosine distance — they get a sentinel 1.0 (relevance 0.0)
-            # that the reranker replaces with a real cross-encoder score
-            # when rerank is on.
-            ordering_scores: list[float] | None = None
-            if variant_queries or knobs.hybrid:
-                rankings = list(results["ids"])
-                dense_best: dict[str, tuple[dict, float, str]] = {}
-                for ids, metas, dists, docs in zip(
-                    results["ids"], results["metadatas"],
-                    results["distances"], results["documents"],
-                ):
-                    for cid, meta, dist, doc in zip(ids, metas, dists, docs):
-                        if (
-                            cid not in dense_best
-                            or dist < dense_best[cid][1]
-                        ):
-                            dense_best[cid] = (meta, dist, doc)
-                lex = None
-                if knobs.hybrid:
-                    lex = _get_lexical_index()
-                    lex_where = query_kwargs.get("where")
-                    rankings.append(lex.search(
-                        query_text,
-                        k=request.n_results * 10,
-                        allowed=lambda m: matches_where(m, lex_where),
-                    ))
-                fused_metadatas, fused_distances = [], []
-                fused_docs, fused_scores = [], []
-                for cid, score in rrf_fuse(rankings):
-                    if cid in dense_best:
-                        meta, dist, doc = dense_best[cid]
-                        fused_metadatas.append(meta)
-                        fused_distances.append(dist)
-                        fused_docs.append(doc)
-                    else:
-                        fused_metadatas.append(lex.metadatas[cid])
-                        fused_distances.append(1.0)
-                        fused_docs.append(lex.documents[cid])
-                    fused_scores.append(score)
-                ordered_metadatas = fused_metadatas
-                ordered_distances = fused_distances
-                ordered_docs = fused_docs
-                ordering_scores = fused_scores
-
-            # Game-system soft-boost: when the query names a system and
-            # the request isn't already scoped to one (or to a single
-            # file), reorder the over-fetched candidate pool by
-            # boosted cosine similarity. Ordering only — distances (and
-            # therefore reported relevance/tier) stay on the raw scale.
-            # All distances are cosine at this point, so one sort key is
-            # safe; ties keep chroma's order (sorted() is stable).
-            boost_factors: list[float] | None = None
-            if not (
-                request.game_system or request.game_systems
-                or request.source_filter
-            ):
-                target_systems = detect_systems_in_query(
-                    query_text, _merged["known"]
-                )
-                if target_systems:
-                    boost_factors = _system_boost_factors(
-                        ordered_metadatas, target_systems,
-                        data_dir, _merged["known"],
-                    )
-                    # Hybrid candidates are ordered by RRF score, not
-                    # cosine — boost whichever scale ordered the pool.
-                    order = sorted(
-                        range(len(boost_factors)),
-                        key=lambda i: (
-                            (ordering_scores[i] if ordering_scores is not None
-                             else max(0.0, 1.0 - ordered_distances[i]))
-                            * boost_factors[i]
-                        ),
-                        reverse=True,
-                    )
-                    ordered_metadatas = [ordered_metadatas[i] for i in order]
-                    ordered_distances = [ordered_distances[i] for i in order]
-                    ordered_docs = [ordered_docs[i] for i in order]
-                    boost_factors = [boost_factors[i] for i in order]
-                    if ordering_scores is not None:
-                        ordering_scores = [ordering_scores[i] for i in order]
-
-            # Re-rank the top of the candidate pool with a cross-encoder.
-            # Scoring (query, chunk-text) jointly is more accurate than raw
-            # cosine, especially when several candidates are topically
-            # adjacent. Trailing candidates stay in cosine order so the
-            # dedupe loop never starves if a section has many slices.
-            #
-            # Section_heading is prepended to mirror what the embedder saw
-            # (`_embed_text`). Without the breadcrumb the cross-encoder is
-            # blind to whether a chunk is from a rule definition
-            # ("Combat > Grappling") versus a creature card with the same
-            # keyword ("Goblin > Actions"), and tends to over-rank the
-            # keyword-dense action text.
-            rerank_applied = False
-            pool = 0
-            if knobs.rerank and _rerank_safe_for_query(query_text):
-                pool = min(knobs.rerank_candidates, len(ordered_metadatas))
-                pool_docs = ordered_docs[:pool]
-                pool_meta = ordered_metadatas[:pool]
-                rerank_inputs = [
-                    f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
-                    for m, d in zip(pool_meta, pool_docs)
-                ]
-                scores = rerank_scores(query_text, rerank_inputs)
-                if scores is not None:
-                    rerank_applied = True
-                    # The soft-boost weighs the cross-encoder scores the
-                    # same way it weighed cosine similarity; the stored
-                    # distances stay raw either way.
-                    if boost_factors is not None:
-                        order = sorted(
-                            range(pool),
-                            key=lambda i: scores[i] * boost_factors[i],
-                            reverse=True,
-                        )
-                        boost_factors = (
-                            [boost_factors[i] for i in order]
-                            + boost_factors[pool:]
-                        )
-                    else:
-                        order = sorted(
-                            range(pool), key=lambda i: scores[i], reverse=True
-                        )
-                    head_metadatas = [ordered_metadatas[i] for i in order]
-                    # Use 1 - rerank_score so 1 - distance = rerank score
-                    # downstream, keeping the response shape unchanged.
-                    head_distances = [1.0 - scores[i] for i in order]
-                    head_docs = [ordered_docs[i] for i in order]
-                    ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
-                    ordered_distances = head_distances + ordered_distances[pool:]
-                    ordered_docs = head_docs + ordered_docs[pool:]
-
-            # Dedupe by parent_id, keeping the first hit per parent (the
-            # iteration order is the re-ranked-then-cosine order from above).
-            seen: set[str] = set()
-            picked: list[dict] = []
-            for i, (metadata, distance) in enumerate(
-                zip(ordered_metadatas, ordered_distances)
-            ):
-                pid = metadata.get("parent_id")
-                if not pid or pid in seen:
-                    continue
-                seen.add(pid)
-                picked.append({
-                    "metadata": metadata,
-                    "distance": distance,
-                    "doc": ordered_docs[i],
-                    "reranked": rerank_applied and i < pool,
-                    "boost": boost_factors[i] if boost_factors is not None else 1.0,
-                })
-                if len(picked) >= request.n_results:
-                    break
-
-            # Single-scale page (issue #306): when the reranker ran, picked
-            # results that came from the cosine tail are rescored with the
-            # cross-encoder in one small batch (≤ n_results pairs), so every
-            # returned relevance is on the same scale. On failure the tail
-            # keeps its cosine score and an honest reranked=False flag.
-            if rerank_applied:
-                stragglers = [p for p in picked if not p["reranked"]]
-                if stragglers:
-                    straggler_inputs = [
-                        f"{p['metadata']['section_heading']}\n\n{p['doc']}"
-                        if p["metadata"].get("section_heading") else p["doc"]
-                        for p in stragglers
-                    ]
-                    straggler_scores = rerank_scores(
-                        query_text, straggler_inputs
-                    )
-                    if straggler_scores is not None:
-                        for p, s in zip(stragglers, straggler_scores):
-                            p["distance"] = 1.0 - s
-                            p["reranked"] = True
-                        # All picked distances are now cross-encoder scale;
-                        # stable sort keeps head order, interleaves the
-                        # rescored tail where it belongs — by the boosted
-                        # ordering score when the soft-boost is active.
-                        picked.sort(
-                            key=lambda p: -(
-                                max(0.0, 1.0 - p["distance"]) * p["boost"]
-                            )
-                        )
-
-            parent_docs = fetch_parents_extended(
-                data_dir, [p["metadata"]["parent_id"] for p in picked]
-            ) if data_dir else {}
-
-            formatted = []
-            for p in picked:
-                metadata = p["metadata"]
-                distance = p["distance"]
-                pid = metadata["parent_id"]
-                parent = parent_docs.get(pid)
-                # Fall back to the embed unit text if the parent row is
-                # missing (shouldn't happen post-reindex; defensive).
-                text = parent.text if parent else p["doc"]
-                # ParentDoc.section_heading is Optional[str] (granularity.py),
-                # so the chain "" or parent.section_heading can leak None into
-                # the response. Trailing `or ""` coerces back to a string —
-                # the Tauri SearchResultItem decoder requires String, not
-                # null, and would otherwise reject the whole response.
-                section_heading = (
-                    metadata.get("section_heading")
-                    or (parent.section_heading if parent else None)
-                    or ""
-                )
-                relevance = round(max(0.0, min(1.0, 1 - distance)), 3)
-                formatted.append({
-                    "text": text,
-                    "filename": metadata["filename"],
-                    "source": metadata.get("source", ""),
-                    "section_heading": section_heading,
-                    "page_start": parent.page_start if parent else metadata.get("page_start", 0),
-                    "page_end": parent.page_end if parent else metadata.get("page_end", 0),
-                    "game_system": metadata.get("game_system") or "unknown",
-                    "relevance": relevance,
-                    "tier": _tier_for(relevance, p["reranked"]),
-                    "reranked": p["reranked"],
-                })
-
-            response: dict = {
-                "results": formatted,
-                "corrected_query": corrected_query,
-                "effective_collection": effective_collection,            }
-            if filter_notes:
-                response["message"] = " ".join(filter_notes)
-            return response
         except HTTPException:
             raise
         except Exception as e:
@@ -3676,6 +3775,10 @@ if __name__ == "__main__":
     # Truncation probe (daemon thread — diagnostics only, must not block
     # startup and must not fail it if Ollama isn't up yet)
     threading.Thread(target=probe_embed_truncation, daemon=True).start()
+
+    # Keep bge-m3 resident so the first search after an idle spell doesn't
+    # pay a cold model load (issue #341). Daemon thread, same contract.
+    threading.Thread(target=keep_embedder_warm, daemon=True).start()
 
     application = create_app()
     config = uvicorn.Config(application, log_level="info")
