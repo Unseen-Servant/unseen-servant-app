@@ -4,6 +4,63 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.1.0] - 2026-08-09
+
+### Added
+
+- Relevance tiers — results read as **strong / good / weak** instead of a raw "% match", with weak matches dimmed below a floor so noise reads as noise
+- Table row-linearization: tables are split into per-row embed units, so a lookup lands on the exact row of a spell or equipment table, with a coverage-ratio tripwire that flags lossy table parses
+- Spell correction: misspelled query tokens are rewritten against your library's own vocabulary ("owlber" → "owlbear") before searching, and results say what was corrected
+- Game-system soft-boost — naming a system in the query ("fireball in 5e") lifts that system's results without hiding the rest of the library
+- Startup probe that detects silent Ollama embed truncation and warns in the sidecar logs
+- General settings tab with sidecar-wide search-pipeline knobs, including a candidate pool preset from Fastest (10) to Exhaustive (200)
+- Solo/mute/play scope doctrine: a mixer-style filter console, a play/stop transport on collections, archive as shelving, and a focus lens that hides out-of-scope items
+- Scope bar with system and collection chips, pinned above the scrolling tree and systems views
+- Full console recall — solo, mute, play, and lens state persist across launches
+- Stateful search view: focusing the search bar opens it, and Escape, a view switch, or ⌘J / ⌘T step back out
+- Pane focus model for keyboard navigation, with keyboard chords shown on menu rows
+- Space as the primary action on a focused row, X to toggle the indexing checkbox, ⌘⇧F for the Filters panel, and ⌘⌥↑/↓ to move within the left dock
+- "Hide unindexed items" switch with a matching indexed-only scope chip
+- Window opens at 1280×800 and remembers its geometry across launches
+- Retrieval eval harness with answer-chunk grading, per-query latency, and a recorded baseline
+- Experimental, default-off search flags: `hybrid` (BM25) and `variant_expansion`
+
+### Changed
+
+- Shared header voice classes, an LED pip in place of the menu checkmark, and menu geometry driven by tokens and real measurements
+- Game systems go monochrome — color is now reserved for collections — over a manuscript-pigment palette
+- Amethyst re-grounded as the active hue and vermilion as danger, with a brighter tertiary text token for WCAG contrast on the app background
+- Mono font, radii, and modal shadow moved onto tokens; stylelint now forbids raw colors in component styles
+- Filter console and collections became docked sibling panels, with a view-switch picker in the header
+- MCP: near-miss filter values (typos, partial names) resolve to the closest match instead of failing silently; `list_collections` reports file counts and descriptions; results carry match tiers
+- Sidecar hard-cap splitter cuts on row boundaries instead of mid-row
+- Tag metadata updates are batched past ChromaDB's write cap
+- Accessibility: menu roles and `aria-checked`, chords exposed via `aria-keyshortcuts` rather than the accessible name, and view rows as `role=checkbox` buttons
+
+### Fixed
+
+- Untagged-mute drop and same-named-file scoping leaks
+- A saved tag no longer rolls back when the status refresh fails
+- Tauri errors now include the sidecar response body
+- File renames migrate path solos and mutes like every other path set
+- Only one menu stays open at a time, and Escape no longer closes the docked filter panel
+- Archived collections stay off both collection submenus
+- Context-menu actions no longer fire against a nulled menu state
+- Empty-state messaging is centralized and truthful on every surface
+
+## [2.0.2] - 2026-07-02
+
+### Changed
+
+- Migrate the sidecar to uv and Python 3.12
+- Drop cross-platform smoke jobs from CI and document the billable-minutes budget policy
+- Refresh Rust, npm, and sidecar dependencies
+
+### Fixed
+
+- Raise the MCP client timeout
+- Skip the English-only reranker on non-ASCII queries
+
 ## [2.0.1] - 2026-05-11
 
 ### Changed
