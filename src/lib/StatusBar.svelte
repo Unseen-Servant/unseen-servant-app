@@ -59,8 +59,12 @@
         class:active={mcpActive}
         title={mcpActive ? 'MCP active — agent querying' : mcpConnected ? 'MCP connected' : 'MCP not detected'}
       >
-        <!-- MCP logo (static/icons/mcp.svg) -->
-        <svg class="indicator-icon" viewBox="0 0 180 180" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round">
+        <!-- MCP logo (static/icons/mcp.svg). The viewBox is padded out from the
+             mark's native 0 0 180 180 so its ink renders 8.4px tall — the same
+             optical size as the Font Awesome server icon beside it, which
+             carries built-in padding the bare logo doesn't. stroke-width scales
+             with the box, so it's bumped 12 -> 17 to keep the same 0.8px stroke. -->
+        <svg class="indicator-icon" viewBox="-37 -37 254 254" fill="none" stroke="currentColor" stroke-width="17" stroke-linecap="round">
           <path d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706V16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/>
           <path d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/>
           <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
@@ -82,8 +86,11 @@
       {/if}
       <span class="separator">&middot;</span>
       <button class="sync-btn" on:click={onOpenFolder} title={`Reveal library folder${chordHint('library.reveal')}`}>
-        <!-- Font Awesome "folder-open" icon -->
-        <svg class="sync-icon" viewBox="0 0 576 512" fill="currentColor">
+        <!-- Font Awesome "folder-open" icon. The path is drawn on a 640 grid but
+             was shipped with a 576x512 viewBox, which clipped both side edges;
+             the box below contains it and centres it on the 640 grid the other
+             icons use. Wide glyph, so it renders wider and shorter than they do. -->
+        <svg class="sync-icon" viewBox="-24 -60 640 640" fill="currentColor">
           <path d="M88.7 223.8L0 375.8L0 96C0 60.7 28.7 32 64 32L181.5 32C198.5 32 214.8 38.7 226.7 50.7L269.3 93.3C281.3 105.3 297.6 112 314.5 112L448 112C483.3 112 512 140.7 512 176L512 208L144 208C121.4 208 100.6 220 88.7 223.8zM144 240L560 240C572.1 240 583.3 246.8 588.9 257.6C594.5 268.4 593.5 281.4 586.4 291.2L501.9 467.2C495.3 480.6 481.6 488 467.2 488L48 488C36 488 24.8 481.2 19.2 470.4C13.6 459.6 14.6 446.6 21.7 436.8L106.2 260.8C112.8 247.4 126.5 240 144 240z"/>
         </svg>
       </button>
@@ -127,8 +134,10 @@
   </div>
   <div class="statusbar-right">
     <button class="license-link" on:click={onOpenSettings} title={`Settings${chordHint('settings.open')}`}>
-      <!-- Font Awesome "gear" icon -->
-      <svg class="license-icon" viewBox="0 0 512 512" fill="currentColor">
+      <!-- Font Awesome "gear" icon. This is the v6 path, which bleeds to all four
+           edges of its native 0 0 512 512 box; the v7 icons around it sit inside
+           ~15% padding. Padding the viewBox to a 640 grid matches their size. -->
+      <svg class="license-icon" viewBox="-64 -64 640 640" fill="currentColor">
         <path d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/>
       </svg>
     </button>
@@ -304,6 +313,10 @@
 
   .separator {
     opacity: 0.5;
+    /* Crimson Text sets the middot low: its ink centres 0.5px under the icon
+       row. Nudge it back onto the same line. */
+    position: relative;
+    top: -0.5px;
   }
 
   .license-link {
