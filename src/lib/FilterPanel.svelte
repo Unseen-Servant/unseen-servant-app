@@ -239,15 +239,27 @@
           class:kb-focused={focusedRow === `curation:${ch.key}`}
           data-fm-key="curation:{ch.key}"
         >
-          {#if ch.key === 'collected'}
-            <!-- Outline bookmark — same ribbon as the chip bookmarks, unfilled:
-                 the channel is the curation bucket, not a specific collection -->
-            <svg class="row-die" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d="M6 3h12v18l-6-4.4L6 21z"/>
-            </svg>
-          {:else}
-            <span class="row-die" aria-hidden="true"></span>
-          {/if}
+          <!-- Outline bookmark — same ribbon as the chip bookmarks, unfilled:
+               the channel is the curation bucket, not a specific collection.
+               Loose dashes that same ribbon rather than taking a shape of its
+               own — one rung further down the ladder the systems section
+               already walks (filled cube for a tagged system, outline for
+               Untagged), so the two rows read as ends of one axis. A strike or
+               slash would have been the obvious alternative and is wrong here:
+               in this panel that reads as muted, which is a live state on this
+               very row. -->
+          <svg
+            class="row-die"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linejoin="round"
+            stroke-dasharray={ch.key === 'loose' ? '3.2 2.4' : undefined}
+            aria-hidden="true"
+          >
+            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+          </svg>
           <span class="row-name">{ch.name}</span>
           <span class="sm" class:engaged={soloed || muted}>
             <button
