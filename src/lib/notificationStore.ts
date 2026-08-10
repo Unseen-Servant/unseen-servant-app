@@ -51,17 +51,6 @@ function createNotificationStore() {
     set(null);
   }
 
-  // Dismiss as if the user clicked the X: fires the current notification's
-  // onDismiss callback (e.g. revertToSyncedPaths) before clearing. Returns
-  // true if anything was dismissed — callers can decide whether to
-  // preventDefault on the keystroke that triggered them.
-  function dismissByUser(): boolean {
-    if (!current?.onDismiss) return false;
-    current.onDismiss();
-    dismiss();
-    return true;
-  }
-
   function show(notif: Omit<Notification, 'id'>): string {
     clearTimer();
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -82,7 +71,7 @@ function createNotificationStore() {
     if (current?.id === id) dismiss();
   }
 
-  return { subscribe, show, dismiss, dismissByUser, dismissIf };
+  return { subscribe, show, dismiss, dismissIf };
 }
 
 export const jobNotification = createNotificationStore();

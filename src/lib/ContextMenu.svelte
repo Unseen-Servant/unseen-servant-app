@@ -302,9 +302,16 @@
   on:mousedown|stopPropagation
 >
   {#if !item.is_dir}
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onOpen}>Open file</button>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.open')} aria-keyshortcuts={keyShortcut('tree.open')} on:click={onOpen}>
+      Open file
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.open')} aria-hidden="true">{chord('tree.open')}</span>
+    </button>
   {/if}
-  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.openExternal')} aria-keyshortcuts={keyShortcut('tree.openExternal')} on:click={onReveal}>
+  <!-- Reveal shows its chord but does not claim it: ⌥⌘R carries a modifier
+       eventMatchKey deliberately rejects, so it isn't dispatchable from an open
+       menu. Display-only, like the Collections rows — no data-chord, and no
+       aria-keyshortcuts promising something this row won't honour. -->
+  <button class="context-item" data-mi="item" role="menuitem" on:click={onReveal}>
     Reveal in folder
     <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')} aria-hidden="true">{chord('tree.openExternal')}</span>
   </button>

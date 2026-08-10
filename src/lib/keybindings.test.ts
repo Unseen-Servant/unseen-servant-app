@@ -59,12 +59,17 @@ describe('menu accelerators', () => {
     }
   });
 
-  test('match agrees with the displayed key', () => {
+  test('match agrees with one of the displayed keys', () => {
+    // A binding may advertise several keys ("F2 / R"), so the dispatched one
+    // has to appear among them rather than equal the whole string. Rebinding
+    // `keys` without updating `match` still fails, which is the point.
     for (const entry of KEYBINDINGS.filter((k) => k.match)) {
       const meta = entry.match!.startsWith('meta+');
       const base = meta ? entry.match!.slice(5) : entry.match!;
-      const displayed = entry.keys.other.replace(/^Ctrl\+/, '').toLowerCase();
-      expect(displayed).toBe(base);
+      const shown = entry.keys.other
+        .split('/')
+        .map((k) => k.trim().replace(/^Ctrl\+/, '').toLowerCase());
+      expect(shown).toContain(base);
     }
   });
 
@@ -88,12 +93,14 @@ describe('keyShortcut', () => {
   test('a modifier chord uses the spec modifier names, per platform', () => {
     // isMac decides Meta vs Control, so pin the shape rather than the platform.
     expect(keyShortcut('info.show')).toMatch(/^(Meta|Control)\+I$/);
-    expect(keyShortcut('tree.openExternal')).toMatch(/^(Meta|Control)\+O$/);
+    expect(keyShortcut('tree.open')).toMatch(/^(Meta|Control)\+O$/);
   });
 
   test('a binding with no accelerator has no shortcut to assert', () => {
     // collections.* chords are shown as hints but are not live in that menu,
-    // so they must not claim aria-keyshortcuts.
+    // and Reveal's ⌥⌘R carries a modifier eventMatchKey rejects — none of them
+    // may claim aria-keyshortcuts.
+    expect(keyShortcut('tree.openExternal')).toBe('');
     expect(keyShortcut('collections.rename')).toBe('');
     expect(keyShortcut('collections.archive')).toBe('');
     expect(keyShortcut('nope.missing')).toBe('');
@@ -108,18 +115,19 @@ describe('keyShortcut', () => {
 
 describe('isBareKeyChord', () => {
   test('a lone character is bare — it needs framing to read as a key', () => {
-    expect(isBareKeyChord('tree.rename')).toBe(true); // R
+    expect(isBareKeyChord('tree.solo')).toBe(true); // S
     expect(isBareKeyChord('tree.hide')).toBe(true); // .
     expect(isBareKeyChord('collections.archive')).toBe(true); // A
   });
 
   test('a modifier chord is not bare — the glyph already reads as a key', () => {
     expect(isBareKeyChord('info.show')).toBe(false); // ⌘I / Ctrl+I
-    expect(isBareKeyChord('tree.openExternal')).toBe(false); // ⌘O / Ctrl+O
+    expect(isBareKeyChord('tree.openExternal')).toBe(false); // ⌥⌘R / Ctrl+Alt+R
   });
 
-  test('a named key is not bare', () => {
-    expect(isBareKeyChord('collections.rename')).toBe(false); // F2
+  test('a binding advertising several keys is not bare', () => {
+    expect(isBareKeyChord('tree.rename')).toBe(false); // ↵ / R
+    expect(isBareKeyChord('collections.rename')).toBe(false); // ↵ / F2
   });
 
   test('an unknown id is not bare', () => {

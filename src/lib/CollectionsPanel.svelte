@@ -351,7 +351,10 @@
     if (idx < 0) return;
     const col = rows[idx];
 
-    if (event.key === 'F2') {
+    // Return renames the way Finder trains, F2 the way Explorer does. The
+    // draft/editing rows claim Return for Save above, so this only ever sees
+    // a settled row.
+    if (event.key === 'F2' || event.key === 'Enter') {
       event.preventDefault();
       startRename(col.name);
       return;

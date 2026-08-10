@@ -1940,9 +1940,18 @@
     const lk = event.key.toLowerCase();
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
 
-    if (meta && !event.shiftKey && lk === 'o') {
+    // Cmd/Ctrl+O opens the file, which is what Cmd+O means everywhere. Reveal
+    // moves to Alt+Cmd+R, matching VS Code's "Reveal in Finder". event.code
+    // because Option rewrites event.key to a symbol on macOS layouts (⌥R → ®).
+    if (meta && event.altKey && event.code === 'KeyR') {
       event.preventDefault();
       revealItemInDir(focused.path);
+      return true;
+    }
+
+    if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
+      event.preventDefault();
+      if (!focused.item.is_dir) openPath(focused.path);
       return true;
     }
 
@@ -1958,7 +1967,14 @@
     // event.code is layout-independent (some layouts produce a different
     // event.key for the numpad period, e.g. ',' on German).
     if (bareLetter) {
-      if (lk === 'r') { event.preventDefault(); renamingFilePath = focused.path; return true; }
+      // Rename answers to three keys so each platform's reflex works: Return
+      // is what Finder trains, F2 is what Explorer trains, R is the
+      // vim-flavoured extra this app already had.
+      if (lk === 'r' || event.key === 'Enter' || event.key === 'F2') {
+        event.preventDefault();
+        renamingFilePath = focused.path;
+        return true;
+      }
       // S/M are the one narrowing model on both axes. In tree view they
       // solo/mute the focused row on the collection axis; in systems
       // view they fall through to SystemsView's own handler, which
@@ -2102,21 +2118,24 @@
       return;
     }
 
-    // Cmd/Ctrl+J: switch to Systems view; Cmd/Ctrl+T: switch to Tree view,
-    // or collapse the whole tree when already there (the view switch's
-    // repeat action). Both match the visible switch and double as search-
-    // view exits — during search the repeat action never fires (the tree
-    // isn't on screen). 'J' was chosen over '\' because backslash isn't a
-    // single key on Canadian CSA and several other ISO layouts.
-    if (meta && !event.shiftKey && lk === 'j' && selectedFolder) {
+    // Cmd/Ctrl+1: Tree view, or collapse the whole tree when already there
+    // (the view switch's repeat action). Cmd/Ctrl+2: Systems view. Numbered
+    // rather than lettered because that's Finder's view-mode pattern, and
+    // because the old ⌘T / ⌘J both collided with strong browser defaults
+    // (new tab, downloads) while meaning nothing mnemonically.
+    //
+    // Gated on the search view being closed: while it's open Cmd+1-9 jumps to
+    // result N, and one number cannot mean both. Escape remains the way out of
+    // search, so no exit is lost — only the shortcut that used to double as one.
+    if (meta && !event.shiftKey && !searchViewOpen && selectedFolder && (event.key === '1' || event.key === '2')) {
       event.preventDefault();
-      if (searchViewOpen || viewMode !== 'systems') setViewMode('systems');
-      return;
-    }
-    if (meta && !event.shiftKey && lk === 't' && selectedFolder) {
-      event.preventDefault();
-      if (!searchViewOpen && viewMode === 'tree') collapseAll();
-      else setViewMode('tree');
+      if (event.key === '2') {
+        setViewMode('systems');
+      } else if (viewMode === 'tree') {
+        collapseAll();
+      } else {
+        setViewMode('tree');
+      }
       return;
     }
 
@@ -2168,15 +2187,12 @@
       return;
     }
 
-    // Cmd/Ctrl+Z: revert pending (unsynced) selection changes — same effect
-    // as clicking the X on the "N to add, M to remove" banner. Skipped when
-    // an input has focus so native text undo still works while typing.
-    if (meta && !event.shiftKey && lk === 'z' && !inAnyInput) {
-      if (pendingNotification.dismissByUser()) {
-        event.preventDefault();
-        return;
-      }
-    }
+    // Cmd/Ctrl+Z is deliberately NOT bound. It used to revert the pending sync
+    // selection, but ⌘Z is the most over-learned shortcut there is and it means
+    // "undo what I just did" — not "discard the whole staged set". Someone
+    // reflexively undoing a rename would have wiped their selection instead.
+    // Reverting stays available on the banner's X, where it reads as the
+    // deliberate act it is.
 
     // Cmd/Ctrl+I: show document info for the focused row. Mac muscle
     // memory from Finder ("Get Info"). indexedPaths.has implies the row
