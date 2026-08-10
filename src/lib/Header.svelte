@@ -109,21 +109,6 @@
       <div class="view-switch" role="group" aria-label="Library view">
         <button
           class="view-segment"
-          class:current={currentSegment === 'systems'}
-          on:click={() => { if (currentSegment !== 'systems') onSetViewMode('systems'); }}
-          title={'Shelve by system' + chordHint('view.systems')}
-          aria-label="Shelve by system"
-          aria-pressed={currentSegment === 'systems'}
-        >
-          <!-- Layered stack — shelve by system -->
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-            <path d="M12 2 L22 7 L12 12 L2 7 Z" />
-            <path d="M2 12 L12 17 L22 12" />
-            <path d="M2 17 L12 22 L22 17" />
-          </svg>
-        </button>
-        <button
-          class="view-segment"
           class:current={currentSegment === 'tree'}
           on:click={() => (currentSegment === 'tree' ? onCollapseAll() : onSetViewMode('tree'))}
           title={(currentSegment === 'tree' ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
@@ -135,6 +120,21 @@
             <path d="M21 6H9M21 12h-8M21 18h-8" />
             <path d="M4 4v4c0 1.1.9 2 2 2h3" />
             <path d="M4 8v8c0 1.1.9 2 2 2h3" />
+          </svg>
+        </button>
+        <button
+          class="view-segment"
+          class:current={currentSegment === 'systems'}
+          on:click={() => { if (currentSegment !== 'systems') onSetViewMode('systems'); }}
+          title={'Shelve by system' + chordHint('view.systems')}
+          aria-label="Shelve by system"
+          aria-pressed={currentSegment === 'systems'}
+        >
+          <!-- Layered stack — shelve by system -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+            <path d="M12 2 L22 7 L12 12 L2 7 Z" />
+            <path d="M2 12 L12 17 L22 12" />
+            <path d="M2 17 L12 22 L22 17" />
           </svg>
         </button>
       </div>
