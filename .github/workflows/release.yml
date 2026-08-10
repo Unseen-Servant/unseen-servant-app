@@ -41,7 +41,7 @@ jobs:
       # Any change to deps, bundled sidecar source, or this recipe busts it.
       - name: Cache sidecar binaries
         id: sidecar-dist
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: sidecar/dist
           key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', '.github/workflows/release.yml') }}
@@ -178,7 +178,7 @@ jobs:
       # Any change to deps, bundled sidecar source, or this recipe busts it.
       - name: Cache sidecar binaries
         id: sidecar-dist
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: sidecar/dist
           key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', '.github/workflows/release.yml') }}
