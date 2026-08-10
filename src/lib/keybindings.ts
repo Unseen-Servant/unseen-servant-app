@@ -136,6 +136,19 @@ export function chordHint(id: string): string {
   return c ? ` (${c})` : '';
 }
 
+// The `aria-keyshortcuts` value for a binding: spec modifier names joined with
+// '+', then the key. Derived from `match` so it cannot drift from what the menu
+// actually dispatches — and so it is empty for bindings the menu only *displays*
+// a hint for, which must not claim a shortcut they don't honour.
+export function keyShortcut(id: string): string {
+  const m = matchKey(id);
+  if (!m) return '';
+  if (m.startsWith('meta+')) {
+    return `${isMac ? 'Meta' : 'Control'}+${m.slice(5).toUpperCase()}`;
+  }
+  return m.toUpperCase();
+}
+
 // True when the chord is a single bare character — R, S, '.'. Alone in a menu's
 // hint column such a glyph reads as punctuation or a stray mark rather than a
 // key, so menus frame it in brackets. Modifier chords (⌘O) and named keys (F2)

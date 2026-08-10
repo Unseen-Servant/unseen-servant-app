@@ -1,7 +1,7 @@
 <script lang="ts">
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
-  import { chord, matchKey, eventMatchKey, isBareKeyChord } from './keybindings';
+  import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
 
   export let x: number;
   export let y: number;
@@ -304,27 +304,27 @@
   {#if !item.is_dir}
     <button class="context-item" data-mi="item" role="menuitem" on:click={onOpen}>Open file</button>
   {/if}
-  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.openExternal')} on:click={onReveal}>
+  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.openExternal')} aria-keyshortcuts={keyShortcut('tree.openExternal')} on:click={onReveal}>
     Reveal in folder
-    <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')}>{chord('tree.openExternal')}</span>
+    <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')} aria-hidden="true">{chord('tree.openExternal')}</span>
   </button>
   {#if canScope}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} on:click={onToggleSolo}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} aria-keyshortcuts={keyShortcut('tree.solo')} on:click={onToggleSolo}>
       {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
-      <span class="menu-chord" class:bare={isBareKeyChord('tree.solo')}>{chord('tree.solo')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.solo')} aria-hidden="true">{chord('tree.solo')}</span>
     </button>
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} on:click={onToggleMute}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} aria-keyshortcuts={keyShortcut('tree.mute')} on:click={onToggleMute}>
       {isMuted ? 'Unmute' : 'Mute'} this {item.is_dir ? 'folder' : 'file'}
-      <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')}>{chord('tree.mute')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')} aria-hidden="true">{chord('tree.mute')}</span>
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} on:click={onShowStats}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} aria-keyshortcuts={keyShortcut('info.show')} on:click={onShowStats}>
       Get info
-      <span class="menu-chord" class:bare={isBareKeyChord('info.show')}>{chord('info.show')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('info.show')} aria-hidden="true">{chord('info.show')}</span>
     </button>
   {/if}
 
@@ -382,7 +382,7 @@
       class:open={openSubmenu === 'add'}
       data-mi="submenu-trigger"
       data-submenu="add"
-      data-chord={matchKey('tree.addToCollection')}
+      data-chord={matchKey('tree.addToCollection')} aria-keyshortcuts={keyShortcut('tree.addToCollection')}
       role="menuitem"
       tabindex="-1"
       aria-haspopup="menu"
@@ -391,7 +391,7 @@
       on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Add to collection</span>
-      <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')}>{chord('tree.addToCollection')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')} aria-hidden="true">{chord('tree.addToCollection')}</span>
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'add'}
         <div class="submenu" role="menu">
@@ -476,16 +476,16 @@
        available so nothing strands. -->
   {#if !inheritedHidden && (item.is_dir || directlyHidden || !isIndexed)}
     <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} on:click={onToggleHidden}>
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} aria-keyshortcuts={keyShortcut('tree.hide')} on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
-      <span class="menu-chord" class:bare={isBareKeyChord('tree.hide')}>{chord('tree.hide')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.hide')} aria-hidden="true">{chord('tree.hide')}</span>
     </button>
   {/if}
 
   <hr class="context-divider" />
-  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} on:click={onRename}>
+  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} aria-keyshortcuts={keyShortcut('tree.rename')} on:click={onRename}>
     Rename {item.is_dir ? 'folder' : 'file'}
-    <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')}>{chord('tree.rename')}</span>
+    <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
   </button>
   <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
 </div>

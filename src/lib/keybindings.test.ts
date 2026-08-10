@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { KEYBINDINGS, eventMatchKey, isBareKeyChord, matchKey, type ChordEvent } from './keybindings';
+import {
+  KEYBINDINGS,
+  eventMatchKey,
+  isBareKeyChord,
+  keyShortcut,
+  matchKey,
+  type ChordEvent,
+} from './keybindings';
 
 const ev = (over: Partial<ChordEvent>): ChordEvent => ({
   key: '',
@@ -65,6 +72,37 @@ describe('menu accelerators', () => {
     expect(matchKey('tree.rename')).toBe('r');
     expect(matchKey('nope.missing')).toBe('');
     expect(matchKey('sync.run')).toBe('');
+  });
+});
+
+describe('keyShortcut', () => {
+  test('a bare key is its own shortcut value, uppercased', () => {
+    expect(keyShortcut('tree.rename')).toBe('R');
+    expect(keyShortcut('tree.solo')).toBe('S');
+  });
+
+  test('punctuation survives uppercasing unchanged', () => {
+    expect(keyShortcut('tree.hide')).toBe('.');
+  });
+
+  test('a modifier chord uses the spec modifier names, per platform', () => {
+    // isMac decides Meta vs Control, so pin the shape rather than the platform.
+    expect(keyShortcut('info.show')).toMatch(/^(Meta|Control)\+I$/);
+    expect(keyShortcut('tree.openExternal')).toMatch(/^(Meta|Control)\+O$/);
+  });
+
+  test('a binding with no accelerator has no shortcut to assert', () => {
+    // collections.* chords are shown as hints but are not live in that menu,
+    // so they must not claim aria-keyshortcuts.
+    expect(keyShortcut('collections.rename')).toBe('');
+    expect(keyShortcut('collections.archive')).toBe('');
+    expect(keyShortcut('nope.missing')).toBe('');
+  });
+
+  test('every menu-dispatchable binding yields a shortcut', () => {
+    for (const entry of KEYBINDINGS.filter((k) => k.match)) {
+      expect(keyShortcut(entry.id)).not.toBe('');
+    }
   });
 });
 
