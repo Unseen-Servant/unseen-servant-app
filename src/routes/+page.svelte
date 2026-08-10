@@ -28,6 +28,7 @@
   import { jobNotification, pendingNotification } from '../lib/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
   import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, type VisibleRow } from '../lib/treeNav';
+  import { materializeKey } from '../lib/paneFocus';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
   import { chord } from '../lib/keybindings';
@@ -62,26 +63,52 @@
     }
   }
 
+  // Pane focus is two axes, not one. `activePane` says which region answers
+  // the arrow keys; the three nullable tokens below say where that region's
+  // caret is drawn. Keeping them separate is what lets a click on a panel's
+  // chrome hand it the keyboard without ringing a row the user never pointed
+  // at — see docs/specs/keyboard/2026-08-09-pane-activation-design.md.
+  //
+  // Not nullable: the file region is the resting owner. Tree and systems nav
+  // already accept arrows with no caret and materialize on their own, so
+  // 'files' is simply the name for what used to be spelled "no token
+  // anywhere".
+  let activePane: 'files' | 'collections' | 'filters' = 'files';
+
   // File focus & context menu
   let focusedFilePath: string | null = null;
-  // Mirror state for collection-row keyboard focus. focusedFilePath and
-  // focusedCollectionName are mutually exclusive — only one region claims
-  // the keyboard at a time, which is how arrow keys know where to route.
+  // Mirror state for collection-row keyboard focus. At most one caret exists
+  // at a time, and it belongs to the active pane.
   let focusedCollectionName: string | null = null;
   // Third pane: the filter console. Holds a filterRows key, not an index.
   let focusedFilterRow: string | null = null;
 
+  // Hands a pane the arrows without placing a caret. A no-op when the pane is
+  // already active, so re-clicking its chrome preserves the caret it has.
+  function setActivePane(pane: 'files' | 'collections' | 'filters') {
+    if (activePane === pane) return;
+    activePane = pane;
+    if (pane !== 'files') focusedFilePath = null;
+    if (pane !== 'collections') focusedCollectionName = null;
+    if (pane !== 'filters') focusedFilterRow = null;
+  }
+  // Placing a caret implies claiming the arrows. Clearing a dock caret hands
+  // them back to the file region — which is how Escape and panel-close
+  // release ownership without needing their own callbacks. Clearing the file
+  // caret changes nothing, since 'files' is already the resting state.
   function setFocusedFilePath(path: string | null) {
     focusedFilePath = path;
-    if (path) { focusedCollectionName = null; focusedFilterRow = null; }
+    if (path) setActivePane('files');
   }
   function setFocusedCollectionName(name: string | null) {
     focusedCollectionName = name;
-    if (name) { focusedFilePath = null; focusedFilterRow = null; }
+    if (name) setActivePane('collections');
+    else if (activePane === 'collections') setActivePane('files');
   }
   function setFocusedFilterRow(key: string | null) {
     focusedFilterRow = key;
-    if (key) { focusedFilePath = null; focusedCollectionName = null; }
+    if (key) setActivePane('filters');
+    else if (activePane === 'filters') setActivePane('files');
   }
   // Remember the last non-null focus in each pane so Cmd+Alt+←/→/↑/↓ can
   // restore the user to where they were instead of always landing on
@@ -249,6 +276,12 @@
   let isSearching = false;
   let searchError: string | null = null;
   let searchSeq = 0;
+  // Deliberately outside the activePane model, and non-nullable. This is a
+  // selection with a downstream consumer — it drives SearchInspector — not a
+  // caret, and the search view arbitrates arrows by real DOM focus rather
+  // than by a pane token. There is also no gesture that lands it on row 0
+  // unintentionally: the file pane's mousedown bails while search is open,
+  // and the results list has no chrome handler.
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
   let searchResultsComponent: SearchResults | undefined;
@@ -1742,12 +1775,19 @@
   function moveTreeFocus(delta: number) {
     if (visibleTreeRows.length === 0) return;
     const current = indexOfPath(visibleTreeRows, focusedFilePath);
-    let next: number;
+    // No caret yet — the region owns the arrows but nothing is ringed. Place
+    // the caret rather than stepping, so the first press lands *on* the
+    // restored row instead of one past it.
     if (current < 0) {
-      next = delta > 0 ? 0 : visibleTreeRows.length - 1;
-    } else {
-      next = Math.min(visibleTreeRows.length - 1, Math.max(0, current + delta));
+      const entry = materializeKey(
+        visibleTreeRows.map((r) => r.path),
+        lastFocusedFilePath,
+        delta > 0 ? 1 : -1,
+      );
+      if (entry) focusTreeRow(entry);
+      return;
     }
+    const next = Math.min(visibleTreeRows.length - 1, Math.max(0, current + delta));
     focusTreeRow(visibleTreeRows[next].path);
   }
 
@@ -1808,24 +1848,14 @@
     }
   }
 
-  // Click anywhere in the file-tree pane chrome (not on a specific row)
-  // claims the file-side region with the first visible row, mirroring how
-  // the collections panel claims itself on chrome clicks. Skip in search
-  // mode (search owns its own selectedResultIndex). Systems mode delegates
-  // to SystemsView.claimFirst() because .systems-view only spans the
-  // height of its content, so clicks in the empty area below the last
-  // group still land here.
-  function handleFileTreeAreaMousedown(event: MouseEvent) {
+  // A mousedown anywhere in the file pane hands it the arrows — but places no
+  // caret. A row's own click fires after this and rings that row; a click on
+  // chrome (the scope bar, a systems-view group header, the empty space below
+  // the last row) leaves the pane armed and unringed, which is the point.
+  // Skip in search mode, which owns its own selectedResultIndex.
+  function handleFileTreeAreaMousedown() {
     if (searchViewOpen) return;
-    if (focusedFilePath !== null) return;
-    const target = event.target as HTMLElement | null;
-    if (viewMode === 'systems') {
-      if (target?.closest('[data-sv-row]')) return;
-      systemsViewComponent?.claim();
-      return;
-    }
-    if (target?.closest('[data-tree-row]')) return;
-    if (visibleTreeRows.length > 0) setFocusedFilePath(visibleTreeRows[0].path);
+    setActivePane('files');
   }
 
   // Returns true if the event was handled and shouldn't bubble further.
@@ -2081,13 +2111,13 @@
           // The browse view isn't in the DOM until Svelte flushes the
           // swap; focusFileRegion queries rows / the SystemsView binding.
           void tick().then(() => focusFileRegion());
-        } else if (focusedCollectionName === null) {
+        } else if (activePane === 'files') {
           event.preventDefault();
           headerComponent?.focus();
         }
-        // A focused collection row keeps the panel's own Esc semantics
-        // (its window handler clears the highlight); the next Esc
-        // funnels to the bar.
+        // An active dock pane keeps its own Esc semantics (its window
+        // handler clears the highlight and releases the arrows); the next
+        // Esc funnels to the bar.
         return;
       }
       if (focusedFilePath) { focusedFilePath = null; }
@@ -2158,8 +2188,8 @@
       event.preventDefault();
       if (event.key === 'ArrowDown') {
         // Collections sits above Filters.
-        if (focusedCollectionName !== null) { setFocusedCollectionName(null); focusFilterRegion(); }
-      } else if (focusedFilterRow !== null && collectionsPanelOpen) {
+        if (activePane === 'collections') { setFocusedCollectionName(null); focusFilterRegion(); }
+      } else if (activePane === 'filters' && collectionsPanelOpen) {
         // Guarded on the panel being open: focusCollectionsRegion force-opens
         // it, and a dock-navigation chord must skip a closed panel rather
         // than open one — the down direction already does.
@@ -2279,12 +2309,14 @@
     // specific handlers in either mode.
     const fileActionGate =
       selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath &&
-      !competingMenuOpen && !focusedCollectionName && !inAnyInput;
+      !competingMenuOpen && activePane === 'files' && !inAnyInput;
     if (fileActionGate && handleFocusedFileActionKey(event)) return;
 
     // Tree-row arrow navigation. Systems view owns its own arrow nav,
-    // so this block is gated to tree mode only.
-    if (selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath && !competingMenuOpen && !focusedCollectionName && viewMode === 'tree') {
+    // so this block is gated to tree mode only. Gating on activePane rather
+    // than on a null collection token also stops ↓ stealing the caret out of
+    // the filter panel, which the old check never considered.
+    if (selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath && !competingMenuOpen && activePane === 'files' && viewMode === 'tree') {
       if (!inAnyInput && handleTreeNavKey(event)) return;
     }
 
@@ -2812,10 +2844,10 @@
 
   async function togglePanel() {
     collectionsPanelOpen = !collectionsPanelOpen;
-    // Closing unmounts the panel and its window keydown handler, so a
-    // focused row could never release the mutex — and a stale
-    // focusedCollectionName gates off tree nav and file action keys.
-    // An off-screen region must not hold keyboard focus.
+    // Closing unmounts the panel and its window keydown handler, so an
+    // off-screen region could never release the arrows on its own — and
+    // nothing would answer ↓. The setter hands ownership back to the file
+    // region as it clears the caret.
     if (!collectionsPanelOpen) setFocusedCollectionName(null);
     try {
       const store = await load('settings.json');
@@ -2828,6 +2860,9 @@
 
   async function toggleFilterPanel() {
     filterPanelOpen = !filterPanelOpen;
+    // Same reasoning as togglePanel: an unmounted pane must not keep the
+    // arrows, or the next ↓ goes nowhere.
+    if (!filterPanelOpen) setFocusedFilterRow(null);
     try {
       const store = await load('settings.json');
       await store.set('filterPanelOpen', filterPanelOpen);
@@ -3152,7 +3187,12 @@
       {#if collectionsPanelOpen || filterPanelOpen}
         <!-- Left dock: collections on top, filters below. Each panel
              scrolls its own rows; the dock owns the width and the
-             dividing rules. -->
+             dividing rules.
+
+             Both panes stay mounted while the search view is open, so
+             `active` is ANDed with !searchViewOpen: search owns the arrows
+             there, and without this a dock pane left active from browse mode
+             would step its caret alongside the result selection. -->
         <div class="left-dock">
           {#if collectionsPanelOpen}
             <CollectionsPanel
@@ -3180,6 +3220,9 @@
               onSetSortKey={setCollectionsSortKey}
               onReorder={reorderCollections}
               focusedName={focusedCollectionName}
+              lastFocusedName={lastFocusedCollectionName}
+              active={activePane === 'collections' && !searchViewOpen}
+              onActivate={() => setActivePane('collections')}
               onFocusCollection={setFocusedCollectionName}
             />
           {/if}
@@ -3210,6 +3253,9 @@
               onToggleCurationMute={toggleCurationMute}
               onClearAll={clearAllFilters}
               focusedRow={focusedFilterRow}
+              lastFocusedRow={lastFocusedFilterRow}
+              active={activePane === 'filters' && !searchViewOpen}
+              onActivate={() => setActivePane('filters')}
               onFocusRow={setFocusedFilterRow}
             />
           {/if}
@@ -3297,7 +3343,8 @@
             {showHidden}
             libraryRoot={selectedFolder}
             {focusedFilePath}
-            {focusedCollectionName}
+            lastFocusedPath={lastFocusedFilePath}
+            active={activePane === 'files'}
             onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
             {renamingFilePath}

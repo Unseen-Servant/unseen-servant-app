@@ -5,11 +5,20 @@
   import { PIGMENTS } from './palette';
   import { tick } from 'svelte';
   import { chord, isBareKeyChord } from './keybindings';
+  import { materializeKey } from './paneFocus';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against
   // focusedFilePath (only one region claims arrow keys at a time).
   export let focusedName: string | null = null;
+  // This panel owns the arrow keys. Independent of focusedName: a click on
+  // the panel's chrome activates it without ringing a row, and the first
+  // arrow then materializes the caret.
+  export let active = false;
+  export let onActivate: () => void = () => {};
+  // Where that first arrow lands — the page remembers the last row this pane
+  // held, so pointing at the panel doesn't throw away the user's position.
+  export let lastFocusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
   export let editingName: string | null = null;
   // Proposed name of an in-progress draft (new collection that hasn't been
@@ -287,7 +296,7 @@
       sortMenuOpen = false;
       return;
     }
-    if (focusedName === null) return;
+    if (!active) return;
     // Yield to inline renames, the sort menu, the context menu, and any
     // other popover that may be claiming keys.
     if (renamingDraft || renamingName !== null || sortMenuOpen || ctxMenu) return;
@@ -305,6 +314,18 @@
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
 
+    // Active with no caret (the pane was claimed by a chrome click): the
+    // first arrow places the caret rather than stepping, so it lands *on*
+    // the restored row instead of one past it.
+    if (focusedName === null && (isDown || isUp)) {
+      event.preventDefault();
+      const entry = materializeKey(rows.map((r) => r.name), lastFocusedName, isDown ? 1 : -1);
+      if (entry) onFocusCollection(entry);
+      return;
+    }
+
+    // idx is -1 for a caret on the draft row too — a fresh draft sits outside
+    // `rows` — so these keep the existing "enter from the far end" fallback.
     const idx = rows.findIndex((r) => r.name === focusedName);
 
     if (isDown) {
@@ -407,15 +428,15 @@
     sortMenuOpen = false;
   }
 
-  // Click anywhere in the panel chrome (not on a specific row) claims the
-  // collections region — so arrow keys move here next, even when the user
-  // hasn't picked a row yet. Row clicks set their own focus and we let
-  // those win by skipping when the target is inside a [data-cp-row].
-  function handlePanelMousedown(event: MouseEvent) {
-    if (focusedName !== null) return;
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('[data-cp-row]')) return;
-    if (rows.length > 0) onFocusCollection(rows[0].name);
+  // A mousedown anywhere in the panel hands it the arrows — but places no
+  // caret. A row's own click fires after this and rings that row; a click on
+  // the masthead, the sort button or "+ collection" leaves the pane armed and
+  // unringed. Guarded on there being somewhere for the caret to go, so an
+  // empty panel doesn't silently swallow the arrows (a live draft counts —
+  // it sits outside `rows`).
+  function handlePanelMousedown() {
+    if (rows.length === 0 && draftName === null) return;
+    onActivate();
   }
 
   // Exposed for the page-level Cmd+Alt+← jump. Restores `preferred` if

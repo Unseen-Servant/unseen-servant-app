@@ -4,6 +4,7 @@
   import type { FileItem, FileStatusEntry } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
   import { UNTAGGED_KEY } from './searchScope';
+  import { materializeKey } from './paneFocus';
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -40,9 +41,11 @@
   export let libraryRoot: string = '';
 
   export let focusedFilePath: string | null = null;
-  // Collections panel claims arrow keys when a collection row is focused —
-  // SystemsView must yield so ↓/↑ doesn't move the systems cursor too.
-  export let focusedCollectionName: string | null = null;
+  // The file region owns the arrow keys. False while a dock pane holds them,
+  // so ↓/↑ doesn't move the systems cursor too.
+  export let active = false;
+  // Where the caret lands when this pane is active but has none yet.
+  export let lastFocusedPath: string | null = null;
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
 
@@ -283,10 +286,20 @@
   function moveFocus(delta: number) {
     if (visibleEntries.length === 0) return;
     const cur = focusedIdx;
-    const next = cur === null
-      ? (delta > 0 ? 0 : visibleEntries.length - 1)
-      : Math.max(0, Math.min(visibleEntries.length - 1, cur + delta));
-    setFocusedIdx(next);
+    // No caret yet — the region owns the arrows but nothing is ringed. Place
+    // the caret rather than stepping, so the first press lands *on* the
+    // restored entry instead of one past it.
+    if (cur === null) {
+      const entry = materializeKey(
+        visibleEntries.map((v) => v.path),
+        lastFocusedPath,
+        delta > 0 ? 1 : -1,
+      );
+      const i = entry === null ? -1 : visibleEntries.findIndex((v) => v.path === entry);
+      if (i >= 0) setFocusedIdx(i);
+      return;
+    }
+    setFocusedIdx(Math.max(0, Math.min(visibleEntries.length - 1, cur + delta)));
   }
 
   function handleWindowKey(event: KeyboardEvent) {
@@ -301,8 +314,10 @@
     if (document.querySelector('dialog[open]')) return;
     const target = event.target as HTMLElement | null;
     if (target?.matches('input, textarea, [contenteditable="true"]')) return;
-    // Yield to the collections panel when a collection row is focused.
-    if (focusedCollectionName !== null) return;
+    // Yield whenever a dock pane owns the arrows. Gating on the pane rather
+    // than on a collection token also stops ↓ stealing the caret out of the
+    // filter panel, which the old check never considered.
+    if (!active) return;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
@@ -395,16 +410,6 @@
     return `${years}y`;
   }
 
-  // Click anywhere in the systems-view chrome (not on a specific row)
-  // claims the file-side region with the first visible entry, mirroring
-  // the same behavior on the collections panel.
-  function handleViewMousedown(event: MouseEvent) {
-    if (focusedFilePath !== null) return;
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('[data-sv-row]')) return;
-    if (visibleEntries.length > 0) setFocusedIdx(0);
-  }
-
   // Resolve the currently-focused entry as a FileItem so the parent's
   // shared action-key helper (R/F/./M/C/Cmd+O) can run against it
   // regardless of view mode. Returns null when nothing is focused or
@@ -449,13 +454,11 @@
     node.select();
   }
 
-  // Exposed so the parent's .file-tree-area mousedown can claim systems
-  // mode too — .systems-view only spans the height of its content, so
-  // chrome clicks in the scrollable area below the last group fall on
-  // the parent and miss handleViewMousedown. Also used by the Cmd+Alt+→
-  // jump: passing a path restores that entry when it's still visible
-  // (multi-tagged files land on the first occurrence and ↓ walks the
-  // rest), otherwise we fall back to the first visible entry.
+  // The Cmd+Alt+→ jump: passing a path restores that entry when it's still
+  // visible (multi-tagged files land on the first occurrence and ↓ walks the
+  // rest), otherwise we fall back to the first visible entry. Chrome clicks
+  // do NOT come through here — they only activate the pane, via the parent's
+  // .file-tree-area mousedown, and leave the caret for the first arrow.
   export function claim(preferred: string | null = null) {
     if (focusedFilePath !== null) return;
     if (visibleEntries.length === 0) return;
@@ -470,11 +473,9 @@
 <svelte:window on:keydown={handleWindowKey} />
 
 {#if groups.length === 0}
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="empty" on:mousedown={handleViewMousedown}>No indexed files match the current view.</div>
+  <div class="empty">No indexed files match the current view.</div>
 {:else}
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="systems-view" on:mousedown={handleViewMousedown}>
+  <div class="systems-view">
     {#each groups as group (group.tag)}
       {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}

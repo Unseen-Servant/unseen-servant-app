@@ -6,6 +6,12 @@
 e6186a7 (wiring), a8c7b6a (dock chords), a442ef1 (registry).
 svelte-check, vitest, stylelint and the vite build all green; the plan's
 manual QA checklist is still pending.
+**Partly superseded 2026-08-09** by
+`2026-08-09-pane-activation-design.md`. The state model below — one token per
+pane, "setting one nulls the other two" — was split in two: `activePane` now
+carries keyboard ownership and the tokens carry only caret placement, so a
+pane can be claimed without a caret being drawn. Row identity by stable key,
+the `⌘⌥` chords and the deferrals recorded here are unaffected.
 **Related:** `src/lib/FilterPanel.svelte`, `src/lib/CollectionsPanel.svelte`,
 `src/routes/+page.svelte`, `src/lib/keybindings.ts`, commit 3c6ef23 (the
 interim Escape fix this design supersedes).

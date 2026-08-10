@@ -8,6 +8,7 @@
   // furniture, not a popover.
   import { afterUpdate } from 'svelte';
   import { computeFilterRows, stepFilterRow } from './filterRows';
+  import { materializeKey } from './paneFocus';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
 
@@ -59,10 +60,17 @@
   export let hideUnindexed: boolean = false;
   export let onToggleHideUnindexed: () => void = () => {};
 
-  // Pane focus, owned by +page.svelte and mutually exclusive with the tree
-  // and collections tokens. null means this pane does not hold the keyboard,
-  // and no cursor is drawn.
+  // Where this pane's caret is. null means no cursor is drawn — which is now
+  // distinct from not holding the keyboard, see `active`.
   export let focusedRow: string | null = null;
+  // This panel owns the arrow keys. A click anywhere in it activates the pane
+  // without ringing a row; the first arrow then materializes the caret. Until
+  // this existed the panel had no mouse entry point at all — Cmd+Alt+↓ was
+  // the only way in.
+  export let active = false;
+  export let onActivate: () => void = () => {};
+  // Where that first arrow lands, remembered by the page.
+  export let lastFocusedRow: string | null = null;
   export let onFocusRow: (key: string | null) => void = () => {};
 
   // Curation section: two channels over the collected/loose domain,
@@ -118,7 +126,7 @@
   // Window-level and gated on the token — the same shape CollectionsPanel
   // uses, so exactly one pane responds to a keystroke.
   function handleWindowKey(event: KeyboardEvent) {
-    if (focusedRow === null) return;
+    if (!active) return;
     if (event.isComposing) return;
     // Yield to popovers and modals that own the keyboard while open.
     if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
@@ -138,6 +146,14 @@
       // affordance. Matches CollectionsPanel's onFocusCollection(null).
       event.preventDefault();
       onFocusRow(null);
+      return;
+    }
+    // Active with no caret (the pane was claimed by a click on its chrome):
+    // the first arrow places the caret rather than stepping, so it lands *on*
+    // the restored row instead of one past it.
+    if (focusedRow === null && (isDown || isUp)) {
+      event.preventDefault();
+      onFocusRow(materializeKey(rows.map((r) => r.key), lastFocusedRow, isDown ? 1 : -1));
       return;
     }
     if (isDown) {
@@ -160,6 +176,12 @@
       onFocusRow(rows[rows.length - 1].key);
       return;
     }
+
+    // Everything below acts on the caret's row, which the branches above are
+    // the only way to create. Escape stays above so it can still release an
+    // active pane that never grew one.
+    if (focusedRow === null) return;
+
     if (event.key === ' ' || event.key === 'Enter') {
       // A channel row's default action is its M toggle. A view row has no
       // M — its own control is the only button, so click that.
@@ -186,7 +208,8 @@
 
 <svelte:window on:keydown={handleWindowKey} />
 
-<aside class="filter-panel" bind:this={panelEl}>
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<aside class="filter-panel" bind:this={panelEl} on:mousedown={onActivate}>
   <header class="panel-head">
     <span class="panel-title">Filters</span>
     <button class="btn-link" on:click={onClearAll}>clear all</button>
