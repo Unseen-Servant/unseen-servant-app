@@ -2250,9 +2250,15 @@
       }
     }
 
-    // Cmd/Ctrl+E: toggle the Filters panel (docked below the collections
-    // panel in the left pane).
-    if (meta && !event.shiftKey && lk === 'e' && selectedFolder) {
+    // Cmd/Ctrl+Shift+F: toggle the Filters panel (docked below the collections
+    // panel in the left pane). Deliberately the shift-variant of Cmd+F: that
+    // focuses search, this opens the console that shapes what search covers,
+    // so the pair reads as a family. It replaced Cmd+E, which meant nothing
+    // mnemonically and collided twice — macOS binds Cmd+E to "Use Selection
+    // for Find" in any text field, and Finder binds it to Eject.
+    //
+    // The Cmd+F branch above excludes shift, so this can't be shadowed by it.
+    if (meta && event.shiftKey && lk === 'f' && selectedFolder) {
       event.preventDefault();
       toggleFilterPanel();
       return;
