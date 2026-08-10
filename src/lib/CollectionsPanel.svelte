@@ -3,9 +3,10 @@
   import ActionButton from './ActionButton.svelte';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { chord, isBareKeyChord } from './keybindings';
   import { materializeKey } from './paneFocus';
+  import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against
@@ -257,11 +258,13 @@
       y: Math.min(e.clientY, window.innerHeight - CTX_HEIGHT - 4),
       name,
     };
+    claimMenuSlot(closeContextMenu);
   }
 
   function closeContextMenu() {
     ctxMenu = null;
     ctxPigmentOpen = false;
+    releaseMenuSlot(closeContextMenu);
   }
 
   // Runs a menu action against the menu's collection, then closes the
@@ -293,7 +296,7 @@
     }
     if (sortMenuOpen && event.key === 'Escape') {
       event.preventDefault();
-      sortMenuOpen = false;
+      closeSortMenu();
       return;
     }
     if (!active) return;
@@ -410,13 +413,30 @@
   }
 
   function toggleSortMenu() {
-    sortMenuOpen = !sortMenuOpen;
+    if (sortMenuOpen) {
+      closeSortMenu();
+      return;
+    }
+    sortMenuOpen = true;
+    claimMenuSlot(closeSortMenu);
+  }
+
+  function closeSortMenu() {
+    sortMenuOpen = false;
+    releaseMenuSlot(closeSortMenu);
   }
 
   function pickSort(value: typeof sortKey) {
     onSetSortKey(value);
-    sortMenuOpen = false;
+    closeSortMenu();
   }
+
+  // The dock can be closed with either menu still open — don't leave a menu
+  // that no longer exists holding the slot.
+  onDestroy(() => {
+    releaseMenuSlot(closeSortMenu);
+    releaseMenuSlot(closeContextMenu);
+  });
 
   function handleWindowClick(event: MouseEvent) {
     if (ctxMenu) {
@@ -425,7 +445,7 @@
     if (!sortMenuOpen) return;
     const target = event.target as Node;
     if (sortBtn && (sortBtn === target || sortBtn.contains(target))) return;
-    sortMenuOpen = false;
+    closeSortMenu();
   }
 
   // A mousedown on the panel's empty or non-selectable space — the masthead,

@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { KnownGameSystem } from './types';
+  import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let tags: string[] = [];
@@ -23,7 +25,7 @@
   export function toggle(event: MouseEvent) {
     event.stopPropagation();
     if (showDropdown) {
-      showDropdown = false;
+      closeDropdown();
       return;
     }
     // Anchor the menu under the trigger using viewport coords so it
@@ -34,16 +36,22 @@
     dropdownX = Math.max(4, dropdownX);
     dropdownY = Math.min(rect.bottom + 2, window.innerHeight - DROPDOWN_MAX_HEIGHT - 4);
     showDropdown = true;
+    claimMenuSlot(closeDropdown);
   }
 
   function clearSystem() {
     onClear();
-    showDropdown = false;
+    closeDropdown();
   }
 
   function closeDropdown() {
     showDropdown = false;
+    releaseMenuSlot(closeDropdown);
   }
+
+  // A tree row can be unmounted (folder collapsed, filter changed) with its
+  // dropdown still open — don't leave a dead menu holding the slot.
+  onDestroy(() => releaseMenuSlot(closeDropdown));
 
   function handleWindowKeydown(event: KeyboardEvent) {
     if (showDropdown && event.key === 'Escape') {

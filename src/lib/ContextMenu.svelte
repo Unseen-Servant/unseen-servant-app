@@ -2,6 +2,7 @@
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
+  import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
 
   export let x: number;
   export let y: number;
@@ -155,10 +156,18 @@
     }
   }
 
+  // The page mounts this component to open the menu and unmounts it to close,
+  // so holding the one-menu-at-a-time slot is a lifetime affair. Wrapped
+  // rather than passing `onClose` itself so the slot keeps one stable
+  // reference even if the prop is reassigned.
+  const closeSelf = () => onClose();
+
   onMount(() => {
     clampMenuToViewport();
     positioned = true;
     refreshItemsAndFocus({ initial: true });
+    claimMenuSlot(closeSelf);
+    return () => releaseMenuSlot(closeSelf);
   });
   afterUpdate(() => refreshItemsAndFocus());
 
