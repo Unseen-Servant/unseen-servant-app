@@ -132,6 +132,14 @@ Applied to the corrected query, direct vocab checks (no symspell):
   (reindex/delete), same trigger as the lexical index.
 - `symspellpy` added to `pyproject.toml`; pure Python, so no PyInstaller spec
   changes expected beyond the dependency (verify in the build).
+- **Verified 2026-08-09 (v2.1.0 release prep): the expectation above was wrong.**
+  Pure Python is not the whole story — the general-English guard reads
+  `frequency_dictionary_en_82_765.txt` out of the installed package, and
+  PyInstaller collects an imported module's code but not its data files (no
+  `symspellpy` hook exists in `pyinstaller-hooks-contrib`). A packaged sidecar
+  raised `FileNotFoundError` on the first OOV query token. `--collect-all
+  symspellpy` added to `scripts/build-sidecar.sh` and
+  `.github/workflows/release.yml`.
 
 ## Eval plan and GO/NO-GO gate
 

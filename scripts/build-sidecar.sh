@@ -31,12 +31,16 @@ echo "==> Building legend-lore-sidecar (FastAPI server)..."
 #    pymupdf/layout/resources/
 #  - fastembed: cross-encoder ONNX model + tokenizer assets used by
 #    the reranker
+#  - symspellpy: frequency_dictionary_en_82_765.txt, read at runtime by
+#    spelling.py's general-English guard — pure-Python module, but the
+#    data file is not collected on its own
 # Kept in sync with .github/workflows/release.yml.
 uv run --frozen --no-sync pyinstaller --onefile --name legend-lore-sidecar server.py \
   --collect-all chromadb \
   --collect-all pymupdf \
   --collect-all pymupdf4llm \
   --collect-all fastembed \
+  --collect-all symspellpy \
   --hidden-import uvicorn.logging \
   --hidden-import uvicorn.protocols.http \
   --hidden-import uvicorn.protocols.http.auto \
