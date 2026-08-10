@@ -17,6 +17,8 @@ Clicking anywhere non-selectable in a pane planted the caret on row 0. The
 Collections masthead, the sort button, `+ collection`, a systems-view group
 header, a scope-bar chip, the empty space below the last tree row — all of them
 put a parchment ring on the first row of a list the user had not pointed at.
+And the same gesture could not *remove* a ring either: clicking the gap below a
+selected row left it selected, so there was no way to deselect with the mouse.
 
 One variable was doing two jobs. `focusedFilePath`, `focusedCollectionName` and
 `focusedFilterRow` each meant both *"this pane owns the arrow keys"* and *"the
@@ -61,14 +63,25 @@ into a type.
 
 Four rules, all in `+page.svelte`:
 
-1. **Activating clears foreign carets.** `setActivePane` is a no-op when the
-   pane is already active, so re-clicking a pane's chrome preserves the caret it
-   already has.
-2. **Placing a caret implies activating.**
-3. **Clearing a dock caret returns ownership to `'files'`.** This is why Escape
+1. **Activating clears foreign carets.** `setActivePane` leaves the target
+   pane's own caret alone — the caret setters call it straight after placing
+   theirs.
+2. **Pointing at empty space clears every caret, including the target pane's.**
+   `pointAtEmpty` is the chrome-mousedown entry point, and this is what makes
+   clicking the gap below a row a *deselect* rather than a no-op. Nothing is
+   lost: `lastFocused*` still holds the row, so the next arrow brings it back.
+3. **Placing a caret implies activating.**
+4. **Clearing a dock caret returns ownership to `'files'`.** This is why Escape
    and panel-close release for free — both already call `setFocused…(null)`.
-4. **Clearing the file caret changes nothing**, since `'files'` is the resting
+5. **Clearing the file caret changes nothing**, since `'files'` is the resting
    state.
+
+Rows are skipped by all three chrome handlers (`[data-tree-row]`,
+`[data-sv-row]`, `[data-cp-row]`, `[data-fm-key]`). A row's own `click` fires
+after `mousedown` and would just re-place the caret, but skipping matters for
+two cases it would not cover: starting a **drag** on a collections row produces
+no click, and the filter panel's rows are deliberately inert to clicks, so
+mousing an S/M button there would otherwise drop a caret parked elsewhere.
 
 ### Materialization
 
@@ -136,6 +149,8 @@ token; and no gesture lands it on row 0 unintentionally.
    mutex hole closing.
 3. **Clicking anywhere in the Filters panel now gives it the arrows** — its
    first mouse entry point.
+4. **Clicking empty space deselects.** Previously there was no mouse gesture
+   that cleared a caret at all; Escape was the only way.
 
 ## Verification
 
@@ -152,10 +167,16 @@ Manual QA, none of it reachable by an automated gate:
    `↓` restores your last collection row.
 5. Click the Filters masthead / `clear all` / a section label → the pane takes
    the arrows; `↓` restores your last filter row.
-6. Caret on collections row 3 → click the collections masthead → caret stays on
-   row 3.
+6. Caret on collections row 3 → click the collections masthead → **caret
+   clears**; `↓` brings it back to row 3.
 7. Caret on a tree row → click the collections masthead → tree caret
    disappears, no collections caret appears.
+7b. Caret on a tree row → click the gap below the last tree row → caret clears,
+   arrows stay with the tree.
+7c. Drag a collections row to reorder → its caret survives (no click fires, so
+   the row skip is what protects it).
+7d. Caret on filter row 2 → mouse-click the S button on filter row 5 → row 5
+   solos and the caret stays on row 2.
 8. Filters focused → `↓` must not move the tree, in both tree and systems mode.
 9. `Esc` from each dock pane → caret gone *and* the next `↓` moves the tree.
 10. Chrome-click Collections, then `⌘B` to close it → `↓` moves the tree.

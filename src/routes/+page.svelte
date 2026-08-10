@@ -83,14 +83,26 @@
   // Third pane: the filter console. Holds a filterRows key, not an index.
   let focusedFilterRow: string | null = null;
 
-  // Hands a pane the arrows without placing a caret. A no-op when the pane is
-  // already active, so re-clicking its chrome preserves the caret it has.
+  // Switch ownership, clearing the carets of the panes being left. The target
+  // pane's own caret is untouched — the setters below call this straight after
+  // placing theirs. A no-op when the pane is already active.
   function setActivePane(pane: 'files' | 'collections' | 'filters') {
     if (activePane === pane) return;
     activePane = pane;
     if (pane !== 'files') focusedFilePath = null;
     if (pane !== 'collections') focusedCollectionName = null;
     if (pane !== 'filters') focusedFilterRow = null;
+  }
+  // A mousedown on empty or non-selectable space: point at the pane and select
+  // nothing. Deselects *within* the pane too, which is the difference from
+  // setActivePane — clicking the gap below a row drops that row's caret, the
+  // way clicking away from a selection does anywhere else. Nothing is lost:
+  // lastFocused* still remembers the row, so the next arrow brings it back.
+  function pointAtEmpty(pane: 'files' | 'collections' | 'filters') {
+    activePane = pane;
+    focusedFilePath = null;
+    focusedCollectionName = null;
+    focusedFilterRow = null;
   }
   // Placing a caret implies claiming the arrows. Clearing a dock caret hands
   // them back to the file region — which is how Escape and panel-close
@@ -1848,14 +1860,16 @@
     }
   }
 
-  // A mousedown anywhere in the file pane hands it the arrows — but places no
-  // caret. A row's own click fires after this and rings that row; a click on
-  // chrome (the scope bar, a systems-view group header, the empty space below
-  // the last row) leaves the pane armed and unringed, which is the point.
+  // A mousedown on the file pane's empty or non-selectable space — the scope
+  // bar, a systems-view group header, the gap below the last row — points at
+  // the region and deselects. Rows are skipped so their own click (which fires
+  // after mousedown) owns the caret, and so dragging a row doesn't clear it.
   // Skip in search mode, which owns its own selectedResultIndex.
-  function handleFileTreeAreaMousedown() {
+  function handleFileTreeAreaMousedown(event: MouseEvent) {
     if (searchViewOpen) return;
-    setActivePane('files');
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-tree-row], [data-sv-row]')) return;
+    pointAtEmpty('files');
   }
 
   // Returns true if the event was handled and shouldn't bubble further.
@@ -3222,7 +3236,7 @@
               focusedName={focusedCollectionName}
               lastFocusedName={lastFocusedCollectionName}
               active={activePane === 'collections' && !searchViewOpen}
-              onActivate={() => setActivePane('collections')}
+              onActivate={() => pointAtEmpty('collections')}
               onFocusCollection={setFocusedCollectionName}
             />
           {/if}
@@ -3255,7 +3269,7 @@
               focusedRow={focusedFilterRow}
               lastFocusedRow={lastFocusedFilterRow}
               active={activePane === 'filters' && !searchViewOpen}
-              onActivate={() => setActivePane('filters')}
+              onActivate={() => pointAtEmpty('filters')}
               onFocusRow={setFocusedFilterRow}
             />
           {/if}

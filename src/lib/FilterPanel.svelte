@@ -106,6 +106,17 @@
     return panelEl?.querySelector<HTMLElement>(`[data-fm-key="${CSS.escape(key)}"]`) ?? null;
   }
 
+  // A mousedown on the panel's empty or non-selectable space — the masthead,
+  // [clear all], a section label — points at the pane and deselects. Rows are
+  // skipped even though clicking one selects nothing here (their background is
+  // deliberately inert), so that mousing an S/M button doesn't drop a caret
+  // parked on some other row.
+  function handlePanelMousedown(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-fm-key]')) return;
+    onActivate();
+  }
+
   // The panel body scrolls, and the cursor no longer moves DOM focus, so
   // nothing scrolls it into view for us any more.
   let lastScrolled: string | null = null;
@@ -209,7 +220,7 @@
 <svelte:window on:keydown={handleWindowKey} />
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-<aside class="filter-panel" bind:this={panelEl} on:mousedown={onActivate}>
+<aside class="filter-panel" bind:this={panelEl} on:mousedown={handlePanelMousedown}>
   <header class="panel-head">
     <span class="panel-title">Filters</span>
     <button class="btn-link" on:click={onClearAll}>clear all</button>

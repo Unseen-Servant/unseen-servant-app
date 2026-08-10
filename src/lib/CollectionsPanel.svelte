@@ -428,14 +428,16 @@
     sortMenuOpen = false;
   }
 
-  // A mousedown anywhere in the panel hands it the arrows — but places no
-  // caret. A row's own click fires after this and rings that row; a click on
-  // the masthead, the sort button or "+ collection" leaves the pane armed and
-  // unringed. Guarded on there being somewhere for the caret to go, so an
-  // empty panel doesn't silently swallow the arrows (a live draft counts —
-  // it sits outside `rows`).
-  function handlePanelMousedown() {
+  // A mousedown on the panel's empty or non-selectable space — the masthead,
+  // the sort button, "+ collection", the gap below the last row — points at
+  // the pane and deselects. Rows are skipped so their own click owns the
+  // caret, and so starting a drag doesn't clear it. Guarded on there being
+  // somewhere for the caret to go, so an empty panel doesn't silently swallow
+  // the arrows (a live draft counts — it sits outside `rows`).
+  function handlePanelMousedown(event: MouseEvent) {
     if (rows.length === 0 && draftName === null) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-cp-row]')) return;
     onActivate();
   }
 
