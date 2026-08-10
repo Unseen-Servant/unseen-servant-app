@@ -131,6 +131,17 @@
   --header-height: 40px;
   --statusbar-height: 28px;
 
+  /* Menu geometry. Two steps, applied as floors: a submenu narrower than
+     the menu it hangs off reads as subordinate to it. The max-width caps
+     rows carrying user-generated names (collections, game systems), which
+     have no length limit of their own; it matches the left dock's width.
+     The max-height is a scroll ceiling for the menus rendering a list the
+     user can grow — the fixed-row menus never reach it. */
+  --menu-width: 200px;
+  --submenu-width: 180px;
+  --menu-max-width: 280px;
+  --menu-max-height: 320px;
+
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;

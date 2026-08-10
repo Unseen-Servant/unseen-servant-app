@@ -3,6 +3,7 @@
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
+  import { clampToViewport } from './menuGeometry';
 
   export let x: number;
   export let y: number;
@@ -131,14 +132,17 @@
     const spaceBelow = window.innerHeight - triggerRect.top - padding;
     const spaceAbove = triggerRect.bottom - padding;
 
+    // --submenu-room reports the space on the chosen side; the stylesheet
+    // takes the smaller of it and --menu-max-height, so the scroll ceiling
+    // stays declared in one place.
     if (spaceAbove > spaceBelow) {
       submenu.style.top = 'auto';
       submenu.style.bottom = '-0.15rem';
-      submenu.style.maxHeight = `${Math.max(120, Math.min(spaceAbove, 320))}px`;
+      submenu.style.setProperty('--submenu-room', `${Math.max(120, spaceAbove)}px`);
     } else {
       submenu.style.top = '-0.15rem';
       submenu.style.bottom = 'auto';
-      submenu.style.maxHeight = `${Math.max(120, Math.min(spaceBelow, 320))}px`;
+      submenu.style.setProperty('--submenu-room', `${Math.max(120, spaceBelow)}px`);
     }
 
     // Same idea horizontally: the static CSS opens at left: 100%, which
@@ -265,11 +269,11 @@
 
   function clampMenuToViewport() {
     if (!menuEl) return;
-    const padding = 8;
-    const h = menuEl.offsetHeight;
-    const w = menuEl.offsetWidth;
-    clampedX = Math.max(padding, Math.min(x, window.innerWidth - w - padding));
-    clampedY = Math.max(padding, Math.min(y, window.innerHeight - h - padding));
+    ({ x: clampedX, y: clampedY } = clampToViewport(
+      { x, y },
+      { width: menuEl.offsetWidth, height: menuEl.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight },
+    ));
   }
 
   $: addExcludeSet = new Set(excludeFromAdd);
@@ -376,7 +380,7 @@
               <svg class="submenu-icon" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
                 <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
               </svg>
-              <span class="submenu-tag">{sys.tag}</span>
+              <span class="submenu-tag" title={sys.tag}>{sys.tag}</span>
             </button>
           {/each}
           {#if currentTags.length > 0}
@@ -429,7 +433,7 @@
                   <path d="M6 3h12v18l-6-4.4L6 21z"/>
                 </svg>
               {/if}
-              <span>{col.name}</span>
+              <span class="submenu-name" title={col.name}>{col.name}</span>
             </button>
           {/each}
           {#if hasCollections}
@@ -477,7 +481,7 @@
                     <path d="M6 3h12v18l-6-4.4L6 21z"/>
                   </svg>
                 {/if}
-                <span>{name}</span>
+                <span class="submenu-name" title={name}>{name}</span>
               </button>
             {/each}
           </div>
@@ -514,7 +518,8 @@
     border: 1px solid var(--bg-category);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
-    min-width: 200px;
+    min-width: var(--menu-width);
+    max-width: var(--menu-max-width);
     padding: 0.15rem 0;
   }
   .context-item {
@@ -570,10 +575,19 @@
     height: 11px;
     flex-shrink: 0;
   }
+  /* Collection names and system tags are user-written and uncapped — they
+     ellipsize against --menu-max-width rather than stretching the menu.
+     Both carry a title so the full name stays recoverable. */
+  .submenu-tag,
+  .submenu-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .submenu-tag {
     font-weight: 600;
     color: var(--text-accent);
-    white-space: nowrap;
   }
   .submenu {
     position: absolute;
@@ -583,8 +597,11 @@
     border: 1px solid var(--bg-category);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
-    min-width: 180px;
-    max-height: 320px;
+    min-width: var(--submenu-width);
+    max-width: var(--menu-max-width);
+    /* --submenu-room is measured per open (clampOpenSubmenuToViewport);
+       whichever is smaller wins, so the ceiling lives in the token. */
+    max-height: min(var(--menu-max-height), var(--submenu-room, 100vh));
     overflow-y: auto;
     padding: 0.15rem 0;
     z-index: 201;

@@ -7,6 +7,7 @@
   import { chord, isBareKeyChord } from './keybindings';
   import { materializeKey } from './paneFocus';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
+  import { clampToViewport } from './menuGeometry';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against
@@ -244,21 +245,30 @@
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
   let ctxPigmentOpen = false;
-
-  const CTX_WIDTH = 190;
-  const CTX_HEIGHT = 200;
+  let ctxPositioned = false;
 
   function openContextMenu(e: MouseEvent, name: string) {
     e.preventDefault();
     e.stopPropagation();
     onFocusCollection(name);
     ctxPigmentOpen = false;
-    ctxMenu = {
-      x: Math.min(e.clientX, window.innerWidth - CTX_WIDTH - 4),
-      y: Math.min(e.clientY, window.innerHeight - CTX_HEIGHT - 4),
-      name,
-    };
+    ctxPositioned = false;
+    ctxMenu = { x: e.clientX, y: e.clientY, name };
     claimMenuSlot(closeContextMenu);
+  }
+
+  // Runs as the menu mounts, while it is still hidden: the pointer says where
+  // it wants to go, the measured box says where it can. Clamping against
+  // declared sizes instead used to float the menu off the pointer.
+  function placeContextMenu(node: HTMLElement) {
+    if (!ctxMenu) return;
+    const { x, y } = clampToViewport(
+      { x: ctxMenu.x, y: ctxMenu.y },
+      { width: node.offsetWidth, height: node.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    ctxMenu = { ...ctxMenu, x, y };
+    ctxPositioned = true;
   }
 
   function closeContextMenu() {
@@ -720,7 +730,8 @@
     class="context-menu"
     role="menu"
     tabindex="-1"
-    style={`left: ${ctxMenu.x}px; top: ${ctxMenu.y}px`}
+    use:placeContextMenu
+    style={`left: ${ctxMenu.x}px; top: ${ctxMenu.y}px; visibility: ${ctxPositioned ? 'visible' : 'hidden'}`}
     on:click|stopPropagation
     on:contextmenu|preventDefault|stopPropagation
   >
@@ -846,7 +857,8 @@
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.15rem 0;
-    min-width: 150px;
+    min-width: var(--menu-width);
+    max-width: var(--menu-max-width);
     z-index: 200;
   }
   .sort-item {
@@ -1176,7 +1188,8 @@
     border: 1px solid var(--bg-category);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
-    min-width: 180px;
+    min-width: var(--menu-width);
+    max-width: var(--menu-max-width);
     padding: 0.15rem 0;
     z-index: 200;
     font-family: var(--font-body);
@@ -1222,7 +1235,8 @@
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.15rem 0;
-    min-width: 130px;
+    min-width: var(--submenu-width);
+    max-width: var(--menu-max-width);
     z-index: 2;
   }
 
