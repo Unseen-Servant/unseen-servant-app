@@ -370,7 +370,10 @@
       return;
     }
     if (bareLetter) {
-      if (lk === 'f') { event.preventDefault(); onEditFiles(col.name); return; }
+      // E for edit, not F: F reads as find/filter everywhere, and this app
+      // already spends ⌘F on search — one modifier apart from an unrelated
+      // meaning is worse than no mnemonic at all.
+      if (lk === 'e') { event.preventDefault(); onEditFiles(col.name); return; }
       // P or Space toggle the transport — Space is the DAW play/stop
       // convention, shared with file rows (where it opens). A shelved
       // track has no transport, so both are inert until unarchived
