@@ -626,8 +626,10 @@
   }
 
   /* The lens is a mode the user switched on — checked wears purple,
-     not the parchment content accent. */
-  .lens-checkbox:checked {
+     not the parchment content accent. Matched on aria-checked, not
+     :checked: these rows are role="checkbox" buttons, and a button never
+     matches :checked, so the purple never landed. */
+  .lens-checkbox[aria-checked="true"] {
     background-color: var(--text-active);
     border-color: var(--text-active);
   }
