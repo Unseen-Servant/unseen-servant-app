@@ -143,12 +143,6 @@ state in the app and needs no fill at all.
 | `FilterPanel.svelte:435` `.row:hover, .row.kb-focused` | combined, `--bg-container` | split — hover unchanged, focus ring |
 | `SearchResults.svelte:271` `.result-row:hover` | `--bg-focused` | `--bg-container` |
 | `SearchResults.svelte:275` `.result-row.selected` | `background: --bg-focused` | `box-shadow: --ring-focus`, no fill |
-| `SearchScopeBar.svelte:455` `.chip:hover` | `--bg-focused` | `--bg-container` |
-
-The scope-bar chip is included because the bar rests on `--bg-app`
-(`SearchScopeBar.svelte:304`) — it is the same +25 step against the same
-rest value, and leaving it behind would keep `--bg-focused` doing hover
-work on the dock.
 
 `CollectionsPanel`'s `.drop-before` / `.drop-after` (`:900`, `:905`)
 already use `box-shadow` and are declared after `.kb-focused`, so an
@@ -156,13 +150,17 @@ active drag continues to win the ring. No reordering needed.
 
 ## Decided non-changes
 
-- **Hover fills on modal surfaces stay at `--bg-focused`.** The settings
+- **Hover fills on a `--bg-container` rest stay at `--bg-focused`.** The
+  rule is a +1 surface step from whatever the element actually rests on,
+  not a fixed token. Three cases qualify and are left alone: the settings
   modal body is `--bg-container` (`Modal.svelte:104`), so
-  `GameSystemsSettings.svelte:313` `.system-row:hover` is a +15 step
-  against a 35 rest value — correctly proportioned for where it sits.
-  `SearchInspector.svelte:376` `.open-btn:hover` is the same case and
-  already carries a comment citing the grey-step rule. This spec is
-  about the dock and the list panes, not modal internals.
+  `GameSystemsSettings.svelte:313` `.system-row:hover` is a correctly
+  proportioned +15; `SearchInspector.svelte:376` `.open-btn:hover` is the
+  same case and already carries a comment citing the grey-step rule; and
+  the scope-bar chip fills itself with `--bg-container` at rest
+  (`SearchScopeBar.svelte:377`) even though the bar behind it is
+  `--bg-app`, so its hover is also a 35 → 50 step. Only rows that rest
+  directly on `--bg-app` move.
 - **`--bg-focused` as a raised or inset surface is left alone** — menus,
   the modal header, form selects, `kbd` and inline-code chips. That is
   its remaining meaning and it is coherent.
@@ -204,8 +202,10 @@ active drag continues to win the ring. No reordering needed.
    stylelint colour rule is the gate.
 2. `npm run check` and `npm run test`.
 3. Grep gate: no `--bg-focused` remains as a hover or focus fill on any
-   surface resting on `--bg-app`. The nine rows of the adoption map are
-   the complete list.
+   element resting on `--bg-app`. The eight rows of the adoption map are
+   the complete list. Check the element's own rest fill, not its
+   container's — a chip or control that paints itself `--bg-container`
+   is a `--bg-container` surface no matter what sits behind it.
 4. Keyboard pass in the running app, per pane: arrow through the tree,
    the collections panel, the filter panel, the systems view and the
    search results, and confirm the ring is visible on **every** row
@@ -223,12 +223,21 @@ active drag continues to win the ring. No reordering needed.
 
 ## Outcomes
 
-- **The adoption map was complete.** All nine rows landed as specified,
-  no site was missed and none was found late. The grep gate confirms the
-  only `--bg-focused` left in the six touched components is
-  `CollectionsPanel.svelte:795`, `:1126` and `:1171` — the sort menu, the
-  context menu and its submenu, all raised surfaces, which is the
-  token's intended remaining meaning.
+- **The adoption map was wrong by one row, caught during the
+  design-system sync.** It originally included
+  `SearchScopeBar.svelte:454` `.chip:hover` on the reasoning that the
+  scope bar rests on `--bg-app`. The *bar* does; the *chip* does not —
+  it paints itself `--bg-container` at rest (`:377`), so moving its
+  hover to `--bg-container` made the hover a no-op and silently deleted
+  the chip's fill step. Reverted to `--bg-focused` and moved to the
+  decided non-changes, where it belongs beside the other two
+  `--bg-container`-resting hovers. The lesson is in the grep gate now:
+  read the element's own rest fill, not its container's.
+- **The other eight rows landed as specified**, no site missed and none
+  found late. The grep gate confirms the only `--bg-focused` left in the
+  touched components is `CollectionsPanel.svelte:795`, `:1126` and
+  `:1171` — the sort menu, the context menu and its submenu, all raised
+  surfaces, which is the token's intended remaining meaning.
 - **The ring colour changed during drafting.** The working
   recommendation was `--text-tertiary`, chosen to keep the caret out of
   the semantic hues. Writing the spec turned up the global
