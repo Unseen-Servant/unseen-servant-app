@@ -136,6 +136,14 @@ export function chordHint(id: string): string {
   return c ? ` (${c})` : '';
 }
 
+// True when the chord is a single bare character — R, S, '.'. Alone in a menu's
+// hint column such a glyph reads as punctuation or a stray mark rather than a
+// key, so menus frame it in brackets. Modifier chords (⌘O) and named keys (F2)
+// already look like keys and are left plain.
+export function isBareKeyChord(id: string): boolean {
+  return chord(id).length === 1;
+}
+
 // Structural stand-in for KeyboardEvent so this stays testable under vitest's
 // node environment — a real KeyboardEvent satisfies it.
 export interface ChordEvent {

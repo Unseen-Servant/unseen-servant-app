@@ -1,7 +1,7 @@
 <script lang="ts">
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
-  import { chord, matchKey, eventMatchKey } from './keybindings';
+  import { chord, matchKey, eventMatchKey, isBareKeyChord } from './keybindings';
 
   export let x: number;
   export let y: number;
@@ -306,17 +306,17 @@
   {/if}
   <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.openExternal')} on:click={onReveal}>
     Reveal in folder
-    <span class="menu-chord">{chord('tree.openExternal')}</span>
+    <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')}>{chord('tree.openExternal')}</span>
   </button>
   {#if canScope}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} on:click={onToggleSolo}>
       {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
-      <span class="menu-chord">{chord('tree.solo')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.solo')}>{chord('tree.solo')}</span>
     </button>
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} on:click={onToggleMute}>
       {isMuted ? 'Unmute' : 'Mute'} this {item.is_dir ? 'folder' : 'file'}
-      <span class="menu-chord">{chord('tree.mute')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')}>{chord('tree.mute')}</span>
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
@@ -324,7 +324,7 @@
     <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} on:click={onShowStats}>
       Get info
-      <span class="menu-chord">{chord('info.show')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('info.show')}>{chord('info.show')}</span>
     </button>
   {/if}
 
@@ -391,7 +391,7 @@
       on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Add to collection</span>
-      <span class="menu-chord">{chord('tree.addToCollection')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')}>{chord('tree.addToCollection')}</span>
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'add'}
         <div class="submenu" role="menu">
@@ -478,14 +478,14 @@
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
-      <span class="menu-chord">{chord('tree.hide')}</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.hide')}>{chord('tree.hide')}</span>
     </button>
   {/if}
 
   <hr class="context-divider" />
   <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} on:click={onRename}>
     Rename {item.is_dir ? 'folder' : 'file'}
-    <span class="menu-chord">{chord('tree.rename')}</span>
+    <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')}>{chord('tree.rename')}</span>
   </button>
   <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
 </div>

@@ -390,6 +390,23 @@ input {
   white-space: nowrap;
 }
 
+/* A one-character chord gets bracketed. On its own a bare R reads as a stray
+   capital and a bare '.' barely reads at all, which is worst for exactly the
+   bindings nobody would guess. Brackets are the affordance the design
+   conventions already name, and they draw the real distinction the flat column
+   hid: ⌘O is hold-a-modifier, [R] is press-a-key. Dimmer than the glyph so the
+   frame stays structure and the key stays content. */
+.menu-chord.bare::before {
+  content: '[';
+}
+.menu-chord.bare::after {
+  content: ']';
+}
+.menu-chord.bare::before,
+.menu-chord.bare::after {
+  opacity: 0.55;
+}
+
 /* --- Font Utilities --- */
 
 .font-body {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { KEYBINDINGS, eventMatchKey, matchKey, type ChordEvent } from './keybindings';
+import { KEYBINDINGS, eventMatchKey, isBareKeyChord, matchKey, type ChordEvent } from './keybindings';
 
 const ev = (over: Partial<ChordEvent>): ChordEvent => ({
   key: '',
@@ -65,5 +65,41 @@ describe('menu accelerators', () => {
     expect(matchKey('tree.rename')).toBe('r');
     expect(matchKey('nope.missing')).toBe('');
     expect(matchKey('sync.run')).toBe('');
+  });
+});
+
+describe('isBareKeyChord', () => {
+  test('a lone character is bare — it needs framing to read as a key', () => {
+    expect(isBareKeyChord('tree.rename')).toBe(true); // R
+    expect(isBareKeyChord('tree.hide')).toBe(true); // .
+    expect(isBareKeyChord('collections.archive')).toBe(true); // A
+  });
+
+  test('a modifier chord is not bare — the glyph already reads as a key', () => {
+    expect(isBareKeyChord('info.show')).toBe(false); // ⌘I / Ctrl+I
+    expect(isBareKeyChord('tree.openExternal')).toBe(false); // ⌘O / Ctrl+O
+  });
+
+  test('a named key is not bare', () => {
+    expect(isBareKeyChord('collections.rename')).toBe(false); // F2
+  });
+
+  test('an unknown id is not bare', () => {
+    expect(isBareKeyChord('nope.missing')).toBe(false);
+  });
+
+  test('bareness does not flip between platforms for the chords menus render', () => {
+    // chord() picks mac vs other, so a binding whose two spellings differ in
+    // length would frame itself on one platform and not the other. None of the
+    // menu-rendered bindings may do that.
+    const rendered = [
+      'info.show', 'tree.openExternal', 'tree.rename', 'tree.solo',
+      'tree.mute', 'tree.hide', 'tree.addToCollection',
+      'collections.rename', 'collections.editFiles', 'collections.archive',
+    ];
+    for (const id of rendered) {
+      const entry = KEYBINDINGS.find((k) => k.id === id)!;
+      expect(entry.keys.mac.length === 1).toBe(entry.keys.other.length === 1);
+    }
   });
 });
