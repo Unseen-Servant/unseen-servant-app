@@ -57,14 +57,14 @@
       onSubmit(searchQuery);
     }
     // Escape is handled by the page-level ladder: it steps the search
-    // view closed and never clears the query — ✕ is the only clear.
+    // view closed and never clears the query — × is the only clear.
   }
 
   function handleClear() {
     clearDebounce();
     searchQuery = '';
     onClear();
-    // Refocus only inside the search view — ✕ on a leftover query from a
+    // Refocus only inside the search view — × on a leftover query from a
     // browse view is a tidy-up, not an entry (focus would reopen the view).
     if (searchViewOpen) inputEl?.focus();
   }
@@ -162,18 +162,19 @@
       on:blur={() => (focused = false)}
       aria-label="Search library"
     />
-    <!-- One trailing slot, and a query outranks the hint: ✕ shows whenever
+    <!-- One trailing slot, and a query outranks the hint: × shows whenever
          there is something to clear, focused or not, so a query left behind
          in a browse view stays clearable without entering search first. The
-         ⌘F hint fills the slot only while it is idle — unfocused and empty
-         — and stays out when the bar is disabled and the chord is a no-op. -->
+         focus-chord hint fills the slot only while it is idle — unfocused and
+         empty — and stays out when the bar is disabled and the chord is a
+         no-op. -->
     {#if searchQuery.length > 0}
       <button
         class="clear-btn"
         type="button"
         on:click={handleClear}
         aria-label="Clear search"
-      >✕</button>
+      >&times;</button>
     {:else if !focused && !disabled}
       <span class="search-chord" aria-hidden="true">{chord('search.focus')}</span>
     {/if}
@@ -340,11 +341,17 @@
     user-select: none;
   }
 
+  /* × (U+00D7), not ✕ (U+2715): the bundled Crimson Text maps the former and
+     not the latter, so ✕ dropped through to a system fallback and rendered in
+     a face nothing else in the app uses. Every other dismiss — modal close,
+     status-bar note, scope chips — is already this glyph. It draws lighter
+     than ✕ did at the same size, hence the step up; as a math operator it
+     sits on the mid-line, so it optically centres without nudging. */
   .clear-btn {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: 1.05rem;
     cursor: pointer;
     padding: 0 0.25rem;
     margin-left: 0.25rem;

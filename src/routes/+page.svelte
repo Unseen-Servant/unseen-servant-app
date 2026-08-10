@@ -2116,7 +2116,7 @@
       if (event.isComposing) return;
       // Search-view ladder: anywhere in the view funnels focus to the
       // bar; the bar steps out to the browse view. The query is never
-      // cleared here — ✕ is the only clear, and it isn't an exit.
+      // cleared here — × is the only clear, and it isn't an exit.
       if (searchViewOpen) {
         if (inSearchInput) {
           event.preventDefault();
