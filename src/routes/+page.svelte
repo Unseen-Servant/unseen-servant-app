@@ -2850,6 +2850,15 @@
       // Set last: the panel drops the row into rename the moment it sees
       // this, and the row has to exist by then.
       newlyCreated = { name, token: ++newCollectionToken };
+      // Seeded from a folder or a drop: say how much landed. An empty
+      // one needs no toast — the row appearing in rename is the feedback.
+      if (paths.length > 0) {
+        jobNotification.show({
+          type: 'success',
+          message: `Created "${name}" with ${paths.length} file${paths.length === 1 ? '' : 's'}`,
+          duration: 4000,
+        });
+      }
     } catch (e) {
       jobNotification.show({
         type: 'error',
