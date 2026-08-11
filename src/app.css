@@ -159,7 +159,15 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: var(--bg-app);
+  /* The shell is 100vh with overflow hidden, so nothing here genuinely
+     scrolls — this only suppresses the webview's elastic rubber-band, which
+     otherwise stretches the whole app on a trackpad flick. */
+  overscroll-behavior: none;
+  /* Canvas colour behind the shell. Unreachable once the bounce is gone, but
+     kept matched to the header plate so any overhang a webview still allows
+     reads as the menu bar extending rather than a gap. The app's own base
+     surface is --bg-app, painted by .app-layout over the full viewport. */
+  background: var(--bg-header);
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 16px;
