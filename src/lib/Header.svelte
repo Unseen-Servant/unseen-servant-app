@@ -285,7 +285,10 @@
     flex: 1;
     height: calc(var(--header-height) - 10px);
     padding: 0 0.7rem;
-    background: var(--bg-container);
+    /* Recessed into the header at the same depth as the panels and views
+       below it, and as the .view-switch well alongside it — both header
+       inlays read as cut out of the plate rather than laid on it. */
+    background: var(--bg-app);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     transition: border-color var(--transition-fast);
@@ -330,7 +333,7 @@
 
   /* The hint is supplementary — the placeholder already says what the field
      is for — so it sits one step below the icon and placeholder voice on
-     --bg-container rather than matching them. */
+     --bg-app rather than matching them. */
   .search-chord {
     padding-left: 0.5rem;
     font-family: var(--font-mono);
