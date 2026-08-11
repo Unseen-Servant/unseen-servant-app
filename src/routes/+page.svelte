@@ -411,6 +411,7 @@
   }
 
   const EMPTY_SYSTEMS = new Set<string>();
+  const EMPTY_PATHS = new Set<string>();
   const EMPTY_TAGS = new Map<string, string[]>();
 
   // The resolved scope — mix ∩ all three axes — as the display sees it.
@@ -2847,13 +2848,22 @@
     const paths = item.is_dir ? indexedPathsUnder(item.path, indexedPaths) : [item.path];
     if (paths.length === 0) return;
     const full = memberStateFor(item.path, item.is_dir, armState.paths, armState.folders) === 'all';
-    if (draftName) {
-      // Staged — nothing reaches the database until Save.
-      if (full) handleCollectionRemove(paths);
-      else handleCollectionAdd(paths);
-    } else if (armedCollection) {
-      void applyMembership(armedCollection, paths, !full);
-    }
+    if (full) curationRemove(paths);
+    else curationAdd(paths);
+  }
+
+  // Where a curation change lands. A draft stages into collectionEditPaths
+  // and nothing reaches the database until Save; an armed track commits.
+  // The systems view's checkboxes and the tree's arm slot both come
+  // through here, so the two surfaces can never disagree.
+  function curationAdd(paths: string[]) {
+    if (draftName) handleCollectionAdd(paths);
+    else if (armedCollection) void applyMembership(armedCollection, paths, true);
+  }
+
+  function curationRemove(paths: string[]) {
+    if (draftName) handleCollectionRemove(paths);
+    else if (armedCollection) void applyMembership(armedCollection, paths, false);
   }
 
   // Open a draft for a new (unsaved) collection. The draft renders as a
@@ -3094,6 +3104,15 @@
         name,
         newName,
       });
+      // Re-key the local record before anything else reads it: the arm
+      // clears itself when its collection isn't in `collections`, so
+      // moving the arm to a name the map doesn't carry yet would disarm
+      // in the window before loadCollections lands.
+      const renamed = collections[name];
+      if (renamed) {
+        const { [name]: _gone, ...rest } = collections;
+        collections = { ...rest, [newName]: { ...renamed, name: newName } };
+      }
       // The arm follows the rename, like the transport state below.
       if (armedCollection === name) armedCollection = newName;
       // Migrate any playing state keyed by the old name so an armed
@@ -3558,10 +3577,10 @@
             contextMenuOpen={!!contextMenu}
             {ribbonIndex}
             onBeginDrag={beginPathDrag}
-            {isCollectionEditMode}
-            collectionPaths={collectionEditPaths}
-            onCollectionAdd={handleCollectionAdd}
-            onCollectionRemove={handleCollectionRemove}
+            curating={armState !== null}
+            collectionPaths={armState?.paths ?? EMPTY_PATHS}
+            onCollectionAdd={curationAdd}
+            onCollectionRemove={curationRemove}
           />
         {:else}
           {#if hideOutOfScope && scopeBrightPaths !== null && scopeBrightPaths.size === 0}

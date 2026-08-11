@@ -68,11 +68,12 @@
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
 
-  // Collection-edit props. When `isCollectionEditMode` is true, rows render
-  // checkboxes and group headers carry a tri-state "select all in group"
-  // toggle. All inert otherwise. The parent owns the underlying Set; this
-  // view is purely additive/subtractive via these two callbacks.
-  export let isCollectionEditMode: boolean = false;
+  // Curation props. True while a collection is armed or a draft is being
+  // shaped: rows render checkboxes and group headers carry a tri-state
+  // "select all in group" toggle. All inert otherwise. The parent owns the
+  // underlying Set and decides whether a change is staged or committed;
+  // this view is purely additive/subtractive via these two callbacks.
+  export let curating: boolean = false;
   export let collectionPaths: Set<string> = new Set();
   export let onCollectionAdd: (paths: string[]) => void = () => {};
   export let onCollectionRemove: (paths: string[]) => void = () => {};
@@ -163,7 +164,7 @@
     // In edit mode the row IS the checkbox — clicking anywhere on it
     // toggles inclusion (with shift-range support). Focus-on-click would
     // just be friction when curating a collection.
-    if (isCollectionEditMode) {
+    if (curating) {
       handleCheckboxClick(event, entry, groupTag, groupEntries);
       return;
     }
@@ -178,7 +179,7 @@
   async function handleDoubleClick(entry: FileStatusEntry) {
     // In edit mode the row's job is "tick to include" — opening the
     // PDF on double-click would just compete with that intent.
-    if (isCollectionEditMode) return;
+    if (curating) return;
     try {
       await openPath(entry.path);
     } catch (e) {
@@ -389,7 +390,7 @@
     // collection, toggle the row's membership checkbox.
     if (event.key === ' ') {
       event.preventDefault();
-      if (isCollectionEditMode) {
+      if (curating) {
         handleCheckboxClick({ shiftKey: false, stopPropagation: () => {} } as MouseEvent, focused.entry, focused.tag, groups.find((g) => g.tag === focused.tag)?.entries ?? []);
       } else {
         handleDoubleClick(focused.entry);
@@ -496,13 +497,13 @@
 {:else}
   <div class="systems-view">
     {#each groups as group (group.tag)}
-      {@const groupState = isCollectionEditMode ? groupSelectionState(group.entries) : 'none'}
+      {@const groupState = curating ? groupSelectionState(group.entries) : 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
       {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths)}
       {#if !(hideOutOfScope && groupDimmed)}
       <section class="group">
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
-          {#if isCollectionEditMode}
+          {#if curating}
             <button
               class="app-checkbox group-checkbox"
               on:click={(e) => handleGroupCheckboxClick(e, group.entries)}
@@ -561,7 +562,7 @@
           <ul class="group-files" class:dimmed={groupDimmed}>
             {#each group.entries as entry (entry.path)}
               {@const relParent = relativeParent(entry.path)}
-              {@const isChecked = isCollectionEditMode && collectionPaths.has(entry.path)}
+              {@const isChecked = curating && collectionPaths.has(entry.path)}
               {@const ribbons = ribbonIndex.get(entry.path) ?? EMPTY_RIBBONS}
               {@const ribbonSplit = splitRibbons(ribbons)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
@@ -577,7 +578,7 @@
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
               >
-                {#if isCollectionEditMode}
+                {#if curating}
                   <button
                     class="app-checkbox row-checkbox"
                     on:click={(e) => handleCheckboxClick(e, entry, group.tag, group.entries)}
