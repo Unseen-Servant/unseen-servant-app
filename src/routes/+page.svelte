@@ -1873,10 +1873,10 @@
     const row = visibleTreeRows[idx];
     if (row.item.is_dir) {
       handleToggleExpand(row.path);
-    } else if (armedCollection) {
-      // Armed, a file row's primary action is filing it — the same
-      // rewrite the click path makes, and the same one the systems view
-      // already applies while curating.
+    } else if (armState) {
+      // Armed (or shaping a draft), a file row's primary action is filing
+      // it — the same rewrite the click path makes, and the same one the
+      // systems view already applies while curating.
       toggleMembership(row.item);
     } else {
       openPath(row.path).catch((e) => console.error('Failed to open file:', e));
@@ -2699,6 +2699,17 @@
   // Everything the tree needs to draw and answer the arm slot. Bundled so
   // the recursive component threads one prop instead of five.
   $: armState = (() => {
+    // A draft borrows the same slot, staging into collectionEditPaths
+    // instead of committing — which is what lets it be curated from the
+    // tree rather than forcing the view over to systems.
+    if (draftName) {
+      return {
+        name: draftName,
+        color: null,
+        paths: collectionEditPaths,
+        folders: computeFolderMembership(indexedPaths, collectionEditPaths),
+      };
+    }
     if (!armedCollection) return null;
     const col = collections[armedCollection];
     if (!col) return null;
@@ -2832,11 +2843,17 @@
   const onToggleMembership = (item: FileItem) => toggleMembership(item);
 
   function toggleMembership(item: FileItem) {
-    if (!armedCollection || !armState) return;
+    if (!armState) return;
     const paths = item.is_dir ? indexedPathsUnder(item.path, indexedPaths) : [item.path];
     if (paths.length === 0) return;
-    const state = memberStateFor(item.path, item.is_dir, armState.paths, armState.folders);
-    void applyMembership(armedCollection, paths, state !== 'all');
+    const full = memberStateFor(item.path, item.is_dir, armState.paths, armState.folders) === 'all';
+    if (draftName) {
+      // Staged — nothing reaches the database until Save.
+      if (full) handleCollectionRemove(paths);
+      else handleCollectionAdd(paths);
+    } else if (armedCollection) {
+      void applyMembership(armedCollection, paths, !full);
+    }
   }
 
   // Open a draft for a new (unsaved) collection. The draft renders as a
@@ -2849,7 +2866,9 @@
     if (armedCollection) void disarmCollection();
     collectionEditPaths = new Set(paths);
     draftName = name;
-    setViewMode('systems');
+    // No view switch. The tree carries the same slot the systems view
+    // does, so a draft is curated wherever you already are — the old
+    // forced hop to systems view persisted itself and never came back.
     collectionsPanelOpen = true;
   }
 
