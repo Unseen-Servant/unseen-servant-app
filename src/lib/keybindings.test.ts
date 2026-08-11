@@ -60,7 +60,7 @@ describe('menu accelerators', () => {
   });
 
   test('match agrees with one of the displayed keys', () => {
-    // A binding may advertise several keys ("F2 / R"), so the dispatched one
+    // A binding may advertise several keys ("↓ / J"), so the dispatched one
     // has to appear among them rather than equal the whole string. Rebinding
     // `keys` without updating `match` still fails, which is the point.
     for (const entry of KEYBINDINGS.filter((k) => k.match)) {
@@ -126,8 +126,8 @@ describe('isBareKeyChord', () => {
   });
 
   test('a binding advertising several keys is not bare', () => {
-    expect(isBareKeyChord('tree.rename')).toBe(false); // ↵ / R
-    expect(isBareKeyChord('collections.rename')).toBe(false); // ↵ / F2
+    expect(isBareKeyChord('tree.next')).toBe(false); // ↓ / J
+    expect(isBareKeyChord('collections.play')).toBe(false); // P / Space
   });
 
   test('an unknown id is not bare', () => {

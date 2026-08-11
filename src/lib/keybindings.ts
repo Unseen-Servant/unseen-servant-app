@@ -72,7 +72,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.open',             keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.openExternal',     keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal row in OS file explorer', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
-  { id: 'tree.rename',           keys: { mac: 'R / F2', other: 'R / F2' },      label: 'Rename focused row',           scope: 'fileTree', match: 'r' },
+  { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree', match: 'r' },
   { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'fileTree', match: 's' },
   { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree', match: 'm' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree', match: '.' },
@@ -80,7 +80,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
 
   // Systems view (when a row is focused)
   { id: 'systems.open',          keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'systemsView' },
-  { id: 'systems.rename',        keys: { mac: 'R / F2', other: 'R / F2' },      label: 'Rename focused row',           scope: 'systemsView' },
+  { id: 'systems.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'systemsView' },
   { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView' },
   { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView' },
   { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView' },
@@ -94,7 +94,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse collection',          scope: 'collections' },
   { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections' },
   { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused collection', scope: 'collections' },
-  { id: 'collections.rename',    keys: { mac: 'R / F2', other: 'R / F2' },      label: 'Rename collection',            scope: 'collections' },
+  { id: 'collections.rename',    keys: { mac: 'R',    other: 'R' },             label: 'Rename collection',            scope: 'collections' },
   { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm for editing',     scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
   { id: 'collections.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / cancel an in-progress edit', scope: 'collections' },
@@ -157,7 +157,7 @@ export function keyShortcut(id: string): string {
 
 // True when the chord is a single bare character — R, S, '.'. Alone in a menu's
 // hint column such a glyph reads as punctuation or a stray mark rather than a
-// key, so menus frame it in brackets. Modifier chords (⌘O) and named keys (F2)
+// key, so menus frame it in brackets. Modifier chords (⌘O) and named keys (Home)
 // already look like keys and are left plain.
 export function isBareKeyChord(id: string): boolean {
   return chord(id).length === 1;

@@ -85,7 +85,7 @@
   }
 
   // ------------------------------------------------------------------
-  // Inline rename — F2 or double-click on a settled row. Naming a new
+  // Inline rename — R or double-click on a settled row. Naming a new
   // collection is a separate affordance (see the create box below), so
   // this only ever renames something that already exists.
   // ------------------------------------------------------------------
@@ -443,13 +443,6 @@
     if (idx < 0) return;
     const col = rows[idx];
 
-    // F2 renames the way Explorer trains; R is the rename key every pane
-    // shares. Enter is unbound here.
-    if (event.key === 'F2') {
-      event.preventDefault();
-      startRename(col.name);
-      return;
-    }
     if (bareLetter && (event.key === 'ArrowRight' || lk === 'l') && !expandedNames.has(col.name)) {
       event.preventDefault();
       toggleExpand(col.name);

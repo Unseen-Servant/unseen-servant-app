@@ -1991,9 +1991,8 @@
     // event.code is layout-independent (some layouts produce a different
     // event.key for the numpad period, e.g. ',' on German).
     if (bareLetter) {
-      // R is the rename key across every pane; F2 is kept for the Explorer
-      // reflex.
-      if (lk === 'r' || event.key === 'F2') {
+      // R is the rename key across every pane.
+      if (lk === 'r') {
         event.preventDefault();
         renamingFilePath = focused.path;
         return true;
@@ -3064,7 +3063,7 @@
     beginCreateCollection();
   }
 
-  // Inline rename of an existing collection (F2 / double-click on the
+  // Inline rename of an existing collection (R / double-click on the
   // panel row). Collisions surface as a notification; the row snaps back.
   async function renameCollection(name: string, newName: string) {
     if (newName === name) return;
