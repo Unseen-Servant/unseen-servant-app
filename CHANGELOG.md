@@ -19,12 +19,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Editing a collection's files no longer goes through the context menu, and curating is not modal: search, scope chips, out-of-scope dimming, and disk-change detection all stay live throughout
 - Membership writes are coalesced and strictly serialized, so a long curation sweep is a handful of writes rather than one per click, and a failed write reverts to the last saved state instead of half-applying
 
+- Systems view: `X` ticks the row's collection checkbox and `Space` opens the file, matching the tree, where `X` has always been "toggle the box you can see" and `Space` the row's primary action
+
 ### Removed
 
 - `⌘↵` (Save in-progress collection) — there is nothing left to save
 
 ### Fixed
 
+- Systems view: a game system's "select all" checkbox no longer latches. Unticking the last file in a system left its header still showing selected
 - Creating a collection no longer switches the main pane to the systems view and leaves it there permanently — a bug that persisted across restarts for anyone who worked in tree view
 
 ## [2.1.0] - 2026-08-09

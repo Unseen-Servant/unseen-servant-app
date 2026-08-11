@@ -80,7 +80,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree', match: 'c' },
 
   // Systems view (when a row is focused)
-  { id: 'systems.activate',      keys: { mac: 'Space',other: 'Space' },         label: 'Open file (toggle membership while editing)', scope: 'systemsView' },
+  { id: 'systems.activate',      keys: { mac: 'Space',other: 'Space' },         label: 'Open file',                    scope: 'systemsView' },
+  { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Toggle the row's collection checkbox", scope: 'systemsView' },
   { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView' },
   { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView' },
 

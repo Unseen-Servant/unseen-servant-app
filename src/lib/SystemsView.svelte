@@ -6,6 +6,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
+  import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
   // File path → the collections holding it. Same strip as the file tree.
@@ -176,15 +177,20 @@
     else onFocusFile(entry.path);
   }
 
-  async function handleDoubleClick(entry: FileStatusEntry) {
-    // In edit mode the row's job is "tick to include" — opening the
-    // PDF on double-click would just compete with that intent.
-    if (curating) return;
+  async function openEntry(entry: FileStatusEntry) {
     try {
       await openPath(entry.path);
     } catch (e) {
       console.error('Failed to open file:', e);
     }
+  }
+
+  function handleDoubleClick(entry: FileStatusEntry) {
+    // While curating the row's job is "tick to include", and a click has
+    // already toggled it — opening on the second click would compete with
+    // that. Space still opens, since it toggles nothing.
+    if (curating) return;
+    void openEntry(entry);
   }
 
   function handleMouseDown(event: MouseEvent, entry: FileStatusEntry) {
@@ -223,19 +229,24 @@
     lastClickedGroup = groupTag;
   }
 
-  function groupSelectionState(entries: FileStatusEntry[]): 'none' | 'some' | 'all' {
-    let selected = 0;
-    for (const e of entries) if (collectionPaths.has(e.path)) selected++;
-    if (selected === 0) return 'none';
-    if (selected === entries.length) return 'all';
-    return 'some';
-  }
+  // Per-system tri-state for the "select all" header.
+  //
+  // This has to be a reactive derivation, not a call in the template.
+  // Svelte tracks the dependencies of the expression it sees, and a call
+  // like groupSelectionState(group.entries) hides its read of
+  // collectionPaths inside the function body — so the header latched at
+  // whatever it showed when the group was last rebuilt, and unticking the
+  // last file left the system still looking selected.
+  const NO_GROUP_STATES = new Map<string, MemberState>();
+  $: groupStates = curating
+    ? new Map(groups.map((g) => [g.tag, groupMemberState(g.entries, collectionPaths)]))
+    : NO_GROUP_STATES;
 
   function handleGroupCheckboxClick(event: MouseEvent, entries: FileStatusEntry[]) {
     event.stopPropagation();
-    const state = groupSelectionState(entries);
     const paths = entries.map((e) => e.path);
-    if (state === 'all') onCollectionRemove(paths);
+    // Read membership now rather than trusting the rendered state.
+    if (groupMemberState(entries, collectionPaths) === 'all') onCollectionRemove(paths);
     else onCollectionAdd(paths);
   }
 
@@ -385,16 +396,25 @@
       return;
     }
 
-    // Space is the row's primary action, same grammar as the tree and
-    // the collection transport: open the PDF — or, while editing a
-    // collection, toggle the row's membership checkbox.
+    // Space is the row's primary action, same grammar as the tree and the
+    // collection transport: open the PDF.
     if (event.key === ' ') {
       event.preventDefault();
-      if (curating) {
-        handleCheckboxClick({ shiftKey: false, stopPropagation: () => {} } as MouseEvent, focused.entry, focused.tag, groups.find((g) => g.tag === focused.tag)?.entries ?? []);
-      } else {
-        handleDoubleClick(focused.entry);
-      }
+      void openEntry(focused.entry);
+      return;
+    }
+
+    // X ticks the row's checkbox — the tree spends the same key on its
+    // indexing checkbox, so "X toggles the box you can see" holds in both
+    // views. Left unhandled when there's no box to tick.
+    if (bareLetter && lk === 'x' && curating) {
+      event.preventDefault();
+      handleCheckboxClick(
+        { shiftKey: false, stopPropagation: () => {} } as MouseEvent,
+        focused.entry,
+        focused.tag,
+        groups.find((g) => g.tag === focused.tag)?.entries ?? []
+      );
       return;
     }
   }
@@ -497,7 +517,7 @@
 {:else}
   <div class="systems-view">
     {#each groups as group (group.tag)}
-      {@const groupState = curating ? groupSelectionState(group.entries) : 'none'}
+      {@const groupState = groupStates.get(group.tag) ?? 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
       {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths)}
       {#if !(hideOutOfScope && groupDimmed)}

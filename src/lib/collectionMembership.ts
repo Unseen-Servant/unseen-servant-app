@@ -126,6 +126,21 @@ export function memberStateFor(
   return folders.partial.has(path) ? 'some' : 'none';
 }
 
+/**
+ * Membership of a whole group of files — the systems view's per-system
+ * "select all" header. An empty group reads as 'none': there is nothing
+ * in it to be a member.
+ */
+export function groupMemberState(
+  items: readonly { path: string }[],
+  memberPaths: Set<string>
+): MemberState {
+  let members = 0;
+  for (const item of items) if (memberPaths.has(item.path)) members++;
+  if (members === 0) return 'none';
+  return members === items.length ? 'all' : 'some';
+}
+
 /** Additive merge preserving order. Never mutates `current`. */
 export function addMembers(
   current: readonly string[],

@@ -6,6 +6,7 @@ import {
   uniqueCollectionName,
   computeFolderMembership,
   memberStateFor,
+  groupMemberState,
   addMembers,
   removeMembers,
 } from './collectionMembership';
@@ -159,6 +160,37 @@ describe('memberStateFor', () => {
 
   it('answers none for a folder outside the index', () => {
     expect(memberStateFor('/other', true, members, folders)).toBe('none');
+  });
+});
+
+describe('groupMemberState', () => {
+  const group = [{ path: '/a.pdf' }, { path: '/b.pdf' }];
+
+  it('reads none when nothing in the group is a member', () => {
+    expect(groupMemberState(group, new Set())).toBe('none');
+  });
+
+  it('reads some when part of the group is a member', () => {
+    expect(groupMemberState(group, new Set(['/a.pdf']))).toBe('some');
+  });
+
+  it('reads all when the whole group is', () => {
+    expect(groupMemberState(group, new Set(['/a.pdf', '/b.pdf']))).toBe('all');
+  });
+
+  // The header used to latch: unticking the last file left it looking
+  // selected, because the tri-state never re-read membership.
+  it('falls back to none when the last member is removed', () => {
+    expect(groupMemberState(group, new Set(['/a.pdf']))).toBe('some');
+    expect(groupMemberState(group, new Set())).toBe('none');
+  });
+
+  it('ignores members outside the group', () => {
+    expect(groupMemberState(group, new Set(['/elsewhere.pdf']))).toBe('none');
+  });
+
+  it('reads an empty group as none, not all', () => {
+    expect(groupMemberState([], new Set(['/a.pdf']))).toBe('none');
   });
 });
 
