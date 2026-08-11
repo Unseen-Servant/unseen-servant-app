@@ -945,8 +945,10 @@
   }
   /* While any collection plays, stopped rows dim to 45% (out of scope),
      never hidden. Hover restores legibility, mirroring the tree's muted
-     rows. The transport stays full-strength — it's the way back in. */
-  .row-container.dimmed > :not(.tr) {
+     rows. The transport stays full-strength — it's the way back in.
+     The grip is excluded at rest so dimming doesn't override its
+     hidden-until-hover opacity; the hover rule below still dims it. */
+  .row-container.dimmed > :not(.tr):not(.grip) {
     opacity: var(--opacity-out-of-scope);
   }
   .row-container.dimmed:hover > :not(.tr) {
