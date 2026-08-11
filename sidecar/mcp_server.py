@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 
 PORT_FILENAME = "sidecar.port"
@@ -197,7 +197,7 @@ class SidecarClient:
 # import (e.g. when pytest collects the module).
 sidecar: SidecarClient | None = None
 
-mcp = FastMCP(
+mcp = MCPServer(
     name="Legend Lore",
     instructions=(
         "You have access to the user's indexed TTRPG PDF library via Legend Lore. "
