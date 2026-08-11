@@ -2842,7 +2842,14 @@
   async function createCollection(base: string, paths: string[] = []) {
     const name = uniqueCollectionName(base, collections);
     try {
-      await invoke<CollectionMutationResult>('create_collection', { name, filePaths: paths });
+      // `description` is a required arg on the Rust side even though
+      // nothing in the UI authors one — omitting it fails arg
+      // deserialization before the call ever reaches the sidecar.
+      await invoke<CollectionMutationResult>('create_collection', {
+        name,
+        filePaths: paths,
+        description: '',
+      });
       await loadCollections();
       collectionsPanelOpen = true;
       setFocusedCollectionName(name);
