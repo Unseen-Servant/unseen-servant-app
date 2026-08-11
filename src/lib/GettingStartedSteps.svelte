@@ -136,13 +136,13 @@
       </p>
     </div>
     <p class="field-desc">
-      Use the <strong>+</strong> in the collections panel to create
-      one, or right-click a folder and choose
-      <em>Add to collection&hellip; &rarr; + New collection</em>. It
-      arrives named and <em>armed</em> &mdash; click books in the tree and
-      each click files or unfiles on the spot. Arm any collection later
-      with the &#9679; on its row (or <strong>E</strong>), and for a
-      one-off just drag a book or a whole folder onto the row.
+      Click <em>+ New collection</em> at the foot of the panel
+      (<strong>&#8984;N</strong>), type a name, and press Return &mdash;
+      it becomes a row in the list, already <em>armed</em>. While a
+      collection is armed, clicking a book in the tree files or unfiles it
+      on the spot. Arm any collection later with the &#9679; on its row
+      (or <strong>E</strong>), and for a one-off just drag a book or a
+      whole folder onto the row.
     </p>
   </section>
 

@@ -23,12 +23,13 @@
   // held, so pointing at the panel doesn't throw away the user's position.
   export let lastFocusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
-  // A collection created moments ago. Its row drops straight into rename,
-  // the way Finder lands you in the name of a new folder. The token makes
-  // two successive "Untitled"s distinguishable.
-  export let newlyCreated: { name: string; token: number } | null = null;
-  // Backing out of that first naming, while it's still empty.
-  export let onDiscardNew: (name: string) => void = () => {};
+  // Non-null while a new collection is being named. The "+ New collection"
+  // box becomes the name field; nothing exists until it's committed, so
+  // backing out leaves nothing behind. Carries the suggested name — a
+  // folder's, when the creation was seeded from one.
+  export let creating: { name: string } | null = null;
+  export let onCommitCreate: (name: string) => void = () => {};
+  export let onCancelCreate: () => void = () => {};
   // Collection transport — names currently playing (armed into the
   // search scope). Several can play at once; while any plays, the
   // stopped rows dim out of scope.
@@ -84,27 +85,16 @@
   }
 
   // ------------------------------------------------------------------
-  // Inline rename. One path for every row — F2, double-click, and the
-  // automatic one a freshly created collection lands in. Only that last
-  // case can be backed out of destructively, so it carries a flag.
+  // Inline rename — F2 or double-click on a settled row. Naming a new
+  // collection is a separate affordance (see the create box below), so
+  // this only ever renames something that already exists.
   // ------------------------------------------------------------------
   let renamingName: string | null = null;
   let renameValue = '';
-  let renamingIsNew = false;
 
-  // Drop a newly created row into rename, the way Finder lands you in the
-  // name of a new folder. Tracks the last one seen so an ordinary rename
-  // of the same collection doesn't re-trigger it.
-  let lastSeenToken = 0;
-  $: if (newlyCreated && newlyCreated.token !== lastSeenToken) {
-    lastSeenToken = newlyCreated.token;
-    startRename(newlyCreated.name, true);
-  }
-
-  function startRename(name: string, isNew = false) {
+  function startRename(name: string) {
     renamingName = name;
     renameValue = name;
-    renamingIsNew = isNew;
   }
 
   function commitRename() {
@@ -112,7 +102,6 @@
     const trimmed = renameValue.trim();
     if (trimmed && trimmed !== renamingName) onRename(renamingName, trimmed);
     renamingName = null;
-    renamingIsNew = false;
   }
 
   function handleRenameKeydown(e: KeyboardEvent) {
@@ -122,14 +111,42 @@
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      const name = renamingName;
-      const wasNew = renamingIsNew;
       renamingName = null;
-      renamingIsNew = false;
-      // Escaping the very first naming takes the collection with it, so a
-      // stray ⌘N doesn't leave an empty "Untitled" behind. Only while it's
-      // still empty — the page checks.
-      if (wasNew && name) onDiscardNew(name);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Naming a new collection, in the box that offers it. Committing
+  // promotes it to a real row in the list above; backing out creates
+  // nothing, so a stray ⌘N costs nothing to undo.
+  // ------------------------------------------------------------------
+  let newValue = '';
+  // Keyed on the seed object, not its name: asking to create again while
+  // the box is open must reload the field, and two requests can carry the
+  // same suggested name.
+  let lastSeed: { name: string } | null = null;
+  $: if (creating && creating !== lastSeed) {
+    lastSeed = creating;
+    newValue = creating.name;
+  }
+
+  function commitCreate() {
+    if (creating === null) return;
+    const trimmed = newValue.trim();
+    // Blurring an untouched field is a way out, not a request for an
+    // "Untitled". Committing one deliberately (Enter) still gets a name.
+    if (trimmed) onCommitCreate(trimmed);
+    else onCancelCreate();
+  }
+
+  function handleCreateKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onCommitCreate(newValue.trim() || 'Untitled');
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancelCreate();
     }
   }
 
@@ -361,7 +378,7 @@
     if (!active) return;
     // Yield to inline renames, the sort menu, the context menu, and any
     // other popover that may be claiming keys.
-    if (renamingName !== null || sortMenuOpen || ctxMenu) return;
+    if (renamingName !== null || creating !== null || sortMenuOpen || ctxMenu) return;
     if (document.querySelector('.dropdown, .context-menu')) return;
     // Yield to any open <dialog> — the browser inerts the page but
     // window-level keydown still bubbles, so we'd otherwise navigate
@@ -589,11 +606,11 @@
     </div>
   </header>
 
-  {#if hasNone}
+  {#if hasNone && creating === null}
     <div class="empty">
       <span class="ledger-label">No collections yet</span>
     </div>
-  {:else if rows.length === 0}
+  {:else if rows.length === 0 && creating === null}
     <div class="empty">
       <span class="ledger-label">All archived</span>
     </div>
@@ -748,16 +765,35 @@
       </li>
     {/each}
   </ul>
-  <!-- Outside the scroll container: trails the last row while the
-       list is short, stays visible once the list overflows. -->
-  <button
-    class="add-coll"
-    class:drop-into={dropIntoNew}
-    on:click={onCreate}
-    on:dragover={handleNewDragOver}
-    on:dragleave={handlePathDragLeave}
-    on:drop={handleNewDrop}
-  >+ New collection&hellip;</button>
+  <!-- Outside the scroll container: trails the last row while the list is
+       short, stays visible once the list overflows. -->
+  {#if creating !== null}
+    <!-- The box does the naming. Committing promotes it to a row above;
+         nothing exists until then, so Esc costs nothing. -->
+    <div class="add-coll creating">
+      <input
+        class="new-coll-input"
+        bind:value={newValue}
+        placeholder="Collection name&hellip;"
+        aria-label="Name the new collection"
+        on:keydown={handleCreateKeydown}
+        on:blur={commitCreate}
+        use:autofocusInput
+      />
+    </div>
+  {:else}
+    <button
+      class="add-coll"
+      class:drop-into={dropIntoNew}
+      on:click={onCreate}
+      on:dragover={handleNewDragOver}
+      on:dragleave={handlePathDragLeave}
+      on:drop={handleNewDrop}
+    >
+      <span>+ New collection&hellip;</span>
+      <span class="menu-chord" aria-hidden="true">{chord('collections.new')}</span>
+    </button>
+  {/if}
 </aside>
 
 {#if ctxMenu}
@@ -1185,6 +1221,32 @@
     cursor: pointer;
     transition: all var(--transition-fast);
   }
+  /* Naming in place: the same box, now solid and holding a field, so the
+     affordance you clicked is the one you're typing into. */
+  .add-coll.creating {
+    cursor: default;
+    border-style: solid;
+    border-color: var(--text-accent);
+    padding: 0.1rem 0.3rem;
+  }
+  .new-coll-input {
+    flex: 1;
+    min-width: 0;
+    -webkit-user-select: text;
+    user-select: text;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    padding: 0.05rem 0.25rem;
+    outline: none;
+  }
+  .new-coll-input::placeholder {
+    color: var(--text-tertiary);
+  }
+
   .add-coll:hover,
   .add-coll.drop-into {
     background: color-mix(in srgb, var(--text-accent) 10%, transparent);

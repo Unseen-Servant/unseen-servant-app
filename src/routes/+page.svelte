@@ -169,15 +169,10 @@
 
   // Collections state
   let collections: Record<string, CollectionInfo> = {};
-  // A collection created moments ago and not yet named. The panel uses it
-  // to drop that row straight into rename; backing out of that rename
-  // while the collection is still empty removes it again.
-  //
-  // Carries a token, not just a name: create "Untitled", rename it, then
-  // create again and the name is free once more — an identical value the
-  // panel could not tell from the previous one.
-  let newlyCreated: { name: string; token: number } | null = null;
-  let newCollectionToken = 0;
+  // Non-null while a new collection is being named in the panel's create
+  // box. Holds the paths it will be seeded with (a folder's contents, or a
+  // drop) and the name to suggest. Nothing exists until it's committed.
+  let newCollectionSeed: { paths: string[]; name: string } | null = null;
   // The armed track. Arming rewires the file tree into a live membership
   // surface for this one collection; every toggle writes through the
   // scheduler. Never persisted: a mode that silently changes what a click
@@ -2790,7 +2785,7 @@
   }
 
   function dropPathsOnNewCollection(paths: string[], label: string) {
-    void createCollection(label, paths);
+    beginCreateCollection(paths, label);
   }
 
   // The × on a panel row's expanded file list.
@@ -2854,11 +2849,8 @@
       collectionsPanelOpen = true;
       setFocusedCollectionName(name);
       await armCollection(name);
-      // Set last: the panel drops the row into rename the moment it sees
-      // this, and the row has to exist by then.
-      newlyCreated = { name, token: ++newCollectionToken };
-      // Seeded from a folder or a drop: say how much landed. An empty
-      // one needs no toast — the row appearing in rename is the feedback.
+      // Seeded from a folder or a drop: say how much landed. An empty one
+      // needs no toast — the new row appearing is the feedback.
       if (paths.length > 0) {
         jobNotification.show({
           type: 'success',
@@ -2875,24 +2867,26 @@
     }
   }
 
-  // Esc out of the initial naming, before anything has been filed. Only
-  // ever removes a collection that is still empty — once it holds a book,
-  // backing out of a rename is just backing out of a rename.
-  async function discardNewIfEmpty(name: string) {
-    newlyCreated = null;
-    const col = collections[name];
-    if (!col || col.file_paths.length > 0) return;
-    if (armedCollection === name) {
-      armCommitter.cancel();
-      armedCollection = null;
-    }
-    try {
-      await invoke('delete_collection', { name });
-      await loadCollections();
-    } catch (e) {
-      // An empty collection left behind is harmless; don't nag about it.
-      console.log('Could not discard new collection:', e);
-    }
+  /**
+   * Open the panel's create box to name a new collection. Every route in
+   * — ⌘N, the box itself, a folder's context menu, a drop — lands here, so
+   * there's one place a collection gets named and one place it gets made.
+   * `paths` seeds it; `suggested` pre-fills the field.
+   */
+  function beginCreateCollection(paths: string[] = [], suggested = '') {
+    if (armedCollection) void disarmCollection();
+    collectionsPanelOpen = true;
+    newCollectionSeed = { paths, name: suggested };
+  }
+
+  function commitNewCollection(name: string) {
+    const seed = newCollectionSeed;
+    newCollectionSeed = null;
+    if (seed) void createCollection(name, seed.paths);
+  }
+
+  function cancelNewCollection() {
+    newCollectionSeed = null;
   }
 
   let pendingDeleteCollection: string | null = null;
@@ -3022,7 +3016,7 @@
       return;
     }
     const baseName = item.is_dir ? item.name : item.name.replace(/\.pdf$/i, '');
-    void createCollection(baseName, candidates);
+    beginCreateCollection(candidates, baseName);
   }
 
   // ---------------------------------------------------------------------------
@@ -3062,10 +3056,9 @@
     }
   }
 
-  // Panel "+" handler. The row exists immediately and lands in rename;
-  // Esc there removes it again while it's still empty.
+  // Panel "+" handler, and ⌘N. Opens the create box with an empty field.
   function inlineCreateCollection() {
-    void createCollection('Untitled');
+    beginCreateCollection();
   }
 
   // Inline rename of an existing collection (F2 / double-click on the
@@ -3389,8 +3382,9 @@
               onDropPaths={dropPathsOnCollection}
               onDropNewCollection={dropPathsOnNewCollection}
               onRemoveFile={removeFileFromCollection}
-              {newlyCreated}
-              onDiscardNew={discardNewIfEmpty}
+              creating={newCollectionSeed}
+              onCommitCreate={commitNewCollection}
+              onCancelCreate={cancelNewCollection}
               playingNames={playingCollections}
               mutedNames={mutedCollectionNames}
               gameSystemMap={effectiveGameSystemMap}

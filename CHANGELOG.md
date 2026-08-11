@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
-- **New collections are real immediately** — `⌘N`, "+ New collection…", a folder's context menu, or a drop all create the collection on the spot, named, focused and armed, landing in rename the way Finder lands you in the name of a new folder. No draft row, no Save, no Cancel: creating and filling are the same motion. Escaping that first naming removes the collection again while it's still empty
+- **Naming a new collection happens in the "+ New collection…" box** — the box becomes the name field in place, and committing promotes it to a row in the list, created, focused and armed. `⌘N`, the box itself, a folder's context menu and a drop onto it all land there, the last two pre-filling the field with the folder's name. No draft row, no Save, no Cancel, and nothing exists until you commit, so Esc costs nothing. The box also shows its `⌘N` chord
 - Editing a collection's files no longer goes through the context menu, and curating is not modal: search, scope chips, out-of-scope dimming, and disk-change detection all stay live throughout
 - Membership writes are coalesced and strictly serialized, so a long curation sweep is a handful of writes rather than one per click, and a failed write reverts to the last saved state instead of half-applying
 
