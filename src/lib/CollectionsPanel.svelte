@@ -443,8 +443,9 @@
     if (idx < 0) return;
     const col = rows[idx];
 
-    // Return renames the way Finder trains, F2 the way Explorer does.
-    if (event.key === 'F2' || event.key === 'Enter') {
+    // F2 renames the way Explorer trains; R is the rename key every pane
+    // shares. Enter is unbound here.
+    if (event.key === 'F2') {
       event.preventDefault();
       startRename(col.name);
       return;
@@ -464,6 +465,7 @@
       // already spends ⌘F on search — one modifier apart from an unrelated
       // meaning is worse than no mnemonic at all. Not R either: R is
       // rename one pane over.
+      if (lk === 'r') { event.preventDefault(); startRename(col.name); return; }
       if (lk === 'e') { event.preventDefault(); onArm(col.name); return; }
       // P or Space toggle the transport — Space is the DAW play/stop
       // convention, shared with file rows (where it opens). A shelved

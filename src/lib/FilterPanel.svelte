@@ -193,13 +193,12 @@
     // active pane that never grew one.
     if (focusedRow === null) return;
 
-    if (event.key === ' ' || event.key === 'Enter') {
-      // A channel row's default action is its M toggle. A view row has no
-      // M — its own control is the only button, so click that.
+    // X ticks the focused row's checkbox, the same key both file views
+    // spend on theirs. Channel rows carry S/M instead of a checkbox and
+    // are reached through those. Space and Enter are unbound here.
+    if (bareLetter && lk === 'x') {
       event.preventDefault();
-      const el = rowElByKey(focusedRow);
-      const m = el?.querySelector<HTMLElement>('[data-sm-m]');
-      (m ?? el?.querySelector<HTMLElement>('[data-fm-action]'))?.click();
+      rowElByKey(focusedRow)?.querySelector<HTMLElement>('[data-fm-action]')?.click();
       return;
     }
     if (bareLetter && (lk === 's' || lk === 'm')) {

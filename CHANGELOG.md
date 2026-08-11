@@ -19,10 +19,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Editing a collection's files no longer goes through the context menu, and curating is not modal: search, scope chips, out-of-scope dimming, and disk-change detection all stay live throughout
 - Membership writes are coalesced and strictly serialized, so a long curation sweep is a handful of writes rather than one per click, and a failed write reverts to the last saved state instead of half-applying
 
-- Systems view: `X` ticks the row's collection checkbox and `Space` opens the file, matching the tree, where `X` has always been "toggle the box you can see" and `Space` the row's primary action
+- **Row keys are consistent across the panes.** `R` renames in every pane that has something to rename (new in the collections panel), and `X` ticks the row's checkbox wherever a row has one — the indexing checkbox in the file tree, the collection checkbox in the systems view, the switch on a filter view row
 
 ### Removed
 
+- `Space` and `Enter` as row actions in the file tree, systems view and filter panel, and `Enter` in the collections panel. `Space` still runs a collection's play/stop transport, and `Enter` still submits a search, opens a search result, activates a context-menu item, and commits any text field. Use `R` to rename, `X` to tick a checkbox, `⌘O` to open a file, and `→`/`←` to walk folders
 - `⌘↵` (Save in-progress collection) — there is nothing left to save
 
 ### Fixed

@@ -177,20 +177,16 @@
     else onFocusFile(entry.path);
   }
 
-  async function openEntry(entry: FileStatusEntry) {
+  async function handleDoubleClick(entry: FileStatusEntry) {
+    // While curating the row's job is "tick to include", and a click has
+    // already toggled it — opening on the second click would compete with
+    // that. ⌘O opens whatever is focused, in either mode.
+    if (curating) return;
     try {
       await openPath(entry.path);
     } catch (e) {
       console.error('Failed to open file:', e);
     }
-  }
-
-  function handleDoubleClick(entry: FileStatusEntry) {
-    // While curating the row's job is "tick to include", and a click has
-    // already toggled it — opening on the second click would compete with
-    // that. Space still opens, since it toggles nothing.
-    if (curating) return;
-    void openEntry(entry);
   }
 
   function handleMouseDown(event: MouseEvent, entry: FileStatusEntry) {
@@ -396,17 +392,10 @@
       return;
     }
 
-    // Space is the row's primary action, same grammar as the tree and the
-    // collection transport: open the PDF.
-    if (event.key === ' ') {
-      event.preventDefault();
-      void openEntry(focused.entry);
-      return;
-    }
-
     // X ticks the row's checkbox — the tree spends the same key on its
     // indexing checkbox, so "X toggles the box you can see" holds in both
-    // views. Left unhandled when there's no box to tick.
+    // views. Left unhandled when there's no box to tick. Space and Enter
+    // are unbound here; ⌘O opens the focused file and R renames it.
     if (bareLetter && lk === 'x' && curating) {
       event.preventDefault();
       handleCheckboxClick(

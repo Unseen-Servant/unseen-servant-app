@@ -1846,22 +1846,6 @@
     focusTreeRow(restore);
   }
 
-  function activateFocusedTreeRow() {
-    const idx = indexOfPath(visibleTreeRows, focusedFilePath);
-    if (idx < 0) return;
-    const row = visibleTreeRows[idx];
-    if (row.item.is_dir) {
-      handleToggleExpand(row.path);
-    } else if (armState) {
-      // Armed (or shaping a draft), a file row's primary action is filing
-      // it — the same rewrite the click path makes, and the same one the
-      // systems view already applies while curating.
-      toggleMembership(row.item);
-    } else {
-      openPath(row.path).catch((e) => console.error('Failed to open file:', e));
-    }
-  }
-
   // A mousedown on the file pane's empty or non-selectable space — the scope
   // bar, a systems-view group header, the gap below the last row — points at
   // the region and deselects. Rows are skipped so their own click (which fires
@@ -1938,16 +1922,8 @@
       return true;
     }
 
-    // Space is the row's primary action, same grammar as the collection
-    // transport: open the focused file / toggle the focused folder.
-    // X marks the row for indexing — the selection-checkbox toggle
-    // (Space's old role), on its own key like the other row letters.
-    if (event.key === ' ') {
-      event.preventDefault();
-      activateFocusedTreeRow();
-      return true;
-    }
-
+    // X marks the row for indexing. Space and Enter are unbound here —
+    // →/← walk folders, ⌘O opens, R renames.
     if (bareLetter && lk === 'x') {
       event.preventDefault();
       toogleSelection(row.path, row.item.is_dir, row.item, false);
@@ -2013,10 +1989,9 @@
     // event.code is layout-independent (some layouts produce a different
     // event.key for the numpad period, e.g. ',' on German).
     if (bareLetter) {
-      // Rename answers to three keys so each platform's reflex works: Return
-      // is what Finder trains, F2 is what Explorer trains, R is the
-      // vim-flavoured extra this app already had.
-      if (lk === 'r' || event.key === 'Enter' || event.key === 'F2') {
+      // R is the rename key across every pane; F2 is kept for the Explorer
+      // reflex.
+      if (lk === 'r' || event.key === 'F2') {
         event.preventDefault();
         renamingFilePath = focused.path;
         return true;
