@@ -147,12 +147,11 @@
 
   // The armed collection lives in the arm slot; showing it in the strip
   // as well would say the same thing twice on one row.
-  $: ribbons = (() => {
-    if (item.is_dir) return EMPTY_RIBBONS;
-    const all = ribbonIndex.get(item.path) ?? EMPTY_RIBBONS;
-    if (arm === null || all.length === 0) return all;
-    return all.filter((r) => r.name !== arm!.name);
-  })();
+  // Every collection holding this file, armed one included. The strip is a
+  // readout and the checkbox is a control; they can agree. (The armed
+  // collection used to be filtered out because the old arm slot drew its
+  // ribbon — with that gone, hiding it just cost the row its pigment.)
+  $: ribbons = item.is_dir ? EMPTY_RIBBONS : (ribbonIndex.get(item.path) ?? EMPTY_RIBBONS);
   $: ribbonSplit = splitRibbons(ribbons);
   $: ribbonTitle = ribbons.length === 0 ? '' : ribbons.map((r) => r.name).join(', ');
 
@@ -596,6 +595,13 @@
     gap: 0.15rem;
     margin-left: 0.5rem;
     flex-shrink: 0;
+  }
+  /* Without an explicit size an inline SVG falls back to its intrinsic
+     dimensions, which is how this strip disappeared once. */
+  .ribbon {
+    display: block;
+    width: 10px;
+    height: 10px;
   }
   /* Base pill styles live in SystemBadge.svelte; the +N overflow pills have
      no die and stay grey, so they keep their own copy here. One recipe for
