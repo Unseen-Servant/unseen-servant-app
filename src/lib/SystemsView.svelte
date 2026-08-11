@@ -5,6 +5,10 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
+  import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
+
+  // File path → the collections holding it. Same strip as the file tree.
+  export let ribbonIndex: Map<string, Ribbon[]> = new Map();
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -543,6 +547,8 @@
             {#each group.entries as entry (entry.path)}
               {@const relParent = relativeParent(entry.path)}
               {@const isChecked = isCollectionEditMode && collectionPaths.has(entry.path)}
+              {@const ribbons = ribbonIndex.get(entry.path) ?? EMPTY_RIBBONS}
+              {@const ribbonSplit = splitRibbons(ribbons)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
@@ -586,6 +592,18 @@
                 {#if relParent}
                   <span class="file-sep" aria-hidden="true">·</span>
                   <span class="file-path" title={entry.path}>{relParent}</span>
+                {/if}
+                {#if ribbons.length > 0}
+                  <span class="ribbons" title={ribbons.map((r) => r.name).join(', ')}>
+                    {#each ribbonSplit.shown as r (r.name)}
+                      <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                      </svg>
+                    {/each}
+                    {#if ribbonSplit.overflow > 0}
+                      <span class="ribbon-overflow">+{ribbonSplit.overflow}</span>
+                    {/if}
+                  </span>
                 {/if}
                 {#if entry.indexed_at}
                   <span
@@ -827,6 +845,31 @@
     flex: 1;
     min-width: 0;
   }
+  /* Sits just left of the indexed-at readout, which keeps the flush-right
+     slot. Same strip, same recipe, as the file tree's. */
+  .ribbons {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+  }
+  .ribbon {
+    display: block;
+    width: 10px;
+    height: 10px;
+  }
+  .ribbon-overflow {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-family: var(--font-body);
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    white-space: nowrap;
+  }
+
   .file-meta {
     flex-shrink: 0;
     font-family: var(--font-mono);

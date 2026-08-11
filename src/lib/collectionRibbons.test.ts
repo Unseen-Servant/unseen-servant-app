@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildRibbonIndex, firstColorByPath } from './collectionRibbons';
+import { buildRibbonIndex, firstColorByPath, splitRibbons } from './collectionRibbons';
 import type { CollectionInfo } from './types';
 
 function col(name: string, file_paths: string[], over: Partial<CollectionInfo> = {}): CollectionInfo {
@@ -59,6 +59,40 @@ describe('buildRibbonIndex', () => {
 
   it('returns an empty map for no collections', () => {
     expect(buildRibbonIndex({}).size).toBe(0);
+  });
+});
+
+describe('splitRibbons', () => {
+  const c = (name: string, color: string | null) => ({ name, color });
+
+  it('draws nothing for a file in no collection', () => {
+    expect(splitRibbons([])).toEqual({ shown: [], overflow: 0 });
+  });
+
+  it('draws every colored ribbon up to the cap', () => {
+    expect(splitRibbons([c('A', '#a'), c('B', '#b')]).shown.map((r) => r.name)).toEqual(['A', 'B']);
+  });
+
+  it('counts colored collections past the cap as overflow', () => {
+    const { shown, overflow } = splitRibbons([c('A', '#a'), c('B', '#b'), c('C', '#c')]);
+    expect(shown.map((r) => r.name)).toEqual(['A', 'B']);
+    expect(overflow).toBe(1);
+  });
+
+  // An outline ribbon says nothing a second outline ribbon doesn't, but
+  // the membership still has to be visible somewhere.
+  it('spends no slot on uncolored collections yet still counts them', () => {
+    const { shown, overflow } = splitRibbons([c('A', '#a'), c('Y', null), c('Z', null)]);
+    expect(shown.map((r) => r.name)).toEqual(['A']);
+    expect(overflow).toBe(2);
+  });
+
+  it('shows only an overflow count when nothing is colored', () => {
+    expect(splitRibbons([c('Y', null), c('Z', null)])).toEqual({ shown: [], overflow: 2 });
+  });
+
+  it('honours a custom cap', () => {
+    expect(splitRibbons([c('A', '#a'), c('B', '#b')], 1).overflow).toBe(1);
   });
 });
 

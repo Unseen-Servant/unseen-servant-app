@@ -6,6 +6,7 @@
   import type { FileItem, KnownGameSystem } from './types';
   import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
   import { isRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial } from './treeNav';
+  import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -63,6 +64,11 @@
   // Focus lens: hide (don't render) out-of-scope rows instead of
   // dimming them. Browsing surfaces only — console surfaces never hide.
   export let hideOutOfScope: boolean = false;
+  // File path → the collections holding it, colored ones first. Drawn as
+  // a ribbon strip so curation is visible while browsing; folders carry
+  // no membership of their own and get nothing.
+  export let ribbonIndex: Map<string, Ribbon[]> = new Map();
+
   // "Hide unindexed items": drop rows the library knows nothing about —
   // neither in the index nor selected for it. Tree only; SystemsView
   // renders indexStatus entries and holds nothing unindexed to hide.
@@ -124,6 +130,10 @@
   $: visibleTags = tags.slice(0, 2);
   $: hiddenTagCount = Math.max(0, tags.length - visibleTags.length);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
+
+  $: ribbons = item.is_dir ? EMPTY_RIBBONS : (ribbonIndex.get(item.path) ?? EMPTY_RIBBONS);
+  $: ribbonSplit = splitRibbons(ribbons);
+  $: ribbonTitle = ribbons.length === 0 ? '' : ribbons.map((r) => r.name).join(', ');
 
   async function toggleExpand() {
     if (!item.is_dir) return;
@@ -295,6 +305,22 @@
         <button class="add-tag-btn" on:click={(e) => tagMenu?.toggle(e)}>+ tag</button>
       </div>
     {/if}
+
+    {#if ribbons.length > 0}
+      <!-- Which collections hold this book. Same ribbon the panel rows,
+           scope chips and search results use, so the pigment↔collection
+           mapping only has to be learned once. -->
+      <span class="ribbons" title={ribbonTitle}>
+        {#each ribbonSplit.shown as r (r.name)}
+          <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M5 2h14v20l-7-5.2L5 22z"/>
+          </svg>
+        {/each}
+        {#if ribbonSplit.overflow > 0}
+          <span class="ribbon-overflow">+{ribbonSplit.overflow}</span>
+        {/if}
+      </span>
+    {/if}
   </div>
 
   <SystemTagMenu
@@ -338,6 +364,7 @@
           {indexedFolderPaths}
           {hideOutOfScope}
           {hideUnindexed}
+          {ribbonIndex}
         />
       {/each}
     </div>
@@ -494,9 +521,23 @@
     border: none;
     cursor: pointer;
   }
-  /* Base pill styles live in SystemBadge.svelte; the +N overflow pill has
-     no die and stays grey, so it keeps its own copy here. */
-  .game-system-badge.overflow {
+  .ribbons {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+  }
+  .ribbon {
+    display: block;
+    width: 10px;
+    height: 10px;
+  }
+  /* Base pill styles live in SystemBadge.svelte; the +N overflow pills have
+     no die and stay grey, so they keep their own copy here. One recipe for
+     both clusters so tags and collections read as the same family. */
+  .game-system-badge.overflow,
+  .ribbon-overflow {
     display: inline-block;
     padding: 0.1rem 0.4rem;
     border-radius: var(--radius-sm);

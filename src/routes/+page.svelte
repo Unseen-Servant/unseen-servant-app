@@ -37,7 +37,7 @@
     collectionsFullyContaining,
     uniqueCollectionName,
   } from '../lib/collectionMembership';
-  import { firstColorByPath } from '../lib/collectionRibbons';
+  import { buildRibbonIndex, firstColorByPath } from '../lib/collectionRibbons';
   import { chord } from '../lib/keybindings';
   import {
     parseString,
@@ -374,6 +374,10 @@
 
   // File path → collection pigment for the search-result index cells.
   $: collectionColorByPath = firstColorByPath(collections);
+
+  // File path → the collections holding it, for the tree and systems-view
+  // ribbon strips. Archived collections are shelved and stay out of it.
+  $: ribbonIndex = buildRibbonIndex(collections);
 
   // Path-axis solo/mute Maps resolved to raw file-path arrays. The
   // universe restriction (solo ∩ mix) happens inside resolveScopeSet.
@@ -3328,6 +3332,7 @@
             onRenameSubmit={handleRenameSubmit}
             onRenameCancel={handleRenameCancel}
             contextMenuOpen={!!contextMenu}
+            {ribbonIndex}
             {isCollectionEditMode}
             collectionPaths={collectionEditPaths}
             onCollectionAdd={handleCollectionAdd}
@@ -3367,6 +3372,7 @@
               {indexedFolderPaths}
               {hideOutOfScope}
               {hideUnindexed}
+              {ribbonIndex}
               onToggleScopeSolo={toggleScopeSolo}
               onToggleScopeMute={toggleScopeMute}
             />

@@ -45,6 +45,28 @@ export function buildRibbonIndex(
 }
 
 /**
+ * Split a row's ribbons into the ones that get drawn and a count for the
+ * rest. Only colored collections earn a slot — an outline ribbon says
+ * nothing a second outline ribbon doesn't — but every membership is
+ * accounted for in the overflow, so nothing is silently invisible.
+ *
+ * Relies on buildRibbonIndex's colored-first ordering, so the scan can
+ * stop at the first uncolored entry.
+ */
+export function splitRibbons(
+  ribbons: readonly Ribbon[],
+  max = 2
+): { shown: readonly Ribbon[]; overflow: number } {
+  if (ribbons.length === 0) return { shown: EMPTY_RIBBONS, overflow: 0 };
+  const shown: Ribbon[] = [];
+  for (const r of ribbons) {
+    if (!r.color || shown.length === max) break;
+    shown.push(r);
+  }
+  return { shown, overflow: ribbons.length - shown.length };
+}
+
+/**
  * File path → collection pigment for the search-result index cells.
  * Color is reserved for collections; a file in several colored
  * collections takes the alphabetically-first one for determinism.
