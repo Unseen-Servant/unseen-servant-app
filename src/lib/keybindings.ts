@@ -68,7 +68,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.end',              keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
   { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
-  { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: 'Toggle selection checkbox',    scope: 'fileTree' },
+  { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: "Tick the row's checkbox — indexing, or the collection while armed", scope: 'fileTree' },
   { id: 'tree.open',             keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.openExternal',     keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal row in OS file explorer', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
@@ -81,7 +81,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Systems view (when a row is focused)
   { id: 'systems.open',          keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'systemsView' },
   { id: 'systems.rename',        keys: { mac: 'R / F2', other: 'R / F2' },      label: 'Rename focused row',           scope: 'systemsView' },
-  { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Toggle the row's collection checkbox", scope: 'systemsView' },
+  { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView' },
   { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView' },
   { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView' },
 

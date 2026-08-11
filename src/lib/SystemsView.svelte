@@ -514,7 +514,7 @@
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
           {#if curating}
             <button
-              class="app-checkbox group-checkbox"
+              class="app-checkbox collecting group-checkbox"
               on:click={(e) => handleGroupCheckboxClick(e, group.entries)}
               role="checkbox"
               aria-label="Select all in {group.tag}"
@@ -589,7 +589,7 @@
               >
                 {#if curating}
                   <button
-                    class="app-checkbox row-checkbox"
+                    class="app-checkbox collecting row-checkbox"
                     on:click={(e) => handleCheckboxClick(e, entry, group.tag, group.entries)}
                     on:mousedown|stopPropagation
                     on:dblclick|stopPropagation
@@ -777,19 +777,10 @@
     opacity: var(--opacity-out-of-scope-hover);
   }
 
-  /* Edit-mode selection is a mode the user switched on, so these boxes take
-     --text-active rather than the shared recipe's --text-accent. Anatomy and
-     both knockout glyphs come from .app-checkbox. */
+  /* Colour comes from .app-checkbox.collecting, shared with the file tree
+     so one rule covers every "member of the armed collection" box. */
   .app-checkbox {
     align-self: center;
-  }
-  .app-checkbox:hover {
-    border-color: var(--text-active);
-  }
-  .app-checkbox[aria-checked="true"],
-  .app-checkbox[aria-checked="mixed"] {
-    background-color: var(--text-active);
-    border-color: var(--text-active);
   }
   .group-checkbox {
     margin-left: 0.25rem;

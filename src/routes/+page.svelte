@@ -1922,11 +1922,13 @@
       return true;
     }
 
-    // X marks the row for indexing. Space and Enter are unbound here —
-    // →/← walk folders, ⌘O opens, R renames.
+    // X ticks the row's checkbox, whichever meaning it currently carries:
+    // indexing normally, collection membership while armed. Space and Enter
+    // are unbound here — →/← walk folders, ⌘O opens, R renames.
     if (bareLetter && lk === 'x') {
       event.preventDefault();
-      toogleSelection(row.path, row.item.is_dir, row.item, false);
+      if (armState) toggleMembership(row.item);
+      else toogleSelection(row.path, row.item.is_dir, row.item, false);
       return true;
     }
 
@@ -2777,13 +2779,39 @@
 
   // Tree/systems-view arm slot. A partly-enrolled folder fills; a full one
   // empties, so a second click always undoes the first.
-  const onToggleMembership = (item: FileItem) => toggleMembership(item);
+  const onToggleMembership = (item: FileItem, shiftKey = false) => toggleMembership(item, shiftKey);
 
-  function toggleMembership(item: FileItem) {
+  // Anchor for shift-range membership, mirroring lastIndexClickedPath.
+  let lastCollectClickedPath: string | null = null;
+
+  function toggleMembership(item: FileItem, shiftKey = false) {
     if (!armState) return;
+
+    // Shift extends from the last row filed, the same gesture the indexing
+    // checkbox and the systems view both offer. Only indexed rows in the
+    // span take part — the rest can't be members.
+    if (shiftKey && !item.is_dir && lastCollectClickedPath) {
+      const flat = flattenVisibleFilePaths(files);
+      const a = flat.indexOf(lastCollectClickedPath);
+      const b = flat.indexOf(item.path);
+      if (a !== -1 && b !== -1) {
+        const span = flat
+          .slice(Math.min(a, b), Math.max(a, b) + 1)
+          .filter((p) => indexedPaths.has(p));
+        if (span.length > 0) {
+          const adding = !armState.paths.has(item.path);
+          lastCollectClickedPath = item.path;
+          if (adding) curationAdd(span);
+          else curationRemove(span);
+          return;
+        }
+      }
+    }
+
     const paths = item.is_dir ? indexedPathsUnder(item.path, indexedPaths) : [item.path];
     if (paths.length === 0) return;
     const full = memberStateFor(item.path, item.is_dir, armState.paths, armState.folders) === 'all';
+    if (!item.is_dir) lastCollectClickedPath = item.path;
     if (full) curationRemove(paths);
     else curationAdd(paths);
   }

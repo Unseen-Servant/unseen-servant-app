@@ -71,11 +71,11 @@
   // no membership of their own and get nothing.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
 
-  // The armed collection, or null. While armed, every row grows a slot at
-  // its flush-right edge — the one x-position that doesn't move from row
-  // to row — and clicking a file row files or unfiles it on the spot.
+  // The armed collection, or null. While armed the row's checkbox stops
+  // meaning "index this" and starts meaning "file this", and clicking the
+  // row itself does the same.
   export let arm: ArmState | null = null;
-  export let onToggleMembership: (item: FileItem) => void = () => {};
+  export let onToggleMembership: (item: FileItem, shiftKey?: boolean) => void = () => {};
 
   // Resolving a row to its indexed PDFs needs the page's indexedPaths, so
   // the page does it at dragstart and stashes the payload; null means the
@@ -160,8 +160,13 @@
   // nothing a collection could hold — the sidecar drops unindexed paths at
   // read time — so its slot stays empty rather than offering a dead click.
   $: hasIndexedMaterial = rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths);
+  // Armed, a row with nothing indexed under it has nothing a collection can
+  // take — the sidecar drops unindexed paths at read time — so its box is
+  // shown disabled rather than removed, which would leave the column ragged.
   $: canArm = arm !== null && hasIndexedMaterial;
   $: memberState = arm === null ? 'none' : memberStateFor(item.path, item.is_dir, arm.paths, arm.folders);
+  $: boxOn = arm ? memberState === 'all' : isChecked;
+  $: boxMixed = arm ? memberState === 'some' : isIndeterminate;
 
   async function toggleExpand() {
     if (!item.is_dir) return;
@@ -180,8 +185,12 @@
     }
   }
 
+  // One checkbox, two meanings. Unarmed it marks the row for indexing;
+  // armed it files the row into the collection being curated. The colour
+  // carries the difference — parchment for data, purple for a mode.
   function handleCheckboxChange(event: MouseEvent | KeyboardEvent) {
-    onToggle(item.path, item.is_dir, item, event.shiftKey);
+    if (arm) onToggleMembership(item, event.shiftKey);
+    else onToggle(item.path, item.is_dir, item, event.shiftKey);
   }
 
   function toggleSystem(tag: string) {
@@ -209,7 +218,7 @@
     // While armed, a file row's primary action is filing it — the same
     // rewrite the systems view already does when curating. Folders keep
     // expanding: you have to be able to navigate while you curate, so
-    // enrolling a whole folder goes through its slot instead.
+    // enrolling a whole folder goes through its checkbox instead.
     if (item.is_dir) toggleExpand();
     else if (canArm) onToggleMembership(item);
   }
@@ -271,10 +280,12 @@
   <div class="row-container">
     <button
       class="app-checkbox row-checkbox"
+      class:collecting={arm !== null}
+      disabled={arm !== null && !canArm}
       on:click|stopPropagation={handleCheckboxChange}
       role="checkbox"
-      aria-label="Select {item.name}"
-      aria-checked={isIndeterminate ? 'mixed' : isChecked}
+      aria-label={arm ? `Add ${item.name} to ${arm.name}` : `Select ${item.name} for indexing`}
+      aria-checked={boxMixed ? 'mixed' : boxOn}
     ></button>
 
     <!-- Draggable on .row, not .row-container: the checkbox and the S/M
@@ -376,42 +387,6 @@
       </span>
     {/if}
 
-    {#if arm}
-      <!-- Fixed-width and always present while armed, even when empty, so
-           the target never moves as you sweep down a folder. -->
-      <span class="arm-slot">
-        {#if canArm}
-          <button
-            type="button"
-            class="arm-btn"
-            class:on={memberState === 'all'}
-            class:partial={memberState === 'some'}
-            style={arm.color && memberState !== 'none' ? `color: ${arm.color}` : undefined}
-            on:click|stopPropagation={() => onToggleMembership(item)}
-            aria-pressed={memberState === 'all'}
-            title={memberState === 'all'
-              ? `Remove ${item.name} from ${arm.name}`
-              : `Add ${item.name} to ${arm.name}`}
-          >
-            {#if memberState === 'none'}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                <path d="M6 3h12v18l-6-4.4L6 21z"/>
-              </svg>
-            {:else if memberState === 'some'}
-              <!-- Half-filled ribbon: some of this folder is enrolled. -->
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3h6v18l-6-4.4z" fill="currentColor"/>
-                <path d="M6 3h12v18l-6-4.4L6 21z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
-              </svg>
-            {:else}
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M5 2h14v20l-7-5.2L5 22z"/>
-              </svg>
-            {/if}
-          </button>
-        {/if}
-      </span>
-    {/if}
   </div>
 
   <SystemTagMenu
@@ -621,53 +596,6 @@
     gap: 0.15rem;
     margin-left: 0.5rem;
     flex-shrink: 0;
-  }
-  /* Reserved on every row while armed — an empty slot on an unindexed row
-     still holds the column, so the target never shifts mid-sweep. */
-  .arm-slot {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    margin-left: 0.5rem;
-    flex-shrink: 0;
-  }
-  .arm-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    opacity: 0.35;
-    transition: opacity var(--transition-fast), color var(--transition-fast);
-  }
-  .arm-btn svg {
-    width: 12px;
-    height: 12px;
-    display: block;
-  }
-  .row-container:hover .arm-btn {
-    opacity: 1;
-  }
-  .arm-btn.on,
-  .arm-btn.partial {
-    opacity: 1;
-  }
-  .arm-btn:hover {
-    color: var(--text-accent);
-  }
-  .arm-btn:active {
-    transform: scale(0.97);
-  }
-  .ribbon {
-    display: block;
-    width: 10px;
-    height: 10px;
   }
   /* Base pill styles live in SystemBadge.svelte; the +N overflow pills have
      no die and stay grey, so they keep their own copy here. One recipe for
