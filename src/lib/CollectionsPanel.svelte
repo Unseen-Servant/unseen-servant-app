@@ -23,13 +23,12 @@
   // held, so pointing at the panel doesn't throw away the user's position.
   export let lastFocusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
-  // Proposed name of an in-progress draft (new collection that hasn't been
-  // saved yet). When set, the panel renders a synthetic top row carrying
-  // the inline Save/Cancel controls just like an editing row.
-  export let draftName: string | null = null;
-  // Live count of paths currently selected in the in-progress edit/draft.
-  // Shown on the row being edited.
-  export let editFileCount: number = 0;
+  // A collection created moments ago. Its row drops straight into rename,
+  // the way Finder lands you in the name of a new folder. The token makes
+  // two successive "Untitled"s distinguishable.
+  export let newlyCreated: { name: string; token: number } | null = null;
+  // Backing out of that first naming, while it's still empty.
+  export let onDiscardNew: (name: string) => void = () => {};
   // Collection transport — names currently playing (armed into the
   // search scope). Several can play at once; while any plays, the
   // stopped rows dim out of scope.
@@ -41,13 +40,12 @@
   export let mutedNames: Set<string> = new Set();
   export let onToggleMute: (name: string) => void = () => {};
   // The armed track — the one the file tree is currently curating into.
-  // At most one, never a draft, and never persisted across launches.
+  // At most one, and never persisted across launches.
   export let armedName: string | null = null;
   export let onArm: (name: string) => void = () => {};
   // Rows dragged in from the file tree / systems view.
   export let onDropPaths: (name: string, paths: string[]) => void = () => {};
   export let onDropNewCollection: (paths: string[], label: string) => void = () => {};
-  export let onDropDraft: (paths: string[]) => void = () => {};
   export let onRemoveFile: (name: string, path: string) => void = () => {};
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
@@ -57,9 +55,6 @@
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
-  export let onSaveFiles: () => void = () => {};
-  export let onCancelFiles: () => void = () => {};
-  export let onDraftRename: (name: string) => void = () => {};
   export let onRename: (name: string, newName: string) => void = () => {};
   export let onSetColor: (name: string, color: string | null) => void = () => {};
   export let onTogglePlay: (name: string) => void = () => {};
@@ -89,57 +84,27 @@
   }
 
   // ------------------------------------------------------------------
-  // Inline rename — draft rows (unsaved) and existing rows (F2 or
-  // double-click) share the input treatment; drafts rename locally,
-  // existing rows commit through the backend via onRename.
+  // Inline rename. One path for every row — F2, double-click, and the
+  // automatic one a freshly created collection lands in. Only that last
+  // case can be backed out of destructively, so it carries a flag.
   // ------------------------------------------------------------------
-  let renamingDraft = false;
-  let draftRenameValue = '';
   let renamingName: string | null = null;
   let renameValue = '';
+  let renamingIsNew = false;
 
-  // Reset rename mode when the draft itself goes away.
-  $: if (!draftName) renamingDraft = false;
-
-  // Auto-enter rename mode when a fresh draft appears (matches Finder's
-  // "new folder lands you in rename" convention). Tracks the last-seen
-  // draft name so renames don't re-trigger this.
-  let lastSeenDraft: string | null = null;
-  $: {
-    if (draftName && !lastSeenDraft) startDraftRename();
-    lastSeenDraft = draftName;
+  // Drop a newly created row into rename, the way Finder lands you in the
+  // name of a new folder. Tracks the last one seen so an ordinary rename
+  // of the same collection doesn't re-trigger it.
+  let lastSeenToken = 0;
+  $: if (newlyCreated && newlyCreated.token !== lastSeenToken) {
+    lastSeenToken = newlyCreated.token;
+    startRename(newlyCreated.name, true);
   }
 
-  function startDraftRename() {
-    if (!draftName) return;
-    draftRenameValue = draftName;
-    renamingDraft = true;
-  }
-
-  function commitDraftRename() {
-    const trimmed = draftRenameValue.trim();
-    if (trimmed && trimmed !== draftName) onDraftRename(trimmed);
-    renamingDraft = false;
-  }
-
-  function handleDraftRenameKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitDraftRename();
-      // Plain Enter from the rename input commits AND saves (Finder
-      // "type name + Enter creates the folder"). For Cmd/Ctrl+Enter we
-      // skip saving here so the global handler in +page.svelte fires
-      // exactly once instead of double-firing.
-      if (!e.metaKey && !e.ctrlKey) onSaveFiles();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      renamingDraft = false;
-    }
-  }
-
-  function startRename(name: string) {
+  function startRename(name: string, isNew = false) {
     renamingName = name;
     renameValue = name;
+    renamingIsNew = isNew;
   }
 
   function commitRename() {
@@ -147,6 +112,7 @@
     const trimmed = renameValue.trim();
     if (trimmed && trimmed !== renamingName) onRename(renamingName, trimmed);
     renamingName = null;
+    renamingIsNew = false;
   }
 
   function handleRenameKeydown(e: KeyboardEvent) {
@@ -156,7 +122,14 @@
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
+      const name = renamingName;
+      const wasNew = renamingIsNew;
       renamingName = null;
+      renamingIsNew = false;
+      // Escaping the very first naming takes the collection with it, so a
+      // stray ⌘N doesn't leave an empty "Untitled" behind. Only while it's
+      // still empty — the page checks.
+      if (wasNew && name) onDiscardNew(name);
     }
   }
 
@@ -193,7 +166,7 @@
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
-  $: canDrag = sortKey === 'custom' && rows.length > 1 && !draftName;
+  $: canDrag = sortKey === 'custom' && rows.length > 1;
   $: anyPlaying = playingNames.size > 0;
 
   let draggingName: string | null = null;
@@ -256,8 +229,7 @@
   // drops sit on the wrapping <li>, which also makes the expanded child
   // list a target at no extra cost.
   // ------------------------------------------------------------------
-  // Which target is lit: a collection name, '' for the draft row, or the
-  // new-collection button.
+  // Which target is lit: a collection name, or the new-collection button.
   let dropIntoName: string | null = null;
   let dropIntoNew = false;
 
@@ -303,11 +275,6 @@
   function handlePathDrop(e: DragEvent, name: string) {
     const paths = takePathDrop(e);
     if (paths) onDropPaths(name, paths);
-  }
-
-  function handleDraftDrop(e: DragEvent) {
-    const paths = takePathDrop(e);
-    if (paths) onDropDraft(paths);
   }
 
   function handleNewDrop(e: DragEvent) {
@@ -394,7 +361,7 @@
     if (!active) return;
     // Yield to inline renames, the sort menu, the context menu, and any
     // other popover that may be claiming keys.
-    if (renamingDraft || renamingName !== null || sortMenuOpen || ctxMenu) return;
+    if (renamingName !== null || sortMenuOpen || ctxMenu) return;
     if (document.querySelector('.dropdown, .context-menu')) return;
     // Yield to any open <dialog> — the browser inerts the page but
     // window-level keydown still bubbles, so we'd otherwise navigate
@@ -419,8 +386,6 @@
       return;
     }
 
-    // idx is -1 for a caret on the draft row too — a fresh draft sits outside
-    // `rows` — so these keep the existing "enter from the far end" fallback.
     const idx = rows.findIndex((r) => r.name === focusedName);
 
     if (isDown) {
@@ -446,33 +411,22 @@
       return;
     }
 
-    // Esc/Enter on a focused draft / row-being-edited handled before the
-    // idx-out-of-range early return: a fresh draft sits outside `rows`
-    // (it's rendered separately above the list) so idx is -1 for it.
-    const isOnDraft = draftName !== null && focusedName === draftName;
-
+    // Handled before the idx-out-of-range early return so Esc still works
+    // with the caret nowhere in particular.
     if (event.key === 'Escape') {
       event.preventDefault();
-      if (isOnDraft) onCancelFiles();
       // Leaving the arm comes before releasing focus: the mode has
       // rewired what a click in the tree does, so it's the louder thing
       // Esc should undo.
-      else if (armedName !== null) onArm(armedName);
+      if (armedName !== null) onArm(armedName);
       else onFocusCollection(null);
-      return;
-    }
-    if (event.key === 'Enter' && isOnDraft) {
-      event.preventDefault();
-      onSaveFiles();
       return;
     }
 
     if (idx < 0) return;
     const col = rows[idx];
 
-    // Return renames the way Finder trains, F2 the way Explorer does. The
-    // draft/editing rows claim Return for Save above, so this only ever sees
-    // a settled row.
+    // Return renames the way Finder trains, F2 the way Explorer does.
     if (event.key === 'F2' || event.key === 'Enter') {
       event.preventDefault();
       startRename(col.name);
@@ -549,9 +503,9 @@
   // the pane and deselects. Rows are skipped so their own click owns the
   // caret, and so starting a drag doesn't clear it. Guarded on there being
   // somewhere for the caret to go, so an empty panel doesn't silently swallow
-  // the arrows (a live draft counts — it sits outside `rows`).
+  // the arrows.
   function handlePanelMousedown(event: MouseEvent) {
-    if (rows.length === 0 && draftName === null) return;
+    if (rows.length === 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest('[data-cp-row]')) return;
     onActivate();
@@ -559,13 +513,8 @@
 
   // Exposed for the page-level Cmd+Alt+← jump. Restores `preferred` if
   // it's still in the visible list (matches user expectation: "take me
-  // back to where I was"); otherwise falls back to the first row, or
-  // the draft when one is being created.
+  // back to where I was"); otherwise falls back to the first row.
   export function claim(preferred: string | null) {
-    if (draftName !== null) {
-      onFocusCollection(draftName);
-      return;
-    }
     if (preferred && rows.some((r) => r.name === preferred)) {
       onFocusCollection(preferred);
       return;
@@ -640,52 +589,17 @@
     </div>
   </header>
 
-  {#if hasNone && !draftName}
+  {#if hasNone}
     <div class="empty">
       <span class="ledger-label">No collections yet</span>
     </div>
-  {:else if rows.length === 0 && !draftName}
+  {:else if rows.length === 0}
     <div class="empty">
       <span class="ledger-label">All archived</span>
     </div>
   {/if}
 
   <ul class="rows">
-    {#if draftName}
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-      <li
-        class="row-container editing draft"
-        class:kb-focused={focusedName === draftName}
-        class:drop-into={dropIntoName === ''}
-        title="New collection (unsaved) — click name to rename"
-        data-cp-row={draftName}
-        on:dragover={(e) => handlePathDragOver(e, '')}
-        on:dragleave={handlePathDragLeave}
-        on:drop={handleDraftDrop}
-      >
-        <span class="arrow-spacer" aria-hidden="true"></span>
-        <!-- Outline bookmark — no pigment chosen yet -->
-        <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-          <path d="M6 3h12v18l-6-4.4L6 21z"/>
-        </svg>
-        {#if renamingDraft}
-          <input
-            class="rename-input"
-            bind:value={draftRenameValue}
-            on:keydown={handleDraftRenameKeydown}
-            on:blur={commitDraftRename}
-            use:autofocusInput
-          />
-        {:else}
-          <button class="row-name draft-name" on:click={startDraftRename} title="Rename">{draftName}</button>
-        {/if}
-        <span class="editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
-        <div class="row-actions">
-          <ActionButton kind="discard" compact title="Discard draft" onClick={onCancelFiles} />
-          <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
-        </div>
-      </li>
-    {/if}
     {#each rows as col, i (col.name)}
       {@const isExpanded = expandedNames.has(col.name)}
       {@const playing = playingNames.has(col.name)}
@@ -834,18 +748,16 @@
       </li>
     {/each}
   </ul>
-  {#if !draftName}
-    <!-- Outside the scroll container: trails the last row while the
-         list is short, stays visible once the list overflows. -->
-    <button
-      class="add-coll"
-      class:drop-into={dropIntoNew}
-      on:click={onCreate}
-      on:dragover={handleNewDragOver}
-      on:dragleave={handlePathDragLeave}
-      on:drop={handleNewDrop}
-    >+ New collection&hellip;</button>
-  {/if}
+  <!-- Outside the scroll container: trails the last row while the
+       list is short, stays visible once the list overflows. -->
+  <button
+    class="add-coll"
+    class:drop-into={dropIntoNew}
+    on:click={onCreate}
+    on:dragover={handleNewDragOver}
+    on:dragleave={handlePathDragLeave}
+    on:drop={handleNewDrop}
+  >+ New collection&hellip;</button>
 </aside>
 
 {#if ctxMenu}
@@ -1097,17 +1009,6 @@
     box-shadow: inset 0 -2px 0 var(--text-accent);
   }
 
-  /* Armed-for-edit state: warmer background + purple stripe on the
-     leading edge — DAW-style "this track is record-armed" affordance. */
-  .row-container.editing {
-    background: color-mix(in srgb, var(--text-accent) 25%, transparent);
-    border-left-color: var(--text-active);
-    cursor: default;
-  }
-  .row-container.draft .row-name {
-    font-style: italic;
-  }
-
   /* Drag grip — fades in at the row's left edge on hover, custom order
      only (the markup omits it under other sorts). */
   .grip {
@@ -1135,11 +1036,6 @@
     cursor: pointer;
     text-align: center;
   }
-  .arrow-spacer {
-    width: 0.8rem;
-    flex-shrink: 0;
-  }
-
   .bkm {
     width: 12px;
     height: 12px;
@@ -1155,21 +1051,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* The name doubles as a click-to-rename button on the draft row. */
-  .draft-name {
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    padding: 0.05rem 0.3rem;
-    margin: 0 -0.3rem;
-    text-align: left;
-    cursor: text;
-    transition: border-color var(--transition-fast);
-  }
-  .draft-name:hover {
-    border-color: var(--bg-category);
-  }
-
   .rename-input {
     flex: 1;
     min-width: 0;
@@ -1183,20 +1064,6 @@
     font-size: 0.9rem;
     padding: 0.05rem 0.3rem;
     outline: none;
-  }
-
-  .editing-count {
-    font-size: 0.7rem;
-    color: var(--text-active);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-  }
-  .row-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.05rem;
-    flex-shrink: 0;
   }
 
   /* Transport — hidden at rest, revealed on row hover or keyboard
@@ -1330,8 +1197,7 @@
      become a member" and can't be confused with purple-armed, the engaged
      wash, or the reorder rules (which are inset box-shadows). Covers the
      expanded child list too, since that's part of the same target. */
-  .item.drop-into,
-  .row-container.draft.drop-into {
+  .item.drop-into {
     outline: var(--outline-drop);
     outline-offset: -1px;
     border-radius: var(--radius-sm);

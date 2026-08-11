@@ -169,18 +169,20 @@
 
   // Collections state
   let collections: Record<string, CollectionInfo> = {};
-  // Proposed name of an in-progress new collection that hasn't been saved
-  // yet. Mutually exclusive with armedCollection: a draft isn't a track,
-  // so it's staged behind Save/Cancel rather than committing live.
-  let draftName: string | null = null;
-  let collectionEditPaths = new Set<string>();
+  // A collection created moments ago and not yet named. The panel uses it
+  // to drop that row straight into rename; backing out of that rename
+  // while the collection is still empty removes it again.
+  //
+  // Carries a token, not just a name: create "Untitled", rename it, then
+  // create again and the name is free once more — an identical value the
+  // panel could not tell from the previous one.
+  let newlyCreated: { name: string; token: number } | null = null;
+  let newCollectionToken = 0;
   // The armed track. Arming rewires the file tree into a live membership
   // surface for this one collection; every toggle writes through the
-  // scheduler. Deliberately NOT isCollectionEditMode — that flag blanks
-  // the scope chips and disables search, which is right for the brief
-  // modal act of shaping a draft and wrong for a long curation session.
-  // Never persisted: a mode that silently changes what a click does must
-  // not survive a restart (same line the app draws for searchViewOpen).
+  // scheduler. Never persisted: a mode that silently changes what a click
+  // does must not survive a restart (the same line the app draws for
+  // searchViewOpen).
   let armedCollection: string | null = null;
   // Last membership the sidecar acknowledged, so a failed write has
   // something to roll back to.
@@ -349,30 +351,22 @@
   // its bookmark takes the collection pigment — with the "play" prefix
   // naming the transport that armed it. Clicking the chip stops the
   // track. Folder/file solos and mutes stay on the tertiary fallback.
-  $: collectionPlays = isCollectionEditMode
-    ? []
-    : [...playingCollections].map((name) => ({
-        key: name,
-        label: name,
-        // `|| null` (not ??): a cleared pigment is stored as '', which
-        // must not reach the chip as a fill value.
-        color: collections[name]?.color || null,
-      }));
-  $: collectionSolos = isCollectionEditMode
-    ? []
-    : [...scopeSolos].map(([key, ref]) => ({ key, label: ref.label, color: null }));
-  $: collectionMutes = isCollectionEditMode
-    ? []
-    : [...scopeMutes].map(([key, ref]) => ({ key, label: ref.label, color: null }));
+  $: collectionPlays = [...playingCollections].map((name) => ({
+    key: name,
+    label: name,
+    // `|| null` (not ??): a cleared pigment is stored as '', which
+    // must not reach the chip as a fill value.
+    color: collections[name]?.color || null,
+  }));
+  $: collectionSolos = [...scopeSolos].map(([key, ref]) => ({ key, label: ref.label, color: null }));
+  $: collectionMutes = [...scopeMutes].map(([key, ref]) => ({ key, label: ref.label, color: null }));
   // Collection-track mutes chip like plays — pigment ribbon, mute
   // dressing. Never suppressed: mute wins over play on the mix layer.
-  $: collectionTrackMutes = isCollectionEditMode
-    ? []
-    : [...mutedCollectionNames].map((name) => ({
-        key: name,
-        label: name,
-        color: collections[name]?.color || null,
-      }));
+  $: collectionTrackMutes = [...mutedCollectionNames].map((name) => ({
+    key: name,
+    label: name,
+    color: collections[name]?.color || null,
+  }));
   function handleClearCollectionSolo(key: string) {
     scopeSolos.delete(key);
     scopeSolos = scopeSolos;
@@ -437,11 +431,8 @@
   // the denominator doesn't jump the moment narrowing engages.
   $: searchableFileCount = resolvedScopeSet !== null ? resolvedScopeSet.size : indexedPaths.size;
   // In-scope files plus their ancestor folders — the tree rows that
-  // stay bright. null = no scope engaged, nothing dims. Edit mode is
-  // exempt: it handles its own membership UI (checkboxes) and scope
-  // decoration shouldn't compete with it — same reason the scope-bar
-  // chips suppress there.
-  $: scopeBrightPaths = resolvedScopeSet === null || isCollectionEditMode
+  // stay bright. null = no scope engaged, nothing dims.
+  $: scopeBrightPaths = resolvedScopeSet === null
     ? null
     : new Set<string>([...resolvedScopeSet, ...computeAncestorPaths(resolvedScopeSet)]);
   // Folders containing at least one indexed file — the rows the dim
@@ -1245,13 +1236,12 @@
   async function refreshIndexStatus(options: { userTriggered?: boolean } = {}) {
     const status = await fetchIndexStatus();
     if (!status) return;
-    if (isCollectionEditMode) return;
     const action = decideSyncAction(status, syncPreferences, options.userTriggered ?? false);
     await applySyncAction(action);
   }
 
   function showSyncPrompt(counts: PromptCounts) {
-    if (!indexStatus || isCollectionEditMode) return;
+    if (!indexStatus) return;
 
     const parts: string[] = [];
     if (counts.disk > 0) parts.push(`${counts.disk} disk change${counts.disk === 1 ? '' : 's'}`);
@@ -1579,10 +1569,6 @@
     : '';
 
   // Collection mode derived state
-  // Shaping a draft is modal on purpose — it blanks the scope chips and
-  // disables search. Arming is not: a curation session can run for
-  // minutes and the rest of the app has to keep working around it.
-  $: isCollectionEditMode = draftName !== null;
   // Lit states for the tree's S/M buttons. The dim itself comes from
   // scopeBrightPaths (out-of-scope membership), not from these.
   $: mutedScopePaths = new Set(scopeMutes.keys());
@@ -1640,14 +1626,13 @@
 
   // Whether the Curation section in the filter console has anything to
   // channel: the collected/loose split is meaningless until a collection
-  // exists. Edit mode forces its own UI, so the section is hidden there.
-  $: collectionFilterAvailable =
-    !isCollectionEditMode && Object.keys(collections).length > 0;
+  // exists.
+  $: collectionFilterAvailable = Object.keys(collections).length > 0;
 
   // Filter for what the file tree shows. Composes scope + library filters:
-  // 1. Edit mode and focus mode pick the base file pool. A playing
-  //    collection just highlights — the tree shows the whole library so
-  //    users can see those files in context.
+  // 1. Focus mode picks the base file pool. A playing collection just
+  //    highlights — the tree shows the whole library so users can see
+  //    those files in context.
   // 2. Uncategorized filter narrows to files not in any collection.
   // 3. Add ancestor folders so the tree structure stays intact.
   // Returns null = show everything, no narrowing.
@@ -1662,9 +1647,7 @@
     // collections (which compose orthogonally) is the right tree-view
     // affordance.
     let baseFiles: Set<string>;
-    if (isCollectionEditMode) {
-      baseFiles = new Set(indexedPaths);
-    } else if (viewMode === 'systems' && soloCuration.size > 0) {
+    if (viewMode === 'systems' && soloCuration.size > 0) {
       // Curation solos union within the axis: Collected = files in some
       // collection, Loose = files in none.
       baseFiles = new Set<string>();
@@ -2321,12 +2304,6 @@
     // this branch fires because metaKey + Enter wasn't preventDefault'd
     // by the input's logic. Guard on having pending state so the chord
     // is a clear no-op when nothing's being edited.
-    if (meta && !event.shiftKey && event.key === 'Enter' && draftName) {
-      event.preventDefault();
-      saveCollection();
-      return;
-    }
-
     // `?` — show keyboard shortcuts overlay. Match on event.key (the
     // produced character) rather than Shift+/ so any layout that emits
     // `?` from a different physical key still triggers. Bare chord, gated
@@ -2700,17 +2677,6 @@
   // Everything the tree needs to draw and answer the arm slot. Bundled so
   // the recursive component threads one prop instead of five.
   $: armState = (() => {
-    // A draft borrows the same slot, staging into collectionEditPaths
-    // instead of committing — which is what lets it be curated from the
-    // tree rather than forcing the view over to systems.
-    if (draftName) {
-      return {
-        name: draftName,
-        color: null,
-        paths: collectionEditPaths,
-        folders: computeFolderMembership(indexedPaths, collectionEditPaths),
-      };
-    }
     if (!armedCollection) return null;
     const col = collections[armedCollection];
     if (!col) return null;
@@ -2733,7 +2699,7 @@
       return;
     }
     // A draft isn't a track yet — you can't arm what doesn't exist.
-    if (draftName || !collections[name]) return;
+    if (!collections[name]) return;
     await armCommitter.flush();
     armedCollection = name;
     lastCommittedPaths = collections[name].file_paths;
@@ -2824,7 +2790,7 @@
   }
 
   function dropPathsOnNewCollection(paths: string[], label: string) {
-    startDraftCollection(uniqueCollectionName(label, collections), paths);
+    void createCollection(label, paths);
   }
 
   // The × on a panel row's expanded file list.
@@ -2852,55 +2818,64 @@
     else curationAdd(paths);
   }
 
-  // Where a curation change lands. A draft stages into collectionEditPaths
-  // and nothing reaches the database until Save; an armed track commits.
   // The systems view's checkboxes and the tree's arm slot both come
   // through here, so the two surfaces can never disagree.
   function curationAdd(paths: string[]) {
-    if (draftName) handleCollectionAdd(paths);
-    else if (armedCollection) void applyMembership(armedCollection, paths, true);
+    if (armedCollection) void applyMembership(armedCollection, paths, true);
   }
 
   function curationRemove(paths: string[]) {
-    if (draftName) handleCollectionRemove(paths);
-    else if (armedCollection) void applyMembership(armedCollection, paths, false);
+    if (armedCollection) void applyMembership(armedCollection, paths, false);
   }
 
-  // Open a draft for a new (unsaved) collection. The draft renders as a
-  // synthetic top row in the panel; nothing hits the database until Save.
-  //
-  // Drafts are the one staged act left. An existing collection is a track
-  // and gets armed; a draft isn't a track yet, so it keeps Save/Cancel —
-  // the ✓ is what creates it.
-  function startDraftCollection(name: string, paths: Iterable<string> = []) {
-    if (armedCollection) void disarmCollection();
-    collectionEditPaths = new Set(paths);
-    draftName = name;
-    // No view switch. The tree carries the same slot the systems view
-    // does, so a draft is curated wherever you already are — the old
-    // forced hop to systems view persisted itself and never came back.
-    collectionsPanelOpen = true;
-  }
-
-  function cancelCollectionEdit() {
-    draftName = null;
-    collectionEditPaths = new Set();
-  }
-
-  async function saveCollection() {
-    if (!draftName) return;
-    const name = draftName;
-    const filePaths = Array.from(collectionEditPaths);
+  /**
+   * Make a collection, for real, right away — Finder's "untitled folder",
+   * not a form you fill in and submit. It lands named, focused, armed and
+   * in rename mode, so naming it and filling it are one motion instead of
+   * a staged act with its own row, its own path set and its own modal
+   * rules. Creating from a folder or a drop seeds it in the same call.
+   *
+   * The escape hatch for a stray ⌘N is discardNewIfEmpty below, not a
+   * Cancel button: backing out is rare, so it shouldn't cost a permanent
+   * affordance on every new row.
+   */
+  async function createCollection(base: string, paths: string[] = []) {
+    const name = uniqueCollectionName(base, collections);
     try {
-      await invoke<CollectionMutationResult>('create_collection', { name, filePaths });
-      jobNotification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
-      cancelCollectionEdit();
+      await invoke<CollectionMutationResult>('create_collection', { name, filePaths: paths });
       await loadCollections();
-      // Straight from creating it into curating it — no mode transition
-      // the user has to notice.
+      collectionsPanelOpen = true;
+      setFocusedCollectionName(name);
       await armCollection(name);
+      // Set last: the panel drops the row into rename the moment it sees
+      // this, and the row has to exist by then.
+      newlyCreated = { name, token: ++newCollectionToken };
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Save failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({
+        type: 'error',
+        message: `Could not create "${name}": ${String(e)}`,
+        duration: 5000,
+      });
+    }
+  }
+
+  // Esc out of the initial naming, before anything has been filed. Only
+  // ever removes a collection that is still empty — once it holds a book,
+  // backing out of a rename is just backing out of a rename.
+  async function discardNewIfEmpty(name: string) {
+    newlyCreated = null;
+    const col = collections[name];
+    if (!col || col.file_paths.length > 0) return;
+    if (armedCollection === name) {
+      armCommitter.cancel();
+      armedCollection = null;
+    }
+    try {
+      await invoke('delete_collection', { name });
+      await loadCollections();
+    } catch (e) {
+      // An empty collection left behind is harmless; don't nag about it.
+      console.log('Could not discard new collection:', e);
     }
   }
 
@@ -2922,7 +2897,6 @@
     }
     try {
       await invoke('delete_collection', { name });
-      cancelCollectionEdit();
       // Playing and muted state on the deleted collection clear with it
       // — the chips disappear rather than scoping on a ghost.
       const wasPlaying = playingCollections.delete(name);
@@ -3018,9 +2992,7 @@
     }
   }
 
-  // Open a draft seeded with the indexed PDFs under `item`. The draft
-  // appears as a synthetic top row in the panel and doesn't hit the
-  // database until Save.
+  // Create a collection seeded with the indexed PDFs under `item`.
   function createCollectionFromItem(item: FileItem) {
     const candidates = item.is_dir
       ? indexedPathsUnder(item.path, indexedPaths)
@@ -3034,7 +3006,7 @@
       return;
     }
     const baseName = item.is_dir ? item.name : item.name.replace(/\.pdf$/i, '');
-    startDraftCollection(uniqueCollectionName(baseName, collections), candidates);
+    void createCollection(baseName, candidates);
   }
 
   // ---------------------------------------------------------------------------
@@ -3074,22 +3046,10 @@
     }
   }
 
-  // Panel "+" handler — opens a fresh draft with an auto-generated name.
-  // CollectionsPanel auto-enters rename mode when the draft appears, so
-  // the user can immediately type a name. Focusing the draft also lets
-  // Esc-on-draft discard it via the panel's window keydown handler.
+  // Panel "+" handler. The row exists immediately and lands in rename;
+  // Esc there removes it again while it's still empty.
   function inlineCreateCollection() {
-    const name = uniqueCollectionName('Untitled', collections);
-    startDraftCollection(name);
-    setFocusedCollectionName(name);
-  }
-
-  // Inline rename of the active draft. Only updates local state; nothing
-  // hits the database until Save. Collisions are deferred to the backend
-  // on Save (notification surfaces the error).
-  function handleDraftRename(name: string) {
-    if (!draftName) return;
-    draftName = name;
+    void createCollection('Untitled');
   }
 
   // Inline rename of an existing collection (F2 / double-click on the
@@ -3190,16 +3150,6 @@
         duration: 5000,
       });
     }
-  }
-
-  function handleCollectionAdd(paths: string[]) {
-    for (const p of paths) collectionEditPaths.add(p);
-    collectionEditPaths = collectionEditPaths;
-  }
-
-  function handleCollectionRemove(paths: string[]) {
-    for (const p of paths) collectionEditPaths.delete(p);
-    collectionEditPaths = collectionEditPaths;
   }
 
   // Copy MCP config to clipboard
@@ -3385,7 +3335,7 @@
   <Header
     bind:this={headerComponent}
     bind:searchQuery
-    disabled={!selectedFolder || isCollectionEditMode}
+    disabled={!selectedFolder}
     panelOpen={collectionsPanelOpen}
     panelToggleVisible={!!selectedFolder}
     {filterPanelOpen}
@@ -3422,10 +3372,9 @@
               onArm={armCollection}
               onDropPaths={dropPathsOnCollection}
               onDropNewCollection={dropPathsOnNewCollection}
-              onDropDraft={handleCollectionAdd}
               onRemoveFile={removeFileFromCollection}
-              {draftName}
-              editFileCount={collectionEditPaths.size}
+              {newlyCreated}
+              onDiscardNew={discardNewIfEmpty}
               playingNames={playingCollections}
               mutedNames={mutedCollectionNames}
               gameSystemMap={effectiveGameSystemMap}
@@ -3434,9 +3383,6 @@
               onDelete={requestDeleteCollection}
               onToggleArchived={toggleArchived}
               onCreate={inlineCreateCollection}
-              onSaveFiles={saveCollection}
-              onCancelFiles={cancelCollectionEdit}
-              onDraftRename={handleDraftRename}
               onRename={renameCollection}
               onSetColor={setCollectionColor}
               onTogglePlay={togglePlayCollection}
@@ -3558,7 +3504,7 @@
             entries={indexedEntries}
             {displayPaths}
             {scopeBrightPaths}
-            hideOutOfScope={hideOutOfScope && !isCollectionEditMode}
+            {hideOutOfScope}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
             onToggleSystemFilter={toggleSystemFilter}

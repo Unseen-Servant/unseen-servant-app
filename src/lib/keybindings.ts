@@ -97,8 +97,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm for editing',     scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
   { id: 'collections.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / cancel an in-progress edit', scope: 'collections' },
-  { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (auto-opens panel)', scope: 'global' },
-  { id: 'collections.save',      keys: { mac: '⌘↵',   other: 'Ctrl+Enter' },    label: 'Save in-progress collection',  scope: 'global' },
+  { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (created armed, ready to name)', scope: 'global' },
 
   // Filters panel (while the pane holds focus)
   { id: 'filterPanel.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterPanel' },
