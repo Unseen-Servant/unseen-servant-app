@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Legend Lore",
-        "width": 1280,
-        "height": 800,
+        "width": 940,
+        "height": 600,
         "minWidth": 940,
         "minHeight": 600
       }
