@@ -23,6 +23,17 @@ export const EMPTY_FOLDER_MEMBERSHIP: FolderMembership = Object.freeze({
 });
 
 /**
+ * Everything a browsing surface needs to draw and answer the arm slot,
+ * bundled so the recursive tree threads one prop instead of five.
+ */
+export interface ArmState {
+  name: string;
+  color: string | null;
+  paths: Set<string>;
+  folders: FolderMembership;
+}
+
+/**
  * Indexed PDFs at or under `target`. A path that is itself indexed
  * resolves to just itself; anything else is treated as a folder prefix.
  * The trailing slash matters — without it "/lib/Adv" would swallow

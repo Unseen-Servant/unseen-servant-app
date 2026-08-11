@@ -7,6 +7,7 @@
   import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
   import { isRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial } from './treeNav';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
+  import { memberStateFor, type ArmState } from './collectionMembership';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -68,6 +69,12 @@
   // a ribbon strip so curation is visible while browsing; folders carry
   // no membership of their own and get nothing.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
+
+  // The armed collection, or null. While armed, every row grows a slot at
+  // its flush-right edge — the one x-position that doesn't move from row
+  // to row — and clicking a file row files or unfiles it on the spot.
+  export let arm: ArmState | null = null;
+  export let onToggleMembership: (item: FileItem) => void = () => {};
 
   // "Hide unindexed items": drop rows the library knows nothing about —
   // neither in the index nor selected for it. Tree only; SystemsView
@@ -131,9 +138,23 @@
   $: hiddenTagCount = Math.max(0, tags.length - visibleTags.length);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
 
-  $: ribbons = item.is_dir ? EMPTY_RIBBONS : (ribbonIndex.get(item.path) ?? EMPTY_RIBBONS);
+  // The armed collection lives in the arm slot; showing it in the strip
+  // as well would say the same thing twice on one row.
+  $: ribbons = (() => {
+    if (item.is_dir) return EMPTY_RIBBONS;
+    const all = ribbonIndex.get(item.path) ?? EMPTY_RIBBONS;
+    if (arm === null || all.length === 0) return all;
+    return all.filter((r) => r.name !== arm!.name);
+  })();
   $: ribbonSplit = splitRibbons(ribbons);
   $: ribbonTitle = ribbons.length === 0 ? '' : ribbons.map((r) => r.name).join(', ');
+
+  // Same predicate that gates S/M: a row with nothing indexed under it has
+  // nothing a collection could hold — the sidecar drops unindexed paths at
+  // read time — so its slot stays empty rather than offering a dead click.
+  $: canArm = arm !== null &&
+    rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths);
+  $: memberState = arm === null ? 'none' : memberStateFor(item.path, item.is_dir, arm.paths, arm.folders);
 
   async function toggleExpand() {
     if (!item.is_dir) return;
@@ -169,7 +190,12 @@
 
   function handleRowClick() {
     onFocusFile(item.path);
+    // While armed, a file row's primary action is filing it — the same
+    // rewrite the systems view already does when curating. Folders keep
+    // expanding: you have to be able to navigate while you curate, so
+    // enrolling a whole folder goes through its slot instead.
     if (item.is_dir) toggleExpand();
+    else if (canArm) onToggleMembership(item);
   }
 
   async function openFile() {
@@ -321,6 +347,43 @@
         {/if}
       </span>
     {/if}
+
+    {#if arm}
+      <!-- Fixed-width and always present while armed, even when empty, so
+           the target never moves as you sweep down a folder. -->
+      <span class="arm-slot">
+        {#if canArm}
+          <button
+            type="button"
+            class="arm-btn"
+            class:on={memberState === 'all'}
+            class:partial={memberState === 'some'}
+            style={arm.color && memberState !== 'none' ? `color: ${arm.color}` : undefined}
+            on:click|stopPropagation={() => onToggleMembership(item)}
+            aria-pressed={memberState === 'all'}
+            title={memberState === 'all'
+              ? `Remove ${item.name} from ${arm.name}`
+              : `Add ${item.name} to ${arm.name}`}
+          >
+            {#if memberState === 'none'}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 3h12v18l-6-4.4L6 21z"/>
+              </svg>
+            {:else if memberState === 'some'}
+              <!-- Half-filled ribbon: some of this folder is enrolled. -->
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3h6v18l-6-4.4z" fill="currentColor"/>
+                <path d="M6 3h12v18l-6-4.4L6 21z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+              </svg>
+            {:else}
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M5 2h14v20l-7-5.2L5 22z"/>
+              </svg>
+            {/if}
+          </button>
+        {/if}
+      </span>
+    {/if}
   </div>
 
   <SystemTagMenu
@@ -365,6 +428,8 @@
           {hideOutOfScope}
           {hideUnindexed}
           {ribbonIndex}
+          {arm}
+          {onToggleMembership}
         />
       {/each}
     </div>
@@ -527,6 +592,48 @@
     gap: 0.15rem;
     margin-left: 0.5rem;
     flex-shrink: 0;
+  }
+  /* Reserved on every row while armed — an empty slot on an unindexed row
+     still holds the column, so the target never shifts mid-sweep. */
+  .arm-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+  }
+  .arm-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    opacity: 0.35;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+  }
+  .arm-btn svg {
+    width: 12px;
+    height: 12px;
+    display: block;
+  }
+  .row-container:hover .arm-btn {
+    opacity: 1;
+  }
+  .arm-btn.on,
+  .arm-btn.partial {
+    opacity: 1;
+  }
+  .arm-btn:hover {
+    color: var(--text-accent);
+  }
+  .arm-btn:active {
+    transform: scale(0.97);
   }
   .ribbon {
     display: block;

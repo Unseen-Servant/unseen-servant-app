@@ -22,7 +22,6 @@
   // held, so pointing at the panel doesn't throw away the user's position.
   export let lastFocusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
-  export let editingName: string | null = null;
   // Proposed name of an in-progress draft (new collection that hasn't been
   // saved yet). When set, the panel renders a synthetic top row carrying
   // the inline Save/Cancel controls just like an editing row.
@@ -40,12 +39,15 @@
   // nothing until unmuted. Archived rows keep M (no transport).
   export let mutedNames: Set<string> = new Set();
   export let onToggleMute: (name: string) => void = () => {};
+  // The armed track — the one the file tree is currently curating into.
+  // At most one, never a draft, and never persisted across launches.
+  export let armedName: string | null = null;
+  export let onArm: (name: string) => void = () => {};
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
   // Sort state is lifted to +page for per-vault persistence.
   export let sortKey: 'custom' | 'name' | 'size' | 'created' = 'custom';
   export let customOrder: string[] = [];
-  export let onEditFiles: (name: string) => void = () => {};
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
@@ -185,7 +187,7 @@
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
-  $: canDrag = sortKey === 'custom' && rows.length > 1 && !editingName && !draftName;
+  $: canDrag = sortKey === 'custom' && rows.length > 1 && !draftName;
   $: anyPlaying = playingNames.size > 0;
 
   let draggingName: string | null = null;
@@ -240,7 +242,7 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): Rename / Pigment ▸ /
-  // Add files… / Archive / Delete. Same visual family as the file
+  // Arm / Archive / Delete. Same visual family as the file
   // tree's ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
@@ -368,15 +370,18 @@
     // idx-out-of-range early return: a fresh draft sits outside `rows`
     // (it's rendered separately above the list) so idx is -1 for it.
     const isOnDraft = draftName !== null && focusedName === draftName;
-    const isOnEditing = editingName !== null && focusedName === editingName;
 
     if (event.key === 'Escape') {
       event.preventDefault();
-      if (isOnDraft || isOnEditing) onCancelFiles();
+      if (isOnDraft) onCancelFiles();
+      // Leaving the arm comes before releasing focus: the mode has
+      // rewired what a click in the tree does, so it's the louder thing
+      // Esc should undo.
+      else if (armedName !== null) onArm(armedName);
       else onFocusCollection(null);
       return;
     }
-    if (event.key === 'Enter' && (isOnDraft || isOnEditing)) {
+    if (event.key === 'Enter' && isOnDraft) {
       event.preventDefault();
       onSaveFiles();
       return;
@@ -406,8 +411,9 @@
     if (bareLetter) {
       // E for edit, not F: F reads as find/filter everywhere, and this app
       // already spends ⌘F on search — one modifier apart from an unrelated
-      // meaning is worse than no mnemonic at all.
-      if (lk === 'e') { event.preventDefault(); onEditFiles(col.name); return; }
+      // meaning is worse than no mnemonic at all. Not R either: R is
+      // rename one pane over.
+      if (lk === 'e') { event.preventDefault(); onArm(col.name); return; }
       // P or Space toggle the transport — Space is the DAW play/stop
       // convention, shared with file rows (where it opens). A shelved
       // track has no transport, so both are inert until unarchived
@@ -597,16 +603,16 @@
       </li>
     {/if}
     {#each rows as col, i (col.name)}
-      {@const isEditing = editingName === col.name}
       {@const isExpanded = expandedNames.has(col.name)}
       {@const playing = playingNames.has(col.name)}
       {@const muted = mutedNames.has(col.name)}
       {@const isRenamingRow = renamingName === col.name}
+      {@const armed = armedName === col.name}
       <li class="item">
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
         <div
           class="row-container"
-          class:editing={isEditing}
+          class:armed
           class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
           class:playing
@@ -621,9 +627,9 @@
           on:dragover={(e) => handleDragOver(e, i)}
           on:drop={handleDrop}
           on:dragend={handleDragEnd}
-          on:click={() => { if (!isEditing && !isRenamingRow) onFocusCollection(col.name); }}
-          on:dblclick={() => { if (!isEditing && !isRenamingRow) startRename(col.name); }}
-          on:contextmenu={(e) => { if (!isEditing) openContextMenu(e, col.name); }}
+          on:click={() => { if (!isRenamingRow) onFocusCollection(col.name); }}
+          on:dblclick={() => { if (!isRenamingRow) startRename(col.name); }}
+          on:contextmenu={(e) => openContextMenu(e, col.name)}
         >
           {#if sortKey === 'custom'}
             <span class="grip" title="Drag to reorder" aria-hidden="true">⠿</span>
@@ -659,16 +665,24 @@
           {:else}
             <span class="row-name">{col.name}</span>
           {/if}
-          {#if isEditing}
-            <span class="editing-count" title="{editFileCount} file{editFileCount === 1 ? '' : 's'}">{editFileCount}</span>
-            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-            <div class="row-actions" on:click|stopPropagation>
-              <ActionButton kind="discard" compact title="Cancel" onClick={onCancelFiles} />
-              <ActionButton kind="confirm" compact title="Save" onClick={onSaveFiles} />
-            </div>
-          {:else if !isRenamingRow}
-            <span class="tr" class:engaged={playing || muted}>
+          {#if !isRenamingRow}
+            <span class="tr" class:engaged={playing || muted || armed}>
               {#if !col.archived}
+                <!-- Record-arm: point the file tree at this track. Purple
+                     because it's a mode the user switched on; vermilion is
+                     spoken for by mute and danger. -->
+                <button
+                  type="button"
+                  class="tr-btn arm-btn"
+                  class:armed
+                  on:click|stopPropagation={() => onArm(col.name)}
+                  aria-pressed={armed}
+                  title={armed
+                    ? `Disarm ${col.name} (E)`
+                    : `Arm ${col.name} (E) — then click books in the tree to file them`}
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg>
+                </button>
                 <!-- Archived rows carry no transport — unarchive to play. -->
                 <button
                   type="button"
@@ -785,9 +799,9 @@
       {/if}
     </div>
     <hr class="menu-divider" />
-    <button class="context-item" role="menuitem" on:click={() => ctxAction(onEditFiles)}>
-      Add files&hellip;
-      <span class="menu-chord" class:bare={isBareKeyChord('collections.editFiles')} aria-hidden="true">{chord('collections.editFiles')}</span>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(onArm)}>
+      {armedName === ctxMenu.name ? 'Disarm' : 'Arm for editing'}
+      <span class="menu-chord" class:bare={isBareKeyChord('collections.arm')} aria-hidden="true">{chord('collections.arm')}</span>
     </button>
     <button class="context-item" role="menuitem" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
       {col?.archived ? 'Unarchive' : 'Archive'}
@@ -1117,11 +1131,18 @@
   .tr-btn:active {
     transform: scale(0.97);
   }
-  .tr-btn.playing {
+  .tr-btn.playing,
+  .tr-btn.arm-btn.armed {
     color: var(--text-active);
     border-color: var(--text-active);
     background: color-mix(in srgb, var(--text-active) 15%, transparent);
     filter: var(--glow-active);
+  }
+  /* The armed row wears the same treatment the staged edit row does —
+     one look for "this is the collection you're editing". */
+  .row-container.armed {
+    background: color-mix(in srgb, var(--text-accent) 25%, transparent);
+    border-left-color: var(--text-active);
   }
 
   /* Expanded file rows — the collection's contents, indented under the

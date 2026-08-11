@@ -141,7 +141,7 @@ describe('isBareKeyChord', () => {
     const rendered = [
       'info.show', 'tree.openExternal', 'tree.rename', 'tree.solo',
       'tree.mute', 'tree.hide', 'tree.addToCollection',
-      'collections.rename', 'collections.editFiles', 'collections.archive',
+      'collections.rename', 'collections.arm', 'collections.archive',
     ];
     for (const id of rendered) {
       const entry = KEYBINDINGS.find((k) => k.id === id)!;

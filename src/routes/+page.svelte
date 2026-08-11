@@ -36,8 +36,13 @@
     collectionsContaining,
     collectionsFullyContaining,
     uniqueCollectionName,
+    computeFolderMembership,
+    memberStateFor,
+    addMembers,
+    removeMembers,
   } from '../lib/collectionMembership';
   import { buildRibbonIndex, firstColorByPath } from '../lib/collectionRibbons';
+  import { createCommitScheduler, mergeArmedCollection } from '../lib/collectionCommit';
   import { chord } from '../lib/keybindings';
   import {
     parseString,
@@ -163,14 +168,22 @@
 
   // Collections state
   let collections: Record<string, CollectionInfo> = {};
-  let editingCollectionName: string | null = null;
   // Proposed name of an in-progress new collection that hasn't been saved
-  // yet. Mutually exclusive with editingCollectionName: either we're
-  // editing an existing row or shaping a draft, never both.
+  // yet. Mutually exclusive with armedCollection: a draft isn't a track,
+  // so it's staged behind Save/Cancel rather than committing live.
   let draftName: string | null = null;
   let collectionEditPaths = new Set<string>();
-  let collectionEditName = '';
-  let collectionEditDescription = '';
+  // The armed track. Arming rewires the file tree into a live membership
+  // surface for this one collection; every toggle writes through the
+  // scheduler. Deliberately NOT isCollectionEditMode — that flag blanks
+  // the scope chips and disables search, which is right for the brief
+  // modal act of shaping a draft and wrong for a long curation session.
+  // Never persisted: a mode that silently changes what a click does must
+  // not survive a restart (same line the app draws for searchViewOpen).
+  let armedCollection: string | null = null;
+  // Last membership the sidecar acknowledged, so a failed write has
+  // something to roll back to.
+  let lastCommittedPaths: string[] = [];
   let collectionsPanelOpen = true;
   // The filter panel docks below the collections panel in the left pane;
   // both persist across launches independently.
@@ -860,6 +873,8 @@
   }
 
   onDestroy(() => {
+    // Best effort: land any membership still sitting in the debounce.
+    void armCommitter.flush();
     if (healthInterval) clearInterval(healthInterval);
     if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
@@ -1562,7 +1577,10 @@
     : '';
 
   // Collection mode derived state
-  $: isCollectionEditMode = editingCollectionName !== null || draftName !== null;
+  // Shaping a draft is modal on purpose — it blanks the scope chips and
+  // disables search. Arming is not: a curation session can run for
+  // minutes and the rest of the app has to keep working around it.
+  $: isCollectionEditMode = draftName !== null;
   // Lit states for the tree's S/M buttons. The dim itself comes from
   // scopeBrightPaths (out-of-scope membership), not from these.
   $: mutedScopePaths = new Set(scopeMutes.keys());
@@ -1854,6 +1872,11 @@
     const row = visibleTreeRows[idx];
     if (row.item.is_dir) {
       handleToggleExpand(row.path);
+    } else if (armedCollection) {
+      // Armed, a file row's primary action is filing it — the same
+      // rewrite the click path makes, and the same one the systems view
+      // already applies while curating.
+      toggleMembership(row.item);
     } else {
       openPath(row.path).catch((e) => console.error('Failed to open file:', e));
     }
@@ -2296,7 +2319,7 @@
     // this branch fires because metaKey + Enter wasn't preventDefault'd
     // by the input's logic. Guard on having pending state so the chord
     // is a clear no-op when nothing's being edited.
-    if (meta && !event.shiftKey && event.key === 'Enter' && (draftName || editingCollectionName)) {
+    if (meta && !event.shiftKey && event.key === 'Enter' && draftName) {
       event.preventDefault();
       saveCollection();
       return;
@@ -2625,68 +2648,176 @@
   async function loadCollections() {
     try {
       const result = await invoke<CollectionsResult>('get_collections');
-      collections = result.collections;
+      // A sync completing mid-session calls through here. Without the
+      // merge, disk state would overwrite clicks the scheduler hasn't
+      // written yet — and the next flush would then persist that revert.
+      collections = mergeArmedCollection(
+        result.collections,
+        armedCollection,
+        armCommitter.pending() && armedCollection
+          ? collections[armedCollection]?.file_paths ?? null
+          : null
+      );
     } catch (e) {
       console.log('Could not fetch collections:', e);
     }
   }
 
-  function startEditCollection(name: string) {
-    const col = collections[name];
-    if (!col) return;
-    collectionEditName = col.name;
-    collectionEditDescription = col.description;
-    collectionEditPaths = new Set(col.file_paths);
-    editingCollectionName = name;
-    draftName = null;
-    setViewMode('systems');
-    // The Save/Cancel controls now live inline on the panel row, so the
-    // panel must be visible while editing.
+  // ---- Arming a track -------------------------------------------------
+  //
+  // Arm a collection and the file tree becomes a live membership surface
+  // for it: clicking a book files or unfiles it on the spot. No Save, no
+  // Cancel — each toggle is its own undo.
+
+  const armCommitter = createCommitScheduler({
+    write: async (name, filePaths) => {
+      await invoke<CollectionMutationResult>('update_collection', { name, filePaths });
+      lastCommittedPaths = filePaths;
+    },
+    onError: (name, err) => {
+      // The failed write carried every un-persisted click, so they are
+      // gone by construction. Put the row back to what the sidecar last
+      // acknowledged, and leave the mode rather than invite more losses.
+      const col = collections[name];
+      if (col) {
+        collections = {
+          ...collections,
+          [name]: { ...col, file_paths: lastCommittedPaths, file_count: lastCommittedPaths.length },
+        };
+      }
+      armCommitter.cancel();
+      armedCollection = null;
+      jobNotification.show({
+        type: 'error',
+        message: `Could not save "${name}" — reverted to the last saved state. ${String(err)}`,
+        duration: 8000,
+      });
+    },
+  });
+
+  // Everything the tree needs to draw and answer the arm slot. Bundled so
+  // the recursive component threads one prop instead of five.
+  $: armState = (() => {
+    if (!armedCollection) return null;
+    const col = collections[armedCollection];
+    if (!col) return null;
+    const paths = new Set(col.file_paths);
+    return {
+      name: col.name,
+      color: col.color,
+      paths,
+      folders: computeFolderMembership(indexedPaths, paths),
+    };
+  })();
+
+  // A collection deleted out from under the arm (or archived away) takes
+  // the mode with it rather than leaving slots pointing at nothing.
+  $: if (armedCollection && !collections[armedCollection]) armedCollection = null;
+
+  async function armCollection(name: string) {
+    if (armedCollection === name) {
+      await disarmCollection();
+      return;
+    }
+    // A draft isn't a track yet — you can't arm what doesn't exist.
+    if (draftName || !collections[name]) return;
+    await armCommitter.flush();
+    armedCollection = name;
+    lastCommittedPaths = collections[name].file_paths;
     collectionsPanelOpen = true;
+  }
+
+  async function disarmCollection() {
+    if (!armedCollection) return;
+    await armCommitter.flush();
+    armedCollection = null;
+  }
+
+  /**
+   * The one path every membership change takes — the tree's arm toggle, a
+   * drop, the panel's remove ×. Armed collections patch locally and commit
+   * through the scheduler; anything else writes straight through.
+   *
+   * `collections` is patched optimistically because it's the single source
+   * of truth: the ribbon index, the panel's file count, and the curation
+   * channels all derive from it and stay honest for free.
+   */
+  async function applyMembership(name: string, paths: string[], present: boolean): Promise<number> {
+    const col = collections[name];
+    if (!col || paths.length === 0) return 0;
+    const result = present
+      ? addMembers(col.file_paths, paths)
+      : removeMembers(col.file_paths, new Set(paths));
+    const changed = 'added' in result ? result.added : result.removed;
+    if (changed === 0) return 0;
+
+    const next = result.next;
+    collections = {
+      ...collections,
+      [name]: { ...col, file_paths: next, file_count: next.length },
+    };
+
+    if (armedCollection === name) {
+      armCommitter.schedule(name, next);
+    } else {
+      try {
+        await invoke<CollectionMutationResult>('update_collection', { name, filePaths: next });
+      } catch (e) {
+        await loadCollections();
+        jobNotification.show({
+          type: 'error',
+          message: `Could not update "${name}": ${String(e)}`,
+          duration: 5000,
+        });
+        return 0;
+      }
+    }
+    return changed;
+  }
+
+  // Tree/systems-view arm slot. A partly-enrolled folder fills; a full one
+  // empties, so a second click always undoes the first.
+  const onToggleMembership = (item: FileItem) => toggleMembership(item);
+
+  function toggleMembership(item: FileItem) {
+    if (!armedCollection || !armState) return;
+    const paths = item.is_dir ? indexedPathsUnder(item.path, indexedPaths) : [item.path];
+    if (paths.length === 0) return;
+    const state = memberStateFor(item.path, item.is_dir, armState.paths, armState.folders);
+    void applyMembership(armedCollection, paths, state !== 'all');
   }
 
   // Open a draft for a new (unsaved) collection. The draft renders as a
   // synthetic top row in the panel; nothing hits the database until Save.
+  //
+  // Drafts are the one staged act left. An existing collection is a track
+  // and gets armed; a draft isn't a track yet, so it keeps Save/Cancel —
+  // the ✓ is what creates it.
   function startDraftCollection(name: string, paths: Iterable<string> = []) {
-    collectionEditName = name;
-    collectionEditDescription = '';
+    if (armedCollection) void disarmCollection();
     collectionEditPaths = new Set(paths);
     draftName = name;
-    editingCollectionName = null;
     setViewMode('systems');
     collectionsPanelOpen = true;
   }
 
   function cancelCollectionEdit() {
-    editingCollectionName = null;
     draftName = null;
     collectionEditPaths = new Set();
-    collectionEditName = '';
-    collectionEditDescription = '';
   }
 
   async function saveCollection() {
+    if (!draftName) return;
+    const name = draftName;
     const filePaths = Array.from(collectionEditPaths);
     try {
-      if (draftName) {
-        await invoke<CollectionMutationResult>('create_collection', {
-          name: draftName,
-          filePaths,
-          description: collectionEditDescription,
-        });
-        jobNotification.show({ type: 'success', message: `Created "${draftName}"`, duration: 4000 });
-      } else if (editingCollectionName) {
-        await invoke<CollectionMutationResult>('update_collection', {
-          name: editingCollectionName,
-          filePaths,
-          description: collectionEditDescription,
-        });
-        jobNotification.show({ type: 'success', message: `Updated "${editingCollectionName}"`, duration: 4000 });
-      } else {
-        return;
-      }
+      await invoke<CollectionMutationResult>('create_collection', { name, filePaths });
+      jobNotification.show({ type: 'success', message: `Created "${name}"`, duration: 4000 });
       cancelCollectionEdit();
       await loadCollections();
+      // Straight from creating it into curating it — no mode transition
+      // the user has to notice.
+      await armCollection(name);
     } catch (e) {
       jobNotification.show({ type: 'error', message: `Save failed: ${String(e)}`, duration: 5000 });
     }
@@ -2702,6 +2833,12 @@
     if (!pendingDeleteCollection) return;
     const name = pendingDeleteCollection;
     pendingDeleteCollection = null;
+    // Drop the arm first: a pending flush would PUT a name that no longer
+    // exists and surface a 404 as a save failure.
+    if (armedCollection === name) {
+      armCommitter.cancel();
+      armedCollection = null;
+    }
     try {
       await invoke('delete_collection', { name });
       cancelCollectionEdit();
@@ -2824,6 +2961,9 @@
   // ---------------------------------------------------------------------------
 
   async function togglePanel() {
+    // Closing the panel takes away the only ● that can turn the mode off,
+    // so leave the mode with it.
+    if (collectionsPanelOpen && armedCollection) await disarmCollection();
     collectionsPanelOpen = !collectionsPanelOpen;
     // Closing unmounts the panel and its window keydown handler, so an
     // off-screen region could never release the arrows on its own — and
@@ -2869,18 +3009,22 @@
   function handleDraftRename(name: string) {
     if (!draftName) return;
     draftName = name;
-    collectionEditName = name;
   }
 
   // Inline rename of an existing collection (F2 / double-click on the
   // panel row). Collisions surface as a notification; the row snaps back.
   async function renameCollection(name: string, newName: string) {
     if (newName === name) return;
+    // Land any armed writes under the old name — after the rename they
+    // would 404.
+    if (armedCollection === name) await armCommitter.flush();
     try {
       await invoke<CollectionMutationResult>('rename_collection', {
         name,
         newName,
       });
+      // The arm follows the rename, like the transport state below.
+      if (armedCollection === name) armedCollection = newName;
       // Migrate any playing state keyed by the old name so an armed
       // track (and its chip) follows the rename instead of going stale.
       if (playingCollections.has(name)) {
@@ -2931,6 +3075,8 @@
   }
 
   async function toggleArchived(name: string, archived: boolean) {
+    // A shelved track has no transport, and no record-arm either.
+    if (archived && armedCollection === name) await disarmCollection();
     try {
       await invoke('update_collection', { name, archived });
       // Archiving a playing collection stops it — a shelved track can't
@@ -3008,6 +3154,9 @@
 
   async function refreshIndexAndCollections() {
     await refreshIndexStatus();
+    // Get armed writes on the wire before the fetch, so loadCollections
+    // has nothing local left to preserve.
+    await armCommitter.flush();
     await loadCollections();
   }
 
@@ -3179,7 +3328,8 @@
             <CollectionsPanel
               bind:this={collectionsPanelComponent}
               {collections}
-              editingName={editingCollectionName}
+              armedName={armedCollection}
+              onArm={armCollection}
               {draftName}
               editFileCount={collectionEditPaths.size}
               playingNames={playingCollections}
@@ -3187,7 +3337,6 @@
               gameSystemMap={effectiveGameSystemMap}
               sortKey={collectionsSortKey}
               customOrder={collectionsCustomOrder}
-              onEditFiles={startEditCollection}
               onDelete={requestDeleteCollection}
               onToggleArchived={toggleArchived}
               onCreate={inlineCreateCollection}
@@ -3373,6 +3522,8 @@
               {hideOutOfScope}
               {hideUnindexed}
               {ribbonIndex}
+              arm={armState}
+              {onToggleMembership}
               onToggleScopeSolo={toggleScopeSolo}
               onToggleScopeMute={toggleScopeMute}
             />

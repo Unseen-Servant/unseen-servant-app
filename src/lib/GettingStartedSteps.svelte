@@ -138,7 +138,10 @@
     <p class="field-desc">
       Use the <strong>+</strong> in the collections panel to create
       one, or right-click a folder and choose
-      <em>Add to collection&hellip; &rarr; + New collection</em>.
+      <em>Add to collection&hellip; &rarr; + New collection</em>. To fill
+      one, <em>arm</em> it with the &#9679; on its row (or <strong>E</strong>)
+      and click books in the tree &mdash; each click files or unfiles on
+      the spot.
     </p>
   </section>
 
