@@ -471,6 +471,8 @@
     align-items: center;
     gap: 0.45rem;
     padding: 0.28rem 0.75rem 0.28rem 1.1rem;
+    /* Matches the collections panel's rows — see the note there. */
+    min-height: 30px;
     font-size: 0.85rem;
     color: var(--text-primary);
     /* Reserved for the solo rule so engaging S doesn't shift layout. */

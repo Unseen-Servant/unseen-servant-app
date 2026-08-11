@@ -655,15 +655,20 @@
           on:dblclick={() => { if (!isRenamingRow) startRename(col.name); }}
           on:contextmenu={(e) => openContextMenu(e, col.name)}
         >
-          {#if sortKey === 'custom'}
-            <span class="grip" title="Drag to reorder" aria-hidden="true">⠿</span>
-          {/if}
+          <!-- The slot is reserved under every sort so the caret keeps its
+               column when the sort changes; only custom order fills it. -->
+          <span
+            class="grip"
+            class:filled={sortKey === 'custom'}
+            title={sortKey === 'custom' ? 'Drag to reorder' : undefined}
+            aria-hidden="true"
+          >{sortKey === 'custom' ? '⠿' : ''}</span>
           <button
             class="arrow"
             on:click|stopPropagation={() => toggleExpand(col.name)}
             aria-label={isExpanded ? 'Collapse' : 'Expand'}
             aria-expanded={isExpanded}
-          >{isExpanded ? '▼' : '▶'}</button>
+          >{isExpanded ? '▾' : '▸'}</button>
           {#if col.color}
             <!-- Pigment bookmark — this is where the color↔collection
                  mapping is taught; the same ribbon reappears in scope
@@ -733,6 +738,7 @@
               >M</button>
             </span>
           {/if}
+          <span class="row-count">{col.file_count}</span>
         </div>
         {#if isExpanded}
           {#each childFiles(col) as f (f.path)}
@@ -997,12 +1003,18 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.22rem 0.4rem 0.22rem 0.75rem;
+    /* Right gutter matches the filter panel's rows so the two panels'
+       count readouts share a column down the dock. The left inset is
+       tighter than the panel's 0.75rem chrome: the caret already sits
+       behind the grip's reserved width, which reads as dead space. */
+    padding: 0.22rem 0.75rem 0.22rem 0.5rem;
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
     border-left: 3px solid transparent;
     cursor: pointer;
     transition: background var(--transition-fast);
-    min-height: 28px;
+    /* Shared with the filter panel's rows: above both panels' natural
+       content height, so one number pins both to the same rhythm. */
+    min-height: 30px;
   }
   .row-container:hover {
     background: var(--bg-container);
@@ -1048,7 +1060,8 @@
   }
 
   /* Drag grip — fades in at the row's left edge on hover, custom order
-     only (the markup omits it under other sorts). */
+     only. The slot itself is always in the markup, empty under the other
+     sorts, so switching sort doesn't shift the caret's column. */
   .grip {
     width: 0.55rem;
     flex-shrink: 0;
@@ -1057,6 +1070,9 @@
     letter-spacing: -0.05em;
     opacity: 0;
     transition: opacity var(--transition-fast);
+  }
+  /* Only the filled slot offers the grab — an empty spacer must not. */
+  .grip.filled {
     cursor: grab;
   }
   .row-container:hover .grip {
@@ -1102,6 +1118,25 @@
     font-size: 0.9rem;
     padding: 0.05rem 0.3rem;
     outline: none;
+  }
+
+  /* LED count readout — the filter panel's channel count, same box, so a
+     collection's size reads like a game system's. */
+  .row-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 0.3rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    flex-shrink: 0;
   }
 
   /* Transport — hidden at rest, revealed on row hover or keyboard
@@ -1167,7 +1202,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.18rem 0.4rem 0.18rem 0.75rem;
+    padding: 0.18rem 0.75rem 0.18rem 0.75rem;
     border-left: 3px solid transparent;
     font-size: 0.9rem;
     color: var(--text-primary);
