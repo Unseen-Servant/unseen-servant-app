@@ -157,7 +157,10 @@
     justify-content: space-between;
     height: var(--statusbar-height);
     padding: 0 0.75rem;
-    background: var(--bg-container);
+    /* Same plate as the header — the two bars bracket the workspace as one
+       piece of chrome. --bg-container is the generic raised surface (panels,
+       modals, popovers), which is what this used to sit on. */
+    background: var(--bg-header);
     border-top: 1px solid var(--border-subtle);
     flex-shrink: 0;
     font-size: 0.75rem;
