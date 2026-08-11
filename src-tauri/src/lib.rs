@@ -108,6 +108,124 @@ struct SidecarFailedPayload {
     message: String,
 }
 
+// ---------------------------------------------------------------------------
+// Window size — persisted in logical pixels
+// ---------------------------------------------------------------------------
+
+/// A window size in logical (DPI-independent) pixels.
+///
+/// Logical is the only unit that survives a move between displays with
+/// different scale factors, and it's the unit tauri.conf.json already speaks.
+/// tauri-plugin-window-state stored physical pixels instead, so a size saved
+/// on a 1x display came back halved on a 2x one.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+struct WindowSize {
+    width: f64,
+    height: f64,
+}
+
+/// Mirrors minWidth/minHeight in tauri.conf.json.
+const MIN_WINDOW_WIDTH: f64 = 940.0;
+const MIN_WINDOW_HEIGHT: f64 = 600.0;
+
+/// Bring a restored size into range, or reject it outright.
+///
+/// Never trust what's on disk. AppKit enforces NSWindow.minSize only on
+/// interactive resize, so a programmatic set_size below the floor sticks until
+/// the user drags an edge — that snap was the whole symptom of the old bug.
+///
+/// `max` is the current monitor's logical size when it's known, so a size
+/// saved on a large display can't overflow a smaller one. The floor wins if a
+/// monitor is somehow narrower than it.
+fn sanitize_window_size(saved: WindowSize, max: Option<WindowSize>) -> Option<WindowSize> {
+    if !saved.width.is_finite() || !saved.height.is_finite() {
+        return None;
+    }
+    if saved.width <= 0.0 || saved.height <= 0.0 {
+        return None;
+    }
+
+    let (max_width, max_height) = match max {
+        Some(m) if m.width.is_finite() && m.height.is_finite() => (m.width, m.height),
+        _ => (f64::INFINITY, f64::INFINITY),
+    };
+
+    Some(WindowSize {
+        width: saved.width.min(max_width).max(MIN_WINDOW_WIDTH),
+        height: saved.height.min(max_height).max(MIN_WINDOW_HEIGHT),
+    })
+}
+
+fn window_size_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|dir| dir.join("window.json"))
+}
+
+/// Apply the size the user last left the window at.
+///
+/// Called early in setup(), before the sidecar startup blocks: restoring after
+/// it would leave the window at its default size for a couple of seconds and
+/// then jump.
+fn restore_window_size(app: &tauri::AppHandle) {
+    let Some(path) = window_size_path(app) else {
+        return;
+    };
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(saved) = serde_json::from_str::<WindowSize>(&raw) else {
+        return;
+    };
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    let max = window.current_monitor().ok().flatten().map(|monitor| {
+        let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
+        WindowSize {
+            width: size.width,
+            height: size.height,
+        }
+    });
+
+    if let Some(size) = sanitize_window_size(saved, max) {
+        let _ = window.set_size(tauri::LogicalSize::new(size.width, size.height));
+    }
+}
+
+/// Record the window's current size, in logical pixels.
+///
+/// Skips a hidden window: closing hides to the tray, and a hidden frame isn't
+/// what the user last saw.
+fn save_window_size(app: &tauri::AppHandle, label: &str) {
+    let Some(window) = app.get_webview_window(label) else {
+        return;
+    };
+    if !window.is_visible().unwrap_or(false) {
+        return;
+    }
+    let Ok(scale) = window.scale_factor() else {
+        return;
+    };
+    let Ok(physical) = window.inner_size() else {
+        return;
+    };
+    let Some(path) = window_size_path(app) else {
+        return;
+    };
+
+    let logical = physical.to_logical::<f64>(scale);
+    let size = WindowSize {
+        width: logical.width,
+        height: logical.height,
+    };
+    if let Ok(json) = serde_json::to_string(&size) {
+        let _ = std::fs::write(path, json);
+    }
+}
+
 #[derive(Serialize, Clone, Debug)]
 struct SyncProgressPayload {
     files_done: u32,
@@ -1621,6 +1739,9 @@ pub fn run() {
                 .expect("Failed to resolve app data directory");
             std::fs::create_dir_all(&app_data_dir).ok();
 
+            // Before the sidecar startup below, which blocks.
+            restore_window_size(app.handle());
+
             let chroma_dir = app_data_dir.join("chroma_db");
 
             let sidecar_log = app_data_dir.join("sidecar.log");
@@ -1730,13 +1851,17 @@ pub fn run() {
                 } => {
                     // Hide window instead of closing — app stays alive in tray
                     api.prevent_close();
+                    save_window_size(app_handle, &label);
                     if let Some(window) = app_handle.get_webview_window(&label) {
                         let _ = window.hide();
                     }
                 }
                 tauri::RunEvent::ExitRequested { api, code, .. } => {
                     if code.is_some() {
-                        // Triggered by app.exit() (tray Quit or Cmd+Q) — let it proceed
+                        // Triggered by app.exit() (tray Quit or Cmd+Q) — let it proceed.
+                        // No-op when quitting from the tray: the window is already
+                        // hidden, so CloseRequested saved the size we want.
+                        save_window_size(app_handle, "main");
                     } else {
                         // Triggered by last window hiding — keep app alive in tray
                         api.prevent_exit();
@@ -1813,5 +1938,103 @@ mod tests {
     fn validate_rename_name_rejects_trailing_dot_or_space() {
         assert!(validate_rename_name("foo.").is_err());
         assert!(validate_rename_name("foo ").is_err());
+    }
+
+    #[test]
+    fn sanitize_window_size_raises_a_too_small_value_to_the_floor() {
+        // The exact regression: 940x600 physical, saved on the 1x external,
+        // arrived as 470x300 logical on the 2x built-in and stuck there until
+        // the user grabbed an edge.
+        let got = sanitize_window_size(
+            WindowSize {
+                width: 470.0,
+                height: 300.0,
+            },
+            None,
+        );
+        assert_eq!(
+            got,
+            Some(WindowSize {
+                width: MIN_WINDOW_WIDTH,
+                height: MIN_WINDOW_HEIGHT,
+            })
+        );
+    }
+
+    #[test]
+    fn sanitize_window_size_caps_to_the_current_monitor() {
+        // Saved on the 2560x1440 external, restored on the 1728x1117 built-in.
+        let monitor = Some(WindowSize {
+            width: 1728.0,
+            height: 1117.0,
+        });
+        let got = sanitize_window_size(
+            WindowSize {
+                width: 2400.0,
+                height: 1300.0,
+            },
+            monitor,
+        );
+        assert_eq!(
+            got,
+            Some(WindowSize {
+                width: 1728.0,
+                height: 1117.0,
+            })
+        );
+    }
+
+    #[test]
+    fn sanitize_window_size_keeps_the_floor_when_the_monitor_is_smaller() {
+        let monitor = Some(WindowSize {
+            width: 800.0,
+            height: 500.0,
+        });
+        let got = sanitize_window_size(
+            WindowSize {
+                width: 1280.0,
+                height: 800.0,
+            },
+            monitor,
+        );
+        assert_eq!(
+            got,
+            Some(WindowSize {
+                width: MIN_WINDOW_WIDTH,
+                height: MIN_WINDOW_HEIGHT,
+            })
+        );
+    }
+
+    #[test]
+    fn sanitize_window_size_passes_a_reasonable_value_through() {
+        let monitor = Some(WindowSize {
+            width: 2560.0,
+            height: 1440.0,
+        });
+        let size = WindowSize {
+            width: 1400.0,
+            height: 900.0,
+        };
+        assert_eq!(sanitize_window_size(size, monitor), Some(size));
+    }
+
+    #[test]
+    fn sanitize_window_size_rejects_garbage() {
+        let bad = [
+            (f64::NAN, 600.0),
+            (f64::INFINITY, 600.0),
+            (1280.0, f64::NAN),
+            (0.0, 600.0),
+            (-1280.0, 600.0),
+            (1280.0, -600.0),
+        ];
+        for (width, height) in bad {
+            assert_eq!(
+                sanitize_window_size(WindowSize { width, height }, None),
+                None,
+                "expected {width}x{height} to be rejected"
+            );
+        }
     }
 }
