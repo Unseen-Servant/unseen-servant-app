@@ -43,6 +43,7 @@
   } from '../lib/collectionMembership';
   import { buildRibbonIndex, firstColorByPath } from '../lib/collectionRibbons';
   import { createCommitScheduler, mergeArmedCollection } from '../lib/collectionCommit';
+  import { setTreePathsPayload, type TreePathsPayload } from '../lib/dragPayload';
   import { chord } from '../lib/keybindings';
   import {
     parseString,
@@ -2742,7 +2743,11 @@
    * of truth: the ribbon index, the panel's file count, and the curation
    * channels all derive from it and stay honest for free.
    */
-  async function applyMembership(name: string, paths: string[], present: boolean): Promise<number> {
+  async function applyMembership(
+    name: string,
+    paths: string[],
+    present: boolean
+  ): Promise<number | null> {
     const col = collections[name];
     if (!col || paths.length === 0) return 0;
     const result = present
@@ -2769,10 +2774,45 @@
           message: `Could not update "${name}": ${String(e)}`,
           duration: 5000,
         });
-        return 0;
+        return null;
       }
     }
     return changed;
+  }
+
+  // ---- Dragging rows onto a collection --------------------------------
+
+  // Resolve what a row actually contributes at dragstart, where
+  // indexedPaths is in scope. A row with nothing indexed under it returns
+  // null and the drag is refused outright — better than a dead drag that
+  // ends in an apology.
+  function beginPathDrag(path: string, name: string, isDir: boolean): TreePathsPayload | null {
+    const paths = indexedPathsUnder(path, indexedPaths);
+    if (paths.length === 0) return null;
+    const payload = {
+      paths,
+      label: isDir ? name : name.replace(/\.pdf$/i, ''),
+    };
+    setTreePathsPayload(payload);
+    return payload;
+  }
+
+  async function dropPathsOnCollection(name: string, paths: string[]) {
+    const added = await applyMembership(name, paths, true);
+    if (added === null) return; // already reported
+    jobNotification.show(
+      added > 0
+        ? {
+            type: 'success',
+            message: `Added ${added} file${added === 1 ? '' : 's'} to "${name}"`,
+            duration: 4000,
+          }
+        : { type: 'info', message: `Already in "${name}"`, duration: 3000 }
+    );
+  }
+
+  function dropPathsOnNewCollection(paths: string[], label: string) {
+    startDraftCollection(uniqueCollectionName(label, collections), paths);
   }
 
   // Tree/systems-view arm slot. A partly-enrolled folder fills; a full one
@@ -3330,6 +3370,9 @@
               {collections}
               armedName={armedCollection}
               onArm={armCollection}
+              onDropPaths={dropPathsOnCollection}
+              onDropNewCollection={dropPathsOnNewCollection}
+              onDropDraft={handleCollectionAdd}
               {draftName}
               editFileCount={collectionEditPaths.size}
               playingNames={playingCollections}
@@ -3482,6 +3525,7 @@
             onRenameCancel={handleRenameCancel}
             contextMenuOpen={!!contextMenu}
             {ribbonIndex}
+            onBeginDrag={beginPathDrag}
             {isCollectionEditMode}
             collectionPaths={collectionEditPaths}
             onCollectionAdd={handleCollectionAdd}
@@ -3524,6 +3568,7 @@
               {ribbonIndex}
               arm={armState}
               {onToggleMembership}
+              onBeginDrag={beginPathDrag}
               onToggleScopeSolo={toggleScopeSolo}
               onToggleScopeMute={toggleScopeMute}
             />

@@ -19,8 +19,17 @@ export const TREE_PATHS_MIME = 'application/x-legendlore-tree-paths';
 export interface TreePathsPayload {
   /** Absolute paths of indexed PDFs. Never empty — an empty drag is refused at dragstart. */
   paths: string[];
-  /** What the user thinks they're dragging, e.g. `Curse of Strahd (47 files)`. */
+  /** The dragged row's own name, e.g. `Curse of Strahd`. Seeds a new collection. */
   label: string;
+}
+
+/**
+ * How a drag describes itself. Dropping a folder can file dozens of books
+ * at once, so the count is never left implicit.
+ */
+export function describeTreePathsDrag(payload: TreePathsPayload): string {
+  const n = payload.paths.length;
+  return n === 1 ? payload.label : `${payload.label} (${n} files)`;
 }
 
 /** The bits of DataTransfer we touch, so tests can pass a stub. */
@@ -41,7 +50,7 @@ export function isTreePathsDrag(types: readonly string[] | undefined | null): bo
 export function writeTreePathsTransfer(dt: DataTransferLike, payload: TreePathsPayload): void {
   dt.effectAllowed = 'copy';
   dt.setData(TREE_PATHS_MIME, String(payload.paths.length));
-  dt.setData('text/plain', payload.label);
+  dt.setData('text/plain', describeTreePathsDrag(payload));
 }
 
 let current: TreePathsPayload | null = null;

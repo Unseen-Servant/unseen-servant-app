@@ -8,6 +8,7 @@
   import { isRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial } from './treeNav';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { memberStateFor, type ArmState } from './collectionMembership';
+  import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -75,6 +76,12 @@
   // to row — and clicking a file row files or unfiles it on the spot.
   export let arm: ArmState | null = null;
   export let onToggleMembership: (item: FileItem) => void = () => {};
+
+  // Resolving a row to its indexed PDFs needs the page's indexedPaths, so
+  // the page does it at dragstart and stashes the payload; null means the
+  // row has nothing to give and the drag is refused.
+  export let onBeginDrag: (path: string, name: string, isDir: boolean) => TreePathsPayload | null =
+    () => null;
 
   // "Hide unindexed items": drop rows the library knows nothing about —
   // neither in the index nor selected for it. Tree only; SystemsView
@@ -152,8 +159,8 @@
   // Same predicate that gates S/M: a row with nothing indexed under it has
   // nothing a collection could hold — the sidecar drops unindexed paths at
   // read time — so its slot stays empty rather than offering a dead click.
-  $: canArm = arm !== null &&
-    rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths);
+  $: hasIndexedMaterial = rowHasIndexedMaterial(item.path, item.is_dir, indexedPaths, indexedFolderPaths);
+  $: canArm = arm !== null && hasIndexedMaterial;
   $: memberState = arm === null ? 'none' : memberStateFor(item.path, item.is_dir, arm.paths, arm.folders);
 
   async function toggleExpand() {
@@ -186,6 +193,15 @@
 
   function clearSystem() {
     onSetGameSystems(item.path, item.name, []);
+  }
+
+  function handleDragStart(event: DragEvent) {
+    const payload = onBeginDrag(item.path, item.name, item.is_dir);
+    if (!payload || !event.dataTransfer) {
+      event.preventDefault();
+      return;
+    }
+    writeTreePathsTransfer(event.dataTransfer, payload);
   }
 
   function handleRowClick() {
@@ -261,7 +277,19 @@
       aria-checked={isIndeterminate ? 'mixed' : isChecked}
     ></button>
 
-    <button class="row" on:click={handleRowClick} on:dblclick={openFile} on:mousedown={handleMouseDown}>
+    <!-- Draggable on .row, not .row-container: the checkbox and the S/M
+         buttons are siblings, so no drag can start from them. Never while
+         renaming — a draggable ancestor kills text selection inside a
+         descendant input in WebKit. -->
+    <button
+      class="row"
+      draggable={hasIndexedMaterial && !isRenaming}
+      on:dragstart={handleDragStart}
+      on:dragend={clearTreePathsPayload}
+      on:click={handleRowClick}
+      on:dblclick={openFile}
+      on:mousedown={handleMouseDown}
+    >
       {#if item.is_dir}
         <span class="icon arrow" aria-hidden="true">{isExpanded ? '\u25BE' : '\u25B8'}</span>
         <span class="icon type-icon folder-glyph" aria-hidden="true">
@@ -430,6 +458,7 @@
           {ribbonIndex}
           {arm}
           {onToggleMembership}
+          {onBeginDrag}
         />
       {/each}
     </div>

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   TREE_PATHS_MIME,
   isTreePathsDrag,
+  describeTreePathsDrag,
   writeTreePathsTransfer,
   setTreePathsPayload,
   getTreePathsPayload,
@@ -37,10 +38,25 @@ describe('isTreePathsDrag', () => {
   });
 });
 
+describe('describeTreePathsDrag', () => {
+  // Silently filing 47 books is the one way this gesture can feel unsafe.
+  it('names the count for a multi-file drag', () => {
+    expect(describeTreePathsDrag({ paths: ['/a.pdf', '/b.pdf'], label: 'Adventures' })).toBe(
+      'Adventures (2 files)'
+    );
+  });
+
+  it('leaves a single file unadorned', () => {
+    expect(describeTreePathsDrag({ paths: ['/a.pdf'], label: 'Curse of Strahd' })).toBe(
+      'Curse of Strahd'
+    );
+  });
+});
+
 describe('writeTreePathsTransfer', () => {
   it('stamps the marker MIME and a human-readable fallback', () => {
     const dt = stubTransfer();
-    writeTreePathsTransfer(dt, { paths: ['/a.pdf', '/b.pdf'], label: 'Adventures (2 files)' });
+    writeTreePathsTransfer(dt, { paths: ['/a.pdf', '/b.pdf'], label: 'Adventures' });
     expect(Object.keys(dt.data)).toContain(TREE_PATHS_MIME);
     expect(dt.data['text/plain']).toBe('Adventures (2 files)');
     expect(dt.effectAllowed).toBe('copy');

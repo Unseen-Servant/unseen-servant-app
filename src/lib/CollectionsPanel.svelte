@@ -7,6 +7,7 @@
   import { chord, isBareKeyChord } from './keybindings';
   import { materializeKey } from './paneFocus';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
+  import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from './menuGeometry';
 
   export let collections: Record<string, CollectionInfo> = {};
@@ -43,6 +44,10 @@
   // At most one, never a draft, and never persisted across launches.
   export let armedName: string | null = null;
   export let onArm: (name: string) => void = () => {};
+  // Rows dragged in from the file tree / systems view.
+  export let onDropPaths: (name: string, paths: string[]) => void = () => {};
+  export let onDropNewCollection: (paths: string[], label: string) => void = () => {};
+  export let onDropDraft: (paths: string[]) => void = () => {};
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
   // Sort state is lifted to +page for per-vault persistence.
@@ -238,6 +243,80 @@
   function handleDragEnd() {
     draggingName = null;
     dropInsertIndex = null;
+  }
+
+  // ------------------------------------------------------------------
+  // Dropping tree rows onto a collection.
+  //
+  // Two drags reach this panel: its own row reorder, and paths dragged in
+  // from a browsing surface. They're told apart by the private MIME —
+  // during dragover the browser blanks getData(), so `.types` is the only
+  // thing readable. Reorder keeps its handlers on .row-container; path
+  // drops sit on the wrapping <li>, which also makes the expanded child
+  // list a target at no extra cost.
+  // ------------------------------------------------------------------
+  // Which target is lit: a collection name, '' for the draft row, or the
+  // new-collection button.
+  let dropIntoName: string | null = null;
+  let dropIntoNew = false;
+
+  function acceptPathDrag(e: DragEvent): boolean {
+    if (!isTreePathsDrag(e.dataTransfer?.types)) return false;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    return true;
+  }
+
+  function handlePathDragOver(e: DragEvent, name: string | null) {
+    if (!acceptPathDrag(e)) return;
+    dropIntoName = name;
+    dropIntoNew = false;
+  }
+
+  function handleNewDragOver(e: DragEvent) {
+    if (!acceptPathDrag(e)) return;
+    dropIntoNew = true;
+    dropIntoName = null;
+  }
+
+  // dragover fires continuously over descendants, so only clear when the
+  // pointer has genuinely left the target's subtree.
+  function handlePathDragLeave(e: DragEvent) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.contains(e.relatedTarget as Node | null)) return;
+    dropIntoName = null;
+    dropIntoNew = false;
+  }
+
+  function takePathDrop(e: DragEvent): string[] | null {
+    if (!isTreePathsDrag(e.dataTransfer?.types)) return null;
+    e.preventDefault();
+    e.stopPropagation();
+    dropIntoName = null;
+    dropIntoNew = false;
+    const payload = getTreePathsPayload();
+    clearTreePathsPayload();
+    return payload?.paths ?? null;
+  }
+
+  function handlePathDrop(e: DragEvent, name: string) {
+    const paths = takePathDrop(e);
+    if (paths) onDropPaths(name, paths);
+  }
+
+  function handleDraftDrop(e: DragEvent) {
+    const paths = takePathDrop(e);
+    if (paths) onDropDraft(paths);
+  }
+
+  function handleNewDrop(e: DragEvent) {
+    if (!isTreePathsDrag(e.dataTransfer?.types)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dropIntoNew = false;
+    const payload = getTreePathsPayload();
+    clearTreePathsPayload();
+    if (payload) onDropNewCollection(payload.paths, payload.label);
   }
 
   // ------------------------------------------------------------------
@@ -576,8 +655,12 @@
       <li
         class="row-container editing draft"
         class:kb-focused={focusedName === draftName}
+        class:drop-into={dropIntoName === ''}
         title="New collection (unsaved) — click name to rename"
         data-cp-row={draftName}
+        on:dragover={(e) => handlePathDragOver(e, '')}
+        on:dragleave={handlePathDragLeave}
+        on:drop={handleDraftDrop}
       >
         <span class="arrow-spacer" aria-hidden="true"></span>
         <!-- Outline bookmark — no pigment chosen yet -->
@@ -608,7 +691,14 @@
       {@const muted = mutedNames.has(col.name)}
       {@const isRenamingRow = renamingName === col.name}
       {@const armed = armedName === col.name}
-      <li class="item">
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <li
+        class="item"
+        class:drop-into={dropIntoName === col.name}
+        on:dragover={(e) => handlePathDragOver(e, col.name)}
+        on:dragleave={handlePathDragLeave}
+        on:drop={(e) => handlePathDrop(e, col.name)}
+      >
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
         <div
           class="row-container"
@@ -733,7 +823,14 @@
   {#if !draftName}
     <!-- Outside the scroll container: trails the last row while the
          list is short, stays visible once the list overflows. -->
-    <button class="add-coll" on:click={onCreate}>+ New collection&hellip;</button>
+    <button
+      class="add-coll"
+      class:drop-into={dropIntoNew}
+      on:click={onCreate}
+      on:dragover={handleNewDragOver}
+      on:dragleave={handlePathDragLeave}
+      on:drop={handleNewDrop}
+    >+ New collection&hellip;</button>
   {/if}
 </aside>
 
@@ -1197,11 +1294,24 @@
     cursor: pointer;
     transition: all var(--transition-fast);
   }
-  .add-coll:hover {
+  .add-coll:hover,
+  .add-coll.drop-into {
     background: color-mix(in srgb, var(--text-accent) 10%, transparent);
     color: var(--text-accent);
     border-color: var(--text-accent);
     border-style: solid;
+  }
+
+  /* Drop target under a path drag. Dashed parchment reads as "this could
+     become a member" and can't be confused with purple-armed, the engaged
+     wash, or the reorder rules (which are inset box-shadows). Covers the
+     expanded child list too, since that's part of the same target. */
+  .item.drop-into,
+  .row-container.draft.drop-into {
+    outline: var(--outline-drop);
+    outline-offset: -1px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-container);
   }
 
   /* Context menu — same visual family as the file tree's ContextMenu. */

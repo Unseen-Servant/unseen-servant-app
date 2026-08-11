@@ -109,6 +109,11 @@
      no room for that rule's 2px offset. A ring rather than a fill so it
      composes over the engaged wash instead of competing with it. */
   --ring-focus: inset 0 0 0 1px var(--text-accent);
+  /* Drop target under a drag. Dashed parchment is already the app's
+     "prospective, not yet real" idiom (+ New collection, + tag), and it
+     can't be mistaken for purple-armed or the engaged wash. Drawn as an
+     outline so it composes over --ring-focus rather than replacing it. */
+  --outline-drop: 1px dashed var(--text-accent);
 
   /* Corner radii */
   --radius-sm: 3px;

@@ -6,9 +6,24 @@
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
+  import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
+
+  // Same drag contract as the file tree: the page resolves the row to its
+  // indexed paths and stashes the payload.
+  export let onBeginDrag: (path: string, name: string, isDir: boolean) => TreePathsPayload | null =
+    () => null;
+
+  function handleDragStart(event: DragEvent, entry: FileStatusEntry) {
+    const payload = onBeginDrag(entry.path, entry.filename, false);
+    if (!payload || !event.dataTransfer) {
+      event.preventDefault();
+      return;
+    }
+    writeTreePathsTransfer(event.dataTransfer, payload);
+  }
 
   // Indexed file entries from indexStatus (up_to_date + to_update). Unindexed
   // files don't appear here on purpose — only indexed PDFs carry a system tag,
@@ -555,6 +570,9 @@
                 class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
                 data-sv-row={entry.path}
+                draggable={renamingFilePath !== entry.path}
+                on:dragstart={(e) => handleDragStart(e, entry)}
+                on:dragend={clearTreePathsPayload}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
