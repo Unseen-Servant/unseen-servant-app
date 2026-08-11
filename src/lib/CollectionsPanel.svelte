@@ -48,6 +48,7 @@
   export let onDropPaths: (name: string, paths: string[]) => void = () => {};
   export let onDropNewCollection: (paths: string[], label: string) => void = () => {};
   export let onDropDraft: (paths: string[]) => void = () => {};
+  export let onRemoveFile: (name: string, path: string) => void = () => {};
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
   // Sort state is lifted to +page for per-vault persistence.
@@ -808,6 +809,19 @@
               {#if f.tag}
                 <SystemBadge tag={f.tag} />
               {/if}
+              <!-- This list is the only place a collection's contents are
+                   enumerated, so it's where dropping one belongs. Keyed by
+                   full path: two same-named PDFs render identical rows, and
+                   removing by name would take the wrong one. -->
+              <span class="child-remove">
+                <ActionButton
+                  kind="discard"
+                  compact
+                  danger
+                  title={`Remove ${f.base} from ${col.name}`}
+                  onClick={() => onRemoveFile(col.name, f.path)}
+                />
+              </span>
             </div>
           {/each}
           {#if col.file_paths.length === 0}
@@ -1273,6 +1287,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* Hover-revealed, same recipe as the row transport. */
+  .child-remove {
+    display: inline-flex;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+  .child-row:hover .child-remove {
+    opacity: 1;
   }
 
   /* Dashed create affordance — same family as the tree's "+ tag". */

@@ -2815,6 +2815,18 @@
     startDraftCollection(uniqueCollectionName(label, collections), paths);
   }
 
+  // The × on a panel row's expanded file list.
+  async function removeFileFromCollection(name: string, path: string) {
+    const removed = await applyMembership(name, [path], false);
+    if (removed) {
+      jobNotification.show({
+        type: 'success',
+        message: `Removed 1 file from "${name}"`,
+        duration: 3000,
+      });
+    }
+  }
+
   // Tree/systems-view arm slot. A partly-enrolled folder fills; a full one
   // empties, so a second click always undoes the first.
   const onToggleMembership = (item: FileItem) => toggleMembership(item);
@@ -3373,6 +3385,7 @@
               onDropPaths={dropPathsOnCollection}
               onDropNewCollection={dropPathsOnNewCollection}
               onDropDraft={handleCollectionAdd}
+              onRemoveFile={removeFileFromCollection}
               {draftName}
               editFileCount={collectionEditPaths.size}
               playingNames={playingCollections}
