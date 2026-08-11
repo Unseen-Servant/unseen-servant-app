@@ -31,6 +31,13 @@
   import { materializeKey } from '../lib/paneFocus';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../lib/searchScope';
   import { runSyncJob } from '../lib/syncJob';
+  import {
+    indexedPathsUnder,
+    collectionsContaining,
+    collectionsFullyContaining,
+    uniqueCollectionName,
+  } from '../lib/collectionMembership';
+  import { firstColorByPath } from '../lib/collectionRibbons';
   import { chord } from '../lib/keybindings';
   import {
     parseString,
@@ -366,19 +373,7 @@
   }
 
   // File path → collection pigment for the search-result index cells.
-  // Color is reserved for collections; a file in several colored
-  // collections takes the alphabetically-first one for determinism.
-  $: collectionColorByPath = (() => {
-    const m = new Map<string, string>();
-    const sorted = Object.values(collections).sort((a, b) => a.name.localeCompare(b.name));
-    for (const col of sorted) {
-      if (!col.color) continue;
-      for (const p of col.file_paths) {
-        if (!m.has(p)) m.set(p, col.color);
-      }
-    }
-    return m;
-  })();
+  $: collectionColorByPath = firstColorByPath(collections);
 
   // Path-axis solo/mute Maps resolved to raw file-path arrays. The
   // universe restriction (solo ∩ mix) happens inside resolveScopeSet.
@@ -389,7 +384,7 @@
   function scopeRefSets(solos: Map<string, ScopeRef>, mutes: Map<string, ScopeRef>) {
     const refFiles = (key: string, kind: ScopeRef['kind']) =>
       kind === 'folder'
-        ? indexedPdfsUnderPath(key)
+        ? indexedPathsUnder(key, indexedPaths)
         : indexedPaths.has(key) ? [key] : [];
     return {
       soloSets: [...solos].map(([p, r]) => refFiles(p, r.kind)),
@@ -2729,40 +2724,10 @@
   // Bulk collection actions (right-click menu)
   // ---------------------------------------------------------------------------
 
-  function indexedPdfsUnderPath(target: string): string[] {
-    if (indexedPaths.has(target)) return [target];
-    const prefix = target + '/';
-    return [...indexedPaths].filter(p => p.startsWith(prefix));
-  }
-
-  function collectionsContaining(target: string, isDir: boolean): string[] {
-    const targets = isDir ? new Set(indexedPdfsUnderPath(target)) : new Set([target]);
-    if (targets.size === 0) return [];
-    return Object.values(collections)
-      .filter(c => c.file_paths.some(p => targets.has(p)))
-      .map(c => c.name);
-  }
-
-  // Collections that already contain ALL of the target's indexed pdfs.
-  // Used to suppress them from the "Add to collection" submenu — adding
-  // would be a no-op. For folders this differs from collectionsContaining
-  // (which is "any") because partial overlap still permits adding the rest.
-  function collectionsFullyContaining(target: string, isDir: boolean): string[] {
-    const targets = isDir ? new Set(indexedPdfsUnderPath(target)) : new Set([target]);
-    if (targets.size === 0) return [];
-    return Object.values(collections)
-      .filter(c => {
-        const cFiles = new Set(c.file_paths);
-        for (const t of targets) if (!cFiles.has(t)) return false;
-        return true;
-      })
-      .map(c => c.name);
-  }
-
   async function addToCollection(name: string, item: FileItem) {
     const col = collections[name];
     if (!col) return;
-    const candidates = item.is_dir ? indexedPdfsUnderPath(item.path) : [item.path];
+    const candidates = item.is_dir ? indexedPathsUnder(item.path, indexedPaths) : [item.path];
     if (candidates.length === 0) {
       jobNotification.show({
         type: 'info',
@@ -2806,7 +2771,7 @@
   async function removeFromCollection(name: string, item: FileItem) {
     const col = collections[name];
     if (!col) return;
-    const targets = new Set(item.is_dir ? indexedPdfsUnderPath(item.path) : [item.path]);
+    const targets = new Set(item.is_dir ? indexedPathsUnder(item.path, indexedPaths) : [item.path]);
     const remaining = col.file_paths.filter(p => !targets.has(p));
     const removed = col.file_paths.length - remaining.length;
     if (removed === 0) return;
@@ -2831,20 +2796,12 @@
     }
   }
 
-  // Pick a name based on `base`, suffixing " 2", " 3" etc. on collision.
-  function uniqueCollectionName(base: string): string {
-    if (!collections[base]) return base;
-    let suffix = 2;
-    while (collections[`${base} ${suffix}`]) suffix++;
-    return `${base} ${suffix}`;
-  }
-
   // Open a draft seeded with the indexed PDFs under `item`. The draft
   // appears as a synthetic top row in the panel and doesn't hit the
   // database until Save.
   function createCollectionFromItem(item: FileItem) {
     const candidates = item.is_dir
-      ? indexedPdfsUnderPath(item.path)
+      ? indexedPathsUnder(item.path, indexedPaths)
       : [item.path];
     if (candidates.length === 0) {
       jobNotification.show({
@@ -2855,7 +2812,7 @@
       return;
     }
     const baseName = item.is_dir ? item.name : item.name.replace(/\.pdf$/i, '');
-    startDraftCollection(uniqueCollectionName(baseName), candidates);
+    startDraftCollection(uniqueCollectionName(baseName, collections), candidates);
   }
 
   // ---------------------------------------------------------------------------
@@ -2897,7 +2854,7 @@
   // the user can immediately type a name. Focusing the draft also lets
   // Esc-on-draft discard it via the panel's window keydown handler.
   function inlineCreateCollection() {
-    const name = uniqueCollectionName('Untitled');
+    const name = uniqueCollectionName('Untitled', collections);
     startDraftCollection(name);
     setFocusedCollectionName(name);
   }
@@ -3442,17 +3399,17 @@
       isIndexed={contextMenu.isIndexed}
       {collections}
       canAddToCollection={contextMenu.item.is_dir
-        ? indexedPdfsUnderPath(contextMenu.item.path).length > 0
+        ? indexedPathsUnder(contextMenu.item.path, indexedPaths).length > 0
         : indexedPaths.has(contextMenu.item.path)}
       canScope={scopeSolos.has(contextMenu.item.path) || scopeMutes.has(contextMenu.item.path) ||
         rowHasIndexedMaterial(contextMenu.item.path, contextMenu.item.is_dir, indexedPaths, indexedFolderPaths)}
       isSoloed={scopeSolos.has(contextMenu.item.path)}
       isMuted={scopeMutes.has(contextMenu.item.path)}
-      containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir, collections, indexedPaths)}
       knownSystems={knownSystems}
       currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
       onSetGameSystems={(tags) => handleSetGameSystems(contextMenu!.item.path, contextMenu!.item.name, tags)}
-      excludeFromAdd={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir)}
+      excludeFromAdd={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir, collections, indexedPaths)}
       initialSubmenu={contextMenu.initialSubmenu}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
