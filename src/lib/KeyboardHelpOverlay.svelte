@@ -1,6 +1,6 @@
 <script lang="ts">
   import Modal from './Modal.svelte';
-  import { KEYBINDINGS, chord, type KeyScope } from './keybindings';
+  import { KEYBINDINGS, chord, isBareKeyChord, type KeyScope } from './keybindings';
 
   export let visible = false;
   export let onClose: () => void;
@@ -54,7 +54,7 @@
         <h3 class="group-title section-title">{group.label}</h3>
         <dl class="bindings">
           {#each group.entries as entry (entry.id)}
-            <dt class="chord">{chord(entry.id)}</dt>
+            <dt class="chord" class:chord-bare={isBareKeyChord(entry.id)}>{chord(entry.id)}</dt>
             <dd class="label">{entry.label}</dd>
           {/each}
         </dl>

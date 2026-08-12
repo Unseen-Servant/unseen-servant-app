@@ -59,14 +59,16 @@
   $: indexedAbsolute = stats?.indexed_at ? new Date(stats.indexed_at).toLocaleString() : '';
 </script>
 
-<Modal visible={true} {onClose} title="Info" size="md">
+<Modal visible={true} {onClose} title={stats?.filename ?? 'Document info'} size="md">
   <div class="body">
     {#if error}
       <p class="error">Could not load stats: {error}</p>
     {:else if !stats}
       <p class="loading">Loading…</p>
     {:else}
-      <div class="filename" title={stats.source}>{stats.filename}</div>
+      <!-- The title carries the filename; this carries what it can't — the
+           path the file sits at. -->
+      <div class="source" title={stats.source}>{stats.source}</div>
 
       <div class="stat-block" role="group" aria-label="Document stats">
         <div class="stat-cell">
@@ -85,10 +87,14 @@
           <div class="readout-label">INDEXED</div>
           <div class="stat-value" title={indexedAbsolute}>{formatRelative(stats.indexed_at)}</div>
         </div>
-        <div class="stat-cell">
-          <div class="readout-label">SYSTEM</div>
-          <div class="stat-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</div>
-        </div>
+      </div>
+
+      <!-- Out of the numeric grid: a multi-system file joins its tags into
+           a string with no length limit, which a fifth of 560px could not
+           hold without wrapping raggedly against the tabular readouts. -->
+      <div class="system-row">
+        <span class="readout-label">SYSTEM</span>
+        <span class="system-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</span>
       </div>
     {/if}
   </div>
@@ -98,11 +104,16 @@
   .body {
     padding: var(--modal-pad);
   }
-  .filename {
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--text-primary);
+  .source {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
     margin-bottom: 0.75rem;
+    /* Plain tail truncation is right here, not the direction:rtl trick for
+       keeping the end visible: the end of the path is the filename, which
+       the title already carries, so what gets cut is the redundant part.
+       (That trick also moves a leading "/" to the visual end, since a
+       neutral character at the edge takes the paragraph direction.) */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -118,11 +129,27 @@
   }
   .stat-block {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.5rem;
     padding: 0.75rem 0.25rem;
     border-top: 1px solid var(--border-subtle);
+  }
+  /* Shares the block's rules to read as one bordered region with an
+     internal divider, rather than two stacked panels. */
+  .system-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 0.25rem;
+    border-top: 1px solid var(--border-subtle);
     border-bottom: 1px solid var(--border-subtle);
+  }
+  .system-value {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .stat-cell {
     display: flex;

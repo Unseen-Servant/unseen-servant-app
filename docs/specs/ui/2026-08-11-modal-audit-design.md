@@ -1,10 +1,10 @@
 # Modals & Confirmations — Audit and Design
 
 **Date:** 2026-08-11
-**Status:** In progress. **Steps 1–4 implemented 2026-08-11** (F1–F9,
-F12–F16, and the entry point); awaiting the visual/keyboard pass in
-[Verification](#verification). Step 5 not started. Remaining findings are
-code-level, not validated in the running app.
+**Status:** Implemented 2026-08-11 — all five steps, F1–F16. Awaiting the
+visual, keyboard, and screen-reader passes in
+[Verification](#verification), which are what close this out; the findings
+were code-level and none of them have been seen running.
 **Scope:** Frontend only — `src/lib/Modal.svelte`,
 `src/lib/ConfirmDialog.svelte`, `src/lib/ActionButton.svelte`,
 `src/lib/SettingsModal.svelte`, `src/lib/DocumentStatsModal.svelte`,
@@ -386,8 +386,24 @@ Ordered so each step leaves the tree shippable.
      `default`; half-unifying would have been worse than not starting.
      `aria-labelledby` needs a module-level counter for its id — several
      modals sit in the tree permanently, so a fixed id would duplicate.
-5. **Content** — F10, F11. Overlay brackets; Document info title and
-   layout.
+5. ~~**Content**~~ — F10, F11. **Done 2026-08-11.**
+   - **F10 got a shared bracket recipe, not a copy.** `.chord-bare` in
+     `app.css` joins `.menu-chord.bare`'s selector lists so there is one
+     bracket rule, not two. It carries brackets *only* — the sheet keeps
+     its own size and color, because there the chord is the content
+     rather than a hint riding on a label.
+   - **F11 also removed the duplication it created.** With the filename
+     promoted to the title, the body's filename line said the same thing
+     twice, so it now shows `source` (the full path; `filename` is the
+     basename) in mono tertiary, truncating at the *head* — the tail of a
+     path is the identifying part. SYSTEM left the grid, which is now
+     four numeric cells over a full-width key/value row sharing the same
+     borders.
+   - **Open decision 3 resolved:** truncation went into `Modal.svelte`,
+     not the shared voice. Per the header-voices doc, layout stays in
+     component CSS and the class carries only the recipe — and every
+     modal benefits, since a long game-system name would push the close
+     button off the plate too.
 
 Steps 3–5 are independent of each other and of 1–2.
 
@@ -422,12 +438,17 @@ Steps 3–5 are independent of each other and of 1–2.
    backdrop. Four dismissals against one commit is arguably correct for a
    destructive prompt; if it reads as clutter, a `header={false}` variant
    is the fallback, not a second dialog implementation.
-3. **F11's title.** Filename-as-title needs truncation on `.dialog-title`,
-   which is a shared voice class — local override, or amend the voice?
+3. ~~**F11's title.**~~ Neither: the truncation is *layout*, so by the
+   header-voices rule it belongs in `Modal.svelte` and the shared class
+   keeps carrying only the recipe. No amendment needed.
+
+Decision 1 remains genuinely open, and is now cheap to change: grading by
+reversibility instead of by trigger would mean deleting one `await` at the
+delete-file call site.
 
 ## Verification
 
-Checked items were run against step 1 on 2026-08-11.
+Checked items were run on 2026-08-11.
 
 1. ✅ `npm run lint:css` and `npx svelte-check` pass (0 errors), plus
    `npx vite build` and `npm test` (381 passing, 6 of them new against
@@ -468,7 +489,9 @@ Checked items were run against step 1 on 2026-08-11.
    close × becomes a lighter stroked glyph hovering one step instead of
    two; the confirm and info bodies lose 0.25rem of side padding and the
    game-system form gains 0.15rem at the top; the confirm prompt widens
-   420 → 440px. **Step 5:** overlay chords gain brackets.
+   420 → 440px. **Step 5:** the shortcut sheet brackets its bare chords;
+   Document info is titled with the filename over a mono path line, and
+   its stat grid drops to four cells above a SYSTEM row.
 
 ## Notes
 

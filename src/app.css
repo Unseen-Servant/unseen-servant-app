@@ -520,15 +520,25 @@ dialog[open]::backdrop {
    bindings nobody would guess. Brackets are the affordance the design
    conventions already name, and they draw the real distinction the flat column
    hid: ⌘O is hold-a-modifier, [R] is press-a-key. Dimmer than the glyph so the
-   frame stays structure and the key stays content. */
-.menu-chord.bare::before {
+   frame stays structure and the key stays content.
+
+   `.chord-bare` carries the same brackets for chords rendered outside a
+   menu row — the shortcut sheet, whose whole job is teaching these, and
+   which showed a bare R where the menu showed [R]. Brackets only: the
+   sheet sets its own size and color, because there the chord is the
+   content rather than a hint riding on a label. */
+.menu-chord.bare::before,
+.chord-bare::before {
   content: '[';
 }
-.menu-chord.bare::after {
+.menu-chord.bare::after,
+.chord-bare::after {
   content: ']';
 }
 .menu-chord.bare::before,
-.menu-chord.bare::after {
+.menu-chord.bare::after,
+.chord-bare::before,
+.chord-bare::after {
   opacity: 0.55;
 }
 

@@ -173,6 +173,16 @@
     flex-shrink: 0;
   }
 
+  /* Layout only — the voice itself stays in app.css. Titles carrying a
+     user-supplied name (a filename, a game system) have no length limit,
+     and without this they push the close button off the plate. */
+  .modal-header .dialog-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .close-btn {
     background: none;
     border: none;
