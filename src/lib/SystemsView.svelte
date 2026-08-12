@@ -336,7 +336,7 @@
     // after the synchronous handler chain. State is the source of truth.
     if (contextMenuOpen) return;
     // Yield to inputs, popovers, and any rename in flight elsewhere.
-    if (document.querySelector('.filter-menu, .dropdown, .sort-menu')) return;
+    if (document.querySelector('.dropdown, .sort-menu')) return;
     // Yield to any open <dialog> — modal inerting doesn't suppress
     // window-level keydown listeners, so without this we'd nav behind it.
     if (document.querySelector('dialog[open]')) return;

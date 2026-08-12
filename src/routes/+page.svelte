@@ -2354,12 +2354,12 @@
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, the search view is closed, no
     // menu/rename is open.
-    // Other popovers (filter menu, sort menu, dropdowns) attach their own
+    // Other popovers (sort menu, dropdowns) attach their own
     // keydown listeners but they fire AFTER this one — so we have to skip
     // here when the DOM tells us a competing menu is open. Querying by
     // class is pragmatic; once chunk c is fully shipped these could share
     // a small open-menus store instead.
-    const competingMenuOpen = !!document.querySelector('.filter-menu, .sort-menu, .dropdown');
+    const competingMenuOpen = !!document.querySelector('.sort-menu, .dropdown');
 
     // Action keys (R/S/./M/C, Cmd+O reveal, Shift+F10/ContextMenu) work
     // on the focused file in both tree and systems modes. Runs ahead of
