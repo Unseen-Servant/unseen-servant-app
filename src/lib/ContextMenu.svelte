@@ -590,9 +590,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* Primary ink, like the collection rows above: a system's identity is the
+     die, not the label's color. */
   .submenu-tag {
     font-weight: 600;
-    color: var(--text-accent);
   }
   .submenu {
     position: absolute;

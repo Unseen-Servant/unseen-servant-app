@@ -156,14 +156,15 @@
     flex-shrink: 0;
   }
   /* Tags are user-written and uncapped — ellipsize against --menu-max-width
-     rather than stretching the menu or scrolling it sideways. */
+     rather than stretching the menu or scrolling it sideways.
+     The label stays primary ink: identity rides on the die, the same way a
+     collection row carries its pigment in the ribbon and not the name. */
   .dropdown-tag {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 600;
-    color: var(--text-accent);
   }
   .dropdown-divider {
     margin: 0.15rem 0;
