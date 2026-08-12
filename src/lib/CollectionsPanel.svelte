@@ -4,7 +4,7 @@
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
-  import { chord, isBareKeyChord } from './keybindings';
+  import { chord, isBareKeyChord, isDeleteChord } from './keybindings';
   import { materializeKey } from './paneFocus';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
@@ -443,6 +443,14 @@
 
     if (idx < 0) return;
     const col = rows[idx];
+
+    // ⌘⌫ / Del — the same chord the file tree spends on deleting a row.
+    // Raises the confirm dialog; nothing goes until it's answered.
+    if (isDeleteChord(event)) {
+      event.preventDefault();
+      onDelete(col.name);
+      return;
+    }
 
     if (bareLetter && (event.key === 'ArrowRight' || lk === 'l') && !expandedNames.has(col.name)) {
       event.preventDefault();
@@ -887,7 +895,12 @@
       <span class="menu-chord" class:bare={isBareKeyChord('collections.archive')} aria-hidden="true">{chord('collections.archive')}</span>
     </button>
     <hr class="menu-divider" />
-    <button class="context-item danger" role="menuitem" on:click={() => ctxAction(onDelete)}>Delete collection</button>
+    <!-- Display-only, like the tree menu's Reveal row: ⌘⌫ is a named key the
+         menu's own dispatcher can't match, so it hints without claiming. -->
+    <button class="context-item danger" role="menuitem" on:click={() => ctxAction(onDelete)}>
+      Delete collection
+      <span class="menu-chord" class:bare={isBareKeyChord('collections.delete')} aria-hidden="true">{chord('collections.delete')}</span>
+    </button>
   </div>
 {/if}
 

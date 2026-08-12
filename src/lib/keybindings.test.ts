@@ -3,6 +3,7 @@ import {
   KEYBINDINGS,
   eventMatchKey,
   isBareKeyChord,
+  isDeleteChord,
   keyShortcut,
   matchKey,
   type ChordEvent,
@@ -42,6 +43,46 @@ describe('eventMatchKey', () => {
   test('rejects non-character keys', () => {
     expect(eventMatchKey(ev({ key: 'ArrowDown', code: 'ArrowDown' }))).toBeNull();
     expect(eventMatchKey(ev({ key: 'Enter', code: 'Enter' }))).toBeNull();
+  });
+});
+
+describe('isDeleteChord', () => {
+  test('mac takes Cmd+Backspace, and Ctrl+Backspace as the same normalization', () => {
+    expect(isDeleteChord(ev({ key: 'Backspace', metaKey: true }), true)).toBe(true);
+    expect(isDeleteChord(ev({ key: 'Backspace', ctrlKey: true }), true)).toBe(true);
+  });
+
+  test('mac leaves bare Backspace alone — it is a text key there, not a file one', () => {
+    expect(isDeleteChord(ev({ key: 'Backspace' }), true)).toBe(false);
+  });
+
+  test('elsewhere takes bare Del and not the modified form', () => {
+    expect(isDeleteChord(ev({ key: 'Delete' }), false)).toBe(true);
+    expect(isDeleteChord(ev({ key: 'Delete', metaKey: true }), false)).toBe(false);
+    expect(isDeleteChord(ev({ key: 'Delete', ctrlKey: true }), false)).toBe(false);
+  });
+
+  test('neither platform answers to the other platform key', () => {
+    expect(isDeleteChord(ev({ key: 'Delete' }), true)).toBe(false);
+    expect(isDeleteChord(ev({ key: 'Backspace', metaKey: true }), false)).toBe(false);
+  });
+
+  test('Shift is rejected — Shift+Del means delete permanently in file managers', () => {
+    expect(isDeleteChord(ev({ key: 'Backspace', metaKey: true, shiftKey: true }), true)).toBe(false);
+    expect(isDeleteChord(ev({ key: 'Delete', shiftKey: true }), false)).toBe(false);
+  });
+
+  test('Alt is rejected on both platforms', () => {
+    expect(isDeleteChord(ev({ key: 'Backspace', metaKey: true, altKey: true }), true)).toBe(false);
+    expect(isDeleteChord(ev({ key: 'Delete', altKey: true }), false)).toBe(false);
+  });
+
+  test('the chord cannot round-trip through eventMatchKey, so menus only hint it', () => {
+    // Named keys are longer than one character — a menu can display '⌘⌫' but
+    // will never dispatch it, which is why neither delete binding has a match.
+    expect(eventMatchKey(ev({ key: 'Backspace', metaKey: true }))).toBeNull();
+    expect(KEYBINDINGS.find((k) => k.id === 'tree.delete')!.match).toBeUndefined();
+    expect(KEYBINDINGS.find((k) => k.id === 'collections.delete')!.match).toBeUndefined();
   });
 });
 
@@ -140,8 +181,9 @@ describe('isBareKeyChord', () => {
     // menu-rendered bindings may do that.
     const rendered = [
       'info.show', 'tree.openExternal', 'tree.rename', 'tree.solo',
-      'tree.mute', 'tree.hide', 'tree.addToCollection',
+      'tree.mute', 'tree.hide', 'tree.addToCollection', 'tree.delete',
       'collections.rename', 'collections.arm', 'collections.archive',
+      'collections.play', 'collections.mute', 'collections.delete',
     ];
     for (const id of rendered) {
       const entry = KEYBINDINGS.find((k) => k.id === id)!;

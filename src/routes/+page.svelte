@@ -44,7 +44,7 @@
   import { buildRibbonIndex, firstColorByPath } from '../lib/collectionRibbons';
   import { createCommitScheduler, mergeArmedCollection } from '../lib/collectionCommit';
   import { setTreePathsPayload, type TreePathsPayload } from '../lib/dragPayload';
-  import { chord } from '../lib/keybindings';
+  import { chord, isDeleteChord } from '../lib/keybindings';
   import {
     parseString,
     parseBoolean,
@@ -1985,6 +1985,14 @@
       return true;
     }
 
+    // ⌘⌫ / Del — the same chord the collections panel spends on deleting a
+    // track. Confirmed before anything moves, like the menu item it mirrors.
+    if (isDeleteChord(event)) {
+      event.preventDefault();
+      deleteItem(focused.item);
+      return true;
+    }
+
     // Plain letters only — no modifiers. Hide is on '.' (not 'h') so
     // hjkl stays free for vim-style nav and '.' mirrors the Cmd+Shift+.
     // global chord. Period key on the main row OR on the numpad —
@@ -2469,7 +2477,13 @@
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
+    await deleteItem(item);
+  }
 
+  // Confirm-then-trash for one row. Shared by the context menu's Delete item
+  // and the ⌘⌫ / Del chord on the focused row — both act on a single item,
+  // never on the checkbox selection.
+  async function deleteItem(item: FileItem) {
     const label = item.is_dir ? 'folder' : 'file';
     const confirmed = await confirm(`Move "${item.name}" to Trash?`, { title: `Delete ${label}`, kind: 'warning' });
     if (!confirmed) return;

@@ -77,6 +77,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree', match: 'm' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree', match: '.' },
   { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree', match: 'c' },
+  { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete focused row (to Trash)', scope: 'fileTree' },
 
   // Systems view (when a row is focused)
   { id: 'systems.open',          keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'systemsView' },
@@ -97,6 +98,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.rename',    keys: { mac: 'R',    other: 'R' },             label: 'Rename collection',            scope: 'collections' },
   { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm for editing',     scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
+  { id: 'collections.delete',    keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete collection',            scope: 'collections' },
   { id: 'collections.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / cancel an in-progress edit', scope: 'collections' },
   { id: 'collections.new',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: 'New collection (created armed, ready to name)', scope: 'global' },
 
@@ -172,6 +174,22 @@ export interface ChordEvent {
   ctrlKey: boolean;
   shiftKey: boolean;
   altKey: boolean;
+}
+
+// Delete is the one binding whose key genuinely differs by platform: ⌘⌫ is the
+// mac move-to-trash convention, Del the Windows/Linux one. Bare ⌫ stays inert on
+// mac (it's a text-editing key there, not a file-manager one), and Shift is
+// rejected everywhere — Shift+Del means "delete permanently" in file managers,
+// which is not what either delete path does. Named keys can't round-trip through
+// eventMatchKey (single characters only), so this is its own predicate and the
+// menus show the chord as a hint they don't dispatch.
+//
+// `mac` is a parameter rather than a closed-over constant so tests can exercise
+// both platforms without a real navigator.
+export function isDeleteChord(event: ChordEvent, mac = isMac): boolean {
+  if (event.shiftKey || event.altKey) return false;
+  if (mac) return (event.metaKey || event.ctrlKey) && event.key === 'Backspace';
+  return !event.metaKey && !event.ctrlKey && event.key === 'Delete';
 }
 
 // Normalized lookup key for a keydown, matching KeybindingEntry.match. Cmd and

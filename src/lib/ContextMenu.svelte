@@ -507,7 +507,12 @@
     Rename {item.is_dir ? 'folder' : 'file'}
     <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
   </button>
-  <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>Delete {item.is_dir ? 'folder' : 'file'}</button>
+  <!-- Display-only, like Reveal above: ⌘⌫ is a named key eventMatchKey can't
+       resolve, so the row hints the chord without claiming it. -->
+  <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>
+    Delete {item.is_dir ? 'folder' : 'file'}
+    <span class="menu-chord" class:bare={isBareKeyChord('tree.delete')} aria-hidden="true">{chord('tree.delete')}</span>
+  </button>
 </div>
 
 <style>
