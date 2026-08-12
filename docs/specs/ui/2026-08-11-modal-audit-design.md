@@ -1,10 +1,10 @@
 # Modals & Confirmations — Audit and Design
 
 **Date:** 2026-08-11
-**Status:** In progress. **Steps 1–3 implemented 2026-08-11** (F1–F9 and
-the entry point); awaiting the visual/keyboard pass in
-[Verification](#verification). Steps 4–5 not started. Remaining findings
-are code-level, not validated in the running app.
+**Status:** In progress. **Steps 1–4 implemented 2026-08-11** (F1–F9,
+F12–F16, and the entry point); awaiting the visual/keyboard pass in
+[Verification](#verification). Step 5 not started. Remaining findings are
+code-level, not validated in the running app.
 **Scope:** Frontend only — `src/lib/Modal.svelte`,
 `src/lib/ConfirmDialog.svelte`, `src/lib/ActionButton.svelte`,
 `src/lib/SettingsModal.svelte`, `src/lib/DocumentStatsModal.svelte`,
@@ -351,9 +351,41 @@ Ordered so each step leaves the tree shippable.
      red frame around them made structure outrank the controls. The
      section title keeps full danger. Visible change — judge it in the
      pass.
-4. **Shell polish** — F12, F13, F14, F15, F16. Size and padding tokens,
-   scrim token, xmark SVG, entry transition behind a global
-   `prefers-reduced-motion` rule, radius tokens.
+4. ~~**Shell polish**~~ — F12–F16. **Done 2026-08-11.** Five notes, the
+   first of which is the one worth not re-deriving:
+   - **F15: the `::backdrop` token works, but not by inheritance.**
+     Whether `::backdrop` inherits custom properties from its originating
+     element is engine-version dependent (Chromium 122+, WebKit 17.4+),
+     and `tauri.conf.json` sets no `minimumSystemVersion`, so an older
+     WKWebView is reachable. A `var()` that fails to resolve yields *no
+     background* — a missing scrim, not a fallback one. Fixed by
+     declaring the property on a selector that matches the backdrop
+     (`:root, dialog::backdrop { --scrim-modal: … }`), which is cascade
+     rather than inheritance and works everywhere. Both components'
+     `stylelint-disable` escapes are gone: `app.css` is not linted (the
+     script globs `src/lib/**/*.svelte`), so the raw value sits where raw
+     values belong.
+   - **F12: `size` covers width only.** Folding height into the step
+     would have silently retuned Settings from 520px to 640px. Height
+     stays an explicit prop; the three width steps kill the `90vw`
+     repetition, which was the actual complaint. `--modal-pad` was set to
+     **1rem — the value five of the eight surfaces already used** —
+     rather than to a new number, so adoption moves almost nothing.
+   - **F13: entry only.** Exit animation needs `@starting-style` /
+     `allow-discrete` to survive the top layer being torn down. Not worth
+     it; instant close reads fine. `prefers-reduced-motion` lives in
+     `app.css` beside the animation, covering all dialogs — a blanket
+     app-wide motion rule is a separate decision.
+   - **F14: the × is hand-drawn.** Font Awesome vendors `circle-xmark`
+     but no bare `xmark`, and a circled glyph is too heavy for inert
+     chrome. Two stroked lines, the same technique `app.css` already uses
+     for the checkbox tick.
+   - **F16: the disabled-cursor split was wider than audited.** Four
+     sites used `not-allowed` beyond the two recorded (`Header`,
+     `GeneralSettings`, `AboutPane`). All now match `.action-btn`'s
+     `default`; half-unifying would have been worse than not starting.
+     `aria-labelledby` needs a module-level counter for its id — several
+     modals sit in the tree permanently, so a fixed id would duplicate.
 5. **Content** — F10, F11. Overlay brackets; Document info title and
    layout.
 
@@ -408,6 +440,10 @@ Checked items were run against step 1 on 2026-08-11.
 4. ✅ `grep -rn "background: var(--text-danger)" src/` returns nothing —
    no control fills with danger. `.btn`/`.btn-delete`/`.btn-reset` and
    both `.btn-danger-*` classes are gone.
+5. ✅ No `stylelint-disable` remains in `src/lib` for a scrim, no raw
+   `border-radius` px in either dialog file, no `cursor: not-allowed`
+   anywhere in `src/`. (Two unrelated disables survive in
+   `SearchInspector.svelte` — table-cell recess and zebra stripe.)
 5. **Outstanding for step 1** — keyboard pass on the confirm prompt: Esc
    cancels; Tab cycles inside; Enter on a focused Cancel **cancels**
    (F1); the auto-focused button shows a ring when the prompt was raised
@@ -428,8 +464,11 @@ Checked items were run against step 1 on 2026-08-11.
    loses its red fills and its frame softens; destructive confirms carry a
    trash can; the game-systems footer becomes one button family; Cancel
    and Discard no longer redden on hover, while the collections row ×
-   reddens at rest instead. **Later steps:** overlay chords gain brackets,
-   modals fade in.
+   reddens at rest instead. **Step 4:** modals fade and scale in; the
+   close × becomes a lighter stroked glyph hovering one step instead of
+   two; the confirm and info bodies lose 0.25rem of side padding and the
+   game-system form gains 0.15rem at the top; the confirm prompt widens
+   420 → 440px. **Step 5:** overlay chords gain brackets.
 
 ## Notes
 

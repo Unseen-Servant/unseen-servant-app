@@ -147,6 +147,19 @@
   --menu-max-width: 280px;
   --menu-max-height: 320px;
 
+  /* Modal geometry. Three width steps, applied as ceilings against 90vw so
+     a modal can't land 30px off its neighbour. Height stays per-modal:
+     Settings and the shortcut sheet want different ones for content
+     reasons, and folding height into the step would silently retune them.
+     --modal-pad is the inset for any modal body. Set to the value five of
+     the eight surfaces already used, so adopting it moves almost nothing:
+     only the confirm and info bodies lose 0.25rem at the sides and the
+     game-system form gains 0.15rem at the top. */
+  --modal-width-sm: 440px;
+  --modal-width-md: 560px;
+  --modal-width-lg: 640px;
+  --modal-pad: 1rem;
+
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
@@ -412,6 +425,55 @@ input {
 }
 .app-checkbox:disabled:hover {
   border-color: var(--text-tertiary);
+}
+
+/* --- Modals --- */
+
+/* The scrim, declared on the pseudo-element itself and not only on :root.
+   Whether ::backdrop inherits custom properties from its originating
+   element depends on the engine version (Chromium 122+, WebKit 17.4+),
+   this app ships on both WKWebView and WebView2, and tauri.conf.json sets
+   no minimum system version — so an inherited token would resolve to
+   nothing, and a nothing background is no scrim at all. Declaring it on a
+   selector that matches the backdrop sidesteps inheritance entirely.
+   Global because every dialog in the app is a Modal.svelte. */
+:root,
+dialog::backdrop {
+  --scrim-modal: rgba(0, 0, 0, 0.6);
+}
+
+dialog::backdrop {
+  background: var(--scrim-modal);
+}
+
+/* Entry only. Exit needs @starting-style or allow-discrete to survive the
+   top layer being torn down; dialogs close instantly, which reads fine. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+dialog[open] {
+  animation: modal-in var(--transition-fast);
+}
+
+dialog[open]::backdrop {
+  animation: scrim-in var(--transition-fast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog[open],
+  dialog[open]::backdrop {
+    animation: none;
+  }
 }
 
 /* --- Menu Vocabulary --- */

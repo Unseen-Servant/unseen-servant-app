@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Deleting a custom game system, and resetting a customized built-in to its defaults, now ask first — neither did
 - **Danger red means one thing again.** Cancel and Discard no longer turn red under the pointer — hovering only brightens — so red marks the action that actually destroys something. The Danger Zone's two-step arms with a tinted wash instead of filling solid red, matching the mute button, and a destructive confirmation carries a trash can rather than a checkmark
 - The Game Systems editor's footer is one family of buttons instead of three
+- Dialogs fade and scale in rather than appearing instantly, and hold still if your system asks for reduced motion. Their close × is a lighter glyph that no longer outshines the rest of the title bar, and every dialog now draws from one set of width and padding steps
 
 ### Fixed
 

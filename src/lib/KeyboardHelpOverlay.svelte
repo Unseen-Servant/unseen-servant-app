@@ -44,7 +44,7 @@
   {visible}
   {onClose}
   title="Keyboard shortcuts"
-  width="min(640px, 90vw)"
+  size="lg"
   height="min(640px, 80vh)"
   autofocus={false}
 >
@@ -68,7 +68,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1rem;
+    padding: var(--modal-pad);
     display: flex;
     flex-direction: column;
     gap: 1.25rem;

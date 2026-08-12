@@ -1,10 +1,23 @@
+<script context="module" lang="ts">
+  // Per-instance ids for aria-labelledby. Several modals are mounted at
+  // once (Settings, the shortcut sheet, the confirm prompt all sit in the
+  // tree permanently), so a fixed id would duplicate.
+  let seq = 0;
+
+  const WIDTH = {
+    sm: 'var(--modal-width-sm)',
+    md: 'var(--modal-width-md)',
+    lg: 'var(--modal-width-lg)',
+  } as const;
+</script>
+
 <script lang="ts">
   import { tick, onDestroy } from 'svelte';
 
   export let visible = false;
   export let onClose: () => void;
   export let title: string;
-  export let width: string = 'min(480px, 90vw)';
+  export let size: keyof typeof WIDTH = 'md';
   // Undefined by default so the dialog sizes to its content. The old
   // implementation (overlay div + child div) made `height: auto` mean
   // "shrink-wrap content"; on a native <dialog> the user-agent inset
@@ -19,6 +32,10 @@
   // id of the element stating what the dialog is asking, for modals whose
   // body is a statement rather than a form (the confirm prompt).
   export let describedBy: string | undefined = undefined;
+
+  const titleId = `modal-title-${++seq}`;
+
+  $: width = `min(${WIDTH[size]}, 90vw)`;
 
   let dialogEl: HTMLDialogElement | undefined;
   // Element that held focus before the modal opened — restored on close
@@ -96,15 +113,22 @@
   style:width
   style:height
   style:max-height={maxHeight}
-  aria-label={title}
+  aria-labelledby={titleId}
   aria-describedby={describedBy}
   on:cancel={handleCancel}
   on:close={handleClose}
   on:click={handleClick}
 >
   <div class="modal-header">
-    <span class="dialog-title">{title}</span>
-    <button type="button" class="close-btn" on:click={onClose} aria-label="Close">&times;</button>
+    <span class="dialog-title" id={titleId}>{title}</span>
+    <button type="button" class="close-btn" on:click={onClose} aria-label="Close">
+      <!-- Hand-drawn ×, as with the checkbox tick in app.css: Font Awesome
+           vendors circle-xmark but no bare xmark, and a circled glyph is
+           too heavy for inert chrome. -->
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M4 4 L12 12 M12 4 L4 12" />
+      </svg>
+    </button>
   </div>
   <slot />
 </dialog>
@@ -137,11 +161,6 @@
     outline: none;
   }
 
-  dialog.modal::backdrop {
-    /* stylelint-disable-next-line declaration-property-value-allowed-list -- pure-black scrim; ::backdrop can't see :root tokens */
-    background: rgba(0, 0, 0, 0.6);
-  }
-
   .modal-header {
     display: flex;
     align-items: center;
@@ -149,23 +168,35 @@
     padding: 0.4rem 1rem;
     background: var(--bg-focused);
     border-bottom: 1px solid var(--border-subtle);
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
     flex-shrink: 0;
   }
 
   .close-btn {
     background: none;
     border: none;
-    color: var(--text-secondary);
-    font-size: 1.4rem;
-    line-height: 1;
-    padding: 0.1rem 0.4rem;
+    color: var(--text-tertiary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem;
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: color var(--transition-fast);
   }
+  .close-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+  }
+  /* One step, like the rest of the chrome — the old glyph jumped to
+     primary, brighter than anything else in the header plate. */
   .close-btn:hover {
-    color: var(--text-primary);
+    color: var(--text-secondary);
   }
 </style>

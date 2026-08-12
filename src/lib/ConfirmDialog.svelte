@@ -25,7 +25,7 @@
   visible={$confirmPrompt !== null}
   onClose={cancel}
   title={$confirmPrompt?.title ?? ''}
-  width="min(420px, 90vw)"
+  size="sm"
   autofocus={false}
   describedBy={$confirmPrompt?.message ? MESSAGE_ID : undefined}
 >
@@ -53,7 +53,7 @@
 
 <style>
   .body {
-    padding: 1rem 1.25rem 1.25rem;
+    padding: var(--modal-pad);
   }
 
   .message {

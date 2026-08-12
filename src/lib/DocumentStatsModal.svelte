@@ -59,7 +59,7 @@
   $: indexedAbsolute = stats?.indexed_at ? new Date(stats.indexed_at).toLocaleString() : '';
 </script>
 
-<Modal visible={true} {onClose} title="Info" width="min(560px, 90vw)">
+<Modal visible={true} {onClose} title="Info" size="md">
   <div class="body">
     {#if error}
       <p class="error">Could not load stats: {error}</p>
@@ -96,7 +96,7 @@
 
 <style>
   .body {
-    padding: 1rem 1.25rem 1.25rem;
+    padding: var(--modal-pad);
   }
   .filename {
     font-family: var(--font-body);

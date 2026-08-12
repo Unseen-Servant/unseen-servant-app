@@ -328,7 +328,7 @@
   }
 
   .search-input:disabled {
-    cursor: not-allowed;
+    cursor: default;
   }
 
   /* The hint is supplementary — the placeholder already says what the field

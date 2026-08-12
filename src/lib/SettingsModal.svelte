@@ -62,7 +62,7 @@
   ];
 </script>
 
-<Modal {visible} {onClose} title="Settings" width="min(640px, 90vw)" height="min(520px, 80vh)" autofocus={false}>
+<Modal {visible} {onClose} title="Settings" size="lg" height="min(520px, 80vh)" autofocus={false}>
   <div class="panel-content">
     <nav class="tab-nav">
       {#each tabs as tab}
@@ -224,6 +224,6 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1rem;
+    padding: var(--modal-pad);
   }
 </style>

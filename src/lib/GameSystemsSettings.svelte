@@ -191,7 +191,7 @@
   visible={showModal}
   onClose={closeModal}
   title={modalMode === 'add' ? 'Add game system' : 'Edit game system'}
-  width="min(440px, 90vw)"
+  size="sm"
 >
   <div class="body">
     <div class="field">
@@ -387,7 +387,7 @@
 
   /* Modal body */
   .body {
-    padding: 0.85rem 1rem 1rem;
+    padding: var(--modal-pad);
     font-family: var(--font-body);
   }
   .field {

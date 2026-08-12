@@ -203,7 +203,7 @@
 
 <style>
   .general-settings {
-    padding: 1rem;
+    padding: var(--modal-pad);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -282,7 +282,7 @@
     outline-offset: -1px;
   }
   .setting-select:disabled {
-    cursor: not-allowed;
+    cursor: default;
   }
 
   .experimental-group {

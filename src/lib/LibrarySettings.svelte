@@ -408,7 +408,7 @@
 
 <style>
   .library-settings {
-    padding: 1rem;
+    padding: var(--modal-pad);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -563,7 +563,7 @@
   }
   .btn-link:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
+    cursor: default;
   }
 
   .setting-row {
@@ -610,7 +610,7 @@
     outline-offset: -1px;
   }
   .setting-select:disabled {
-    cursor: not-allowed;
+    cursor: default;
   }
 
   .policy-group {
@@ -647,7 +647,7 @@
   }
 
   button:disabled {
-    cursor: not-allowed;
+    cursor: default;
     opacity: 0.5;
   }
 
