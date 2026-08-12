@@ -1,6 +1,6 @@
 [package]
 name = "legend-lore"
-version = "2.1.0"
+version = "2.2.0"
 description = "Local-first, AI-augmented toolkit for tabletop RPG Gamemasters"
 authors = ["Unseen Servant Games <guild@unseenservant.games>"]
 license = "SEE LICENSE IN LICENSE"

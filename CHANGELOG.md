@@ -6,12 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-11
+
 ### Added
 
 - **Arm a collection** — a record-arm (●) beside play and mute on every collection row. Arming points the file tree at that collection: click a book to file or unfile it on the spot, tick a folder to enrol everything indexed beneath it. No Save, no Cancel, and no view switch. `E` arms and disarms, `Esc` leaves
 - **Drag books and folders onto a collection** — from the file tree or the systems view, onto a collection row, its expanded file list, or "+ New collection…" to seed a fresh one named after what you dragged. Folders drag as a unit and their count is named before and after the drop
 - Collection membership shows in the tree and systems view as a pigment ribbon strip on file rows — up to two, plus a `+N` that accounts for the rest
 - A hover × on the panel's expanded file rows removes that book from the collection
+- Every collection row reads out its file count, in the same inverted LED box the filter console uses per channel
+- Play and Mute join the collection's context menu, which now leads with the transport — Arm, Play, Mute — before the track's properties
+- `⌘⌫` (`Del` off mac) deletes the focused row in both the file tree and the collections panel
 
 ### Changed
 
@@ -20,16 +25,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Membership writes are coalesced and strictly serialized, so a long curation sweep is a handful of writes rather than one per click, and a failed write reverts to the last saved state instead of half-applying
 - **Row keys are consistent across the panes.** `R` renames in every pane that has something to rename (new in the collections panel), and `X` ticks the row's checkbox wherever a row has one
 - **A file-tree row has one checkbox, and arming changes what it means.** Unarmed it marks the file for indexing, in parchment — the colour this app reserves for content and data. Armed it files the file into the collection being curated, in purple — the colour reserved for a mode you switched on, and the same box the systems view has always shown. Rows with nothing indexed under them show the box disabled while armed, since a collection can't hold them. Shift-click extends a range, as it already did for indexing
+- **Search no longer blocks the sidecar.** Each query runs on a worker thread, at most four at once, so health checks, MCP heartbeats and everything else answer in milliseconds while a search is in flight instead of waiting it out
+- The embedding model is kept warm — one token re-embedded every four minutes, so an idle bge-m3 isn't unloaded and the first search after a lull doesn't pay a full model load. `OLLAMA_KEEPALIVE_INTERVAL_SECONDS=0` turns it off
+- The window opens at 940×600 — the width where all three panes just fit — and remembers its size across launches in logical pixels, so a size saved on one display comes back right on another
+- The status bar moved onto the header plate and the search bar is recessed into the panel surface, so the two bars bracketing the workspace match and the header's two inlays share one depth
+- The search bar shows its focus chord while empty, and the view switch keeps a dimmed mark on the view you'd return to while search is up
+- The Loose curation row draws a dashed ribbon where it used to hold an empty spacer
+- MCP server migrated to mcp 2.0 (`FastMCP` → `MCPServer`) — the same four tools with the same arguments
+- Refreshed Rust, npm, and sidecar dependencies
 
 ### Removed
 
 - `Space` and `Enter` as row actions in the file tree, systems view and filter panel, and `Enter` in the collections panel. `Space` still runs a collection's play/stop transport, and `Enter` still submits a search, opens a search result, activates a context-menu item, and commits any text field. Use `R` to rename, `X` to tick a checkbox, `⌘O` to open a file, and `→`/`←` to walk folders
 - `⌘↵` (Save in-progress collection) — there is nothing left to save
+- `F2` as a second spelling of rename — `R` renames in every pane
 
 ### Fixed
 
 - Systems view: a game system's "select all" checkbox no longer latches. Unticking the last file in a system left its header still showing selected
 - Creating a collection no longer switches the main pane to the systems view and leaves it there permanently — a bug that persisted across restarts for anyone who worked in tree view
+- A trackpad flick no longer rubber-bands the whole app and uncovers a dark band at the window edge
+- The filter panel's lens checkboxes light purple again instead of parchment — purple is the colour this app reserves for a mode you switched on
+- The search bar's clear button draws as × in the app's own face, instead of falling through to a system font
 
 ## [2.1.0] - 2026-08-09
 
