@@ -342,10 +342,14 @@ Ordered so each step leaves the tree shippable.
      and safe at rest because the control is revealed by row hover
      anyway. Worth knowing that `danger` on a discard now means
      "removes" rather than "backs out", and is styled.
-   - **F6 got the icon after all.** `static/icons/trash-solid-full.svg`
-     is vendored; destructive commits swap circle-check for it rather
-     than going text-only. `icon={false}` remains as a separate opt-out
-     and is what "Reset to defaults" uses.
+   - **F6 was resolved twice.** First with the vendored
+     `static/icons/trash-solid-full.svg` swapped in for circle-check; then
+     superseded the same day by the bracket pass below, which drops icons
+     from labeled buttons entirely. The finding's second option —
+     *"or drop the icon and let color and label carry it"* — turned out to
+     be the right one, for a reason the audit didn't reach: not that a
+     tick beside "Delete" reads as approval, but that a labeled action
+     should wear the app's bracket affordance rather than an icon.
    - **The Danger Zone's frame was tinted too**, beyond what F7 asked.
      Once the controls inside dropped to a 45% border, a full-strength
      red frame around them made structure outrank the controls. The
@@ -406,6 +410,26 @@ Ordered so each step leaves the tree shippable.
      button off the plate too.
 
 Steps 3–5 are independent of each other and of 1–2.
+
+### Follow-up: bracketed actions (2026-08-11, user-raised)
+
+`ActionButton` rendered an icon beside its label, which is the one place
+the modal work left a non-house affordance standing: the conventions name
+*"text or icons that gain color, glow, or brackets"*, and everything else
+in the app that is a labeled action — `[Compact]`, `[R]`, the dashed
+`+ New collection` — wears brackets.
+
+Now: **a labeled action is bracketed text, an icon-only action is a
+glyph, never both.** Brackets take the label's own color at `opacity:
+0.55`, the same value the chord frames use, so the frame reads as
+structure and the label as content. `compact` (the collections row ×) is
+unchanged.
+
+Consequences worth noting: `.action-btn`'s flex `gap` is gone — pseudo
+elements are flex items, so the gap would have spaced the brackets off
+the label — and the `icon` prop added an hour earlier for F8 is gone with
+it, since no labeled button renders an icon any more. The trash glyph
+added for F6 is deleted rather than left orphaned.
 
 ## Out of scope
 

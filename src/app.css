@@ -240,7 +240,6 @@ input {
 .action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
   background: none;
   border: none;
   padding: 0.3rem 0.5rem;
@@ -251,6 +250,25 @@ input {
   border-radius: var(--radius-sm);
   transition: color var(--transition-fast), transform var(--transition-fast);
 }
+/* Labeled actions are bracketed text — the affordance the conventions name
+   alongside color and glow, and the one the app already spends on
+   [Compact] and [R]. The frame takes the label's own color at the same
+   0.55 the chord brackets use, so the frame stays structure and the label
+   stays content. Icon-only (compact) buttons wear the glyph instead: the
+   two are alternative markers, and doubling them reads as noise. */
+.action-btn:not(.compact)::before {
+  content: '[';
+  margin-right: 0.15rem;
+}
+.action-btn:not(.compact)::after {
+  content: ']';
+  margin-left: 0.15rem;
+}
+.action-btn:not(.compact)::before,
+.action-btn:not(.compact)::after {
+  opacity: 0.55;
+}
+
 .action-btn svg {
   width: 16px;
   height: 16px;

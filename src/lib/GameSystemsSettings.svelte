@@ -236,9 +236,8 @@
     <div class="footer">
       <div class="footer-left">
         {#if modalMode === 'edit' && editIsBuiltin && editIsCustomized}
-          <!-- Tertiary: text beside the iconed primaries. It discards the
-               override, and its prompt carries the weight. -->
-          <ActionButton kind="discard" icon={false} label="Reset to defaults" onClick={handleReset} />
+          <!-- Discards the override; its prompt carries the weight. -->
+          <ActionButton kind="discard" label="Reset to defaults" onClick={handleReset} />
         {/if}
         {#if modalMode === 'edit' && !editIsBuiltin}
           <ActionButton kind="confirm" danger label="Delete" onClick={handleDelete} />

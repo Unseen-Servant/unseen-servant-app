@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Every confirmation is the app's own.** Deleting a file or folder and re-indexing a single file raised a system dialog in the operating system's chrome; they now use the same prompt the rest of the app does, so the same `⌘⌫` looks the same in the file tree as it does in the collections panel
 - Deleting a custom game system, and resetting a customized built-in to its defaults, now ask first — neither did
-- **Danger red means one thing again.** Cancel and Discard no longer turn red under the pointer — hovering only brightens — so red marks the action that actually destroys something. The Danger Zone's two-step arms with a tinted wash instead of filling solid red, matching the mute button, and a destructive confirmation carries a trash can rather than a checkmark
+- **Danger red means one thing again.** Cancel and Discard no longer turn red under the pointer — hovering only brightens — so red marks the action that actually destroys something. The Danger Zone's two-step arms with a tinted wash instead of filling solid red, matching the mute button
+- **Dialog actions are bracketed text** — `[Cancel]`, `[Delete]` — the affordance the app already spends on `[Compact]` and `[R]`, instead of a checkmark or cross beside the label. Icon-only buttons keep their glyph; the two are alternative markers, not a pair
 - The Game Systems editor's footer is one family of buttons instead of three
 - Dialogs fade and scale in rather than appearing instantly, and hold still if your system asks for reduced motion. Their close × is a lighter glyph that no longer outshines the rest of the title bar, and every dialog now draws from one set of width and padding steps
 - The keyboard shortcut sheet brackets its single-key chords — `[R]`, `[X]` — the way the menus already do, so a lone letter reads as a key rather than a stray capital
