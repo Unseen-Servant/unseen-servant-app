@@ -1,9 +1,9 @@
 # Modals & Confirmations — Audit and Design
 
 **Date:** 2026-08-11
-**Status:** In progress. **Step 1 implemented 2026-08-11** (F1–F4 + the
-entry point); awaiting the visual/keyboard pass in
-[Verification](#verification). Steps 2–5 not started. Remaining findings
+**Status:** In progress. **Steps 1 and 2 implemented 2026-08-11** (F1–F4,
+F9, and the entry point); awaiting the visual/keyboard pass in
+[Verification](#verification). Steps 3–5 not started. Remaining findings
 are code-level, not validated in the running app.
 **Scope:** Frontend only — `src/lib/Modal.svelte`,
 `src/lib/ConfirmDialog.svelte`, `src/lib/ActionButton.svelte`,
@@ -305,11 +305,26 @@ Ordered so each step leaves the tree shippable.
      focused button activates on Enter natively, so *where focus sits is
      the whole of the chord's meaning* — which is what made auto-focusing
      Cancel meaningful in the first place.
-2. **Retire the native dialog** — F9. Route `deleteItem`
-   (`+page.svelte:2488`), `handleContextReindex` (`:2417`), and
-   GameSystems `handleDelete` / `handleReset`
-   (`GameSystemsSettings.svelte:118`, `:128`) through `requestConfirm`.
-   Removes the `@tauri-apps/plugin-dialog` import at `+page.svelte:8`.
+2. ~~**Retire the native dialog**~~ — F9. **Done 2026-08-11.** All four
+   sites route through `confirmPrompt.request`; `@tauri-apps/plugin-dialog`
+   is uninstalled. Three things the plan did not anticipate:
+   - **Re-index is not `danger`.** Rebuilding chunks destroys nothing, so
+     it keeps focus on Confirm and Enter rips through it. The doctrine's
+     danger flag turns out to grade *destructiveness*, not *importance* —
+     worth holding to as more prompts arrive.
+   - **The game-system prompts stack on an open modal.** `showModal()` on
+     a dialog outside the open one promotes it above in the top layer, so
+     the edit modal stays visible behind its own prompt and focus returns
+     to the button that raised it. Nesting is the reason to check this
+     specifically in the visual pass.
+   - **Stacking exposed a second instance of F1.**
+     `GameSystemsSettings.handleWindowKey` is a *window* listener, and
+     window keydown still fires behind an open dialog, so ⌘Enter in the
+     prompt would have saved the form underneath. Guarded on
+     `$confirmPrompt`. The generic `dialog[open]` guard at
+     `+page.svelte:2080` cannot help a component whose own modal is the
+     open dialog — any future component-level key handler that coexists
+     with a modal needs this check.
 3. **Danger vocabulary** — F5, F6, F7, F8. `ActionButton` gains a danger
    icon override and a neutral variant; Danger Zone and the GameSystems
    footer adopt them; `.btn-danger-solid`, `.btn-danger-outline`,
@@ -364,7 +379,7 @@ Checked items were run against step 1 on 2026-08-11.
    `npx vite build` and `npm test` (381 passing, 6 of them new against
    `confirmStore`: promise lifecycle, idle answers, and the supersede
    case).
-2. `grep -rn "@tauri-apps/plugin-dialog" src/` returns nothing after step 2.
+2. ✅ `grep -rn "plugin-dialog" src/ package.json` returns nothing.
 3. ✅ `grep -rln "showModal" src/lib/` — `Modal.svelte` is the only
    `.showModal()` caller (the other two hits are a comment and
    GameSystems' local `showModal` boolean).
@@ -375,24 +390,33 @@ Checked items were run against step 1 on 2026-08-11.
    (F1); the auto-focused button shows a ring when the prompt was raised
    by mouse (F2). F2's premise is engine behavior, so this is the one
    step-1 fix that source review cannot settle.
-6. **Outstanding for step 1** — screen-reader pass: the prompt announces
-   its title and its message (F3).
-7. Visual pass by the user. Expected diffs — **step 1:** the confirm
+6. **Outstanding** — screen-reader pass: the prompt announces its title
+   and its message (F3).
+7. **Outstanding for step 2** — the nested case: Delete or Reset inside
+   the game-system edit modal must raise the prompt *above* it, leave it
+   visible behind, return focus to the button that raised it on cancel,
+   and not save the form on ⌘Enter while the prompt is up.
+8. Visual pass by the user. Expected diffs — **step 1:** the confirm
    prompt moves from the focused surface to the container surface, gains
    the header plate and modal-depth shadow, and widens slightly
-   (320–480px → 420px). **Later steps:** Danger Zone armed state loses
-   its red fill, GameSystems footer becomes one button family, overlay
-   chords gain brackets, modals fade in.
+   (320–480px → 420px). **Step 2:** deleting a file or folder and
+   re-indexing one file now show that prompt instead of an OS dialog; two
+   new prompts appear in game-system editing. **Later steps:** Danger Zone
+   armed state loses its red fill, GameSystems footer becomes one button
+   family, overlay chords gain brackets, modals fade in.
 
 ## Notes
 
-- **`@tauri-apps/plugin-dialog` becomes an unused npm dependency** after
-  step 2 — `confirm` is its only JS import. The Rust side stays: the
-  folder picker is a Rust command using `DialogExt`
-  (`src-tauri/src/lib.rs:393`), registered at `:1692`. Whether
-  `"dialog:default"` in `src-tauri/capabilities/default.json:21` can also
-  drop needs a check — capabilities gate the JS bridge, and after step 2
-  nothing crosses it, but confirm before removing.
+- **`@tauri-apps/plugin-dialog` uninstalled** in step 2 — `confirm` was
+  its only JS import. The Rust side stays and must: the folder picker is a
+  Rust command using `DialogExt` (`src-tauri/src/lib.rs:393`), registered
+  at `:1692`. **`"dialog:default"` in
+  `src-tauri/capabilities/default.json:21` was deliberately left in
+  place.** Capabilities gate the JS→Rust bridge and nothing crosses it
+  now, so it is very likely droppable — but the only thing it can break is
+  the folder picker, at runtime, in a way no test or type-check catches.
+  Least-privilege tidying is not worth that on its own; fold it into a
+  release where `npm run tauri build` is being exercised locally anyway.
 - **The `dialog[open]` guard stays correct.** `+page.svelte:2080` bails
   out of the global keydown handler whenever a native dialog is open,
   because keydown still bubbles through the focused dialog even though the

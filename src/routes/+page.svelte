@@ -5,7 +5,6 @@
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { pdfFileUrl } from '../lib/pdfUrl';
-  import { confirm } from '@tauri-apps/plugin-dialog';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
@@ -2415,7 +2414,13 @@
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    const confirmed = await confirm(`Re-index "${item.name}"? This rebuilds its chunks.`, { title: 'Re-index file' });
+    // Not danger: rebuilding chunks destroys nothing, so the prompt focuses
+    // Confirm and Enter rips straight through it.
+    const confirmed = await confirmPrompt.request({
+      title: 'Re-index file',
+      message: `Re-index "${item.name}"? This rebuilds its chunks.`,
+      confirmLabel: 'Re-index',
+    });
     if (!confirmed) return;
     try {
       await invoke('reindex_file', { path: item.path });
@@ -2486,7 +2491,12 @@
   // never on the checkbox selection.
   async function deleteItem(item: FileItem) {
     const label = item.is_dir ? 'folder' : 'file';
-    const confirmed = await confirm(`Move "${item.name}" to Trash?`, { title: `Delete ${label}`, kind: 'warning' });
+    const confirmed = await confirmPrompt.request({
+      title: `Delete ${label}`,
+      message: `Move "${item.name}" to Trash?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
     if (!confirmed) return;
 
     try {

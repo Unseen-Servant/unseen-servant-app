@@ -3,6 +3,7 @@
   import type { KnownGameSystem } from './types';
   import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
+  import { confirmPrompt } from './confirmStore';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
@@ -80,6 +81,10 @@
 
   function handleWindowKey(event: KeyboardEvent) {
     if (!showModal) return;
+    // A confirm prompt stacks above this modal, and window keydown still
+    // fires behind an open <dialog>. Enter there belongs to the focused
+    // button in the prompt, not to Save.
+    if ($confirmPrompt) return;
     if (event.key !== 'Enter' || !canSave) return;
     // Plain Enter saves from any text input (matches the rest of the
     // app's "Enter commits" feel); Cmd/Ctrl+Enter still works globally.
@@ -116,6 +121,13 @@
   }
 
   async function handleDelete() {
+    const confirmed = await confirmPrompt.request({
+      title: 'Delete game system',
+      message: `Delete "${editOriginalTag}" and its keywords? Files already tagged with it are not changed.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await invoke('delete_custom_game_system', { tag: editOriginalTag });
       closeModal();
@@ -126,6 +138,13 @@
   }
 
   async function handleReset() {
+    const confirmed = await confirmPrompt.request({
+      title: 'Reset to defaults',
+      message: `Reset "${editOriginalTag}" to its built-in keywords? Your changes to it are discarded.`,
+      confirmLabel: 'Reset',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await invoke('delete_custom_game_system', { tag: editOriginalTag });
       closeModal();
