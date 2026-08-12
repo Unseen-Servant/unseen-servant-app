@@ -5,6 +5,7 @@
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
   import { clampToViewport } from './menuGeometry';
+  import SystemTagRows from './SystemTagRows.svelte';
 
   export let x: number;
   export let y: number;
@@ -286,7 +287,12 @@
   $: fullyContainingSet = new Set(fullyContainingCollections);
   $: hasCollections = activeCollections.length > 0;
 
-  $: canTag = !item.is_dir && isIndexed && knownSystems.length > 0;
+  // Known systems are the reason to open the submenu; existing tags are a
+  // reason of their own. A file tagged with a system since disabled in
+  // Settings has no rows to toggle and still needs "Clear tags" — without the
+  // second clause the submenu hides on exactly the file that needs it, while
+  // the tree row's own badge keeps offering it.
+  $: canTag = !item.is_dir && isIndexed && (knownSystems.length > 0 || currentTags.length > 0);
 
   // One row, both verbs. Only a collection that already holds everything has
   // nothing left to add, so that's the only state that removes; a half-lit
@@ -322,7 +328,7 @@
   on:mousedown|stopPropagation
 >
   {#if !item.is_dir}
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.open')} aria-keyshortcuts={keyShortcut('tree.open')} on:click={onOpen}>
+    <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.open')} aria-keyshortcuts={keyShortcut('tree.open')} on:click={onOpen}>
       Open file
       <span class="menu-chord" class:bare={isBareKeyChord('tree.open')} aria-hidden="true">{chord('tree.open')}</span>
     </button>
@@ -331,25 +337,25 @@
        eventMatchKey deliberately rejects, so it isn't dispatchable from an open
        menu. Display-only, like the Collections rows — no data-chord, and no
        aria-keyshortcuts promising something this row won't honour. -->
-  <button class="context-item" data-mi="item" role="menuitem" on:click={onReveal}>
+  <button class="menu-row" data-mi="item" role="menuitem" on:click={onReveal}>
     Reveal in folder
     <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')} aria-hidden="true">{chord('tree.openExternal')}</span>
   </button>
   <!-- Get info rides with the other two ways of looking at the file; its
        sibling Re-index is an action and sits down with Rename. -->
   {#if !item.is_dir && isIndexed}
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} aria-keyshortcuts={keyShortcut('info.show')} on:click={onShowStats}>
+    <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} aria-keyshortcuts={keyShortcut('info.show')} on:click={onShowStats}>
       Get info
       <span class="menu-chord" class:bare={isBareKeyChord('info.show')} aria-hidden="true">{chord('info.show')}</span>
     </button>
   {/if}
   {#if canScope}
-    <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} aria-keyshortcuts={keyShortcut('tree.solo')} on:click={onToggleSolo}>
+    <hr class="menu-divider" />
+    <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} aria-keyshortcuts={keyShortcut('tree.solo')} on:click={onToggleSolo}>
       {isSoloed ? 'Stop soloing' : 'Solo'} {item.is_dir ? 'folder' : 'file'}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.solo')} aria-hidden="true">{chord('tree.solo')}</span>
     </button>
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} aria-keyshortcuts={keyShortcut('tree.mute')} on:click={onToggleMute}>
+    <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} aria-keyshortcuts={keyShortcut('tree.mute')} on:click={onToggleMute}>
       {isMuted ? 'Unmute' : 'Mute'} {item.is_dir ? 'folder' : 'file'}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')} aria-hidden="true">{chord('tree.mute')}</span>
     </button>
@@ -358,12 +364,12 @@
   <!-- The two filing axes share a section: a collection is curation, a game
        system is what the book is. Both are submenus of togglable rows. -->
   {#if canAddToCollection || canTag}
-    <hr class="context-divider" />
+    <hr class="menu-divider" />
   {/if}
   {#if canAddToCollection}
     <!-- svelte-ignore a11y-mouse-events-have-key-events -->
     <div
-      class="context-item submenu-trigger"
+      class="menu-row submenu-trigger"
       class:open={openSubmenu === 'collection'}
       data-mi="submenu-trigger"
       data-submenu="collection"
@@ -383,7 +389,7 @@
           {#each activeCollections as col}
             {@const state = menuMemberState(col.name, containingSet, fullyContainingSet)}
             <button
-              class="context-item"
+              class="menu-row"
               data-mi="item"
               role="menuitemcheckbox"
               aria-checked={state === 'some' ? 'mixed' : state === 'all'}
@@ -405,9 +411,9 @@
             </button>
           {/each}
           {#if hasCollections}
-            <hr class="context-divider" />
+            <hr class="menu-divider" />
           {/if}
-          <button class="context-item" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
+          <button class="menu-row" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
             + New collection&hellip;
           </button>
         </div>
@@ -417,7 +423,7 @@
   {#if canTag}
     <!-- svelte-ignore a11y-mouse-events-have-key-events -->
     <div
-      class="context-item submenu-trigger"
+      class="menu-row submenu-trigger"
       class:open={openSubmenu === 'tag'}
       data-mi="submenu-trigger"
       data-submenu="tag"
@@ -432,28 +438,12 @@
       <span class="submenu-caret">&#9656;</span>
       {#if openSubmenu === 'tag'}
         <div class="submenu" role="menu">
-          {#each knownSystems as sys}
-            <button
-              class="context-item"
-              data-mi="item"
-              role="menuitemcheckbox"
-              aria-checked={currentTags.includes(sys.tag)}
-              on:click={() => toggleGameSystem(sys.tag)}
-            >
-              <span class="menu-pip" class:on={currentTags.includes(sys.tag)} aria-hidden="true"></span>
-              <!-- Font Awesome "dice-d6" — one fill for every system -->
-              <svg class="submenu-icon" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
-                <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
-              </svg>
-              <span class="submenu-tag" title={sys.tag}>{sys.tag}</span>
-            </button>
-          {/each}
-          {#if currentTags.length > 0}
-            <hr class="context-divider" />
-            <button class="context-item danger" data-mi="item" role="menuitem" on:click={clearGameSystems}>
-              Clear tags
-            </button>
-          {/if}
+          <SystemTagRows
+            {knownSystems}
+            tags={currentTags}
+            onToggle={toggleGameSystem}
+            onClear={clearGameSystems}
+          />
         </div>
       {/if}
     </div>
@@ -464,28 +454,28 @@
        leave them searchable but invisible). Unhide always stays
        available so nothing strands. -->
   {#if !inheritedHidden && (item.is_dir || directlyHidden || !isIndexed)}
-    <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} aria-keyshortcuts={keyShortcut('tree.hide')} on:click={onToggleHidden}>
+    <hr class="menu-divider" />
+    <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} aria-keyshortcuts={keyShortcut('tree.hide')} on:click={onToggleHidden}>
       {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.hide')} aria-hidden="true">{chord('tree.hide')}</span>
     </button>
   {/if}
 
-  <hr class="context-divider" />
-  <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} aria-keyshortcuts={keyShortcut('tree.rename')} on:click={onRename}>
+  <hr class="menu-divider" />
+  <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} aria-keyshortcuts={keyShortcut('tree.rename')} on:click={onRename}>
     Rename {item.is_dir ? 'folder' : 'file'}
     <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
   </button>
   {#if !item.is_dir && isIndexed}
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
+    <button class="menu-row" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
   {/if}
 
   <!-- Delete stands alone: a divider between it and the other write actions
        is the only thing between a misaimed click and the wrong row. -->
-  <hr class="context-divider" />
+  <hr class="menu-divider" />
   <!-- Display-only, like Reveal above: ⌘⌫ is a named key eventMatchKey can't
        resolve, so the row hints the chord without claiming it. -->
-  <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>
+  <button class="menu-row danger" data-mi="item" role="menuitem" on:click={onDelete}>
     Delete {item.is_dir ? 'folder' : 'file'}
     <span class="menu-chord" class:bare={isBareKeyChord('tree.delete')} aria-hidden="true">{chord('tree.delete')}</span>
   </button>
@@ -503,34 +493,9 @@
     max-width: var(--menu-max-width);
     padding: 0.15rem 0;
   }
-  .context-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.2rem 0.6rem;
-    border: none;
-    background: none;
-    cursor: pointer;
-    text-align: left;
-    font-size: 0.8rem;
-    line-height: 1.3;
-    font-family: var(--font-body);
-    color: var(--text-primary);
-    transition: background var(--transition-fast);
-  }
-  .context-item:hover,
-  .context-item:global(.kb-focused) {
-    background: var(--bg-container);
-  }
-  .context-item.danger {
-    color: var(--text-danger);
-  }
-  .context-divider {
-    margin: 0.15rem 0;
-    border: none;
-    border-top: 1px solid var(--bg-category);
-  }
+  /* Rows and dividers are .menu-row / .menu-divider in app.css — shared
+     anatomy, so the tag rows this menu now delegates to SystemTagRows land
+     under the same rule as the ones it renders itself. */
   .submenu-trigger {
     position: relative;
     display: flex;
@@ -556,20 +521,14 @@
     height: 11px;
     flex-shrink: 0;
   }
-  /* Collection names and system tags are user-written and uncapped — they
-     ellipsize against --menu-max-width rather than stretching the menu.
-     Both carry a title so the full name stays recoverable. */
-  .submenu-tag,
+  /* Collection names are user-written and uncapped — they ellipsize against
+     --menu-max-width rather than stretching the menu, and carry a title so
+     the full name stays recoverable. */
   .submenu-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  /* Primary ink, like the collection rows above: a system's identity is the
-     die, not the label's color. */
-  .submenu-tag {
-    font-weight: 600;
   }
   .submenu {
     position: absolute;

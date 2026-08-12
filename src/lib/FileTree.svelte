@@ -144,6 +144,11 @@
   $: visibleTags = tags.slice(0, 2);
   $: hiddenTagCount = Math.max(0, tags.length - visibleTags.length);
   $: isIndexed = !item.is_dir && indexedPaths.has(item.path);
+  // Same gate the context menu puts on its "Game system" submenu: with no
+  // systems known the menu has nothing to offer, and no menu in the app
+  // carries empty-state copy. The badge cluster above stays ungated — on a
+  // tagged file the menu still holds "Clear tags".
+  $: canTag = isIndexed && knownSystems.length > 0;
 
   // The armed collection lives in the arm slot; showing it in the strip
   // as well would say the same thing twice on one row.
@@ -364,7 +369,7 @@
           {/if}
         </button>
       </div>
-    {:else if isIndexed}
+    {:else if canTag}
       <div class="badge-wrapper">
         <button class="add-tag-btn" on:click={(e) => tagMenu?.toggle(e)}>+ tag</button>
       </div>

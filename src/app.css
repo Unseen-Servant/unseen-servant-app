@@ -536,6 +536,44 @@ dialog[open]::backdrop {
 
 /* --- Menu Vocabulary --- */
 
+/* The row every menu is built from. Global because the anatomy is shared:
+   .menu-pip, .menu-chord and this rule describe one row between them, and a
+   scoped copy per menu is how the two game-system pickers drifted apart in
+   the first place. CollectionsPanel still declares its own — it converts with
+   the menu-machinery adoption pass. */
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.2rem 0.6rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  transition: background var(--transition-fast);
+}
+/* Hover and the keyboard cursor land on the same fill: one highlight, two ways
+   of arriving at it. .kb-focused is applied imperatively by the menu that owns
+   the cursor, so it never appears in a component's markup. */
+.menu-row:hover,
+.menu-row.kb-focused {
+  background: var(--bg-container);
+}
+/* Danger is a hue swap, not a new shape — per the design conventions. */
+.menu-row.danger {
+  color: var(--text-danger);
+}
+.menu-divider {
+  margin: 0.15rem 0;
+  border: none;
+  border-top: 1px solid var(--bg-category);
+}
+
 /* Menu selection lamp — reports which option is in effect on rows whose whole
    surface is the click target. Deliberately unlike .app-checkbox: 5px vs 14px
    and no border, because a panel LED has no bezel you press. Decorative;
