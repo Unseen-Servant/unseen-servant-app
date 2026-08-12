@@ -3211,7 +3211,7 @@
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not set pigment: ${String(e)}`,
+        message: `Could not set ribbon: ${String(e)}`,
         duration: 5000,
       });
     }

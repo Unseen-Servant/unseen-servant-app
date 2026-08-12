@@ -307,7 +307,7 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): the transport first
-  // (Arm / Play / Mute), then the track's properties (Rename / Pigment ▸ /
+  // (Arm / Play / Mute), then the track's properties (Ribbon ▸ / Rename /
   // Archive), then Delete. Same visual family as the file tree's
   // ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
@@ -850,10 +850,6 @@
       <span class="menu-chord" class:bare={isBareKeyChord('collections.mute')} aria-hidden="true">{chord('collections.mute')}</span>
     </button>
     <hr class="menu-divider" />
-    <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
-      Rename
-      <span class="menu-chord" class:bare={isBareKeyChord('collections.rename')} aria-hidden="true">{chord('collections.rename')}</span>
-    </button>
     <div
       class="context-item has-submenu"
       class:open={ctxPigmentOpen}
@@ -865,7 +861,10 @@
       aria-haspopup="menu"
       aria-expanded={ctxPigmentOpen}
     >
-      <span>Pigment</span>
+      <!-- "Ribbon" names the glyph the user sees; the palette entries behind
+           it stay pigments in code, where Ribbon is already collectionRibbons'
+           per-file type. -->
+      <span>Ribbon</span>
       <span class="submenu-caret" aria-hidden="true">&#9656;</span>
       {#if ctxPigmentOpen}
         <div class="submenu" role="menu">
@@ -899,8 +898,12 @@
         </div>
       {/if}
     </div>
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
+      Rename collection
+      <span class="menu-chord" class:bare={isBareKeyChord('collections.rename')} aria-hidden="true">{chord('collections.rename')}</span>
+    </button>
     <button class="context-item" role="menuitem" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
-      {col?.archived ? 'Unarchive' : 'Archive'}
+      {col?.archived ? 'Unarchive' : 'Archive'} collection
       <span class="menu-chord" class:bare={isBareKeyChord('collections.archive')} aria-hidden="true">{chord('collections.archive')}</span>
     </button>
     <hr class="menu-divider" />

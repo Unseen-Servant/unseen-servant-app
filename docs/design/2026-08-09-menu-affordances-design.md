@@ -257,6 +257,41 @@ contradicts itself as well as the menus — "re-indexed chunks" at `:271`
 against "Reindex all files" at `:326` and "Reindex all" at `:358`, plus
 "needs reindexing" at `:49`.
 
+**Object nouns.** *Amended 2026-08-12, superseding the "already right"
+non-change below.* The noun does two jobs: **disambiguation**, saying
+which kind of row you grabbed, and **gravity**, marking an action that
+changes or destroys the thing. Which jobs a menu needs decides the rule:
+
+> A polymorphic menu names the object on every command row. A
+> monomorphic menu names it on management verbs and leaves transport
+> verbs bare.
+
+The tree menu is polymorphic — files and folders — so `Rename file`,
+`Hide folder` and `Solo file` all carry the noun. The Collections menu
+is monomorphic, so only gravity is left to do: `Rename collection`,
+`Archive collection` and `Delete collection` take it, while `Arm`,
+`Play` and `Mute` stay bare. Those three are mixer grammar — the
+panel's own transport controls are unlabeled icon buttons, and a
+channel's transport verbs never name the channel.
+
+The superseded rule (bare verbs throughout a monomorphic menu) was
+internally coherent but invisible from inside the app: the same verb
+read `Rename file` in one pane and `Rename` in another, with the reason
+legible only to someone holding both menus in mind. `Delete collection`
+made it worse, reading as drift rather than as emphasis.
+
+**Ribbon.** The Collections submenu trigger is `Ribbon`, not `Pigment`.
+It names the glyph the user actually sees, and the ribbon↔collection
+mapping is already taught in four places — panel rows, tree rows, scope
+chips and search-result index cells. `Ribbon ▸ None` also reads
+correctly where `Pigment ▸ None` did not: an undyed ribbon is still a
+ribbon. Only the two user-visible strings changed (the trigger and the
+`Could not set ribbon` toast); the palette entries stay `Pigment` in
+code, because `Ribbon` is already `collectionRibbons.ts`'s per-file type
+and a rename would collide. The trigger is filed above `Rename
+collection` so the two chord-bearing rows sit together rather than being
+split by a caret row.
+
 ## Decided non-changes
 
 Recorded so they are not re-litigated.
@@ -267,7 +302,9 @@ Recorded so they are not re-litigated.
 - **`Reveal in folder` stays.** Platform-specific copy (`Reveal in
   Finder` / `Show in File Explorer`) was available via the existing
   `isMac` check and declined.
-- **Object nouns are already right.** The tree menu names its object
+- **Object nouns are already right.** *Superseded 2026-08-12 — see
+  "Object nouns" under Copy. Kept for the reasoning, which is still the
+  best case against the current rule.* The tree menu names its object
   because it is polymorphic — one menu serves files and folders, so
   "Rename file" vs "Rename folder" tells you what you right-clicked. The
   Collections menu is monomorphic, so bare verbs carry the same
