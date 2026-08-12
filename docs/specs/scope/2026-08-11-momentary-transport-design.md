@@ -118,7 +118,9 @@ repeat it on eight labels.
 ## Out of scope
 
 - **Scene recall** — snapshotting and restoring whole console states.
-  Filed separately; it is a feature, not a feel change.
+  Filed as #365; it is a feature, not a feel change. Master bypass is the
+  cheap partial answer to the same itch ("let me see past my scope for a
+  second") and shipped here instead.
 - **Solo-safe** — a channel that another channel's solo can't drop.
   Discussed, not built: it is per-collection persisted state plus an
   explanation burden, and wants a real need behind it first.
