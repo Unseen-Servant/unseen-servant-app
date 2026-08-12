@@ -53,6 +53,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
+  { id: 'scope.bypass',          keys: { mac: 'B',    other: 'B' },             label: 'Bypass the whole scope console', scope: 'global' },
+  // Not a chord of its own — one line teaching the idiom every transport
+  // key shares, so the sheet doesn't have to repeat it on eight labels.
+  { id: 'scope.peek',            keys: { mac: 'hold S / M / P / B', other: 'hold S / M / P / B' }, label: 'Hold rather than tap to engage only while held', scope: 'global' },
   { id: 'help.overlay',          keys: { mac: '?',    other: '?' },             label: 'Show keyboard shortcuts',     scope: 'global' },
   { id: 'app.escape',            keys: { mac: 'Esc',  other: 'Esc' },           label: 'Cancel / close / step back', scope: 'global' },
 

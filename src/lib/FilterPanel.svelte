@@ -9,6 +9,7 @@
   import { afterUpdate } from 'svelte';
   import { computeFilterRows, stepFilterRow } from './filterRows';
   import { materializeKey } from './paneFocus';
+  import { holdLatch } from './holdLatch';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
 
@@ -203,9 +204,11 @@
     }
     if (bareLetter && (lk === 's' || lk === 'm')) {
       event.preventDefault();
-      rowElByKey(focusedRow)
-        ?.querySelector<HTMLElement>(lk === 's' ? '[data-sm-s]' : '[data-sm-m]')
-        ?.click();
+      if (event.repeat) return;
+      // Capture the button, not the row: focus may move before release.
+      const btn = rowElByKey(focusedRow)
+        ?.querySelector<HTMLElement>(lk === 's' ? '[data-sm-s]' : '[data-sm-m]');
+      if (btn) holdLatch.press(lk, () => btn.click());
     }
   }
 

@@ -5,6 +5,7 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
+  import { holdLatch } from './holdLatch';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
@@ -383,12 +384,16 @@
     // never pass under solos) and mutes under the backend's key.
     if (bareLetter && lk === 's' && focused.tag !== 'Untagged') {
       event.preventDefault();
-      onToggleSystemSolo(focused.tag);
+      if (event.repeat) return;
+      const tag = focused.tag;
+      holdLatch.press('s', () => onToggleSystemSolo(tag));
       return;
     }
     if (bareLetter && lk === 'm') {
       event.preventDefault();
-      onToggleSystemFilter(focused.tag === 'Untagged' ? UNTAGGED_KEY : focused.tag);
+      if (event.repeat) return;
+      const key = focused.tag === 'Untagged' ? UNTAGGED_KEY : focused.tag;
+      holdLatch.press('m', () => onToggleSystemFilter(key));
       return;
     }
 

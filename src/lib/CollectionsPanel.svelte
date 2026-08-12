@@ -6,6 +6,7 @@
   import { onDestroy, tick } from 'svelte';
   import { chord, isBareKeyChord, isDeleteChord } from './keybindings';
   import { materializeKey } from './paneFocus';
+  import { holdLatch } from './holdLatch';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from './menuGeometry';
@@ -481,10 +482,18 @@
       // (Space still swallowed so the list doesn't scroll).
       if (lk === 'p' || lk === ' ') {
         event.preventDefault();
-        if (!col.archived) onTogglePlay(col.name);
+        if (event.repeat) return;
+        // Keyed on lk, not 'p': Space is the other way to fire this, and
+        // the release has to match whichever one is physically held.
+        if (!col.archived) holdLatch.press(lk, () => onTogglePlay(col.name));
         return;
       }
-      if (lk === 'm') { event.preventDefault(); onToggleMute(col.name); return; }
+      if (lk === 'm') {
+        event.preventDefault();
+        if (event.repeat) return;
+        holdLatch.press('m', () => onToggleMute(col.name));
+        return;
+      }
       if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
     }
   }

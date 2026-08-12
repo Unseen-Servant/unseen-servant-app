@@ -14,6 +14,9 @@
   export let storageBytes: number;
   export let reclaimableBytes: number = 0;
   export let isSyncing: boolean = false;
+  // Master bypass is lit, not persisted — the lamp is the only thing
+  // telling you the console you can see isn't currently doing anything.
+  export let scopeBypassed: boolean = false;
   export let lastSyncTime: Date | null = null;
   export let onSync: (() => void) | undefined = undefined;
   export let onOpenFolder: () => void;
@@ -70,6 +73,13 @@
           <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
         </svg>
       </span>
+      {#if scopeBypassed}
+        <span class="separator">&middot;</span>
+        <span
+          class="bypass-lamp readout-label"
+          title="Scope bypassed — every indexed file is in scope. B restores it."
+        >BYPASS</span>
+      {/if}
       <span class="separator">&middot;</span>
       {#if indexedCount > 0}
         <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
@@ -312,6 +322,14 @@
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+
+  /* Purple + glow: bypass is a mode you switched on, which is what the
+     colour semantics reserve purple for. Not amber — that is connectivity
+     — and not danger, since nothing is being destroyed. */
+  .bypass-lamp {
+    color: var(--text-active);
+    filter: var(--glow-active);
   }
 
   .separator {

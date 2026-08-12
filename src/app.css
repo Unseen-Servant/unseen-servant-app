@@ -354,16 +354,39 @@ input {
 .sm-btn:active {
   transform: scale(0.97);
 }
+/* Detent — the snap of a switch reaching its position. A single bright
+   frame on *engage* only; releasing a switch has no detent. The glow rides
+   inside the keyframe rather than being replaced by it, because `filter`
+   is one property and animating brightness alone would drop the LED for
+   the length of the animation. */
+@keyframes detent-glow {
+  from {
+    filter: brightness(1.7) var(--glow-active);
+  }
+}
+
+@keyframes detent-flat {
+  from {
+    filter: brightness(1.7);
+  }
+}
+
 .sm-btn.solo-on {
   color: var(--text-active);
   border-color: var(--text-active);
   background: color-mix(in srgb, var(--text-active) 15%, transparent);
   filter: var(--glow-active);
 }
+.motion-ready .sm-btn.solo-on {
+  animation: detent-glow 110ms ease-out;
+}
 .sm-btn.mute-on {
   color: var(--text-danger);
   border-color: color-mix(in srgb, var(--text-danger) 45%, transparent);
   background: color-mix(in srgb, var(--text-danger) 10%, transparent);
+}
+.motion-ready .sm-btn.mute-on {
+  animation: detent-flat 110ms ease-out;
 }
 .sm-btn:focus-visible {
   outline: 1px solid var(--text-accent);
@@ -489,7 +512,9 @@ dialog[open]::backdrop {
 
 @media (prefers-reduced-motion: reduce) {
   dialog[open],
-  dialog[open]::backdrop {
+  dialog[open]::backdrop,
+  .motion-ready .sm-btn.solo-on,
+  .motion-ready .sm-btn.mute-on {
     animation: none;
   }
 }

@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Dialogs fade and scale in rather than appearing instantly, and hold still if your system asks for reduced motion. Their close × is a lighter glyph that no longer outshines the rest of the title bar, and every dialog now draws from one set of width and padding steps
 - The keyboard shortcut sheet brackets its single-key chords — `[R]`, `[X]` — the way the menus already do, so a lone letter reads as a key rather than a stray capital
 - A file's Info dialog is titled with the filename, with its full path beneath it, and the game system moves out of the cramped five-column readout onto its own line where a multi-system file fits
+- **Tap latches, hold is momentary.** Holding `S`, `M` or `P` engages it only while the key is down and puts it back when you let go, the way a hardware transport works — peek at one book alone mid-search without dismantling a scope you spent prep time building. Tapping still latches, exactly as before
+- **`B` bypasses the whole scope console** — every indexed file back in scope, for A/B'ing a thin result against your own filters. Hold to peek or tap to latch. Nothing is cleared: the chips stay lit while the signal passes through them, and a `BYPASS` lamp shows in the status bar. Not remembered across launches
+- Engaging a solo or mute snaps — one bright frame as the switch reaches its position
 
 ### Fixed
 

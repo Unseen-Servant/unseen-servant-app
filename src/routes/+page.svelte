@@ -22,6 +22,7 @@
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
   import { confirmPrompt } from '../lib/confirmStore';
+  import { holdLatch } from '../lib/holdLatch';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import FilterPanel from '../lib/FilterPanel.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
@@ -275,6 +276,8 @@
   let showSettings = false;
   let showHelpOverlay = false;
   let showSplash = true;
+  // Gates the engage detent (app.css). See where it's set in onMount.
+  let motionReady = false;
   let splashTimer: ReturnType<typeof setTimeout> | null = null;
   let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
@@ -403,10 +406,24 @@
   const EMPTY_PATHS = new Set<string>();
   const EMPTY_TAGS = new Map<string, string[]>();
 
+  // Master bypass: the whole scope console passes through unresolved, so
+  // every indexed file is in scope. Not persisted and not part of
+  // ScopeConsoleState — it is a momentary A/B against your own scope, not
+  // a setting, and coming back to a silently bypassed console next launch
+  // would be a trap.
+  let scopeBypassed = false;
+
+  function toggleScopeBypass() {
+    scopeBypassed = !scopeBypassed;
+    // The scope feeds the query, so the results have to be re-asked for.
+    if (committedQuery) runSearch(committedQuery);
+  }
+
   // The resolved scope — mix ∩ all three axes — as the display sees it.
   // null = nothing engaged, every indexed file is in scope. Drives the
   // scope-bar denominator and every surface's out-of-scope dimming.
   $: resolvedScopeSet = (() => {
+    if (scopeBypassed) return null;
     const { soloSets, muteSets } = scopeRefSets(scopeSolos, scopeMutes);
     return resolveScopeSet(
       resolveMix(playingCollections, mutedCollectionNames, collections, indexedPaths),
@@ -452,7 +469,11 @@
     // Mix first: the transport layer resolves before any narrowing.
     // Computed fresh (not from the deriveds) — toggles call runSearch
     // synchronously after mutating state; see scopeRefSets.
-    const mix = resolveMix(playingCollections, mutedCollectionNames, collections, indexedPaths);
+    // Under bypass every axis resolves to "no narrowing" without the
+    // console being touched, so releasing B puts the scope back exactly.
+    const mix = scopeBypassed
+      ? null
+      : resolveMix(playingCollections, mutedCollectionNames, collections, indexedPaths);
     const mixEmpty = mix !== null && mix.size === 0;
 
     // Path + curation axes narrow within the mix. Systems stay out of
@@ -461,7 +482,7 @@
     // set in, an empty set out), so this runs unconditionally — the
     // empty-scope priority below picks the one message that wins.
     const { soloSets, muteSets } = scopeRefSets(scopeSolos, scopeMutes);
-    const pathScope = resolveScopeSet(
+    const pathScope = scopeBypassed ? null : resolveScopeSet(
       mix, soloSets, muteSets,
       soloCuration, mutedCuration, collectedPaths,
       EMPTY_SYSTEMS, EMPTY_SYSTEMS, EMPTY_TAGS, indexedPaths
@@ -471,7 +492,7 @@
 
     // Systems axis → backend game_systems include-list (issue #307:
     // the untagged bucket must be named explicitly under mutes).
-    const gameSystems = searchGameSystemsFilter(
+    const gameSystems = scopeBypassed ? null : searchGameSystemsFilter(
       soloedSystems,
       filterExcludedSystems,
       gameSystemStats.map((s) => s.name)
@@ -771,6 +792,13 @@
       // No saved state on first run — that's fine
       console.log('No saved state:', e);
     }
+
+    // Arm the detent only once the restored console has been applied. A
+    // CSS animation also runs when an element is *created* already
+    // carrying the class, so without this every lamp the session restored
+    // would snap on launch as though the user had just thrown it.
+    await tick();
+    motionReady = true;
 
     try {
       dataDir = await invoke<string>('get_data_dir');
@@ -2010,8 +2038,20 @@
       // view they fall through to SystemsView's own handler, which
       // works the systems axis. The context menu moves to Shift+F10 /
       // the Menu key (M used to open it).
-      if (lk === 's' && viewMode !== 'systems') { event.preventDefault(); toggleScopeSolo(focused.item); return true; }
-      if (lk === 'm' && viewMode !== 'systems') { event.preventDefault(); toggleScopeMute(focused.item); return true; }
+      if (lk === 's' && viewMode !== 'systems') {
+        event.preventDefault();
+        if (event.repeat) return true;
+        const item = focused.item;
+        holdLatch.press('s', () => toggleScopeSolo(item));
+        return true;
+      }
+      if (lk === 'm' && viewMode !== 'systems') {
+        event.preventDefault();
+        if (event.repeat) return true;
+        const item = focused.item;
+        holdLatch.press('m', () => toggleScopeMute(item));
+        return true;
+      }
       if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
       if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
@@ -2058,6 +2098,13 @@
       clearTimeout(splashTimer);
       splashTimer = null;
     }
+  }
+
+  // The release half of every hold. Unconditional on purpose: whatever
+  // gating applied when the key went down, the key coming back up must
+  // always reach the latch, or a control stays stuck in its held state.
+  function handleGlobalKeyup(event: KeyboardEvent) {
+    holdLatch.release(event.key.toLowerCase());
   }
 
   function handleGlobalKeydown(event: KeyboardEvent) {
@@ -2290,6 +2337,17 @@
     if (event.key === '?' && !meta && !event.altKey && !inAnyInput) {
       event.preventDefault();
       showHelpOverlay = true;
+      return;
+    }
+
+    // Master bypass — the console's "hear it raw" switch. Tap latches,
+    // hold is momentary (holdLatch), same as S/M on a row. Deliberately
+    // does not clear anything: the chips and lamps stay lit while the
+    // signal passes through them, so you can see what you're bypassing.
+    if (lk === 'b' && !meta && !event.altKey && !event.shiftKey && !inAnyInput) {
+      event.preventDefault();
+      if (event.repeat) return;
+      holdLatch.press('b', toggleScopeBypass);
       return;
     }
 
@@ -3361,11 +3419,19 @@
 
 </script>
 
-<svelte:window on:keydown={handleGlobalKeydown} on:contextmenu|preventDefault />
+<!-- keyup/blur are the release half of the hold latch (holdLatch.ts). They
+     live here, at window level, because the press can come from any pane
+     and focus may have moved by the time the key comes back up. -->
+<svelte:window
+  on:keydown={handleGlobalKeydown}
+  on:keyup={handleGlobalKeyup}
+  on:blur={() => holdLatch.cancel()}
+  on:contextmenu|preventDefault
+/>
 
 <LaunchSplash visible={showSplash} onDismiss={dismissSplash} />
 
-<main class="app-layout">
+<main class="app-layout" class:motion-ready={motionReady}>
   <Header
     bind:this={headerComponent}
     bind:searchQuery
@@ -3686,6 +3752,7 @@
     {storageBytes}
     {reclaimableBytes}
     {isSyncing}
+    {scopeBypassed}
     {lastSyncTime}
     onSync={handleManualSync}
     onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
