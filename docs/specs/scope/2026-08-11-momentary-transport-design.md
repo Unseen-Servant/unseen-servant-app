@@ -52,11 +52,33 @@ The whole console passes through unresolved: `resolvedScopeSet` returns
 null and `runSearch` skips all three narrowing axes. Tap latches, hold is
 momentary, same as any transport key.
 
-**Bypass does not clear anything.** The chips stay in the scope bar and
-the lamps stay lit while the signal passes through them — that is what a
-console bypass does, and it is the difference between "A/B this" and
-"undo this". A `BYPASS` lamp in the status bar is the only thing saying
-the visible console isn't currently doing anything.
+**Bypass does not clear anything.** The console stays exactly as set —
+that is the difference between "A/B this" and "undo this".
+
+It is reported in two places, doing two jobs:
+
+- **The status bar** carries a `BYPASS` lamp — peripheral, always
+  present, purple and glowing because the colour semantics reserve purple
+  for a mode you switched on (amber is connectivity, and nothing is being
+  destroyed, so not danger).
+- **The scope bar** shows *what* is bypassed. A `bypass` chip leads the
+  row wearing that same purple and glow, so the two read as one state
+  rather than two notifications, and the chips behind it drop to the
+  app's single out-of-scope dim step. Dimmed rather than hidden: the
+  point of a bypass is seeing what you are bypassing. The dim is
+  transitioned, so a momentary hold reads as a dip rather than a strobe.
+
+The scope bar is not an optional extra here — it was **asserting
+something false**. Its meter tooltip reads *"Across N files matching the
+active scope and filters"*, and under bypass that denominator is the whole
+library while the chips beside it still claim a narrowed scope. The
+tooltip now says the scope is bypassed instead. A menu-bar icon was
+considered and rejected: the header is controls only and carries no state
+lamps, and an icon would have said *that* bypass is on without fixing the
+readout that says otherwise.
+
+The `bypass` chip is also the only mouse route out of a state `B` latched;
+clicking it clears the bypass like any other chip.
 
 `B` and `⌘B` (sidebar) are different actions. That is the distinction the
 app's own bracket convention already teaches — *"⌘O is hold-a-modifier,
@@ -138,8 +160,11 @@ repeat it on eight labels.
    hold, key mismatch, double release, cancel, supersede),
    `npx svelte-check` 0 errors, `npm run lint:css`, `npx vite build`.
 2. **Feel pass, outstanding.** Tap `S` on a row — it latches. Hold it —
-   it reverts on release. Hold `B` — the library goes unscoped and the
-   `BYPASS` lamp lights; release restores the exact scope.
+   it reverts on release. Hold `B` — the library goes unscoped, the
+   `BYPASS` lamp lights and the chip row dims behind a `bypass` chip;
+   release restores the exact scope. Judge the dim specifically on a
+   *momentary* hold: if the row reads as broken rather than passed
+   through, a strikethrough or a row-level overlay is the fallback.
 3. **Launch check, outstanding.** Relaunch with a saved console: no lamp
    should flash. Then toggle one: it should snap.
 4. **Repeat check, outstanding.** Hold a key for several seconds — the

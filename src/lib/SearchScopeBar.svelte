@@ -25,6 +25,11 @@
   export let hideUnindexed: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
+  // Master bypass. The row is the readout for what narrows a search, so
+  // it has to say when nothing does — otherwise the chips claim a scope
+  // the meter's denominator contradicts.
+  export let scopeBypassed: boolean = false;
+  export let onClearBypass: () => void = () => {};
   export let isLoading: boolean = false;
   export let searchActive: boolean = false;
   export let onClearCollectionPlay: (key: string) => void = () => {};
@@ -59,7 +64,21 @@
 </script>
 
 <div class="scope-bar">
-  <div class="left">
+  <div class="left" class:bypassed={scopeBypassed}>
+    {#if scopeBypassed}
+      <!-- Leads the row: it is the one control still in effect, and the
+           only mouse way out of a state B latched. -->
+      <button
+        type="button"
+        class="chip bypass"
+        on:click|stopPropagation={onClearBypass}
+        title="Scope bypassed — every indexed file is in scope. Click, or press B, to restore it."
+        aria-label="Restore the scope"
+      >
+        <span class="chip-label">bypass</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/if}
     {#each collectionPlays as chip (chip.key)}
       <button
         type="button"
@@ -281,7 +300,14 @@
           Searching<span class="searching-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
         </span>
       {:else}
-        <span class="meter" title="Across {indexedFileCount} file{indexedFileCount === 1 ? '' : 's'} matching the active scope and filters">
+        <!-- Under bypass the denominator is the whole library, so the
+             tooltip must stop claiming the scope produced it. -->
+        <span
+          class="meter"
+          title={scopeBypassed
+            ? `Across all ${indexedFileCount} indexed file${indexedFileCount === 1 ? '' : 's'} — the scope is bypassed`
+            : `Across ${indexedFileCount} file${indexedFileCount === 1 ? '' : 's'} matching the active scope and filters`}
+        >
           {resultCount} {resultCount === 1 ? 'hit' : 'hits'} <span class="meter-of">of {indexedFileCount} files</span>
         </span>
       {/if}
@@ -377,6 +403,28 @@
     background: var(--bg-container);
     color: var(--text-secondary);
     line-height: 1.2;
+  }
+
+  /* The master chip: purple and lit, the same colour and glow the
+     status-bar lamp wears, so the two read as one state rather than two
+     notifications. It outranks the row — everything behind it goes inert
+     while this stays at full strength. */
+  .chip.bypass {
+    border-color: var(--text-active);
+    background: color-mix(in srgb, var(--text-active) 15%, transparent);
+    color: var(--text-active);
+    filter: var(--glow-active);
+  }
+
+  /* Dimmed, not hidden: the point of a bypass is to see what you are
+     bypassing. Reuses the app's single out-of-scope dim step rather than
+     inventing a second one, and transitions so a momentary hold reads as
+     a dip rather than a strobe. */
+  .left .chip:not(.bypass) {
+    transition: background var(--transition-fast), opacity var(--transition-fast);
+  }
+  .left.bypassed .chip:not(.bypass) {
+    opacity: var(--opacity-out-of-scope);
   }
 
   /* Mute chips wear the lit M button's dressing — 45% danger border,

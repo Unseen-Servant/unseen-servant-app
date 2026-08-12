@@ -3539,6 +3539,8 @@
              narrowing, plus the hits meter while a search is active. The
              console itself is the docked FilterPanel. -->
         <SearchScopeBar
+          {scopeBypassed}
+          onClearBypass={toggleScopeBypass}
           {collectionPlays}
           {collectionSolos}
           {collectionMutes}
