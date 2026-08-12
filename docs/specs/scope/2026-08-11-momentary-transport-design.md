@@ -61,12 +61,39 @@ It is reported in two places, doing two jobs:
   present, purple and glowing because the colour semantics reserve purple
   for a mode you switched on (amber is connectivity, and nothing is being
   destroyed, so not danger).
-- **The scope bar** shows *what* is bypassed. A `bypass` chip leads the
-  row wearing that same purple and glow, so the two read as one state
-  rather than two notifications, and the chips behind it drop to the
-  app's single out-of-scope dim step. Dimmed rather than hidden: the
-  point of a bypass is seeing what you are bypassing. The dim is
-  transitioned, so a momentary hold reads as a dip rather than a strobe.
+- **The scope bar** carries the switch itself and shows *what* is being
+  bypassed. Lit, it wears the same purple and glow as the lamp, so the
+  two read as one state rather than two notifications, and the chips
+  behind it drop to the app's single out-of-scope dim step. Dimmed rather
+  than hidden: the point of a bypass is seeing what you are bypassing.
+  The dim is transitioned, so a momentary hold reads as a dip rather than
+  a strobe.
+
+### The bar had to become discoverable first
+
+An indicator that only appears once bypass is engaged teaches nobody that
+bypass exists. Neither does a chord buried in the `?` sheet. The bar was
+also *rendered* always but *empty* until something narrowed — always
+visible and perceptually absent, a hairline you could learn nothing from.
+
+So the master section is permanent: a `Scope` nameplate, the bypass
+switch, and a rule dividing them from the channels. The switch is the
+same 18px hardware square as S and M — the app already teaches solo and
+mute by putting a lettered switch in front of you, and the letter on this
+one is the key that throws it.
+
+- **Disabled when nothing is narrowed**, at the same 0.35 a disabled
+  checkbox uses. Bypassing nothing is a no-op, and a switch that looks
+  live but does nothing is a small lie. Visible-but-inert still teaches;
+  that is the whole point of it being there.
+- **A resting readout** — *"all 1,284 files"* — where the chips would be,
+  suppressed while the hits meter is showing, since with a search running
+  and no scope engaged both would report the same total.
+
+Rejected: a dashed placeholder slot reading "solo or mute to narrow".
+Dashed parchment is already `--outline-drop`, the app's drag-target
+idiom, and the bar sits at the top of the tree area where drags land — it
+would have read as *drop files here*.
 
 The scope bar is not an optional extra here — it was **asserting
 something false**. Its meter tooltip reads *"Across N files matching the
@@ -77,8 +104,8 @@ considered and rejected: the header is controls only and carries no state
 lamps, and an icon would have said *that* bypass is on without fixing the
 readout that says otherwise.
 
-The `bypass` chip is also the only mouse route out of a state `B` latched;
-clicking it clears the bypass like any other chip.
+The switch is also the only mouse route in or out of a bypass; `B` alone
+would have made this keyboard-only.
 
 `B` and `⌘B` (sidebar) are different actions. That is the distinction the
 app's own bracket convention already teaches — *"⌘O is hold-a-modifier,
@@ -161,10 +188,13 @@ repeat it on eight labels.
    `npx svelte-check` 0 errors, `npm run lint:css`, `npx vite build`.
 2. **Feel pass, outstanding.** Tap `S` on a row — it latches. Hold it —
    it reverts on release. Hold `B` — the library goes unscoped, the
-   `BYPASS` lamp lights and the chip row dims behind a `bypass` chip;
+   `BYPASS` lamp lights, the `B` switch goes purple and the chips dim;
    release restores the exact scope. Judge the dim specifically on a
    *momentary* hold: if the row reads as broken rather than passed
    through, a strikethrough or a row-level overlay is the fallback.
+5. **Resting-bar check, outstanding.** With no scope engaged the bar
+   should read `SCOPE │ B │ all N files` with the switch visibly inert —
+   the state in which the feature has to be discoverable at all.
 3. **Launch check, outstanding.** Relaunch with a saved console: no lamp
    should flash. Then toggle one: it should snap.
 4. **Repeat check, outstanding.** Hold a key for several seconds — the

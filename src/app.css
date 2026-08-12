@@ -347,9 +347,18 @@ input {
               background var(--transition-fast), filter var(--transition-fast),
               transform var(--transition-fast);
 }
-.sm-btn:hover {
+.sm-btn:hover:not(:disabled) {
   color: var(--text-secondary);
   border-color: var(--text-secondary);
+}
+/* Present but inert — the scope bar's master bypass before anything is
+   narrowed. Dimmed to the same degree as a disabled checkbox: a switch
+   that can't do anything should say so rather than lie by looking live,
+   and staying visible is the whole point (it is how the control is
+   discovered at all). */
+.sm-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 .sm-btn:active {
   transform: scale(0.97);
@@ -371,13 +380,18 @@ input {
   }
 }
 
-.sm-btn.solo-on {
+/* Solo-on and the scope bar's master bypass share one lit recipe: both
+   are "a mode you switched on", and the master switch should read as the
+   same kind of object as the channel switches it overrides. */
+.sm-btn.solo-on,
+.sm-btn.bypass-on {
   color: var(--text-active);
   border-color: var(--text-active);
   background: color-mix(in srgb, var(--text-active) 15%, transparent);
   filter: var(--glow-active);
 }
-.motion-ready .sm-btn.solo-on {
+.motion-ready .sm-btn.solo-on,
+.motion-ready .sm-btn.bypass-on {
   animation: detent-glow 110ms ease-out;
 }
 .sm-btn.mute-on {
@@ -514,6 +528,7 @@ dialog[open]::backdrop {
   dialog[open],
   dialog[open]::backdrop,
   .motion-ready .sm-btn.solo-on,
+  .motion-ready .sm-btn.bypass-on,
   .motion-ready .sm-btn.mute-on {
     animation: none;
   }

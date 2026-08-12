@@ -3540,7 +3540,7 @@
              console itself is the docked FilterPanel. -->
         <SearchScopeBar
           {scopeBypassed}
-          onClearBypass={toggleScopeBypass}
+          onToggleBypass={toggleScopeBypass}
           {collectionPlays}
           {collectionSolos}
           {collectionMutes}

@@ -6,6 +6,7 @@
   // single narrowing without touching the others.
 
   import { displaySystem } from './searchScope';
+  import { chordHint } from './keybindings';
   import type { CurationKey } from './searchScope';
 
   // Chip glyph = axis (pigment bookmark = collection, outline bookmark =
@@ -29,7 +30,25 @@
   // it has to say when nothing does — otherwise the chips claim a scope
   // the meter's denominator contradicts.
   export let scopeBypassed: boolean = false;
-  export let onClearBypass: () => void = () => {};
+  export let onToggleBypass: () => void = () => {};
+
+  // Only the narrowings bypass actually suppresses. The lens chips
+  // (hidden items, focus lens, indexed-only) are display filters that
+  // bypass leaves alone, so they must not summon a switch that would do
+  // nothing to them.
+  // Bypassed counts as bypassable so the switch can be thrown back — the
+  // narrowings it suppresses are still set, they just aren't in effect.
+  $: bypassable = scopeBypassed || anyBypassable;
+
+  $: anyBypassable =
+    collectionPlays.length > 0 ||
+    collectionSolos.length > 0 ||
+    collectionMutes.length > 0 ||
+    collectionTrackMutes.length > 0 ||
+    excludedSystems.size > 0 ||
+    soloedSystems.size > 0 ||
+    curationSolos.size > 0 ||
+    curationMutes.size > 0;
   export let isLoading: boolean = false;
   export let searchActive: boolean = false;
   export let onClearCollectionPlay: (key: string) => void = () => {};
@@ -65,19 +84,33 @@
 
 <div class="scope-bar">
   <div class="left" class:bypassed={scopeBypassed}>
-    {#if scopeBypassed}
-      <!-- Leads the row: it is the one control still in effect, and the
-           only mouse way out of a state B latched. -->
-      <button
-        type="button"
-        class="chip bypass"
-        on:click|stopPropagation={onClearBypass}
-        title="Scope bypassed — every indexed file is in scope. Click, or press B, to restore it."
-        aria-label="Restore the scope"
-      >
-        <span class="chip-label">bypass</span>
-        <span class="chip-clear" aria-hidden="true">×</span>
-      </button>
+    <!-- The master section: a nameplate and the bypass switch, both
+         permanent. The bar used to render empty until something narrowed,
+         which made it a hairline nobody could learn anything from — and a
+         bypass that only appears once engaged teaches nobody it exists.
+         The switch is the same 18px hardware square the S and M buttons
+         use, labelled with its own chord: the letter on the switch is the
+         key that throws it. -->
+    <span class="nameplate ledger-label">Scope</span>
+    <button
+      type="button"
+      class="sm-btn"
+      class:bypass-on={scopeBypassed}
+      disabled={!bypassable}
+      aria-pressed={scopeBypassed}
+      on:click|stopPropagation={onToggleBypass}
+      title={!bypassable
+        ? 'Nothing to bypass yet — solo or mute something first'
+        : scopeBypassed
+          ? `Scope bypassed — every indexed file is in scope. Restore it${chordHint('scope.bypass')}`
+          : `Bypass the scope — every indexed file back in scope, without clearing anything${chordHint('scope.bypass')}`}
+    >B</button>
+    <span class="master-rule" aria-hidden="true"></span>
+
+    {#if !bypassable && !searchActive}
+      <!-- Only when the meter isn't showing: with a search active and no
+           scope engaged, both would report the same total. -->
+      <span class="resting">all {indexedFileCount} files</span>
     {/if}
     {#each collectionPlays as chip (chip.key)}
       <button
@@ -405,25 +438,37 @@
     line-height: 1.2;
   }
 
-  /* The master chip: purple and lit, the same colour and glow the
-     status-bar lamp wears, so the two read as one state rather than two
-     notifications. It outranks the row — everything behind it goes inert
-     while this stays at full strength. */
-  .chip.bypass {
-    border-color: var(--text-active);
-    background: color-mix(in srgb, var(--text-active) 15%, transparent);
-    color: var(--text-active);
-    filter: var(--glow-active);
+  /* Names the region whether or not anything is in it. Same voice the
+     other row-group headings wear. */
+  .nameplate {
+    flex-shrink: 0;
+  }
+
+  /* Divides master from channels — the switch above the strip, not the
+     first chip in it. */
+  .master-rule {
+    width: 1px;
+    height: 12px;
+    background: var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  /* What the bar says when nothing narrows: the count the search would
+     run against. Quiet — it is the absence of state, not state. */
+  .resting {
+    color: var(--text-tertiary);
+    opacity: 0.75;
+    font-style: italic;
   }
 
   /* Dimmed, not hidden: the point of a bypass is to see what you are
      bypassing. Reuses the app's single out-of-scope dim step rather than
      inventing a second one, and transitions so a momentary hold reads as
      a dip rather than a strobe. */
-  .left .chip:not(.bypass) {
+  .left .chip {
     transition: background var(--transition-fast), opacity var(--transition-fast);
   }
-  .left.bypassed .chip:not(.bypass) {
+  .left.bypassed .chip {
     opacity: var(--opacity-out-of-scope);
   }
 
