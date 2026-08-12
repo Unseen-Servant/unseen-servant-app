@@ -1,9 +1,9 @@
 # Modals & Confirmations — Audit and Design
 
 **Date:** 2026-08-11
-**Status:** In progress. **Steps 1 and 2 implemented 2026-08-11** (F1–F4,
-F9, and the entry point); awaiting the visual/keyboard pass in
-[Verification](#verification). Steps 3–5 not started. Remaining findings
+**Status:** In progress. **Steps 1–3 implemented 2026-08-11** (F1–F9 and
+the entry point); awaiting the visual/keyboard pass in
+[Verification](#verification). Steps 4–5 not started. Remaining findings
 are code-level, not validated in the running app.
 **Scope:** Frontend only — `src/lib/Modal.svelte`,
 `src/lib/ConfirmDialog.svelte`, `src/lib/ActionButton.svelte`,
@@ -325,10 +325,32 @@ Ordered so each step leaves the tree shippable.
      `+page.svelte:2080` cannot help a component whose own modal is the
      open dialog — any future component-level key handler that coexists
      with a modal needs this check.
-3. **Danger vocabulary** — F5, F6, F7, F8. `ActionButton` gains a danger
-   icon override and a neutral variant; Danger Zone and the GameSystems
-   footer adopt them; `.btn-danger-solid`, `.btn-danger-outline`,
-   `.btn`/`.btn-delete`/`.btn-reset` are deleted.
+3. ~~**Danger vocabulary**~~ — F5, F6, F7, F8. **Done 2026-08-11.**
+   `.btn-danger-solid`, `.btn-danger-outline`, and
+   `.btn`/`.btn-delete`/`.btn-reset` are deleted. Four corrections to what
+   this step was thought to be:
+   - **F5 was under-diagnosed.** The audit called it a local collision in
+     one button row. It is a breach of a global rule — *"hover never
+     glows and never introduces new hues"* — and `.action-btn.discard`
+     had been introducing danger red on hover app-wide. So the fix is a
+     deletion, not a variant flag: backing out brightens a step.
+   - **…which exposed a button the flag was load-bearing for.** The
+     collections panel's row × is `kind="discard" danger`, and no rule
+     targeted `.discard.danger`, so its *hover* was the only thing
+     carrying "this removes something". It now wears danger at rest and
+     brightens on hover — the hue swap the conventions actually ask for,
+     and safe at rest because the control is revealed by row hover
+     anyway. Worth knowing that `danger` on a discard now means
+     "removes" rather than "backs out", and is styled.
+   - **F6 got the icon after all.** `static/icons/trash-solid-full.svg`
+     is vendored; destructive commits swap circle-check for it rather
+     than going text-only. `icon={false}` remains as a separate opt-out
+     and is what "Reset to defaults" uses.
+   - **The Danger Zone's frame was tinted too**, beyond what F7 asked.
+     Once the controls inside dropped to a 45% border, a full-strength
+     red frame around them made structure outrank the controls. The
+     section title keeps full danger. Visible change — judge it in the
+     pass.
 4. **Shell polish** — F12, F13, F14, F15, F16. Size and padding tokens,
    scrim token, xmark SVG, entry transition behind a global
    `prefers-reduced-motion` rule, radius tokens.
@@ -383,8 +405,9 @@ Checked items were run against step 1 on 2026-08-11.
 3. ✅ `grep -rln "showModal" src/lib/` — `Modal.svelte` is the only
    `.showModal()` caller (the other two hits are a comment and
    GameSystems' local `showModal` boolean).
-4. Grep confirms no remaining `background: var(--text-danger)` or
-   `.btn-danger-solid` after step 3.
+4. ✅ `grep -rn "background: var(--text-danger)" src/` returns nothing —
+   no control fills with danger. `.btn`/`.btn-delete`/`.btn-reset` and
+   both `.btn-danger-*` classes are gone.
 5. **Outstanding for step 1** — keyboard pass on the confirm prompt: Esc
    cancels; Tab cycles inside; Enter on a focused Cancel **cancels**
    (F1); the auto-focused button shows a ring when the prompt was raised
@@ -401,9 +424,12 @@ Checked items were run against step 1 on 2026-08-11.
    the header plate and modal-depth shadow, and widens slightly
    (320–480px → 420px). **Step 2:** deleting a file or folder and
    re-indexing one file now show that prompt instead of an OS dialog; two
-   new prompts appear in game-system editing. **Later steps:** Danger Zone
-   armed state loses its red fill, GameSystems footer becomes one button
-   family, overlay chords gain brackets, modals fade in.
+   new prompts appear in game-system editing. **Step 3:** Danger Zone
+   loses its red fills and its frame softens; destructive confirms carry a
+   trash can; the game-systems footer becomes one button family; Cancel
+   and Discard no longer redden on hover, while the collections row ×
+   reddens at rest instead. **Later steps:** overlay chords gain brackets,
+   modals fade in.
 
 ## Notes
 

@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Every confirmation is the app's own.** Deleting a file or folder and re-indexing a single file raised a system dialog in the operating system's chrome; they now use the same prompt the rest of the app does, so the same `⌘⌫` looks the same in the file tree as it does in the collections panel
 - Deleting a custom game system, and resetting a customized built-in to its defaults, now ask first — neither did
+- **Danger red means one thing again.** Cancel and Discard no longer turn red under the pointer — hovering only brightens — so red marks the action that actually destroys something. The Danger Zone's two-step arms with a tinted wash instead of filling solid red, matching the mute button, and a destructive confirmation carries a trash can rather than a checkmark
+- The Game Systems editor's footer is one family of buttons instead of three
 
 ### Fixed
 

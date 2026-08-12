@@ -251,8 +251,22 @@ input {
   color: var(--text-tertiary);
   cursor: default;
 }
-.action-btn.discard:hover:not(:disabled) {
+/* Backing out brightens by a step; it does not go red. Hover never
+   introduces a hue (design conventions), and a red Cancel beside a red
+   Delete put two danger signals in one row meaning opposite things. */
+.action-btn.discard:not(.danger):hover:not(:disabled) {
+  color: var(--text-primary);
+}
+/* A discard that removes something rather than backing out of something
+   (the collections panel's row ×). Destructive, so it wears danger at
+   rest — a hue swap, not a hue that arrives on hover — and brightens like
+   any other engaged control. Safe to carry at rest: the control is
+   revealed by row hover in the first place. */
+.action-btn.discard.danger {
   color: var(--text-danger);
+}
+.action-btn.discard.danger:hover:not(:disabled) {
+  filter: brightness(1.2);
 }
 .action-btn.confirm {
   color: var(--text-active);

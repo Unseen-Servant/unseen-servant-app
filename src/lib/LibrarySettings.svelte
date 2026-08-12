@@ -335,7 +335,7 @@
         {#if confirmingReindex}
           <button
             type="button"
-            class="btn-danger-solid"
+            class="btn-danger armed"
             on:click={handleReindexClick}
             disabled={isSyncing}
           >
@@ -352,7 +352,7 @@
         {:else}
           <button
             type="button"
-            class="btn-danger-outline"
+            class="btn-danger"
             on:click={handleReindexClick}
             disabled={isSyncing || indexedFileCount === 0}
             title={indexedFileCount === 0 ? 'No indexed files' : ''}
@@ -376,7 +376,7 @@
         {#if confirmingDelete}
           <button
             type="button"
-            class="btn-danger-solid"
+            class="btn-danger armed"
             on:click={handleDeleteClick}
             disabled={isSyncing}
           >
@@ -393,7 +393,7 @@
         {:else}
           <button
             type="button"
-            class="btn-danger-outline"
+            class="btn-danger"
             on:click={handleDeleteClick}
             disabled={isSyncing || indexedFileCount === 0}
             title={indexedFileCount === 0 ? 'No indexed files' : ''}
@@ -651,28 +651,37 @@
     opacity: 0.5;
   }
 
-  .btn-danger-outline {
+  /* Arm, then fire. Both steps wear the recipe the mute button already
+     uses for "destructive and engaged" (.sm-btn.mute-on in app.css):
+     danger text, a tinted border, and a tint wash — never a fill, and
+     never a glow, since glows are reserved for activated states and a
+     removal is not an activation. Arming steps the border to full and
+     lays in the wash; the label changing to name the damage
+     ("Delete 128 files?") carries the rest. */
+  .btn-danger {
     background: transparent;
-    border: 1px solid var(--text-danger);
+    border: 1px solid color-mix(in srgb, var(--text-danger) 45%, transparent);
     color: var(--text-danger);
   }
-  .btn-danger-outline:hover:not(:disabled) {
-    background: var(--text-danger);
-    color: var(--bg-container);
+  .btn-danger:hover:not(:disabled) {
+    border-color: var(--text-danger);
+    filter: brightness(1.15);
   }
 
-  .btn-danger-solid {
-    background: var(--text-danger);
-    border: 1px solid var(--text-danger);
-    color: var(--bg-container);
+  .btn-danger.armed {
+    background: color-mix(in srgb, var(--text-danger) 10%, transparent);
+    border-color: var(--text-danger);
   }
-  .btn-danger-solid:hover:not(:disabled) {
-    filter: brightness(1.1);
+  .btn-danger.armed:hover:not(:disabled) {
+    filter: brightness(1.15);
   }
 
   .danger-zone {
-    border: 1px solid var(--text-danger);
-    border-radius: 6px;
+    /* Tinted to the same 45% the controls inside now use. At full strength
+       the frame shouted louder than the buttons it contains — structure
+       outranking the controls. The title keeps full danger. */
+    border: 1px solid color-mix(in srgb, var(--text-danger) 45%, transparent);
+    border-radius: var(--radius-well);
     margin-top: 0.25rem;
     display: flex;
     flex-direction: column;

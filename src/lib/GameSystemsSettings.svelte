@@ -236,10 +236,12 @@
     <div class="footer">
       <div class="footer-left">
         {#if modalMode === 'edit' && editIsBuiltin && editIsCustomized}
-          <button class="btn btn-reset" on:click={handleReset}>Reset to defaults</button>
+          <!-- Tertiary: text beside the iconed primaries. It discards the
+               override, and its prompt carries the weight. -->
+          <ActionButton kind="discard" icon={false} label="Reset to defaults" onClick={handleReset} />
         {/if}
         {#if modalMode === 'edit' && !editIsBuiltin}
-          <button class="btn btn-delete" on:click={handleDelete}>Delete</button>
+          <ActionButton kind="confirm" danger label="Delete" onClick={handleDelete} />
         {/if}
       </div>
       <div class="footer-right">
@@ -447,28 +449,4 @@
     gap: 0.4rem;
   }
 
-  .btn {
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    border: 1px solid var(--border-subtle);
-    background: none;
-    transition: all var(--transition-fast);
-  }
-  .btn-delete {
-    color: var(--text-danger);
-    border-color: var(--text-danger);
-  }
-  .btn-delete:hover {
-    background: var(--text-danger);
-    color: var(--text-inverse);
-  }
-  .btn-reset {
-    color: var(--text-secondary);
-  }
-  .btn-reset:hover {
-    color: var(--text-primary);
-  }
 </style>
