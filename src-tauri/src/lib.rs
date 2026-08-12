@@ -295,9 +295,15 @@ struct CollectionInfo {
     archived: bool,
 }
 
+/// BTreeMap, not HashMap: this map is re-serialized straight back to the
+/// frontend, and HashMap's per-instance random seed would hand JS a
+/// differently-ordered object on every get_collections call. Anything
+/// rendering `Object.values(collections)` without sorting first would then
+/// reshuffle on every refresh. BTreeMap costs nothing here and makes the
+/// IPC payload deterministic (by collection name).
 #[derive(Serialize, Deserialize, Debug)]
 struct CollectionsResult {
-    collections: std::collections::HashMap<String, CollectionInfo>,
+    collections: std::collections::BTreeMap<String, CollectionInfo>,
     count: u32,
 }
 
