@@ -60,10 +60,10 @@ export function collectionsContaining(
 }
 
 /**
- * Names of collections holding ALL of the target's indexed PDFs. Used to
- * suppress no-op entries from the "Add to collection" submenu. For folders
- * this differs from collectionsContaining (which is "any") because partial
- * overlap still permits adding the rest.
+ * Names of collections holding ALL of the target's indexed PDFs. Paired with
+ * collectionsContaining ("any") to resolve the Collection submenu's tri-state
+ * — see menuMemberState. For folders the two differ, and that gap is exactly
+ * the half-lit row: partial overlap still permits adding the rest.
  */
 export function collectionsFullyContaining(
   target: string,
@@ -124,6 +124,25 @@ export function memberStateFor(
   if (!isDir) return memberPaths.has(path) ? 'all' : 'none';
   if (folders.full.has(path)) return 'all';
   return folders.partial.has(path) ? 'some' : 'none';
+}
+
+/**
+ * How one row of the context menu's Collection submenu should draw. The
+ * two inputs are collectionsContaining ("holds any") and
+ * collectionsFullyContaining ("holds all"), so a folder whose indexed
+ * descendants straddle the collection reads 'some'. A file can only ever
+ * be 'none' or 'all' — the two sets agree on it.
+ *
+ * 'some' routes to add, not remove: topping the folder up is what the old
+ * two-submenu menu offered there, and it's the reversible half of the pair.
+ */
+export function menuMemberState(
+  name: string,
+  containing: ReadonlySet<string>,
+  fullyContaining: ReadonlySet<string>
+): MemberState {
+  if (fullyContaining.has(name)) return 'all';
+  return containing.has(name) ? 'some' : 'none';
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   uniqueCollectionName,
   computeFolderMembership,
   memberStateFor,
+  menuMemberState,
   groupMemberState,
   addMembers,
   removeMembers,
@@ -191,6 +192,36 @@ describe('groupMemberState', () => {
 
   it('reads an empty group as none, not all', () => {
     expect(groupMemberState([], new Set(['/a.pdf']))).toBe('none');
+  });
+});
+
+describe('menuMemberState', () => {
+  it('reads all when the collection holds every target file', () => {
+    expect(menuMemberState('Homebrew', new Set(['Homebrew']), new Set(['Homebrew']))).toBe('all');
+  });
+
+  it('reads some for a folder the collection only partly holds', () => {
+    expect(menuMemberState('Homebrew', new Set(['Homebrew']), new Set())).toBe('some');
+  });
+
+  it('reads none for a collection the target is absent from', () => {
+    expect(menuMemberState('Homebrew', new Set(['Other']), new Set(['Other']))).toBe('none');
+  });
+
+  // Both props come off the same target, so a file — which is binary —
+  // appears in both sets or neither. 'some' is unreachable for files.
+  it('never reads some for a file', () => {
+    expect(menuMemberState('Homebrew', new Set(['Homebrew']), new Set(['Homebrew']))).toBe('all');
+    expect(menuMemberState('Homebrew', new Set(), new Set())).toBe('none');
+  });
+
+  // Guards the routing: only 'all' sends the click to remove, so a folder
+  // that is merely overlapping can still be topped up.
+  it('separates the two states that route to add from the one that removes', () => {
+    const add = ['none', 'some'];
+    expect(add).toContain(menuMemberState('C', new Set(), new Set()));
+    expect(add).toContain(menuMemberState('C', new Set(['C']), new Set()));
+    expect(menuMemberState('C', new Set(['C']), new Set(['C']))).toBe('all');
   });
 });
 

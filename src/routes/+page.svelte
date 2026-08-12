@@ -159,7 +159,7 @@
     y: number;
     item: FileItem;
     isIndexed: boolean;
-    initialSubmenu: 'add' | 'remove' | null;
+    initialSubmenu: 'collection' | null;
     hideState: { directlyHidden: boolean; inheritedHidden: boolean };
   } | null = null;
   let renamingFilePath: string | null = null;
@@ -2052,7 +2052,7 @@
         holdLatch.press('m', () => toggleScopeMute(item));
         return true;
       }
-      if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('add'); return true; }
+      if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('collection'); return true; }
       if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
         toggleHidden(focused.item);
@@ -2063,7 +2063,7 @@
     return false;
   }
 
-  function openContextMenuAtFocusedRow(initialSubmenu: 'add' | 'remove' | null = null) {
+  function openContextMenuAtFocusedRow(initialSubmenu: 'collection' | null = null) {
     const focused = getFocusedFileItem();
     if (!focused) return;
     // Try the tree row first, fall back to the systems-view row. Both
@@ -2427,7 +2427,7 @@
     }
   }
 
-  function handleContextMenu(event: MouseEvent, item: FileItem, initialSubmenu: 'add' | 'remove' | null = null) {
+  function handleContextMenu(event: MouseEvent, item: FileItem, initialSubmenu: 'collection' | null = null) {
     // Highlight whatever was right-clicked / triggered via M, including
     // folders — keyboard nav allows folder focus since chunk b.
     setFocusedFilePath(item.path);
@@ -3711,7 +3711,7 @@
       knownSystems={knownSystems}
       currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
       onSetGameSystems={(tags) => handleSetGameSystems(contextMenu!.item.path, contextMenu!.item.name, tags)}
-      excludeFromAdd={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir, collections, indexedPaths)}
+      fullyContainingCollections={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir, collections, indexedPaths)}
       initialSubmenu={contextMenu.initialSubmenu}
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}

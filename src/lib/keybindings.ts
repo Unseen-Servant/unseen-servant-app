@@ -80,7 +80,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'fileTree', match: 's' },
   { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree', match: 'm' },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree', match: '.' },
-  { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to collection (opens menu)', scope: 'fileTree', match: 'c' },
+  { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Collection (opens menu)',     scope: 'fileTree', match: 'c' },
   { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete focused row (to Trash)', scope: 'fileTree' },
 
   // Systems view (when a row is focused)

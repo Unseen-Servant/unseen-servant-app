@@ -1,6 +1,7 @@
 <script lang="ts">
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
+  import { menuMemberState, type MemberState } from './collectionMembership';
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
   import { clampToViewport } from './menuGeometry';
@@ -10,11 +11,11 @@
   export let item: FileItem;
   export let isIndexed: boolean = false;
   export let collections: Record<string, CollectionInfo> = {};
+  // The two halves of the Collection submenu's tri-state: "holds any of the
+  // target's files" and "holds all of them". They agree on a file and can
+  // disagree on a folder, which is what makes a row read half-lit.
   export let containingCollections: string[] = [];
-  // Names to suppress from the Add-to-collection submenu — used to hide
-  // collections that already fully contain the target so we don't offer
-  // a no-op action. Folder partials (some files in, some not) stay visible.
-  export let excludeFromAdd: string[] = [];
+  export let fullyContainingCollections: string[] = [];
   export let canAddToCollection: boolean = true;
   // Collection-axis S/M (folders and files) — replaces the old
   // "Search in this folder / file" scoping. Offered only when the row
@@ -28,8 +29,8 @@
   export let inheritedHidden: boolean = false;
   // Optional initial submenu to open on mount (used by the C tree-row chord
   // in PR 2 of chunk c — for now the prop just exists so callers can land
-  // a row directly in the Add submenu without a follow-up keystroke).
-  export let initialSubmenu: 'add' | 'remove' | 'tag' | null = null;
+  // a row directly in the Collection submenu without a follow-up keystroke).
+  export let initialSubmenu: 'collection' | 'tag' | null = null;
   // Game-system tagging — only relevant for indexed PDFs. Empty arrays
   // are valid (no tags / no known systems) and gate the trigger off.
   export let knownSystems: KnownGameSystem[] = [];
@@ -50,7 +51,7 @@
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
-  let openSubmenu: 'add' | 'remove' | 'tag' | null = initialSubmenu;
+  let openSubmenu: 'collection' | 'tag' | null = initialSubmenu;
   // -1 means "no keyboard cursor yet" — stays that way for mouse users.
   // First ↑/↓ promotes to 0 (Math.max(0, -1 ± 1) clamps to 0). When the
   // menu opens directly into a submenu (C chord) the trigger's index is
@@ -114,7 +115,7 @@
   // 320px, but a trigger near the bottom of the window leaves no room —
   // items become unreachable. Re-measure on every render: pick whichever
   // side (above or below the trigger) has more room, anchor the submenu
-  // there, and shrink max-height to fit. Generic across Add/Remove/Tag.
+  // there, and shrink max-height to fit. Generic across Collection/Tag.
   function clampOpenSubmenuToViewport() {
     if (!menuEl || !openSubmenu) return;
     const trigger = menuEl.querySelector(
@@ -202,7 +203,7 @@
     }
     if (isRight && !inSub) {
       const item = mainItems[focusedIdx];
-      const which = item?.dataset.submenu as 'add' | 'remove' | 'tag' | undefined;
+      const which = item?.dataset.submenu as 'collection' | 'tag' | undefined;
       if (item?.dataset.mi === 'submenu-trigger' && which) {
         event.preventDefault();
         openSubmenu = which;
@@ -227,7 +228,7 @@
       const hit = mk ? mainItems.find((el) => el.dataset.chord === mk) : undefined;
       if (hit) {
         event.preventDefault();
-        const sub = hit.dataset.submenu as 'add' | 'remove' | 'tag' | undefined;
+        const sub = hit.dataset.submenu as 'collection' | 'tag' | undefined;
         if (hit.dataset.mi === 'submenu-trigger' && sub) {
           // The ArrowRight path gets this for free — the user had already
           // navigated onto the row. A chord jumps straight here, so resolve
@@ -276,18 +277,21 @@
     ));
   }
 
-  $: addExcludeSet = new Set(excludeFromAdd);
-  // Archived collections are shelved and inert — neither submenu offers them.
-  $: addableCollections = Object.values(collections).filter(
-    (c) => !c.archived && !addExcludeSet.has(c.name),
-  );
-  $: removableCollections = containingCollections.filter((n) => !collections[n]?.archived);
-  // Remove-submenu rows only carry names — resolve their pigment here.
-  $: collectionColorByName = new Map(Object.values(collections).map((c) => [c.name, c.color]));
-  $: hasCollections = addableCollections.length > 0;
-  $: hasContainingCollections = removableCollections.length > 0;
+  // Archived collections are shelved and inert — the submenu never offers them.
+  $: activeCollections = Object.values(collections).filter((c) => !c.archived);
+  $: containingSet = new Set(containingCollections);
+  $: fullyContainingSet = new Set(fullyContainingCollections);
+  $: hasCollections = activeCollections.length > 0;
 
   $: canTag = !item.is_dir && isIndexed && knownSystems.length > 0;
+
+  // One row, both verbs. Only a collection that already holds everything has
+  // nothing left to add, so that's the only state that removes; a half-lit
+  // folder tops up instead, which is what the old Add submenu offered it.
+  function toggleCollection(name: string, state: MemberState) {
+    if (state === 'all') onRemoveFromCollection(name);
+    else onAddToCollection(name);
+  }
 
   function toggleGameSystem(tag: string) {
     const next = currentTags.includes(tag)
@@ -328,6 +332,14 @@
     Reveal in folder
     <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')} aria-hidden="true">{chord('tree.openExternal')}</span>
   </button>
+  <!-- Get info rides with the other two ways of looking at the file; its
+       sibling Re-index is an action and sits down with Rename. -->
+  {#if !item.is_dir && isIndexed}
+    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} aria-keyshortcuts={keyShortcut('info.show')} on:click={onShowStats}>
+      Get info
+      <span class="menu-chord" class:bare={isBareKeyChord('info.show')} aria-hidden="true">{chord('info.show')}</span>
+    </button>
+  {/if}
   {#if canScope}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} aria-keyshortcuts={keyShortcut('tree.solo')} on:click={onToggleSolo}>
@@ -339,17 +351,67 @@
       <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')} aria-hidden="true">{chord('tree.mute')}</span>
     </button>
   {/if}
-  {#if !item.is_dir && isIndexed}
-    <hr class="context-divider" />
-    <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
-    <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} aria-keyshortcuts={keyShortcut('info.show')} on:click={onShowStats}>
-      Get info
-      <span class="menu-chord" class:bare={isBareKeyChord('info.show')} aria-hidden="true">{chord('info.show')}</span>
-    </button>
-  {/if}
 
-  {#if canTag}
+  <!-- The two filing axes share a section: a collection is curation, a game
+       system is what the book is. Both are submenus of togglable rows. -->
+  {#if canAddToCollection || canTag}
     <hr class="context-divider" />
+  {/if}
+  {#if canAddToCollection}
+    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
+    <div
+      class="context-item submenu-trigger"
+      class:open={openSubmenu === 'collection'}
+      data-mi="submenu-trigger"
+      data-submenu="collection"
+      data-chord={matchKey('tree.addToCollection')} aria-keyshortcuts={keyShortcut('tree.addToCollection')}
+      role="menuitem"
+      tabindex="-1"
+      aria-haspopup="menu"
+      aria-expanded={openSubmenu === 'collection'}
+      on:mouseenter={() => { openSubmenu = 'collection'; }}
+      on:mouseleave={() => { openSubmenu = null; }}
+    >
+      <span>Collection</span>
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')} aria-hidden="true">{chord('tree.addToCollection')}</span>
+      <span class="submenu-caret">&#9656;</span>
+      {#if openSubmenu === 'collection'}
+        <div class="submenu" role="menu">
+          {#each activeCollections as col}
+            {@const state = menuMemberState(col.name, containingSet, fullyContainingSet)}
+            <button
+              class="context-item"
+              data-mi="item"
+              role="menuitemcheckbox"
+              aria-checked={state === 'some' ? 'mixed' : state === 'all'}
+              on:click={() => toggleCollection(col.name, state)}
+            >
+              <span class="menu-pip" class:on={state === 'all'} class:partial={state === 'some'} aria-hidden="true"></span>
+              {#if col.color}
+                <!-- Bookmark ribbon — the collection keeps its pigment -->
+                <svg class="submenu-icon" viewBox="0 0 24 24" fill={col.color} aria-hidden="true">
+                  <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                </svg>
+              {:else}
+                <!-- No pigment — outline ribbon, same grammar as the chips -->
+                <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M6 3h12v18l-6-4.4L6 21z"/>
+                </svg>
+              {/if}
+              <span class="submenu-name" title={col.name}>{col.name}</span>
+            </button>
+          {/each}
+          {#if hasCollections}
+            <hr class="context-divider" />
+          {/if}
+          <button class="context-item" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
+            + New collection&hellip;
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
+  {#if canTag}
     <!-- svelte-ignore a11y-mouse-events-have-key-events -->
     <div
       class="context-item submenu-trigger"
@@ -394,102 +456,6 @@
     </div>
   {/if}
 
-  {#if canAddToCollection}
-    <hr class="context-divider" />
-    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
-    <div
-      class="context-item submenu-trigger"
-      class:open={openSubmenu === 'add'}
-      data-mi="submenu-trigger"
-      data-submenu="add"
-      data-chord={matchKey('tree.addToCollection')} aria-keyshortcuts={keyShortcut('tree.addToCollection')}
-      role="menuitem"
-      tabindex="-1"
-      aria-haspopup="menu"
-      aria-expanded={openSubmenu === 'add'}
-      on:mouseenter={() => { openSubmenu = 'add'; }}
-      on:mouseleave={() => { openSubmenu = null; }}
-    >
-      <span>Add to collection</span>
-      <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')} aria-hidden="true">{chord('tree.addToCollection')}</span>
-      <span class="submenu-caret">&#9656;</span>
-      {#if openSubmenu === 'add'}
-        <div class="submenu" role="menu">
-          {#each addableCollections as col}
-            <button
-              class="context-item"
-              data-mi="item"
-              role="menuitem"
-              on:click={() => onAddToCollection(col.name)}
-            >
-              {#if col.color}
-                <!-- Bookmark ribbon — the collection keeps its pigment -->
-                <svg class="submenu-icon" viewBox="0 0 24 24" fill={col.color} aria-hidden="true">
-                  <path d="M5 2h14v20l-7-5.2L5 22z"/>
-                </svg>
-              {:else}
-                <!-- No pigment — outline ribbon, same grammar as the chips -->
-                <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M6 3h12v18l-6-4.4L6 21z"/>
-                </svg>
-              {/if}
-              <span class="submenu-name" title={col.name}>{col.name}</span>
-            </button>
-          {/each}
-          {#if hasCollections}
-            <hr class="context-divider" />
-          {/if}
-          <button class="context-item" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
-            + New collection&hellip;
-          </button>
-        </div>
-      {/if}
-    </div>
-
-    {#if hasContainingCollections}
-      <!-- svelte-ignore a11y-mouse-events-have-key-events -->
-      <div
-        class="context-item submenu-trigger"
-        class:open={openSubmenu === 'remove'}
-        data-mi="submenu-trigger"
-        data-submenu="remove"
-        role="menuitem"
-        tabindex="-1"
-        aria-haspopup="menu"
-        aria-expanded={openSubmenu === 'remove'}
-        on:mouseenter={() => { openSubmenu = 'remove'; }}
-        on:mouseleave={() => { openSubmenu = null; }}
-      >
-        <span>Remove from collection</span>
-        <span class="submenu-caret">&#9656;</span>
-        {#if openSubmenu === 'remove'}
-          <div class="submenu" role="menu">
-            {#each removableCollections as name}
-              <button
-                class="context-item"
-                data-mi="item"
-                role="menuitem"
-                on:click={() => onRemoveFromCollection(name)}
-              >
-                {#if collectionColorByName.get(name)}
-                  <!-- Bookmark ribbon — the collection keeps its pigment -->
-                  <svg class="submenu-icon" viewBox="0 0 24 24" fill={collectionColorByName.get(name)} aria-hidden="true">
-                    <path d="M5 2h14v20l-7-5.2L5 22z"/>
-                  </svg>
-                {:else}
-                  <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M6 3h12v18l-6-4.4L6 21z"/>
-                  </svg>
-                {/if}
-                <span class="submenu-name" title={name}>{name}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
-  {/if}
-
   <!-- Hide is the visibility verb for what scope can't speak about:
        indexed files get M instead (hide is display-only and would
        leave them searchable but invisible). Unhide always stays
@@ -507,6 +473,13 @@
     Rename {item.is_dir ? 'folder' : 'file'}
     <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
   </button>
+  {#if !item.is_dir && isIndexed}
+    <button class="context-item" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
+  {/if}
+
+  <!-- Delete stands alone: a divider between it and the other write actions
+       is the only thing between a misaimed click and the wrong row. -->
+  <hr class="context-divider" />
   <!-- Display-only, like Reveal above: ⌘⌫ is a named key eventMatchKey can't
        resolve, so the row hints the chord without claiming it. -->
   <button class="context-item danger" data-mi="item" role="menuitem" on:click={onDelete}>

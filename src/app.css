@@ -557,6 +557,13 @@ dialog[open]::backdrop {
   background: var(--text-accent);
   filter: var(--glow-accent);
 }
+/* Half-lit — a folder whose indexed files straddle the collection. Dimmed
+   rather than a different glyph: at 5px the checkbox's indeterminate dash
+   reads as a rendering artifact, and the glow stays reserved for a lamp
+   that is fully on. */
+.menu-pip.partial::before {
+  background: color-mix(in srgb, var(--text-accent) 50%, transparent);
+}
 
 /* Keyboard hint riding at the trailing edge of a menu row. --text-secondary is
    4.17:1 on --bg-focused, below AA for small text: an accepted gap, consistent
