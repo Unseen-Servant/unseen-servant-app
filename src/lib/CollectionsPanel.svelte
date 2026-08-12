@@ -305,9 +305,10 @@
   }
 
   // ------------------------------------------------------------------
-  // Context menu (right-click a collection row): Rename / Pigment ▸ /
-  // Arm / Archive / Delete. Same visual family as the file
-  // tree's ContextMenu, scoped to what a collection can do.
+  // Context menu (right-click a collection row): the transport first
+  // (Arm / Play / Mute), then the track's properties (Rename / Pigment ▸ /
+  // Archive), then Delete. Same visual family as the file tree's
+  // ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
   let ctxPigmentOpen = false;
@@ -459,7 +460,13 @@
       // meaning is worse than no mnemonic at all. Not R either: R is
       // rename one pane over.
       if (lk === 'r') { event.preventDefault(); startRename(col.name); return; }
-      if (lk === 'e') { event.preventDefault(); onArm(col.name); return; }
+      // Arm is inert on a shelved track, same as play: neither the row's
+      // button strip nor the context menu offers it there.
+      if (lk === 'e') {
+        event.preventDefault();
+        if (!col.archived) onArm(col.name);
+        return;
+      }
       // P or Space toggle the transport — Space is the DAW play/stop
       // convention, shared with file rows (where it opens). A shelved
       // track has no transport, so both are inert until unarchived
@@ -809,6 +816,23 @@
     on:click|stopPropagation
     on:contextmenu|preventDefault|stopPropagation
   >
+    <!-- Shelved tracks carry no transport, same as the row's button strip —
+         unarchive to arm or play. Mute stays: it works on archived rows too. -->
+    {#if !col?.archived}
+      <button class="context-item" role="menuitem" on:click={() => ctxAction(onArm)}>
+        {armedName === ctxMenu.name ? 'Disarm' : 'Arm for editing'}
+        <span class="menu-chord" class:bare={isBareKeyChord('collections.arm')} aria-hidden="true">{chord('collections.arm')}</span>
+      </button>
+      <button class="context-item" role="menuitem" on:click={() => ctxAction(onTogglePlay)}>
+        {playingNames.has(ctxMenu.name) ? 'Stop' : 'Play'}
+        <span class="menu-chord" class:bare={isBareKeyChord('collections.play')} aria-hidden="true">{chord('collections.play')}</span>
+      </button>
+    {/if}
+    <button class="context-item" role="menuitem" on:click={() => ctxAction(onToggleMute)}>
+      {mutedNames.has(ctxMenu.name) ? 'Unmute' : 'Mute'}
+      <span class="menu-chord" class:bare={isBareKeyChord('collections.mute')} aria-hidden="true">{chord('collections.mute')}</span>
+    </button>
+    <hr class="menu-divider" />
     <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
       Rename
       <span class="menu-chord" class:bare={isBareKeyChord('collections.rename')} aria-hidden="true">{chord('collections.rename')}</span>
@@ -858,11 +882,6 @@
         </div>
       {/if}
     </div>
-    <hr class="menu-divider" />
-    <button class="context-item" role="menuitem" on:click={() => ctxAction(onArm)}>
-      {armedName === ctxMenu.name ? 'Disarm' : 'Arm for editing'}
-      <span class="menu-chord" class:bare={isBareKeyChord('collections.arm')} aria-hidden="true">{chord('collections.arm')}</span>
-    </button>
     <button class="context-item" role="menuitem" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
       {col?.archived ? 'Unarchive' : 'Archive'}
       <span class="menu-chord" class:bare={isBareKeyChord('collections.archive')} aria-hidden="true">{chord('collections.archive')}</span>
