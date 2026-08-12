@@ -1,107 +1,82 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick } from 'svelte';
+  import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
+  import { confirmPrompt } from './confirmStore';
 
-  export let title: string = 'Confirm';
-  export let message: string = '';
-  export let confirmLabel: string = 'Confirm';
-  export let cancelLabel: string = 'Cancel';
-  export let danger: boolean = false;
-  export let onConfirm: () => void = () => {};
-  export let onCancel: () => void = () => {};
+  // Mounted once at page level; the store decides whether it is on screen
+  // and what it asks. No props — see confirmStore.ts for the call-site
+  // shape and docs/specs/ui/2026-08-11-modal-audit-design.md for why this
+  // stopped being one dialog per caller.
 
-  let dialogEl: HTMLDialogElement | undefined;
-  let confirmBtn: HTMLButtonElement | undefined;
-  let cancelBtn: HTMLButtonElement | undefined;
-  let returnTarget: HTMLElement | null = null;
+  const MESSAGE_ID = 'confirm-dialog-message';
 
-  onMount(async () => {
-    returnTarget = document.activeElement as HTMLElement | null;
-    dialogEl?.showModal();
-    await tick();
-    // Destructive prompts auto-focus Cancel — pressing Enter on muscle
-    // memory shouldn't commit a permanent action. Safe prompts focus
-    // Confirm so power users can rip through them.
-    (danger ? cancelBtn : confirmBtn)?.focus();
-  });
+  // Esc, the backdrop, and the shell's × all mean the same thing here.
+  const cancel = () => confirmPrompt.answer(false);
+  const accept = () => confirmPrompt.answer(true);
 
-  onDestroy(() => {
-    if (returnTarget && document.contains(returnTarget)) {
-      returnTarget.focus();
-    }
-  });
-
-  function handleKey(event: KeyboardEvent) {
-    // Esc is handled via the native cancel event below. Enter still
-    // commits regardless of which button is auto-focused — danger only
-    // changes the auto-focus target, not the chord semantics.
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      onConfirm();
-    }
-  }
-
-  function handleCancel(e: Event) {
-    e.preventDefault();
-    onCancel();
-  }
-
-  function handleClick(e: MouseEvent) {
-    if (e.target === dialogEl) onCancel();
-  }
+  // Destructive prompts put initial focus on Cancel — Enter on muscle
+  // memory then cancels rather than committing. Nothing intercepts Enter
+  // at dialog level: the focused button handles it natively, so where
+  // focus sits is the whole of the chord's meaning.
+  $: danger = $confirmPrompt?.danger === true;
 </script>
 
-<dialog
-  bind:this={dialogEl}
-  class="confirm-dialog"
-  on:cancel={handleCancel}
-  on:keydown={handleKey}
-  on:click={handleClick}
+<Modal
+  visible={$confirmPrompt !== null}
+  onClose={cancel}
+  title={$confirmPrompt?.title ?? ''}
+  width="min(420px, 90vw)"
+  autofocus={false}
+  describedBy={$confirmPrompt?.message ? MESSAGE_ID : undefined}
 >
-  <div class="title dialog-title">{title}</div>
-  {#if message}
-    <div class="message">{message}</div>
-  {/if}
-  <div class="actions">
-    <ActionButton kind="discard" label={cancelLabel} onClick={onCancel} bind:buttonRef={cancelBtn} />
-    <ActionButton
-      kind="confirm"
-      {danger}
-      label={confirmLabel}
-      onClick={onConfirm}
-      bind:buttonRef={confirmBtn}
-    />
+  <div class="body">
+    {#if $confirmPrompt?.message}
+      <p id={MESSAGE_ID} class="message">{$confirmPrompt.message}</p>
+    {/if}
+    <div class="actions">
+      <ActionButton
+        kind="discard"
+        label={$confirmPrompt?.cancelLabel ?? 'Cancel'}
+        onClick={cancel}
+        initialFocus={danger}
+      />
+      <ActionButton
+        kind="confirm"
+        {danger}
+        label={$confirmPrompt?.confirmLabel ?? 'Confirm'}
+        onClick={accept}
+        initialFocus={!danger}
+      />
+    </div>
   </div>
-</dialog>
+</Modal>
 
 <style>
-  dialog.confirm-dialog {
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
-    border-radius: 6px;
-    box-shadow: var(--shadow-dropdown);
-    padding: 1rem 1.25rem;
-    min-width: 320px;
-    max-width: 480px;
-    font-family: var(--font-body);
-    color: var(--text-primary);
+  .body {
+    padding: 1rem 1.25rem 1.25rem;
   }
-  dialog.confirm-dialog::backdrop {
-    /* stylelint-disable-next-line declaration-property-value-allowed-list -- pure-black scrim; ::backdrop can't see :root tokens */
-    background: rgba(0, 0, 0, 0.5);
-  }
-  .title {
-    margin-bottom: 0.5rem;
-  }
+
   .message {
+    margin: 0 0 1rem;
     font-size: 0.9rem;
     color: var(--text-primary);
-    margin-bottom: 1rem;
     line-height: 1.4;
   }
+
   .actions {
     display: flex;
     justify-content: flex-end;
     gap: 0.4rem;
+  }
+
+  /* A programmatic .focus() does not trigger :focus-visible in Chromium
+     when the preceding interaction was a mouse click — which is how a
+     context-menu delete arrives. Without this the danger prompt's Cancel
+     is focused but doesn't look focused, and auto-focusing it protects
+     nobody. Plain :focus is right here: both buttons are decision
+     targets, and there is nothing else in the dialog to confuse it with. */
+  .actions :global(.action-btn:focus) {
+    outline: 2px solid var(--text-accent);
+    outline-offset: 2px;
   }
 </style>

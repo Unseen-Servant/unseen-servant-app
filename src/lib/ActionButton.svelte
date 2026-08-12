@@ -7,6 +7,10 @@
   export let disabled: boolean = false;
   export let onClick: () => void = () => {};
   export let buttonRef: HTMLButtonElement | undefined = undefined;
+  // Marks this button as the modal's initial focus target. Modal.svelte
+  // queries for [data-autofocus] after showModal(), so the attribute has
+  // to be in the markup rather than set from a bound ref.
+  export let initialFocus: boolean = false;
 </script>
 
 <button
@@ -17,6 +21,7 @@
   class:danger
   class:compact
   {disabled}
+  data-autofocus={initialFocus || undefined}
   on:click={onClick}
   bind:this={buttonRef}
   title={title || label}

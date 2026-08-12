@@ -22,6 +22,7 @@
   import LaunchSplash from '../lib/LaunchSplash.svelte';
   import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
   import ConfirmDialog from '../lib/ConfirmDialog.svelte';
+  import { confirmPrompt } from '../lib/confirmStore';
   import CollectionsPanel from '../lib/CollectionsPanel.svelte';
   import FilterPanel from '../lib/FilterPanel.svelte';
   import SystemsView from '../lib/SystemsView.svelte';
@@ -2905,16 +2906,14 @@
     newCollectionSeed = null;
   }
 
-  let pendingDeleteCollection: string | null = null;
-
-  function requestDeleteCollection(name: string) {
-    pendingDeleteCollection = name;
-  }
-
-  async function confirmDeleteCollection() {
-    if (!pendingDeleteCollection) return;
-    const name = pendingDeleteCollection;
-    pendingDeleteCollection = null;
+  async function requestDeleteCollection(name: string) {
+    const confirmed = await confirmPrompt.request({
+      title: 'Delete collection',
+      message: `Delete "${name}"? Its files are freed to Loose — nothing in your library is deleted.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     // Drop the arm first: a pending flush would PUT a name that no longer
     // exists and surface a 404 as a save failure.
     if (armedCollection === name) {
@@ -3661,16 +3660,8 @@
     />
   {/if}
 
-  {#if pendingDeleteCollection}
-    <ConfirmDialog
-      title="Delete collection"
-      message={`Delete "${pendingDeleteCollection}"? Its files are freed to Loose — nothing in your library is deleted.`}
-      confirmLabel="Delete"
-      danger
-      onConfirm={confirmDeleteCollection}
-      onCancel={() => { pendingDeleteCollection = null; }}
-    />
-  {/if}
+  <!-- One prompt for the whole app; confirmStore decides when it shows. -->
+  <ConfirmDialog />
 
   <StatusBar
     {selectedFolder}

@@ -16,6 +16,9 @@
   // wrong — e.g., Settings opens on a readonly path field that we
   // don't want highlighted as if it were inviting an edit.
   export let autofocus: boolean = true;
+  // id of the element stating what the dialog is asking, for modals whose
+  // body is a statement rather than a form (the confirm prompt).
+  export let describedBy: string | undefined = undefined;
 
   let dialogEl: HTMLDialogElement | undefined;
   // Element that held focus before the modal opened — restored on close
@@ -35,6 +38,12 @@
       // showModal() auto-focuses the first sequentially-focusable
       // descendant — that's the × button in our header, which paints
       // a focus ring on what should be inert chrome. Override it.
+      // An explicit [data-autofocus] outranks both the text-input
+      // heuristic and the `autofocus` prop — a child naming its own
+      // target is stating intent. It lands here rather than in the child
+      // so there is one focus call, made after showModal(), instead of
+      // two racing across a reactive flush.
+      const declared = dialogEl.querySelector('[data-autofocus]') as HTMLElement | null;
       const firstInput = autofocus
         ? (dialogEl.querySelector(
             'input:not([disabled]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea:not([disabled]), [contenteditable="true"]',
@@ -42,7 +51,7 @@
         : null;
       // Falling back to the dialog itself keeps Esc/Tab working without
       // any visible focus ring (the dialog has tabindex="-1").
-      (firstInput ?? dialogEl).focus();
+      (declared ?? firstInput ?? dialogEl).focus();
     } else if (!v && dialogEl.open) {
       dialogEl.close();
     }
@@ -88,6 +97,7 @@
   style:height
   style:max-height={maxHeight}
   aria-label={title}
+  aria-describedby={describedBy}
   on:cancel={handleCancel}
   on:close={handleClose}
   on:click={handleClick}
