@@ -100,7 +100,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections' },
   { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused collection', scope: 'collections' },
   { id: 'collections.rename',    keys: { mac: 'R',    other: 'R' },             label: 'Rename collection',            scope: 'collections' },
-  { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm for editing',     scope: 'collections' },
+  { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm focused collection', scope: 'collections' },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
   { id: 'collections.delete',    keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete collection',            scope: 'collections' },
   { id: 'collections.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / cancel an in-progress edit', scope: 'collections' },
@@ -114,7 +114,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Channel rows (curation, system) answer with their M; view rows have no M,
   // so this hits their single switch instead. One key, "do this row's thing".
   { id: 'filterPanel.toggle',    keys: { mac: 'X',    other: 'X' },             label: "Tick the focused view row's checkbox", scope: 'filterPanel' },
-  { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / unsolo focused channel', scope: 'filterPanel' },
+  { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / stop soloing focused channel', scope: 'filterPanel' },
   { id: 'filterPanel.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterPanel' },
   { id: 'filterPanel.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / leave the panel', scope: 'filterPanel' },
 

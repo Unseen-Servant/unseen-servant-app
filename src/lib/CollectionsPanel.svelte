@@ -837,7 +837,7 @@
          unarchive to arm or play. Mute stays: it works on archived rows too. -->
     {#if !col?.archived}
       <button class="context-item" role="menuitem" on:click={() => ctxAction(onArm)}>
-        {armedName === ctxMenu.name ? 'Disarm' : 'Arm for editing'}
+        {armedName === ctxMenu.name ? 'Disarm' : 'Arm'}
         <span class="menu-chord" class:bare={isBareKeyChord('collections.arm')} aria-hidden="true">{chord('collections.arm')}</span>
       </button>
       <button class="context-item" role="menuitem" on:click={() => ctxAction(onTogglePlay)}>

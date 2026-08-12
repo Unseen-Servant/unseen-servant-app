@@ -346,11 +346,11 @@
   {#if canScope}
     <hr class="context-divider" />
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} aria-keyshortcuts={keyShortcut('tree.solo')} on:click={onToggleSolo}>
-      {isSoloed ? 'Stop soloing' : 'Solo'} this {item.is_dir ? 'folder' : 'file'}
+      {isSoloed ? 'Stop soloing' : 'Solo'} {item.is_dir ? 'folder' : 'file'}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.solo')} aria-hidden="true">{chord('tree.solo')}</span>
     </button>
     <button class="context-item" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} aria-keyshortcuts={keyShortcut('tree.mute')} on:click={onToggleMute}>
-      {isMuted ? 'Unmute' : 'Mute'} this {item.is_dir ? 'folder' : 'file'}
+      {isMuted ? 'Unmute' : 'Mute'} {item.is_dir ? 'folder' : 'file'}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')} aria-hidden="true">{chord('tree.mute')}</span>
     </button>
   {/if}
