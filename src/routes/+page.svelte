@@ -2495,18 +2495,19 @@
     contextMenu = null;
   }
 
+  // Both leave the menu standing, like the Game system rows: filing into
+  // several collections is one errand, and the pip is the receipt. The
+  // membership props are computed from `collections`, so loadCollections()
+  // flips the row under the cursor. Everything else in the menu still
+  // closes on click — these two are the only repeatable actions.
   function handleContextAddToCollection(name: string) {
     if (!contextMenu) return;
-    const item = contextMenu.item;
-    contextMenu = null;
-    addToCollection(name, item);
+    addToCollection(name, contextMenu.item);
   }
 
   function handleContextRemoveFromCollection(name: string) {
     if (!contextMenu) return;
-    const item = contextMenu.item;
-    contextMenu = null;
-    removeFromCollection(name, item);
+    removeFromCollection(name, contextMenu.item);
   }
 
   function handleContextToggleSolo() {
