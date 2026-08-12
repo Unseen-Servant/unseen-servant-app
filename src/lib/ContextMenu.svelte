@@ -278,6 +278,9 @@
   }
 
   // Archived collections are shelved and inert — the submenu never offers them.
+  // Row order is the IPC's, alphabetical by name since CollectionsResult became
+  // a BTreeMap. Deliberately NOT the panel's collectionsSortKey: a menu you
+  // scan for one name wants A–Z, whatever order the panel is dragged into.
   $: activeCollections = Object.values(collections).filter((c) => !c.archived);
   $: containingSet = new Set(containingCollections);
   $: fullyContainingSet = new Set(fullyContainingCollections);
