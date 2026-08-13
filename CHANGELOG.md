@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
-- The filter console's `[clear all]` is now `[reset]`, and it sits dim until a solo, mute, or playing collection actually gives it something to clear
+- The filter console's `[clear all]` is now `[reset]`, and it answers for the whole panel: every solo and mute, plus the focus lens, show-hidden and hide-unindexed switches below it, which it used to leave lit. It sits dim until something is actually engaged. Files you've hidden by hand stay hidden — the Hidden items section keeps its own Clear for those
 - **Search is `⌘K`, the Filters panel is `⌘F`.** Search moves to the chord command bars everywhere use, which frees `F` for the thing it actually reads as: filtering. `⌘⇧F` no longer does anything
 - **Every confirmation is the app's own.** Deleting a file or folder and re-indexing a single file raised a system dialog in the operating system's chrome; they now use the same prompt the rest of the app does, so the same `⌘⌫` looks the same in the file tree as it does in the collections panel
 - Deleting a custom game system, and resetting a customized built-in to its defaults, now ask first — neither did
