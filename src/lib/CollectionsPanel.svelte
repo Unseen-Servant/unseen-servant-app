@@ -85,6 +85,31 @@
     expandedNames = expandedNames;
   }
 
+  // Which rows reveal their hover-summoned controls: a collection's
+  // transport, and an expanded file row's remove mark. Deliberately not CSS
+  // :hover — closing a context menu or ending a drag tears an element out
+  // from under the pointer, and the browser then re-hit-tests and hovers
+  // whatever is underneath without ever queueing the matching leave. The
+  // row lit up and stayed lit, because no event was coming to clear it.
+  // Latching on a real pointerenter can't go stale that way: if the enter
+  // never fires the control simply stays hidden, and if it does fire the
+  // pointer has somewhere to leave from.
+  let hoveredRowName: string | null = null;
+  let hoveredChildPath: string | null = null;
+
+  function clearHover() {
+    hoveredRowName = null;
+    hoveredChildPath = null;
+  }
+
+  function leaveRow(name: string) {
+    if (hoveredRowName === name) hoveredRowName = null;
+  }
+
+  function leaveChild(path: string) {
+    if (hoveredChildPath === path) hoveredChildPath = null;
+  }
+
   // ------------------------------------------------------------------
   // Inline rename — R or double-click on a settled row. Naming a new
   // collection is a separate affordance (see the create box below), so
@@ -235,6 +260,11 @@
   function handleDragEnd() {
     draggingName = null;
     dropInsertIndex = null;
+    // A reorder drag starts on a row the pointer is already latched to, and
+    // delivers no pointerleave while it runs — so by the time it ends the
+    // list has resequenced under a pointer that never moved. Unlatch and
+    // let the next real pointerenter decide.
+    clearHover();
   }
 
   // ------------------------------------------------------------------
@@ -285,6 +315,10 @@
     e.stopPropagation();
     dropIntoName = null;
     dropIntoNew = false;
+    // A drag delivers no pointerleave, and the rows it just added shift the
+    // list under a pointer that hasn't moved. Drop the latch and let the
+    // next real pointerenter decide.
+    clearHover();
     const payload = getTreePathsPayload();
     clearTreePathsPayload();
     return payload?.paths ?? null;
@@ -573,7 +607,11 @@
 <svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-<aside class="panel" on:mousedown={handlePanelMousedown}>
+<aside
+  class="panel"
+  on:mousedown={handlePanelMousedown}
+  on:pointerleave={clearHover}
+>
   <header class="panel-head">
     <span class="panel-title">Collections</span>
     <div class="sort-wrapper">
@@ -653,6 +691,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
         <div
           class="row-container"
+          class:hovered={hoveredRowName === col.name}
           class:armed
           class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
@@ -664,6 +703,8 @@
           title={col.description || col.name}
           data-cp-row={col.name}
           draggable={canDrag && !isRenamingRow}
+          on:pointerenter={() => (hoveredRowName = col.name)}
+          on:pointerleave={() => leaveRow(col.name)}
           on:dragstart={(e) => handleDragStart(e, col.name)}
           on:dragover={(e) => handleDragOver(e, i)}
           on:drop={handleDrop}
@@ -759,7 +800,15 @@
         </div>
         {#if isExpanded}
           {#each childFiles(col) as f (f.path)}
-            <div class="child-row" class:washed={playing && !muted} class:dimmed={muted || (anyPlaying && !playing)} title={f.path}>
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div
+              class="child-row"
+              class:washed={playing && !muted}
+              class:dimmed={muted || (anyPlaying && !playing)}
+              title={f.path}
+              on:pointerenter={() => (hoveredChildPath = f.path)}
+              on:pointerleave={() => leaveChild(f.path)}
+            >
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">{f.base}</span>
               {#if f.tag}
@@ -772,6 +821,7 @@
               <button
                 type="button"
                 class="child-remove"
+                class:revealed={hoveredChildPath === f.path}
                 title={`Remove ${f.base} from ${col.name}`}
                 aria-label={`Remove ${f.base} from ${col.name}`}
                 on:click={() => onRemoveFile(col.name, f.path)}
@@ -1055,7 +1105,7 @@
        content height, so one number pins both to the same rhythm. */
     min-height: 30px;
   }
-  .row-container:hover {
+  .row-container.hovered {
     background: var(--bg-container);
   }
   /* Keyboard focus rings rather than fills, so the caret stays visible
@@ -1077,7 +1127,7 @@
   .row-container.dimmed > :not(.tr):not(.grip) {
     opacity: var(--opacity-out-of-scope);
   }
-  .row-container.dimmed:hover > :not(.tr) {
+  .row-container.dimmed.hovered > :not(.tr) {
     opacity: var(--opacity-out-of-scope-hover);
   }
   /* Shelved — quieter than the playing-dim and italic, a track set
@@ -1114,7 +1164,7 @@
   .grip.filled {
     cursor: grab;
   }
-  .row-container:hover .grip {
+  .row-container.hovered .grip {
     opacity: 1;
   }
 
@@ -1189,7 +1239,7 @@
     opacity: 0;
     transition: opacity var(--transition-fast);
   }
-  .row-container:hover .tr,
+  .row-container.hovered .tr,
   .row-container.kb-focused .tr,
   .tr.engaged {
     opacity: 1;
@@ -1288,7 +1338,7 @@
     height: 11px;
     display: block;
   }
-  .child-row:hover .child-remove {
+  .child-remove.revealed {
     opacity: 1;
   }
   .child-remove:hover {
