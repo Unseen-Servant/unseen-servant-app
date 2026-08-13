@@ -555,17 +555,16 @@ dialog.stacked::backdrop {
   background: var(--scrim-modal-stacked);
 }
 
-/* The frame stays outside the scrim, so it must say for itself that it is
-   not available: the page behind an open dialog is inert, and a bright
-   Header whose buttons do nothing is a false affordance — a click there
-   does not even dismiss the dialog. This is the app's existing step for
-   "present but not available", the one the scope bar's bypass uses on the
-   principle that the point of a bypass is to see what you are bypassing. */
-.app-layout.dialog-open > .header,
-.app-layout.dialog-open > .statusbar {
-  opacity: var(--opacity-out-of-scope);
-  transition: opacity var(--transition-fast);
-}
+/* The frame is not dimmed at all, deliberately. An earlier pass dropped it
+   to --opacity-out-of-scope so a bright-but-inert Header would not be a
+   false affordance. That traded the wrong way round: the platform already
+   works like this — a macOS sheet dims content and leaves window chrome
+   lit — and the modal itself is what says everything else waits, so nobody
+   reads "bright" as "clickable". Meanwhile the titlebar is drawn by the OS
+   outside the webview and cannot be dimmed by anything we write, so any
+   dim here made the one strip we do not control the only lit one, every
+   time a dialog opened. A constant inconsistency is worse than an
+   occasional dead click on a panel toggle. */
 
 /* Entry only. Exit needs @starting-style or allow-discrete to survive the
    top layer being torn down; dialogs close instantly, which reads fine. */

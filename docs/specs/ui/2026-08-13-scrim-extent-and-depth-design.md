@@ -6,8 +6,9 @@ Automated verification green at 416 tests. The visual passes in
 [Verification](#verification) are outstanding, and one risk below was not
 measurable here and is recorded as a hypothesis rather than a finding.
 **Scope:** Frontend only — `src/app.css`, `src/lib/Modal.svelte`,
-`src/lib/dialogStack.ts` *(new)*, `src/routes/+page.svelte`. No Rust or
-sidecar changes.
+`src/lib/dialogStack.ts` *(new)*. No Rust or sidecar changes, and
+specifically **no window-shell change**: see the reversal under
+[The frame is not dimmed at all](#the-frame-is-not-dimmed-at-all).
 
 **Follows** [Modals as Rack Units](2026-08-12-modal-rack-units-design.md),
 which is code complete. This closes that design's open decision 2 and the
@@ -79,22 +80,35 @@ between the two chrome bars leaves them unscrimmed. The heights are already
 tokens and already drive the bars themselves, so the edges cannot drift
 apart.
 
-### The frame dims itself, one step, and says why
+### The frame is not dimmed at all
 
-Leaving the chrome at full brightness would be worse than scrimming it. The
-page behind an open dialog is **inert**: a bright, apparently-live Header
-whose buttons do nothing is a false affordance, and a click there does not
-even dismiss the dialog.
+**Reversed 2026-08-13, after seeing it run.** This section first argued the
+chrome should dim one step to `--opacity-out-of-scope`, so a bright-but-inert
+Header would not be a false affordance. That was wrong twice over.
 
-So the chrome takes the app's existing dim for *present but not available* —
-`--opacity-out-of-scope` (0.45), the same value the scope console's bypass
-uses on the principle that *"the point of a bypass is to see what you are
-bypassing"*. Present, legible, obviously not for pressing. No new token, no
-new vocabulary.
+**The platform already works this way.** A macOS sheet dims content and
+leaves window chrome lit; users do not read "bright" as "clickable" while a
+modal is up, because the modal is what says everything else waits. The
+strongest evidence is in the same window: the traffic lights sit at full
+brightness for the entire life of a dialog and confuse nobody.
 
-The net effect is the one being asked for: the modal sits **inside** the
-instrument's frame rather than over the whole app, and the lamps stay
-readable.
+**And the dim made the one strip we do not control the odd one out.** The
+titlebar is drawn by macOS *outside the webview* — `tauri.conf.json` sets no
+`decorations` or `titleBarStyle`, and nothing carries `data-tauri-drag-region`
+— so no rule we write can reach it. Dimming the Header and StatusBar left a
+frame whose top bar was lit and whose other two bars were not, every time a
+dialog opened.
+
+Weighed properly, the dim traded a **constant** cost for an **intermittent**
+one: the inconsistency is visible the whole time a modal is open, while a
+dead click on a panel toggle is occasional and self-correcting. So the chrome
+stays exactly as it is, and the scrim's inset alone does the work.
+
+This also retires the alternative that was on the table — adopting
+`titleBarStyle: "Overlay"` so the app owns its titlebar and the frame becomes
+continuous. That would have cost a macOS-only silhouette, a drag region, and
+~78px of traffic-light padding shifting the Header's controls, to solve a
+problem that only existed because of the dim.
 
 ### A stacked dialog scrims lighter
 
@@ -123,8 +137,7 @@ token joins the existing declaration rather than starting a second one.
 
 ### Both facts come from one store
 
-CSS cannot ask "am I the second dialog open?", and it should not have to
-guess "is any dialog open?" either. A four-line store answers both:
+CSS cannot ask "am I the second dialog open?". A small store answers it:
 
 ```ts
 // src/lib/dialogStack.ts
@@ -138,8 +151,10 @@ way a dialog can know it is stacked.
 `Modal.svelte` already owns the open/close lifecycle in `sync()`. On show it
 reads the count *before* incrementing — a non-zero value means this dialog is
 stacked, which sets `class="stacked"` for the lighter scrim — and decrements
-on close and on destroy. `+page.svelte` sets `class:dialog-open={$openDialogs > 0}`
-on `<main class="app-layout">`, which is where the Header and StatusBar live.
+on close and on destroy. (The count also once drove a chrome dim on `<main>`; that was reversed above,
+so `subscribe` now has no consumer in the app. It stays because it is what
+makes the store testable, and because "how many dialogs are open" is the
+question `register()`'s return value is derived from.)
 
 Two properties matter and both are testable, which is worth something in a
 repo with no jsdom: the count never goes negative, and it survives a dialog
