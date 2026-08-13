@@ -1024,9 +1024,17 @@
   }
 
   // Masthead [reset] in the filter console: clears every solo/mute on
-  // all three axes, stops every playing collection, and unmutes every
-  // muted one — the same action as clearing each chip in the scope bar.
-  // The focus lens is a view mode, not a narrowing, so it stays as-is.
+  // all three axes, stops every playing collection, unmutes every muted
+  // one, and returns the three view switches to off. It sits in the
+  // panel's masthead, above every section, so it answers for the whole
+  // panel — the earlier split, where it cleared the narrowing axes but
+  // left the view switches lit, made the masthead lie about its reach.
+  //
+  // It stops at hiddenPaths. Everything above is a switch thrown in one
+  // gesture and restored in one; the hidden set is built a file at a time
+  // and this app has no undo, so a reset that wiped it could cost an
+  // afternoon of curation. The Hidden items section keeps its own Clear
+  // for that, scoped to the section that owns it.
   function clearAllFilters() {
     filterExcludedSystems = new Set();
     soloedSystems = new Set();
@@ -1036,15 +1044,20 @@
     mutedCollectionNames = new Set();
     soloCuration = new Set();
     mutedCuration = new Set();
+    showHidden = false;
+    hideOutOfScope = false;
+    hideUnindexed = false;
     persistScopeConsole();
+    persistHidden();
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Whether [reset] has anything to do — one term per set clearAllFilters()
-  // empties, so the two can't drift into a button that fires a no-op or one
-  // that sits dim over a live scope. Bypass is deliberately not a term: it
-  // suspends the scope without discarding it, and the chips it dims are
-  // exactly what reset exists to clear.
+  // Whether [reset] has anything to do — one term for each thing
+  // clearAllFilters() puts back, in the same order, so the two can't drift
+  // into a button that fires a no-op or one that sits dim over a live
+  // console. Bypass is deliberately not a term: it suspends the scope
+  // without discarding it, and the chips it dims are exactly what reset
+  // exists to clear. hiddenPaths isn't one either — reset doesn't touch it.
   $: scopeConsoleEngaged =
     filterExcludedSystems.size > 0 ||
     soloedSystems.size > 0 ||
@@ -1053,7 +1066,10 @@
     playingCollections.size > 0 ||
     mutedCollectionNames.size > 0 ||
     soloCuration.size > 0 ||
-    mutedCuration.size > 0;
+    mutedCuration.size > 0 ||
+    showHidden ||
+    hideOutOfScope ||
+    hideUnindexed;
 
   $: hiddenCount = hiddenPaths.size;
 
