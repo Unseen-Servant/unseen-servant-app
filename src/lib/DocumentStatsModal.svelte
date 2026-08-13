@@ -59,109 +59,109 @@
   $: indexedAbsolute = stats?.indexed_at ? new Date(stats.indexed_at).toLocaleString() : '';
 </script>
 
-<Modal visible={true} {onClose} title={stats?.filename ?? 'Document info'} size="md">
-  <div class="body">
+<!-- The filename leaves the title: as a rail nameplate it would truncate at
+     ~48 characters, and as the first readout row it gets the full 560px in the
+     same mono column as everything else about the file. -->
+<Modal visible={true} {onClose} title="Document" size="md" escapeWord="close">
+  <svelte:fragment slot="rail">
+    <span class="rail-rule" aria-hidden="true"></span>
+    <span class="lamp" class:live={!!stats?.indexed_at} aria-hidden="true"></span>
+    <span class="rail-note">{stats?.indexed_at ? 'indexed' : 'not indexed'}</span>
+  </svelte:fragment>
+
+  <div class="modal-bays">
     {#if error}
       <p class="error">Could not load stats: {error}</p>
     {:else if !stats}
       <p class="loading">Loading…</p>
     {:else}
-      <!-- The title carries the filename; this carries what it can't — the
-           path the file sits at. -->
-      <div class="source" title={stats.source}>{stats.source}</div>
-
-      <div class="stat-block" role="group" aria-label="Document stats">
-        <div class="stat-cell">
-          <div class="readout-label">CHUNKS</div>
-          <div class="stat-value">{stats.chunks.toLocaleString()}</div>
-        </div>
-        <div class="stat-cell">
-          <div class="readout-label">PAGES</div>
-          <div class="stat-value">{stats.pages > 0 ? stats.pages.toLocaleString() : '—'}</div>
-        </div>
-        <div class="stat-cell">
-          <div class="readout-label">SIZE</div>
-          <div class="stat-value">{formatBytes(stats.file_size_bytes)}</div>
-        </div>
-        <div class="stat-cell">
-          <div class="readout-label">INDEXED</div>
-          <div class="stat-value" title={indexedAbsolute}>{formatRelative(stats.indexed_at)}</div>
+      <div class="modal-bay">
+        <div class="modal-well">
+          <div class="modal-well-row">
+            <span class="ledger-label">File</span>
+            <span class="modal-readout" title={stats.filename}>{stats.filename}</span>
+          </div>
+          <div class="modal-well-row">
+            <span class="ledger-label">Path</span>
+            <span class="modal-readout" title={stats.source}>{stats.source}</span>
+          </div>
+          <!-- Wrapped, not ellipsised: a multi-system file joins its tags into
+               a string with no length limit, and the tail is as much the answer
+               as the head. -->
+          <div class="modal-well-row">
+            <span class="ledger-label">System</span>
+            <span class="modal-readout wrap">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Out of the numeric grid: a multi-system file joins its tags into
-           a string with no length limit, which a fifth of 560px could not
-           hold without wrapping raggedly against the tabular readouts. -->
-      <div class="system-row">
-        <span class="readout-label">SYSTEM</span>
-        <span class="system-value">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</span>
+      <div class="modal-bay">
+        <span class="ledger-label">Index</span>
+        <div class="modal-well">
+          <div class="modal-well-row">
+            <span class="ledger-label">Chunks</span>
+            <span class="modal-readout">{stats.chunks.toLocaleString()}</span>
+          </div>
+          <div class="modal-well-row">
+            <span class="ledger-label">Pages</span>
+            <span class="modal-readout">{stats.pages > 0 ? stats.pages.toLocaleString() : '—'}</span>
+          </div>
+          <div class="modal-well-row">
+            <span class="ledger-label">Size</span>
+            <span class="modal-readout">{formatBytes(stats.file_size_bytes)}</span>
+          </div>
+          <div class="modal-well-row">
+            <span class="ledger-label">Indexed</span>
+            <span class="modal-readout">{formatRelative(stats.indexed_at)}<span class="stamp">{indexedAbsolute}</span></span>
+          </div>
+        </div>
       </div>
     {/if}
   </div>
 </Modal>
+<!-- There is no `slot="commit"`: nothing here is operable, and the missing
+     rail is the signal. -->
 
 <style>
-  .body {
-    padding: var(--modal-pad);
-  }
-  .source {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-tertiary);
-    margin-bottom: 0.75rem;
-    /* Plain tail truncation is right here, not the direction:rtl trick for
-       keeping the end visible: the end of the path is the filename, which
-       the title already carries, so what gets cut is the redundant part.
-       (That trick also moves a leading "/" to the visual end, since a
-       neutral character at the edge takes the paragraph direction.) */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .loading,
   .error {
     color: var(--text-secondary);
     font-size: 0.85rem;
     padding: 0.5rem 0;
+    margin: 0;
   }
   .error {
     color: var(--text-danger);
   }
-  .stat-block {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-    padding: 0.75rem 0.25rem;
-    border-top: 1px solid var(--border-subtle);
+
+  /* `.rail-rule` is global (Task 3) — three surfaces need it. */
+
+  /* Amber is connectivity in this system, and "live in the index" is exactly
+     that. Dark when the file has never been indexed. */
+  .lamp {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+    opacity: 0.4;
+    flex-shrink: 0;
   }
-  /* Shares the block's rules to read as one bordered region with an
-     internal divider, rather than two stacked panels. */
-  .system-row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    padding: 0.5rem 0.25rem;
-    border-top: 1px solid var(--border-subtle);
-    border-bottom: 1px solid var(--border-subtle);
+  .lamp.live {
+    background: var(--text-connected);
+    opacity: 1;
   }
-  .system-value {
-    font-family: var(--font-mono);
+
+  .rail-note {
+    font-family: var(--font-body);
     font-size: 0.75rem;
-    color: var(--text-primary);
-    min-width: 0;
-    overflow-wrap: anywhere;
+    color: var(--text-tertiary);
   }
-  .stat-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.15rem;
-  }
-  .stat-value {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--text-primary);
-    font-variant-numeric: tabular-nums;
-    text-align: center;
+
+  /* The exact stamp used to exist only as a title attribute — invisible on an
+     instrument panel and unreachable by touch or keyboard. The well has room. */
+  .stamp {
+    color: var(--text-tertiary);
+    opacity: 0.8;
+    margin-left: 0.5rem;
   }
 </style>
