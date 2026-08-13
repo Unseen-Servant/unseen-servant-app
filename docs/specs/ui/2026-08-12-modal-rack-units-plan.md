@@ -38,6 +38,17 @@ Tasks 8, 9, 10 and 11 are independent of each other. Everything depends on 3 and
 
 ## Task 1: The commit-key model
 
+> **Shipped 2026-08-12** as `33180b9` + `524ff5d`. Code review corrected three
+> things this task's snippets got wrong, so read the tree rather than the code
+> blocks below: `isCommitChord` collapses to
+> `return danger && isDeleteChord(event, mac);` (default parameters fire on an
+> explicitly-passed `undefined`, so the ternary defended against nothing); the
+> two `commitKeyId` tests were tautologies and became a coupling test against
+> `KEYBINDINGS`/`chord()`, because `chord()` returns `''` silently for an
+> unknown id and a rename would blank the switch face with every check green;
+> and the `modal`-scope comment must name **two** `SCOPE_ORDER` gatekeepers —
+> `KeyboardHelpOverlay` and `help/ReferencePane` each keep their own.
+
 **Files:**
 - Create: `src/lib/confirmKeys.ts`
 - Create: `src/lib/confirmKeys.test.ts`
@@ -739,6 +750,11 @@ Create `src/lib/CommitSwitch.svelte`:
   class:activation={!danger}
   {disabled}
   data-autofocus={initialFocus || undefined}
+  {/* 'Enter' is hardcoded on purpose and must NOT be derived from
+      confirm.commitSafe: an activation prompt commits on Enter because its
+      commit is a *focused button*, which is browser behaviour, not a binding.
+      The binding exists only to supply the face glyph. Deriving this would
+      assert a dependency that does not exist. */}
   aria-keyshortcuts={danger ? commitKeyShortcut() : 'Enter'}
   on:click={onClick}
 >
