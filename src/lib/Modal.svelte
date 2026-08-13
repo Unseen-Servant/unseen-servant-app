@@ -62,8 +62,18 @@
     if (!dialogEl) return;
     if (v && !dialogEl.open) {
       returnTarget = document.activeElement as HTMLElement | null;
-      stacked = openDialogs.register();
-      registered = true;
+      // Guarded so register and release stay symmetric. `close` fires its
+      // event as a queued task rather than synchronously, so a caller that
+      // flipped `visible` false→true inside one task would re-enter here
+      // with `dialogEl.open` already false and register twice against a
+      // single release — net +1, and the chrome dims for the rest of the
+      // session. No call site does that today; the guard costs a line and
+      // the failure mode is invisible until someone wonders why the app
+      // looks wrong.
+      if (!registered) {
+        stacked = openDialogs.register();
+        registered = true;
+      }
       dialogEl.showModal();
       await tick();
       // showModal() auto-focuses the first sequentially-focusable
