@@ -359,7 +359,6 @@
           extractor has been upgraded, or if search results look stale.
         </span>
         <ActionButton
-          kind="confirm"
           label={isSyncing ? 'Sync in progress…' : 'Re-index all'}
           onClick={handleReindexClick}
           disabled={isSyncing || indexedFileCount === 0}
@@ -372,7 +371,6 @@
           index is rebuilt from scratch on the next sync.
         </span>
         <ActionButton
-          kind="confirm"
           danger
           label="Delete index"
           onClick={handleDeleteClick}

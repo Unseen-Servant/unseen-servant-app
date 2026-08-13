@@ -231,12 +231,11 @@ input {
   font-family: inherit;
 }
 
-/* --- Action buttons (Confirm / Discard) --- */
+/* --- Action buttons --- */
 
-/* Quiet at rest, color on intent. Confirm carries the active accent (purple)
-   when enabled; Discard stays neutral and tints danger on hover. The danger
-   modifier on a Confirm swaps active for danger, used for irreversible
-   confirmations (e.g. Delete). Compact variant is icon-only. */
+/* Color on intent: the active accent (purple) when enabled, swapped for
+   danger on irreversible confirmations (e.g. Delete). Hover brightens by a
+   step and never introduces a hue, so red marks only what destroys. */
 .action-btn {
   display: inline-flex;
   align-items: center;
@@ -245,35 +244,32 @@ input {
   padding: 0.3rem 0.5rem;
   font-family: var(--font-body);
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--text-active);
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: color var(--transition-fast), transform var(--transition-fast);
 }
-/* Labeled actions are bracketed text — the affordance the conventions name
-   alongside color and glow, and the one the app already spends on
-   [Compact] and [R]. The frame takes the label's own color at the same
-   0.55 the chord brackets use, so the frame stays structure and the label
-   stays content. Icon-only (compact) buttons wear the glyph instead: the
-   two are alternative markers, and doubling them reads as noise. */
-.action-btn:not(.compact)::before {
+/* Bracketed text — the affordance the conventions name alongside color and
+   glow, and the one the app already spends on [Compact] and [R]. The frame
+   takes the label's own color at the same 0.55 the chord brackets use, so
+   the frame stays structure and the label stays content. */
+.action-btn::before {
   content: '[';
   margin-right: 0.15rem;
 }
-.action-btn:not(.compact)::after {
+.action-btn::after {
   content: ']';
   margin-left: 0.15rem;
 }
-.action-btn:not(.compact)::before,
-.action-btn:not(.compact)::after {
+.action-btn::before,
+.action-btn::after {
   opacity: 0.55;
 }
-
-.action-btn svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-  flex-shrink: 0;
+.action-btn.danger {
+  color: var(--text-danger);
+}
+.action-btn:hover:not(:disabled) {
+  filter: brightness(1.2);
 }
 .action-btn:active:not(:disabled) {
   transform: scale(0.97);
@@ -281,43 +277,7 @@ input {
 .action-btn:disabled {
   color: var(--text-tertiary);
   cursor: default;
-}
-/* Backing out brightens by a step; it does not go red. Hover never
-   introduces a hue (design conventions), and a red Cancel beside a red
-   Delete put two danger signals in one row meaning opposite things. */
-.action-btn.discard:not(.danger):hover:not(:disabled) {
-  color: var(--text-primary);
-}
-/* A discard that removes something rather than backing out of something
-   (the collections panel's row ×). Destructive, so it wears danger at
-   rest — a hue swap, not a hue that arrives on hover — and brightens like
-   any other engaged control. Safe to carry at rest: the control is
-   revealed by row hover in the first place. */
-.action-btn.discard.danger {
-  color: var(--text-danger);
-}
-.action-btn.discard.danger:hover:not(:disabled) {
-  filter: brightness(1.2);
-}
-.action-btn.confirm {
-  color: var(--text-active);
-}
-.action-btn.confirm.danger {
-  color: var(--text-danger);
-}
-.action-btn.confirm:hover:not(:disabled) {
-  filter: brightness(1.2);
-}
-.action-btn.confirm:disabled {
-  color: var(--text-tertiary);
   filter: none;
-}
-.action-btn.compact {
-  padding: 0.2rem 0.35rem;
-}
-.action-btn.compact svg {
-  width: 13px;
-  height: 13px;
 }
 
 /* --- S/M channel buttons --- */

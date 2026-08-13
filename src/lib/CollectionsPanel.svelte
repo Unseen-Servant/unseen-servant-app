@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
   import { RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
-  import ActionButton from './ActionButton.svelte';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
@@ -770,15 +769,17 @@
                    enumerated, so it's where dropping one belongs. Keyed by
                    full path: two same-named PDFs render identical rows, and
                    removing by name would take the wrong one. -->
-              <span class="child-remove">
-                <ActionButton
-                  kind="discard"
-                  compact
-                  danger
-                  title={`Remove ${f.base} from ${col.name}`}
-                  onClick={() => onRemoveFile(col.name, f.path)}
-                />
-              </span>
+              <button
+                type="button"
+                class="child-remove"
+                title={`Remove ${f.base} from ${col.name}`}
+                aria-label={`Remove ${f.base} from ${col.name}`}
+                on:click={() => onRemoveFile(col.name, f.path)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18"/>
+                </svg>
+              </button>
             </div>
           {/each}
           {#if col.file_paths.length === 0}
@@ -1266,15 +1267,35 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Hover-revealed, same recipe as the row transport. */
+  /* Hover-revealed, same recipe as the row transport — but a bare stroked
+     mark, not a boxed control: child rows carry no hardware, and the ▸ and
+     ⠿ they sit under are bare glyphs too. Danger is the hue the mark is
+     drawn in (a swap, not a shape), and it's safe at rest because row
+     hover is what reveals it in the first place. */
   .child-remove {
     display: inline-flex;
     flex-shrink: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-danger);
+    cursor: pointer;
     opacity: 0;
-    transition: opacity var(--transition-fast);
+    transition: all var(--transition-fast);
+  }
+  .child-remove svg {
+    width: 11px;
+    height: 11px;
+    display: block;
   }
   .child-row:hover .child-remove {
     opacity: 1;
+  }
+  .child-remove:hover {
+    filter: brightness(1.2);
+  }
+  .child-remove:active {
+    transform: scale(0.97);
   }
 
   /* Dashed create affordance — same family as the tree's "+ tag". */

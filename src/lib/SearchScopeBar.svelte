@@ -547,7 +547,7 @@
 
   /* The whole chip is the clear button; the × is just a glyph. Hover
      signals removal: grey fill step, label struck through, × at full
-     opacity in danger ("color on intent", like the discard action-btn). */
+     opacity in danger ("color on intent"). */
   .chip {
     cursor: pointer;
     transition: background var(--transition-fast);
