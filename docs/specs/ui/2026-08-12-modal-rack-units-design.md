@@ -452,12 +452,12 @@ Steps 4–6 are independent of each other and of 3.
    detail in the app's own tabular-figure idiom. If the prompt reads worse
    than the two-step did, that judgement belongs in the visual pass and
    reverting is one commit.
-2. **The stacked scrim, carried forward undecided.** Two open dialogs each
-   paint a `::backdrop` at `rgba(0,0,0,0.6)`, so a prompt over the game-system
-   unit dims it 60% and the page behind to 84%. The modal underneath is meant
-   to be context. A `--scrim-modal-stacked` at ~0.35 needs a class the store
-   sets when another `dialog[open]` exists. Orthogonal to everything above and
-   still worth doing.
+2. ~~**The stacked scrim, carried forward undecided.**~~ **Resolved
+   2026-08-13** in [The Scrim: Extent and Depth](2026-08-13-scrim-extent-and-depth-design.md),
+   which takes it up together with a second scrim question this design raised
+   without noticing: a rack unit wears `--bg-header` rails so it reads as part
+   of the instrument, and then the scrim dims the instrument. Both come down
+   to what the scrim covers and how dark it is, so they are one decision.
 3. **Delete-file's chunk row** — fetch or omit. Omit first; see
    [Readout data](#readout-data).
 4. **The audit's open decision 1 is untouched.** Grading confirmations by
