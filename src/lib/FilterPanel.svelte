@@ -648,9 +648,17 @@
   .btn-link:hover:not(:disabled)::after {
     color: var(--text-accent);
   }
+  /* Unavailable is a step down the text ramp, not a veil: the same
+     --text-tertiary .row-disabled uses one section below. The brackets go
+     with it — they sit at --text-secondary, which is *lighter* than
+     tertiary, so leaving them would light the frame around a dead label. */
   .btn-link:disabled {
-    opacity: 0.5;
+    color: var(--text-tertiary);
     cursor: default;
+  }
+  .btn-link:disabled::before,
+  .btn-link:disabled::after {
+    color: var(--text-tertiary);
   }
 
   .empty {
