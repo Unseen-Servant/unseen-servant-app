@@ -343,7 +343,7 @@ Ordered so each step leaves the tree shippable.
      anyway. Worth knowing that `danger` on a discard now means
      "removes" rather than "backs out", and is styled.
    - **F6 was resolved twice.** First with the vendored
-     `static/icons/trash-solid-full.svg` swapped in for circle-check; then
+     `trash-solid-full.svg` swapped in for circle-check; then
      superseded the same day by the bracket pass below, which drops icons
      from labeled buttons entirely. The finding's second option —
      *"or drop the icon and let color and label carry it"* — turned out to

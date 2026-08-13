@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
+  import { RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
   import ActionButton from './ActionButton.svelte';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
@@ -691,12 +692,12 @@
                  mapping is taught; the same ribbon reappears in scope
                  chips and search-result index cells. -->
             <svg class="bkm" style={`color: ${col.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M5 2h14v20l-7-5.2L5 22z"/>
+              <path d={RIBBON_FILLED}/>
             </svg>
           {:else}
             <!-- Outline ribbon — uncolored, same grammar as the untagged die -->
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d="M6 3h12v18l-6-4.4L6 21z"/>
+              <path d={RIBBON_OUTLINE}/>
             </svg>
           {/if}
           {#if isRenamingRow}
@@ -877,7 +878,7 @@
             >
               <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
               <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                <path d={RIBBON_FILLED}/>
               </svg>
               <span>{pig.name}</span>
             </button>
@@ -891,7 +892,7 @@
           >
             <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d="M6 3h12v18l-6-4.4L6 21z"/>
+              <path d={RIBBON_OUTLINE}/>
             </svg>
             <span>None</span>
           </button>

@@ -5,6 +5,7 @@
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
   import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
   import { clampToViewport } from './menuGeometry';
+  import { RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
   import SystemTagRows from './SystemTagRows.svelte';
 
   export let x: number;
@@ -399,12 +400,12 @@
               {#if col.color}
                 <!-- Bookmark ribbon — the collection keeps its pigment -->
                 <svg class="submenu-icon" viewBox="0 0 24 24" fill={col.color} aria-hidden="true">
-                  <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                  <path d={RIBBON_FILLED}/>
                 </svg>
               {:else}
                 <!-- No pigment — outline ribbon, same grammar as the chips -->
                 <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M6 3h12v18l-6-4.4L6 21z"/>
+                  <path d={RIBBON_OUTLINE}/>
                 </svg>
               {/if}
               <span class="submenu-name" title={col.name}>{col.name}</span>

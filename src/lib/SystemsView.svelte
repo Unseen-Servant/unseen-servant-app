@@ -9,6 +9,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
+  import { BOOK, DICE_D6, DIE_OUTLINE, RIBBON_FILLED } from './iconPaths';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -535,16 +536,16 @@
               <span class="group-icon" aria-hidden="true">
                 <!-- Font Awesome "dice-d6" -->
                 <svg viewBox="0 0 640 640" fill="currentColor">
-                  <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+                  <path d={DICE_D6}/>
                 </svg>
               </span>
             {:else}
               <span class="group-icon" aria-hidden="true">
                 <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
                 <svg viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round">
-                  <path d="M320 76 L548 206 L548 434 L320 564 L92 434 L92 206 Z"/>
-                  <path d="M92 206 L320 336 L548 206"/>
-                  <path d="M320 336 L320 564"/>
+                  {#each DIE_OUTLINE as stroke}
+                    <path d={stroke}/>
+                  {/each}
                 </svg>
               </span>
             {/if}
@@ -606,7 +607,7 @@
                 <span class="file-icon" aria-hidden="true">
                   <!-- Font Awesome "book" — matches collection rows -->
                   <svg viewBox="0 0 640 640" fill="currentColor">
-                    <path d="M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z"/>
+                    <path d={BOOK}/>
                   </svg>
                 </span>
                 {#if renamingFilePath === entry.path && isFocused(entry, group.tag)}
@@ -630,7 +631,7 @@
                   <span class="ribbons" title={ribbons.map((r) => r.name).join(', ')}>
                     {#each ribbonSplit.shown as r (r.name)}
                       <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M5 2h14v20l-7-5.2L5 22z"/>
+                        <path d={RIBBON_FILLED}/>
                       </svg>
                     {/each}
                     {#if ribbonSplit.overflow > 0}

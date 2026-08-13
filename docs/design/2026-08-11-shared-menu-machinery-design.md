@@ -256,6 +256,26 @@ the menu and on the row alike.
   trigger-anchored, submenu-relative-with-flip — and rewrite markup at
   four call sites. Positioning is #279 territory, which is closed and
   working.
+- **No `<DieIcon>` component.** The dice-d6 path was inlined eight times
+  across seven files, but three of the classes carrying it then —
+  `.row-icon`, `.submenu-icon`, `.chip-die` — were icon *slots* shared
+  with the bookmark ribbons, the outline die and the chip ✕, and five of
+  the sites style the glyph from the parent's scoped CSS
+  (`.chip.exclusion .chip-die`, `.row.dimmed .row-icon`,
+  `.untagged-row .row-icon`, `.group-icon svg`, `.system-icon svg`).
+  A Svelte scope hash does not cross a component boundary, so the
+  extraction would have traded ~4.7KB of duplicated path for `:global()`
+  escapes at those five call sites. The fills disagree on purpose too: in
+  the two menus the die is pinned to `--text-secondary` beneath a
+  `--text-primary` label, one ramp step down, so `currentColor` there
+  would collapse the ramp.
+
+  The duplication was real, so it was cut one layer lower: `iconPaths.ts`
+  holds the shape, each surface keeps its own `<svg>` wrapper, and every
+  scoped selector above stays where it is. The two menu copies went a
+  different way — the rows extraction above took them into
+  `SystemTagRows`, which is why `.submenu-icon` carries only ribbons now.
+  The seven that remain bind `DICE_D6`.
 - **`menuSlot` stays where it is.** Already shared, already tested,
   different lifetimes per component.
 - **Mouse lifecycle is untouched.** Hover intent, rapid re-opens,

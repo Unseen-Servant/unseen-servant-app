@@ -8,6 +8,7 @@
 
   const HOMEPAGE_URL = 'https://unseenservant.games';
   const LICENSE_URL = 'https://unseenservant.games/license';
+  const FONTAWESOME_LICENSE_URL = 'https://fontawesome.com/license/free';
 
   let appVersion = '';
 
@@ -63,6 +64,18 @@
       <li>
         <button class="btn-link" on:click={() => open(LICENSE_URL)}>Software license</button>
         <span class="link-desc">Unseen Servant Games Software License</span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <header class="block-head">
+      <h3 class="block-title section-title">Credits</h3>
+    </header>
+    <ul class="link-list">
+      <li>
+        <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7.2.0</button>
+        <span class="link-desc">icons &copy; Fonticons, Inc. — CC BY 4.0</span>
       </li>
     </ul>
   </section>

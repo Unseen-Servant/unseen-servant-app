@@ -12,6 +12,7 @@
   import { holdLatch } from './holdLatch';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
+  import { DICE_D6, DIE_OUTLINE, RIBBON_OUTLINE } from './iconPaths';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.
@@ -251,7 +252,7 @@
                in this panel that reads as muted, which is a live state on this
                very row. -->
           <svg
-            class="row-die"
+            class="row-icon"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -260,7 +261,7 @@
             stroke-dasharray={ch.key === 'loose' ? '3.2 2.4' : undefined}
             aria-hidden="true"
           >
-            <path d="M6 3h12v18l-6-4.4L6 21z"/>
+            <path d={RIBBON_OUTLINE}/>
           </svg>
           <span class="row-name">{ch.name}</span>
           <span class="sm" class:engaged={soloed || muted}>
@@ -307,8 +308,8 @@
             data-fm-key="system:{name}"
           >
             <!-- Font Awesome "dice-d6" — monochrome; systems don't carry color -->
-            <svg class="row-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-              <path d="M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z"/>
+            <svg class="row-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+              <path d={DICE_D6}/>
             </svg>
             <span class="row-name">{name}</span>
             <span class="sm" class:engaged={soloed || muted}>
@@ -346,10 +347,10 @@
             data-fm-key="system:{UNTAGGED_KEY}"
           >
             <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
-            <svg class="row-die" viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
-              <path d="M320 76 L548 206 L548 434 L320 564 L92 434 L92 206 Z"/>
-              <path d="M92 206 L320 336 L548 206"/>
-              <path d="M320 336 L320 564"/>
+            <svg class="row-icon" viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+              {#each DIE_OUTLINE as stroke}
+                <path d={stroke}/>
+              {/each}
             </svg>
             <span class="row-name">Untagged</span>
             <span class="sm" class:engaged={muted}>
@@ -515,7 +516,7 @@
     border-left-color: var(--text-active);
   }
 
-  .row-die {
+  .row-icon {
     width: 0.8rem;
     height: 0.8rem;
     flex-shrink: 0;
@@ -594,7 +595,7 @@
   /* A muted channel dims in place — removed from results, still on the
      board. Solo overrides mute, so a soloed row never dims. */
   .row.dimmed .row-name,
-  .row.dimmed .row-die,
+  .row.dimmed .row-icon,
   .row.dimmed .row-count {
     opacity: var(--opacity-out-of-scope);
   }
@@ -602,7 +603,7 @@
   .untagged-row {
     color: var(--text-tertiary);
   }
-  .untagged-row .row-die {
+  .untagged-row .row-icon {
     color: var(--text-tertiary);
   }
 
