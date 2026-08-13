@@ -83,17 +83,16 @@ describe('confirm store', () => {
       title: 'Delete collection',
       danger: true,
       rows: [
-        { label: 'Track', from: 'Session 14' },
-        { label: 'Files', from: '12', to: 'Loose', unchanged: true },
+        { label: 'Track', value: 'Session 14' },
+        { label: 'Files', value: '12', to: 'Loose', unchanged: true },
       ],
     });
 
     expect(get(store)?.rows).toEqual([
-      { label: 'Track', from: 'Session 14' },
-      { label: 'Files', from: '12', to: 'Loose', unchanged: true },
+      { label: 'Track', value: 'Session 14' },
+      { label: 'Files', value: '12', to: 'Loose', unchanged: true },
     ]);
 
-    store.answer(false);
     void store.request({ title: 'Delete file', message: 'Move it to Trash?', danger: true });
 
     expect(get(store)?.rows).toBeUndefined();
