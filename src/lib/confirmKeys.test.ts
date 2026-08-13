@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { commitKeyId, isCommitChord } from './confirmKeys';
-import { KEYBINDINGS, chord, type ChordEvent } from './keybindings';
+import { KEYBINDINGS, chord, isDeleteChord, type ChordEvent } from './keybindings';
 
 const ev = (over: Partial<ChordEvent> = {}): ChordEvent => ({
   key: 'a', code: 'KeyA', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...over,
@@ -53,14 +53,21 @@ describe('isCommitChord', () => {
   });
 
   // The dialog calls isCommitChord(event, danger) with two arguments — every
-  // test above passes `mac` explicitly, so this is the only one exercising
-  // the real call shape and its fall-through to isDeleteChord's platform
-  // default. Written platform-agnostic since the test runner's own platform
-  // decides which branch is live.
+  // other test here passes `mac` explicitly, so this is the only one
+  // exercising the real call shape and its fall-through to isDeleteChord's
+  // platform default. That comparison is deliberate, not a proxy for it:
+  // `navigator.platform` reads "MacIntel" under vitest on macOS, so isMac
+  // resolves true in a local run and false on Linux CI — the two
+  // environments exercise different branches of every default-`mac` path in
+  // this repo. Asserting against isDeleteChord(ev(over)) (also called with
+  // no `mac`) is what catches a broken default on *either* platform; a test
+  // that only checks "exactly one platform chord is live" would pass under
+  // both `mac ?? true` and `mac ?? false`, since either mutation still
+  // leaves exactly one branch true.
   it('forwards to isDeleteChord\'s own default when mac is omitted', () => {
     expect(isCommitChord(ev({ key: 'Enter' }), true)).toBe(false);
-    const macChordLive = isCommitChord(ev({ key: 'Backspace', metaKey: true }), true);
-    const otherChordLive = isCommitChord(ev({ key: 'Delete' }), true);
-    expect(macChordLive).not.toBe(otherChordLive);
+    for (const over of [{ key: 'Backspace', metaKey: true }, { key: 'Delete' }]) {
+      expect(isCommitChord(ev(over), true)).toBe(isDeleteChord(ev(over)));
+    }
   });
 });
