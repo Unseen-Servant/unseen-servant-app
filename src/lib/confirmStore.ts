@@ -32,9 +32,14 @@ export interface ConfirmRequest {
   message?: string;
   rows?: ConfirmRow[];
   confirmLabel?: string;
-  cancelLabel?: string;
-  // Destructive prompts auto-focus Cancel and paint the confirm in
-  // --text-danger. The dialog owns both behaviors; this is just the flag.
+  // Grades the change: a removal (delete, reset) rather than an activation
+  // (re-index). The caller states the nature and the dialog derives all three
+  // consequences — the commit switch's dressing, which key commits it, and
+  // where initial focus lands. A removal is danger-tinted and unlit, commits
+  // on ⌘⌫, and leaves focus on the dialog element so Enter is inert; an
+  // activation is purple and lit, takes initial focus, and is activated by
+  // Enter natively as any focused button is. See
+  // docs/specs/ui/2026-08-12-modal-rack-units-design.md#the-keyboard.
   danger?: boolean;
 }
 
