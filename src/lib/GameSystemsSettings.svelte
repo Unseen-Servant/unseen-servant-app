@@ -4,6 +4,7 @@
   import { DICE_D6 } from './iconPaths';
   import Modal from './Modal.svelte';
   import ActionButton from './ActionButton.svelte';
+  import CommitSwitch from './CommitSwitch.svelte';
   import { confirmPrompt } from './confirmStore';
 
   export let knownSystems: KnownGameSystem[] = [];
@@ -35,10 +36,9 @@
   let editIsBuiltin = false;
   let editIsCustomized = false;
 
-  let tagInput: HTMLInputElement;
-
-  // Auto-focus the first input when the modal opens.
-  $: if (showModal && tagInput) tagInput.focus();
+  // No tagInput ref and no focus call: Modal.svelte's text-input heuristic
+  // already focuses the Tag field, once, after showModal(). Two focus calls
+  // racing across a reactive flush is what [data-autofocus] exists to avoid.
 
   // Save is enabled only when there is a tag and either we're adding
   // or the user actually changed something — same convention as the
@@ -122,9 +122,21 @@
   }
 
   async function handleDelete() {
+    // What goes is the tag and its keywords, and the prompt shows both rather
+    // than naming one and summarising the other. The reassurance — that
+    // deleting a definition retags nothing — stays in the message rather than
+    // becoming a fourth row: this page has no count of tagged files, so the
+    // row could only have read "files already tagged → unchanged", which is
+    // prose sitting in a column of names and figures. A row earns its place
+    // by carrying a value; when the value would be a sentence, it is a
+    // sentence.
     const confirmed = await confirmPrompt.request({
       title: 'Delete game system',
-      message: `Delete "${editOriginalTag}" and its keywords? Files already tagged with it are not changed.`,
+      rows: [
+        { label: 'Tag', value: editOriginalTag },
+        { label: 'Keywords', value: modalKeywords || '—' },
+      ],
+      message: 'Files already tagged with it are not changed, and you can add the tag again at any time.',
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -139,9 +151,16 @@
   }
 
   async function handleReset() {
+    // The one genuine transition among these rows: the keywords you edited
+    // become the built-in set again. The tag itself is identity and survives,
+    // so it has no `to`.
     const confirmed = await confirmPrompt.request({
       title: 'Reset to defaults',
-      message: `Reset "${editOriginalTag}" to its built-in keywords? Your changes to it are discarded.`,
+      rows: [
+        { label: 'Tag', value: editOriginalTag },
+        { label: 'Keywords', value: modalKeywords || '—', to: 'built-in set' },
+      ],
+      message: 'Your changes to this system are discarded.',
       confirmLabel: 'Reset',
       danger: true,
     });
@@ -193,22 +212,22 @@
   onClose={closeModal}
   title={modalMode === 'add' ? 'Add game system' : 'Edit game system'}
   size="sm"
+  escapeWord="close"
 >
-  <div class="body">
-    <div class="field">
-      <span class="label readout-label">Tag</span>
+  <div class="modal-bays">
+    <div class="modal-bay">
+      <span class="ledger-label">Tag</span>
       <input
         id="sys-tag"
         type="text"
         class="input"
         bind:value={modalTag}
-        bind:this={tagInput}
         placeholder="e.g. Cairn"
       />
     </div>
 
-    <div class="field">
-      <span class="label readout-label">Keywords</span>
+    <div class="modal-bay">
+      <span class="ledger-label">Keywords</span>
       <input
         id="sys-keywords"
         type="text"
@@ -216,17 +235,12 @@
         bind:value={modalKeywords}
         placeholder="e.g. cairn, cairn rpg"
       />
+      <!-- The one sentence here that changes what you type. How matching
+           normalises case and punctuation is true, useful once, and re-read
+           never — it lives in Help → Reference now. -->
       <p class="hint">
-        Comma-separated. Detection checks the file's <strong>folder path</strong> first,
-        then scans the <strong>first 2000 characters</strong> of the PDF. Path tokens
-        like &ldquo;<em>{modalTag.trim() || 'Cairn'}</em>&rdquo; or its abbreviation
-        match best — a folder named that way wins over content.
-      </p>
-      <p class="hint">
-        Matching ignores case, spaces, punctuation, and accents — so
-        <em>d&amp;d 5e</em>, <em>dnd-5e</em>, and <em>DnD 5E</em> all match the same
-        keyword. Avoid very short keywords (e.g. two-letter abbreviations) since
-        they false-positive on unrelated paths.
+        Comma-separated. A folder named &ldquo;<em>{modalTag.trim() || 'Cairn'}</em>&rdquo;
+        beats a match found inside the PDF.
       </p>
     </div>
 
@@ -234,22 +248,44 @@
       <div class="error-msg">{modalError}</div>
     {/if}
 
-    <div class="footer">
-      <div class="footer-left">
-        {#if modalMode === 'edit' && editIsBuiltin && editIsCustomized}
-          <!-- Discards the override; its prompt carries the weight. -->
-          <ActionButton kind="discard" label="Reset to defaults" onClick={handleReset} />
-        {/if}
-        {#if modalMode === 'edit' && !editIsBuiltin}
-          <ActionButton kind="confirm" danger label="Delete" onClick={handleDelete} />
-        {/if}
+    <!-- Destructive actions sit in a bay, not on the commit rail: the strip is
+         where this unit's commit lives, and a secondary that undoes the record
+         is not that commit. These raise a prompt rather than committing, so
+         they wear bracketed danger text and no switch face — a face carries a
+         key, and nothing here implements one. See the design's "A face is a
+         promise, and only a commit may make it". -->
+    {#if modalMode === 'edit' && (editIsBuiltin ? editIsCustomized : true)}
+      <div class="modal-bay">
+        <div class="modal-well danger-bay">
+          <div class="modal-well-row action-row">
+            <span class="row-text">
+              {editIsBuiltin
+                ? 'Discard your changes and restore the built-in keywords.'
+                : 'Remove this tag and its keywords. Files already tagged are not changed.'}
+            </span>
+            {#if editIsBuiltin}
+              <ActionButton kind="confirm" danger label="Reset to defaults" onClick={handleReset} />
+            {:else}
+              <ActionButton kind="confirm" danger label="Delete" onClick={handleDelete} />
+            {/if}
+          </div>
+        </div>
       </div>
-      <div class="footer-right">
-        <ActionButton kind="discard" label="Discard" onClick={closeModal} />
-        <ActionButton kind="confirm" label={modalMode === 'add' ? 'Add' : 'Save'} onClick={handleSave} disabled={!canSave} />
-      </div>
-    </div>
+    {/if}
   </div>
+
+  <!-- Activation, not removal: saving a system creates or updates a record.
+       The face reads ↵ and handleWindowKey above honours it — plain Enter from
+       either text input, ⌘/Ctrl+Enter from anywhere in the unit — with the
+       browser's own activation covering Enter while the switch itself holds
+       focus. The face is only honest because all three paths exist. -->
+  <svelte:fragment slot="commit">
+    <CommitSwitch
+      label={modalMode === 'add' ? 'Add' : 'Save'}
+      onClick={handleSave}
+      disabled={!canSave}
+    />
+  </svelte:fragment>
 </Modal>
 
 <style>
@@ -385,20 +421,11 @@
     border: 1px solid var(--border-accent);
   }
 
-  /* Modal body */
-  .body {
-    padding: var(--modal-pad);
-    font-family: var(--font-body);
-  }
-  .field {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 0.75rem;
-    font-size: 0.85rem;
-  }
-  .label {
-    margin-bottom: 0.3rem;
-  }
+  /* Modal unit. The bays own the padding and the spacing between things
+     (.modal-bays / .modal-bay in app.css), so what is left here is only what
+     the fields themselves look like. Nothing below may carry a margin: it
+     would add to the bay's gap rather than replace it, which is why .hint
+     lost the 0.4rem it used to need. */
   .input {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border-subtle);
@@ -415,15 +442,11 @@
   }
 
   .hint {
-    margin: 0.4rem 0 0;
+    margin: 0;
     font-family: var(--font-body);
     font-size: 0.75rem;
     color: var(--text-secondary);
     line-height: 1.4;
-  }
-  .hint strong {
-    color: var(--text-primary);
-    font-weight: 600;
   }
   .hint em {
     font-style: normal;
@@ -433,20 +456,5 @@
   .error-msg {
     font-size: 0.75rem;
     color: var(--text-danger);
-    margin-bottom: 0.5rem;
   }
-
-  .footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 0.5rem;
-    gap: 0.5rem;
-  }
-  .footer-left,
-  .footer-right {
-    display: flex;
-    gap: 0.4rem;
-  }
-
 </style>

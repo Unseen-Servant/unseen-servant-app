@@ -2976,9 +2976,24 @@
   }
 
   async function requestDeleteCollection(name: string) {
+    // The name and the file count are both in hand, so the prompt states them
+    // as figures rather than folding them into a sentence. The Files row is a
+    // reassurance, not damage — the books are freed to Loose, not deleted —
+    // so it is marked `unchanged` and renders calm. A collection absent from
+    // `collections` (deleted from another surface mid-flight) drops the row
+    // rather than reading `undefined`.
+    const info = collections[name];
     const confirmed = await confirmPrompt.request({
       title: 'Delete collection',
-      message: `Delete "${name}"? Its files are freed to Loose — nothing in your library is deleted.`,
+      rows: [
+        { label: 'Track', value: name },
+        ...(info
+          ? [
+              { label: 'Files', value: String(info.file_count), to: 'Loose', unchanged: true },
+            ]
+          : []),
+      ],
+      message: 'The track goes; its books stay in your library.',
       confirmLabel: 'Delete',
       danger: true,
     });

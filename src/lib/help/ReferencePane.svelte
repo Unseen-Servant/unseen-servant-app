@@ -60,6 +60,23 @@
 
   <section class="block">
     <header class="block-head">
+      <h3 class="block-title section-title">Game system keywords</h3>
+      <p class="block-desc">
+        How the keywords you set in Settings → Game systems are matched against
+        your library.
+      </p>
+    </header>
+
+    <p class="block-desc">
+      Keyword matching ignores case, spaces, punctuation, and accents — so
+      <em>d&amp;d 5e</em>, <em>dnd-5e</em>, and <em>DnD 5E</em> all match the
+      same keyword. Avoid very short keywords such as two-letter
+      abbreviations: they false-positive on unrelated paths.
+    </p>
+  </section>
+
+  <section class="block">
+    <header class="block-head">
       <h3 class="block-title section-title">MCP tools</h3>
       <p class="block-desc">
         What an AI agent connected via MCP (Claude Desktop, Claude Code, or
