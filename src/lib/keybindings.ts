@@ -132,11 +132,15 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
   { id: 'results.toInput',       keys: { mac: 'Esc',  other: 'Esc' },           label: 'Back to search input',         scope: 'searchResults' },
 
-  // Modal — excluded from the cheat sheet by KeyboardHelpOverlay's SCOPE_ORDER.
-  // Defined anyway so the commit switch's face and the dialog's matcher read the
-  // chord from one place instead of hardcoding a glyph in each.
-  { id: 'confirm.commit',     keys: { mac: '⌘⌫', other: 'Del' },   label: 'Commit a destructive confirmation', scope: 'modal' },
-  { id: 'confirm.commitSafe', keys: { mac: '↵',  other: 'Enter' }, label: 'Commit a confirmation',             scope: 'modal' },
+  // Modal — excluded from the cheat sheet by both KeyboardHelpOverlay's and
+  // help/ReferencePane's SCOPE_ORDER; each keeps its own copy of that list,
+  // and both must keep omitting 'modal'. Defined anyway so the commit
+  // switch's face and the dialog's matcher read the chord from one place
+  // instead of hardcoding a glyph in each.
+  { id: 'confirm.commit',        keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Commit a destructive confirmation', scope: 'modal' },
+  // Must stay Enter: the safe commit fires via native <button> activation
+  // (focus sits on the button), not a dispatched chord — see confirmKeys.ts.
+  { id: 'confirm.commitSafe',    keys: { mac: '↵',    other: 'Enter' },         label: 'Commit a confirmation',             scope: 'modal' },
 ];
 
 const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));

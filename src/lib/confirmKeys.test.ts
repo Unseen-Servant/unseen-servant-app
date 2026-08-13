@@ -1,18 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { commitKeyId, isCommitChord } from './confirmKeys';
-import type { ChordEvent } from './keybindings';
+import { KEYBINDINGS, chord, type ChordEvent } from './keybindings';
 
 const ev = (over: Partial<ChordEvent> = {}): ChordEvent => ({
   key: 'a', code: 'KeyA', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...over,
 });
 
 describe('commitKeyId', () => {
-  it('names the safe binding for an activation prompt', () => {
-    expect(commitKeyId(false)).toBe('confirm.commitSafe');
-  });
-
-  it('names the delete binding for a removal prompt', () => {
-    expect(commitKeyId(true)).toBe('confirm.commit');
+  // Asserting the ternary returns its own literal can't fail. The real risk
+  // is `chord()` returning '' silently for an unknown id — renaming a
+  // binding out from under this function would blank the switch face with
+  // every check here still green, so assert the coupling instead.
+  it('names ids that resolve to a registered binding with a glyph', () => {
+    for (const danger of [true, false]) {
+      const id = commitKeyId(danger);
+      expect(KEYBINDINGS.some(k => k.id === id)).toBe(true);
+      expect(chord(id)).not.toBe('');
+    }
   });
 });
 
@@ -46,5 +50,17 @@ describe('isCommitChord', () => {
 
   it('rejects Shift+Delete — that means "delete permanently" elsewhere', () => {
     expect(isCommitChord(ev({ key: 'Delete', shiftKey: true }), true, false)).toBe(false);
+  });
+
+  // The dialog calls isCommitChord(event, danger) with two arguments — every
+  // test above passes `mac` explicitly, so this is the only one exercising
+  // the real call shape and its fall-through to isDeleteChord's platform
+  // default. Written platform-agnostic since the test runner's own platform
+  // decides which branch is live.
+  it('forwards to isDeleteChord\'s own default when mac is omitted', () => {
+    expect(isCommitChord(ev({ key: 'Enter' }), true)).toBe(false);
+    const macChordLive = isCommitChord(ev({ key: 'Backspace', metaKey: true }), true);
+    const otherChordLive = isCommitChord(ev({ key: 'Delete' }), true);
+    expect(macChordLive).not.toBe(otherChordLive);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   KEYBINDINGS,
+  commitKeyShortcut,
   eventMatchKey,
   isBareKeyChord,
   isDeleteChord,
@@ -83,6 +84,32 @@ describe('isDeleteChord', () => {
     expect(eventMatchKey(ev({ key: 'Backspace', metaKey: true }))).toBeNull();
     expect(KEYBINDINGS.find((k) => k.id === 'tree.delete')!.match).toBeUndefined();
     expect(KEYBINDINGS.find((k) => k.id === 'collections.delete')!.match).toBeUndefined();
+  });
+});
+
+describe('commitKeyShortcut', () => {
+  test('names a key isDeleteChord actually accepts, on both platforms', () => {
+    // Coupling test, not a pinned literal: parse the aria name back into a
+    // keydown and confirm isDeleteChord fires for it. If the two functions
+    // ever disagreed, aria-keyshortcuts would advertise a key that doesn't
+    // actually commit anything.
+    for (const mac of [true, false]) {
+      const shortcut = commitKeyShortcut(mac);
+      const [modifier, key] = shortcut.includes('+') ? shortcut.split('+') : [undefined, shortcut];
+      expect(isDeleteChord(ev({ key, metaKey: modifier === 'Meta' }), mac)).toBe(true);
+    }
+  });
+
+  // confirm.commitSafe fires by native <button> activation (focus sits on
+  // the button, and Enter is browser behavior, not a dispatched chord) — see
+  // confirmKeys.ts. That means this module can't derive the fact from
+  // isDeleteChord the way it does above; pin it directly instead, so a
+  // retune of the binding (e.g. to ⌘↵) can't drift from what the button
+  // actually honours.
+  test('confirm.commitSafe stays Enter', () => {
+    const entry = KEYBINDINGS.find((k) => k.id === 'confirm.commitSafe')!;
+    expect(entry.keys.mac).toBe('↵');
+    expect(entry.keys.other).toBe('Enter');
   });
 });
 
