@@ -11,9 +11,27 @@ import { writable } from 'svelte/store';
 // is why the file-tree handlers reached for the native OS dialog instead.
 // See docs/specs/ui/2026-08-11-modal-audit-design.md.
 
+/**
+ * One line of a confirmation's readout — the app's habit of answering "how
+ * much" with a figure rather than an adjective, applied to damage.
+ *
+ * `from` is the current figure (or the only one, for an identifying row);
+ * `to` is what it becomes. `unchanged` marks a `to` that is a reassurance
+ * rather than damage ("untouched", "Loose") so the dialog renders it calm
+ * instead of in the prompt's tone — the caller states what the value means
+ * and the dialog decides how that looks, keeping this store presentation-free.
+ */
+export interface ConfirmRow {
+  label: string;
+  from: string;
+  to?: string;
+  unchanged?: boolean;
+}
+
 export interface ConfirmRequest {
   title: string;
   message?: string;
+  rows?: ConfirmRow[];
   confirmLabel?: string;
   cancelLabel?: string;
   // Destructive prompts auto-focus Cancel and paint the confirm in

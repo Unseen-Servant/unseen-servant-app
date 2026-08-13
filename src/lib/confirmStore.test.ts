@@ -72,4 +72,30 @@ describe('confirm store', () => {
     store.answer(true);
     expect(await second).toBe(true);
   });
+
+  // Rows are optional per call site: a caller with no figures in hand keeps
+  // using `message`, so adoption never blocks on data the page can't cheaply
+  // get (delete-file has no chunk count — see the design's Readout data).
+  it('carries readout rows through untouched, and omits them when absent', () => {
+    const store = createConfirmStore();
+
+    void store.request({
+      title: 'Delete collection',
+      danger: true,
+      rows: [
+        { label: 'Track', from: 'Session 14' },
+        { label: 'Files', from: '12', to: 'Loose', unchanged: true },
+      ],
+    });
+
+    expect(get(store)?.rows).toEqual([
+      { label: 'Track', from: 'Session 14' },
+      { label: 'Files', from: '12', to: 'Loose', unchanged: true },
+    ]);
+
+    store.answer(false);
+    void store.request({ title: 'Delete file', message: 'Move it to Trash?', danger: true });
+
+    expect(get(store)?.rows).toBeUndefined();
+  });
 });
