@@ -2,6 +2,8 @@
   import type { BackgroundCheckInterval, BucketPolicy, SyncPreferences } from './types';
   import { BACKGROUND_CHECK_OPTIONS, DEFAULT_SYNC_PREFERENCES } from './types';
   import { FOLDER_OPEN, FOLDER_OPEN_VIEWBOX } from './iconPaths';
+  import ActionButton from './ActionButton.svelte';
+  import { confirmPrompt } from './confirmStore';
 
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
@@ -59,37 +61,58 @@
     onSyncPreferencesChange({ backgroundCheckInterval: value });
   }
 
-  let confirmingReindex = false;
-  let confirmingDelete = false;
+  // Both of these used to arm in place and fire on a second click — the app's
+  // one surviving second idiom for "are you sure". They raise a confirmation
+  // unit now, like every other destructive action, and the armed label that
+  // named the damage ("Reprocess 128 files?") becomes the prompt's readout
+  // rows, which say the same thing with the figures spelled out. This is the
+  // one surface where those figures are genuinely dramatic, which is what
+  // settled the design's open decision 1.
 
-  function handleReindexClick() {
+  async function handleReindexClick() {
     if (isSyncing || indexedFileCount === 0) return;
-    if (!confirmingReindex) {
-      confirmingReindex = true;
-      confirmingDelete = false;
-      return;
-    }
-    confirmingReindex = false;
+    // No `danger`: re-indexing rebuilds and destroys nothing, so the prompt is
+    // an activation — purple, lit, Enter commits. The zone names the blast
+    // radius; the flag names the kind of change.
+    //
+    // Bare counts, not "128 files": the label column already says FILES, and
+    // the delete prompt below states the same figure the same way. A readout
+    // column holds figures; the unit belongs to the label.
+    if (!(await confirmPrompt.request({
+      title: 'Re-index all files',
+      rows: [
+        { label: 'Files', value: String(indexedFileCount), to: 'reprocessed' },
+        { label: 'Chunks', value: totalChunks.toLocaleString(), to: 'rebuilt' },
+      ],
+      message: 'Every file is re-extracted and re-embedded. Nothing is deleted.',
+      confirmLabel: 'Re-index all',
+    }))) return;
     onReindexAll();
   }
 
-  function cancelReindex() {
-    confirmingReindex = false;
-  }
-
-  function handleDeleteClick() {
+  async function handleDeleteClick() {
     if (isSyncing || indexedFileCount === 0) return;
-    if (!confirmingDelete) {
-      confirmingDelete = true;
-      confirmingReindex = false;
-      return;
-    }
-    confirmingDelete = false;
+    // A removal, and the one prompt in the app whose readout is the whole
+    // argument: three figures going to zero, and a fourth that does not move.
+    if (!(await confirmPrompt.request({
+      title: 'Delete the index',
+      rows: [
+        { label: 'Files', value: String(indexedFileCount), to: '0' },
+        { label: 'Chunks', value: totalChunks.toLocaleString(), to: '0' },
+        // Dropped rather than shown as "0 B → 0 B" when the store reports
+        // nothing: storageBytes can be 0 with files still indexed, and a row
+        // whose before and after are the same figure states nothing. The
+        // Database section guards the same value the same way.
+        ...(storageBytes > 0
+          ? [{ label: 'Storage', value: formatSize(storageBytes), to: '0 B' }]
+          : []),
+        { label: 'PDFs', value: String(indexedFileCount), to: 'untouched', unchanged: true },
+      ],
+      message: 'Your library folder is not touched. The index rebuilds on the next sync.',
+      confirmLabel: 'Delete index',
+      danger: true,
+    }))) return;
     onDeleteIndex();
-  }
-
-  function cancelDelete() {
-    confirmingDelete = false;
   }
 
   function formatSize(bytes: number): string {
@@ -317,87 +340,44 @@
     </div>
   </section>
 
-  <section class="danger-zone" aria-label="Danger Zone">
-    <h3 class="danger-title section-title">Danger Zone</h3>
-
-    <div class="danger-row">
-      <div class="danger-row-text">
-        <div class="danger-row-title">Re-index all files</div>
-        <div class="danger-row-desc">
+  <!-- A bay, not a panel of its own: the same tinted well the game-system unit
+       uses for its destructive secondaries. Neither control commits here —
+       both raise a prompt — so both wear bracketed text and no switch face. A
+       face carries a key, and nothing on this surface implements one. See the
+       design's "A face is a promise, and only a commit may make it".
+       The two differ in hue because they differ in kind: re-indexing is an
+       activation and takes the confirm accent, deleting is a removal and takes
+       danger. Only the frame and the caption say "this bay is where the heavy
+       levers live". -->
+  <section class="modal-bay" aria-label="Danger zone">
+    <span class="ledger-label danger-caption">Danger zone</span>
+    <div class="modal-well danger-bay">
+      <div class="modal-well-row action-row">
+        <span class="row-text">
+          <span class="row-title">Re-index all files</span>
           Re-extracts and re-embeds every file in your index. Use after the
           extractor has been upgraded, or if search results look stale.
-        </div>
+        </span>
+        <ActionButton
+          kind="confirm"
+          label={isSyncing ? 'Sync in progress…' : 'Re-index all'}
+          onClick={handleReindexClick}
+          disabled={isSyncing || indexedFileCount === 0}
+        />
       </div>
-      <div class="danger-row-action">
-        {#if confirmingReindex}
-          <button
-            type="button"
-            class="btn-danger armed"
-            on:click={handleReindexClick}
-            disabled={isSyncing}
-          >
-            Reprocess {indexedFileCount} {indexedFileCount === 1 ? 'file' : 'files'}?
-          </button>
-          <button
-            type="button"
-            class="btn-ghost"
-            on:click={cancelReindex}
-            disabled={isSyncing}
-          >
-            Cancel
-          </button>
-        {:else}
-          <button
-            type="button"
-            class="btn-danger"
-            on:click={handleReindexClick}
-            disabled={isSyncing || indexedFileCount === 0}
-            title={indexedFileCount === 0 ? 'No indexed files' : ''}
-          >
-            {isSyncing ? 'Sync in progress…' : 'Re-index all'}
-          </button>
-        {/if}
-      </div>
-    </div>
-
-    <div class="danger-row">
-      <div class="danger-row-text">
-        <div class="danger-row-title">Delete the index</div>
-        <div class="danger-row-desc">
-          Removes every chunk from the database and clears the manifest.
-          Your library folder, game systems, and collections are kept — the
-          next sync rebuilds the index from scratch.
-        </div>
-      </div>
-      <div class="danger-row-action">
-        {#if confirmingDelete}
-          <button
-            type="button"
-            class="btn-danger armed"
-            on:click={handleDeleteClick}
-            disabled={isSyncing}
-          >
-            Delete {indexedFileCount} {indexedFileCount === 1 ? 'file' : 'files'}?
-          </button>
-          <button
-            type="button"
-            class="btn-ghost"
-            on:click={cancelDelete}
-            disabled={isSyncing}
-          >
-            Cancel
-          </button>
-        {:else}
-          <button
-            type="button"
-            class="btn-danger"
-            on:click={handleDeleteClick}
-            disabled={isSyncing || indexedFileCount === 0}
-            title={indexedFileCount === 0 ? 'No indexed files' : ''}
-          >
-            Delete the index
-          </button>
-        {/if}
+      <div class="modal-well-row action-row">
+        <span class="row-text">
+          <span class="row-title">Delete the index</span>
+          Removes every chunk and embedding. Your PDFs are untouched; the
+          index is rebuilt from scratch on the next sync.
+        </span>
+        <ActionButton
+          kind="confirm"
+          danger
+          label="Delete index"
+          onClick={handleDeleteClick}
+          disabled={isSyncing || indexedFileCount === 0}
+        />
       </div>
     </div>
   </section>
@@ -648,94 +628,16 @@
     opacity: 0.5;
   }
 
-  /* Arm, then fire. Both steps wear the recipe the mute button already
-     uses for "destructive and engaged" (.sm-btn.mute-on in app.css):
-     danger text, a tinted border, and a tint wash — never a fill, and
-     never a glow, since glows are reserved for activated states and a
-     removal is not an activation. Arming steps the border to full and
-     lays in the wash; the label changing to name the damage
-     ("Delete 128 files?") carries the rest. */
-  .btn-danger {
-    background: transparent;
-    border: 1px solid color-mix(in srgb, var(--text-danger) 45%, transparent);
+  /* The bay's caption. `.ledger-label` is the bay voice everywhere else and
+     only the hue changes here, because this is the one bay whose name is a
+     warning. Stepped back to 0.85 for the same reason the well's frame is
+     tinted rather than solid: a caption that shouts louder than the controls
+     it introduces is structure outranking them. Everything else about the
+     zone — the frame, the rows, the row voice — is global (.danger-bay,
+     .action-row, .row-text, .row-title in app.css). */
+  .danger-caption {
     color: var(--text-danger);
-  }
-  .btn-danger:hover:not(:disabled) {
-    border-color: var(--text-danger);
-    filter: brightness(1.15);
-  }
-
-  .btn-danger.armed {
-    background: color-mix(in srgb, var(--text-danger) 10%, transparent);
-    border-color: var(--text-danger);
-  }
-  .btn-danger.armed:hover:not(:disabled) {
-    filter: brightness(1.15);
-  }
-
-  .danger-zone {
-    /* Tinted to the same 45% the controls inside now use. At full strength
-       the frame shouted louder than the buttons it contains — structure
-       outranking the controls. The title keeps full danger. */
-    border: 1px solid color-mix(in srgb, var(--text-danger) 45%, transparent);
-    border-radius: var(--radius-well);
-    margin-top: 0.25rem;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .danger-title {
-    color: var(--text-danger);
-    margin: 0;
-    padding: 0.6rem 0.85rem;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .danger-row {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 0.85rem;
-  }
-  .danger-row + .danger-row {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .danger-row-text {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .danger-row-title {
-    font-family: var(--font-heading, var(--font-body));
-    font-size: 0.85rem;
-    color: var(--text-primary);
-    margin-bottom: 0.2rem;
-  }
-
-  .danger-row-desc {
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-  }
-
-  .danger-row-action {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  .btn-ghost {
-    background: transparent;
-    border: 1px solid var(--border-subtle);
-    color: var(--text-secondary);
-  }
-  .btn-ghost:hover:not(:disabled) {
-    color: var(--text-primary);
-    border-color: var(--text-primary);
+    opacity: 0.85;
   }
 
   .btn-icon {
