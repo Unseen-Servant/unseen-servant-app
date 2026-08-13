@@ -218,3 +218,32 @@ describe('isBareKeyChord', () => {
     }
   });
 });
+
+describe('switch bindings', () => {
+  // A key cap in the legend means "there is a square in the window for this".
+  test('marks the keys that light a switch', () => {
+    const ids = KEYBINDINGS.filter(k => k.switch).map(k => k.id);
+    expect(ids).toContain('tree.solo');
+    expect(ids).toContain('tree.mute');
+    expect(ids).toContain('collections.play');
+    expect(ids).toContain('collections.arm');
+    expect(ids).toContain('scope.bypass');
+  });
+
+  test('does not mark bare keys with no switch behind them', () => {
+    const byId = new Map(KEYBINDINGS.map(k => [k.id, k]));
+    expect(byId.get('tree.rename')?.switch).toBeUndefined();
+    expect(byId.get('collections.archive')?.switch).toBeUndefined();
+  });
+
+  // A modifier chord is a command, not a switch — a cap would lie about it.
+  // Note this cannot assert a single character: collections.play is a real
+  // switch whose chord reads "P / Space". It renders as text rather than a cap
+  // (isBareKeyChord is false for it), which is correct — the flag records what
+  // the key does, the renderer decides what that earns.
+  test('never marks a modifier chord', () => {
+    for (const k of KEYBINDINGS.filter(e => e.switch)) {
+      expect(k.keys.mac).not.toMatch(/[⌘⌥⇧⌃]/);
+    }
+  });
+});

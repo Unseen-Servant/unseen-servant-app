@@ -26,6 +26,22 @@ export interface KeybindingEntry {
   // Present only on bindings a menu re-exposes as an accelerator; the menu
   // matches on this rather than on the display string in `keys`.
   match?: string;
+  // True when this bare key throws a physical switch in the window — one of
+  // the app's 18px hardware squares that lights when engaged. The cheat sheet
+  // draws those as key caps and everything else as text, because the
+  // difference is real: a switch has a square you can point at, a command does
+  // not. A key that only reaches a context-menu item — R, A, '.', C — is a
+  // command, however bare it looks.
+  //
+  // The square goes by three class names and they are one control: `.sm-btn`
+  // (S / M / B), `.tr-btn` (collections' P and E), and `.app-checkbox` (X) —
+  // same 18px, same --border-subtle, same --radius-sm. Every flag below was
+  // checked against the component that renders it rather than against a list,
+  // which is what caught this: "an .sm-btn" is false for 6 of the 13. The test
+  // for it lives in keybindings.test.ts; the flag is what the key *does*, and
+  // the renderer decides what that earns (collections.play is a switch whose
+  // chord reads `P / Space`, so it draws as text, not a cap).
+  switch?: true;
 }
 
 const isMac =
@@ -53,7 +69,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filter.toggle',         keys: { mac: '⌘⇧F',  other: 'Ctrl+Shift+F' },  label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
-  { id: 'scope.bypass',          keys: { mac: 'B',    other: 'B' },             label: 'Bypass the whole scope console', scope: 'global' },
+  { id: 'scope.bypass',          keys: { mac: 'B',    other: 'B' },             label: 'Bypass the whole scope console', scope: 'global', switch: true },
   // Not a chord of its own — one line teaching the idiom every transport
   // key shares, so the sheet doesn't have to repeat it on eight labels.
   { id: 'scope.peek',            keys: { mac: 'hold S / M / P / B', other: 'hold S / M / P / B' }, label: 'Hold rather than tap to engage only while held', scope: 'global' },
@@ -72,13 +88,13 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.end',              keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
   { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
-  { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: "Tick the row's checkbox — indexing, or the collection while armed", scope: 'fileTree' },
+  { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: "Tick the row's checkbox — indexing, or the collection while armed", scope: 'fileTree', switch: true },
   { id: 'tree.open',             keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.openExternal',     keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal row in OS file explorer', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'fileTree', match: 'r' },
-  { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'fileTree', match: 's' },
-  { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree', match: 'm' },
+  { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'fileTree', match: 's', switch: true },
+  { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'fileTree', match: 'm', switch: true },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree', match: '.' },
   { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Collection (opens menu)',     scope: 'fileTree', match: 'c' },
   { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete focused row (to Trash)', scope: 'fileTree' },
@@ -86,9 +102,9 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Systems view (when a row is focused)
   { id: 'systems.open',          keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'systemsView' },
   { id: 'systems.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'systemsView' },
-  { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView' },
-  { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView' },
-  { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView' },
+  { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView', switch: true },
+  { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView', switch: true },
+  { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView', switch: true },
 
   // Collections panel (when a row is focused)
   { id: 'collections.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'collections' },
@@ -97,10 +113,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
   { id: 'collections.expand',    keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand collection',            scope: 'collections' },
   { id: 'collections.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse collection',          scope: 'collections' },
-  { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections' },
-  { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused collection', scope: 'collections' },
+  { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections', switch: true },
+  { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused collection', scope: 'collections', switch: true },
   { id: 'collections.rename',    keys: { mac: 'R',    other: 'R' },             label: 'Rename collection',            scope: 'collections' },
-  { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm focused collection', scope: 'collections' },
+  { id: 'collections.arm',       keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm focused collection', scope: 'collections', switch: true },
   { id: 'collections.archive',   keys: { mac: 'A',    other: 'A' },             label: 'Toggle archived',              scope: 'collections' },
   { id: 'collections.delete',    keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete collection',            scope: 'collections' },
   { id: 'collections.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / cancel an in-progress edit', scope: 'collections' },
@@ -113,9 +129,9 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filterPanel.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'filterPanel' },
   // Channel rows (curation, system) answer with their M; view rows have no M,
   // so this hits their single switch instead. One key, "do this row's thing".
-  { id: 'filterPanel.toggle',    keys: { mac: 'X',    other: 'X' },             label: "Tick the focused view row's checkbox", scope: 'filterPanel' },
-  { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / stop soloing focused channel', scope: 'filterPanel' },
-  { id: 'filterPanel.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterPanel' },
+  { id: 'filterPanel.toggle',    keys: { mac: 'X',    other: 'X' },             label: "Tick the focused view row's checkbox", scope: 'filterPanel', switch: true },
+  { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / stop soloing focused channel', scope: 'filterPanel', switch: true },
+  { id: 'filterPanel.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterPanel', switch: true },
   { id: 'filterPanel.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / leave the panel', scope: 'filterPanel' },
 
   // Context menu (when open)
