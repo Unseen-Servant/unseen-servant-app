@@ -368,6 +368,7 @@ The block at `app.css:527` lists selectors explicitly, so the switch is **not** 
   dialog[open],
   dialog[open]::backdrop,
   .motion-ready .sm-btn.solo-on,
+  .motion-ready .sm-btn.bypass-on,
   .motion-ready .sm-btn.mute-on,
   .motion-ready .commit-switch.activation .switch-face,
   .motion-ready .commit-switch.danger .switch-face {
