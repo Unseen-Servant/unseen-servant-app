@@ -654,23 +654,18 @@ dialog[open]::backdrop {
    hid: ⌘O is hold-a-modifier, [R] is press-a-key. Dimmer than the glyph so the
    frame stays structure and the key stays content.
 
-   `.chord-bare` carries the same brackets for chords rendered outside a
-   menu row — the shortcut sheet, whose whole job is teaching these, and
-   which showed a bare R where the menu showed [R]. Brackets only: the
-   sheet sets its own size and color, because there the chord is the
-   content rather than a hint riding on a label. */
-.menu-chord.bare::before,
-.chord-bare::before {
+   Menu hint columns only. The shortcut sheet used to share this treatment via
+   a `.chord-bare` sibling selector; it now draws a bare key as a key cap,
+   which is a stronger frame than brackets and would double the marker if it
+   wore both. */
+.menu-chord.bare::before {
   content: '[';
 }
-.menu-chord.bare::after,
-.chord-bare::after {
+.menu-chord.bare::after {
   content: ']';
 }
 .menu-chord.bare::before,
-.menu-chord.bare::after,
-.chord-bare::before,
-.chord-bare::after {
+.menu-chord.bare::after {
   opacity: 0.55;
 }
 
@@ -847,6 +842,21 @@ dialog[open]::backdrop {
    `cursor: pointer` on the element itself, and a direct declaration beats
    the `default` the disabled switch is only passing down. */
 .commit-switch:disabled .switch-face { opacity: 0.35; cursor: default; }
+
+/* The audit's F2, carried over to the switch that replaced the button it was
+   written for. Chromium does not match :focus-visible on a programmatic
+   .focus() when the preceding interaction was a click — and the app's one
+   activation prompt is raised from a context menu, i.e. by click. So the
+   commit really does hold focus, Enter and Space really do fire it, and the
+   :focus-visible rule above paints nothing to say so. This is not redundant
+   with it: delete this and a mouse-raised prompt shows its decision target
+   unmarked, which is the exact fault F2 named. Plain :focus is safe scoped to
+   the strip — there is exactly one control in there and it is the decision,
+   so there is nothing else for a stray pointer to light up. */
+.modal-commit-strip .commit-switch:focus {
+  outline: 1px solid var(--text-accent);
+  outline-offset: 2px;
+}
 
 /* Divides a rail's nameplate from what it carries — the same rule the scope
    bar puts between its master switch and the channels (.master-rule). Shared

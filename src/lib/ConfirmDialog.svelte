@@ -29,18 +29,35 @@
   // the focused control overrides the answer that control was sitting there to
   // give, which is how Cancel came to commit. ⌘⌫ carries no such meaning to
   // override: it is a deliberate modifier chord that means delete, nothing
-  // inside a confirm claims it, and a user who reaches for it has stated an
-  // intent that does not change with what Tab last landed on. Esc is
+  // inside a confirm claims it, and a *person* who reaches for it has stated
+  // an intent that does not change with what Tab last landed on. Esc is
   // dialog-wide for the same reason — both keys are statements about the
   // prompt rather than about the focused control.
   function handleKeydown(e: KeyboardEvent) {
     if (e.isComposing) return;
+    // A held key is one intent, not two — and the sentence above is only true
+    // of presses a person made. ⌘⌫ on a file row raises this prompt within a
+    // microtask, well inside the OS repeat delay, so the second keydown of a
+    // *single* held press would arrive at the freshly focused dialog and
+    // commit a deletion nobody has read yet. Auto-repeat is not someone
+    // reaching for the chord. Press-release-press still commits: that is the
+    // arm-then-fire the design asks for. Same guard as every other key path
+    // in the app (+page.svelte:2043, CollectionsPanel.svelte:486).
+    if (e.repeat) return;
     if (!$confirmPrompt) return;
     if (!isCommitChord(e, danger)) return;
-    // The global handler already bails while a dialog is open
-    // (+page.svelte:2127); this stops the browser's own delete handling.
+    // Hygiene, both of them: ⌘⌫ has no default action outside editable
+    // content and this unit contains no field, and the global handler already
+    // bails while a dialog is open (+page.svelte:2127). Stopping the event
+    // here is what makes that second fact structural rather than lucky —
+    // accept() clears the store synchronously, so a window-level guard that
+    // reads $confirmPrompt (GameSystemsSettings.svelte:88) sees null by the
+    // time the answering keystroke reaches it. Today only Svelte batching the
+    // close into a microtask keeps that from mattering; this retires the
+    // class instead of resting on flush order.
     e.preventDefault();
     accept();
+    e.stopPropagation();
   }
 </script>
 

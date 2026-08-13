@@ -33,10 +33,12 @@ export interface ConfirmRequest {
   rows?: ConfirmRow[];
   confirmLabel?: string;
   // Grades the change: a removal (delete, reset) rather than an activation
-  // (re-index). The caller states the nature and the dialog derives all three
-  // consequences — the commit switch's dressing, which key commits it, and
-  // where initial focus lands. A removal is danger-tinted and unlit, commits
-  // on ⌘⌫, and leaves focus on the dialog element so Enter is inert; an
+  // (re-index). The caller states the nature and the dialog derives its
+  // consequences — the commit switch's dressing and the glyph on its face,
+  // whether it declares a shortcut, the tone a row's `to` is rendered in,
+  // which key commits, and where initial focus lands. A removal is
+  // danger-tinted and unlit, commits on the delete chord (⌘⌫ on mac, Del
+  // elsewhere), and leaves focus on the dialog element so Enter is inert; an
   // activation is purple and lit, takes initial focus, and is activated by
   // Enter natively as any focused button is. See
   // docs/specs/ui/2026-08-12-modal-rack-units-design.md#the-keyboard.

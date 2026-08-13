@@ -38,6 +38,18 @@
   data-autofocus={initialFocus || undefined}
   aria-keyshortcuts={ariaKeys}
   on:click={onClick}
+  on:keydown={(e) => {
+    // The sibling of ConfirmDialog's repeat guard, for the commit the browser
+    // fires rather than us. Holding Enter on a menu row opens an activation
+    // prompt whose switch takes focus inside the OS repeat delay; the next
+    // repeat keydown is then a synthesized click on this button, answering a
+    // question that was never on screen long enough to read. preventDefault
+    // on keydown cancels that synthesized activation for Enter and Space
+    // alike. It lives here because every commit in the app is this component,
+    // and because no handler in the dialog can reach a click the browser
+    // makes for us.
+    if (e.repeat) e.preventDefault();
+  }}
 >
   <span class="commit-label">{label}</span>
   <!-- A span, not a button: a nested button is illegal, and the face is not
