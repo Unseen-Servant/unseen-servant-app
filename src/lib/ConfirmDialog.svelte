@@ -1,41 +1,47 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import Modal from './Modal.svelte';
-  import ActionButton from './ActionButton.svelte';
+  import CommitSwitch from './CommitSwitch.svelte';
   import { confirmPrompt } from './confirmStore';
-  import { trackInputModality, type InputModality } from './inputModality';
+  import { isCommitChord } from './confirmKeys';
 
-  // Mounted once at page level; the store decides whether it is on screen
-  // and what it asks. No props — see confirmStore.ts for the call-site
-  // shape and docs/specs/ui/2026-08-11-modal-audit-design.md for why this
-  // stopped being one dialog per caller.
+  // Mounted once at page level; the store decides whether it is on screen and
+  // what it asks. See confirmStore.ts for the call-site shape and
+  // docs/specs/ui/2026-08-12-modal-rack-units-design.md for the unit.
 
   const MESSAGE_ID = 'confirm-dialog-message';
 
-  // Esc, the backdrop, and the shell's × all mean the same thing here.
+  // Esc, the backdrop, and the rail's escape legend all mean the same thing.
   const cancel = () => confirmPrompt.answer(false);
   const accept = () => confirmPrompt.answer(true);
 
-  // Destructive prompts put initial focus on Cancel — Enter on muscle
-  // memory then cancels rather than committing. Nothing intercepts Enter
-  // at dialog level: the focused button handles it natively, so where
-  // focus sits is the whole of the chord's meaning. Which is also why
-  // only a keyboard-raised prompt places it: see viaKeyboard below.
   $: danger = $confirmPrompt?.danger === true;
 
-  let modality: InputModality | null = null;
-  onMount(() => {
-    modality = trackInputModality(document);
-    return () => modality?.stop();
-  });
-
-  // Snapshotted as the prompt opens rather than read at render time: the
-  // question is which hand raised it, and a click on the dialog's own
-  // buttons must not revise the answer. Only $confirmPrompt is a
-  // dependency here, so an interaction inside an open prompt can't
-  // re-run it.
-  let viaKeyboard = false;
-  $: if ($confirmPrompt) viaKeyboard = modality?.lastWasKeyboard() ?? false;
+  // An activation prompt puts focus on its commit, so Enter activates the
+  // button natively — there is deliberately no Enter handler here (F1). A
+  // removal prompt focuses the dialog itself, leaving Enter inert, and
+  // commits on the delete chord instead: the key that raised the deletion is
+  // the key that commits it.
+  //
+  // That chord is matched at dialog level, so it fires wherever focus sits —
+  // including when the user has tabbed to the rail's escape legend. That is
+  // the same *shape* as F1 and not the same fault. F1 was Enter, and Enter is
+  // the key that means "activate the thing that is focused"; handling it above
+  // the focused control overrides the answer that control was sitting there to
+  // give, which is how Cancel came to commit. ⌘⌫ carries no such meaning to
+  // override: it is a deliberate modifier chord that means delete, nothing
+  // inside a confirm claims it, and a user who reaches for it has stated an
+  // intent that does not change with what Tab last landed on. Esc is
+  // dialog-wide for the same reason — both keys are statements about the
+  // prompt rather than about the focused control.
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
+    if (!$confirmPrompt) return;
+    if (!isCommitChord(e, danger)) return;
+    // The global handler already bails while a dialog is open
+    // (+page.svelte:2127); this stops the browser's own delete handling.
+    e.preventDefault();
+    accept();
+  }
 </script>
 
 <Modal
@@ -44,57 +50,49 @@
   title={$confirmPrompt?.title ?? ''}
   size="sm"
   autofocus={false}
+  escapeWord="cancel"
   describedBy={$confirmPrompt?.message ? MESSAGE_ID : undefined}
+  on:keydown={handleKeydown}
 >
-  <div class="body">
+  <div class="modal-bays">
+    {#if $confirmPrompt?.rows?.length}
+      <div class="modal-bay">
+        <div class="modal-well" class:removal={danger} class:activation={!danger}>
+          {#each $confirmPrompt.rows as row, i (i)}
+            <div class="modal-well-row">
+              <span class="ledger-label">{row.label}</span>
+              <span class="modal-readout">
+                {row.value}{#if row.to}<span class="arrow">→</span><span
+                    class="to"
+                    class:unchanged={row.unchanged}>{row.to}</span>{/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
     {#if $confirmPrompt?.message}
       <p id={MESSAGE_ID} class="message">{$confirmPrompt.message}</p>
     {/if}
-    <div class="actions" class:ringed={viaKeyboard}>
-      <ActionButton
-        kind="discard"
-        label={$confirmPrompt?.cancelLabel ?? 'Cancel'}
-        onClick={cancel}
-        initialFocus={viaKeyboard && danger}
-      />
-      <ActionButton
-        kind="confirm"
-        {danger}
-        label={$confirmPrompt?.confirmLabel ?? 'Confirm'}
-        onClick={accept}
-        initialFocus={viaKeyboard && !danger}
-      />
-    </div>
   </div>
+
+  <svelte:fragment slot="commit">
+    <CommitSwitch
+      label={$confirmPrompt?.confirmLabel ?? 'Confirm'}
+      {danger}
+      onClick={accept}
+      initialFocus={!danger}
+    />
+  </svelte:fragment>
 </Modal>
 
 <style>
-  .body {
-    padding: var(--modal-pad);
-  }
-
+  /* The prose line, when a caller has one. Rows carry the figures; this
+     carries what a figure can't — what the change means. */
   .message {
-    margin: 0 0 1rem;
+    margin: 0;
     font-size: 0.9rem;
-    color: var(--text-primary);
+    color: var(--text-secondary);
     line-height: 1.4;
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.4rem;
-  }
-
-  /* A programmatic .focus() does not trigger :focus-visible when the
-     preceding interaction was a click, so a keyboard-raised prompt has to
-     paint its own ring. Gated on .ringed, which is only set for those:
-     a mouse-raised prompt auto-focuses nothing, and without the gate this
-     rule would light up whichever button the pointer presses. Plain :focus
-     inside it is right — both buttons are decision targets, and there is
-     nothing else in the dialog to confuse it with. */
-  .actions.ringed :global(.action-btn:focus) {
-    outline: 2px solid var(--text-accent);
-    outline-offset: 2px;
   }
 </style>
