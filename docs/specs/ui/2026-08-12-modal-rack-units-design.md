@@ -105,6 +105,26 @@ The colour law applies for the first time:
 Both recipes already exist as `.sm-btn.solo-on` / `.sm-btn.bypass-on` and
 `.sm-btn.mute-on`. Nothing new is defined; the selector list grows.
 
+**A face is a promise, and only a commit may make it.** The switch's face
+carries a key, which asserts that pressing that key fires this control. So a
+`CommitSwitch` may only be used where its container actually implements the
+key — that is, in a unit's commit rail:
+
+| Control | Container implements the key? | Wears |
+|---|---|---|
+| Confirm prompt's commit | yes — `ConfirmDialog`'s keydown (⌘⌫) or native button activation (↵) | `CommitSwitch` |
+| Game system Add / Save | yes — `GameSystemsSettings.handleWindowKey` (↵ from a text input, ⌘↵ globally) | `CommitSwitch` |
+| Danger Zone rows, game system Delete / Reset | **no** — they sit in a bay and raise a prompt | `ActionButton kind="confirm" danger` |
+
+This was very nearly got wrong: an earlier draft put `CommitSwitch` in both
+danger *bays*, where they would have worn `⌘⌫` and asserted
+`aria-keyshortcuts="Meta+Backspace"` for a shortcut nobody implements — and in
+the game-system modal, focus sits in a text input where ⌘⌫ genuinely deletes a
+line, so the face would have named a key that does something else entirely.
+
+A bay-level destructive action is not a commit; it is an action that *raises*
+one. It keeps the app's existing bracketed-danger-text vocabulary.
+
 ### Cancel is a legend in the top rail
 
 Cancel is not a peer of the commit — it is the absence of an action. It becomes

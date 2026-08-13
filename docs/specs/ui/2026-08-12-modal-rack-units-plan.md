@@ -770,6 +770,13 @@ Create `src/lib/CommitSwitch.svelte`:
 
 There is no `<style>` block: both classes live in `app.css` (Task 3) because the face shares its recipe with `.sm-btn`.
 
+**Only use this where the container implements the key on its face.** The face
+asserts that pressing that key fires the control, so a `CommitSwitch` belongs
+in a unit's commit rail and nowhere else. A destructive action sitting in a
+*bay* — the Danger Zone rows, the game system's Delete and Reset — raises a
+prompt rather than committing, and uses `ActionButton kind="confirm" danger`.
+See the design's "A face is a promise, and only a commit may make it".
+
 - [ ] **Step 2: Verify it type-checks**
 
 ```bash
@@ -1195,9 +1202,9 @@ Replace the modal's `<div class="body">…</div>` and the `<div class="footer">`
                 : 'Remove this tag and its keywords. Files already tagged are not changed.'}
             </span>
             {#if editIsBuiltin}
-              <CommitSwitch label="Reset to defaults" danger onClick={handleReset} />
+              <ActionButton kind="confirm" danger label="Reset to defaults" onClick={handleReset} />
             {:else}
-              <CommitSwitch label="Delete" danger onClick={handleDelete} />
+              <ActionButton kind="confirm" danger label="Delete" onClick={handleDelete} />
             {/if}
           </div>
         </div>
@@ -1458,7 +1465,9 @@ branches collapse to a single control each:
             Re-extracts and re-embeds every file in your index. Use after the
             extractor has been upgraded, or if search results look stale.
           </span>
-          <CommitSwitch
+          <ActionButton
+            kind="confirm"
+            danger
             label={isSyncing ? 'Sync in progress…' : 'Re-index all'}
             onClick={handleReindexClick}
             disabled={isSyncing || indexedFileCount === 0}
@@ -1470,9 +1479,10 @@ branches collapse to a single control each:
             Removes every chunk and embedding. Your PDFs are untouched; the
             index is rebuilt from scratch on the next sync.
           </span>
-          <CommitSwitch
-            label="Delete index"
+          <ActionButton
+            kind="confirm"
             danger
+            label="Delete index"
             onClick={handleDeleteClick}
             disabled={isSyncing || indexedFileCount === 0}
           />
@@ -1492,7 +1502,7 @@ needed either** — there is no armed state to step back out of — so drop it
 from Task 3's `app.css` additions if that task has already run, and skip it
 if it has not.
 
-Add `import CommitSwitch from './CommitSwitch.svelte';` to the script block.
+Add `import ActionButton from './ActionButton.svelte';` to the script block.
 
 **What is lost, recorded deliberately:** the armed label naming the damage
 (*"Reprocess 128 files?"*) was the best confirmation copy in the app. It is
