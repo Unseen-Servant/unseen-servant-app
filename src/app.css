@@ -396,28 +396,39 @@ input {
 
 /* Solo-on and the scope bar's master bypass share one lit recipe: both
    are "a mode you switched on", and the master switch should read as the
-   same kind of object as the channel switches it overrides.
-
-   The commit switch joins them lit, which stretches the convention: its face
-   is an *offer* to activate, not a mode already switched on, and it has no
-   off state to return to. Deliberate — the approved mockup (2026-08-12) reads
-   the whole prompt as the armed state — and cheap to reverse, since it is
-   this one `filter` line. Judge it in the visual pass. */
+   same kind of object as the channel switches it overrides. */
 .sm-btn.solo-on,
-.sm-btn.bypass-on,
-.commit-switch.activation .switch-face {
+.sm-btn.bypass-on {
   color: var(--text-active);
   border-color: var(--text-active);
   background: color-mix(in srgb, var(--text-active) 15%, transparent);
   filter: var(--glow-active);
 }
+
+/* The commit switch takes the same ink, border and wash but **no glow**.
+   It was lit here for one release and removed: a glow reports a state you
+   switched on, and in the window that reads because lit and unlit switches
+   sit side by side to compare. A prompt shows exactly one switch, always
+   dressed, with nothing to read the signal against — so the halo said
+   nothing a viewer could decode, while spending the app's scarcest visual
+   token. Purple ink against danger ink already separates an activation
+   from a removal, which is all this control has to say. */
+.commit-switch.activation .switch-face {
+  color: var(--text-active);
+  border-color: var(--text-active);
+  background: color-mix(in srgb, var(--text-active) 15%, transparent);
+}
 /* A detent is a switch reaching its position, so a switch nobody can throw
    has none: the commit switch is dressed from the moment the dialog opens,
    and a disabled one would animate having been thrown by no one. */
 .motion-ready .sm-btn.solo-on,
-.motion-ready .sm-btn.bypass-on,
-.motion-ready .commit-switch.activation:not(:disabled) .switch-face {
+.motion-ready .sm-btn.bypass-on {
   animation: detent-glow 110ms ease-out;
+}
+/* detent-flat, not detent-glow: the commit face carries no halo at rest, so
+   a keyframe that ends on one would flash a glow the switch never wears. */
+.motion-ready .commit-switch.activation:not(:disabled) .switch-face {
+  animation: detent-flat 110ms ease-out;
 }
 .sm-btn.mute-on,
 .commit-switch.danger .switch-face {
@@ -697,12 +708,6 @@ dialog[open]::backdrop {
   color: var(--text-accent);
 }
 
-.dialog-title {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  line-height: 1.2;
-  color: var(--text-accent);
-}
 
 .section-title {
   font-family: var(--font-heading);
