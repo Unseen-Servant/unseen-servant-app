@@ -45,6 +45,7 @@
   import { buildRibbonIndex, firstColorByPath } from '../lib/collectionRibbons';
   import { createCommitScheduler, mergeArmedCollection } from '../lib/collectionCommit';
   import { setTreePathsPayload, type TreePathsPayload } from '../lib/dragPayload';
+  import { openDialogs } from '../lib/dialogStack';
   import { chord, isDeleteChord } from '../lib/keybindings';
   import {
     parseString,
@@ -3462,7 +3463,7 @@
 
 <LaunchSplash visible={showSplash} onDismiss={dismissSplash} />
 
-<main class="app-layout" class:motion-ready={motionReady}>
+<main class="app-layout" class:motion-ready={motionReady} class:dialog-open={$openDialogs > 0}>
   <Header
     bind:this={headerComponent}
     bind:searchQuery

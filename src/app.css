@@ -533,10 +533,38 @@ input {
 :root,
 dialog::backdrop {
   --scrim-modal: rgba(0, 0, 0, 0.6);
+  --scrim-modal-stacked: rgba(0, 0, 0, 0.35);
 }
 
+/* The scrim covers the workspace, not the frame. A rack unit wears
+   --bg-header rails so it reads as part of the instrument; dimming the
+   instrument it quotes undercuts that, and the StatusBar's lamps and sync
+   spinner sometimes answer the very question the prompt is asking. The
+   heights are the same tokens that size the two bars, so the edges cannot
+   drift apart. */
 dialog::backdrop {
   background: var(--scrim-modal);
+  top: var(--header-height);
+  bottom: var(--statusbar-height);
+}
+
+/* A second dialog's backdrop sits *between* the two dialogs, so at full
+   strength a prompt darkens the modal it is asking about by 60%. Lighter
+   keeps that modal legible as context while still reading as inactive. */
+dialog.stacked::backdrop {
+  background: var(--scrim-modal-stacked);
+}
+
+/* The frame stays outside the scrim, so it must say for itself that it is
+   not available: the page behind an open dialog is inert, and a bright
+   Header whose buttons do nothing is a false affordance — a click there
+   does not even dismiss the dialog. This is the app's existing step for
+   "present but not available", the one the scope bar's bypass uses on the
+   principle that the point of a bypass is to see what you are bypassing. */
+.app-layout.dialog-open > .header,
+.app-layout.dialog-open > .statusbar {
+  opacity: var(--opacity-out-of-scope);
+  transition: opacity var(--transition-fast);
 }
 
 /* Entry only. Exit needs @starting-style or allow-discrete to survive the
