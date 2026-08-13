@@ -351,6 +351,13 @@
 
 <style>
   .scope-bar {
+    /* A chip is the tallest thing the row carries — taller than the 18px
+       switch that sets the resting height — so the row has to be built
+       for it from the start. Otherwise the first chip thickened the bar
+       and shoved the tree below it down a couple of pixels. The chip
+       wears this height and the row reserves it: 1.2 line-height on the
+       0.75rem body text, plus 0.1rem padding and a 1px border per side. */
+    --chip-height: calc(1.1rem + 2px);
     /* Pins to the top of the scrolling tree/systems container; inert in
        search mode, whose flex column doesn't scroll. z-index keeps the
        rows' positioned affordances beneath (fixed dropdowns sit higher). */
@@ -376,6 +383,10 @@
     flex: 1;
     min-width: 0;
     flex-wrap: wrap;
+    /* Room for a chip whether or not one is there. Wrapping to a second
+       line still grows the bar — that is a real change of state; a chip
+       appearing on the line already on screen is not. */
+    min-height: var(--chip-height);
   }
 
   .right {
@@ -431,6 +442,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    height: var(--chip-height);
     padding: 0.1rem 0.4rem;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-subtle);
