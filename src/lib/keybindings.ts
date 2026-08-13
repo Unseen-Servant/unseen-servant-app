@@ -131,6 +131,12 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.open',          keys: { mac: '↵',    other: 'Enter' },         label: 'Open focused result',          scope: 'searchResults' },
   { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
   { id: 'results.toInput',       keys: { mac: 'Esc',  other: 'Esc' },           label: 'Back to search input',         scope: 'searchResults' },
+
+  // Modal — excluded from the cheat sheet by KeyboardHelpOverlay's SCOPE_ORDER.
+  // Defined anyway so the commit switch's face and the dialog's matcher read the
+  // chord from one place instead of hardcoding a glyph in each.
+  { id: 'confirm.commit',     keys: { mac: '⌘⌫', other: 'Del' },   label: 'Commit a destructive confirmation', scope: 'modal' },
+  { id: 'confirm.commitSafe', keys: { mac: '↵',  other: 'Enter' }, label: 'Commit a confirmation',             scope: 'modal' },
 ];
 
 const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
@@ -194,6 +200,13 @@ export function isDeleteChord(event: ChordEvent, mac = isMac): boolean {
   if (event.shiftKey || event.altKey) return false;
   if (mac) return (event.metaKey || event.ctrlKey) && event.key === 'Backspace';
   return !event.metaKey && !event.ctrlKey && event.key === 'Delete';
+}
+
+// aria-keyshortcuts for a destructive commit. keyShortcut() derives from
+// `match`, and named keys can't round-trip through eventMatchKey (single
+// characters only) — so this binding has no `match` and needs its own.
+export function commitKeyShortcut(mac = isMac): string {
+  return mac ? 'Meta+Backspace' : 'Delete';
 }
 
 // Normalized lookup key for a keydown, matching KeybindingEntry.match. Cmd and
