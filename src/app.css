@@ -875,20 +875,13 @@ dialog[open]::backdrop {
    the `default` the disabled switch is only passing down. */
 .commit-switch:disabled .switch-face { opacity: 0.35; cursor: default; }
 
-/* The audit's F2, carried over to the switch that replaced the button it was
-   written for. Chromium does not match :focus-visible on a programmatic
-   .focus() when the preceding interaction was a click — and the app's one
-   activation prompt is raised from a context menu, i.e. by click. So the
-   commit really does hold focus, Enter and Space really do fire it, and the
-   :focus-visible rule above paints nothing to say so. This is not redundant
-   with it: delete this and a mouse-raised prompt shows its decision target
-   unmarked, which is the exact fault F2 named. Plain :focus is safe scoped to
-   the strip — there is exactly one control in there and it is the decision,
-   so there is nothing else for a stray pointer to light up. */
-.modal-commit-strip .commit-switch:focus {
-  outline: 1px solid var(--text-accent);
-  outline-offset: 2px;
-}
+/* No forced :focus rule here, deliberately. An earlier pass added one as
+   F2's remedy — Chromium does not match :focus-visible on a programmatic
+   .focus() when the preceding interaction was a click. ConfirmDialog now
+   gates focus placement on input modality instead, so the only programmatic
+   focus follows a keypress and :focus-visible matches on its own. Adding
+   plain :focus back would ring the switch after an ordinary mouse click on
+   it, which is the fault F2 was avoiding, pointed the other way. */
 
 /* Divides a rail's nameplate from what it carries — the same rule the scope
    bar puts between its master switch and the channels (.master-rule). Shared

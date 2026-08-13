@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Modal from './Modal.svelte';
   import CommitSwitch from './CommitSwitch.svelte';
   import { confirmPrompt } from './confirmStore';
   import { isCommitChord } from './confirmKeys';
+  import { trackInputModality, type InputModality } from './inputModality';
 
   // Mounted once at page level; the store decides whether it is on screen and
   // what it asks. See confirmStore.ts for the call-site shape and
@@ -15,6 +17,22 @@
   const accept = () => confirmPrompt.answer(true);
 
   $: danger = $confirmPrompt?.danger === true;
+
+  // Which hand raised the prompt. Focus is only *placed* when a keyboard did:
+  // a mouse user who picked Delete from a context menu never asked for a
+  // control to be focused, and ringing one reads as a stray highlight — the
+  // rule the panes already follow, where nothing is ringed until you navigate.
+  // Snapshotted as the prompt opens rather than read at render time, so a
+  // click on the dialog's own commit cannot revise the answer; only
+  // $confirmPrompt is a dependency here.
+  let modality: InputModality | null = null;
+  onMount(() => {
+    modality = trackInputModality(document);
+    return () => modality?.stop();
+  });
+
+  let viaKeyboard = false;
+  $: if ($confirmPrompt) viaKeyboard = modality?.lastWasKeyboard() ?? false;
 
   // An activation prompt puts focus on its commit, so Enter activates the
   // button natively — there is deliberately no Enter handler here (F1). A
@@ -98,7 +116,7 @@
       label={$confirmPrompt?.confirmLabel ?? 'Confirm'}
       {danger}
       onClick={accept}
-      initialFocus={!danger}
+      initialFocus={viaKeyboard && !danger}
     />
   </svelte:fragment>
 </Modal>

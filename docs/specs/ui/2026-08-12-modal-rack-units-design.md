@@ -219,10 +219,24 @@ warned must not come back.
 
 Resolution, split by nature:
 
-**Activation prompts** (`danger` unset). The commit switch takes initial focus,
-as the confirm button does today. Its face reads `↵`. Enter is handled
+**Activation prompts** (`danger` unset), **raised by keyboard**. The commit
+switch takes initial focus. Its face reads `↵`, and Enter is handled
 **natively by the focused button** — no dialog-level listener, exactly as F1's
 fix left it.
+
+**Activation prompts raised by pointer.** Focus is *not* placed. A mouse user
+who picked Re-index from a context menu never asked for a control to be
+focused, and ringing one reads as a stray highlight — the rule the panes
+already follow, where nothing is ringed until you navigate. Focus parks on
+the dialog, so Esc works and nothing is marked. `inputModality.ts` answers
+which hand raised it.
+
+This gate was in the app before this redesign and was dropped when
+`ConfirmDialog` was rebuilt — restored 2026-08-13 after the visual pass
+caught it. It also removes the need for the forced `:focus` rule that F2
+called for: the only programmatic focus now follows a keypress, so
+`:focus-visible` matches on its own, and a plain mouse click on the switch
+correctly rings nothing.
 
 **Removal prompts** (`danger: true`). Initial focus goes to the **dialog
 element itself** (`tabindex="-1"`, no visible ring — the shell already does
