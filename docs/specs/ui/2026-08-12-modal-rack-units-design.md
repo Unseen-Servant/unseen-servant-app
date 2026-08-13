@@ -1,13 +1,17 @@
 # Modals as Rack Units — Design
 
 **Date:** 2026-08-12
-**Status:** Proposed. Approved in mockup form 2026-08-12; nothing implemented.
+**Status:** In progress. Approved in mockup form 2026-08-12. Tasks 1-2 shipped
+(`confirmKeys.ts`, `ConfirmRow`); see
+[the plan](2026-08-12-modal-rack-units-plan.md) for per-task state.
 **Scope:** Frontend only — `src/lib/Modal.svelte`, `src/lib/ConfirmDialog.svelte`,
 `src/lib/confirmStore.ts`, `src/lib/DocumentStatsModal.svelte`,
 `src/lib/SettingsModal.svelte`, `src/lib/LibrarySettings.svelte`,
 `src/lib/GameSystemsSettings.svelte`, `src/lib/KeyboardHelpOverlay.svelte`,
-`src/lib/keybindings.ts`, `src/app.css`. No Rust or sidecar changes; one
-optional Tauri command call is discussed in [Readout data](#readout-data).
+`src/lib/keybindings.ts`, `src/lib/confirmKeys.ts`, `src/app.css`. No Rust or
+sidecar changes; one optional Tauri command call is discussed in
+[Readout data](#readout-data). Retiring the inline two-step (open decision 1)
+makes `LibrarySettings.svelte` a behaviour change, not only a restyle.
 
 **Supersedes** the incremental proposals reviewed on 2026-08-12 (headerless
 confirm, recessed Document-info well, bracketed Danger Zone controls). Those
@@ -196,8 +200,8 @@ audit set when it moved defaults into the dialog.
 ```ts
 export interface ConfirmRow {
   label: string;            // rendered in the .ledger-label voice
-  from: string;             // the current figure, or the only figure
-  to?: string;              // the figure after committing
+  value: string;            // the figure
+  to?: string;              // what it becomes, when there is a transition
   // This row's `to` is a reassurance rather than damage ("untouched",
   // "Loose"), so the dialog renders it calm instead of in the prompt's
   // tone. Semantic, not presentational: the caller states what the value
@@ -215,14 +219,18 @@ export interface ConfirmRequest {
 }
 ```
 
+The field carrying the figure is `value`, not `from`: four of the rows this
+ships have no transition at all, and `from` named one that does not exist.
+
 `rows` is optional and `message` is unchanged, so **adoption is per call site**
 and no caller is blocked on data it cannot cheaply get. A prompt with no rows
 renders exactly as it does today, inside the new shell.
 
 ### Readout data
 
-Five of the six call sites can fill rows from state they already hold. The
-exception is delete-file (`+page.svelte:2552`), which has no chunk count. Two
+There are five prompt call sites today, and retiring the two-step (open
+decision 1) adds two more. Most can fill rows from state they already hold.
+The exception is delete-file (`+page.svelte:2552`), which has no chunk count. Two
 options, decided in [Adoption](#adoption):
 
 1. **Fetch it.** `get_document_stats` already exists and
@@ -337,12 +345,43 @@ Steps 4–6 are independent of each other and of 3.
 
 ## Open decisions
 
-1. **Does the inline two-step survive?** Once a prompt carries a numeric
-   readout it strictly dominates arm-then-fire — *"Reprocess 128 files?"* was
-   good because it was a readout, and the well is a better one. Retiring it
-   would collapse the audit's *"one doctrine, two idioms"* into one idiom.
-   **Not decided here.** Step 5 restyles the Danger Zone either way; whether
-   its rows raise a unit or arm in place is a separate change on top.
+1. ~~**Does the inline two-step survive?**~~ **Resolved 2026-08-12: no.**
+   The audit's *"one doctrine, two idioms"* collapses into one idiom — every
+   destructive action raises a unit, and arm-then-fire is retired.
+
+   What forced it was counting, during implementation, what the readout well
+   would actually contain. Of the eight rows planned across the call sites
+   that had figures in hand: **four were identity rows** (a name, a tag),
+   **three were reassurances** (`→ Loose`, `→ untouched`), and exactly **one**
+   was a genuine damage transition. The flagship readout this design argues
+   for — `CHUNKS 3,412 → 0` — shipped nowhere. Delete-file has no chunk count
+   (`FileItem` carries only `name`/`path`/`is_dir`/`children`), and
+   delete-index, where the figures are real and dramatic, never opened a
+   prompt at all.
+
+   So the well was set to grow every confirmation from ~137px to ~210px in
+   order to restate strings the prompt already had. Routing the Danger Zone
+   through prompts is what lets the feature make its own argument, on the one
+   surface where the numbers genuinely matter:
+
+   ```
+   FILES     128     → 0
+   CHUNKS    41,203  → 0
+   STORAGE   2.14 GB → 0 B
+   PDFs      128     → untouched
+   ```
+
+   Note the two Danger Zone rows grade differently: re-indexing rebuilds and
+   destroys nothing, so it is an **activation** (purple, lit, Enter commits);
+   deleting the index is a **removal** (danger tint, no glow, ⌘⌫ commits). The
+   zone names the blast radius; the flag names the kind of change.
+
+   **What is lost, recorded deliberately:** the armed label naming the damage
+   (*"Reprocess 128 files?"*) was the best confirmation copy in the app. It is
+   not discarded — it becomes the rows above, saying the same thing in more
+   detail in the app's own tabular-figure idiom. If the prompt reads worse
+   than the two-step did, that judgement belongs in the visual pass and
+   reverting is one commit.
 2. **The stacked scrim, carried forward undecided.** Two open dialogs each
    paint a `::backdrop` at `rgba(0,0,0,0.6)`, so a prompt over the game-system
    unit dims it 60% and the page behind to 84%. The modal underneath is meant

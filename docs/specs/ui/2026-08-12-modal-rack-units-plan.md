@@ -6,7 +6,7 @@
 
 **Architecture:** `Modal.svelte` grows a rail/commit slot pair and loses its `×`. A new `CommitSwitch.svelte` composes a label with a switch face that shares `.sm-btn`'s recipe through a selector list in `app.css`, so the two can never drift. The keyboard model is extracted into a pure `confirmKeys.ts` module so it is unit-testable: activation prompts leave Enter to the focused button (never a dialog-level Enter listener — that was the audit's F1), removal prompts focus the dialog and commit on the delete chord.
 
-**Tech Stack:** Svelte 4 + TypeScript, Vitest (pure-logic tests only — there is no jsdom or testing-library in this repo, so components are verified by `svelte-check`, `stylelint`, `vite build`, and the manual passes in Task 12), stylelint with a raw-colour ban over `src/lib/**/*.svelte`.
+**Tech Stack:** Svelte **5.56.8 in legacy (non-runes) mode** — components use `export let` and `<slot>`, and `svelte.config.js` sets no `runes: true`, so named slots and `$$slots` work as written. (An earlier draft of this plan said Svelte 4; that was wrong, and it matters for `{#each}` keying — see Task 6.) TypeScript, Vitest (pure-logic tests only — there is no jsdom or testing-library in this repo, so components are verified by `svelte-check`, `stylelint`, `vite build`, and the manual passes in Task 12), stylelint with a raw-colour ban over `src/lib/**/*.svelte`.
 
 **Design:** [2026-08-12-modal-rack-units-design.md](2026-08-12-modal-rack-units-design.md)
 
@@ -200,6 +200,13 @@ git add src/lib/confirmKeys.ts src/lib/confirmKeys.test.ts src/lib/keybindings.t
 
 ## Task 2: Readout rows in the store
 
+> **Shipped 2026-08-12** as `96d3eb0` + `875761c`. The field below was
+> originally specified as `from`; review renamed it to `value`, because four of
+> the rows this feature actually writes have no `to` at all and the doc comment
+> had to apologise for the name on its own first line. The snippets here are
+> corrected. Also note vitest does **not** type-check, so this test passes with
+> or without the field — `svelte-check` is what actually gates it.
+
 **Files:**
 - Modify: `src/lib/confirmStore.ts`
 - Modify: `src/lib/confirmStore.test.ts`
@@ -219,14 +226,14 @@ Append inside the existing `describe('confirm store', ...)` block in `src/lib/co
       title: 'Delete collection',
       danger: true,
       rows: [
-        { label: 'Track', from: 'Session 14' },
-        { label: 'Files', from: '12', to: 'Loose', unchanged: true },
+        { label: 'Track', value: 'Session 14' },
+        { label: 'Files', value: '12', to: 'Loose', unchanged: true },
       ],
     });
 
     expect(get(store)?.rows).toEqual([
-      { label: 'Track', from: 'Session 14' },
-      { label: 'Files', from: '12', to: 'Loose', unchanged: true },
+      { label: 'Track', value: 'Session 14' },
+      { label: 'Files', value: '12', to: 'Loose', unchanged: true },
     ]);
 
     store.answer(false);
@@ -253,15 +260,15 @@ In `src/lib/confirmStore.ts`, insert above `export interface ConfirmRequest`:
  * One line of a confirmation's readout — the app's habit of answering "how
  * much" with a figure rather than an adjective, applied to damage.
  *
- * `from` is the current figure (or the only one, for an identifying row);
- * `to` is what it becomes. `unchanged` marks a `to` that is a reassurance
+ * `value` is the figure; `to` is what it becomes, when there is a transition
+ * at all — four of the rows this ships have none. `unchanged` marks a `to` that is a reassurance
  * rather than damage ("untouched", "Loose") so the dialog renders it calm
  * instead of in the prompt's tone — the caller states what the value means
  * and the dialog decides how that looks, keeping this store presentation-free.
  */
 export interface ConfirmRow {
   label: string;
-  from: string;
+  value: string;
   to?: string;
   unchanged?: boolean;
 }
@@ -506,27 +513,17 @@ Append to `src/app.css`, after the modal geometry tokens block:
   color: var(--text-primary);
   margin-bottom: 0.15rem;
 }
-
-/* Stepping back out of an armed state — quiet text, never a second box. */
-.step-back {
-  background: none;
-  border: none;
-  padding: 0.2rem 0.3rem;
-  font-family: var(--font-body);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color var(--transition-fast);
-}
-.step-back:hover:not(:disabled) { color: var(--text-primary); }
-.step-back:disabled { color: var(--text-tertiary); cursor: default; }
 ```
 
-These four groups are in `app.css` rather than in a component because **Svelte
-scopes component styles** — `danger-bay`, `action-row`, `.rail-rule` and
-`.step-back` are each needed by two or more of `DocumentStatsModal`,
-`GameSystemsSettings`, `SettingsModal` and `LibrarySettings`, and a per-file
-copy is exactly the drift this design exists to remove.
+These groups are in `app.css` rather than in a component because **Svelte
+scopes component styles** — `danger-bay`, `action-row` and `.rail-rule` are
+each needed by two or more of `DocumentStatsModal`, `GameSystemsSettings`,
+`SettingsModal` and `LibrarySettings`, and a per-file copy is exactly the
+drift this design exists to remove.
+
+(An earlier draft also added a `.step-back` recipe for backing out of an armed
+Danger Zone control. Task 10 now retires arm-then-fire entirely, so there is no
+armed state to step back out of and the recipe is gone before it was written.)
 
 - [ ] **Step 5: Verify nothing regressed**
 
@@ -854,11 +851,11 @@ Replace the `<Modal>…</Modal>` block with:
     {#if $confirmPrompt?.rows?.length}
       <div class="modal-bay">
         <div class="modal-well" class:removal={danger} class:activation={!danger}>
-          {#each $confirmPrompt.rows as row (row.label)}
+          {#each $confirmPrompt.rows as row, i (i)}
             <div class="modal-well-row">
               <span class="ledger-label">{row.label}</span>
               <span class="modal-readout">
-                {row.from}{#if row.to}<span class="arrow">→</span><span
+                {row.value}{#if row.to}<span class="arrow">→</span><span
                   class="to"
                   class:unchanged={row.unchanged}>{row.to}</span>{/if}
               </span>
@@ -928,7 +925,7 @@ git add src/lib/ConfirmDialog.svelte && git commit -m "feat(modals): rebuild the
 
 ## Task 7: Fill the readouts where the data is in hand
 
-Three of the six call sites hold real figures. Two do not — delete-file and re-index-file have only a `FileItem` (`name`, `path`, `is_dir`, `children`), and `+page.svelte` keeps no path→chunk-count map. Those keep `message` only, which is exactly the optional path Task 2 built.
+Three of the five call sites hold real figures (Task 10 adds two more when it retires the two-step). Two do not — delete-file and re-index-file have only a `FileItem` (`name`, `path`, `is_dir`, `children`), and `+page.svelte` keeps no path→chunk-count map. Those keep `message` only, which is exactly the optional path Task 2 built.
 
 **Files:**
 - Modify: `src/routes/+page.svelte:2978` (delete collection)
@@ -943,11 +940,10 @@ Three of the six call sites hold real figures. Two do not — delete-file and re
     const confirmed = await confirmPrompt.request({
       title: 'Delete collection',
       rows: [
-        { label: 'Track', from: name },
+        { label: 'Track', value: name },
         ...(info
           ? [
-              { label: 'Files', from: String(info.file_count), to: 'Loose', unchanged: true },
-              { label: 'Deleted', from: '0 files', to: '0 chunks', unchanged: true },
+              { label: 'Files', value: String(info.file_count), to: 'Loose', unchanged: true },
             ]
           : []),
       ],
@@ -965,9 +961,9 @@ In `src/lib/GameSystemsSettings.svelte`, replace the request in the delete handl
     const confirmed = await confirmPrompt.request({
       title: 'Delete game system',
       rows: [
-        { label: 'Tag', from: editOriginalTag },
-        { label: 'Keywords', from: modalKeywords || '—' },
-        { label: 'Tagged', from: 'files already tagged', to: 'unchanged', unchanged: true },
+        { label: 'Tag', value: editOriginalTag },
+        { label: 'Keywords', value: modalKeywords || '—' },
+        { label: 'Tagged', value: 'files already tagged', to: 'unchanged', unchanged: true },
       ],
       message: 'You can add the tag again at any time.',
       confirmLabel: 'Delete',
@@ -983,8 +979,8 @@ Replace the request in the reset handler:
     const confirmed = await confirmPrompt.request({
       title: 'Reset to defaults',
       rows: [
-        { label: 'Tag', from: editOriginalTag },
-        { label: 'Keywords', from: modalKeywords || '—', to: 'built-in set' },
+        { label: 'Tag', value: editOriginalTag },
+        { label: 'Keywords', value: modalKeywords || '—', to: 'built-in set' },
       ],
       message: 'Your changes to this system are discarded.',
       confirmLabel: 'Reset',
@@ -1386,63 +1382,123 @@ Delete the `.tab-nav`, `.tab-btn`, `.tab-btn:hover:not(.active)`, `.tab-btn.acti
 
 Change the `height` prop on `<Modal>` from `min(520px, 80vh)` to `min(486px, 80vh)` — the tab band's ~34px is bought back by the rail.
 
-- [ ] **Step 4: Restyle the Danger Zone as a bay**
+- [ ] **Step 4: Retire the arm-then-fire two-step**
 
-In `src/lib/LibrarySettings.svelte`, replace the `.danger-zone` section's wrapper classes so it uses `modal-well danger-bay`, and swap both `.btn-danger` / `.btn-ghost` buttons for `CommitSwitch`. Keep the arm-then-fire behaviour exactly as it is — whether these rows should raise a unit instead is [open decision 1](2026-08-12-modal-rack-units-design.md#open-decisions) and is **not** settled by this task.
+**Decision, 2026-08-12:** the design's open decision 1 is now resolved —
+one idiom, not two. The Danger Zone rows stop arming in place and raise a
+unit like every other destructive action.
 
-Replace the resting and armed buttons in the re-index row with:
+What forced it: a review tallied the rows Task 7 actually writes and found
+four identity rows, three reassurances, and exactly **one** genuine damage
+transition. The design's flagship readout, `CHUNKS 3,412 → 0`, shipped
+nowhere — delete-file has no chunk count (`FileItem` carries only
+`name`/`path`/`is_dir`/`children`) and delete-index never opened a prompt.
+Delete-index is where the figures are real, so that is where the well has
+to appear or the feature does not make its own argument.
+
+In `src/lib/LibrarySettings.svelte`, delete the whole arm-then-fire
+apparatus at `:62-93` — `confirmingReindex`, `confirmingDelete`,
+`cancelReindex`, `cancelDelete`, and the two-branch bodies of
+`handleReindexClick` / `handleDeleteClick` — and replace the two handlers
+with prompt-raising ones:
+
+```ts
+  async function handleReindexClick() {
+    if (isSyncing || indexedFileCount === 0) return;
+    const files = `${indexedFileCount} ${indexedFileCount === 1 ? 'file' : 'files'}`;
+    if (!(await confirmPrompt.request({
+      title: 'Re-index all files',
+      rows: [
+        { label: 'Files', value: files, to: 'reprocessed' },
+        { label: 'Chunks', value: totalChunks.toLocaleString(), to: 'rebuilt' },
+      ],
+      message: 'Every file is re-extracted and re-embedded. Nothing is deleted.',
+      confirmLabel: 'Re-index all',
+    }))) return;
+    onReindexAll();
+  }
+
+  async function handleDeleteClick() {
+    if (isSyncing || indexedFileCount === 0) return;
+    if (!(await confirmPrompt.request({
+      title: 'Delete the index',
+      rows: [
+        { label: 'Files', value: String(indexedFileCount), to: '0' },
+        { label: 'Chunks', value: totalChunks.toLocaleString(), to: '0' },
+        { label: 'Storage', value: formatSize(storageBytes), to: '0 B' },
+        { label: 'PDFs', value: String(indexedFileCount), to: 'untouched', unchanged: true },
+      ],
+      message: 'Your library folder is not touched. The index rebuilds on the next sync.',
+      confirmLabel: 'Delete index',
+      danger: true,
+    }))) return;
+    onDeleteIndex();
+  }
+```
+
+Note the two differ in `danger`: re-indexing rebuilds and destroys nothing,
+so it is an **activation** (purple, lit, Enter commits). Deleting the index
+is a **removal** (danger tint, no glow, ⌘⌫ commits). That is the same grading
+the design applies everywhere, and it is why re-index keeps no `danger` flag
+despite living in the Danger Zone — the zone names the blast radius, the flag
+names the kind of change.
+
+`totalChunks`, `storageBytes` and `indexedFileCount` are already props on this
+component, and `formatSize` is already defined at `:94`. Add
+`import { confirmPrompt } from './confirmStore';`.
+
+Then replace both rows' markup — the `{#if confirmingReindex}` / `{#if confirmingDelete}`
+branches collapse to a single control each:
 
 ```svelte
-        {#if confirmingReindex}
-          <CommitSwitch
-            label={`Reprocess ${indexedFileCount} ${indexedFileCount === 1 ? 'file' : 'files'}?`}
-            danger
-            onClick={handleReindexClick}
-            disabled={isSyncing}
-          />
-          <button type="button" class="step-back" on:click={cancelReindex} disabled={isSyncing}>Cancel</button>
-        {:else}
+        <div class="modal-well-row action-row">
+          <span class="row-text">
+            <span class="row-title">Re-index all files</span>
+            Re-extracts and re-embeds every file in your index. Use after the
+            extractor has been upgraded, or if search results look stale.
+          </span>
           <CommitSwitch
             label={isSyncing ? 'Sync in progress…' : 'Re-index all'}
-            danger
             onClick={handleReindexClick}
             disabled={isSyncing || indexedFileCount === 0}
           />
-        {/if}
-```
-
-Then the delete-index row, written out because the labels and handlers differ:
-
-```svelte
-        {#if confirmingDelete}
-          <CommitSwitch
-            label={`Delete ${indexedFileCount} ${indexedFileCount === 1 ? 'file' : 'files'} from the index?`}
-            danger
-            onClick={handleDeleteClick}
-            disabled={isSyncing}
-          />
-          <button type="button" class="step-back" on:click={cancelDelete} disabled={isSyncing}>Cancel</button>
-        {:else}
+        </div>
+        <div class="modal-well-row action-row">
+          <span class="row-text">
+            <span class="row-title">Delete the index</span>
+            Removes every chunk and embedding. Your PDFs are untouched; the
+            index is rebuilt from scratch on the next sync.
+          </span>
           <CommitSwitch
             label="Delete index"
             danger
             onClick={handleDeleteClick}
             disabled={isSyncing || indexedFileCount === 0}
           />
-        {/if}
+        </div>
 ```
 
-Use the file's own existing state and handler names for the delete row — read
-them off the current markup around `LibrarySettings.svelte:376` rather than
-assuming `confirmingDelete` / `handleDeleteClick` / `cancelDelete`, which are
-the names the re-index row's pattern implies but may not be what is there.
+Wrap both rows in `<div class="modal-well danger-bay">` inside a
+`<div class="modal-bay">` whose `.ledger-label` caption is `Danger zone` in
+`--text-danger` at 0.85 opacity. Delete the old `.danger-zone`,
+`.danger-title`, `.danger-row`, `.danger-row-text`, `.danger-row-title`,
+`.danger-row-desc` and `.danger-row-action` rules.
 
 Then delete the `.btn-danger`, `.btn-danger:hover:not(:disabled)`,
-`.btn-danger.armed`, `.btn-danger.armed:hover:not(:disabled)`, `.btn-ghost` and
-`.btn-ghost:hover:not(:disabled)` rules. No new rules are needed — `.step-back`
-is global (Task 3).
+`.btn-danger.armed`, `.btn-danger.armed:hover:not(:disabled)`, `.btn-ghost`
+and `.btn-ghost:hover:not(:disabled)` rules. **`.step-back` is no longer
+needed either** — there is no armed state to step back out of — so drop it
+from Task 3's `app.css` additions if that task has already run, and skip it
+if it has not.
 
 Add `import CommitSwitch from './CommitSwitch.svelte';` to the script block.
+
+**What is lost, recorded deliberately:** the armed label naming the damage
+(*"Reprocess 128 files?"*) was the best confirmation copy in the app. It is
+not being thrown away — it becomes the readout rows above, which say the same
+thing in more detail and in the app's own tabular-figure idiom. If the prompt
+turns out to read worse than the two-step did, that judgement belongs in the
+visual pass (Task 12), and reverting is one commit.
 
 - [ ] **Step 5: Verify the old button families are gone**
 
