@@ -89,9 +89,14 @@
   export let onToggleCurationSolo: (key: CurationKey) => void = () => {};
   export let onToggleCurationMute: (key: CurationKey) => void = () => {};
 
-  // Masthead [clear all]: resets every solo/mute on all axes — the same
-  // action as clearing each chip in the scope bar.
+  // Masthead [reset]: clears every solo/mute on all axes — the same action
+  // as clearing each chip in the scope bar. `canReset` is the page's answer
+  // to "is any of that engaged?", which this panel can't work out on its
+  // own: half the axes it resets (file scope, collection plays and mutes)
+  // never reach it as props. Unset means nothing to reset, so the control
+  // sits dim rather than offering a no-op.
   export let onClearAll: () => void = () => {};
+  export let canReset: boolean = false;
 
   let panelEl: HTMLElement;
 
@@ -109,7 +114,7 @@
   }
 
   // A mousedown on the panel's empty or non-selectable space — the masthead,
-  // [clear all], a section label — points at the pane and deselects. Rows are
+  // [reset], a section label — points at the pane and deselects. Rows are
   // skipped even though clicking one selects nothing here (their background is
   // deliberately inert), so that mousing an S/M button doesn't drop a caret
   // parked on some other row.
@@ -226,7 +231,7 @@
 <aside class="filter-panel" bind:this={panelEl} on:mousedown={handlePanelMousedown}>
   <header class="panel-head">
     <span class="panel-title">Filters</span>
-    <button class="btn-link" on:click={onClearAll}>clear all</button>
+    <button class="btn-link" on:click={onClearAll} disabled={!canReset}>reset</button>
   </header>
 
   <div class="panel-body">
@@ -636,12 +641,16 @@
     content: ']';
     margin-left: 0.15rem;
   }
-  .btn-link:hover {
+  .btn-link:hover:not(:disabled) {
     filter: brightness(1.25);
   }
-  .btn-link:hover::before,
-  .btn-link:hover::after {
+  .btn-link:hover:not(:disabled)::before,
+  .btn-link:hover:not(:disabled)::after {
     color: var(--text-accent);
+  }
+  .btn-link:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   .empty {

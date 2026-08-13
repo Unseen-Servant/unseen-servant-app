@@ -1022,7 +1022,7 @@
     persistScopeConsole();
   }
 
-  // Footer [clear all] in the filter console: resets every solo/mute on
+  // Masthead [reset] in the filter console: clears every solo/mute on
   // all three axes, stops every playing collection, and unmutes every
   // muted one — the same action as clearing each chip in the scope bar.
   // The focus lens is a view mode, not a narrowing, so it stays as-is.
@@ -1038,6 +1038,21 @@
     persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
   }
+
+  // Whether [reset] has anything to do — one term per set clearAllFilters()
+  // empties, so the two can't drift into a button that fires a no-op or one
+  // that sits dim over a live scope. Bypass is deliberately not a term: it
+  // suspends the scope without discarding it, and the chips it dims are
+  // exactly what reset exists to clear.
+  $: scopeConsoleEngaged =
+    filterExcludedSystems.size > 0 ||
+    soloedSystems.size > 0 ||
+    scopeSolos.size > 0 ||
+    scopeMutes.size > 0 ||
+    playingCollections.size > 0 ||
+    mutedCollectionNames.size > 0 ||
+    soloCuration.size > 0 ||
+    mutedCuration.size > 0;
 
   $: hiddenCount = hiddenPaths.size;
 
@@ -3539,6 +3554,7 @@
               onToggleCurationSolo={toggleCurationSolo}
               onToggleCurationMute={toggleCurationMute}
               onClearAll={clearAllFilters}
+              canReset={scopeConsoleEngaged}
               focusedRow={focusedFilterRow}
               lastFocusedRow={lastFocusedFilterRow}
               active={activePane === 'filters' && !searchViewOpen}
