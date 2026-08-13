@@ -1,9 +1,12 @@
 # Modals as Rack Units — Design
 
 **Date:** 2026-08-12
-**Status:** In progress. Approved in mockup form 2026-08-12. Tasks 1-2 shipped
-(`confirmKeys.ts`, `ConfirmRow`); see
-[the plan](2026-08-12-modal-rack-units-plan.md) for per-task state.
+**Status:** Code complete 2026-08-13, in 26 commits (`766cde4`..`647d7ca`).
+Automated verification is green; the visual, keyboard, screen-reader,
+detent and reduced-motion passes in [Verification](#verification) are
+outstanding and are what close this out. Three decisions listed there need
+the app running.
+
 **Scope:** Frontend only — `src/lib/Modal.svelte`, `src/lib/ConfirmDialog.svelte`,
 `src/lib/confirmStore.ts`, `src/lib/DocumentStatsModal.svelte`,
 `src/lib/SettingsModal.svelte`, `src/lib/LibrarySettings.svelte`,
@@ -19,6 +22,53 @@ were the right small moves; this replaces them with the structural one that
 makes most of them unnecessary. It does **not** supersede
 [the modal audit](2026-08-11-modal-audit-design.md), whose five adoption steps
 are shipped and which this builds on.
+
+---
+
+### What the build turned out to be
+
+Ordered by how much they'd cost to rediscover.
+
+- **The keyboard model was designed for keys a human presses once.** Holding
+  the delete chord on a file row committed the deletion without the prompt
+  being read: the dialog opens and focuses itself within a microtask, far
+  inside the macOS repeat delay, so auto-repeat keydown #2 landed on the
+  focused dialog and fired the commit. It compounded — once the dialog
+  closed, the `dialog[open]` guard went false and further repeats re-entered
+  the delete handler on the still-focused row. The invariant now holds as one
+  sentence: *the commit is reachable only from a pointer click, or from a
+  keydown with `repeat === false`* — and one physical press produces exactly
+  one such keydown, which was consumed raising the prompt. Its sibling lives
+  in `CommitSwitch`: a held Enter on an auto-focused commit is the browser
+  synthesizing one click per repeat, which no dialog handler can intercept.
+- **A face is a promise, and only a commit may make it** — see
+  [the rule](#a-confirmation-is-a-switch-you-throw). Nearly shipped wrong in
+  two bays.
+- **`ConfirmRow.from` became `value`.** Four of the rows this ships have no
+  transition, so `from` named one that does not exist. The tell was in the
+  doc comment, which had to apologise for the name on its own first line.
+- **Contrast does not travel between surfaces.** The rail nameplate inherited
+  `.ledger-label` from the scope bar, where tertiary-on-`--bg-app` is 4.72:1;
+  on `--bg-header` the same pair is 3.64:1. The escape legend was worse — two
+  compounding opacities put the chord at 1.79:1, below the non-text floor and
+  dimmer than the `×` it replaced. Both now sit one ramp step up.
+- **`flex-shrink: 0` on the nameplate** defeated the `text-overflow` rule
+  three lines above it and would have pushed the escape outside the dialog
+  border on any long filename. Copied from the scope bar, whose nameplate is
+  a static string rather than user data.
+- **`column-count` on the sheet's scroller** would have rendered four columns
+  scrolling sideways — a multicol box with a definite block size spills into
+  inline-direction overflow columns. Measured: 1272px of scrollWidth against
+  a 640px client, with no vertical scroll at all.
+- **Three modules were orphaned by this work and removed**: `inputModality.ts`
+  and its test (the ring heuristic it served is gone), `ConfirmRequest.cancelLabel`,
+  and `.chord-bare` (the sheet was its only consumer; menus use
+  `.menu-chord.bare`). `.dialog-title` is also orphaned but **kept** pending a
+  decision — see [Verification](#verification).
+- **Reviews found what tests could not.** There is no jsdom here, so no
+  component is unit-testable; every defect above was caught by reading,
+  measuring, or mutation-testing rather than by the suite, which stayed green
+  throughout at 408-411 tests.
 
 ---
 
