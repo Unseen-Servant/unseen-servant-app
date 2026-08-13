@@ -1,7 +1,10 @@
 # The Scrim: Extent and Depth — Design
 
 **Date:** 2026-08-13
-**Status:** Proposed.
+**Status:** Implemented 2026-08-13 (`7773913`, `c709707`, `cd1adff`, `3c0cf53`).
+Automated verification green at 416 tests. The visual passes in
+[Verification](#verification) are outstanding, and one risk below was not
+measurable here and is recorded as a hypothesis rather than a finding.
 **Scope:** Frontend only — `src/app.css`, `src/lib/Modal.svelte`,
 `src/lib/dialogStack.ts` *(new)*, `src/routes/+page.svelte`. No Rust or
 sidecar changes.
@@ -125,13 +128,17 @@ guess "is any dialog open?" either. A four-line store answers both:
 
 ```ts
 // src/lib/dialogStack.ts
-export const openDialogCount = writable(0);
+export const openDialogs = createDialogStack();   // subscribe + register() + release()
 ```
+
+`register()` returns whether a dialog was *already* open, which is the whole
+reason it is a function rather than a bare counter — that boolean is the only
+way a dialog can know it is stacked.
 
 `Modal.svelte` already owns the open/close lifecycle in `sync()`. On show it
 reads the count *before* incrementing — a non-zero value means this dialog is
 stacked, which sets `class="stacked"` for the lighter scrim — and decrements
-on close and on destroy. `+page.svelte` sets `class:dialog-open={$openDialogCount > 0}`
+on close and on destroy. `+page.svelte` sets `class:dialog-open={$openDialogs > 0}`
 on `<main class="app-layout">`, which is where the Header and StatusBar live.
 
 Two properties matter and both are testable, which is worth something in a
