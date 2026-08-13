@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **Search is `⌘K`, the Filters panel is `⌘F`.** Search moves to the chord command bars everywhere use, which frees `F` for the thing it actually reads as: filtering. `⌘⇧F` no longer does anything
 - **Every confirmation is the app's own.** Deleting a file or folder and re-indexing a single file raised a system dialog in the operating system's chrome; they now use the same prompt the rest of the app does, so the same `⌘⌫` looks the same in the file tree as it does in the collections panel
 - Deleting a custom game system, and resetting a customized built-in to its defaults, now ask first — neither did
 - **Danger red means one thing again.** Cancel and Discard no longer turn red under the pointer — hovering only brightens — so red marks the action that actually destroys something. The Danger Zone's two-step arms with a tinted wash instead of filling solid red, matching the mute button

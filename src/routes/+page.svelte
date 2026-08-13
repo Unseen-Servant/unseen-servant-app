@@ -2173,8 +2173,10 @@
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
 
-    // Cmd/Ctrl+F: focus the search input from anywhere in the app.
-    if (meta && !event.shiftKey && lk === 'f') {
+    // Cmd/Ctrl+K: focus the search input from anywhere in the app. Not ⌘F —
+    // that's the browser/OS find-in-page chord, and here it opens the Filters
+    // panel instead (below). ⌘K is the command-bar convention.
+    if (meta && !event.shiftKey && lk === 'k') {
       event.preventDefault();
       headerComponent?.focus();
       return;
@@ -2283,15 +2285,13 @@
       }
     }
 
-    // Cmd/Ctrl+Shift+F: toggle the Filters panel (docked below the collections
-    // panel in the left pane). Deliberately the shift-variant of Cmd+F: that
-    // focuses search, this opens the console that shapes what search covers,
-    // so the pair reads as a family. It replaced Cmd+E, which meant nothing
-    // mnemonically and collided twice — macOS binds Cmd+E to "Use Selection
-    // for Find" in any text field, and Finder binds it to Eject.
-    //
-    // The Cmd+F branch above excludes shift, so this can't be shadowed by it.
-    if (meta && event.shiftKey && lk === 'f' && selectedFolder) {
+    // Cmd/Ctrl+F: toggle the Filters panel (docked below the collections panel
+    // in the left pane). F for filter, on the chord everything else spends on
+    // find — the panel is where you narrow what a search covers, so the two
+    // read as a pair with search on ⌘K. It was ⌘⇧F, and before that ⌘E, which
+    // meant nothing mnemonically and collided twice — macOS binds Cmd+E to
+    // "Use Selection for Find" in any text field, and Finder binds it to Eject.
+    if (meta && !event.shiftKey && lk === 'f' && selectedFolder) {
       event.preventDefault();
       toggleFilterPanel();
       return;

@@ -466,8 +466,8 @@
     }
     if (bareLetter) {
       // E for edit, not F: F reads as find/filter everywhere, and this app
-      // already spends ⌘F on search — one modifier apart from an unrelated
-      // meaning is worse than no mnemonic at all. Not R either: R is
+      // already spends ⌘F on the Filters panel — one modifier apart from an
+      // unrelated meaning is worse than no mnemonic at all. Not R either: R is
       // rename one pane over.
       if (lk === 'r') { event.preventDefault(); startRename(col.name); return; }
       // Arm is inert on a shelved track, same as play: neither the row's
