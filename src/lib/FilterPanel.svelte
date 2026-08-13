@@ -614,8 +614,11 @@
     background: none;
     border: none;
     padding: 0;
-    font-family: var(--font-body);
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    /* A step below the settings modal's 0.7rem: same token, but this one
+       sits in the masthead of a dense panel rather than on a settings row,
+       and a reset nobody reaches for often shouldn't carry that weight. */
+    font-size: 0.65rem;
     color: var(--text-accent);
     cursor: pointer;
     transition: filter var(--transition-fast);
@@ -623,6 +626,7 @@
   .btn-link::before,
   .btn-link::after {
     color: var(--text-secondary);
+    transition: color var(--transition-fast);
   }
   .btn-link::before {
     content: '[';
@@ -634,6 +638,10 @@
   }
   .btn-link:hover {
     filter: brightness(1.25);
+  }
+  .btn-link:hover::before,
+  .btn-link:hover::after {
+    color: var(--text-accent);
   }
 
   .empty {
