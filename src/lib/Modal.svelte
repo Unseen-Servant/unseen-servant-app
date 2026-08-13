@@ -36,7 +36,6 @@
   // word differs because backing out of a question is not the same act as
   // closing a panel. See the design's "Cancel is a legend in the top rail".
   export let escapeWord: 'cancel' | 'close' = 'close';
-  $: escapeName = escapeWord === 'cancel' ? 'Cancel' : 'Close';
 
   const titleId = `modal-title-${++seq}`;
 
@@ -129,22 +128,23 @@
     <span class="dialog-nameplate ledger-label" id={titleId}>{title}</span>
     <slot name="rail" />
     <span class="rail-grow"></span>
-    <!-- The chord is a hint, not part of the name: hidden, as every chord in
-         the app already is (ContextMenu's .menu-chord). That leaves `close` as
-         the visible label, which `aria-label` matches — WCAG 2.5.3 wants the
-         name to contain the visible text, and "esc close" would not.
+    <!-- No aria-label: the name comes from content, so hiding the chord is what
+         keeps it out — the button announces "close"/"cancel". That is the same
+         shape as ContextMenu's .menu-row, which also names itself from its text
+         and hides its .menu-chord; an aria-label here would win outright and
+         make the aria-hidden inert.
+         This rests on a judgement: WCAG 2.5.3 asks the name to contain the
+         *visible label*, and we read the dimmed mono `esc` as a shortcut badge
+         rather than label text — how menus and platform chrome have always
+         treated chords — with aria-keyshortcuts carrying the key properly for
+         AT. Disagreeing means naming this "esc close", which announces the
+         chord on every single dismissal.
          aria-keyshortcuts is right here but wrong on the commit switch, and the
          two are correctly different: it names shortcuts *an author has
          implemented*. Esc is ours — handleCancel below preventDefaults the
          native `cancel` and routes through onClose. The switch's Enter is the
          browser's own <button> activation, so it stays undeclared. -->
-    <button
-      type="button"
-      class="modal-escape"
-      on:click={onClose}
-      aria-label={escapeName}
-      aria-keyshortcuts="Escape"
-    >
+    <button type="button" class="modal-escape" on:click={onClose} aria-keyshortcuts="Escape">
       <span class="k" aria-hidden="true">esc</span>{escapeWord}
     </button>
   </div>
