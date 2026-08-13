@@ -163,15 +163,29 @@ edge cases that come with it.
 
 ## Risks
 
-- **Backdrop-click-to-dismiss may already not work, and this makes it
-  matter.** `Modal.svelte`'s `handleClick` treats `e.target === dialogEl` as a
-  backdrop click, but that fires on the dialog's own padding/border area, not
-  on the `::backdrop` pseudo-element, which is not an element and receives no
-  events. Whether clicking outside a modal dismisses it today is **unverified**
-  — the audit listed "the backdrop" as a dismissal route without testing it.
-  Verify before shipping: if it never worked, that is a pre-existing bug this
-  design should not silently inherit into its rationale; if it did, confirm
-  insetting the scrim has not changed which region responds.
+- **Backdrop-click-to-dismiss is still unverified, and this change makes the
+  answer matter more.** An attempt to measure it failed: the harness available
+  here renders local files as static snapshots rather than live pages, so no
+  result was obtained. Recording that rather than a guess dressed as data.
+
+  What is *reasoned*, and should be treated as a hypothesis until someone
+  clicks: `::backdrop` generates a box but no DOM node, and the reason
+  `e.target === dialogEl` is the canonical backdrop-click idiom is that
+  browsers dispatch clicks in the backdrop region to the dialog element
+  itself. If that holds, insetting the backdrop shrinks its box and therefore
+  its hit region, so after this change the scrimmed workspace should still
+  dismiss and the chrome strips should not — which is the behaviour we want,
+  since those strips are deliberately outside the scrim and should not read as
+  backdrop.
+
+  Three outcomes and what each means, for whoever runs it:
+  - **Neither region dismisses** — backdrop dismissal never worked and the
+    audit's claim was wrong. Correct the audit; do not add the behaviour here,
+    that is its own decision.
+  - **Both regions dismiss** — the chrome strip is acting as backdrop, which
+    is wrong. Restrict `handleClick` to the scrimmed region.
+  - **Only the scrimmed region dismisses** — correct as shipped; record it and
+    delete this risk.
 - **Insetting `::backdrop` needs checking in both engines.** Ordinary
   positioning on a well-specified pseudo-element should be uniform, but this
   is the same class of assumption that failed before. Check WKWebView and
