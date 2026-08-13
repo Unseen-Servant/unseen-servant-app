@@ -13,6 +13,7 @@
 
 <script lang="ts">
   import { tick, onDestroy } from 'svelte';
+  import { openDialogs } from './dialogStack';
 
   export let visible = false;
   export let onClose: () => void;
@@ -45,6 +46,13 @@
   // Element that held focus before the modal opened — restored on close
   // so the user lands back where they were instead of falling to <body>.
   let returnTarget: HTMLElement | null = null;
+  // Set from the count at showModal() time: a dialog that opens while
+  // another is already open scrims lighter, so it does not extinguish the
+  // modal it is asking about.
+  let stacked = false;
+  // Guards the release: `visible` and unmount are independent paths into
+  // closing, and DocumentStatsModal takes the second one.
+  let registered = false;
 
   // Drive the native dialog from the `visible` prop so existing call
   // sites can stay declarative. Reactive runs once dialogEl is bound.
@@ -54,6 +62,8 @@
     if (!dialogEl) return;
     if (v && !dialogEl.open) {
       returnTarget = document.activeElement as HTMLElement | null;
+      stacked = openDialogs.register();
+      registered = true;
       dialogEl.showModal();
       await tick();
       // showModal() auto-focuses the first sequentially-focusable
@@ -87,6 +97,7 @@
   }
 
   function handleClose() {
+    releaseDialog();
     restoreFocus();
   }
 
@@ -94,7 +105,19 @@
   // rather than flipping `visible` first, so the dialog's close event
   // never fires. Restore focus on destroy too — restoreFocus is
   // idempotent because returnTarget is cleared after use.
-  onDestroy(() => restoreFocus());
+  onDestroy(() => {
+    releaseDialog();
+    restoreFocus();
+  });
+
+  // Idempotent for the same reason restoreFocus is: `close` and `destroy`
+  // are both reachable for one open, and DocumentStatsModal exercises the
+  // destroy path because {#if statsModalPath} unmounts it outright.
+  function releaseDialog() {
+    if (!registered) return;
+    registered = false;
+    openDialogs.release();
+  }
 
   function restoreFocus() {
     if (returnTarget && document.contains(returnTarget)) {
@@ -113,6 +136,7 @@
 <dialog
   bind:this={dialogEl}
   class="modal"
+  class:stacked
   tabindex="-1"
   style:width
   style:height
