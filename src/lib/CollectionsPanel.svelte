@@ -816,7 +816,7 @@
       on:dragleave={handlePathDragLeave}
       on:drop={handleNewDrop}
     >
-      <span>+ New collection&hellip;</span>
+      <span>+ New collection</span>
       <span class="menu-chord" aria-hidden="true">{chord('collections.new')}</span>
     </button>
   {/if}

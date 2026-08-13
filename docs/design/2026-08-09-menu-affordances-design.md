@@ -248,9 +248,31 @@ edits in place, and no file manager ellipsizes rename.
   collection…` (`:346`), `Remove from collection…` (`:390`) and
   `Pigment…` (`CollectionsPanel.svelte:679`) — the caret already says
   "submenu", and the ellipsis contradicts it.
-- Keep on `Add files…` and `+ New collection…`.
+- ~~Keep on `Add files…` and `+ New collection…`.~~ *Superseded
+  2026-08-13 — see the amendment below.*
 - `+ collection` (`CollectionsPanel.svelte:654`) becomes `+ New
   collection…`, matching the submenu row for the same kind of action.
+
+*Amended 2026-08-13.* `+ New collection` now carries **no** ellipsis on
+any surface, and the rule above is what removed it rather than an
+exception to it. `bcd3e41` (2026-08-10) moved the naming into the box
+that offers it: the panel's create button is replaced in place by its
+own input (`CollectionsPanel.svelte:796`), which is in-place editing,
+the case the rule already denies an ellipsis. The tree submenu row still
+reaches a separate surface and would keep its `…` on a strict
+site-by-site reading — but that splits one label into two spellings, so:
+
+> A label that appears on more than one surface takes one spelling,
+> decided by where the action *completes*. Naming completes in the box,
+> in place; so the label loses its ellipsis everywhere.
+
+The leading `+` is unaffected — it marks "prospective, not yet real"
+(`app.css:113`) and is shared with `+ tag`. This also aligns the
+onboarding copy, which had always written the label bare
+(`GettingStartedSteps.svelte:139`).
+
+`Add files…` no longer exists; that half of the superseded bullet is
+moot.
 
 **Re-index.** Standardise on the hyphenated form. `LibrarySettings`
 contradicts itself as well as the menus — "re-indexed chunks" at `:271`

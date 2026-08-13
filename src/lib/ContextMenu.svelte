@@ -415,7 +415,7 @@
             <hr class="menu-divider" />
           {/if}
           <button class="menu-row" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
-            + New collection&hellip;
+            + New collection
           </button>
         </div>
       {/if}
