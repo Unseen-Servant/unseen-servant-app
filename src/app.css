@@ -326,7 +326,11 @@ input {
    group headers, and file-tree folder rows: 18px hardware squares, quiet
    at rest. Solo-on is a mode (purple + glow); mute-on is a removal
    (danger tint, no glow — glows are reserved for activated states). */
-.sm-btn {
+/* `.switch-face` is the same object rendered inside another button (the
+   commit switch), where a nested <button> is illegal. One recipe, two
+   elements — a copy would drift the moment either is retuned. */
+.sm-btn,
+.switch-face {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
@@ -384,22 +388,26 @@ input {
    are "a mode you switched on", and the master switch should read as the
    same kind of object as the channel switches it overrides. */
 .sm-btn.solo-on,
-.sm-btn.bypass-on {
+.sm-btn.bypass-on,
+.commit-switch.activation .switch-face {
   color: var(--text-active);
   border-color: var(--text-active);
   background: color-mix(in srgb, var(--text-active) 15%, transparent);
   filter: var(--glow-active);
 }
 .motion-ready .sm-btn.solo-on,
-.motion-ready .sm-btn.bypass-on {
+.motion-ready .sm-btn.bypass-on,
+.motion-ready .commit-switch.activation .switch-face {
   animation: detent-glow 110ms ease-out;
 }
-.sm-btn.mute-on {
+.sm-btn.mute-on,
+.commit-switch.danger .switch-face {
   color: var(--text-danger);
   border-color: color-mix(in srgb, var(--text-danger) 45%, transparent);
   background: color-mix(in srgb, var(--text-danger) 10%, transparent);
 }
-.motion-ready .sm-btn.mute-on {
+.motion-ready .sm-btn.mute-on,
+.motion-ready .commit-switch.danger .switch-face {
   animation: detent-flat 110ms ease-out;
 }
 .sm-btn:focus-visible {
@@ -529,7 +537,9 @@ dialog[open]::backdrop {
   dialog[open]::backdrop,
   .motion-ready .sm-btn.solo-on,
   .motion-ready .sm-btn.bypass-on,
-  .motion-ready .sm-btn.mute-on {
+  .motion-ready .sm-btn.mute-on,
+  .motion-ready .commit-switch.activation .switch-face,
+  .motion-ready .commit-switch.danger .switch-face {
     animation: none;
   }
 }
@@ -712,4 +722,137 @@ dialog[open]::backdrop {
   text-transform: uppercase;
   line-height: 1.2;
   color: var(--text-tertiary);
+}
+
+/* --- Modal unit --- */
+
+/* A dialog is a rack unit: two --bg-header rails bracketing its bays, the
+   way the Header and StatusBar bracket the workspace (StatusBar.svelte:168).
+   The rails themselves are layout and live in Modal.svelte; what is shared
+   across surfaces — bays, wells, readouts, the commit switch — lives here.
+   See docs/specs/ui/2026-08-12-modal-rack-units-design.md. */
+
+.modal-bays {
+  padding: var(--modal-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-height: 0;
+}
+
+.modal-bay {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Readouts sit *in* the panel, not on it. --radius-well is documented as the
+   concentric wrap around --radius-md contents; this is what it was for. */
+.modal-well {
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-well);
+  overflow: hidden;
+}
+
+.modal-well-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.4rem 0.65rem;
+}
+.modal-well-row + .modal-well-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.modal-readout {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-readout.wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.modal-readout .arrow {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+  padding: 0 0.15rem;
+}
+/* The tone of a `to` comes from the well, not the row: one prompt is one
+   kind of change. `.unchanged` is the exception a caller marks. */
+.modal-well.removal .modal-readout .to { color: var(--text-danger); }
+.modal-well.activation .modal-readout .to { color: var(--text-active); }
+.modal-readout .to.unchanged { color: var(--text-secondary); }
+
+/* Commit switch: the label is the switch's nameplate, the face carries the
+   key that throws it — the scope bar's `Scope │ B` grammar, mirrored. */
+.commit-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: none;
+  border: none;
+  padding: 0.1rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: transform var(--transition-fast);
+}
+.commit-switch .commit-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: filter var(--transition-fast);
+}
+.commit-switch.danger .commit-label { color: var(--text-danger); }
+.commit-switch.activation .commit-label { color: var(--text-active); }
+.commit-switch:hover:not(:disabled) .commit-label { filter: brightness(1.2); }
+.commit-switch:active:not(:disabled) { transform: scale(0.97); }
+.commit-switch:focus-visible { outline: 1px solid var(--text-accent); outline-offset: 2px; }
+.commit-switch:disabled { cursor: default; }
+.commit-switch:disabled .commit-label { color: var(--text-tertiary); filter: none; }
+.commit-switch:disabled .switch-face { opacity: 0.35; }
+
+/* Divides a rail's nameplate from what it carries — the same rule the scope
+   bar puts between its master switch and the channels (.master-rule). Shared
+   because three surfaces need it and Svelte scopes component styles. */
+.rail-rule {
+  width: 1px;
+  height: 12px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* A bay of destructive actions: the well's frame tinted to the same 45% the
+   controls inside use, so structure never outranks them. Shared by the Danger
+   Zone and the game-system unit. */
+.modal-well.danger-bay {
+  border-color: color-mix(in srgb, var(--text-danger) 32%, transparent);
+}
+.modal-well-row.action-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0.65rem;
+}
+.modal-well-row.action-row .row-text {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  min-width: 0;
+}
+.modal-well-row.action-row .row-title {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  margin-bottom: 0.15rem;
 }
