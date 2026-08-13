@@ -57,7 +57,7 @@
       dialogEl.showModal();
       await tick();
       // showModal() auto-focuses the first sequentially-focusable
-      // descendant — that's the escape legend in our rail, which paints
+      // descendant — that's the first control in our rail, which paints
       // a focus ring on what should be inert chrome. Override it.
       // An explicit [data-autofocus] outranks both the text-input
       // heuristic and the `autofocus` prop — a child naming its own
@@ -127,28 +127,34 @@
   <div class="modal-rail">
     <span class="dialog-nameplate ledger-label" id={titleId}>{title}</span>
     <slot name="rail" />
-    <span class="rail-grow"></span>
     <!-- No aria-label: the name comes from content, so hiding the chord is what
          keeps it out — the button announces "close"/"cancel". That is the same
          shape as ContextMenu's .menu-row, which also names itself from its text
          and hides its .menu-chord; an aria-label here would win outright and
          make the aria-hidden inert.
          This rests on a judgement: WCAG 2.5.3 asks the name to contain the
-         *visible label*, and we read the dimmed mono `esc` as a shortcut badge
-         rather than label text — how menus and platform chrome have always
-         treated chords — with aria-keyshortcuts carrying the key properly for
-         AT. Disagreeing means naming this "esc close", which announces the
-         chord on every single dismissal.
-         aria-keyshortcuts is right here but wrong on the commit switch, and the
-         two are correctly different: it names shortcuts *an author has
-         implemented*. Esc is ours — handleCancel below preventDefaults the
-         native `cancel` and routes through onClose. The switch's Enter is the
-         browser's own <button> activation, so it stays undeclared. -->
+         *visible label*, and we read the mono `esc` as a shortcut badge rather
+         than label text — how menus and platform chrome have always treated
+         chords — with aria-keyshortcuts carrying the key properly for AT. The
+         weak point, stated plainly: our badge *leads* the word, where
+         .menu-chord trails its label, and a leading badge reads more like part
+         of the label. Disagreeing means naming this "esc close", which then
+         announces the chord on every single dismissal.
+         aria-keyshortcuts is right here but wrong on an *activation* commit
+         switch, and the two are correctly different: it names shortcuts *an
+         author has implemented*. Esc is ours — handleCancel above preventDefaults
+         the native `cancel` and routes through onClose, as a removal switch's
+         ⌘⌫ is its prompt's. An activation switch's Enter is the browser's own
+         <button> activation, so that one stays undeclared. -->
     <button type="button" class="modal-escape" on:click={onClose} aria-keyshortcuts="Escape">
       <span class="k" aria-hidden="true">esc</span>{escapeWord}
     </button>
   </div>
   <slot />
+  <!-- $$slots is compile-time: a caller writing `<svelte:fragment slot="commit">`
+       registers the slot whatever its contents evaluate to, so wrapping the
+       switch in an `{#if}` inside the fragment yields a bare band claiming the
+       unit is operable when it offers nothing. Gate the fragment, not its body. -->
   {#if $$slots.commit}
     <div class="modal-commit-strip">
       <slot name="commit" />
@@ -192,7 +198,10 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    height: var(--statusbar-height);
+    /* min-height, not height, as on the commit strip: whatever a caller puts in
+       the rail slot fits inside 28px today, but a fixed height would overflow
+       rather than grow the first time something doesn't. */
+    min-height: var(--statusbar-height);
     padding: 0 0.6rem;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
@@ -201,29 +210,52 @@
     flex-shrink: 0;
   }
 
-  .rail-grow {
-    flex: 1;
-    min-width: 0;
-  }
+  /* Layout, plus one surface correction. A title carrying a user-supplied name
+     has no length limit — DocumentStatsModal passes a raw PDF filename from a
+     library of thousands — so the nameplate has to be the item that gives, and
+     these four properties are what let it ellipsise instead of shoving the
+     escape past the dialog's border. It must NOT carry flex-shrink: 0: with no
+     flex-basis the item's base size is max-content, so refusing to shrink means
+     the overflow never happens and the ellipsis never fires. (The scope bar's
+     .nameplate can afford that property because it holds the fixed string
+     `Scope`.) The escape is what stays whole; flex-shrink: 0 lives there.
 
-  /* Layout only — the voice stays in app.css. A title carrying a user-supplied
-     name has no length limit and would otherwise push the rail's dismiss off
-     the plate. */
+     The colour is not a new voice. .ledger-label is --text-tertiary, which is
+     4.71:1 on the --bg-app the scope bar sits on but only 3.64:1 here on the
+     --bg-header plate — same pair, darker surface, and the ramp has to be read
+     against the surface it actually meets. One step up to --text-secondary is
+     4.42:1: still a hair under AA rather than clearing it, and the honest trade
+     for chrome. --text-primary would clear it and make the module's name shout
+     louder than the content below. Every other .ledger-label sits on a darker
+     well, so this correction stays local to this surface. */
   .modal-rail .dialog-nameplate {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex-shrink: 0;
+    color: var(--text-secondary);
   }
 
   /* The dismissal is ambient — it belongs with the unit's identity, not with
      the decision — so it sits here and nowhere else. A real button, drawn as
-     the legend it reads as. */
+     the legend it reads as. `margin-left: auto` rides it to the trailing edge
+     the way .menu-chord rides to the end of a menu row, which is one fewer
+     element than a spacer div; flex-shrink: 0 keeps this fixed two-word string
+     whole and hands the shrinking to the nameplate, where it belongs.
+
+     Colour follows .menu-chord (app.css:641) — mono, --text-secondary, and no
+     opacity, because opacity was the bug. 0.8 on the button multiplied by 0.55
+     on the chord composited the chord to 1.79:1 against --bg-header, under even
+     the 3:1 non-text floor, on the one element whose entire job is teaching the
+     Esc key. Now: word 4.42:1, chord one ramp step below at 3.64:1 — where the
+     × this replaced was 3.44:1. Keeping them one step apart rather than two is
+     what makes the chord read as a badge instead of a smudge. */
   .modal-escape {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
+    margin-left: auto;
+    flex-shrink: 0;
     background: none;
     border: none;
     padding: 0.15rem 0.2rem;
@@ -231,16 +263,19 @@
     cursor: pointer;
     font-family: var(--font-mono);
     font-size: 0.68rem;
-    color: var(--text-tertiary);
-    opacity: 0.8;
-    transition: color var(--transition-fast), opacity var(--transition-fast);
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
   }
   .modal-escape .k {
-    opacity: 0.55;
+    color: var(--text-tertiary);
   }
+  /* One grey step for both halves, so hover brightens the legend without
+     widening the gap between the chord and the word it labels. */
   .modal-escape:hover {
+    color: var(--text-primary);
+  }
+  .modal-escape:hover .k {
     color: var(--text-secondary);
-    opacity: 1;
   }
   .modal-escape:focus-visible {
     outline: 1px solid var(--text-accent);
