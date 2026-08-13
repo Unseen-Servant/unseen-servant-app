@@ -32,6 +32,11 @@
   // id of the element stating what the dialog is asking, for modals whose
   // body is a statement rather than a form (the confirm prompt).
   export let describedBy: string | undefined = undefined;
+  // The rail's dismiss slot names the escape rather than drawing an ×: the
+  // word differs because backing out of a question is not the same act as
+  // closing a panel. See the design's "Cancel is a legend in the top rail".
+  export let escapeWord: 'cancel' | 'close' = 'close';
+  $: escapeName = escapeWord === 'cancel' ? 'Cancel' : 'Close';
 
   const titleId = `modal-title-${++seq}`;
 
@@ -53,7 +58,7 @@
       dialogEl.showModal();
       await tick();
       // showModal() auto-focuses the first sequentially-focusable
-      // descendant — that's the × button in our header, which paints
+      // descendant — that's the escape legend in our rail, which paints
       // a focus ring on what should be inert chrome. Override it.
       // An explicit [data-autofocus] outranks both the text-input
       // heuristic and the `autofocus` prop — a child naming its own
@@ -118,19 +123,22 @@
   on:cancel={handleCancel}
   on:close={handleClose}
   on:click={handleClick}
+  on:keydown
 >
-  <div class="modal-header">
-    <span class="dialog-title" id={titleId}>{title}</span>
-    <button type="button" class="close-btn" on:click={onClose} aria-label="Close">
-      <!-- Hand-drawn ×, as with the checkbox tick in app.css: Font Awesome
-           vendors circle-xmark but no bare xmark, and a circled glyph is
-           too heavy for inert chrome. -->
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M4 4 L12 12 M12 4 L4 12" />
-      </svg>
+  <div class="modal-rail">
+    <span class="dialog-nameplate ledger-label" id={titleId}>{title}</span>
+    <slot name="rail" />
+    <span class="rail-grow"></span>
+    <button type="button" class="modal-escape" on:click={onClose} aria-label={escapeName}>
+      <span class="k">esc</span>{escapeWord}
     </button>
   </div>
   <slot />
+  {#if $$slots.commit}
+    <div class="modal-commit-strip">
+      <slot name="commit" />
+    </div>
+  {/if}
 </dialog>
 
 <style>
@@ -161,52 +169,84 @@
     outline: none;
   }
 
-  .modal-header {
+  /* --bg-header, not --bg-container: the Header and StatusBar wear this plate
+     and "bracket the workspace as one piece of chrome" (StatusBar.svelte:168).
+     A unit that brackets its own bays the same way reads as a small instance
+     of the instrument rather than a card floating over it. */
+  .modal-rail {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.4rem 1rem;
-    background: var(--bg-focused);
+    gap: 0.5rem;
+    height: var(--statusbar-height);
+    padding: 0 0.6rem;
+    background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
     border-top-left-radius: var(--radius-lg);
     border-top-right-radius: var(--radius-lg);
     flex-shrink: 0;
   }
 
-  /* Layout only — the voice itself stays in app.css. Titles carrying a
-     user-supplied name (a filename, a game system) have no length limit,
-     and without this they push the close button off the plate. */
-  .modal-header .dialog-title {
+  .rail-grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Layout only — the voice stays in app.css. A title carrying a user-supplied
+     name has no length limit and would otherwise push the rail's dismiss off
+     the plate. */
+  .modal-rail .dialog-nameplate {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
-  .close-btn {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
+  /* The dismissal is ambient — it belongs with the unit's identity, not with
+     the decision — so it sits here and nowhere else. A real button, drawn as
+     the legend it reads as. */
+  .modal-escape {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0.2rem;
-    border-radius: var(--radius-md);
+    gap: 0.3rem;
+    background: none;
+    border: none;
+    padding: 0.15rem 0.2rem;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: color var(--transition-fast);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-tertiary);
+    opacity: 0.8;
+    transition: color var(--transition-fast), opacity var(--transition-fast);
   }
-  .close-btn svg {
-    width: 14px;
-    height: 14px;
-    display: block;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
+  .modal-escape .k {
+    opacity: 0.55;
   }
-  /* One step, like the rest of the chrome — the old glyph jumped to
-     primary, brighter than anything else in the header plate. */
-  .close-btn:hover {
+  .modal-escape:hover {
     color: var(--text-secondary);
+    opacity: 1;
+  }
+  .modal-escape:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 1px;
+  }
+
+  /* The commit rail. Rendered only when a caller fills the slot: a unit that
+     ends at its last bay is one you cannot operate, and that absence is the
+     signal (Document info relies on it). A caller placing a note instead of a
+     commit pushes it left with margin-right: auto. */
+  .modal-commit-strip {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    min-height: var(--statusbar-height);
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-header);
+    border-top: 1px solid var(--border-subtle);
+    border-bottom-left-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
+    flex-shrink: 0;
   }
 </style>
