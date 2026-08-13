@@ -741,6 +741,16 @@ Create `src/lib/CommitSwitch.svelte`:
   // The face carries the key that throws it — the rule the scope bar's bypass
   // already follows. Read from KEYBINDINGS so the glyph has one definition.
   $: face = chord(commitKeyId(danger));
+
+  // aria-keyshortcuts names shortcuts *an author has implemented* (per its
+  // spec). A removal prompt's ⌘⌫ is one — ConfirmDialog's own keydown handler
+  // implements it. An activation prompt's Enter is not: that is native
+  // <button> activation, which answers Space equally, so naming Enter alone
+  // would both describe built-in behaviour and imply Enter is special. Omit
+  // the attribute there rather than deriving it from confirm.commitSafe —
+  // that binding exists only to supply the face glyph, and deriving from it
+  // would assert a dependency that does not exist.
+  $: ariaKeys = danger ? commitKeyShortcut() : undefined;
 </script>
 
 <button
@@ -750,12 +760,7 @@ Create `src/lib/CommitSwitch.svelte`:
   class:activation={!danger}
   {disabled}
   data-autofocus={initialFocus || undefined}
-  {/* 'Enter' is hardcoded on purpose and must NOT be derived from
-      confirm.commitSafe: an activation prompt commits on Enter because its
-      commit is a *focused button*, which is browser behaviour, not a binding.
-      The binding exists only to supply the face glyph. Deriving this would
-      assert a dependency that does not exist. */}
-  aria-keyshortcuts={danger ? commitKeyShortcut() : 'Enter'}
+  aria-keyshortcuts={ariaKeys}
   on:click={onClick}
 >
   <span class="commit-label">{label}</span>
