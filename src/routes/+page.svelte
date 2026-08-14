@@ -499,12 +499,24 @@
     );
     const systemsEmpty = gameSystems !== null && gameSystems.length === 0;
 
+    // The full intersection, systems axis included — what the scope-bar
+    // meter's denominator shows. Catches cross-axis empties the per-axis
+    // checks above can't (a soloed system with no file under a soloed
+    // folder), so the meter never reads "of 0 files" beside a generic
+    // no-results message. Computed fresh for the same reason as the rest.
+    const fullScope = scopeBypassed ? null : resolveScopeSet(
+      mix, soloSets, muteSets,
+      soloCuration, mutedCuration, collectedPaths,
+      soloedSystems, filterExcludedSystems, effectiveGameSystemMap, indexedPaths
+    );
+
     const emptyMsg = emptyScopeMessage({
       mixEmpty,
       anyLivePlaying: [...playingCollections].some((n) => Object.hasOwn(collections, n)),
       pathScopeEmpty,
-      anySolosEngaged: scopeSolos.size > 0 || soloCuration.size > 0,
+      anySolosEngaged: scopeSolos.size > 0 || soloCuration.size > 0 || soloedSystems.size > 0,
       systemsEmpty,
+      scopeEmpty: fullScope !== null && fullScope.size === 0,
     });
     if (emptyMsg !== null) {
       searchError = emptyMsg;
@@ -1051,13 +1063,11 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Whether [reset] has anything to do — one term for each thing
-  // clearAllFilters() puts back, in the same order, so the two can't drift
-  // into a button that fires a no-op or one that sits dim over a live
-  // console. Bypass is deliberately not a term: it suspends the scope
-  // without discarding it, and the chips it dims are exactly what reset
-  // exists to clear. hiddenPaths isn't one either — reset doesn't touch it.
-  $: scopeConsoleEngaged =
+  // The narrowings bypass actually suppresses — every S/M and transport
+  // term, none of the view switches (those are display filters bypass
+  // leaves alone). Mirror of the scope bar's anyBypassable, and the gate
+  // for keyboard B: the key must refuse exactly what the switch refuses.
+  $: scopeNarrowingEngaged =
     filterExcludedSystems.size > 0 ||
     soloedSystems.size > 0 ||
     scopeSolos.size > 0 ||
@@ -1065,7 +1075,17 @@
     playingCollections.size > 0 ||
     mutedCollectionNames.size > 0 ||
     soloCuration.size > 0 ||
-    mutedCuration.size > 0 ||
+    mutedCuration.size > 0;
+
+  // Whether [reset] has anything to do — the narrowing terms above plus
+  // one term for each view switch clearAllFilters() puts back, so the two
+  // can't drift into a button that fires a no-op or one that sits dim over
+  // a live console. Bypass is deliberately not a term: it suspends the
+  // scope without discarding it, and the chips it dims are exactly what
+  // reset exists to clear. hiddenPaths isn't one either — reset doesn't
+  // touch it.
+  $: scopeConsoleEngaged =
+    scopeNarrowingEngaged ||
     showHidden ||
     hideOutOfScope ||
     hideUnindexed;
@@ -1701,7 +1721,9 @@
     // collections (which compose orthogonally) is the right tree-view
     // affordance.
     let baseFiles: Set<string>;
-    if (viewMode === 'systems' && soloCuration.size > 0) {
+    // Under bypass the narrowing is suspended, not cleared — the rows it
+    // removed come back, like every other dim and drop on this surface.
+    if (!scopeBypassed && viewMode === 'systems' && soloCuration.size > 0) {
       // Curation solos union within the axis: Collected = files in some
       // collection, Loose = files in none.
       baseFiles = new Set<string>();
@@ -2378,6 +2400,11 @@
     if (lk === 'b' && !meta && !event.altKey && !event.shiftKey && !inAnyInput) {
       event.preventDefault();
       if (event.repeat) return;
+      // Same gate as the scope bar's switch: nothing to bypass, nothing
+      // to latch — a lit BYPASS lamp over an empty console would be a
+      // no-op wearing a mode light. Bypassed always passes so the key
+      // can throw the switch back.
+      if (!scopeBypassed && !scopeNarrowingEngaged) return;
       holdLatch.press('b', toggleScopeBypass);
       return;
     }
@@ -3656,6 +3683,7 @@
             {displayPaths}
             {scopeBrightPaths}
             {hideOutOfScope}
+            {scopeBypassed}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
             onToggleSystemFilter={toggleSystemFilter}

@@ -25,6 +25,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **Bypass now reaches every dim it should.** While `B` is engaged the systems view no longer keeps muted and non-soloed groups dimmed (or hidden, under the focus lens), and a soloed Collected/Loose bucket no longer keeps rows out of the systems view — search already saw all of it; now the browsing surfaces agree. The S/M buttons stay lit through it, as before
+- The scope bar's `hidden shown`, `indexed only` and `lens on` chips no longer dim under bypass — bypass doesn't suspend those switches, and the dim claimed it did
+- Pressing `B` over an empty console no longer lights the `BYPASS` lamp for nothing — the key now refuses exactly what the scope bar's inert switch refuses
+- Soloing combinations that intersect to nothing — a system solo with no file under a soloed folder, say — now say "Nothing under the soloed items." instead of a generic no-results message beside a meter reading "of 0 files"
 - The hits meter no longer claims its count came from your scope while the scope is bypassed — the number was already the whole library, but the tooltip said otherwise
 - Enter no longer commits a destructive prompt when Cancel is focused. Destructive prompts open on Cancel so that Enter from muscle memory is harmless, and that focus is now visible — it was being drawn without a ring whenever the prompt was raised by mouse
 

@@ -398,4 +398,24 @@ describe('emptyScopeMessage', () => {
       })
     ).toBe('Nothing under the soloed items.');
   });
+
+  // The cross-axis case: every per-axis check passes, nothing survives
+  // the intersection (e.g. a soloed system with no file under a soloed
+  // folder). Without scopeEmpty this fell through to the backend and a
+  // generic no-results message beside a meter reading "of 0 files".
+  it('full intersection empty + a solo engaged → "Nothing under the soloed items."', () => {
+    expect(
+      emptyScopeMessage({ ...NONE_EMPTY, scopeEmpty: true, anySolosEngaged: true })
+    ).toBe('Nothing under the soloed items.');
+  });
+
+  it('full intersection empty + no solo engaged → "Everything is muted."', () => {
+    expect(
+      emptyScopeMessage({ ...NONE_EMPTY, scopeEmpty: true, anySolosEngaged: false })
+    ).toBe('Everything is muted.');
+  });
+
+  it('scopeEmpty false (or omitted) adds nothing — the scope is not empty', () => {
+    expect(emptyScopeMessage({ ...NONE_EMPTY, scopeEmpty: false })).toBeNull();
+  });
 });

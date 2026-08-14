@@ -155,6 +155,18 @@ systems view) show material and may hide it under the focus lens below;
 channels and controls and never hide them — the mixer is the recovery
 path, so nothing can disappear from it.
 
+**What each class's dim speaks about (amended 2026-08-13, per the S/M
+bypass audit).** Browsing surfaces dim by membership in the *resolved
+scope* — so the master bypass, which suspends the resolution, lifts
+every dim and every lens-drop on them. Console surfaces dim by *channel
+state* (a muted row, a track outside the mix) the way a mixer shows a
+lit M regardless of what else is soloed — so their dims persist through
+bypass and through another channel's solo, and the filter console does
+not dim channels that only a sibling's solo excludes. The scope bar is
+the readout of *effect*: it alone suppresses overridden mute chips and
+dips its narrowing chips under bypass. The three treatments differ on
+purpose; they answer different questions.
+
 - **Dim predicate:** membership in the final resolved scope (mix ∩ all
   axes), applied at each surface's own granularity:
   - *Tree file rows* dim when the file is indexed but not in scope.
