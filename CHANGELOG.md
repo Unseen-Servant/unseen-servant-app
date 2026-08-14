@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- A hidden file shown under "Show hidden items" no longer fades almost to nothing in the by-system view when it is also out of scope — the two dims were multiplying. Hidden wins, as it always has in the file tree
 - **Bypass now reaches every dim it should.** While `B` is engaged the systems view no longer keeps muted and non-soloed groups dimmed (or hidden, under the focus lens), and a soloed Collected/Loose bucket no longer keeps rows out of the systems view — search already saw all of it; now the browsing surfaces agree. The S/M buttons stay lit through it, as before
 - The scope bar's `hidden shown`, `indexed only` and `lens on` chips no longer dim under bypass — bypass doesn't suspend those switches, and the dim claimed it did
 - Pressing `B` over an empty console no longer lights the `BYPASS` lamp for nothing — the key now refuses exactly what the scope bar's inert switch refuses

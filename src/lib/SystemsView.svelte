@@ -652,13 +652,14 @@
               {@const rowSoloed = soloedScopePaths.has(entry.path)}
               {@const rowMuted = mutedScopePaths.has(entry.path)}
               {@const rowOutOfScope = isIndexedRowOutOfScope(entry.path, scopeBrightPaths)}
+              {@const rowHidden = isPathOrAncestorIn(entry.path, hiddenPaths)}
               {#if !(hideOutOfScope && rowOutOfScope)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
                 class:focused={isFocused(entry, group.tag)}
-                class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
-                class:out-of-scope={rowOutOfScope && !groupDimmed}
+                class:hidden-item={rowHidden}
+                class:out-of-scope={rowOutOfScope && !groupDimmed && !rowHidden}
                 class:hovered={hoveredRow === rowHoverKey(group.tag, entry.path)}
                 data-sv-row={entry.path}
                 draggable={renamingFilePath !== entry.path}
@@ -913,19 +914,23 @@
      stay visible — a muted channel never disappears from the mixer.
      Hover restores legibility, mirroring the filter menu's row-dimmed.
      The dim lands on each row's content, never the S/M cluster: the lit
-     chip is the way back in — same rule as the tree's :not(.sm). */
-  .group-files.dimmed > .file > :not(.sm) {
+     chip is the way back in — same rule as the tree's :not(.sm).
+     User-hidden rows are skipped — they already wear their own dim, and
+     stacking the two would mint a deeper tier the doctrine doesn't have. */
+  .group-files.dimmed > .file:not(.hidden-item) > :not(.sm) {
     opacity: var(--opacity-out-of-scope);
     transition: opacity var(--transition-fast);
   }
-  .group-files.dimmed:hover > .file > :not(.sm) {
+  .group-files.dimmed:hover > .file:not(.hidden-item) > :not(.sm) {
     opacity: var(--opacity-out-of-scope-hover);
   }
 
   /* A row out of the resolved scope dims inside a bright group — the
      surface's grain became the row when rows became channels. The
-     class is gated on the group being bright, so dims never stack; a
-     dimmed group dims as one. Chips stay lit: same :not(.sm) grammar. */
+     class is gated on the group being bright and the row not being
+     user-hidden, so dims never stack; a dimmed group dims as one, and
+     a hidden row keeps its own dim alone — same gate as the tree's.
+     Chips stay lit: same :not(.sm) grammar. */
   .file.out-of-scope > :not(.sm) {
     opacity: var(--opacity-out-of-scope);
     transition: opacity var(--transition-fast);

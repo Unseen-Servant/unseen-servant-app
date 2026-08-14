@@ -214,6 +214,15 @@ purpose; they answer different questions.
 - **Search results never dim** — by construction they are always in
   scope.
 
+**User-hidden rows take the hidden treatment alone (amended
+2026-08-14).** A row rendered only because "Show hidden items" is on
+already wears its own dim (0.55, italic) — the out-of-scope dim never
+stacks on top of it. Hidden wins, at both grains: the tree and the
+systems view gate the row-level out-of-scope class on the row not being
+hidden, and the systems view's group-level dim skips hidden rows.
+Compounding the two (0.55 × 0.45 ≈ 0.25) would mint a deeper tier the
+one-dim-level rule doesn't have.
+
 The tree gains the two treatments it is missing today (dim outside the
 playing mix, dim outside an active solo); "what's in tonight's mix" then
 reads in the tree as the complement's dimming — no wash needed there.
