@@ -19,12 +19,23 @@
   export let onBeginDrag: (path: string, name: string, isDir: boolean) => TreePathsPayload | null =
     () => null;
 
+  // Capture-phase press recording: the chips' bubble-phase
+  // stopPropagation runs after this, so the row always sees the true
+  // press target. dragstart's own target is the draggable li (the
+  // drag source node per the HTML spec), never the pressed chip — the
+  // guard has to remember the press instead.
+  let pressedControl = false;
+  function recordPressTarget(event: MouseEvent) {
+    const el = event.target as HTMLElement | null;
+    pressedControl = !!el?.closest('.sm, .app-checkbox');
+  }
+
   function handleDragStart(event: DragEvent, entry: FileStatusEntry) {
     // No drag from the console switches or the curation checkbox — the
     // tree gets this structurally (draggable sits on a sibling of its
-    // cluster); here the li itself is the drag source, so bail before
-    // the browser starts one.
-    if ((event.target as HTMLElement | null)?.closest('.sm, .app-checkbox')) {
+    // cluster); here the li itself is the drag source, so bail when the
+    // press began on one.
+    if (pressedControl) {
       event.preventDefault();
       return;
     }
@@ -619,6 +630,7 @@
                 on:dragend={clearTreePathsPayload}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
+                on:mousedown|capture={recordPressTarget}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
               >
                 {#if curating}
@@ -963,7 +975,7 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
-    min-width: 2.75rem;
+    min-width: 2rem;
     text-align: right;
   }
 
