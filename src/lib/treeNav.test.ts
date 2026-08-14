@@ -1,4 +1,4 @@
-import { describe, it, expect, test } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { FileItem } from './types';
 import { computeVisibleRows, indexOfPath, isRowOutOfScope, isIndexedRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial, type LibraryKnowledge, type ScopeVisibility } from './treeNav';
 
@@ -372,19 +372,19 @@ describe('isRowOutOfScope', () => {
 // --- isIndexedRowOutOfScope ---
 
 describe('isIndexedRowOutOfScope', () => {
-  test('no narrowing engaged (null bright set) — nothing is out of scope', () => {
+  it('no narrowing engaged (null bright set) — nothing is out of scope', () => {
     expect(isIndexedRowOutOfScope('/a.pdf', null)).toBe(false);
   });
 
-  test('a row in the bright set is in scope', () => {
+  it('a row in the bright set is in scope', () => {
     expect(isIndexedRowOutOfScope('/a.pdf', new Set(['/a.pdf']))).toBe(false);
   });
 
-  test('a row outside the bright set is out of scope', () => {
+  it('a row outside the bright set is out of scope', () => {
     expect(isIndexedRowOutOfScope('/a.pdf', new Set(['/b.pdf']))).toBe(true);
   });
 
-  test('an empty bright set puts every row out of scope', () => {
+  it('an empty bright set puts every row out of scope', () => {
     expect(isIndexedRowOutOfScope('/a.pdf', new Set())).toBe(true);
   });
 });
