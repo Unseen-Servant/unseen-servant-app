@@ -77,6 +77,18 @@ export function isRowOutOfScope(path: string, isDir: boolean, scope: ScopeVisibi
   return speaks && !scope.scopeBrightPaths.has(path);
 }
 
+/** A systems-view row is indexed by construction, so out-of-scope
+ * reduces to bright-set membership (null = no narrowing engaged,
+ * nothing dims). Lives beside isRowOutOfScope so every surface's dim
+ * predicate stays in this one module; SystemsView's template and its
+ * keyboard nav both call it, so render and nav can never drift. */
+export function isIndexedRowOutOfScope(
+  path: string,
+  scopeBrightPaths: Set<string> | null,
+): boolean {
+  return scopeBrightPaths !== null && !scopeBrightPaths.has(path);
+}
+
 // Flattens the file tree into the rows the user can actually navigate to,
 // respecting expansion state, the optional collection filter, the
 // hidden-paths rule (descendants of a hidden ancestor stay hidden unless
