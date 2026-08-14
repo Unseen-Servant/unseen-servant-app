@@ -1,7 +1,8 @@
 # Systems view row S/M — design
 
 **Date:** 2026-08-13
-**Status:** Designed; implementation pending.
+**Status:** Implemented 2026-08-13 on main (automated checks green;
+manual QA pending — see Testing).
 **Related:** `2026-08-08-solo-mute-play-doctrine-design.md` (amended by
 this design), `2026-08-13-sm-bypass-audit.md`,
 `2026-08-11-momentary-transport-design.md` (hold latch),

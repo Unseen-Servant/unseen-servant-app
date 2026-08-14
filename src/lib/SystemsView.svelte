@@ -370,8 +370,9 @@
   }
 
   function handleWindowKey(event: KeyboardEvent) {
-    // IME composition first — same guard every other keydown handler
-    // carries; keybindings.ts's dispatch helpers can't see it themselves.
+    // IME composition — belt-and-braces ahead of the input-target check
+    // below; keybindings.ts's dispatch helpers can't see composition
+    // state themselves.
     if (event.isComposing) return;
     // Yield to the context menu via state — DOM checks for `.context-menu`
     // are racy because Svelte's reactive DOM updates flush in a microtask
