@@ -20,6 +20,14 @@
     () => null;
 
   function handleDragStart(event: DragEvent, entry: FileStatusEntry) {
+    // No drag from the console switches or the curation checkbox — the
+    // tree gets this structurally (draggable sits on a sibling of its
+    // cluster); here the li itself is the drag source, so bail before
+    // the browser starts one.
+    if ((event.target as HTMLElement | null)?.closest('.sm, .app-checkbox')) {
+      event.preventDefault();
+      return;
+    }
     const payload = onBeginDrag(entry.path, entry.filename, false);
     if (!payload || !event.dataTransfer) {
       event.preventDefault();
@@ -770,9 +778,9 @@
     color: inherit;
   }
 
-  /* S/M cluster — hidden at rest, revealed on header hover or keyboard
-     focus, always visible while engaged. Button anatomy is the shared
-     .sm-btn in app.css. */
+  /* S/M clusters — hidden at rest, revealed on header or row hover and
+     keyboard focus, always visible while engaged. Button anatomy is the
+     shared .sm-btn in app.css. */
   .sm {
     display: inline-flex;
     gap: 0.25rem;
@@ -819,12 +827,14 @@
 
   /* Muted groups (and non-soloed groups while a solo is active) dim but
      stay visible — a muted channel never disappears from the mixer.
-     Hover restores legibility, mirroring the filter menu's row-dimmed. */
-  .group-files.dimmed {
+     Hover restores legibility, mirroring the filter menu's row-dimmed.
+     The dim lands on each row's content, never the S/M cluster: the lit
+     chip is the way back in — same rule as the tree's :not(.sm). */
+  .group-files.dimmed > .file > :not(.sm) {
     opacity: var(--opacity-out-of-scope);
     transition: opacity var(--transition-fast);
   }
-  .group-files.dimmed:hover {
+  .group-files.dimmed:hover > .file > :not(.sm) {
     opacity: var(--opacity-out-of-scope-hover);
   }
 
@@ -869,7 +879,8 @@
   }
   /* The row cluster keeps the flush-right slot: it carries the auto
      margin the meta used to, so chips and readout pack together on the
-     right edge, one console column under the header's own cluster. */
+     right edge. The meta's min-width pins the chips to one x-position
+     down the list even as the readout's width varies. */
   .file .sm {
     margin-left: auto;
   }
@@ -921,8 +932,8 @@
     flex: 1;
     min-width: 0;
   }
-  /* Sits just left of the indexed-at readout, which keeps the flush-right
-     slot. Same strip, same recipe, as the file tree's. */
+  /* Sits just left of the row's S/M cluster and readout, which keep the
+     flush-right slot. Same strip, same recipe, as the file tree's. */
   .ribbons {
     display: inline-flex;
     align-items: center;
@@ -952,6 +963,8 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
+    min-width: 2.75rem;
+    text-align: right;
   }
 
   .empty {
