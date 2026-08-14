@@ -198,16 +198,24 @@ export function resolveScopeSet(
  * `anyLivePlaying` must count only playing names whose collection still
  * exists (resolveMix's ghost rule) — a persisted ghost play-name must
  * not claim "Nothing indexed is playing." over a live mute. Returns
- * null when the scope isn't empty. */
+ * null when the scope isn't empty.
+ *
+ * `scopeEmpty` is the full cross-axis intersection (resolveScopeSet with
+ * the systems axis included). It catches the empties the per-axis checks
+ * can't see — each axis non-empty on its own, nothing surviving all of
+ * them (e.g. a soloed system with no file under a soloed folder) — so
+ * the scope-bar meter's "of 0 files" and this message never disagree. */
 export function emptyScopeMessage(args: {
   mixEmpty: boolean;
   anyLivePlaying: boolean;
   pathScopeEmpty: boolean;
   anySolosEngaged: boolean;
   systemsEmpty: boolean;
+  scopeEmpty?: boolean;
 }): string | null {
   if (args.mixEmpty) return args.anyLivePlaying ? 'Nothing indexed is playing.' : 'Everything is muted.';
   if (args.pathScopeEmpty) return args.anySolosEngaged ? 'Nothing under the soloed items.' : 'Everything is muted.';
   if (args.systemsEmpty) return 'Everything is muted.';
+  if (args.scopeEmpty) return args.anySolosEngaged ? 'Nothing under the soloed items.' : 'Everything is muted.';
   return null;
 }

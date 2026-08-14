@@ -51,6 +51,10 @@
   export let scopeBrightPaths: Set<string> | null = null;
   // Focus lens: dimmed groups drop from the render entirely.
   export let hideOutOfScope: boolean = false;
+  // Master bypass: every dim lifts (this is a browsing surface — dims
+  // speak about the resolved scope, which bypass suspends). The S/M
+  // buttons stay lit through it, same as the console surfaces.
+  export let scopeBypassed: boolean = false;
 
   // User-hidden paths (same set as the tree). Entries whose path is hidden
   // are dropped when `showHidden` is false; rendered with dimmed/italic
@@ -144,11 +148,17 @@
   // groupDimmed and the keyboard-nav model both call this; keep them
   // in sync through it, never by copy (same pattern as treeNav's
   // isRowOutOfScope).
+  // `bypassed` is a parameter, not a closed-over read of the prop, for
+  // the same dependency-tracking reason groupStates is a derivation:
+  // Svelte only re-runs the template/reactive callers on values it can
+  // see in the call expression.
   function isGroupDimmed(
     group: { muted: boolean; tag: string; entries: FileStatusEntry[] },
     soloed: Set<string>,
-    bright: Set<string> | null
+    bright: Set<string> | null,
+    bypassed: boolean
   ): boolean {
+    if (bypassed) return false;
     return group.muted
       || (soloed.size > 0 && !soloed.has(group.tag))
       || (bright !== null && !group.entries.some((e) => bright.has(e.path)));
@@ -258,7 +268,7 @@
     const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
     for (const g of groups) {
       if (collapsed.has(g.tag)) continue;
-      if (hideOutOfScope && isGroupDimmed(g, soloedSystems, scopeBrightPaths)) continue;
+      if (hideOutOfScope && isGroupDimmed(g, soloedSystems, scopeBrightPaths, scopeBypassed)) continue;
       for (const e of g.entries) out.push({ path: e.path, entry: e, tag: g.tag });
     }
     return out;
@@ -514,7 +524,7 @@
     {#each groups as group (group.tag)}
       {@const groupState = groupStates.get(group.tag) ?? 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
-      {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths)}
+      {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths, scopeBypassed)}
       {#if !(hideOutOfScope && groupDimmed)}
       <section class="group">
         <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
@@ -654,7 +664,7 @@
       </section>
       {/if}
     {/each}
-    {#if hideOutOfScope && groups.length > 0 && groups.every((g) => isGroupDimmed(g, soloedSystems, scopeBrightPaths))}
+    {#if hideOutOfScope && groups.length > 0 && groups.every((g) => isGroupDimmed(g, soloedSystems, scopeBrightPaths, scopeBypassed))}
       <div class="empty">Everything is out of scope.</div>
     {/if}
   </div>

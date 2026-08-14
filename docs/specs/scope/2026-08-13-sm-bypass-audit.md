@@ -1,7 +1,12 @@
 # S/M filter + master bypass — behavior audit
 
 **Date:** 2026-08-13
-**Status:** Audit only — no code changed. Findings ordered by severity.
+**Status:** Findings 1–5 fixed on this branch (2026-08-14). Findings
+6–7 resolved by doctrine, not code: the display-doctrine amendment of
+2026-08-13 in the doctrine design doc codifies browsing surfaces dim by
+resolved scope, console surfaces by channel state, and the scope bar as
+the readout of effect — which makes the observed FilterPanel and
+CollectionsPanel behavior correct as-is. Findings ordered by severity.
 **Baseline:** `docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md`,
 `src/lib/searchScope.ts`, commit 6a5b2b0.
 

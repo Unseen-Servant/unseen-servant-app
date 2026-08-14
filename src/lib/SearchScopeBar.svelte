@@ -465,11 +465,15 @@
   /* Dimmed, not hidden: the point of a bypass is to see what you are
      bypassing. Reuses the app's single out-of-scope dim step rather than
      inventing a second one, and transitions so a momentary hold reads as
-     a dip rather than a strobe. */
+     a dip rather than a strobe. Only the narrowing chips (solo/play and
+     mute frames) dip — the view-switch chips (hidden shown, indexed
+     only, lens on) are display filters bypass leaves alone, and dimming
+     a switch that is still doing its job would claim otherwise. */
   .left .chip {
     transition: background var(--transition-fast), opacity var(--transition-fast);
   }
-  .left.bypassed .chip {
+  .left.bypassed .chip.solo,
+  .left.bypassed .chip.exclusion {
     opacity: var(--opacity-out-of-scope);
   }
 
