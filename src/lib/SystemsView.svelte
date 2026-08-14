@@ -493,24 +493,6 @@
     return parent;
   }
 
-  // Compact "how long ago" formatter for the catalog metadata slot.
-  // Drops the trailing "ago" since the column header carries that context.
-  function formatRelativeShort(iso: string | undefined): string {
-    if (!iso) return '';
-    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (seconds < 60) return 'now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h`;
-    const days = Math.floor(hours / 24);
-    if (days < 30) return `${days}d`;
-    const months = Math.floor(days / 30);
-    if (months < 12) return `${months}mo`;
-    const years = Math.floor(days / 365);
-    return `${years}y`;
-  }
-
   // Resolve the currently-focused entry as a FileItem so the parent's
   // shared action-key helper (R/F/./M/C/Cmd+O) can run against it
   // regardless of view mode. Returns null when nothing is focused or
@@ -625,7 +607,7 @@
             {/if}
             <span class="group-name ledger-label">{group.tag}</span>
           </button>
-          <span class="sm" class:engaged={soloedSystems.has(group.tag) || group.muted}>
+          <span class="sm">
             {#if group.tag !== 'Untagged'}
               <button
                 type="button"
@@ -719,7 +701,7 @@
                     {/if}
                   </span>
                 {/if}
-                <span class="sm" class:engaged={rowSoloed || rowMuted}>
+                <span class="sm">
                   <button
                     type="button"
                     class="sm-btn"
@@ -741,14 +723,6 @@
                     title={rowMuted ? `Unmute ${entry.filename} (M)` : `Mute ${entry.filename} (M)`}
                   >M</button>
                 </span>
-                {#if entry.indexed_at}
-                  <span
-                    class="file-meta"
-                    title={`Indexed ${new Date(entry.indexed_at).toLocaleString()}`}
-                  >
-                    {formatRelativeShort(entry.indexed_at)}
-                  </span>
-                {/if}
               </li>
             {/each}
           </ul>
@@ -764,6 +738,10 @@
 
 <style>
   .systems-view {
+    /* Width of the group-count column. Group headers spend it on the
+       count; file rows reserve it as right padding, which is what puts
+       both row types' S/M switches in one column. */
+    --count-w: 1.85rem;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -782,6 +760,10 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+    /* Matches the file rows' 0.25rem margin + 0.75rem padding, so both
+       row types share one right inset — and one switch column. The
+       border stays full-bleed because this is padding, not margin. */
+    padding-right: 1rem;
     border-bottom: 1px solid var(--border-subtle);
   }
   /* The untagged bucket is a bucket, not an identity: grey, never the
@@ -830,38 +812,57 @@
     color: inherit;
   }
 
-  /* S/M clusters — hidden at rest, revealed on header or row hover and
-     keyboard focus, always visible while engaged. Button anatomy is the
-     shared .sm-btn in app.css. Hover is the latched .hovered class, not
-     :hover — see the note at its declaration. */
+  /* S/M clusters — always drawn. A mixer's channel switches are simply on
+     the strip; hiding them made every row reserve 40px for something it
+     refused to paint, which stranded the ribbon strip against a hole.
+     Reaching a row doesn't summon the switches, it dresses them: the
+     border returns and the ink steps up. Nothing appears or moves.
+     Button anatomy is the shared .sm-btn in app.css; the :not() guards
+     keep the engaged recipes there untouched rather than racing them.
+     Hover is the latched .hovered class, not :hover — see the note at its
+     declaration. */
   .sm {
     display: inline-flex;
     gap: 0.25rem;
     align-self: center;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
   }
-  .group-head-row.hovered .sm,
-  .group-head-row:focus-within .sm,
-  .file.hovered .sm,
-  .file:focus-within .sm,
-  .file.focused .sm,
-  .sm.engaged {
-    opacity: 1;
+  .sm-btn:not(.solo-on):not(.mute-on) {
+    border-color: transparent;
+    color: color-mix(in srgb, var(--text-tertiary) 60%, transparent);
+  }
+  .group-head-row.hovered .sm-btn:not(.solo-on):not(.mute-on),
+  .group-head-row:focus-within .sm-btn:not(.solo-on):not(.mute-on),
+  .file.hovered .sm-btn:not(.solo-on):not(.mute-on),
+  .file:focus-within .sm-btn:not(.solo-on):not(.mute-on),
+  .file.focused .sm-btn:not(.solo-on):not(.mute-on) {
+    border-color: var(--border-subtle);
+    color: var(--text-tertiary);
+  }
+  /* Pointer on the switch itself. Restates app.css's step because the
+     row-dressing rule above outranks it; must stay last to win the tie. */
+  .sm-btn:hover:not(:disabled):not(.solo-on):not(.mute-on) {
+    color: var(--text-secondary);
+    border-color: var(--text-secondary);
   }
 
   /* The count is the cluster's LED readout: same 18px height as the S/M
      buttons but inverted anatomy (filled, borderless) so it can't be
-     mistaken for a third switch. */
+     mistaken for a third switch.
+
+     --count-w pins it to a fixed width, which is what makes the switch
+     column possible: sized to its digits it slid right as a group grew
+     (28px inset at 3 files, 33px at 137), so headers didn't even align
+     with each other. 1.85rem holds four digits — a system would need
+     10,000 books to outgrow it — and a fixed readout is what an
+     instrument panel wants anyway. */
   .group-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     align-self: center;
     height: 18px;
-    min-width: 18px;
+    min-width: var(--count-w);
     padding: 0 0.3rem;
-    margin-right: 0.25rem;
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
     color: var(--text-secondary);
@@ -903,11 +904,13 @@
     margin-right: 0.1rem;
   }
 
+  /* The right padding reserves the count column so a row's switches land
+     in the same x as the group header's — see --count-w. */
   .file {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    padding: 0.25rem 0.75rem 0.25rem 1.5rem;
+    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.4rem) 0.25rem 1.5rem;
     margin: 0 0.25rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -930,10 +933,8 @@
   .file.hidden-item .file-name {
     font-style: italic;
   }
-  /* The row cluster keeps the flush-right slot: it carries the auto
-     margin the meta used to, so chips and readout pack together on the
-     right edge. The meta's min-width pins the chips to one x-position
-     down the list even as the readout's width varies. */
+  /* The auto margin packs the cluster against the row's right padding,
+     which is itself inset by the count column. */
   .file .sm {
     margin-left: auto;
     align-self: center;
@@ -959,6 +960,14 @@
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+  }
+  /* Whatever sits last before the switch cluster has to be the thing that
+     grows. With a sub-folder that's .file-path; a book at the library root
+     has none, and without this the cluster is flung right on its auto
+     margin, stranding the ribbons mid-row. Conditional because growing the
+     name unconditionally opens a gap between it and the path. */
+  .file:not(:has(.file-path)) .file-name {
+    flex: 1 1 auto;
   }
   .rename-input {
     flex: 1;
@@ -1009,16 +1018,6 @@
     color: var(--text-secondary);
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
     white-space: nowrap;
-  }
-
-  .file-meta {
-    flex-shrink: 0;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    font-variant-numeric: tabular-nums;
-    min-width: 2rem;
-    text-align: right;
   }
 
   .empty {
