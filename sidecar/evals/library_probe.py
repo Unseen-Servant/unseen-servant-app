@@ -61,15 +61,18 @@ DEFAULT_QUERIES = [
 # the cross-encoder input (server._search_sync), so damage here degrades
 # retrieval itself, not just what the UI renders.
 INLINE_TAGS = re.compile(r"</?(?:mark|u|b|i|em|strong)>", re.I)
-# Kerning loss splits words: "Ranger Spells" -> "Ran er S ells".
-SPLIT_WORD = re.compile(r"\b[a-z]\s[a-z]{1,3}\b")
+# Extraction splits a letter off a word: "Dexterity" -> "Dexterit y",
+# "Spells" -> "S ells". Detected as a stranded single-letter token, excluding
+# the only legitimate ones ("a", "I") — matching on the *split* instead
+# ("word space short-word") just finds ordinary English like "a pit".
+LONE_LETTER = re.compile(r"(?<![\w'])(?![aAI](?![\w']))[A-Za-z](?![\w'])")
 
 
 def heading_flaws(heading: str) -> list[str]:
     flaws = []
     if INLINE_TAGS.search(heading or ""):
         flaws.append("inline-tags")
-    if SPLIT_WORD.search(strip_markup(heading)):
+    if LONE_LETTER.search(strip_markup(heading)):
         flaws.append("split-words")
     return flaws
 

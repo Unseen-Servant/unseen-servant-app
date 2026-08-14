@@ -63,8 +63,8 @@ corpus, where the score distribution is much narrower than a real library's.
 ### 2. Section headings are damaged, and they are in the retrieval path
 
 Over the same 150 results: **51% carry inline markup** (`<mark>`, `<u>`, `**`)
-and **10% contain kerning-split words**. It shows up in the top hits, not just
-the tail:
+and **35% have a letter split off a word** (`Dexterity` → `Dexterit y`). It shows
+up in the top hits, not just the tail:
 
 ```
 how does grappling work        → Dexterit y > Grappling
@@ -106,16 +106,30 @@ metadata**, not in the embedding model or the ranker.
 
 1. **Recalibrate relevance tiers against the real library.** 62% strong is not a
    signal. Include the MCP weak-divider, which shares the thresholds.
-2. **Fix section-heading extraction.** Strip inline markup and repair kerning
-   splits before the heading reaches `_embed_text` — this is in the embed path,
-   so it needs a re-index to take effect.
-3. **Fix heading-hierarchy promotion.** Investigate `promote_markdown` treating
-   table-of-contents entries as section ancestors.
-4. **Grow the eval corpus past three books.** Every defect here is invisible at
+2. **Sanitise heading text.** Strip inline markup and rejoin split letters before
+   the heading reaches `_embed_text` — this is in the embed path, so it needs a
+   re-index to take effect. Distinct from #328, which is about *which* heading
+   becomes the parent; this is the heading string itself being mangled.
+3. **Grow the eval corpus past three books.** Every defect here is invisible at
    that size, which is the same limitation the rerank ablation ran into.
-5. **Add an answerability metric to the eval harness** — can a small model answer
+4. **Add an answerability metric to the eval harness** — can a small model answer
    correctly from the returned set alone? That is the agent's contribution as an
    evaluator, and it does not require the agent to ship.
+
+Heading *hierarchy* is already tracked as
+[#328](https://github.com/Unseen-Servant/unseen-legend-lore/issues/328), which
+independently found the same `CONTENTS >` root and stale-heading pathologies;
+the measurements above are added there rather than duplicated.
+
+### A note on measuring this
+
+The first pass at the split-word detector matched on the gap between words
+(`word` + space + short word) and reported 10%. That pattern finds ordinary
+English — `a pit`, `a hit`, `a few` — and matched none of the real cases.
+Detecting the *stranded single letter* instead (excluding `a` and `I`) gives
+35%. Worth stating because the corrected number is nearly four times worse, and
+because a corpus-health metric that silently measures the wrong thing is how a
+workstream ends up optimising nothing.
 
 ## What the agent work established, so it need not be re-derived
 
