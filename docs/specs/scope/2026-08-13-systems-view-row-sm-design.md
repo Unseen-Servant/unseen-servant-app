@@ -147,7 +147,10 @@ design:
   checklist: chips reveal/engage; bare vs shifted targets; hold-S peek
   snaps back; header-solo + row-solo collision shows the doctrine
   message; bypass lifts dims with chips lit; a multi-tagged file lights
-  in every group; untagged rows solo while `⇧S` stays inert.
+  in every group; untagged rows solo while `⇧S` stays inert; muting one
+  file dims that row (in every group it appears under) with M lit;
+  soloing one file dims its same-group shelf-mates; the lens hides
+  out-of-scope rows; bypass lifts row dims.
 
 ## Non-goals
 

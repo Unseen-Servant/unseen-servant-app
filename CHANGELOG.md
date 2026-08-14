@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **The scope bar names itself and carries the bypass switch.** It used to render empty until something narrowed — present but blank, and nothing you could learn from. It now always shows a `Scope` nameplate, a `B` switch beside it, and, when nothing is narrowed, the number of files a search would run against. The switch sits inert until there's a scope to bypass
 - Engaging a solo or mute snaps — one bright frame as the switch reaches its position
 - **The systems view's rows are channels.** Every file row in the by-system view carries its own S/M pair beside the system's, so the view works as the asset library it is: solo or mute one book without leaving it. Bare `S`/`M` on a focused row act on the file; `⇧S`/`⇧M` still throw the system's switches, and holding any of them stays momentary. Untagged books can finally be soloed — individually, as files
+- **A muted book dims where it stands.** Muting a single file in the by-system view now dims that row — in every system it appears under — and soloing one file dims its shelf-mates, so the view reads scope at the row the way the tree does, instead of only at the whole system. The focus lens likewise hides out-of-scope rows, not just whole systems
 
 ### Fixed
 
