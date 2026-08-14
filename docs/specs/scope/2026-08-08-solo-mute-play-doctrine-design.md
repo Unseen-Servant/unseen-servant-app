@@ -197,6 +197,10 @@ purpose; they answer different questions.
   - *System groups* dim when the channel is muted, when another
     channel's solo excludes it, or when none of the group's files are
     in scope (e.g. transport armed elsewhere).
+  - *Systems-view file rows* (amended 2026-08-14) dim when the file is
+    out of the resolved scope and the group is otherwise bright — the
+    surface's grain became the row when rows became channels
+    (2026-08-13). A dimmed group dims as one; dims never stack.
   - *Collection tracks* dim when not contributing to the mix — not
     armed while others play, or muted. A muted-while-playing row shows
     ▶ armed **and** M lit vermilion, content dimmed.

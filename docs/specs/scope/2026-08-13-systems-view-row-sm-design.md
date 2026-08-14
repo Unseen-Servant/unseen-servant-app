@@ -86,6 +86,25 @@ exactly:
 - Scope-bar chips per existing rules: file solos neutral, mutes
   vermilion.
 
+### Row-grain dim (amended 2026-08-14)
+
+Shipping rows as channels left the surface's dim at group grain: a
+muted file's row stayed bright (M lit, nothing dimmed) and a soloed
+file's shelf-mates stayed bright, while the tree dimmed both — two
+browsing surfaces disagreeing about one scope state, the exact shape
+of the bypass audit's finding 1. Amended: **the surface's grain is the
+row.** A row in a bright group dims when its file is out of the
+resolved scope (`isIndexedRowOutOfScope` in `treeNav.ts` — rows are
+indexed by construction, so the predicate reduces to bright-set
+membership; the template and the keyboard nav share it, so render and
+nav never drift). A dimmed group still dims as one — the row class is
+gated on the group being bright, so dims never stack. The focus lens
+drops out-of-scope rows as well as groups; a bright group can never
+lose all its rows to the lens, because a group with no in-scope file
+is already group-dimmed. Bypass nulls the bright set, so row dims lift
+with every other dim. Group counts stay whole-channel per the doctrine
+— the lens never shrinks them.
+
 ## The cross-level solo collision (named, deliberate)
 
 Soloing a group header and a file row in *another* group intersects two
