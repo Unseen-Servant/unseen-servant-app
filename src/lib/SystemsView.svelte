@@ -290,6 +290,13 @@
   // collectionPaths inside the function body — so the header latched at
   // whatever it showed when the group was last rebuilt, and unticking the
   // last file left the system still looking selected.
+  // Digits in the largest group count on screen. The count column is sized
+  // from this rather than from a fixed worst case, so a library whose
+  // biggest system holds 9 books doesn't pay for four digits everywhere.
+  $: countDigits = String(
+    groups.reduce((max, g) => Math.max(max, g.entries.length), 0)
+  ).length;
+
   const NO_GROUP_STATES = new Map<string, MemberState>();
   $: groupStates = curating
     ? new Map(groups.map((g) => [g.tag, groupMemberState(g.entries, collectionPaths)]))
@@ -559,7 +566,7 @@
   <div class="empty">No indexed files match the current view.</div>
 {:else}
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="systems-view" on:pointerleave={clearHover}>
+  <div class="systems-view" style="--count-digits: {countDigits}" on:pointerleave={clearHover}>
     {#each groups as group (group.tag)}
       {@const groupState = groupStates.get(group.tag) ?? 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
@@ -607,27 +614,29 @@
             {/if}
             <span class="group-name ledger-label">{group.tag}</span>
           </button>
-          <span class="sm">
-            {#if group.tag !== 'Untagged'}
+          <span class="head-cluster">
+            <span class="sm">
+              {#if group.tag !== 'Untagged'}
+                <button
+                  type="button"
+                  class="sm-btn"
+                  class:solo-on={soloedSystems.has(group.tag)}
+                  on:click|stopPropagation={() => onToggleSystemSolo(group.tag)}
+                  aria-pressed={soloedSystems.has(group.tag)}
+                  title={soloedSystems.has(group.tag) ? `Stop soloing ${group.tag} (⇧S)` : `Solo ${group.tag} (⇧S)`}
+                >S</button>
+              {/if}
               <button
                 type="button"
                 class="sm-btn"
-                class:solo-on={soloedSystems.has(group.tag)}
-                on:click|stopPropagation={() => onToggleSystemSolo(group.tag)}
-                aria-pressed={soloedSystems.has(group.tag)}
-                title={soloedSystems.has(group.tag) ? `Stop soloing ${group.tag} (⇧S)` : `Solo ${group.tag} (⇧S)`}
-              >S</button>
-            {/if}
-            <button
-              type="button"
-              class="sm-btn"
-              class:mute-on={group.muted}
-              on:click|stopPropagation={() => onToggleSystemFilter(group.tag === 'Untagged' ? UNTAGGED_KEY : group.tag)}
-              aria-pressed={group.muted}
-              title={group.muted ? `Unmute ${smLabel} (⇧M)` : `Mute ${smLabel} (⇧M)`}
-            >M</button>
+                class:mute-on={group.muted}
+                on:click|stopPropagation={() => onToggleSystemFilter(group.tag === 'Untagged' ? UNTAGGED_KEY : group.tag)}
+                aria-pressed={group.muted}
+                title={group.muted ? `Unmute ${smLabel} (⇧M)` : `Mute ${smLabel} (⇧M)`}
+              >M</button>
+            </span>
+            <span class="group-count">{group.entries.length}</span>
           </span>
-          <span class="group-count">{group.entries.length}</span>
         </div>
         {#if !collapsed.has(group.tag)}
           <ul class="group-files" class:dimmed={groupDimmed}>
@@ -738,10 +747,18 @@
 
 <style>
   .systems-view {
-    /* Width of the group-count column. Group headers spend it on the
-       count; file rows reserve it as right padding, which is what puts
-       both row types' S/M switches in one column. */
-    --count-w: 1.85rem;
+    /* Width of the group-count column: headers spend it on the count, file
+       rows reserve it as right padding, and that is what puts both row
+       types' switches in one column.
+
+       Sized from --count-digits (the largest count actually on screen, set
+       by the component) rather than a fixed worst case, so a chip is only
+       as wide as the library needs. The 1.125rem floor is the chip's own
+       18px minimum — without it the reserved padding would undershoot a
+       one-digit chip and knock the column out. The per-digit step is
+       deliberately loose: Crimson Text has no tabular figures, so digit
+       widths vary and the column has to absorb the widest of them. */
+    --count-w: max(1.125rem, calc(0.6rem + var(--count-digits, 2) * 0.32rem));
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -845,16 +862,21 @@
     border-color: var(--text-secondary);
   }
 
+  /* Switches and readout are one cluster, so they get the switches' own
+     0.25rem spacing rather than the header row's looser 0.4rem. The chip
+     fills --count-w exactly, which is what keeps that gap constant: a chip
+     that hugged its digits would leave slack inside the column and the gap
+     would breathe with every group's magnitude. */
+  .head-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: center;
+  }
+
   /* The count is the cluster's LED readout: same 18px height as the S/M
      buttons but inverted anatomy (filled, borderless) so it can't be
-     mistaken for a third switch.
-
-     --count-w pins it to a fixed width, which is what makes the switch
-     column possible: sized to its digits it slid right as a group grew
-     (28px inset at 3 files, 33px at 137), so headers didn't even align
-     with each other. 1.85rem holds four digits — a system would need
-     10,000 books to outgrow it — and a fixed readout is what an
-     instrument panel wants anyway. */
+     mistaken for a third switch. */
   .group-count {
     display: inline-flex;
     align-items: center;
@@ -904,13 +926,14 @@
     margin-right: 0.1rem;
   }
 
-  /* The right padding reserves the count column so a row's switches land
-     in the same x as the group header's — see --count-w. */
+  /* The right padding reserves the count column plus the cluster's own
+     0.25rem gap, so a row's switches land in the same x as the group
+     header's — see --count-w. */
   .file {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.4rem) 0.25rem 1.5rem;
+    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.25rem) 0.25rem 1.5rem;
     margin: 0 0.25rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
