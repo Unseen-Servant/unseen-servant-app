@@ -26,19 +26,21 @@ export interface KeybindingEntry {
   // Present only on bindings a menu re-exposes as an accelerator; the menu
   // matches on this rather than on the display string in `keys`.
   match?: string;
-  // True when this bare key throws a physical switch in the window — one of
+  // True when this key throws a physical switch in the window — one of
   // the app's 18px hardware squares that lights when engaged. The cheat sheet
   // draws those as key caps and everything else as text, because the
   // difference is real: a switch has a square you can point at, a command does
   // not. A key that only reaches a context-menu item — R, A, '.', C — is a
-  // command, however bare it looks.
+  // command, however bare it looks. Shift can ride along only where the
+  // shifted chord still lands on a real square (⇧S/⇧M reach the systems
+  // view's group cluster); the test pins those by id.
   //
   // The square goes by three class names and they are one control: `.sm-btn`
   // (S / M / B), `.tr-btn` (collections' P and E), and `.app-checkbox` (X) —
   // same 18px, same --border-subtle, same --radius-sm. Every flag below was
   // checked against the component that renders it rather than against a list,
-  // which is what caught this: "an .sm-btn" is false for 6 of the 13. The test
-  // for it lives in keybindings.test.ts; the flag is what the key *does*, and
+  // which is what caught this: "an .sm-btn" is false for several of them. The
+  // test for it lives in keybindings.test.ts; the flag is what the key *does*, and
   // the renderer decides what that earns (collections.play is a switch whose
   // chord reads `P / Space`, so it draws as text, not a cap).
   switch?: true;

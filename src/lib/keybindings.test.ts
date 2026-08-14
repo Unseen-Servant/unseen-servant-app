@@ -120,6 +120,11 @@ describe('menu accelerators', () => {
     expect(new Set(matches).size).toBe(matches.length);
   });
 
+  test('no two bindings share an id — BY_ID last-wins silently otherwise', () => {
+    const ids = KEYBINDINGS.map((k) => k.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   test('every declared match key is reachable from a real keypress', () => {
     for (const entry of KEYBINDINGS.filter((k) => k.match)) {
       const meta = entry.match!.startsWith('meta+');
@@ -230,6 +235,7 @@ describe('switch bindings', () => {
     expect(ids).toContain('collections.arm');
     expect(ids).toContain('scope.bypass');
     expect(ids).toContain('systems.solo');
+    expect(ids).toContain('systems.mute');
     expect(ids).toContain('systems.soloGroup');
     expect(ids).toContain('systems.muteGroup');
   });
@@ -240,14 +246,17 @@ describe('switch bindings', () => {
     expect(byId.get('collections.archive')?.switch).toBeUndefined();
   });
 
-  // A meta/alt chord is a command, not a switch — a cap would lie about
-  // it. Shift is different since 2026-08-13: ⇧S/⇧M throw the systems
-  // view's group squares from a file row — the same physical switch,
-  // reached with a modifier. The renderer still draws them as text
-  // (isBareKeyChord is false for '⇧S'), so no cap lies either way.
-  test('never marks a meta or alt chord', () => {
+  // Shift is the one modifier that can still land on a square: ⇧S/⇧M throw
+  // the systems view's group squares from a file row. That is a fact about
+  // these two entries, not about shift, so it is pinned by id rather than
+  // waved through.
+  const SHIFT_SWITCHES = new Set(['systems.soloGroup', 'systems.muteGroup']);
+
+  test('never marks a meta or alt chord, and shift only where a square really is', () => {
     for (const k of KEYBINDINGS.filter(e => e.switch)) {
       expect(k.keys.mac).not.toMatch(/[⌘⌥⌃]/);
+      expect(k.keys.other).not.toMatch(/Ctrl\+|Alt\+/);
+      if (k.keys.mac.includes('⇧')) expect(SHIFT_SWITCHES.has(k.id)).toBe(true);
     }
   });
 });
