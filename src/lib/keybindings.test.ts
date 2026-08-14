@@ -229,6 +229,9 @@ describe('switch bindings', () => {
     expect(ids).toContain('collections.play');
     expect(ids).toContain('collections.arm');
     expect(ids).toContain('scope.bypass');
+    expect(ids).toContain('systems.solo');
+    expect(ids).toContain('systems.soloGroup');
+    expect(ids).toContain('systems.muteGroup');
   });
 
   test('does not mark bare keys with no switch behind them', () => {
@@ -237,14 +240,14 @@ describe('switch bindings', () => {
     expect(byId.get('collections.archive')?.switch).toBeUndefined();
   });
 
-  // A modifier chord is a command, not a switch — a cap would lie about it.
-  // Note this cannot assert a single character: collections.play is a real
-  // switch whose chord reads "P / Space". It renders as text rather than a cap
-  // (isBareKeyChord is false for it), which is correct — the flag records what
-  // the key does, the renderer decides what that earns.
-  test('never marks a modifier chord', () => {
+  // A meta/alt chord is a command, not a switch — a cap would lie about
+  // it. Shift is different since 2026-08-13: ⇧S/⇧M throw the systems
+  // view's group squares from a file row — the same physical switch,
+  // reached with a modifier. The renderer still draws them as text
+  // (isBareKeyChord is false for '⇧S'), so no cap lies either way.
+  test('never marks a meta or alt chord', () => {
     for (const k of KEYBINDINGS.filter(e => e.switch)) {
-      expect(k.keys.mac).not.toMatch(/[⌘⌥⇧⌃]/);
+      expect(k.keys.mac).not.toMatch(/[⌘⌥⌃]/);
     }
   });
 });
@@ -266,11 +269,12 @@ describe('systemsRowScopeKey', () => {
 
   test('untagged: bare S solos the file, shift+S is inert, shift+M still mutes the system', () => {
     expect(systemsRowScopeKey(ev({ key: 's' }), true)).toEqual({ axis: 'file', kind: 'solo' });
+    expect(systemsRowScopeKey(ev({ key: 'm' }), true)).toEqual({ axis: 'file', kind: 'mute' });
     expect(systemsRowScopeKey(ev({ key: 'S', shiftKey: true }), true)).toBeNull();
     expect(systemsRowScopeKey(ev({ key: 'M', shiftKey: true }), true)).toEqual({ axis: 'system', kind: 'mute' });
   });
 
-  test('meta, ctrl, and alt combinations are someone else\'s chord', () => {
+  test("meta, ctrl, and alt combinations are someone else's chord", () => {
     // ⌘S is sync.commit — it must never read as a scope gesture.
     expect(systemsRowScopeKey(ev({ key: 's', metaKey: true }), false)).toBeNull();
     expect(systemsRowScopeKey(ev({ key: 's', ctrlKey: true }), false)).toBeNull();

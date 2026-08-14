@@ -103,8 +103,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'systems.open',          keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'systemsView' },
   { id: 'systems.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'systemsView' },
   { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView', switch: true },
-  { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the row's system",        scope: 'systemsView', switch: true },
-  { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the row's system",        scope: 'systemsView', switch: true },
+  { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'systemsView', switch: true },
+  { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'systemsView', switch: true },
+  { id: 'systems.soloGroup',     keys: { mac: '⇧S',   other: 'Shift+S' },       label: "Solo the row's system",        scope: 'systemsView', switch: true },
+  { id: 'systems.muteGroup',     keys: { mac: '⇧M',   other: 'Shift+M' },       label: "Mute the row's system",        scope: 'systemsView', switch: true },
 
   // Collections panel (when a row is focused)
   { id: 'collections.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'collections' },
@@ -244,17 +246,21 @@ export function eventMatchKey(event: ChordEvent): string | null {
   return event.metaKey || event.ctrlKey ? `meta+${base}` : base;
 }
 
+export interface SystemsRowScopeAction {
+  axis: 'file' | 'system';
+  kind: 'solo' | 'mute';
+}
+
 // S/M dispatch for a focused systems-view row. Bare letters act on the
 // row's file (the folder/file axis — the tree's "act on the row you're
 // on" grammar); ⇧S/⇧M lift to the row's group on the systems axis. The
 // system axis stays mute-only for the untagged bucket (#307): ⇧S is
-// inert there, while bare S still solos the untagged file itself.
-// Meta/Ctrl/Alt combinations are someone else's chord (⌘S is sync).
-export type SystemsRowScopeAction = {
-  axis: 'file' | 'system';
-  kind: 'solo' | 'mute';
-};
-
+// inert there, while bare S still solos the untagged file itself. A
+// null return covers both "not my chord" and that deliberate inertness —
+// callers let the event through either way. Meta/Ctrl/Alt combinations
+// are someone else's chord (⌘S is sync). Callers must additionally
+// check `!event.isComposing`, same as eventMatchKey — ChordEvent can't
+// see composition state.
 export function systemsRowScopeKey(
   event: ChordEvent,
   untagged: boolean,
