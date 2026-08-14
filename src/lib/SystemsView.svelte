@@ -598,6 +598,8 @@
               {@const isChecked = curating && collectionPaths.has(entry.path)}
               {@const ribbons = ribbonIndex.get(entry.path) ?? EMPTY_RIBBONS}
               {@const ribbonSplit = splitRibbons(ribbons)}
+              {@const rowSoloed = soloedScopePaths.has(entry.path)}
+              {@const rowMuted = mutedScopePaths.has(entry.path)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
@@ -657,6 +659,28 @@
                     {/if}
                   </span>
                 {/if}
+                <span class="sm" class:engaged={rowSoloed || rowMuted}>
+                  <button
+                    type="button"
+                    class="sm-btn"
+                    class:solo-on={rowSoloed}
+                    on:click|stopPropagation={() => onToggleScopeSolo(entryToFileItem(entry))}
+                    on:mousedown|stopPropagation
+                    on:dblclick|stopPropagation
+                    aria-pressed={rowSoloed}
+                    title={rowSoloed ? `Stop soloing ${entry.filename} (S)` : `Solo ${entry.filename} (S)`}
+                  >S</button>
+                  <button
+                    type="button"
+                    class="sm-btn"
+                    class:mute-on={rowMuted}
+                    on:click|stopPropagation={() => onToggleScopeMute(entryToFileItem(entry))}
+                    on:mousedown|stopPropagation
+                    on:dblclick|stopPropagation
+                    aria-pressed={rowMuted}
+                    title={rowMuted ? `Unmute ${entry.filename} (M)` : `Mute ${entry.filename} (M)`}
+                  >M</button>
+                </span>
                 {#if entry.indexed_at}
                   <span
                     class="file-meta"
@@ -758,6 +782,9 @@
   }
   .group-head-row:hover .sm,
   .group-head-row:focus-within .sm,
+  .file:hover .sm,
+  .file:focus-within .sm,
+  .file.focused .sm,
   .sm.engaged {
     opacity: 1;
   }
@@ -840,6 +867,12 @@
   .file.hidden-item .file-name {
     font-style: italic;
   }
+  /* The row cluster keeps the flush-right slot: it carries the auto
+     margin the meta used to, so chips and readout pack together on the
+     right edge, one console column under the header's own cluster. */
+  .file .sm {
+    margin-left: auto;
+  }
   .file-icon {
     display: inline-flex;
     align-items: center;
@@ -919,7 +952,6 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
-    margin-left: auto;
   }
 
   .empty {
