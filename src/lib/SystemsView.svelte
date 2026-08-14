@@ -3,6 +3,7 @@
   import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, FileStatusEntry } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
+  import { isIndexedRowOutOfScope } from './treeNav';
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
   import { holdLatch } from './holdLatch';
@@ -313,15 +314,18 @@
   // Flat list of entries the user can keyboard-navigate to: every entry
   // from a non-collapsed group, in display order. A multi-tagged file
   // appears once per group it belongs to — same as the rendered list,
-  // so ↓ walks visually adjacent rows. Mirrors the template's lens guard
-  // via isGroupDimmed so nav and render never drift: a group the lens
-  // drops is never focusable.
+  // so ↓ walks visually adjacent rows. Mirrors the template's lens guards
+  // via isGroupDimmed and isIndexedRowOutOfScope so nav and render never
+  // drift: a group the lens drops is never focusable.
   $: visibleEntries = (() => {
     const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
     for (const g of groups) {
       if (collapsed.has(g.tag)) continue;
       if (hideOutOfScope && isGroupDimmed(g, soloedSystems, scopeBrightPaths, scopeBypassed)) continue;
-      for (const e of g.entries) out.push({ path: e.path, entry: e, tag: g.tag });
+      for (const e of g.entries) {
+        if (hideOutOfScope && isIndexedRowOutOfScope(e.path, scopeBrightPaths)) continue;
+        out.push({ path: e.path, entry: e, tag: g.tag });
+      }
     }
     return out;
   })();
@@ -647,11 +651,14 @@
               {@const ribbonSplit = splitRibbons(ribbons)}
               {@const rowSoloed = soloedScopePaths.has(entry.path)}
               {@const rowMuted = mutedScopePaths.has(entry.path)}
+              {@const rowOutOfScope = isIndexedRowOutOfScope(entry.path, scopeBrightPaths)}
+              {#if !(hideOutOfScope && rowOutOfScope)}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="file"
                 class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
+                class:out-of-scope={rowOutOfScope && !groupDimmed}
                 class:hovered={hoveredRow === rowHoverKey(group.tag, entry.path)}
                 data-sv-row={entry.path}
                 draggable={renamingFilePath !== entry.path}
@@ -733,6 +740,7 @@
                   >M</button>
                 </span>
               </li>
+              {/if}
             {/each}
           </ul>
         {/if}
@@ -911,6 +919,18 @@
     transition: opacity var(--transition-fast);
   }
   .group-files.dimmed:hover > .file > :not(.sm) {
+    opacity: var(--opacity-out-of-scope-hover);
+  }
+
+  /* A row out of the resolved scope dims inside a bright group — the
+     surface's grain became the row when rows became channels. The
+     class is gated on the group being bright, so dims never stack; a
+     dimmed group dims as one. Chips stay lit: same :not(.sm) grammar. */
+  .file.out-of-scope > :not(.sm) {
+    opacity: var(--opacity-out-of-scope);
+    transition: opacity var(--transition-fast);
+  }
+  .file.out-of-scope:hover > :not(.sm) {
     opacity: var(--opacity-out-of-scope-hover);
   }
 
