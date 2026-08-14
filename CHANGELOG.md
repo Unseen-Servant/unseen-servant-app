@@ -6,10 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-14
+
 ### Changed
 
 - The filter console's `[clear all]` is now `[reset]`, and it answers for the whole panel: every solo and mute, plus the focus lens, show-hidden and hide-unindexed switches below it, which it used to leave lit. It sits dim until something is actually engaged. Files you've hidden by hand stay hidden — the Hidden items section keeps its own Clear for those
 - **Search is `⌘K`, the Filters panel is `⌘F`.** Search moves to the chord command bars everywhere use, which frees `F` for the thing it actually reads as: filtering. `⌘⇧F` no longer does anything
+- **A search result is a row like any other.** Results now drag onto a collection, open the same context menu the tree and systems view use, take a filing checkbox while a collection is armed, and answer `j`/`k`, `Home`/`End`, `⌘O`, `⌘I` and bare `S`/`M`. Rename is the one verb withheld — a result row has nowhere to host the field
+- **The dock stays keyboard-live while you search.** The two sides arbitrate who holds the keys — entering search or clicking the results points them at the file side, and the `⌘⌥` chords cross between the two — instead of search taking the keyboard whole. Entering search also clears stale carets in the dock, so no focus ring claims the arrows act somewhere they don't
+- **One Collection submenu, filed beside Game system.** Add and Remove were two triggers describing one axis, and a partly-filed folder showed up in both at once. They collapse into a single submenu of togglable rows whose pip reads all, some, or none — a half-filled folder tops up rather than emptying. `C` opens it, and it stays open while you file, so filing a book into three collections is one right-click instead of three. The menu regroups around that: Get info joins Open and Reveal, Re-index moves down beside Rename, and Delete gets its own section
+- **Pigment is now Ribbon**, named for the glyph actually on the row — and `Ribbon > None` reads correctly where `Pigment > None` did not. Rename and Archive take the object noun the way Delete always had, while Arm, Play and Mute stay bare mixer verbs; Solo and Mute drop "this file" so every toggle row names its object the same way; and "New collection" loses its ellipsis, since the naming happens in place rather than on another surface
+- Game system labels in the menus take primary ink instead of parchment. Parchment marked "this system has a pigment" back when that varied; it has been universal since, so the warm ink signalled nothing on a cool grey menu. The die still marks the axis, exactly as a collection's sigil does
+- Clicking a filter row focuses it, the way clicking a collections row already did
+- A collection's expanded file rows join the keyboard model: `j`/`k` walk them, `⌘⌫` removes one and hands focus to its sibling, `⌘O` opens it, and `←` hops back to the collection head
 - **Every confirmation is the app's own.** Deleting a file or folder and re-indexing a single file raised a system dialog in the operating system's chrome; they now use the same prompt the rest of the app does, so the same `⌘⌫` looks the same in the file tree as it does in the collections panel
 - Deleting a custom game system, and resetting a customized built-in to its defaults, now ask first — neither did
 - **Danger red means one thing again.** Cancel and Discard no longer turn red under the pointer — hovering only brightens — so red marks the action that actually destroys something. The Danger Zone's two-step arms with a tinted wash instead of filling solid red, matching the mute button
@@ -24,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Engaging a solo or mute snaps — one bright frame as the switch reaches its position
 - **The systems view's rows are channels.** Every file row in the by-system view carries its own S/M pair beside the system's, so the view works as the asset library it is: solo or mute one book without leaving it. Bare `S`/`M` on a focused row act on the file; `⇧S`/`⇧M` still throw the system's switches, and holding any of them stays momentary. Untagged books can finally be soloed — individually, as files
 - **A muted book dims where it stands.** Muting a single file in the by-system view now dims that row — in every system it appears under — and soloing one file dims its shelf-mates, so the view reads scope at the row the way the tree does, instead of only at the whole system. The focus lens likewise hides out-of-scope rows, not just whole systems
+- **The systems view's channel switches sit on the strip.** They used to be laid out invisible and painted only when you reached the row, so a file row spent its switch column on switches it refused to draw and the ribbon strip hung short of the right edge. They rest in tertiary ink now and dress up under the pointer — nothing appears or moves. Group headers and file rows share one switch column, and a system's count readout is sized to the largest count on screen, so a header stops sliding as its shelf grows
 
 ### Fixed
 
@@ -34,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Soloing combinations that intersect to nothing — a system solo with no file under a soloed folder, say — now say "Nothing under the soloed items." instead of a generic no-results message beside a meter reading "of 0 files"
 - The hits meter no longer claims its count came from your scope while the scope is bypassed — the number was already the whole library, but the tooltip said otherwise
 - Enter no longer commits a destructive prompt when Cancel is focused. Destructive prompts open on Cancel so that Enter from muscle memory is harmless, and that focus is now visible — it was being drawn without a ring whenever the prompt was raised by mouse
+- Opening a search result opens the book it came from. Results were matched back to disk by filename, so two books sharing a name — the same supplement under two systems, say — could open the wrong one. They open by path now, and the filename scan survives only as a fallback for a file that moved since it was indexed
+- The collections list no longer reshuffles between reads. The order came back from Rust differently on every call, and every surface sorted before drawing, so nothing showed it — until the Collection submenu started staying open and visibly reordered its rows under the cursor after each toggle
+- The scope bar no longer thickens, shoving the tree down, when its first chip lands. The row reserves a chip's height whether or not one is there
+- Filter, tree and systems rows no longer hold a highlight the pointer has left — they latch hover on a real pointer entry, the fix the collections panel already had for itself
 
 ## [2.2.0] - 2026-08-11
 
