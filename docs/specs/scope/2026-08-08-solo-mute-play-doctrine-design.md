@@ -107,9 +107,25 @@ Keyboard: M toggles mute on a focused collection row (joining the
 existing P/Space transport binding), matching S/M on tree and systems
 view rows.
 
-### Affordance parity (amended 2026-08-08)
+### Rows as channels in the systems view (amended 2026-08-13)
 
-Every input path offers S/M on tree rows under one predicate
+The systems view is the asset library: bus-level S/M on system headers
+speaks the systems axis, channel-level S/M on file rows speaks the
+folder/file axis — two levels of one console, not two consoles. File
+rows carry the inline cluster (every row is indexed material, so the
+parity gate passes trivially); bare `S`/`M` on a focused row target the
+file, and `⇧S`/`⇧M` lift to the row's group — all four through the hold
+latch, so holds stay momentary. Untagged rows solo and mute as files
+while the *system* axis stays mute-only (#307). Soloing a header and a
+row in another group intersects two axes and resolves empty — a named
+tradeoff, narrated by the cross-axis empty message; the gesture for
+"this system plus that one book" remains a played collection. See
+`2026-08-13-systems-view-row-sm-design.md`.
+
+### Affordance parity (amended 2026-08-08, 2026-08-13)
+
+Every input path offers S/M on browsing-surface rows — tree rows, and
+systems-view file rows since 2026-08-13 — under one predicate
 (`rowHasIndexedMaterial` in `treeNav.ts`): the row has indexed material
 to act on — a file in the index, or a folder with an indexed
 descendant — or is already engaged, so stale chips stay toggleable
@@ -153,7 +169,10 @@ Surfaces split into two classes: **browsing surfaces** (file tree,
 systems view) show material and may hide it under the focus lens below;
 **console surfaces** (filter console, collections panel, scope bar) show
 channels and controls and never hide them — the mixer is the recovery
-path, so nothing can disappear from it.
+path, so nothing can disappear from it. Within the browsing class the
+systems view is the asset library (amended 2026-08-13): its group
+headers and file rows are bus- and channel-level controls of one
+console — see "Rows as channels in the systems view".
 
 **What each class's dim speaks about (amended 2026-08-13, per the S/M
 bypass audit).** Browsing surfaces dim by membership in the *resolved
