@@ -3688,6 +3688,10 @@
             {soloedSystems}
             onToggleSystemFilter={toggleSystemFilter}
             onToggleSystemSolo={toggleSystemSolo}
+            {soloedScopePaths}
+            {mutedScopePaths}
+            onToggleScopeSolo={toggleScopeSolo}
+            onToggleScopeMute={toggleScopeMute}
             {hiddenPaths}
             {showHidden}
             libraryRoot={selectedFolder}

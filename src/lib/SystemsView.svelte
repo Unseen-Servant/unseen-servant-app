@@ -56,6 +56,14 @@
   // buttons stay lit through it, same as the console surfaces.
   export let scopeBypassed: boolean = false;
 
+  // Collection-axis S/M for the row's file — the same four props the
+  // tree rows take. Lit state is path-keyed, so a multi-tagged file
+  // lights under every group it appears in.
+  export let soloedScopePaths: Set<string> = new Set();
+  export let mutedScopePaths: Set<string> = new Set();
+  export let onToggleScopeSolo: (item: FileItem) => void = () => {};
+  export let onToggleScopeMute: (item: FileItem) => void = () => {};
+
   // User-hidden paths (same set as the tree). Entries whose path is hidden
   // are dropped when `showHidden` is false; rendered with dimmed/italic
   // styling when `showHidden` is true.
