@@ -6,6 +6,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
   import { holdLatch } from './holdLatch';
+  import { systemsRowScopeKey } from './keybindings';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
@@ -369,6 +370,9 @@
   }
 
   function handleWindowKey(event: KeyboardEvent) {
+    // IME composition first — same guard every other keydown handler
+    // carries; keybindings.ts's dispatch helpers can't see it themselves.
+    if (event.isComposing) return;
     // Yield to the context menu via state — DOM checks for `.context-menu`
     // are racy because Svelte's reactive DOM updates flush in a microtask
     // after the synchronous handler chain. State is the source of truth.
@@ -417,21 +421,28 @@
     const focused = visibleEntries[focusedIdx];
     if (!focused) return;
 
-    // S / M toggle solo / mute for the focused row's group — same
-    // bare-letter guard as j/k. Untagged gets no solo (untagged files
-    // never pass under solos) and mutes under the backend's key.
-    if (bareLetter && lk === 's' && focused.tag !== 'Untagged') {
+    // S / M — bare letters solo/mute the focused row's file (the tree's
+    // grammar: act on the row you're on); ⇧S/⇧M lift to the row's group.
+    // All four are hold-latch keys: tap latches, hold is momentary. The
+    // system axis stays mute-only for Untagged (#307), so ⇧S is inert
+    // there — while bare S still solos the untagged file itself.
+    const scopeAction = systemsRowScopeKey(event, focused.tag === 'Untagged');
+    if (scopeAction) {
       event.preventDefault();
       if (event.repeat) return;
-      const tag = focused.tag;
-      holdLatch.press('s', () => onToggleSystemSolo(tag));
-      return;
-    }
-    if (bareLetter && lk === 'm') {
-      event.preventDefault();
-      if (event.repeat) return;
-      const key = focused.tag === 'Untagged' ? UNTAGGED_KEY : focused.tag;
-      holdLatch.press('m', () => onToggleSystemFilter(key));
+      const latchId = scopeAction.kind === 'solo' ? 's' : 'm';
+      if (scopeAction.axis === 'file') {
+        const item = entryToFileItem(focused.entry);
+        holdLatch.press(latchId, () =>
+          scopeAction.kind === 'solo' ? onToggleScopeSolo(item) : onToggleScopeMute(item),
+        );
+      } else if (scopeAction.kind === 'solo') {
+        const tag = focused.tag;
+        holdLatch.press(latchId, () => onToggleSystemSolo(tag));
+      } else {
+        const key = focused.tag === 'Untagged' ? UNTAGGED_KEY : focused.tag;
+        holdLatch.press(latchId, () => onToggleSystemFilter(key));
+      }
       return;
     }
 
@@ -596,7 +607,7 @@
                 class:solo-on={soloedSystems.has(group.tag)}
                 on:click|stopPropagation={() => onToggleSystemSolo(group.tag)}
                 aria-pressed={soloedSystems.has(group.tag)}
-                title={soloedSystems.has(group.tag) ? `Stop soloing ${group.tag} (S)` : `Solo ${group.tag} (S)`}
+                title={soloedSystems.has(group.tag) ? `Stop soloing ${group.tag} (⇧S)` : `Solo ${group.tag} (⇧S)`}
               >S</button>
             {/if}
             <button
@@ -605,7 +616,7 @@
               class:mute-on={group.muted}
               on:click|stopPropagation={() => onToggleSystemFilter(group.tag === 'Untagged' ? UNTAGGED_KEY : group.tag)}
               aria-pressed={group.muted}
-              title={group.muted ? `Unmute ${smLabel} (M)` : `Mute ${smLabel} (M)`}
+              title={group.muted ? `Unmute ${smLabel} (⇧M)` : `Mute ${smLabel} (⇧M)`}
             >M</button>
           </span>
           <span class="group-count">{group.entries.length}</span>

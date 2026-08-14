@@ -2088,9 +2088,9 @@
       }
       // S/M are the one narrowing model on both axes. In tree view they
       // solo/mute the focused row on the collection axis; in systems
-      // view they fall through to SystemsView's own handler, which
-      // works the systems axis. The context menu moves to Shift+F10 /
-      // the Menu key (M used to open it).
+      // view they fall through to SystemsView's own handler — bare
+      // letters work the focused file, ⇧S/⇧M its group. The context
+      // menu moves to Shift+F10 / the Menu key (M used to open it).
       if (lk === 's' && viewMode !== 'systems') {
         event.preventDefault();
         if (event.repeat) return true;
