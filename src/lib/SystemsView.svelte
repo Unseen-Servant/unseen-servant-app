@@ -907,6 +907,7 @@
      down the list even as the readout's width varies. */
   .file .sm {
     margin-left: auto;
+    align-self: center;
   }
   .file-icon {
     display: inline-flex;
