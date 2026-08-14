@@ -316,7 +316,7 @@
   // appears once per group it belongs to — same as the rendered list,
   // so ↓ walks visually adjacent rows. Mirrors the template's lens guards
   // via isGroupDimmed and isIndexedRowOutOfScope so nav and render never
-  // drift: a group the lens drops is never focusable.
+  // drift: a group or row the lens drops is never focusable.
   $: visibleEntries = (() => {
     const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
     for (const g of groups) {
@@ -930,7 +930,7 @@
     opacity: var(--opacity-out-of-scope);
     transition: opacity var(--transition-fast);
   }
-  .file.out-of-scope:hover > :not(.sm) {
+  .file.out-of-scope.hovered > :not(.sm) {
     opacity: var(--opacity-out-of-scope-hover);
   }
 
