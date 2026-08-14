@@ -4,10 +4,11 @@
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
-  import { chord, isBareKeyChord, isDeleteChord } from './keybindings';
+  import { chord, chordHint, isBareKeyChord, isDeleteChord } from './keybindings';
   import { materializeKey } from './paneFocus';
   import { holdLatch } from './holdLatch';
-  import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
+  import { childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
+  import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from './menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from './menuGeometry';
 
@@ -49,6 +50,8 @@
   export let onDropPaths: (name: string, paths: string[]) => void = () => {};
   export let onDropNewCollection: (paths: string[], label: string) => void = () => {};
   export let onRemoveFile: (name: string, path: string) => void = () => {};
+  // ⌘O on a focused child row — the page owns the opener plugin.
+  export let onOpenFile: (path: string) => void = () => {};
   // File path → game-system tags, for the badge on expanded file rows.
   export let gameSystemMap: Map<string, string[]> = new Map();
   // Sort state is lifted to +page for per-vault persistence.
@@ -211,6 +214,28 @@
   $: hasNone = Object.keys(collections).length === 0;
   $: canDrag = sortKey === 'custom' && rows.length > 1;
   $: anyPlaying = playingNames.size > 0;
+
+  // What the keyboard can land on: head rows, plus expanded children in
+  // render order (collectionsNav mirrors the template the way filterRows
+  // mirrors the filter panel's). The focus token stays one string —
+  // child keys parse back with parseNavKey — so the page's pane mutex
+  // carries it unchanged.
+  $: navEntries = computeCollectionNav(
+    rows.map((r) => r.name),
+    expandedNames,
+    (name) => (collections[name] ? childFiles(collections[name]).map((f) => f.path) : []),
+  );
+
+  // ⌘⌫ on a child row: point the caret at the next sibling (or the head
+  // when the last file goes) before removing, so the keyboard never
+  // strands on a key that no longer renders.
+  function removeChildRow(name: string, path: string) {
+    const siblings = navEntries.filter((e) => e.name === name && e.path !== null);
+    const i = siblings.findIndex((e) => e.path === path);
+    const next = siblings[i + 1] ?? siblings[i - 1];
+    onFocusCollection(next ? next.key : name);
+    onRemoveFile(name, path);
+  }
 
   let draggingName: string | null = null;
   // Insertion index into `rows` while dragging (rows.length = after last).
@@ -415,7 +440,7 @@
     // Yield to inline renames, the sort menu, the context menu, and any
     // other popover that may be claiming keys.
     if (renamingName !== null || creating !== null || sortMenuOpen || ctxMenu) return;
-    if (document.querySelector('.dropdown, .context-menu')) return;
+    if (menuSlotHeld()) return;
     // Yield to any open <dialog> — the browser inerts the page but
     // window-level keydown still bubbles, so we'd otherwise navigate
     // collections behind the modal.
@@ -434,33 +459,31 @@
     // the restored row instead of one past it.
     if (focusedName === null && (isDown || isUp)) {
       event.preventDefault();
-      const entry = materializeKey(rows.map((r) => r.name), lastFocusedName, isDown ? 1 : -1);
+      const entry = materializeKey(navEntries.map((e) => e.key), lastFocusedName, isDown ? 1 : -1);
       if (entry) onFocusCollection(entry);
       return;
     }
 
-    const idx = rows.findIndex((r) => r.name === focusedName);
-
     if (isDown) {
       event.preventDefault();
-      const next = idx < 0 ? 0 : Math.min(rows.length - 1, idx + 1);
-      if (rows[next]) onFocusCollection(rows[next].name);
+      const next = stepNavKey(navEntries, focusedName, 1);
+      if (next) onFocusCollection(next);
       return;
     }
     if (isUp) {
       event.preventDefault();
-      const prev = idx < 0 ? rows.length - 1 : Math.max(0, idx - 1);
-      if (rows[prev]) onFocusCollection(rows[prev].name);
+      const prev = stepNavKey(navEntries, focusedName, -1);
+      if (prev) onFocusCollection(prev);
       return;
     }
-    if (event.key === 'Home' && !meta && rows[0]) {
+    if (event.key === 'Home' && !meta && navEntries[0]) {
       event.preventDefault();
-      onFocusCollection(rows[0].name);
+      onFocusCollection(navEntries[0].key);
       return;
     }
-    if (event.key === 'End' && !meta && rows.length > 0) {
+    if (event.key === 'End' && !meta && navEntries.length > 0) {
       event.preventDefault();
-      onFocusCollection(rows[rows.length - 1].name);
+      onFocusCollection(navEntries[navEntries.length - 1].key);
       return;
     }
 
@@ -476,8 +499,34 @@
       return;
     }
 
-    if (idx < 0) return;
-    const col = rows[idx];
+    const parsed = focusedName === null ? null : parseNavKey(focusedName);
+    if (parsed === null) return;
+
+    // A child row answers with the file verbs; the collection verbs stay
+    // on its head row. ⌘⌫ mirrors the hover × (membership only — the
+    // file itself is untouched), and ← hops to the head the way the
+    // tree's ← climbs to the parent.
+    if (parsed.path !== null) {
+      if (isDeleteChord(event)) {
+        event.preventDefault();
+        removeChildRow(parsed.name, parsed.path);
+        return;
+      }
+      if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
+        event.preventDefault();
+        onOpenFile(parsed.path);
+        return;
+      }
+      if (bareLetter && (event.key === 'ArrowLeft' || lk === 'h')) {
+        event.preventDefault();
+        onFocusCollection(parsed.name);
+        return;
+      }
+      return;
+    }
+
+    const col = rows.find((r) => r.name === parsed.name);
+    if (!col) return;
 
     // ⌘⌫ / Del — the same chord the file tree spends on deleting a row.
     // Raises the confirm dialog; nothing goes until it's answered.
@@ -487,9 +536,16 @@
       return;
     }
 
-    if (bareLetter && (event.key === 'ArrowRight' || lk === 'l') && !expandedNames.has(col.name)) {
+    if (bareLetter && (event.key === 'ArrowRight' || lk === 'l')) {
       event.preventDefault();
-      toggleExpand(col.name);
+      if (!expandedNames.has(col.name)) {
+        toggleExpand(col.name);
+      } else {
+        // Already open: → walks into the first file — the tree's
+        // "expand folder / first child" grammar.
+        const firstChild = navEntries.find((e) => e.name === col.name && e.path !== null);
+        if (firstChild) onFocusCollection(firstChild.key);
+      }
       return;
     }
     if (bareLetter && (event.key === 'ArrowLeft' || lk === 'h') && expandedNames.has(col.name)) {
@@ -582,10 +638,11 @@
   }
 
   // Exposed for the page-level Cmd+Alt+← jump. Restores `preferred` if
-  // it's still in the visible list (matches user expectation: "take me
-  // back to where I was"); otherwise falls back to the first row.
+  // it's still in the navigable list — child keys included (matches user
+  // expectation: "take me back to where I was"); otherwise falls back to
+  // the first row.
   export function claim(preferred: string | null) {
-    if (preferred && rows.some((r) => r.name === preferred)) {
+    if (preferred && navEntries.some((e) => e.key === preferred)) {
       onFocusCollection(preferred);
       return;
     }
@@ -800,12 +857,16 @@
         </div>
         {#if isExpanded}
           {#each childFiles(col) as f (f.path)}
-            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            {@const childKey = childNavKey(col.name, f.path)}
+            <!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events -->
             <div
               class="child-row"
               class:washed={playing && !muted}
               class:dimmed={muted || (anyPlaying && !playing)}
+              class:kb-focused={focusedName === childKey}
               title={f.path}
+              data-cp-row={childKey}
+              on:click={() => onFocusCollection(childKey)}
               on:pointerenter={() => (hoveredChildPath = f.path)}
               on:pointerleave={() => leaveChild(f.path)}
             >
@@ -821,10 +882,10 @@
               <button
                 type="button"
                 class="child-remove"
-                class:revealed={hoveredChildPath === f.path}
-                title={`Remove ${f.base} from ${col.name}`}
+                class:revealed={hoveredChildPath === f.path || focusedName === childKey}
+                title={`Remove ${f.base} from ${col.name}${chordHint('collections.removeFile')}`}
                 aria-label={`Remove ${f.base} from ${col.name}`}
-                on:click={() => onRemoveFile(col.name, f.path)}
+                on:click|stopPropagation={() => onRemoveFile(col.name, f.path)}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
                   <path d="M6 6l12 12M18 6L6 18"/>
@@ -1301,6 +1362,10 @@
   }
   .child-row.dimmed {
     opacity: var(--opacity-out-of-scope);
+  }
+  /* Same ring the head rows wear — children are peer stops for j/k now. */
+  .child-row.kb-focused {
+    box-shadow: var(--ring-focus);
   }
   .child-empty .child-name {
     color: var(--text-tertiary);

@@ -5,6 +5,7 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
   import { displaySystem } from './searchScope';
+  import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
@@ -31,7 +32,21 @@
   export let canLoadMore: boolean = false;
   export let onSelect: (index: number) => void = () => {};
   export let onLoadMore: () => void = () => {};
-  export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
+  export let onOpenResult: (source: string, filename: string, page?: number | null) => void = () => {};
+  // The browse views' row affordances, reaching the results: rows are
+  // drag sources for the collections panel (same page-stashed payload
+  // contract as the tree), carry the shared context menu, and — while a
+  // collection is armed — a filing checkbox. Search stays a browsing
+  // surface with a selection, so clicking a row still selects (the
+  // inspector is how you judge a book before filing it); the checkbox
+  // and X are the filing gestures.
+  export let onBeginDrag: (path: string, name: string, isDir: boolean) => TreePathsPayload | null =
+    () => null;
+  export let onContextMenu: (event: MouseEvent, result: SearchResultItem) => void = () => {};
+  export let curating: boolean = false;
+  export let collectionPaths: Set<string> = new Set();
+  export let onCollectionAdd: (paths: string[]) => void = () => {};
+  export let onCollectionRemove: (paths: string[]) => void = () => {};
 
   // Scroll-near-bottom triggers an upstream fetch for more results. The
   // parent's canLoadMore prop reflects the actual load gate (not searching,
@@ -104,7 +119,46 @@
 
   function handleRowDblClick(i: number, result: SearchResultItem) {
     onSelect(i);
-    onOpenResult(result.filename, result.page_start);
+    onOpenResult(result.source, result.filename, result.page_start);
+  }
+
+  // Capture-phase press recording, mirroring SystemsView: the row itself
+  // is the drag source, so a drag begun on the filing checkbox must be
+  // refused — stopPropagation on the checkbox can't do it (drag
+  // initiation isn't propagation-based).
+  let pressedControl = false;
+  function recordPressTarget(event: MouseEvent) {
+    pressedControl = !!(event.target as HTMLElement | null)?.closest('.app-checkbox');
+  }
+
+  function handleDragStart(event: DragEvent, result: SearchResultItem) {
+    if (pressedControl) {
+      event.preventDefault();
+      return;
+    }
+    const payload = onBeginDrag(result.source, result.filename, false);
+    if (!payload || !event.dataTransfer) {
+      event.preventDefault();
+      return;
+    }
+    writeTreePathsTransfer(event.dataTransfer, payload);
+  }
+
+  function handleRowMouseDown(event: MouseEvent, i: number, result: SearchResultItem) {
+    if (event.button === 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      // The menu acts on the row under the pointer — select it first so
+      // the inspector and the menu agree about which book is meant.
+      onSelect(i);
+      onContextMenu(event, result);
+    }
+  }
+
+  function handleCheckboxClick(event: MouseEvent, result: SearchResultItem) {
+    event.stopPropagation();
+    if (collectionPaths.has(result.source)) onCollectionRemove([result.source]);
+    else onCollectionAdd([result.source]);
   }
 </script>
 
@@ -148,19 +202,35 @@
       {#if i === dividerAt}
         <div class="weak-divider" role="separator">weak matches</div>
       {/if}
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <div
         class="result-row"
         class:selected={i === selectedIndex}
         class:weak={result.tier === 'weak'}
         style={collColor ? `--collection-color: ${collColor}` : ''}
         bind:this={rowEls[i]}
+        draggable="true"
+        on:dragstart={(e) => handleDragStart(e, result)}
+        on:dragend={clearTreePathsPayload}
         on:click={() => handleRowClick(i)}
         on:dblclick={() => handleRowDblClick(i, result)}
+        on:mousedown|capture={recordPressTarget}
+        on:mousedown={(e) => handleRowMouseDown(e, i, result)}
         role="option"
         aria-selected={i === selectedIndex}
         tabindex="-1"
       >
+        {#if curating}
+          <button
+            class="app-checkbox collecting row-checkbox"
+            on:click={(e) => handleCheckboxClick(e, result)}
+            on:mousedown|stopPropagation
+            on:dblclick|stopPropagation
+            role="checkbox"
+            aria-label="Add {result.filename} to collection"
+            aria-checked={collectionPaths.has(result.source)}
+          ></button>
+        {/if}
         <span class="index-cell" aria-hidden="true">{i + 1}</span>
         <div class="row-body">
           {#if segments.length > 0}
@@ -241,6 +311,18 @@
     cursor: pointer;
     transition: background var(--transition-fast), opacity var(--transition-fast);
     align-items: flex-start;
+    /* Rows are drag sources, like the tree's; the inspector keeps the
+       selectable full text. */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Filing checkbox while a collection is armed — colour comes from the
+     shared .app-checkbox.collecting recipe. Nudged to the index cell's
+     optical line, since the row aligns flex-start. */
+  .row-checkbox {
+    flex-shrink: 0;
+    margin-top: 0.05rem;
   }
 
   /* Stale-results state: a new search is in flight against a different

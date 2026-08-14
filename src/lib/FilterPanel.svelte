@@ -10,6 +10,7 @@
   import { computeFilterRows, stepFilterRow } from './filterRows';
   import { materializeKey } from './paneFocus';
   import { holdLatch } from './holdLatch';
+  import { menuSlotHeld } from './menuSlot';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
   import { DICE_D6, DIE_OUTLINE, RIBBON_OUTLINE } from './iconPaths';
@@ -115,13 +116,33 @@
 
   // A mousedown on the panel's empty or non-selectable space — the masthead,
   // [reset], a section label — points at the pane and deselects. Rows are
-  // skipped even though clicking one selects nothing here (their background is
-  // deliberately inert), so that mousing an S/M button doesn't drop a caret
-  // parked on some other row.
+  // skipped so their own click (below) owns the caret, and so that mousing
+  // an S/M button doesn't drop a caret parked on some other row.
   function handlePanelMousedown(event: MouseEvent) {
     const target = event.target as HTMLElement | null;
     if (target?.closest('[data-fm-key]')) return;
     onActivate();
+  }
+
+  // A click on the row body parks the caret there — the same gesture the
+  // collections rows honor. The S/M buttons and checkboxes stop
+  // propagation, so pressing one never re-aims a caret parked elsewhere.
+  // Guarded on the row being navigable so the disabled Show-hidden row
+  // can't take a caret j/k could never have reached.
+  function clickRow(key: string) {
+    if (rows.some((r) => r.key === key)) onFocusRow(key);
+  }
+
+  // Hover is latched on real pointerenter, not CSS :hover — closing a
+  // menu or ending a drag re-hit-tests whatever lands under a pointer
+  // that never moved, and :hover lights it with no leave ever queued.
+  // Same fix the collections panel carries; see the note there.
+  let hoveredRow: string | null = null;
+  function enterRow(key: string) {
+    hoveredRow = key;
+  }
+  function leaveRow(key: string) {
+    if (hoveredRow === key) hoveredRow = null;
   }
 
   // The panel body scrolls, and the cursor no longer moves DOM focus, so
@@ -147,7 +168,7 @@
     if (!active) return;
     if (event.isComposing) return;
     // Yield to popovers and modals that own the keyboard while open.
-    if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
+    if (menuSlotHeld()) return;
     if (document.querySelector('dialog[open]')) return;
     const target = event.target as HTMLElement | null;
     if (target?.matches('input, textarea, [contenteditable="true"]')) return;
@@ -228,7 +249,12 @@
 <svelte:window on:keydown={handleWindowKey} />
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-<aside class="filter-panel" bind:this={panelEl} on:mousedown={handlePanelMousedown}>
+<aside
+  class="filter-panel"
+  bind:this={panelEl}
+  on:mousedown={handlePanelMousedown}
+  on:pointerleave={() => (hoveredRow = null)}
+>
   <header class="panel-head">
     <span class="panel-title">Filters</span>
     <button class="btn-link" on:click={onClearAll} disabled={!canReset}>reset</button>
@@ -240,12 +266,17 @@
       {#each curationRows as ch (ch.key)}
         {@const soloed = curationSolos.has(ch.key)}
         {@const muted = curationMutes.has(ch.key)}
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div
           class="row channel-row"
           class:soloed
           class:dimmed={muted && !soloed}
           class:kb-focused={focusedRow === `curation:${ch.key}`}
+          class:hovered={hoveredRow === `curation:${ch.key}`}
           data-fm-key="curation:{ch.key}"
+          on:click={() => clickRow(`curation:${ch.key}`)}
+          on:pointerenter={() => enterRow(`curation:${ch.key}`)}
+          on:pointerleave={() => leaveRow(`curation:${ch.key}`)}
         >
           <!-- Outline bookmark — same ribbon as the chip bookmarks, unfilled:
                the channel is the curation bucket, not a specific collection.
@@ -304,13 +335,18 @@
         {#each systems as { name, count } (name)}
           {@const soloed = soloedSystems.has(name)}
           {@const muted = excludedSystems.has(name)}
+          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
           <div
             class="row channel-row"
             class:soloed
             class:dimmed={muted && !soloed}
             class:kb-focused={focusedRow === `system:${name}`}
+            class:hovered={hoveredRow === `system:${name}`}
             title={name}
             data-fm-key="system:{name}"
+            on:click={() => clickRow(`system:${name}`)}
+            on:pointerenter={() => enterRow(`system:${name}`)}
+            on:pointerleave={() => leaveRow(`system:${name}`)}
           >
             <!-- Font Awesome "dice-d6" — monochrome; systems don't carry color -->
             <svg class="row-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
@@ -344,12 +380,17 @@
         {/each}
         {#if untaggedCount > 0}
           {@const muted = excludedSystems.has(UNTAGGED_KEY)}
+          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
           <div
             class="row channel-row untagged-row"
             class:dimmed={muted}
             class:kb-focused={focusedRow === `system:${UNTAGGED_KEY}`}
+            class:hovered={hoveredRow === `system:${UNTAGGED_KEY}`}
             title="Files with no game-system tag"
             data-fm-key="system:{UNTAGGED_KEY}"
+            on:click={() => clickRow(`system:${UNTAGGED_KEY}`)}
+            on:pointerenter={() => enterRow(`system:${UNTAGGED_KEY}`)}
+            on:pointerleave={() => leaveRow(`system:${UNTAGGED_KEY}`)}
           >
             <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
             <svg class="row-icon" viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
@@ -387,12 +428,17 @@
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
       {/if}
     </div>
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
     <div
       class="row"
       class:row-disabled={!hasHidden}
       class:kb-focused={focusedRow === 'view:showHidden'}
+      class:hovered={hoveredRow === 'view:showHidden'}
       title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
       data-fm-key="view:showHidden"
+      on:click={() => clickRow('view:showHidden')}
+      on:pointerenter={() => enterRow('view:showHidden')}
+      on:pointerleave={() => leaveRow('view:showHidden')}
     >
       <span class="row-name muted-name">Show hidden items</span>
       <span class="row-count">{hiddenCount}</span>
@@ -408,11 +454,16 @@
       ></button>
     </div>
 
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
     <div
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideUnindexed'}
+      class:hovered={hoveredRow === 'view:hideUnindexed'}
       title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
       data-fm-key="view:hideUnindexed"
+      on:click={() => clickRow('view:hideUnindexed')}
+      on:pointerenter={() => enterRow('view:hideUnindexed')}
+      on:pointerleave={() => leaveRow('view:hideUnindexed')}
     >
       <span class="row-name muted-name">Hide unindexed items</span>
       <button
@@ -426,11 +477,16 @@
       ></button>
     </div>
 
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
     <div
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideOutOfScope'}
+      class:hovered={hoveredRow === 'view:hideOutOfScope'}
       title="Hide dimmed out-of-scope rows in the tree and systems view"
       data-fm-key="view:hideOutOfScope"
+      on:click={() => clickRow('view:hideOutOfScope')}
+      on:pointerenter={() => enterRow('view:hideOutOfScope')}
+      on:pointerleave={() => leaveRow('view:hideOutOfScope')}
     >
       <span class="row-name muted-name">Hide out-of-scope items</span>
       <button
@@ -488,7 +544,7 @@
     border-left: 3px solid transparent;
     transition: background var(--transition-fast);
   }
-  .row:hover {
+  .row.hovered {
     background: var(--bg-container);
   }
   /* Keyboard focus rings rather than fills, so the caret stays visible
@@ -500,7 +556,7 @@
     color: var(--text-tertiary);
     cursor: default;
   }
-  .row-disabled:hover {
+  .row-disabled.hovered {
     background: transparent;
   }
   .row-disabled .row-count {
@@ -577,7 +633,8 @@
 
   /* S/M cluster — hidden at rest, revealed on row hover or keyboard
      focus, always visible while engaged. Same reveal grammar as the
-     tree's folder rows; button anatomy is the shared .sm-btn in app.css. */
+     tree's folder rows; button anatomy is the shared .sm-btn in app.css.
+     Hover is the latched .hovered class, not :hover — see enterRow. */
   .sm {
     display: inline-flex;
     gap: 0.25rem;
@@ -585,7 +642,7 @@
     opacity: 0;
     transition: opacity var(--transition-fast);
   }
-  .row:hover .sm,
+  .row.hovered .sm,
   .row:focus-within .sm,
   .row.kb-focused .sm,
   .sm.engaged {

@@ -23,3 +23,13 @@ export function claimMenuSlot(close: () => void): void {
 export function releaseMenuSlot(close: () => void): void {
   if (holder === close) holder = null;
 }
+
+/** Whether any menu currently holds the slot. This is the state-based
+ * answer to "is a popover open?" — key handlers yield on it instead of
+ * querying the DOM for menu class names, which races Svelte's microtask
+ * flush in both directions (a menu just opened isn't in the DOM yet; a
+ * menu just closed still is). Claims happen synchronously at open and
+ * releases at close, so this is current within the same event dispatch. */
+export function menuSlotHeld(): boolean {
+  return holder !== null;
+}

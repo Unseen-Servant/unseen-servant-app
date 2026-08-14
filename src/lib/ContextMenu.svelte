@@ -29,6 +29,10 @@
   // so the toggle is omitted (user must unhide the originally-hidden folder).
   export let directlyHidden: boolean = false;
   export let inheritedHidden: boolean = false;
+  // Rename renders an inline input on a browse-view row; opened from a
+  // search result no row can host it, so the item is withheld rather
+  // than left to silently no-op.
+  export let canRename: boolean = true;
   // Optional initial submenu to open on mount (used by the C tree-row chord
   // in PR 2 of chunk c — for now the prop just exists so callers can land
   // a row directly in the Collection submenu without a follow-up keystroke).
@@ -462,11 +466,15 @@
     </button>
   {/if}
 
-  <hr class="menu-divider" />
-  <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} aria-keyshortcuts={keyShortcut('tree.rename')} on:click={onRename}>
-    Rename {item.is_dir ? 'folder' : 'file'}
-    <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
-  </button>
+  {#if canRename || (!item.is_dir && isIndexed)}
+    <hr class="menu-divider" />
+  {/if}
+  {#if canRename}
+    <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} aria-keyshortcuts={keyShortcut('tree.rename')} on:click={onRename}>
+      Rename {item.is_dir ? 'folder' : 'file'}
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
+    </button>
+  {/if}
   {#if !item.is_dir && isIndexed}
     <button class="menu-row" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
   {/if}

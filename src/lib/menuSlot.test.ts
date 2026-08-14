@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
+import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from './menuSlot';
 
 describe('menuSlot', () => {
   // The slot is module state — empty it between cases by claiming with a
@@ -53,6 +53,23 @@ describe('menuSlot', () => {
     claimMenuSlot(second);
     claimMenuSlot(vi.fn());
     expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports whether any menu holds the slot', () => {
+    expect(menuSlotHeld()).toBe(false);
+    const close = vi.fn();
+    claimMenuSlot(close);
+    expect(menuSlotHeld()).toBe(true);
+    releaseMenuSlot(close);
+    expect(menuSlotHeld()).toBe(false);
+  });
+
+  it('still reports held when an evicted menu releases out of turn', () => {
+    const first = vi.fn();
+    claimMenuSlot(first);
+    claimMenuSlot(vi.fn());
+    releaseMenuSlot(first);
+    expect(menuSlotHeld()).toBe(true);
   });
 
   it('closes only the current holder, never an earlier one', () => {

@@ -115,6 +115,12 @@
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let tagMenu: SystemTagMenu | undefined;
   let childrenLoading = false;
+  // Hover latched on real pointerenter, not CSS :hover — closing a menu
+  // or ending a drag re-hit-tests whatever lands under a pointer that
+  // never moved, and :hover lights it with no leave ever queued. Same
+  // fix the collections panel carries. Per-instance state: this
+  // component IS one row.
+  let hovered = false;
   // Auto-fetch children when a folder is expanded but tree data was reloaded
   afterUpdate(() => {
     if (!hidden && isExpanded && item.children === null && !childrenLoading) {
@@ -282,7 +288,13 @@
 
 {#if !hidden}
 <div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope && !isHiddenItem} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
-  <div class="row-container">
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div
+    class="row-container"
+    class:hovered
+    on:pointerenter={() => (hovered = true)}
+    on:pointerleave={() => (hovered = false)}
+  >
     <button
       class="app-checkbox row-checkbox"
       class:collecting={arm !== null}
@@ -301,7 +313,7 @@
       class="row"
       draggable={hasIndexedMaterial && !isRenaming}
       on:dragstart={handleDragStart}
-      on:dragend={clearTreePathsPayload}
+      on:dragend={() => { clearTreePathsPayload(); hovered = false; }}
       on:click={handleRowClick}
       on:dblclick={openFile}
       on:mousedown={handleMouseDown}
@@ -458,7 +470,7 @@
     border-radius: var(--radius-sm);
     transition: background var(--transition-fast);
   }
-  .row-container:hover {
+  .row-container.hovered {
     background: var(--bg-container);
   }
   .row-checkbox {
@@ -483,12 +495,13 @@
   .out-of-scope > .row-container > :not(.sm) {
     opacity: var(--opacity-out-of-scope);
   }
-  .out-of-scope > .row-container:hover > :not(.sm) {
+  .out-of-scope > .row-container.hovered > :not(.sm) {
     opacity: var(--opacity-out-of-scope-hover);
   }
   /* S/M cluster on folder rows — hidden at rest, revealed on row hover
      or keyboard focus, always visible while engaged. Button anatomy is
-     the shared .sm-btn in app.css. */
+     the shared .sm-btn in app.css. Hover is the latched .hovered class,
+     not :hover — see the note at its declaration. */
   .sm {
     display: inline-flex;
     gap: 0.25rem;
@@ -496,7 +509,7 @@
     opacity: 0;
     transition: opacity var(--transition-fast);
   }
-  .row-container:hover .sm,
+  .row-container.hovered .sm,
   .row-container:focus-within .sm,
   .focused > .row-container .sm,
   .sm.engaged {

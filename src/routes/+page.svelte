@@ -46,6 +46,7 @@
   import { createCommitScheduler, mergeArmedCollection } from '../lib/collectionCommit';
   import { setTreePathsPayload, type TreePathsPayload } from '../lib/dragPayload';
   import { chord, isDeleteChord } from '../lib/keybindings';
+  import { menuSlotHeld } from '../lib/menuSlot';
   import {
     parseString,
     parseBoolean,
@@ -608,6 +609,12 @@
 
   function handleSearchFocus() {
     searchViewOpen = true;
+    // Entering search points the pane model at the search side. A dock
+    // caret left over from browse mode would otherwise stay ringed —
+    // and, since the dock stays keyboard-live during search, keep the
+    // arrows — while the user is looking at results. Nothing is lost:
+    // lastFocused* remembers every position.
+    pointAtEmpty('files');
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -621,8 +628,12 @@
     return null;
   }
 
-  async function handleOpenResult(filename: string, page?: number | null) {
-    const path = resolvePathForFilename(filename);
+  async function handleOpenResult(source: string, filename: string, page?: number | null) {
+    // The index already knows the hit's exact path — duplicate filenames
+    // in different folders must not open the wrong book. The filename
+    // scan stays as the fallback for a file moved since indexing, which
+    // the status tracks at its new path under the same name.
+    const path = indexedPaths.has(source) ? source : resolvePathForFilename(filename);
     if (!path) {
       jobNotification.show({
         type: 'error',
@@ -1931,9 +1942,14 @@
   // bar, a systems-view group header, the gap below the last row — points at
   // the region and deselects. Rows are skipped so their own click (which fires
   // after mousedown) owns the caret, and so dragging a row doesn't clear it.
-  // Skip in search mode, which owns its own selectedResultIndex.
+  // In search mode the whole area is the search side: any click here — result
+  // rows included — reclaims the arrows from a dock pane. Result selection is
+  // not a pane caret, so nothing there needs the row skip.
   function handleFileTreeAreaMousedown(event: MouseEvent) {
-    if (searchViewOpen) return;
+    if (searchViewOpen) {
+      pointAtEmpty('files');
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (target?.closest('[data-tree-row], [data-sv-row]')) return;
     pointAtEmpty('files');
@@ -2195,8 +2211,9 @@
       // A competing popover (sort menu / dropdown / the collections
       // panel's context menu) handles its own Esc. Don't reach the
       // branches below — that would close the search view or wipe the
-      // tree highlight as a side effect of closing a menu.
-      if (document.querySelector('.sort-menu, .dropdown, .context-menu')) return;
+      // tree highlight as a side effect of closing a menu. Every popover
+      // claims the menu slot at open, so the slot is the one authority.
+      if (menuSlotHeld()) return;
       // Escape mid-IME-composition just cancels the composition — never
       // step the ladder on it.
       if (event.isComposing) return;
@@ -2272,20 +2289,30 @@
     }
 
     // Cmd/Ctrl+Alt+←/→: jump keyboard focus between the collections panel
-    // and the file pane (tree or systems). Restores the last-focused row
-    // in the target region if it's still visible, else lands on the first
-    // visible row. Skipped during search (the search input owns ←/→ for
-    // text editing).
-    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchViewOpen
+    // and the file pane (tree, systems, or the search results). Restores
+    // the last-focused row in the target region if it's still visible,
+    // else lands on the first visible row. During search the chords keep
+    // working — the console must stay reachable while the mix is audible —
+    // but ← first blurs the input or result row so the dock's window
+    // handlers stop yielding to it, and → means "back to the results".
+    if (meta && event.altKey && !event.shiftKey && selectedFolder
         && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       event.preventDefault();
-      if (event.key === 'ArrowLeft') focusDockRegion();
-      else focusFileRegion();
+      if (event.key === 'ArrowLeft') {
+        if (searchViewOpen) (document.activeElement as HTMLElement | null)?.blur?.();
+        void focusDockRegion();
+      } else if (searchViewOpen) {
+        setActivePane('files');
+        if (searchResults.length > 0) searchResultsComponent?.focusRow(selectedResultIndex);
+        else headerComponent?.focus();
+      } else {
+        focusFileRegion();
+      }
       return;
     }
 
     // Cmd+Alt+↑/↓: move between the two panels stacked in the left dock.
-    if (meta && event.altKey && !event.shiftKey && selectedFolder && !searchViewOpen
+    if (meta && event.altKey && !event.shiftKey && selectedFolder
         && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       event.preventDefault();
       if (event.key === 'ArrowDown') {
@@ -2329,11 +2356,16 @@
     // Cmd/Ctrl+I: show document info for the focused row. Mac muscle
     // memory from Finder ("Get Info"). indexedPaths.has implies the row
     // is a file (folders aren't tracked there) AND that get_document_stats
-    // has data to return — matches the context menu's gating.
+    // has data to return — matches the context menu's gating. In the
+    // search view the selection is the focused thing — the inspector's
+    // file is what "info" can only mean there.
     if (meta && !event.shiftKey && lk === 'i' && !inAnyInput) {
-      if (focusedFilePath && indexedPaths.has(focusedFilePath)) {
+      const infoPath = searchViewOpen
+        ? searchResults[selectedResultIndex]?.source
+        : focusedFilePath;
+      if (infoPath && indexedPaths.has(infoPath)) {
         event.preventDefault();
-        statsModalPath = focusedFilePath;
+        statsModalPath = infoPath;
         return;
       }
     }
@@ -2411,13 +2443,10 @@
 
     // ── Tree-row navigation ─────────────────────────────────────────────
     // Active when a library is loaded, the search view is closed, no
-    // menu/rename is open.
-    // Other popovers (sort menu, dropdowns) attach their own
-    // keydown listeners but they fire AFTER this one — so we have to skip
-    // here when the DOM tells us a competing menu is open. Querying by
-    // class is pragmatic; once chunk c is fully shipped these could share
-    // a small open-menus store instead.
-    const competingMenuOpen = !!document.querySelector('.sort-menu, .dropdown');
+    // menu/rename is open. Every popover claims the menu slot at open,
+    // so the slot is the state-based answer to "is a menu open?" — no
+    // DOM query, no race with Svelte's microtask flush.
+    const competingMenuOpen = menuSlotHeld();
 
     // Action keys (R/S/./M/C, Cmd+O reveal, Shift+F10/ContextMenu) work
     // on the focused file in both tree and systems modes. Runs ahead of
@@ -2443,25 +2472,35 @@
 
     const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
+    const bareLetter = !meta && !event.shiftKey && !event.altKey;
 
     // Cmd/Ctrl + 1..9: jump to result N and move focus to it so Enter
-    // opens. Works regardless of where focus currently lives.
+    // opens. Works regardless of where focus currently lives — moving
+    // into the list reclaims the search side from a dock pane.
     if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
       const idx = parseInt(event.key, 10) - 1;
       if (idx < searchResults.length) {
         event.preventDefault();
+        setActivePane('files');
         selectedResultIndex = idx;
         searchResultsComponent?.focusRow(idx);
       }
       return;
     }
 
+    // While a dock pane holds the arrows (⌘⌥← mid-search), the list's
+    // keys stand down — the pane's window handler owns the keyboard
+    // until Esc, ⌘⌥→, or a click on the search side hands it back.
+    if (activePane !== 'files') return;
+
     // Combobox flow: ArrowDown from the input pops focus into the list at
     // the current selection. Arrow nav within the list moves both
-    // selection and focus together. ArrowUp from the first row pops back
-    // to the input. Enter on a focused row opens; Escape is handled by
-    // the ladder above.
-    if (event.key === 'ArrowDown') {
+    // selection and focus together (j/k ride along, list-only — they must
+    // type in the input). ArrowUp from the first row pops back to the
+    // input. Enter or ⌘O opens; Escape is handled by the ladder above.
+    const isDown = event.key === 'ArrowDown' || (bareLetter && inList && lk === 'j');
+    const isUp = event.key === 'ArrowUp' || (bareLetter && inList && lk === 'k');
+    if (isDown) {
       if (inInput) {
         event.preventDefault();
         searchResultsComponent?.focusRow(selectedResultIndex);
@@ -2470,7 +2509,7 @@
         selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
         searchResultsComponent?.focusRow(selectedResultIndex);
       }
-    } else if (event.key === 'ArrowUp' && inList) {
+    } else if (isUp && inList) {
       event.preventDefault();
       if (selectedResultIndex > 0) {
         selectedResultIndex -= 1;
@@ -2478,10 +2517,68 @@
       } else {
         headerComponent?.focus();
       }
+    } else if (event.key === 'Home' && !meta && inList) {
+      event.preventDefault();
+      selectedResultIndex = 0;
+      searchResultsComponent?.focusRow(0);
+    } else if (event.key === 'End' && !meta && inList) {
+      event.preventDefault();
+      selectedResultIndex = searchResults.length - 1;
+      searchResultsComponent?.focusRow(selectedResultIndex);
     } else if (event.key === 'Enter' && inList) {
       event.preventDefault();
       const sel = searchResults[selectedResultIndex];
-      if (sel) handleOpenResult(sel.filename, sel.page_start);
+      if (sel) handleOpenResult(sel.source, sel.filename, sel.page_start);
+    } else if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
+      // ⌘O opens the selection from anywhere in the search view — the
+      // input included — matching the browse views' "open the focused
+      // thing" muscle memory.
+      event.preventDefault();
+      const sel = searchResults[selectedResultIndex];
+      if (sel) handleOpenResult(sel.source, sel.filename, sel.page_start);
+    } else if (bareLetter && inList && (lk === 's' || lk === 'm')) {
+      // Bare S/M act on the selected result's file — the same
+      // row-you're-on grammar the tree and systems rows follow, on the
+      // same hold latch, so a held M peeks the search without the book
+      // and release restores it.
+      event.preventDefault();
+      if (event.repeat) return;
+      const sel = searchResults[selectedResultIndex];
+      if (sel) {
+        const item = resultToFileItem(sel);
+        holdLatch.press(lk, () =>
+          lk === 's' ? toggleScopeSolo(item) : toggleScopeMute(item),
+        );
+      }
+    } else if (bareLetter && inList && lk === 'x' && armState) {
+      // X files the selected result into the armed collection — "tick
+      // the box you can see", the key both browse views spend on it.
+      event.preventDefault();
+      const sel = searchResults[selectedResultIndex];
+      if (sel) {
+        if (armState.paths.has(sel.source)) curationRemove([sel.source]);
+        else curationAdd([sel.source]);
+      }
+    }
+  }
+
+  // A search hit resolved to the row shape every file affordance already
+  // takes — `source` is the index's absolute path, so the context menu,
+  // the drag payload, and the scope toggles all work on it unchanged.
+  function resultToFileItem(result: SearchResultItem): FileItem {
+    return { name: result.filename, path: result.source, is_dir: false, children: null };
+  }
+
+  function handleResultContextMenu(event: MouseEvent, result: SearchResultItem) {
+    handleContextMenu(event, resultToFileItem(result));
+  }
+
+  // ⌘O on a collections-panel child row.
+  async function openCollectionFile(path: string) {
+    try {
+      await openPath(path);
+    } catch (e) {
+      jobNotification.show({ type: 'error', message: `Failed to open file: ${String(e)}`, duration: 4000 });
     }
   }
 
@@ -3533,10 +3630,12 @@
              scrolls its own rows; the dock owns the width and the
              dividing rules.
 
-             Both panes stay mounted while the search view is open, so
-             `active` is ANDed with !searchViewOpen: search owns the arrows
-             there, and without this a dock pane left active from browse mode
-             would step its caret alongside the result selection. -->
+             Both panes stay keyboard-live while the search view is open —
+             the console must stay reachable while the mix is audible.
+             Arbitration is by activePane alone: entering search (and any
+             click on the search side) points it at 'files', the search
+             block yields whenever a dock pane holds it, and ⌘⌥←/→ move
+             between the two sides. -->
         <div class="left-dock">
           {#if collectionsPanelOpen}
             <CollectionsPanel
@@ -3547,6 +3646,7 @@
               onDropPaths={dropPathsOnCollection}
               onDropNewCollection={dropPathsOnNewCollection}
               onRemoveFile={removeFileFromCollection}
+              onOpenFile={openCollectionFile}
               creating={newCollectionSeed}
               onCommitCreate={commitNewCollection}
               onCancelCreate={cancelNewCollection}
@@ -3566,7 +3666,7 @@
               onReorder={reorderCollections}
               focusedName={focusedCollectionName}
               lastFocusedName={lastFocusedCollectionName}
-              active={activePane === 'collections' && !searchViewOpen}
+              active={activePane === 'collections'}
               onActivate={() => pointAtEmpty('collections')}
               onFocusCollection={setFocusedCollectionName}
             />
@@ -3600,7 +3700,7 @@
               canReset={scopeConsoleEngaged}
               focusedRow={focusedFilterRow}
               lastFocusedRow={lastFocusedFilterRow}
-              active={activePane === 'filters' && !searchViewOpen}
+              active={activePane === 'filters'}
               onActivate={() => pointAtEmpty('filters')}
               onFocusRow={setFocusedFilterRow}
             />
@@ -3660,9 +3760,15 @@
                 canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
                 {hiddenPaths}
                 {collectionColorByPath}
-                onSelect={(i) => { selectedResultIndex = i; }}
+                onSelect={(i) => { selectedResultIndex = i; setActivePane('files'); }}
                 onLoadMore={loadMoreResults}
                 onOpenResult={handleOpenResult}
+                onBeginDrag={beginPathDrag}
+                onContextMenu={handleResultContextMenu}
+                curating={armState !== null}
+                collectionPaths={armState?.paths ?? EMPTY_PATHS}
+                onCollectionAdd={curationAdd}
+                onCollectionRemove={curationRemove}
               />
             </div>
             <div class="search-inspector-pane">
@@ -3807,6 +3913,7 @@
       directlyHidden={contextMenu.hideState.directlyHidden}
       inheritedHidden={contextMenu.hideState.inheritedHidden}
       onToggleHidden={handleContextToggleHidden}
+      canRename={!searchViewOpen}
       onClose={() => { contextMenu = null; }}
     />
   {/if}

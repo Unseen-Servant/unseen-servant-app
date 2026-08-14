@@ -115,8 +115,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'collections' },
   { id: 'collections.home',      keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'collections' },
   { id: 'collections.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
-  { id: 'collections.expand',    keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand collection',            scope: 'collections' },
-  { id: 'collections.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse collection',          scope: 'collections' },
+  { id: 'collections.expand',    keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand collection / first file', scope: 'collections' },
+  { id: 'collections.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse collection / parent row', scope: 'collections' },
+  { id: 'collections.openFile',  keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'collections' },
+  { id: 'collections.removeFile', keys: { mac: '⌘⌫',  other: 'Del' },           label: 'Remove focused file from the collection', scope: 'collections' },
   { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections', switch: true },
   { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused collection', scope: 'collections', switch: true },
   { id: 'collections.rename',    keys: { mac: 'R',    other: 'R' },             label: 'Rename collection',            scope: 'collections' },
@@ -146,10 +148,18 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'contextMenu.activate',  keys: { mac: '↵',    other: 'Enter' },         label: 'Activate focused item',        scope: 'contextMenu' },
 
   // Search results list
-  { id: 'results.next',          keys: { mac: '↓',    other: '↓' },             label: 'Next result',                  scope: 'searchResults' },
-  { id: 'results.prev',          keys: { mac: '↑',    other: '↑' },             label: 'Previous result (or back to input)', scope: 'searchResults' },
-  { id: 'results.open',          keys: { mac: '↵',    other: 'Enter' },         label: 'Open focused result',          scope: 'searchResults' },
+  { id: 'results.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Next result',                  scope: 'searchResults' },
+  { id: 'results.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Previous result (or back to input)', scope: 'searchResults' },
+  { id: 'results.home',          keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first result',         scope: 'searchResults' },
+  { id: 'results.end',           keys: { mac: 'End',  other: 'End' },           label: 'Jump to last result',          scope: 'searchResults' },
+  { id: 'results.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused result',       scope: 'searchResults' },
   { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
+  // No switch flag: the search rows draw no S/M squares — the lit state
+  // materializes as a scope-bar chip instead.
+  { id: 'results.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the result's file (narrow search to it)", scope: 'searchResults' },
+  { id: 'results.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the result's file (drop from search)",    scope: 'searchResults' },
+  { id: 'results.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox (while armed)", scope: 'searchResults', switch: true },
+  { id: 'results.info',          keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused result', scope: 'searchResults' },
   { id: 'results.toInput',       keys: { mac: 'Esc',  other: 'Esc' },           label: 'Back to search input',         scope: 'searchResults' },
 
   // Modal — excluded from the cheat sheet by both KeyboardHelpOverlay's and

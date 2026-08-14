@@ -6,6 +6,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from './paneFocus';
   import { holdLatch } from './holdLatch';
+  import { menuSlotHeld } from './menuSlot';
   import { systemsRowScopeKey } from './keybindings';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
@@ -134,6 +135,22 @@
   // never crosses tag boundaries (would feel arbitrary in this view).
   let lastClickedPath: string | null = null;
   let lastClickedGroup: string | null = null;
+
+  // Hover latched on real pointerenter, not CSS :hover — closing a menu
+  // or ending a drag re-hit-tests whatever lands under a pointer that
+  // never moved, and :hover lights it with no leave ever queued. Same
+  // fix the collections panel carries. File rows key on (tag, path):
+  // a multi-tagged file renders once per group and only the row under
+  // the pointer should light.
+  let hoveredGroup: string | null = null;
+  let hoveredRow: string | null = null;
+  function rowHoverKey(tag: string, path: string): string {
+    return `${tag}\n${path}`;
+  }
+  function clearHover() {
+    hoveredGroup = null;
+    hoveredRow = null;
+  }
 
   // Section collapse state — transient (not persisted).
   let collapsed = new Set<string>();
@@ -379,7 +396,7 @@
     // after the synchronous handler chain. State is the source of truth.
     if (contextMenuOpen) return;
     // Yield to inputs, popovers, and any rename in flight elsewhere.
-    if (document.querySelector('.dropdown, .sort-menu')) return;
+    if (menuSlotHeld()) return;
     // Yield to any open <dialog> — modal inerting doesn't suppress
     // window-level keydown listeners, so without this we'd nav behind it.
     if (document.querySelector('dialog[open]')) return;
@@ -559,14 +576,22 @@
 {#if groups.length === 0}
   <div class="empty">No indexed files match the current view.</div>
 {:else}
-  <div class="systems-view">
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="systems-view" on:pointerleave={clearHover}>
     {#each groups as group (group.tag)}
       {@const groupState = groupStates.get(group.tag) ?? 'none'}
       {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
       {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths, scopeBypassed)}
       {#if !(hideOutOfScope && groupDimmed)}
       <section class="group">
-        <div class="group-head-row" class:untagged={group.tag === 'Untagged'}>
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div
+          class="group-head-row"
+          class:untagged={group.tag === 'Untagged'}
+          class:hovered={hoveredGroup === group.tag}
+          on:pointerenter={() => (hoveredGroup = group.tag)}
+          on:pointerleave={() => { if (hoveredGroup === group.tag) hoveredGroup = null; }}
+        >
           {#if curating}
             <button
               class="app-checkbox collecting group-checkbox"
@@ -636,14 +661,17 @@
                 class="file"
                 class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={isPathOrAncestorIn(entry.path, hiddenPaths)}
+                class:hovered={hoveredRow === rowHoverKey(group.tag, entry.path)}
                 data-sv-row={entry.path}
                 draggable={renamingFilePath !== entry.path}
                 on:dragstart={(e) => handleDragStart(e, entry)}
-                on:dragend={clearTreePathsPayload}
+                on:dragend={() => { clearTreePathsPayload(); clearHover(); }}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
                 on:dblclick={() => handleDoubleClick(entry)}
                 on:mousedown|capture={recordPressTarget}
                 on:mousedown={(e) => handleMouseDown(e, entry)}
+                on:pointerenter={() => (hoveredRow = rowHoverKey(group.tag, entry.path))}
+                on:pointerleave={() => { if (hoveredRow === rowHoverKey(group.tag, entry.path)) hoveredRow = null; }}
               >
                 {#if curating}
                   <button
@@ -804,7 +832,8 @@
 
   /* S/M clusters — hidden at rest, revealed on header or row hover and
      keyboard focus, always visible while engaged. Button anatomy is the
-     shared .sm-btn in app.css. */
+     shared .sm-btn in app.css. Hover is the latched .hovered class, not
+     :hover — see the note at its declaration. */
   .sm {
     display: inline-flex;
     gap: 0.25rem;
@@ -812,9 +841,9 @@
     opacity: 0;
     transition: opacity var(--transition-fast);
   }
-  .group-head-row:hover .sm,
+  .group-head-row.hovered .sm,
   .group-head-row:focus-within .sm,
-  .file:hover .sm,
+  .file.hovered .sm,
   .file:focus-within .sm,
   .file.focused .sm,
   .sm.engaged {
@@ -886,7 +915,7 @@
     -webkit-user-select: none;
     user-select: none;
   }
-  .file:hover {
+  .file.hovered {
     background: var(--bg-container);
   }
   .file.focused {

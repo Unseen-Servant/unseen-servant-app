@@ -3,6 +3,14 @@
 **Date:** 2026-08-09
 **Status:** Implemented 2026-08-09 on main. Automated gates green; the manual
 QA checklist below is pending.
+**Amended 2026-08-14** by the search-panel interaction audit
+(`docs/specs/ui/2026-08-13-search-panel-interaction-audit.md`): the
+Search section below is superseded — the dock panes now stay
+keyboard-live during search, arbitrated by `activePane` (entering search
+or clicking the search side points it at `'files'`; the search key
+block yields whenever a dock pane holds it; `⌘⌥←/→` cross between the
+sides). QA item 15 no longer describes intended behavior: clicking dock
+chrome mid-search claims the dock.
 **Supersedes:** the state model in
 `2026-08-09-pane-focus-model-design.md`. That spec's rule — "setting one token
 nulls the other two" — is no longer the whole story. Everything else in it

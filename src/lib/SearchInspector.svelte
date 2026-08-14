@@ -12,7 +12,7 @@
   export let hiddenPaths: Set<string> = new Set();
   export let knownSystems: KnownGameSystem[] = [];
   export let gameSystemMap: Map<string, string[]> = new Map();
-  export let onOpenResult: (filename: string, page?: number | null) => void = () => {};
+  export let onOpenResult: (source: string, filename: string, page?: number | null) => void = () => {};
   export let onSetGameSystems: (path: string, filename: string, tags: string[]) => void = () => {};
 
   // Tag-editor menu shared with FileTree; left-aligned under the badge.
@@ -81,7 +81,7 @@
       <button
         type="button"
         class="open-btn"
-        on:click={() => onOpenResult(result.filename, result.page_start)}
+        on:click={() => onOpenResult(result.source, result.filename, result.page_start)}
         title={openLabel}
         aria-label={openLabel}
       >
