@@ -7,6 +7,7 @@ import {
   isDeleteChord,
   keyShortcut,
   matchKey,
+  systemsRowScopeKey,
   type ChordEvent,
 } from './keybindings';
 
@@ -245,5 +246,39 @@ describe('switch bindings', () => {
     for (const k of KEYBINDINGS.filter(e => e.switch)) {
       expect(k.keys.mac).not.toMatch(/[⌘⌥⇧⌃]/);
     }
+  });
+});
+
+describe('systemsRowScopeKey', () => {
+  test('bare S and M act on the file', () => {
+    expect(systemsRowScopeKey(ev({ key: 's' }), false)).toEqual({ axis: 'file', kind: 'solo' });
+    expect(systemsRowScopeKey(ev({ key: 'm' }), false)).toEqual({ axis: 'file', kind: 'mute' });
+  });
+
+  test('shifted S and M lift to the system', () => {
+    expect(systemsRowScopeKey(ev({ key: 'S', shiftKey: true }), false)).toEqual({ axis: 'system', kind: 'solo' });
+    expect(systemsRowScopeKey(ev({ key: 'M', shiftKey: true }), false)).toEqual({ axis: 'system', kind: 'mute' });
+  });
+
+  test('a capital letter without shift (CapsLock) still acts on the file', () => {
+    expect(systemsRowScopeKey(ev({ key: 'S' }), false)).toEqual({ axis: 'file', kind: 'solo' });
+  });
+
+  test('untagged: bare S solos the file, shift+S is inert, shift+M still mutes the system', () => {
+    expect(systemsRowScopeKey(ev({ key: 's' }), true)).toEqual({ axis: 'file', kind: 'solo' });
+    expect(systemsRowScopeKey(ev({ key: 'S', shiftKey: true }), true)).toBeNull();
+    expect(systemsRowScopeKey(ev({ key: 'M', shiftKey: true }), true)).toEqual({ axis: 'system', kind: 'mute' });
+  });
+
+  test('meta, ctrl, and alt combinations are someone else\'s chord', () => {
+    // ⌘S is sync.commit — it must never read as a scope gesture.
+    expect(systemsRowScopeKey(ev({ key: 's', metaKey: true }), false)).toBeNull();
+    expect(systemsRowScopeKey(ev({ key: 's', ctrlKey: true }), false)).toBeNull();
+    expect(systemsRowScopeKey(ev({ key: 'm', altKey: true }), false)).toBeNull();
+  });
+
+  test('other keys are not scope chords', () => {
+    expect(systemsRowScopeKey(ev({ key: 'x' }), false)).toBeNull();
+    expect(systemsRowScopeKey(ev({ key: 'Enter' }), false)).toBeNull();
   });
 });

@@ -244,6 +244,30 @@ export function eventMatchKey(event: ChordEvent): string | null {
   return event.metaKey || event.ctrlKey ? `meta+${base}` : base;
 }
 
+// S/M dispatch for a focused systems-view row. Bare letters act on the
+// row's file (the folder/file axis — the tree's "act on the row you're
+// on" grammar); ⇧S/⇧M lift to the row's group on the systems axis. The
+// system axis stays mute-only for the untagged bucket (#307): ⇧S is
+// inert there, while bare S still solos the untagged file itself.
+// Meta/Ctrl/Alt combinations are someone else's chord (⌘S is sync).
+export type SystemsRowScopeAction = {
+  axis: 'file' | 'system';
+  kind: 'solo' | 'mute';
+};
+
+export function systemsRowScopeKey(
+  event: ChordEvent,
+  untagged: boolean,
+): SystemsRowScopeAction | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null;
+  const key = event.key.toLowerCase();
+  if (key !== 's' && key !== 'm') return null;
+  const kind = key === 's' ? 'solo' : 'mute';
+  if (!event.shiftKey) return { axis: 'file', kind };
+  if (kind === 'solo' && untagged) return null;
+  return { axis: 'system', kind };
+}
+
 // The match key for a binding id, or '' when the binding has no accelerator.
 export function matchKey(id: string): string {
   return BY_ID.get(id)?.match ?? '';
