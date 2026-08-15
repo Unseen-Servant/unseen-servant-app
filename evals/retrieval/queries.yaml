@@ -1,0 +1,267 @@
+# First eval query set — Phase 0 retrieval suite (v3 scaffold §3).
+#
+# 10 intent pairs (keyword + nl style) = 20 queries, across 5 categories.
+# Every anchor is verified in BOTH the digital-native reference and the PDF
+# by evals/retrieval/verify_anchors.py — do not hand-edit anchors without
+# re-running it (the old GT was once 30% wrong).
+#
+# Fields (schema: v3 scaffold §3):
+#   pair       — keyword+nl forms of one intent share this key
+#   style      — keyword | nl (separately scored)
+#   category   — exact_name | table_lookup | prose_rule | cross_page
+#                | paraphrase_control   (oov_homebrew deferred: needs a
+#                homebrew PDF with invented proper nouns, not yet in corpus)
+#   doc        — id from corpus.manifest.json
+#   answer_ref — canonical source file (provenance + verify target)
+#   anchors    — all outer must hit; an inner list means any-of
+#   pages      — physical PDF page(s), secondary check only
+#
+# NOTE: OSRIC's first reference capture was JS-rendered nav shells with no
+# rule text; replaced 2026-08-14 with 6 osric_chapter*.html files carrying
+# full rules (manifest digest re-pinned). OSRIC is the hardest-extraction
+# book, so it is over-weighted here per §3.
+
+# ───────────────────────── srd_5_1 ─────────────────────────
+- id: q001
+  pair: goblin_ac
+  style: keyword
+  category: exact_name
+  query: "goblin armor class"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
+  anchors: [["armor class", "ac"], "15", "leather armor"]
+  pages: "315"
+- id: q002
+  pair: goblin_ac
+  style: nl
+  category: exact_name
+  query: "what armor class does a goblin have?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
+  anchors: [["armor class", "ac"], "15", "leather armor"]
+  pages: "315"
+
+- id: q003
+  pair: fireball_effect
+  style: keyword
+  category: prose_rule
+  query: "fireball damage radius saving throw"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Fireball.md"
+  anchors: ["8d6", ["fire damage", "fire"], "20 foot", ["dexterity saving throw", "dexterity"]]
+- id: q004
+  pair: fireball_effect
+  style: nl
+  category: prose_rule
+  query: "how much damage does a fireball deal and how large is the blast?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Fireball.md"
+  anchors: ["8d6", ["fire damage", "fire"], "20 foot", ["dexterity saving throw", "dexterity"]]
+
+# Kraken stat block straddles physical pp.324-325: "armor class 18" is on
+# p324 only, "ink cloud" on p325 only — a genuine page-break span.
+- id: q005
+  pair: kraken_span
+  style: keyword
+  category: cross_page
+  query: "kraken armor class ink cloud"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Kraken.md"
+  anchors: ["kraken", "armor class 18", "ink cloud"]
+  pages: "324-325"
+- id: q006
+  pair: kraken_span
+  style: nl
+  category: cross_page
+  query: "what is the kraken's armor class and what does its ink cloud do?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Kraken.md"
+  anchors: ["kraken", "armor class 18", "ink cloud"]
+  pages: "324-325"
+
+- id: q007
+  pair: death_saves
+  style: keyword
+  category: paraphrase_control
+  query: "dying character zero health survival roll"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/06_Gameplay/Order_of_Combat.md"
+  anchors: ["death saving throw", "hit points", ["three successes", "stable", "regain 1 hit point"]]
+- id: q008
+  pair: death_saves
+  style: nl
+  category: paraphrase_control
+  query: "when my hero drops unconscious at 0 health, how do they cling to life?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/06_Gameplay/Order_of_Combat.md"
+  anchors: ["death saving throw", "hit points", ["three successes", "stable", "regain 1 hit point"]]
+
+# ───────────────────────── srd_5_2_1 ─────────────────────────
+# 5.2.1 renamed Goblin -> "Goblin Warrior" (HP 10 vs 5.1's HP 7): the
+# near-duplicate-candidate regime when both SRDs are indexed together.
+- id: q009
+  pair: goblin_warrior_hp
+  style: keyword
+  category: exact_name
+  query: "goblin warrior hit points"
+  doc: srd_5_2_1
+  answer_ref: "dnd_srd_52/11_Monsters/Monsters_Each/Goblin_Warrior.md"
+  anchors: ["goblin warrior", ["hp 10", "10 3d6"], "15"]
+- id: q010
+  pair: goblin_warrior_hp
+  style: nl
+  category: exact_name
+  query: "how many hit points does a goblin warrior have?"
+  doc: srd_5_2_1
+  answer_ref: "dnd_srd_52/11_Monsters/Monsters_Each/Goblin_Warrior.md"
+  anchors: ["goblin warrior", ["hp 10", "10 3d6"], "15"]
+
+# ───────────────────────── cairn_1e ─────────────────────────
+- id: q011
+  pair: cairn_armor
+  style: keyword
+  category: prose_rule
+  query: "cairn armor reduce damage weapon die"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor", ["unarmed", "1d4"]]
+- id: q012
+  pair: cairn_armor
+  style: nl
+  category: prose_rule
+  query: "how does armor reduce the damage you take in cairn?"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor", ["unarmed", "1d4"]]
+
+- id: q013
+  pair: cairn_armor_value
+  style: keyword
+  category: table_lookup
+  query: "cairn chainmail armor value slots"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: ["chainmail", "2 armor", "bulky"]
+- id: q014
+  pair: cairn_armor_value
+  style: nl
+  category: table_lookup
+  query: "how much armor does chainmail give you in cairn?"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: ["chainmail", "2 armor", "bulky"]
+
+# ───────────────────────── black_hack_2e ─────────────────────────
+- id: q015
+  pair: bh_stat_test
+  style: keyword
+  category: prose_rule
+  query: "black hack test attribute roll under d20"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
+- id: q016
+  pair: bh_stat_test
+  style: nl
+  category: prose_rule
+  query: "how do you resolve a risky action against an attribute in the black hack?"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
+
+# NB: black_hack's HTML ref is a DIFFERENT edition than the 2e PDF (ref
+# armor table = Chain Mail 6 pts; PDF = "armour", chain mail 3). Only
+# edition-invariant facts (the roll-under core above) are safely anchored;
+# the armor-table lookup was moved to the SRD, where ref and PDF match.
+- id: q017
+  pair: srd_plate_armor
+  style: keyword
+  category: table_lookup
+  query: "plate armor armor class cost strength"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
+  anchors: ["plate", "18", ["str 15", "1 500 gp"]]
+- id: q018
+  pair: srd_plate_armor
+  style: nl
+  category: table_lookup
+  query: "what armor class and cost does plate armor have in 5e?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
+  anchors: ["plate", "18", ["str 15", "1 500 gp"]]
+
+# ───────────────────────── yze_srd ─────────────────────────
+- id: q019
+  pair: yze_armor
+  style: keyword
+  category: prose_rule
+  query: "year zero engine armor rating gear dice damage"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["gear dice", "armor rating", ["decreases the damage", "every success"]]
+- id: q020
+  pair: yze_armor
+  style: nl
+  category: prose_rule
+  query: "how does armor reduce incoming damage in the year zero engine?"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["gear dice", "armor rating", ["decreases the damage", "every success"]]
+
+# ───────────────────────── osric_2e (stress case) ─────────────────────────
+- id: q021
+  pair: osric_falling
+  style: keyword
+  category: prose_rule
+  query: "osric falling damage distance dice"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["distance fallen", "1d6", "3d6", ["6d6", "20d6"]]
+  pages: "135"
+- id: q022
+  pair: osric_falling
+  style: nl
+  category: prose_rule
+  query: "how much damage do you take from falling in osric?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["distance fallen", "1d6", "3d6", ["6d6", "20d6"]]
+  pages: "135"
+
+- id: q023
+  pair: osric_thief_skills
+  style: keyword
+  category: table_lookup
+  query: "osric thief climb walls pick pockets level 1"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["climb walls", "80", "pick pockets", "35"]
+  pages: "40"
+- id: q024
+  pair: osric_thief_skills
+  style: nl
+  category: table_lookup
+  query: "what chance does a first level osric thief have to pick pockets and climb walls?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["climb walls", "80", "pick pockets", "35"]
+  pages: "40"
+
+- id: q025
+  pair: osric_paladin_loh
+  style: keyword
+  category: exact_name
+  query: "osric paladin lay on hands healing"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["lay on hands", "2 hit points", ["per day", "per level"]]
+  pages: "34"
+- id: q026
+  pair: osric_paladin_loh
+  style: nl
+  category: exact_name
+  query: "how many hit points can an osric paladin restore with lay on hands?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["lay on hands", "2 hit points", ["per day", "per level"]]
+  pages: "34"

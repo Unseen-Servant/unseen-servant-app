@@ -127,7 +127,8 @@
           "url": "<fill>",
           "retrieved": "2026-08-14"
         },
-        "digest": "8da67b2a9ab3e84e8b2f97519d21a7663ef27e37b2dd61344289b06450956d74"
+        "digest": "808634ceebaacd239cab967f1a7857cec447304087a9dacfa03c3514265741cc",
+        "note": "6 osric_chapter*.html files with full rule text; replaced the earlier per-topic captures that were JS-rendered nav shells (no content)."
       }
     },
     {
