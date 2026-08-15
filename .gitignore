@@ -13,6 +13,8 @@ src-tauri/target/
 src-tauri/gen/schemas
 .claude/
 .superpowers/
+evals/corpus/
+evals/.eval_data/
 
 # Python sidecar
 .venv

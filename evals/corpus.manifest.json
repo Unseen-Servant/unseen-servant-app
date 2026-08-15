@@ -1,0 +1,154 @@
+{
+  "corpus_resolution": [
+    "$LL_EVAL_CORPUS",
+    "evals/corpus/",
+    "<main-checkout>/evals/corpus/"
+  ],
+  "documents": [
+    {
+      "id": "bfrpg_4e",
+      "system": "Basic Fantasy RPG",
+      "pdf": {
+        "path": "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.pdf",
+        "sha256": "95c3a32b3cce9edb63a44fe715703f015fe16f6446f5192e8e7d2f9f565e2ef8",
+        "source": {
+          "url": "https://basicfantasy.org/downloads/Basic-Fantasy-RPG-Rules-r142.pdf",
+          "release": "r-142"
+        },
+        "page_count": 208
+      },
+      "refs": {
+        "glob": "basic_fantasy/*.odt",
+        "source": {
+          "url": "https://basicfantasy.org/downloads/Basic-Fantasy-RPG-Rules-r142.odt",
+          "release": "r-142",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "2dc4006b4e878b8c7e3d83a060b43be8fd2223499561f3ad35c13c2f6a633bae",
+        "note": "ODT is the authoring source of the PDF — release numbers MUST match"
+      }
+    },
+    {
+      "id": "black_hack_2e",
+      "system": "The Black Hack",
+      "pdf": {
+        "path": "black_hack/The_Black_Hack_Booklet_Second_Edition.pdf",
+        "sha256": "3355f28c53a260a24d91772c003b09a835329229399ceac151b65cf85aa9b57c",
+        "source": {
+          "url": "<fill>"
+        },
+        "page_count": 26
+      },
+      "refs": {
+        "glob": "black_hack/The Black Hack -- English.html",
+        "source": {
+          "url": "<fill>",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "51c85597fa5df8630ce1b3d6f7a0ca72e7d219de3cb4fddadb63a182f2c6a0d3"
+      }
+    },
+    {
+      "id": "cairn_1e",
+      "system": "Cairn",
+      "pdf": {
+        "path": "cairn_1e/Cairn.pdf",
+        "sha256": "66ce230e6998a226f901c715edfa59d397c27e0c430ae1acc355cb915c5ef94b",
+        "source": {
+          "url": "<fill>"
+        },
+        "page_count": 24
+      },
+      "refs": {
+        "glob": "cairn_1e/Cairn Markdown.md",
+        "source": {
+          "url": "<fill>",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "c9e4f92cf88899b2ccdc457939bfc56eeaec8a465761d7f6be871e48b43d93ac"
+      }
+    },
+    {
+      "id": "srd_5_1",
+      "system": "D&D 5E (SRD 5.1)",
+      "pdf": {
+        "path": "dnd_srd_51/SRD_CC_v5.1.pdf",
+        "sha256": "2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0",
+        "source": {
+          "url": "<fill>"
+        },
+        "page_count": 403
+      },
+      "refs": {
+        "glob": "dnd_srd_51/**/*.md",
+        "source": {
+          "url": "<fill>",
+          "rev": "<commit>",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "08535017eb71b3246792432a409251c3eb6e7369d9fc38425924aec5a82d3c9c"
+      }
+    },
+    {
+      "id": "srd_5_2_1",
+      "system": "D&D 5E (SRD 5.2.1)",
+      "pdf": {
+        "path": "dnd_srd_52/SRD_CC_v5.2.1.pdf",
+        "sha256": "8974902d109d6e63672d7c490bde9ccf052410503d9cfa768237154fbc5e3d87",
+        "source": {
+          "url": "<fill>"
+        },
+        "page_count": 364
+      },
+      "refs": {
+        "glob": "dnd_srd_52/**/*.md",
+        "source": {
+          "url": "<fill>",
+          "rev": "<commit>",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "865f14cbc11ad04e57924df3da27a3ffdc72263ecbb86723ce9fd323c2d2453a"
+      }
+    },
+    {
+      "id": "osric_2e",
+      "system": "OSRIC",
+      "pdf": {
+        "path": "osric_2e/OSRIC.pdf",
+        "sha256": "74d51e37b6388b97b771ba9595f736cf9dd84b3c5e51af9e5c5315a7de14d43c",
+        "source": {
+          "url": "<fill>"
+        },
+        "page_count": 404
+      },
+      "refs": {
+        "glob": "osric_2e/*.html",
+        "source": {
+          "url": "<fill>",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "8da67b2a9ab3e84e8b2f97519d21a7663ef27e37b2dd61344289b06450956d74"
+      }
+    },
+    {
+      "id": "yze_srd",
+      "system": "Year Zero Engine",
+      "pdf": {
+        "path": "year_zero/YZE-Standard-Reference-Document.pdf",
+        "sha256": "5bd19db54f41631344b4e46adb1c7610794fbd80315b9c635111318453cf777a",
+        "source": {
+          "url": "<fill>"
+        },
+        "page_count": 45
+      },
+      "refs": {
+        "glob": "year_zero/*.html",
+        "source": {
+          "url": "<fill>",
+          "retrieved": "2026-08-14"
+        },
+        "digest": "fd9dbf52a6538d5a9e32a9007f2ade7e532e200bdc74dd8c2eea83e0f53acd2b"
+      }
+    }
+  ]
+}
