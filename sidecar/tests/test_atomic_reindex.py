@@ -114,6 +114,45 @@ def test_embed_batch_error_chains_original_cause():
     assert isinstance(exc_info.value.__cause__, ValueError)
 
 
+def test_embed_batch_retries_transient_reset(monkeypatch):
+    """A transient runner reset ("connection reset by peer") is retried and
+    recovers, so one dropped connection doesn't abort the file."""
+    import server
+
+    monkeypatch.setattr(server.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    class _FlakyCollection(_RecordingCollection):
+        def _embed(self, texts):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError(
+                    'Post ".../tokenize": read: connection reset by peer (status code: 400)'
+                )
+            return [[float(i)] * 4 for i, _ in enumerate(texts)]
+
+    out = server._embed_batch(_FlakyCollection(), _make_units(2))
+    assert calls["n"] == 2  # failed once, recovered on retry
+    assert len(out) == 2
+
+
+def test_embed_batch_does_not_retry_deterministic_error(monkeypatch):
+    """A real error (bad input) fails fast — no retry, no backoff sleep."""
+    import server
+
+    monkeypatch.setattr(server.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    class _BoomCollection(_RecordingCollection):
+        def _embed(self, texts):
+            calls["n"] += 1
+            raise ValueError("bad input")
+
+    with pytest.raises(ValueError):
+        server._embed_batch(_BoomCollection(), _make_units(2))
+    assert calls["n"] == 1  # not retried
+
+
 # ---------------------------------------------------------------------------
 # Atomic helper: rollback on failure
 # ---------------------------------------------------------------------------

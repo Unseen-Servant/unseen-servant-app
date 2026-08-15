@@ -1074,9 +1074,47 @@ EMBED_CONCURRENCY = 3
 METADATA_UPDATE_BATCH_SIZE = 5000
 
 
+# A model runner can drop an in-flight embed ("connection reset by peer")
+# under a large book's sustained embed load — OSRIC (46 batches) hit this
+# reliably where smaller books never did. Without a retry, one transient
+# reset raises EmbedBatchError and aborts the *whole* file's index. Retry
+# ONLY transient connection failures; a deterministic error (bad input,
+# wedged model) won't be fixed by retrying and must surface immediately.
+EMBED_MAX_ATTEMPTS = 3
+
+_TRANSIENT_EMBED_MARKERS = (
+    "connection reset", "reset by peer", "connection refused",
+    "connection aborted", "broken pipe", "timed out", "timeout",
+    "temporarily unavailable", "eof",
+)
+
+
+def _is_transient_embed_error(exc: Exception) -> bool:
+    """A dropped/failed connection worth retrying, vs a deterministic error
+    a retry can't fix."""
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        return True
+    msg = str(exc).lower()
+    return any(m in msg for m in _TRANSIENT_EMBED_MARKERS)
+
+
 def _embed_batch(collection, batch: list[EmbedUnit]) -> list[list[float]]:
-    """Heading-prepended embeddings for a batch (no DB writes)."""
-    return collection._embedding_function([_embed_text(eu) for eu in batch])
+    """Heading-prepended embeddings for a batch (no DB writes).
+
+    Retries transient Ollama runner resets so a single dropped connection
+    mid-index does not abort the entire file; non-transient failures raise
+    immediately.
+    """
+    texts = [_embed_text(eu) for eu in batch]
+    for attempt in range(1, EMBED_MAX_ATTEMPTS + 1):
+        try:
+            return collection._embedding_function(texts)
+        except Exception as e:
+            if attempt == EMBED_MAX_ATTEMPTS or not _is_transient_embed_error(e):
+                raise
+            print(f"embed batch failed (attempt {attempt}/{EMBED_MAX_ATTEMPTS}, "
+                  f"transient): {str(e)[:120]} — retrying", flush=True)
+            time.sleep(1.0 * attempt)
 
 
 def _upsert_batch(
