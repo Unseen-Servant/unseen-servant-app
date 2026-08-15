@@ -1,0 +1,226 @@
+{
+  "baseline": "2026-08-15-v2-phase0",
+  "top": 5,
+  "labels": {
+    "q001": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ]
+    },
+    "q002": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2
+      ]
+    },
+    "q003": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4
+      ]
+    },
+    "q004": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ]
+    },
+    "q005": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ]
+    },
+    "q006": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ]
+    },
+    "q007": {
+      "reviewed": true,
+      "relevant": [
+        5
+      ]
+    },
+    "q008": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q009": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q010": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q011": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        3,
+        1
+      ]
+    },
+    "q012": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3,
+        2
+      ]
+    },
+    "q013": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        1,
+        3,
+        4
+      ]
+    },
+    "q014": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ]
+    },
+    "q015": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        5,
+        1,
+        3,
+        4
+      ]
+    },
+    "q016": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        2,
+        1
+      ]
+    },
+    "q017": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q018": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q019": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ]
+    },
+    "q020": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q021": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ]
+    },
+    "q022": {
+      "reviewed": true,
+      "relevant": [
+        3
+      ]
+    },
+    "q023": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q024": {
+      "reviewed": true,
+      "relevant": [
+        5
+      ]
+    },
+    "q025": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q026": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q027": {
+      "reviewed": true,
+      "relevant": [
+        3,
+        1,
+        4
+      ]
+    },
+    "q028": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ]
+    },
+    "q029": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        1,
+        4,
+        2
+      ]
+    },
+    "q030": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3
+      ]
+    },
+    "q031": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3
+      ]
+    },
+    "q032": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q033": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        1,
+        2,
+        3
+      ]
+    },
+    "q034": {
+      "reviewed": true,
+      "relevant": [
+        3,
+        2,
+        5,
+        1
+      ]
+    }
+  }
+}
