@@ -7,7 +7,7 @@ baselines never know which pipeline they are talking to. The grading side
 (``evals/retrieval/``) consumes :class:`SearchResponse` only.
 
 Design rules (from docs/roadmap/2026-08-13-pipeline-rebuild-plan.md and
-docs/specs/retrieval/2026-08-14-v3-scaffold.md):
+docs/retrieval/2026-08-14-v3-scaffold.md):
 
 - Knobs are ALWAYS explicit. The harness pins every pipeline flag in
   :class:`SearchOptions` rather than inheriting server-side settings, so a

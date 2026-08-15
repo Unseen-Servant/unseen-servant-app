@@ -4,7 +4,7 @@
 
 **Goal:** Give every file row in the systems view an inline S/M cluster on the folder/file axis, retarget bare `S`/`M` to the focused row's file, and lift group toggles to `⇧S`/`⇧M`.
 
-**Architecture:** No algebra changes — row chips are a second render of the tree's folder/file-axis state (`soloedScopePaths`/`mutedScopePaths` + `toggleScopeSolo`/`toggleScopeMute`) threaded into `SystemsView` and converted per-row via the existing `entryToFileItem`. Keyboard dispatch becomes a pure, unit-tested function in `keybindings.ts`; all four gestures run through the existing hold latch (tap latches, hold is momentary). Spec: `docs/specs/scope/2026-08-13-systems-view-row-sm-design.md`.
+**Architecture:** No algebra changes — row chips are a second render of the tree's folder/file-axis state (`soloedScopePaths`/`mutedScopePaths` + `toggleScopeSolo`/`toggleScopeMute`) threaded into `SystemsView` and converted per-row via the existing `entryToFileItem`. Keyboard dispatch becomes a pure, unit-tested function in `keybindings.ts`; all four gestures run through the existing hold latch (tap latches, hold is momentary). Spec: `docs/frontend/2026-08-13-systems-view-row-sm-design.md`.
 
 **Tech Stack:** Svelte 4 (SvelteKit), TypeScript, vitest, stylelint. No sidecar/backend changes.
 
@@ -455,7 +455,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 6: Docs — status flip, changelog, QA handoff
 
 **Files:**
-- Modify: `docs/specs/scope/2026-08-13-systems-view-row-sm-design.md` (Status line)
+- Modify: `docs/frontend/2026-08-13-systems-view-row-sm-design.md` (Status line)
 - Modify: `CHANGELOG.md` (`## [Unreleased]` → end of the `### Changed` list)
 
 - [ ] **Step 1: Flip the design doc status**
@@ -483,7 +483,7 @@ Expected: all green.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/specs/scope/2026-08-13-systems-view-row-sm-design.md CHANGELOG.md
+git add docs/frontend/2026-08-13-systems-view-row-sm-design.md CHANGELOG.md
 git commit -m "docs(scope): record rows-as-channels as shipped
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"

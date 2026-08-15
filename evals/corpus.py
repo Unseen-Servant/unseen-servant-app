@@ -127,7 +127,7 @@ def resolve_corpus_root() -> Path:
     raise CorpusError(
         "Eval corpus not found. Expected it at 'evals/corpus/' (gitignored) "
         "or set $LL_EVAL_CORPUS to its location. It is not in git — copy it "
-        "between machines (see docs/specs/retrieval/2026-08-14-v3-scaffold.md §1)."
+        "between machines (see docs/retrieval/2026-08-14-v3-scaffold.md §1)."
     )
 
 

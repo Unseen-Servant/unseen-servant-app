@@ -4,7 +4,7 @@ Search-pipeline knobs (rerank, pool size, spell correction, experimental
 flags) persist sidecar-side in ``search_settings.json`` so every caller —
 desktop UI and MCP alike — inherits them. Explicit request fields still
 override: resolution order is request field > persisted setting >
-built-in default (docs/specs/retrieval/2026-07-11-search-settings-design.md).
+built-in default (docs/retrieval/2026-07-11-search-settings-design.md).
 """
 
 import pytest

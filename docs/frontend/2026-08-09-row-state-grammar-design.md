@@ -75,7 +75,7 @@ The filter panel's value wins. Two reasons beyond preference:
   and it makes the two axes readable independently. At `--bg-focused`
   the hover step is brighter than the engaged wash, so a passing mouse
   outshouts a state the user deliberately set.
-- **It improves contrast.** `docs/design/2026-08-09-header-voices-design.md`
+- **It improves contrast.** `docs/frontend/2026-08-09-header-voices-design.md`
   measured `--text-tertiary` `#7d8590` at 3.44:1 on `--bg-focused` and
   4.21:1 on `--bg-container`. Row counts, badges and secondary labels
   are tertiary text; today they get *less* legible under the pointer.

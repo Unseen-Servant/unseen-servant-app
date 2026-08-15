@@ -9,7 +9,7 @@ import { writable } from 'svelte/store';
 // That ergonomic matters more than it looks: the previous shape needed a
 // page-level state variable plus a conditional block per call site, which
 // is why the file-tree handlers reached for the native OS dialog instead.
-// See docs/specs/ui/2026-08-11-modal-audit-design.md.
+// See docs/frontend/2026-08-11-modal-audit-design.md.
 
 /**
  * One line of a confirmation's readout — the app's habit of answering "how
@@ -41,7 +41,7 @@ export interface ConfirmRequest {
   // elsewhere), and leaves focus on the dialog element so Enter is inert; an
   // activation is purple and lit, takes initial focus, and is activated by
   // Enter natively as any focused button is. See
-  // docs/specs/ui/2026-08-12-modal-rack-units-design.md#the-keyboard.
+  // docs/frontend/2026-08-12-modal-rack-units-design.md#the-keyboard.
   danger?: boolean;
 }
 

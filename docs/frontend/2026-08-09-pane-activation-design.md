@@ -4,7 +4,7 @@
 **Status:** Implemented 2026-08-09 on main. Automated gates green; the manual
 QA checklist below is pending.
 **Amended 2026-08-14** by the search-panel interaction audit
-(`docs/specs/ui/2026-08-13-search-panel-interaction-audit.md`): the
+(`docs/frontend/2026-08-13-search-panel-interaction-audit.md`): the
 Search section below is superseded — the dock panes now stay
 keyboard-live during search, arbitrated by `activePane` (entering search
 or clicking the search side points it at `'files'`; the search key
@@ -53,7 +53,7 @@ Split the two jobs into two axes.
 | Caret | the three nullable tokens | where the ring is drawn | row click, keyboard nav, `claim()` |
 
 This is the state-level echo of the row-state grammar
-(`docs/design/2026-08-09-row-state-grammar-design.md`): *background says what a
+(`docs/frontend/2026-08-09-row-state-grammar-design.md`): *background says what a
 row is, a ring says where the caret is.* Ownership and caret were already
 separate ideas visually; now they are separate in the model behind them.
 

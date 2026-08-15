@@ -6,7 +6,7 @@
 a709a2a (persistence), ec6435e (wiring). svelte-check, vitest, stylelint
 and the vite build all green; the plan's manual QA checklist is still
 pending.
-**Related:** `docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md`
+**Related:** `docs/frontend/2026-08-08-solo-mute-play-doctrine-design.md`
 (the focus lens and the hide/mute territory split this amends),
 `src/lib/treeNav.ts`, `src/lib/FileTree.svelte`, `src/lib/FilterPanel.svelte`.
 

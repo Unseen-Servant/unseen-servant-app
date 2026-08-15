@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-10
 **Context:** Implements section A + Vocabulary of the
-[typo-tolerance design](../specs/retrieval/2026-07-10-typo-tolerance-design.md):
+[typo-tolerance design](../retrieval/2026-07-10-typo-tolerance-design.md):
 out-of-vocabulary query tokens are rewritten to the closest library term
 (symspellpy over a library-derived frequency vocabulary) before the dense
 embed, reranker, system detection, and BM25 side see the query. Section B

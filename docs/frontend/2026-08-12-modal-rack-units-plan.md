@@ -165,7 +165,7 @@ import { isDeleteChord, type ChordEvent } from './keybindings';
  *   button to activate and is inert. It commits on the delete chord —
  *   the key that raised the deletion is the key that commits it.
  *
- * See docs/specs/ui/2026-08-12-modal-rack-units-design.md#the-keyboard.
+ * See docs/frontend/2026-08-12-modal-rack-units-design.md#the-keyboard.
  */
 export function commitKeyId(danger: boolean): 'confirm.commit' | 'confirm.commitSafe' {
   return danger ? 'confirm.commit' : 'confirm.commitSafe';
@@ -388,7 +388,7 @@ Append to `src/app.css`, after the modal geometry tokens block:
    way the Header and StatusBar bracket the workspace (StatusBar.svelte:168).
    The rails themselves are layout and live in Modal.svelte; what is shared
    across surfaces — bays, wells, readouts, the commit switch — lives here.
-   See docs/specs/ui/2026-08-12-modal-rack-units-design.md. */
+   See docs/frontend/2026-08-12-modal-rack-units-design.md. */
 
 .modal-bays {
   padding: var(--modal-pad);
@@ -698,7 +698,7 @@ Expected: the first grep returns nothing. The second returns only
 voice class is now unreferenced.
 
 **Leave it in `app.css`.** It is a documented voice from
-`docs/design/2026-08-09-header-voices-design.md`, and deleting a shared voice
+`docs/frontend/2026-08-09-header-voices-design.md`, and deleting a shared voice
 is a vocabulary decision, not a side effect of this change. Record it in the
 design doc's status note (Task 12, Step 7) so it is decided deliberately.
 
@@ -811,7 +811,7 @@ Replace the whole `<script lang="ts">` block in `src/lib/ConfirmDialog.svelte` w
 
   // Mounted once at page level; the store decides whether it is on screen and
   // what it asks. See confirmStore.ts for the call-site shape and
-  // docs/specs/ui/2026-08-12-modal-rack-units-design.md for the unit.
+  // docs/frontend/2026-08-12-modal-rack-units-design.md for the unit.
 
   const MESSAGE_ID = 'confirm-dialog-message';
 
@@ -1797,7 +1797,7 @@ Compare against the mockups: https://claude.ai/code/artifact/d79814d1-f2c7-4b6e-
 Update the design doc's **Status** line to `Implemented <date>`, and append any corrections to what the plan assumed — the audit doc's per-step "what this turned out to be" notes are the format to follow.
 
 ```bash
-git add docs/specs/ui/2026-08-12-modal-rack-units-design.md && git commit -m "docs(modals): record what the rack-unit build turned out to be"
+git add docs/frontend/2026-08-12-modal-rack-units-design.md && git commit -m "docs(modals): record what the rack-unit build turned out to be"
 ```
 
 ---

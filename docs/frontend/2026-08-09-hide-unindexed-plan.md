@@ -8,7 +8,7 @@
 
 **Tech Stack:** SvelteKit 2 + TypeScript, vitest for unit tests, svelte-check for type checking, stylelint for the tokens-only CSS rule.
 
-**Spec:** `docs/specs/scope/2026-08-09-hide-unindexed-design.md`
+**Spec:** `docs/frontend/2026-08-09-hide-unindexed-design.md`
 
 **Testing reality:** Tasks 1–2 are pure functions and get full TDD. Tasks 3–7 touch `.svelte` files, and this repo has **no component test harness** — every existing test is a `.ts` unit test. Those tasks are verified by `npm run check` (svelte-check), the unit suite staying green, `npm run lint:css`, and the manual QA checklist in Task 8. Do not scaffold a component test harness; that is out of scope for this change.
 
@@ -413,7 +413,7 @@ After the `onToggleHideOutOfScope` prop (currently line 53), add:
 
 ```ts
   // "Hide unindexed items" — the bulk gesture for material scope can't
-  // speak about, sibling to per-item hide. Spec: docs/specs/scope/
+  // speak about, sibling to per-item hide. Spec: docs/frontend/
   // 2026-08-09-hide-unindexed-design.md.
   export let hideUnindexed: boolean = false;
   export let onToggleHideUnindexed: () => void = () => {};
@@ -733,7 +733,7 @@ Walk this checklist — these are the behaviors no unit test in this repo can re
 
 - [ ] **Step 3: Mark the spec implemented**
 
-In `docs/specs/scope/2026-08-09-hide-unindexed-design.md`, change the status line from:
+In `docs/frontend/2026-08-09-hide-unindexed-design.md`, change the status line from:
 
 ```markdown
 **Status:** Designed; not implemented.
@@ -748,7 +748,7 @@ to (substituting the real date and commit range):
 - [ ] **Step 4: Commit and push**
 
 ```bash
-git add docs/specs/scope/2026-08-09-hide-unindexed-design.md && git commit docs/specs/scope/2026-08-09-hide-unindexed-design.md -m "docs(scope): mark the hide-unindexed spec implemented"
+git add docs/frontend/2026-08-09-hide-unindexed-design.md && git commit docs/frontend/2026-08-09-hide-unindexed-design.md -m "docs(scope): mark the hide-unindexed spec implemented"
 ```
 
 ```bash

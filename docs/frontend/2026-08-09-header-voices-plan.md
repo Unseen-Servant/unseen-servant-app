@@ -28,7 +28,7 @@
 /* --- Header Voices --- */
 /* One class per header voice; recipe only (font, size, tracking, case,
    line-height, default color) — layout stays in components.
-   See docs/design/2026-08-09-header-voices-design.md. */
+   See docs/frontend/2026-08-09-header-voices-design.md. */
 
 .panel-title {
   font-family: var(--font-display);
@@ -553,7 +553,7 @@ git commit -m "refactor(headers): badges and chip prefixes adopt .micro-label vo
 
 **Files:**
 - Create: `<scratchpad>/contrast.mjs` (not committed)
-- Modify: `docs/design/2026-08-09-header-voices-design.md` (record results in Notes)
+- Modify: `docs/frontend/2026-08-09-header-voices-design.md` (record results in Notes)
 
 - [ ] **Step 1: Write the script** (token values from `src/app.css:82-103`)
 
@@ -590,7 +590,7 @@ Expected (approximately): tertiary ≈ 3.8 / 3.4 / 3.0 — FAIL on all three sur
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/design/2026-08-09-header-voices-design.md
+git add docs/frontend/2026-08-09-header-voices-design.md
 git commit -m "docs(design): record header-label contrast measurements"
 ```
 

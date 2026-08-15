@@ -4,7 +4,7 @@
 
 **Goal:** Make search a stateful view entered by focusing the search bar and left only explicitly (view switch, Cmd+J/T, or the Escape ladder) — Escape never clears the query.
 
-**Architecture:** A new `searchViewOpen` boolean in `+page.svelte`, orthogonal to the persisted `viewMode: 'tree' | 'systems'` (which is the "previous view" exits return to). Render precedence: `searchViewOpen` → else `viewMode`. `searchActive` (committed query non-empty) keeps its result-wiring meaning. Spec: `docs/specs/ui/2026-08-08-search-view-behavior-design.md`.
+**Architecture:** A new `searchViewOpen` boolean in `+page.svelte`, orthogonal to the persisted `viewMode: 'tree' | 'systems'` (which is the "previous view" exits return to). Render precedence: `searchViewOpen` → else `viewMode`. `searchActive` (committed query non-empty) keeps its result-wiring meaning. Spec: `docs/frontend/2026-08-08-search-view-behavior-design.md`.
 
 **Tech Stack:** Svelte 4 (SvelteKit), TypeScript, Tauri v2 webview (WKWebView on macOS). No sidecar/Rust changes.
 

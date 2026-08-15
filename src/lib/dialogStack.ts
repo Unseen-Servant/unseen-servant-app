@@ -14,7 +14,7 @@ import { writable } from 'svelte/store';
  * pinned — it has already been bitten once assuming ::backdrop behaved
  * uniformly across engines. State is cheap and certain.
  *
- * See docs/specs/ui/2026-08-13-scrim-extent-and-depth-design.md.
+ * See docs/frontend/2026-08-13-scrim-extent-and-depth-design.md.
  */
 export function createDialogStack() {
   const { subscribe, update } = writable(0);

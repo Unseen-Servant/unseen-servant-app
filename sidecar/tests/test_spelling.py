@@ -1,6 +1,6 @@
 """Unit tests for spelling.py — library-derived vocabulary + spell correction.
 
-Covers the spec's unit surface (docs/specs/retrieval/2026-07-10-typo-
+Covers the spec's unit surface (docs/retrieval/2026-07-10-typo-
 tolerance-design.md): vocabulary build (frequencies, junk-term
 thresholding), OOV detection, correction rules (typos corrected; proper
 nouns, digit tokens, short tokens, and non-ASCII untouched), query-span

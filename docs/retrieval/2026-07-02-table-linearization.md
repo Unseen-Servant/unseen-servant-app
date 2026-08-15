@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Linearize `chunk_type=="table"` chunks into one row-as-sentence embed unit per row (replacing the atomic table vector), with a coverage guard, hard-cap newline fallback, and a startup embed-truncation probe — per `docs/specs/retrieval/2026-07-02-table-linearization-design.md` (#327).
+**Goal:** Linearize `chunk_type=="table"` chunks into one row-as-sentence embed unit per row (replacing the atomic table vector), with a coverage guard, hard-cap newline fallback, and a startup embed-truncation probe — per `docs/retrieval/2026-07-02-table-linearization-design.md` (#327).
 
 **Architecture:** A new pure-function module `sidecar/linearize.py` (ported from the spike's `linearize_tables.py`) parses Markdown pipe-tables and emits row sentences. `granularity.build()` calls it in the table branch: rows that parse and pass a coverage check become embed units sharing the source table's `parent_id`; anything else falls back to today's atomic unit. Parents, retrieval, and schema are untouched — this is embed-side only. Two small hardening pieces ride along: `chunker._enforce_hard_cap` learns a `\n` fallback, and `server.py` gains a startup probe that warns when Ollama silently truncates embeddings.
 
@@ -779,7 +779,7 @@ Nothing in this plan touches `src/` or `src-tauri/` — skip unless a previous s
 
 - [ ] **Step 3: Cross-check the spec**
 
-Re-read `docs/specs/retrieval/2026-07-02-table-linearization-design.md` section by section and confirm each maps to a landed commit: linearizer module (Task 1), coverage guard (Task 2), build() replace-with-fallback + counters (Task 3), hard-cap newline fallback (Task 4), truncation probe (Task 5). The "manual validation" item (14 spike queries before/after) is deliberately **not** in this plan — it requires a user-triggered re-index of the dev library and happens at review time.
+Re-read `docs/retrieval/2026-07-02-table-linearization-design.md` section by section and confirm each maps to a landed commit: linearizer module (Task 1), coverage guard (Task 2), build() replace-with-fallback + counters (Task 3), hard-cap newline fallback (Task 4), truncation probe (Task 5). The "manual validation" item (14 spike queries before/after) is deliberately **not** in this plan — it requires a user-triggered re-index of the dev library and happens at review time.
 
 ---
 

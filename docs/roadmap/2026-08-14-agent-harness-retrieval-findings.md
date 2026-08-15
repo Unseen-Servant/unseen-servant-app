@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-14
 **Status:** Findings. Input to the search-quality workstream.
-**Origin:** The [Unseen Servant](../design/2026-08-09-unseen-servant-design.md)
+**Origin:** The [Unseen Servant](../frontend/2026-08-09-unseen-servant-design.md)
 agent harness, built end to end and then paused. The harness itself works; what
 it exposed is that retrieval is not yet good enough to carry it.
 

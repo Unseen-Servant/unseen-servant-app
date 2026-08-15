@@ -8,7 +8,7 @@
 
 **Tech Stack:** Svelte 4 (SvelteKit), TypeScript, Vitest, tauri-plugin-store. No sidecar/backend changes.
 
-**Spec:** `docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md` — read it first; it defines the algebra, gesture grammar, display doctrine, and empty-state strings this plan implements.
+**Spec:** `docs/frontend/2026-08-08-solo-mute-play-doctrine-design.md` — read it first; it defines the algebra, gesture grammar, display doctrine, and empty-state strings this plan implements.
 
 **Verification commands** (used throughout):
 
@@ -678,7 +678,7 @@ Add (near the `soloedScopePaths`/`mutedScopePaths` props, whose comment becomes)
   export let onToggleScopeSolo: (item: FileItem) => void = () => {};
   export let onToggleScopeMute: (item: FileItem) => void = () => {};
 
-  // Scope membership (spec: docs/specs/scope/2026-08-08-solo-mute-play-
+  // Scope membership (spec: docs/frontend/2026-08-08-solo-mute-play-
   // doctrine-design.md). null = no narrowing engaged, nothing dims.
   // Contains every in-scope indexed file plus its ancestor folders, so
   // the path to in-scope material stays bright.
@@ -912,7 +912,7 @@ Extend the `searchScope` import (~line 31) to include the new functions:
 Replace the narrowing comment block and state (~lines 145–163) with:
 
 ```ts
-  // Library narrowing — the scope doctrine (docs/specs/scope/
+  // Library narrowing — the scope doctrine (docs/frontend/
   // 2026-08-08-solo-mute-play-doctrine-design.md): the transport arms
   // material into the mix; S narrows within what's armed; M carves out
   // of it. playingCollections ∪-minus-mutedCollectionNames resolve to
@@ -1242,7 +1242,7 @@ Create `src/lib/scopeConsole.ts`:
 
 ```ts
 // Serialization of the scope console (solo/mute/play/lens state) for
-// full console recall across launches — spec: docs/specs/scope/
+// full console recall across launches — spec: docs/frontend/
 // 2026-08-08-solo-mute-play-doctrine-design.md. One store key holds
 // the whole console; parsing is defensive per field, so one corrupt
 // field falls back to empty without nuking the rest. Stale collection
@@ -1421,11 +1421,11 @@ Run `npm run tauri dev` (the user runs this if the environment can't) and walk t
 
 - [ ] **Step 3: Update the spec status line**
 
-In `docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md`, change `**Status:** Approved design, not yet implemented.` to `**Status:** Implemented <date of completion> on branch claude/unseen-servant-solo-mute-play-02b695.`
+In `docs/frontend/2026-08-08-solo-mute-play-doctrine-design.md`, change `**Status:** Approved design, not yet implemented.` to `**Status:** Implemented <date of completion> on branch claude/unseen-servant-solo-mute-play-02b695.`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md
+git add docs/frontend/2026-08-08-solo-mute-play-doctrine-design.md
 git commit -m "docs(scope): mark solo/mute/play doctrine implemented"
 ```

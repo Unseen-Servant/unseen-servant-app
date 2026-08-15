@@ -4,7 +4,7 @@
 
 **Goal:** Dim individual systems-view rows by resolved-scope membership (mute one file → that row dims; solo one file → its shelf-mates dim), and make the focus lens drop out-of-scope rows, matching the tree.
 
-**Architecture:** One shared predicate (`isIndexedRowOutOfScope` in `treeNav.ts`) consumed by both the template and the keyboard nav so render and nav never drift. Row dim is gated on the group being bright so dims never stack. No algebra changes; `searchScope.ts` untouched. Spec: the "Row-grain dim (amended 2026-08-14)" section of `docs/specs/scope/2026-08-13-systems-view-row-sm-design.md`.
+**Architecture:** One shared predicate (`isIndexedRowOutOfScope` in `treeNav.ts`) consumed by both the template and the keyboard nav so render and nav never drift. Row dim is gated on the group being bright so dims never stack. No algebra changes; `searchScope.ts` untouched. Spec: the "Row-grain dim (amended 2026-08-14)" section of `docs/frontend/2026-08-13-systems-view-row-sm-design.md`.
 
 **Tech Stack:** Svelte 4, TypeScript, vitest, stylelint.
 
@@ -155,7 +155,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 3: Docs — QA items and changelog
 
 **Files:**
-- Modify: `docs/specs/scope/2026-08-13-systems-view-row-sm-design.md` (Testing list)
+- Modify: `docs/frontend/2026-08-13-systems-view-row-sm-design.md` (Testing list)
 - Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: QA items.** In the design doc's Testing section, the manual-QA sentence currently ends "untagged rows solo while `⇧S` stays inert." Extend the list so it ends: "untagged rows solo while `⇧S` stays inert; muting one file dims that row (in every group it appears under) with M lit; soloing one file dims its same-group shelf-mates; the lens hides out-of-scope rows; bypass lifts row dims."
@@ -171,7 +171,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - [ ] **Step 4: Commit.**
 
 ```bash
-git add docs/specs/scope/2026-08-13-systems-view-row-sm-design.md CHANGELOG.md
+git add docs/frontend/2026-08-13-systems-view-row-sm-design.md CHANGELOG.md
 git commit -m "docs(scope): record the row-grain dim amendment as shipped
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"

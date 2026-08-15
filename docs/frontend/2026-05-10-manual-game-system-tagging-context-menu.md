@@ -305,8 +305,8 @@ user's natural reach for \"do something to this file\" is right-click.
 This PR adds a discoverable right-click path while removing the
 redundant \`+\` affordance.
 
-Spec: \`docs/superpowers/specs/2026-05-10-manual-game-system-tagging-context-menu-design.md\`
-Plan: \`docs/superpowers/plans/2026-05-10-manual-game-system-tagging-context-menu.md\`
+Spec: \`docs/frontend/2026-05-10-manual-game-system-tagging-context-menu-design.md\`
+Plan: \`docs/frontend/2026-05-10-manual-game-system-tagging-context-menu.md\`
 
 ## What changes
 

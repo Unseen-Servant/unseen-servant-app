@@ -7,7 +7,7 @@
 resolved scope, console surfaces by channel state, and the scope bar as
 the readout of effect — which makes the observed FilterPanel and
 CollectionsPanel behavior correct as-is. Findings ordered by severity.
-**Baseline:** `docs/specs/scope/2026-08-08-solo-mute-play-doctrine-design.md`,
+**Baseline:** `docs/frontend/2026-08-08-solo-mute-play-doctrine-design.md`,
 `src/lib/searchScope.ts`, commit 6a5b2b0.
 
 ## The solo question first

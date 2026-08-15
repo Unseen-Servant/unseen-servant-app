@@ -8,7 +8,7 @@
 
 **Tech Stack:** SvelteKit 2 + TypeScript, vitest, svelte-check, stylelint.
 
-**Spec:** `docs/specs/keyboard/2026-08-09-pane-focus-model-design.md`
+**Spec:** `docs/frontend/2026-08-09-pane-focus-model-design.md`
 
 **Testing reality:** Task 1 is a pure module with full TDD. Tasks 2–7 are component and page wiring, and this repo has **no component test harness** — every existing test is a `.ts` unit test. Those tasks are gated on `npm run check`, the unit suite, `npm run lint:css`, and the manual QA checklist in Task 8. Do not scaffold a component test harness.
 
@@ -966,15 +966,15 @@ npm run tauri dev
 
 - [ ] **Step 3: Mark the spec implemented**
 
-In `docs/specs/keyboard/2026-08-09-pane-focus-model-design.md`, change
+In `docs/frontend/2026-08-09-pane-focus-model-design.md`, change
 `**Status:** Designed; not implemented.` to name the real date and the
 commits from Tasks 1–7, following the format used in
-`docs/specs/scope/2026-08-09-hide-unindexed-design.md`.
+`docs/frontend/2026-08-09-hide-unindexed-design.md`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/specs/keyboard/2026-08-09-pane-focus-model-design.md && git commit docs/specs/keyboard/2026-08-09-pane-focus-model-design.md -m "docs(keyboard): mark the pane focus model implemented"
+git add docs/frontend/2026-08-09-pane-focus-model-design.md && git commit docs/frontend/2026-08-09-pane-focus-model-design.md -m "docs(keyboard): mark the pane focus model implemented"
 ```
 
 ---

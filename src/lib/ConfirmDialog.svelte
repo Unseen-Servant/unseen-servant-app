@@ -8,7 +8,7 @@
 
   // Mounted once at page level; the store decides whether it is on screen and
   // what it asks. See confirmStore.ts for the call-site shape and
-  // docs/specs/ui/2026-08-12-modal-rack-units-design.md for the unit.
+  // docs/frontend/2026-08-12-modal-rack-units-design.md for the unit.
 
   const MESSAGE_ID = 'confirm-dialog-message';
 

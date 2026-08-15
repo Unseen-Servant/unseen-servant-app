@@ -11,7 +11,7 @@
 //   button to activate and is inert. It commits on the delete chord —
 //   the key that raised the deletion is the key that commits it.
 //
-// See docs/specs/ui/2026-08-12-modal-rack-units-design.md#the-keyboard.
+// See docs/frontend/2026-08-12-modal-rack-units-design.md#the-keyboard.
 
 import { isDeleteChord, type ChordEvent } from './keybindings';
 

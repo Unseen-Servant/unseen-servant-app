@@ -1,7 +1,7 @@
 """Library-derived vocabulary + spell correction for search queries.
 
 Sections A and B + Vocabulary of the typo-tolerance design
-(docs/specs/retrieval/2026-07-10-typo-tolerance-design.md): out-of-
+(docs/retrieval/2026-07-10-typo-tolerance-design.md): out-of-
 vocabulary query tokens are rewritten to the closest in-vocabulary term
 before embedding, so a misspelled query returns (approximately) the
 results of its corrected form. ``expand()`` (section B, behind the

@@ -82,7 +82,7 @@
   // the arrow keys; the three nullable tokens below say where that region's
   // caret is drawn. Keeping them separate is what lets a click on a panel's
   // chrome hand it the keyboard without ringing a row the user never pointed
-  // at — see docs/specs/keyboard/2026-08-09-pane-activation-design.md.
+  // at — see docs/frontend/2026-08-09-pane-activation-design.md.
   //
   // Not nullable: the file region is the resting owner. Tree and systems nav
   // already accept arrows with no caret and materialize on their own, so
@@ -216,7 +216,7 @@
     persistCollectionsSort();
   }
 
-  // Library narrowing — the scope doctrine (docs/specs/scope/
+  // Library narrowing — the scope doctrine (docs/frontend/
   // 2026-08-08-solo-mute-play-doctrine-design.md): the transport arms
   // material into the mix; S narrows within what's armed; M carves out
   // of it. playingCollections ∪-minus-mutedCollectionNames resolve to

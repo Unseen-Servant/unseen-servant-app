@@ -1,7 +1,7 @@
 // Search-pipeline settings (General settings tab). These are sidecar-wide:
 // the values persist in the sidecar's data dir and apply to every caller
 // (app search bar and MCP), with explicit per-request fields still winning.
-// See docs/specs/retrieval/2026-07-11-search-settings-design.md.
+// See docs/retrieval/2026-07-11-search-settings-design.md.
 
 export interface SearchSettings {
   rerank: boolean;

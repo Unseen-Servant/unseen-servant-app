@@ -121,7 +121,7 @@ import { writable } from 'svelte/store';
  * pinned — it has already been bitten once assuming ::backdrop behaved
  * uniformly across engines. State is cheap and certain.
  *
- * See docs/specs/ui/2026-08-13-scrim-extent-and-depth-design.md.
+ * See docs/frontend/2026-08-13-scrim-extent-and-depth-design.md.
  */
 export function createDialogStack() {
   const { subscribe, update } = writable(0);
@@ -376,7 +376,7 @@ Update the design's Risks section with what was measured. Three outcomes and wha
 - **Clicks reach it only in the scrimmed region** — the behaviour is already correct and the inset improved it. Record and move on.
 
 ```bash
-git commit -m "docs(modals): settle whether the backdrop ever dismissed" -- docs/specs/ui/2026-08-13-scrim-extent-and-depth-design.md
+git commit -m "docs(modals): settle whether the backdrop ever dismissed" -- docs/frontend/2026-08-13-scrim-extent-and-depth-design.md
 ```
 
 ---

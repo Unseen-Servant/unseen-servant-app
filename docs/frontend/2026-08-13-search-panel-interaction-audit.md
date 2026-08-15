@@ -13,7 +13,7 @@ are the filing gestures. Finding 7 took the full form — child rows
 joined the panel's row model via `collectionsNav.ts` — with `⌘⌫`
 remove, `⌘O` open, and `←` to the head row. Findings ordered by
 severity within each section. Scope semantics (solo/mute/bypass resolution) were audited
-separately in `docs/specs/scope/2026-08-13-sm-bypass-audit.md` and are
+separately in `docs/frontend/2026-08-13-sm-bypass-audit.md` and are
 not re-covered here — this audit is about the *interaction layer*:
 reachability, affordances, and mouse/keyboard symmetry between the
 search view, the two dock panels, and the two browsing views.

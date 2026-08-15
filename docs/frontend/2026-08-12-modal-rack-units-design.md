@@ -489,7 +489,7 @@ Steps 4–6 are independent of each other and of 3.
   rejected: three values, none of them tokens, and it reads as skeuomorphism
   rather than as an instrument.
 - **Hold-to-commit.** Tempting given the momentary transport keys
-  (`docs/specs/scope/2026-08-11-momentary-transport-design.md`), but arming
+  (`docs/frontend/2026-08-11-momentary-transport-design.md`), but arming
   already exists as a concept and a hold makes every deletion slow in order to
   punish a rare mistake.
 - **Token values.** No colour, contrast, or type-scale changes. Every value in

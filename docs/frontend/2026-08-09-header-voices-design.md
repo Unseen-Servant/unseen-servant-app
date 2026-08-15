@@ -33,7 +33,7 @@ All voices set `line-height: 1.2`. Font is Almendra unless noted.
 | Class | Recipe | Use when… |
 |---|---|---|
 | `.panel-title` | Cinzel · 0.8rem · 0.12em · uppercase · `--text-accent` | Naming a fixture of the chassis — a panel nameplate. The display font's only job. |
-| ~~`.dialog-title`~~ | *retired 2026-08-13* | Modals name themselves with `.ledger-label` on the rail; see [the rack-unit design](../specs/ui/2026-08-12-modal-rack-units-design.md). |
+| ~~`.dialog-title`~~ | *retired 2026-08-13* | Modals name themselves with `.ledger-label` on the rail; see [the rack-unit design](2026-08-12-modal-rack-units-design.md). |
 | `.section-title` | 0.95rem · `--text-primary` | Titling a content section inside a surface (settings groups, help blocks). |
 | `.ledger-label` | 0.7rem · 0.08em · uppercase · `--text-tertiary` | Heading a group of rows — quiet, sits below row-text size by design. |
 | `.readout-label` | 0.7rem · 0.08em · uppercase · `--text-secondary` | Labeling a value — the key half of a key/value or stat pair. |

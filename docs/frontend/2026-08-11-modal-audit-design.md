@@ -435,7 +435,7 @@ added for F6 is deleted rather than left orphaned.
 
 - **Context menus and popovers** (`ContextMenu`, `SystemTagMenu`,
   collections sort menu) — non-modal, own vocabulary, documented in
-  `docs/design/2026-08-09-menu-affordances-design.md`.
+  `docs/frontend/2026-08-09-menu-affordances-design.md`.
 - **`LaunchSplash`** — a full-screen overlay with no dismissal decision to
   make; its hero title is already excluded by the header-voices doc.
 - **Settings tab and sub-tab navigation** (`SettingsModal.svelte:161-221`)

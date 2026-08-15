@@ -575,7 +575,7 @@ class SearchRequest(BaseModel):
 
 # ---------------------------------------------------------------------------
 # Search settings — user-tunable pipeline knobs, persisted in the data dir
-# (docs/specs/retrieval/2026-07-11-search-settings-design.md). These are the
+# (docs/retrieval/2026-07-11-search-settings-design.md). These are the
 # sidecar-wide defaults: every caller (desktop UI, MCP) inherits them unless
 # the request sets the corresponding SearchRequest field.
 # ---------------------------------------------------------------------------
