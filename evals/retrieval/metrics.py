@@ -1,9 +1,9 @@
 """Rank + cost metrics over binary relevance vectors.
 
 Ported from sidecar/evals/scorer.py so the shared srd_5_1 slice stays
-comparable to the old baselines, with the scaffold's additions (§2):
-precision@3 as the headline, plus per-response cost metrics (payload
-chars, duplicate sections@10) folded into the aggregate.
+comparable to the old baselines. Headline is MRR@5 (these queries are
+known-item), with recall@3 = answer-in-top-3, plus per-response cost
+metrics (payload chars, duplicate sections@10) folded into the aggregate.
 
 A relevance vector ``rels`` is a list of bools in rank order (index 0 =
 rank 1). Judging (which result is relevant) lives in grade.py; this
@@ -14,8 +14,12 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
-# Rank metrics reported per category/style. precision@3 leads (§2 headline).
-RANK_METRICS = ["precision@3", "ndcg@10", "mrr@5", "recall@5", "recall@10"]
+# Rank metrics reported per category/style. mrr@5 leads: these queries are
+# known-item (find THE answer chunk), so reciprocal rank is the honest
+# headline — precision@3 capped at 0.33 for single-answer queries and was
+# gamed by chunk-splitting. recall@3 (= "answer in the top-3 window") is the
+# interpretable hit-rate that precision@3 was poorly approximating.
+RANK_METRICS = ["mrr@5", "ndcg@10", "recall@3", "recall@5", "recall@10"]
 # Cost metrics averaged alongside them (from the SearchResponse, not rels).
 COST_METRICS = ["payload_chars", "dup_sections@10"]
 
@@ -27,14 +31,10 @@ def mrr_at(rels: list[bool], k: int = 5) -> float:
     return 0.0
 
 
-def precision_at(rels: list[bool], k: int) -> float:
-    """Fraction of the top k that are relevant; missing slots count against."""
-    return sum(rels[:k]) / k
-
-
 def recall_at(rels: list[bool], k: int) -> float:
     """Hit rate: 1 if any relevant result in the top k (total relevant per
-    query is unknown, so set-recall is not computable)."""
+    query is unknown, so set-recall is not computable). recall@3 is the
+    'answer landed in the top-3 window' signal (a.k.a. success@3 / hit@3)."""
     return 1.0 if any(rels[:k]) else 0.0
 
 
@@ -50,9 +50,9 @@ def ndcg_at(rels: list[bool], k: int = 10) -> float:
 
 def rank_metrics(rels: list[bool]) -> dict[str, float]:
     return {
-        "precision@3": precision_at(rels, 3),
-        "ndcg@10": ndcg_at(rels, 10),
         "mrr@5": mrr_at(rels, 5),
+        "ndcg@10": ndcg_at(rels, 10),
+        "recall@3": recall_at(rels, 3),
         "recall@5": recall_at(rels, 5),
         "recall@10": recall_at(rels, 10),
     }
@@ -96,8 +96,8 @@ def latency_stats(latencies_ms: list[float]) -> dict[str, float]:
 def format_report(summary: dict[str, dict], title: str = "category") -> str:
     metrics = RANK_METRICS + COST_METRICS
     cats = sorted(c for c in summary if c != "all") + ["all"]
-    widths = {"precision@3": 12, "ndcg@10": 9, "mrr@5": 8, "recall@5": 9,
-              "recall@10": 10, "payload_chars": 15, "dup_sections@10": 16}
+    widths = {"mrr@5": 9, "ndcg@10": 10, "recall@3": 11, "recall@5": 11,
+              "recall@10": 11, "payload_chars": 15, "dup_sections@10": 16}
 
     def cell(m: str, v: float) -> str:
         return f"{int(round(v)):>{widths[m]}}" if m == "payload_chars" else f"{v:>{widths[m]}.3f}"

@@ -126,7 +126,7 @@ tr.all td{color:var(--text-accent);border-top:1px solid var(--border);font-weigh
 <script>
 const DATA = __DATA__;
 const R = DATA.results || {}, M = DATA.meta || {};
-const METRICS = ["precision@3","ndcg@10","mrr@5","recall@5","recall@10","payload_chars","dup_sections@10"];
+const METRICS = ["mrr@5","ndcg@10","recall@3","recall@5","recall@10","payload_chars","dup_sections@10"];
 const esc = s => (s==null?"":String(s)).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const fmt = (m,v) => m==="payload_chars" ? Math.round(v).toLocaleString() : Number(v).toFixed(3);
 
@@ -193,9 +193,9 @@ function render(){
   const head = `<h1>${esc(M.engine)} · ${esc(M.name)} · ${esc(M.date)}</h1>`
     + `<div class="sub mono">rerank=${opts.rerank} hybrid=${opts.hybrid} spell=${opts.spell_correction}`
     + ` · ${M.n_queries} queries (${M.n_pairs} pairs) · n_results=${M.n_results} · ${esc((M.docs||[]).join(", "))}</div>`
-    + `<div class="headline"><span>precision@3 <b>${agg["precision@3"].toFixed(3)}</b></span>`
+    + `<div class="headline"><span>MRR@5 <b>${agg["mrr@5"].toFixed(3)}</b></span>`
     + `<span>nDCG@10 <b>${agg["ndcg@10"].toFixed(3)}</b></span>`
-    + `<span>MRR@5 <b>${agg["mrr@5"].toFixed(3)}</b></span>`
+    + `<span>recall@3 <b>${agg["recall@3"].toFixed(3)}</b></span>`
     + `<span>recall@10 <b>${agg["recall@10"].toFixed(3)}</b></span>`
     + `<span>payload <b>${Math.round(agg["payload_chars"]).toLocaleString()}</b>c</span>`
     + `<span>p95 <b>${Math.round(lat.p95_ms||0)}</b>ms</span></div>`;

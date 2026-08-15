@@ -24,9 +24,9 @@
   "by_category": {
     "exact_name": {
       "queries": 6,
-      "precision@3": 0.2222222222222222,
-      "ndcg@10": 0.7148441377196479,
       "mrr@5": 0.6666666666666666,
+      "ndcg@10": 0.7148441377196479,
+      "recall@3": 0.6666666666666666,
       "recall@5": 0.6666666666666666,
       "recall@10": 0.8333333333333334,
       "payload_chars": 40414.333333333336,
@@ -34,9 +34,9 @@
     },
     "all": {
       "queries": 26,
-      "precision@3": 0.16666666666666666,
-      "ndcg@10": 0.45450657453249554,
       "mrr@5": 0.37243589743589745,
+      "ndcg@10": 0.45450657453249554,
+      "recall@3": 0.4230769230769231,
       "recall@5": 0.6538461538461539,
       "recall@10": 0.6923076923076923,
       "payload_chars": 38900.0,
@@ -44,9 +44,9 @@
     },
     "prose_rule": {
       "queries": 10,
-      "precision@3": 0.13333333333333333,
-      "ndcg@10": 0.32974246287549136,
       "mrr@5": 0.24,
+      "ndcg@10": 0.32974246287549136,
+      "recall@3": 0.4,
       "recall@5": 0.6,
       "recall@10": 0.6,
       "payload_chars": 33436.5,
@@ -54,9 +54,9 @@
     },
     "cross_page": {
       "queries": 2,
-      "precision@3": 0.0,
-      "ndcg@10": 0.0,
       "mrr@5": 0.0,
+      "ndcg@10": 0.0,
+      "recall@3": 0.0,
       "recall@5": 0.0,
       "recall@10": 0.0,
       "payload_chars": 34969.5,
@@ -64,9 +64,9 @@
     },
     "paraphrase_control": {
       "queries": 2,
-      "precision@3": 0.0,
-      "ndcg@10": 0.21533827903669653,
       "mrr@5": 0.125,
+      "ndcg@10": 0.21533827903669653,
+      "recall@3": 0.0,
       "recall@5": 0.5,
       "recall@10": 0.5,
       "payload_chars": 30767.0,
@@ -74,9 +74,9 @@
     },
     "table_lookup": {
       "queries": 6,
-      "precision@3": 0.27777777777777773,
-      "ndcg@10": 0.6333341541164482,
       "mrr@5": 0.5055555555555555,
+      "ndcg@10": 0.6333341541164482,
+      "recall@3": 0.5,
       "recall@5": 1.0,
       "recall@10": 1.0,
       "payload_chars": 50512.666666666664,
@@ -86,9 +86,9 @@
   "by_style": {
     "keyword": {
       "queries": 13,
-      "precision@3": 0.17948717948717946,
-      "ndcg@10": 0.501975597120754,
       "mrr@5": 0.40384615384615385,
+      "ndcg@10": 0.501975597120754,
+      "recall@3": 0.46153846153846156,
       "recall@5": 0.6923076923076923,
       "recall@10": 0.7692307692307693,
       "payload_chars": 36692.230769230766,
@@ -96,9 +96,9 @@
     },
     "all": {
       "queries": 26,
-      "precision@3": 0.16666666666666666,
-      "ndcg@10": 0.45450657453249554,
       "mrr@5": 0.37243589743589745,
+      "ndcg@10": 0.45450657453249554,
+      "recall@3": 0.4230769230769231,
       "recall@5": 0.6538461538461539,
       "recall@10": 0.6923076923076923,
       "payload_chars": 38900.0,
@@ -106,9 +106,9 @@
     },
     "nl": {
       "queries": 13,
-      "precision@3": 0.15384615384615385,
-      "ndcg@10": 0.40703755194423713,
       "mrr@5": 0.34102564102564104,
+      "ndcg@10": 0.40703755194423713,
+      "recall@3": 0.38461538461538464,
       "recall@5": 0.6153846153846154,
       "recall@10": 0.6153846153846154,
       "payload_chars": 41107.769230769234,
@@ -117,9 +117,9 @@
   },
   "latency": {
     "count": 26,
-    "mean_ms": 1630.5576923076924,
-    "p50_ms": 1591.25,
-    "p95_ms": 2008.5
+    "mean_ms": 1621.3807692307694,
+    "p50_ms": 1608.1,
+    "p95_ms": 1915.6
   },
   "per_query": [
     {
@@ -130,15 +130,15 @@
       "doc": "srd_5_1",
       "query": "goblin armor class",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 1.0,
         "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 36809,
         "dup_sections@10": 0
       },
-      "latency_ms": 1355.7,
+      "latency_ms": 1383.8,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -151,15 +151,15 @@
       "doc": "srd_5_1",
       "query": "what armor class does a goblin have?",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 1.0,
         "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 46260,
         "dup_sections@10": 0
       },
-      "latency_ms": 1743.4,
+      "latency_ms": 1697.1,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -172,15 +172,15 @@
       "doc": "srd_5_1",
       "query": "fireball damage radius saving throw",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 0.6309297535714575,
         "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 37977,
         "dup_sections@10": 0
       },
-      "latency_ms": 1749.7,
+      "latency_ms": 1767.6,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -193,15 +193,15 @@
       "doc": "srd_5_1",
       "query": "how much damage does a fireball deal and how large is the blast?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.38685280723454163,
         "mrr@5": 0.2,
+        "ndcg@10": 0.38685280723454163,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 36853,
         "dup_sections@10": 0
       },
-      "latency_ms": 1812.3,
+      "latency_ms": 1863.3,
       "page_hit": false,
       "hit_rank": 5,
       "corrected_query": null
@@ -214,15 +214,15 @@
       "doc": "srd_5_1",
       "query": "kraken armor class ink cloud",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 41695,
         "dup_sections@10": 0
       },
-      "latency_ms": 1504.6,
+      "latency_ms": 1537.0,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -235,15 +235,15 @@
       "doc": "srd_5_1",
       "query": "what is the kraken's armor class and what does its ink cloud do?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 28244,
         "dup_sections@10": 0
       },
-      "latency_ms": 1592.8,
+      "latency_ms": 1615.0,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -256,15 +256,15 @@
       "doc": "srd_5_1",
       "query": "dying character zero health survival roll",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.43067655807339306,
         "mrr@5": 0.25,
+        "ndcg@10": 0.43067655807339306,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 30984,
         "dup_sections@10": 0
       },
-      "latency_ms": 1153.9,
+      "latency_ms": 1169.2,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -277,15 +277,15 @@
       "doc": "srd_5_1",
       "query": "when my hero drops unconscious at 0 health, how do they cling to life?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 30550,
         "dup_sections@10": 0
       },
-      "latency_ms": 1537.5,
+      "latency_ms": 1593.1,
       "page_hit": false,
       "hit_rank": 11,
       "corrected_query": null
@@ -298,15 +298,15 @@
       "doc": "srd_5_2_1",
       "query": "goblin warrior hit points",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.2890648263178879,
         "mrr@5": 0.0,
+        "ndcg@10": 0.2890648263178879,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 1.0,
         "payload_chars": 16366,
         "dup_sections@10": 0
       },
-      "latency_ms": 1440.5,
+      "latency_ms": 1448.2,
       "page_hit": false,
       "hit_rank": 10,
       "corrected_query": null
@@ -319,15 +319,15 @@
       "doc": "srd_5_2_1",
       "query": "how many hit points does a goblin warrior have?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 38787,
         "dup_sections@10": 0
       },
-      "latency_ms": 1788.3,
+      "latency_ms": 1693.9,
       "page_hit": false,
       "hit_rank": 22,
       "corrected_query": null
@@ -340,15 +340,15 @@
       "doc": "cairn_1e",
       "query": "cairn armor reduce damage weapon die",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 0.6309297535714575,
         "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 32160,
         "dup_sections@10": 0
       },
-      "latency_ms": 1380.2,
+      "latency_ms": 1378.7,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -361,15 +361,15 @@
       "doc": "cairn_1e",
       "query": "how does armor reduce the damage you take in cairn?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 39559,
         "dup_sections@10": 0
       },
-      "latency_ms": 1534.8,
+      "latency_ms": 1601.2,
       "page_hit": false,
       "hit_rank": 12,
       "corrected_query": null
@@ -382,15 +382,15 @@
       "doc": "cairn_1e",
       "query": "cairn chainmail armor value slots",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.48247555939075504,
         "mrr@5": 0.25,
+        "ndcg@10": 0.48247555939075504,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 35432,
         "dup_sections@10": 0
       },
-      "latency_ms": 1858.4,
+      "latency_ms": 1915.6,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -403,15 +403,15 @@
       "doc": "cairn_1e",
       "query": "how much armor does chainmail give you in cairn?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.38685280723454163,
         "mrr@5": 0.2,
+        "ndcg@10": 0.38685280723454163,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 42559,
         "dup_sections@10": 1
       },
-      "latency_ms": 1637.5,
+      "latency_ms": 1696.9,
       "page_hit": false,
       "hit_rank": 5,
       "corrected_query": null
@@ -424,15 +424,15 @@
       "doc": "black_hack_2e",
       "query": "black hack test attribute roll under d20",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 0.6309297535714575,
         "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 14708,
         "dup_sections@10": 0
       },
-      "latency_ms": 1386.4,
+      "latency_ms": 1378.9,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -445,15 +445,15 @@
       "doc": "black_hack_2e",
       "query": "how do you resolve a risky action against an attribute in the black hack?",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 0.6309297535714575,
         "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 39548,
         "dup_sections@10": 1
       },
-      "latency_ms": 1584.8,
+      "latency_ms": 1587.7,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -466,15 +466,15 @@
       "doc": "srd_5_1",
       "query": "plate armor armor class cost strength",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.43067655807339306,
         "mrr@5": 0.25,
+        "ndcg@10": 0.43067655807339306,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 48020,
         "dup_sections@10": 1
       },
-      "latency_ms": 1186.6,
+      "latency_ms": 1194.6,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -487,15 +487,15 @@
       "doc": "srd_5_1",
       "query": "what armor class and cost does plate armor have in 5e?",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 0.5,
         "mrr@5": 0.3333333333333333,
+        "ndcg@10": 0.5,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 60215,
         "dup_sections@10": 0
       },
-      "latency_ms": 1889.9,
+      "latency_ms": 1820.8,
       "page_hit": false,
       "hit_rank": 3,
       "corrected_query": null
@@ -508,15 +508,15 @@
       "doc": "yze_srd",
       "query": "year zero engine armor rating gear dice damage",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 25558,
         "dup_sections@10": 0
       },
-      "latency_ms": 1184.4,
+      "latency_ms": 1183.3,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -529,15 +529,15 @@
       "doc": "yze_srd",
       "query": "how does armor reduce incoming damage in the year zero engine?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 15366,
         "dup_sections@10": 0
       },
-      "latency_ms": 1519.8,
+      "latency_ms": 1496.6,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -550,15 +550,15 @@
       "doc": "osric_2e",
       "query": "osric falling damage distance dice",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.0,
         "mrr@5": 0.0,
+        "ndcg@10": 0.0,
+        "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "payload_chars": 39905,
         "dup_sections@10": 0
       },
-      "latency_ms": 1892.1,
+      "latency_ms": 1907.3,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -571,15 +571,15 @@
       "doc": "osric_2e",
       "query": "how much damage do you take from falling in osric?",
       "metrics": {
-        "precision@3": 0.0,
-        "ndcg@10": 0.38685280723454163,
         "mrr@5": 0.2,
+        "ndcg@10": 0.38685280723454163,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 52731,
         "dup_sections@10": 0
       },
-      "latency_ms": 1592.2,
+      "latency_ms": 1659.3,
       "page_hit": true,
       "hit_rank": 5,
       "corrected_query": null
@@ -592,15 +592,15 @@
       "doc": "osric_2e",
       "query": "osric thief climb walls pick pockets level 1",
       "metrics": {
-        "precision@3": 0.6666666666666666,
-        "ndcg@10": 1.0,
         "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 58092,
         "dup_sections@10": 0
       },
-      "latency_ms": 1590.3,
+      "latency_ms": 1548.1,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -613,15 +613,15 @@
       "doc": "osric_2e",
       "query": "what chance does a first level osric thief have to pick pockets and climb walls?",
       "metrics": {
-        "precision@3": 0.6666666666666666,
-        "ndcg@10": 1.0,
         "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 58758,
         "dup_sections@10": 0
       },
-      "latency_ms": 1765.6,
+      "latency_ms": 1658.1,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -634,15 +634,15 @@
       "doc": "osric_2e",
       "query": "osric paladin lay on hands healing",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 1.0,
         "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 59293,
         "dup_sections@10": 1
       },
-      "latency_ms": 2704.3,
+      "latency_ms": 2452.9,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -655,15 +655,15 @@
       "doc": "osric_2e",
       "query": "how many hit points can an osric paladin restore with lay on hands?",
       "metrics": {
-        "precision@3": 0.3333333333333333,
-        "ndcg@10": 1.0,
         "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "payload_chars": 44971,
         "dup_sections@10": 1
       },
-      "latency_ms": 2008.5,
+      "latency_ms": 1907.7,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
