@@ -1,0 +1,23 @@
+[project]
+name = "legend-lore-sidecar-v3"
+version = "0.0.0"
+description = "v3 retrieval pipeline for Legend Lore — typed-IR ingestion, ONNX embed/rerank, SQLite store (skeleton until Phase 2)"
+requires-python = ">=3.12"
+# Loose bounds while this is a skeleton — the Phase 1 spikes pin the exact
+# layout model, embedder ONNX export, and vector engine before anything is
+# locked. No PyTorch, ever (constitution #1: ONNX only).
+dependencies = [
+    "pymupdf>=1.24",
+    "onnxruntime>=1.18",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+# Run modules directly (python -m ...), same as sidecar/; not an installed package.
+[tool.uv]
+package = false
