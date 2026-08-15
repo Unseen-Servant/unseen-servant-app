@@ -162,10 +162,10 @@ function queryEl(q){
     : `<div class="empty">no retrieved-results capture for this baseline — re-run run_eval to populate it.</div>`;
   const div = document.createElement("div");
   div.className = "q"; div.dataset.style = q.style; div.dataset.cat = q.category;
-  div.dataset.miss = rank ? "0" : "1";
+  div.dataset.scope = q.scope || "cued"; div.dataset.miss = rank ? "0" : "1";
   div.innerHTML =
     `<div class="qhead"><span class="caret">▸</span>`
-    + `<span class="qid">${esc(q.id)}</span><span class="cat">${esc(q.category)}</span>`
+    + `<span class="qid">${esc(q.id)}</span><span class="cat">${esc(q.scope||"")}·${esc(q.category)}</span>`
     + `${badge}<span class="qtext">${esc(q.query||q.pair)}</span>`
     + `<span class="pay">${Math.round(q.metrics.payload_chars).toLocaleString()}c</span></div>`
     + `<div class="results">${body}</div>`;
@@ -176,10 +176,11 @@ function queryEl(q){
   return div;
 }
 
-const state = {style:"all", cats:new Set(), missesOnly:false};
+const state = {style:"all", scope:"all", cats:new Set(), missesOnly:false};
 function applyFilters(){
   for(const div of document.querySelectorAll(".q")){
     const ok = (state.style==="all" || div.dataset.style===state.style)
+      && (state.scope==="all" || div.dataset.scope===state.scope)
       && (state.cats.size===0 || state.cats.has(div.dataset.cat))
       && (!state.missesOnly || div.dataset.miss==="1");
     div.style.display = ok ? "" : "none";
@@ -199,11 +200,15 @@ function render(){
     + `<span>recall@10 <b>${agg["recall@10"].toFixed(3)}</b></span>`
     + `<span>payload <b>${Math.round(agg["payload_chars"]).toLocaleString()}</b>c</span>`
     + `<span>p95 <b>${Math.round(lat.p95_ms||0)}</b>ms</span></div>`;
-  const tables = `<div class="tables">${aggTable("category",DATA.by_category)}${aggTable("style",DATA.by_style)}</div>`;
+  const tables = `<div class="tables">${DATA.by_scope?aggTable("scope",DATA.by_scope):""}`
+    + `${aggTable("category",DATA.by_category)}${aggTable("style",DATA.by_style)}</div>`;
 
   const cats = [...new Set(DATA.per_query.map(q=>q.category))].sort();
   const styleChip = s => `<span class="chip ${state.style===s?'on':''}" data-style="${s}">${s}</span>`;
-  const filters = `<div class="filters"><span class="lbl">style</span>`
+  const scopeChip = s => `<span class="chip ${state.scope===s?'on':''}" data-scope="${s}">${s}</span>`;
+  const filters = `<div class="filters"><span class="lbl">scope</span>`
+    + ["all","single","cued","uncued"].map(scopeChip).join("")
+    + `<span class="lbl" style="margin-left:12px">style</span>`
     + ["all","keyword","nl"].map(styleChip).join("")
     + `<span class="lbl" style="margin-left:12px">category</span>`
     + cats.map(c=>`<span class="chip" data-cat="${c}">${c}</span>`).join("")
@@ -216,6 +221,11 @@ function render(){
   app.querySelectorAll(".chip[data-style]").forEach(c=>c.onclick=()=>{
     state.style=c.dataset.style;
     app.querySelectorAll(".chip[data-style]").forEach(x=>x.classList.toggle("on",x.dataset.style===state.style));
+    applyFilters();
+  });
+  app.querySelectorAll(".chip[data-scope]").forEach(c=>c.onclick=()=>{
+    state.scope=c.dataset.scope;
+    app.querySelectorAll(".chip[data-scope]").forEach(x=>x.classList.toggle("on",x.dataset.scope===state.scope));
     applyFilters();
   });
   app.querySelectorAll(".chip[data-cat]").forEach(c=>c.onclick=()=>{

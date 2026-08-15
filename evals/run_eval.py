@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import yaml
@@ -55,9 +56,24 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
     per_query, latencies = [], []
     results_by_query: dict[str, list[dict]] = {}
     for q in queries:
-        resp = engine.search(q["query"], opts)
+        # Scope decides how we search and how we grade (v3 scaffold §3):
+        #   single — filter search to the intended file; grade anchors only
+        #            (the filter guarantees the system).
+        #   cued   — unfiltered; the query names the system; grade anchors AND
+        #            right file (the right system must win over other systems).
+        #   uncued — unfiltered; the query omits the system; grade anchors, any
+        #            file (a correct answer from any system counts). `doc` is
+        #            kept as the representative for anchor verification only.
+        scope = q.get("scope", "cued")
         doc_fn = None if q["doc"] == "any" else doc_file.get(q["doc"])
-        g = grade.grade_response(resp, q, doc_fn)
+        if scope == "single":
+            q_opts, grade_doc = replace(opts, source_filter=doc_fn), None
+        elif scope == "uncued":
+            q_opts, grade_doc = opts, None
+        else:  # cued
+            q_opts, grade_doc = opts, doc_fn
+        resp = engine.search(q["query"], q_opts)
+        g = grade.grade_response(resp, q, grade_doc)
         # Trimmed retrieved chunks for the HTML inspector (gitignored side file).
         results_by_query[q["id"]] = [
             {
@@ -76,7 +92,8 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         ]
         per_query.append({
             "id": q["id"], "pair": q["pair"], "style": q["style"],
-            "category": q["category"], "doc": q["doc"], "query": q["query"],
+            "category": q["category"], "scope": scope, "doc": q["doc"],
+            "query": q["query"],
             "metrics": {
                 **metrics.rank_metrics(g["rels"]),
                 "payload_chars": g["payload_chars"],
@@ -89,11 +106,12 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         })
         latencies.append(resp.latency_ms)
         mark = f"#{per_query[-1]['hit_rank']}" if per_query[-1]["hit_rank"] else "MISS"
-        print(f"  {q['id']} [{q['style']:<7}] {mark:>5}  {q['query'][:52]}", flush=True)
+        print(f"  {q['id']} [{scope:<6} {q['style']:<7}] {mark:>5}  {q['query'][:48]}", flush=True)
 
     return {
         "by_category": metrics.aggregate(per_query, "category"),
         "by_style": metrics.aggregate(per_query, "style"),
+        "by_scope": metrics.aggregate(per_query, "scope"),
         "latency": metrics.latency_stats(latencies),
         "per_query": per_query,
         "results": results_by_query,
@@ -111,6 +129,9 @@ def render_md(meta: dict, result: dict) -> str:
         f"Knobs: rerank={meta['opts']['rerank']} hybrid={meta['opts']['hybrid']} "
         f"spell_correction={meta['opts']['spell_correction']} "
         f"variant_expansion={meta['opts']['variant_expansion']}",
+        "",
+        "## By scope",
+        "```", metrics.format_report(result["by_scope"], "scope"), "```",
         "",
         "## By category",
         "```", metrics.format_report(result["by_category"], "category"), "```",
@@ -232,6 +253,7 @@ def main() -> int:
             print(f"\nwrote evals/baselines/{stem}.{{json,md}}")
         return 0
 
+    print("\n## By scope\n" + metrics.format_report(result["by_scope"], "scope"))
     print("\n## By category\n" + metrics.format_report(result["by_category"], "category"))
     print("\n## By style\n" + metrics.format_report(result["by_style"], "style"))
     lat = result["latency"]

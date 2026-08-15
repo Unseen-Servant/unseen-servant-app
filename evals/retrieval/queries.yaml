@@ -1,31 +1,28 @@
-# Phase 0 retrieval suite (v3 scaffold §3).
+# Phase 0 retrieval suite (v3 scaffold §3) — scope-aware.
 #
-# 16 intent pairs (keyword + nl style) = 32 queries, across 5 categories and
-# all 7 corpus systems.
-# Every anchor is verified in BOTH the digital-native reference and the PDF
-# by evals/retrieval/verify_anchors.py — do not hand-edit anchors without
-# re-running it (the old GT was once 30% wrong).
+# Each query names a `scope` that decides how it is searched AND graded,
+# matching how Unseen Servant is actually used:
+#   single — GM has a book selected. Search is filtered to `doc`'s file;
+#            relevance = anchors only (the filter guarantees the system).
+#   cued   — "swimming mechanics dragonbane": the query NAMES the system.
+#            Search is unfiltered; relevance = anchors AND the right file —
+#            the right system must beat other-system-same-topic and
+#            same-system-other-topic. Target single-file systems so doc-match
+#            is system-match.
+#   uncued — ambiguous search, no system named. Unfiltered; relevance =
+#            anchors, ANY file (a correct answer from any system counts).
+#            `doc`/`answer_ref` are a representative for verify only.
 #
-# Fields (schema: v3 scaffold §3):
-#   pair       — keyword+nl forms of one intent share this key
-#   style      — keyword | nl (separately scored)
-#   category   — exact_name | table_lookup | prose_rule | cross_page
-#                | paraphrase_control   (oov_homebrew deferred: needs a
-#                homebrew PDF with invented proper nouns, not yet in corpus)
-#   doc        — id from corpus.manifest.json
-#   answer_ref — canonical source file (provenance + verify target)
-#   anchors    — all outer must hit; an inner list means any-of
-#   pages      — physical PDF page(s), secondary check only
-#
-# NOTE: OSRIC's first reference capture was JS-rendered nav shells with no
-# rule text; replaced 2026-08-14 with 6 osric_chapter*.html files carrying
-# full rules (manifest digest re-pinned). OSRIC is the hardest-extraction
-# book, so it is over-weighted here per §3.
+# Fields: pair, style (keyword|nl), scope, category, query, doc, answer_ref,
+# anchors (all outer must hit; inner list = any-of), pages (secondary).
+# Every anchor is verified in ref ∧ PDF by verify_anchors.py. Table-cell
+# anchors use any-of for spacing (raw PDF "60 gp" vs v2 markdown "60gp").
 
-# ───────────────────────── srd_5_1 ─────────────────────────
+# ═══════════════════════════ SINGLE (filtered to one file) ═══════════════════════════
 - id: q001
   pair: goblin_ac
   style: keyword
+  scope: single
   category: exact_name
   query: "goblin armor class"
   doc: srd_5_1
@@ -35,6 +32,7 @@
 - id: q002
   pair: goblin_ac
   style: nl
+  scope: single
   category: exact_name
   query: "what armor class does a goblin have?"
   doc: srd_5_1
@@ -45,6 +43,7 @@
 - id: q003
   pair: fireball_effect
   style: keyword
+  scope: single
   category: prose_rule
   query: "fireball damage radius saving throw"
   doc: srd_5_1
@@ -53,17 +52,18 @@
 - id: q004
   pair: fireball_effect
   style: nl
+  scope: single
   category: prose_rule
   query: "how much damage does a fireball deal and how large is the blast?"
   doc: srd_5_1
   answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Fireball.md"
   anchors: ["8d6", ["fire damage", "fire"], "20 foot", ["dexterity saving throw", "dexterity"]]
 
-# Kraken stat block straddles physical pp.324-325: "armor class 18" is on
-# p324 only, "ink cloud" on p325 only — a genuine page-break span.
+# Kraken stat block straddles physical pp.324-325 (a genuine page-break span).
 - id: q005
   pair: kraken_span
   style: keyword
+  scope: single
   category: cross_page
   query: "kraken armor class ink cloud"
   doc: srd_5_1
@@ -73,6 +73,7 @@
 - id: q006
   pair: kraken_span
   style: nl
+  scope: single
   category: cross_page
   query: "what is the kraken's armor class and what does its ink cloud do?"
   doc: srd_5_1
@@ -80,148 +81,122 @@
   anchors: ["kraken", "armor class 18", "ink cloud"]
   pages: "324-325"
 
+# 5.2.1 renamed Goblin -> "Goblin Warrior" (HP 10 vs 5.1's HP 7): filtering to
+# the 5.2.1 file is the within-file test of the near-duplicate.
 - id: q007
-  pair: death_saves
-  style: keyword
-  category: paraphrase_control
-  query: "dying character zero health survival roll"
-  doc: srd_5_1
-  answer_ref: "dnd_srd_51/06_Gameplay/Order_of_Combat.md"
-  anchors: ["death saving throw", "hit points", ["three successes", "stable", "regain 1 hit point"]]
-- id: q008
-  pair: death_saves
-  style: nl
-  category: paraphrase_control
-  query: "when my hero drops unconscious at 0 health, how do they cling to life?"
-  doc: srd_5_1
-  answer_ref: "dnd_srd_51/06_Gameplay/Order_of_Combat.md"
-  anchors: ["death saving throw", "hit points", ["three successes", "stable", "regain 1 hit point"]]
-
-# ───────────────────────── srd_5_2_1 ─────────────────────────
-# 5.2.1 renamed Goblin -> "Goblin Warrior" (HP 10 vs 5.1's HP 7): the
-# near-duplicate-candidate regime when both SRDs are indexed together.
-- id: q009
   pair: goblin_warrior_hp
   style: keyword
+  scope: single
   category: exact_name
   query: "goblin warrior hit points"
   doc: srd_5_2_1
   answer_ref: "dnd_srd_52/11_Monsters/Monsters_Each/Goblin_Warrior.md"
   anchors: ["goblin warrior", ["hp 10", "10 3d6"], "15"]
-- id: q010
+- id: q008
   pair: goblin_warrior_hp
   style: nl
+  scope: single
   category: exact_name
   query: "how many hit points does a goblin warrior have?"
   doc: srd_5_2_1
   answer_ref: "dnd_srd_52/11_Monsters/Monsters_Each/Goblin_Warrior.md"
   anchors: ["goblin warrior", ["hp 10", "10 3d6"], "15"]
 
-# ───────────────────────── cairn_1e ─────────────────────────
+- id: q009
+  pair: srd_plate_armor
+  style: keyword
+  scope: single
+  category: table_lookup
+  query: "plate armor armor class cost strength"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
+  anchors: ["plate", "18", ["str 15", "1 500 gp"]]
+- id: q010
+  pair: srd_plate_armor
+  style: nl
+  scope: single
+  category: table_lookup
+  query: "what armor class and cost does plate armor have?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
+  anchors: ["plate", "18", ["str 15", "1 500 gp"]]
+
 - id: q011
   pair: cairn_armor
   style: keyword
+  scope: single
   category: prose_rule
-  query: "cairn armor reduce damage weapon die"
+  query: "armor reduce damage weapon die"
   doc: cairn_1e
   answer_ref: "cairn_1e/Cairn Markdown.md"
   anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor", ["unarmed", "1d4"]]
 - id: q012
   pair: cairn_armor
   style: nl
+  scope: single
   category: prose_rule
-  query: "how does armor reduce the damage you take in cairn?"
+  query: "how does armor reduce the damage you take?"
   doc: cairn_1e
   answer_ref: "cairn_1e/Cairn Markdown.md"
   anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor", ["unarmed", "1d4"]]
 
 - id: q013
-  pair: cairn_armor_value
+  pair: bh_stat_test
   style: keyword
-  category: table_lookup
-  query: "cairn chainmail armor value slots"
-  doc: cairn_1e
-  answer_ref: "cairn_1e/Cairn Markdown.md"
-  anchors: ["chainmail", "2 armor", "bulky"]
+  scope: single
+  category: prose_rule
+  query: "test attribute roll under d20"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
 - id: q014
-  pair: cairn_armor_value
+  pair: bh_stat_test
   style: nl
-  category: table_lookup
-  query: "how much armor does chainmail give you in cairn?"
-  doc: cairn_1e
-  answer_ref: "cairn_1e/Cairn Markdown.md"
-  anchors: ["chainmail", "2 armor", "bulky"]
+  scope: single
+  category: prose_rule
+  query: "how do you resolve a risky action against an attribute?"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
 
-# ───────────────────────── black_hack_2e ─────────────────────────
 - id: q015
-  pair: bh_stat_test
+  pair: osric_thief_skills
   style: keyword
-  category: prose_rule
-  query: "black hack test attribute roll under d20"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
-  anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
+  scope: single
+  category: table_lookup
+  query: "thief climb walls pick pockets level 1"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["climb walls", "80", "pick pockets", "35"]
+  pages: "40"
 - id: q016
-  pair: bh_stat_test
+  pair: osric_thief_skills
   style: nl
-  category: prose_rule
-  query: "how do you resolve a risky action against an attribute in the black hack?"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
-  anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
+  scope: single
+  category: table_lookup
+  query: "what chance does a first level thief have to pick pockets and climb walls?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["climb walls", "80", "pick pockets", "35"]
+  pages: "40"
 
-# NB: black_hack's HTML ref is a DIFFERENT edition than the 2e PDF (ref
-# armor table = Chain Mail 6 pts; PDF = "armour", chain mail 3). Only
-# edition-invariant facts (the roll-under core above) are safely anchored;
-# the armor-table lookup was moved to the SRD, where ref and PDF match.
+# ═══════════════════════════ CUED (unfiltered, query names the system) ═══════════════════════════
+# Target single-file systems so "right file" == "right system"; the named
+# system must beat other systems' same-topic entries.
 - id: q017
-  pair: srd_plate_armor
+  pair: cued_osric_falling
   style: keyword
-  category: table_lookup
-  query: "plate armor armor class cost strength"
-  doc: srd_5_1
-  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
-  anchors: ["plate", "18", ["str 15", "1 500 gp"]]
-- id: q018
-  pair: srd_plate_armor
-  style: nl
-  category: table_lookup
-  query: "what armor class and cost does plate armor have in 5e?"
-  doc: srd_5_1
-  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
-  anchors: ["plate", "18", ["str 15", "1 500 gp"]]
-
-# ───────────────────────── yze_srd ─────────────────────────
-- id: q019
-  pair: yze_armor
-  style: keyword
-  category: prose_rule
-  query: "year zero engine armor rating gear dice damage"
-  doc: yze_srd
-  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
-  anchors: ["gear dice", "armor rating", ["decreases the damage", "every success"]]
-- id: q020
-  pair: yze_armor
-  style: nl
-  category: prose_rule
-  query: "how does armor reduce incoming damage in the year zero engine?"
-  doc: yze_srd
-  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
-  anchors: ["gear dice", "armor rating", ["decreases the damage", "every success"]]
-
-# ───────────────────────── osric_2e (stress case) ─────────────────────────
-- id: q021
-  pair: osric_falling
-  style: keyword
+  scope: cued
   category: prose_rule
   query: "osric falling damage distance dice"
   doc: osric_2e
   answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
   anchors: ["distance fallen", "1d6", "3d6", ["6d6", "20d6"]]
   pages: "135"
-- id: q022
-  pair: osric_falling
+- id: q018
+  pair: cued_osric_falling
   style: nl
+  scope: cued
   category: prose_rule
   query: "how much damage do you take from falling in osric?"
   doc: osric_2e
@@ -229,28 +204,69 @@
   anchors: ["distance fallen", "1d6", "3d6", ["6d6", "20d6"]]
   pages: "135"
 
-- id: q023
-  pair: osric_thief_skills
+- id: q019
+  pair: cued_bfrpg_chain_mail
   style: keyword
+  scope: cued
   category: table_lookup
-  query: "osric thief climb walls pick pockets level 1"
-  doc: osric_2e
-  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
-  anchors: ["climb walls", "80", "pick pockets", "35"]
-  pages: "40"
-- id: q024
-  pair: osric_thief_skills
+  query: "basic fantasy chain mail cost armor class"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["chain mail", ["60 gp", "60gp"], "15"]
+  pages: "15"
+- id: q020
+  pair: cued_bfrpg_chain_mail
   style: nl
+  scope: cued
   category: table_lookup
-  query: "what chance does a first level osric thief have to pick pockets and climb walls?"
-  doc: osric_2e
-  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
-  anchors: ["climb walls", "80", "pick pockets", "35"]
-  pages: "40"
+  query: "how much does chain mail cost and what armor class in basic fantasy?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["chain mail", ["60 gp", "60gp"], "15"]
+  pages: "15"
+
+- id: q021
+  pair: cued_cairn_armor
+  style: keyword
+  scope: cued
+  category: prose_rule
+  query: "cairn armor weapon die reduce damage"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor"]
+- id: q022
+  pair: cued_cairn_armor
+  style: nl
+  scope: cued
+  category: prose_rule
+  query: "how does armor reduce damage in cairn?"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor"]
+
+- id: q023
+  pair: cued_yze_armor
+  style: keyword
+  scope: cued
+  category: prose_rule
+  query: "year zero engine armor rating gear dice"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["gear dice", "armor rating", ["decreases the damage", "every success"]]
+- id: q024
+  pair: cued_yze_armor
+  style: nl
+  scope: cued
+  category: prose_rule
+  query: "how does armor reduce damage in the year zero engine?"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["gear dice", "armor rating", ["decreases the damage", "every success"]]
 
 - id: q025
-  pair: osric_paladin_loh
+  pair: cued_osric_paladin
   style: keyword
+  scope: cued
   category: exact_name
   query: "osric paladin lay on hands healing"
   doc: osric_2e
@@ -258,8 +274,9 @@
   anchors: ["lay on hands", "2 hit points", ["per day", "per level"]]
   pages: "34"
 - id: q026
-  pair: osric_paladin_loh
+  pair: cued_osric_paladin
   style: nl
+  scope: cued
   category: exact_name
   query: "how many hit points can an osric paladin restore with lay on hands?"
   doc: osric_2e
@@ -267,62 +284,82 @@
   anchors: ["lay on hands", "2 hit points", ["per day", "per level"]]
   pages: "34"
 
-# ───────────────────────── basic_fantasy (odt reference) ─────────────────────────
-# Unblocked once the extraction axis added the odt loader; the .odt is the
-# whole-book authoring source of the r142 PDF (releases must match).
+# ═══════════════════════════ UNCUED (unfiltered, no system, any-file grading) ═══════════════════════════
+# Generic anchors so a correct answer from ANY system counts; doc/answer_ref
+# are a representative for verification only. Paired with cued topics above
+# (falling, chain mail, armor) so by_scope shows what the system cue is worth.
 - id: q027
-  pair: bfrpg_cloud_dragon
+  pair: uncued_falling
   style: keyword
-  category: exact_name
-  query: "cloud dragon armor class hit dice"
-  doc: bfrpg_4e
-  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: [["cloud dragon", "dragon cloud"], "armor class 22", "hit dice 11"]
-  pages: "85"
+  scope: uncued
+  category: prose_rule
+  query: "falling damage rules"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: [["falling", "fall"], ["1d6", "d6"], "damage"]
 - id: q028
-  pair: bfrpg_cloud_dragon
+  pair: uncued_falling
   style: nl
-  category: exact_name
-  query: "what armor class and hit dice does a cloud dragon have in basic fantasy?"
-  doc: bfrpg_4e
-  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: [["cloud dragon", "dragon cloud"], "armor class 22", "hit dice 11"]
-  pages: "85"
+  scope: uncued
+  category: prose_rule
+  query: "how much damage do you take from a fall?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: [["falling", "fall"], ["1d6", "d6"], "damage"]
 
 - id: q029
-  pair: bfrpg_chain_mail
+  pair: uncued_chain_mail
   style: keyword
+  scope: uncued
   category: table_lookup
-  query: "basic fantasy chain mail cost armor class"
+  query: "chain mail cost and armor class"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["chain mail", ["60 gp", "60gp"], "15"]
-  pages: "15"
+  anchors: ["chain mail", ["gp", "cost"], ["15", "16", "armor class"]]
 - id: q030
-  pair: bfrpg_chain_mail
+  pair: uncued_chain_mail
   style: nl
+  scope: uncued
   category: table_lookup
-  query: "how much does chain mail cost and what armor class does it give in basic fantasy?"
+  query: "how much is chain mail and what armor class does it give?"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["chain mail", ["60 gp", "60gp"], "15"]
-  pages: "15"
+  anchors: ["chain mail", ["gp", "cost"], ["15", "16", "armor class"]]
 
 - id: q031
-  pair: bfrpg_turn_undead
+  pair: uncued_armor_reduce
   style: keyword
+  scope: uncued
   category: prose_rule
-  query: "basic fantasy cleric turn undead"
-  doc: bfrpg_4e
-  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: [["turn", "turning"], "undead", ["automatically affected", "no roll needed"]]
-  pages: "62"
+  query: "how does armor reduce damage"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: ["armor", ["subtracts", "subtract", "reduce", "reduces", "decreases"]]
 - id: q032
-  pair: bfrpg_turn_undead
+  pair: uncued_armor_reduce
   style: nl
+  scope: uncued
   category: prose_rule
-  query: "how does a cleric turn undead in basic fantasy?"
-  doc: bfrpg_4e
-  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: [["turn", "turning"], "undead", ["automatically affected", "no roll needed"]]
-  pages: "62"
+  query: "what does wearing armor do against attacks?"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: ["armor", ["subtracts", "subtract", "reduce", "reduces", "decreases"]]
+
+- id: q033
+  pair: uncued_goblin_ac
+  style: keyword
+  scope: uncued
+  category: exact_name
+  query: "goblin armor class"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
+  anchors: ["goblin", ["armor class", "ac"]]
+- id: q034
+  pair: uncued_goblin_ac
+  style: nl
+  scope: uncued
+  category: exact_name
+  query: "what is a goblin's armor class?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
+  anchors: ["goblin", ["armor class", "ac"]]
