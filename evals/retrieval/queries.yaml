@@ -180,6 +180,84 @@
   anchors: ["climb walls", "80", "pick pockets", "35"]
   pages: "40"
 
+# ── more SINGLE (2026-08-15 scale-up: fill bfrpg/yze/5.2.1 + a 2nd cross_page) ──
+- id: q035
+  pair: bfrpg_saves
+  style: keyword
+  scope: single
+  category: table_lookup
+  query: "saving throw categories death ray poison dragon breath"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["death ray or poison", "magic wands", "paralysis or petrify", "dragon breath"]
+- id: q036
+  pair: bfrpg_saves
+  style: nl
+  scope: single
+  category: table_lookup
+  query: "what are the five categories of saving throw?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["death ray or poison", "magic wands", "paralysis or petrify", "dragon breath"]
+
+- id: q037
+  pair: yze_push
+  style: keyword
+  scope: single
+  category: prose_rule
+  query: "push roll reroll failed dice"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["push", "bane", ["reroll", "re roll"]]
+- id: q038
+  pair: yze_push
+  style: nl
+  scope: single
+  category: prose_rule
+  query: "how do you reroll dice after a failed roll?"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["push", "bane", ["reroll", "re roll"]]
+
+- id: q039
+  pair: srd52_magic_missile
+  style: keyword
+  scope: single
+  category: exact_name
+  query: "magic missile darts force damage range"
+  doc: srd_5_2_1
+  answer_ref: "dnd_srd_52/07_Spells/Spells_Each/Magic_Missile.md"
+  anchors: ["magic missile", "1d4 1", ["three glowing darts", "force"], "120 feet"]
+- id: q040
+  pair: srd52_magic_missile
+  style: nl
+  scope: single
+  category: exact_name
+  query: "how many darts does magic missile create and how much damage?"
+  doc: srd_5_2_1
+  answer_ref: "dnd_srd_52/07_Spells/Spells_Each/Magic_Missile.md"
+  anchors: ["magic missile", "1d4 1", ["three glowing darts", "force"], "120 feet"]
+
+# Ancient Gold Dragon's stat block runs long — a genuine PDF page-break span.
+- id: q041
+  pair: srd_gold_dragon
+  style: keyword
+  scope: single
+  category: cross_page
+  query: "ancient gold dragon armor class breath weapon"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Ancient_Gold_Dragon_(Metallic).md"
+  anchors: ["ancient gold dragon", "armor class 22", ["fire breath", "weakening breath"], ["change shape", "wing attack"]]
+- id: q042
+  pair: srd_gold_dragon
+  style: nl
+  scope: single
+  category: cross_page
+  query: "what is the ancient gold dragon's armor class and breath weapon?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Ancient_Gold_Dragon_(Metallic).md"
+  anchors: ["ancient gold dragon", "armor class 22", ["fire breath", "weakening breath"], ["change shape", "wing attack"]]
+
 # ═══════════════════════════ CUED (unfiltered, query names the system) ═══════════════════════════
 # Target single-file systems so "right file" == "right system"; the named
 # system must beat other systems' same-topic entries.
@@ -284,6 +362,144 @@
   anchors: ["lay on hands", "2 hit points", ["per day", "per level"]]
   pages: "34"
 
+# ── more CUED (2026-08-15 scale-up: the disambiguation target — most new power here) ──
+# magic missile is the sharpest cross-system pair: 5e (1d4+1) vs bfrpg (1d6+1),
+# same spell name — the named system must win.
+- id: q043
+  pair: cued_srd_magic_missile
+  style: keyword
+  scope: cued
+  category: exact_name
+  query: "dnd 5e magic missile darts damage"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Magic_Missile.md"
+  anchors: ["magic missile", "1d4 1", ["three glowing darts", "force"], "120 feet"]
+- id: q044
+  pair: cued_srd_magic_missile
+  style: nl
+  scope: cued
+  category: exact_name
+  query: "how much damage does magic missile deal in dnd 5e?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Magic_Missile.md"
+  anchors: ["magic missile", "1d4 1", ["three glowing darts", "force"], "120 feet"]
+
+- id: q045
+  pair: cued_bfrpg_magic_missile
+  style: keyword
+  scope: cued
+  category: exact_name
+  query: "basic fantasy magic missile damage"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["magic missile", "1d6 1", "instantaneous"]
+- id: q046
+  pair: cued_bfrpg_magic_missile
+  style: nl
+  scope: cued
+  category: exact_name
+  query: "what does magic missile do in basic fantasy?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["magic missile", "1d6 1", "instantaneous"]
+
+- id: q047
+  pair: cued_osric_surprise
+  style: keyword
+  scope: cued
+  category: prose_rule
+  query: "osric surprise segments d6 roll"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["surprise", ["one segment", "two segments", "surprised for"], "d6"]
+- id: q048
+  pair: cued_osric_surprise
+  style: nl
+  scope: cued
+  category: prose_rule
+  query: "how is surprise determined in osric?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["surprise", ["one segment", "two segments", "surprised for"], "d6"]
+
+- id: q049
+  pair: cued_yze_initiative
+  style: keyword
+  scope: cued
+  category: prose_rule
+  query: "year zero engine initiative draw cards"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["initiative", "ten cards", "numbered 1 through 10"]
+- id: q050
+  pair: cued_yze_initiative
+  style: nl
+  scope: cued
+  category: prose_rule
+  query: "how does initiative work in the year zero engine?"
+  doc: yze_srd
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  anchors: ["initiative", "ten cards", "numbered 1 through 10"]
+
+- id: q051
+  pair: cued_cairn_slots
+  style: keyword
+  scope: cued
+  category: prose_rule
+  query: "cairn inventory slots backpack encumbrance"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: ["10 inventory slots", "backpack with six slots", "bulky"]
+- id: q052
+  pair: cued_cairn_slots
+  style: nl
+  scope: cued
+  category: prose_rule
+  query: "how many inventory slots do characters have in cairn?"
+  doc: cairn_1e
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  anchors: ["10 inventory slots", "backpack with six slots", "bulky"]
+
+# Usage die is the Black Hack's signature and edition-invariant; the 1e HTML ref
+# and 2e PDF word advantage/disadvantage too differently to anchor safely.
+- id: q053
+  pair: cued_blackhack_usage
+  style: keyword
+  scope: cued
+  category: prose_rule
+  query: "black hack usage die downgrade"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: ["usage die", "downgraded", "following chain"]
+- id: q054
+  pair: cued_blackhack_usage
+  style: nl
+  scope: cued
+  category: prose_rule
+  query: "how does the usage die work in the black hack?"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: ["usage die", "downgraded", "following chain"]
+
+- id: q055
+  pair: cued_osric_druid
+  style: keyword
+  scope: cued
+  category: exact_name
+  query: "osric druid change shape shapeshift"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["three times per day", ["change their forms", "shapeshift"], ["7th level", "1d6 10 percent"]]
+- id: q056
+  pair: cued_osric_druid
+  style: nl
+  scope: cued
+  category: exact_name
+  query: "how often can an osric druid change shape?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  anchors: ["three times per day", ["change their forms", "shapeshift"], ["7th level", "1d6 10 percent"]]
+
 # ═══════════════════════════ UNCUED (unfiltered, no system, any-file grading) ═══════════════════════════
 # Generic anchors so a correct answer from ANY system counts; doc/answer_ref
 # are a representative for verification only. Paired with cued topics above
@@ -363,3 +579,118 @@
   doc: srd_5_1
   answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
   anchors: ["goblin", ["armor class", "ac"]]
+
+# ── more UNCUED (2026-08-15 scale-up: controls paired with the new cued topics) ──
+- id: q057
+  pair: uncued_magic_missile
+  style: keyword
+  scope: uncued
+  category: exact_name
+  query: "magic missile spell damage"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Magic_Missile.md"
+  anchors: ["magic missile", ["1d4 1", "1d6 1"]]
+- id: q058
+  pair: uncued_magic_missile
+  style: nl
+  scope: uncued
+  category: exact_name
+  query: "what does the magic missile spell do?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Magic_Missile.md"
+  anchors: ["magic missile", ["1d4 1", "1d6 1"]]
+
+- id: q059
+  pair: uncued_saving_throw
+  style: keyword
+  scope: uncued
+  category: prose_rule
+  query: "saving throw against poison"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["saving throw", "poison"]
+- id: q060
+  pair: uncued_saving_throw
+  style: nl
+  scope: uncued
+  category: prose_rule
+  query: "what do you roll to save against poison?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["saving throw", "poison"]
+
+- id: q061
+  pair: uncued_initiative
+  style: keyword
+  scope: uncued
+  category: prose_rule
+  query: "how is initiative determined in combat"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["initiative", ["d6", "segment"]]
+- id: q062
+  pair: uncued_initiative
+  style: nl
+  scope: uncued
+  category: prose_rule
+  query: "who acts first in a combat round?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["initiative", ["d6", "segment"]]
+
+- id: q063
+  pair: uncued_longsword
+  style: keyword
+  scope: uncued
+  category: table_lookup
+  query: "longsword damage"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/04_Equipment/Weapons.md"
+  anchors: ["longsword", ["1d8", "1d10"]]
+- id: q064
+  pair: uncued_longsword
+  style: nl
+  scope: uncued
+  category: table_lookup
+  query: "how much damage does a longsword deal?"
+  doc: srd_5_1
+  answer_ref: "dnd_srd_51/04_Equipment/Weapons.md"
+  anchors: ["longsword", ["1d8", "1d10"]]
+
+- id: q065
+  pair: uncued_zero_hp
+  style: keyword
+  scope: uncued
+  category: prose_rule
+  query: "what happens at zero hit points"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: [["zero hit points", "0 hit points", "0hp", "0 hp"], ["out of action", "unconscious", "dying"]]
+- id: q066
+  pair: uncued_zero_hp
+  style: nl
+  scope: uncued
+  category: prose_rule
+  query: "what happens when a character drops to 0 hit points?"
+  doc: black_hack_2e
+  answer_ref: "black_hack/The Black Hack -- English.html"
+  anchors: [["zero hit points", "0 hit points", "0hp", "0 hp"], ["out of action", "unconscious", "dying"]]
+
+- id: q067
+  pair: uncued_surprise
+  style: keyword
+  scope: uncued
+  category: prose_rule
+  query: "surprise combat rules"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["surprise", ["d6", "segment"]]
+- id: q068
+  pair: uncued_surprise
+  style: nl
+  scope: uncued
+  category: prose_rule
+  query: "how does being surprised affect combat?"
+  doc: osric_2e
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  anchors: ["surprise", ["d6", "segment"]]
