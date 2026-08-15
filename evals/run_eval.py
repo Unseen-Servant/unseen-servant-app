@@ -53,13 +53,30 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
     engine.warmup(opts)
 
     per_query, latencies = [], []
+    results_by_query: dict[str, list[dict]] = {}
     for q in queries:
         resp = engine.search(q["query"], opts)
         doc_fn = None if q["doc"] == "any" else doc_file.get(q["doc"])
         g = grade.grade_response(resp, q, doc_fn)
+        # Trimmed retrieved chunks for the HTML inspector (gitignored side file).
+        results_by_query[q["id"]] = [
+            {
+                "rank": i,
+                "book": r.filename,
+                "section_heading": r.section_heading,
+                "page_start": r.page_start,
+                "page_end": r.page_end,
+                "relevance": round(r.relevance, 4),
+                "tier": r.tier,
+                "reranked": r.reranked,
+                "matched": bool(matched),
+                "snippet": (r.text or "").strip()[:200],
+            }
+            for i, (r, matched) in enumerate(zip(resp.results, g["rels"]), 1)
+        ]
         per_query.append({
             "id": q["id"], "pair": q["pair"], "style": q["style"],
-            "category": q["category"], "doc": q["doc"],
+            "category": q["category"], "doc": q["doc"], "query": q["query"],
             "metrics": {
                 **metrics.rank_metrics(g["rels"]),
                 "payload_chars": g["payload_chars"],
@@ -79,6 +96,7 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         "by_style": metrics.aggregate(per_query, "style"),
         "latency": metrics.latency_stats(latencies),
         "per_query": per_query,
+        "results": results_by_query,
     }
 
 
@@ -149,12 +167,22 @@ def main() -> int:
     }
 
     if not args.no_write:
+        from evals.retrieval import report
+
         BASELINE_DIR.mkdir(exist_ok=True)
         stem = f"{meta['date']}-{args.engine}-{args.baseline}"
+        # Retrieved chunks are pulled out of the committed baseline so its
+        # diff stays a clean metrics review (§6); they live in a gitignored
+        # side file that drives the HTML inspector.
+        results = result.pop("results", {})
         (BASELINE_DIR / f"{stem}.json").write_text(
             json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
         (BASELINE_DIR / f"{stem}.md").write_text(render_md(meta, result), encoding="utf-8")
-        print(f"\nwrote evals/baselines/{stem}.{{json,md}}")
+        (BASELINE_DIR / f"{stem}.results.json").write_text(
+            json.dumps({"meta": {k: meta[k] for k in ("engine", "name", "date", "n_results")},
+                        "results": results}, indent=2, ensure_ascii=False), encoding="utf-8")
+        report.write_html(BASELINE_DIR / stem)
+        print(f"\nwrote evals/baselines/{stem}.{{json,md,results.json,html}}")
     return 0
 
 

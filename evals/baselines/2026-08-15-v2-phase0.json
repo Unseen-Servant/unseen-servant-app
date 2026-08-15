@@ -117,9 +117,9 @@
   },
   "latency": {
     "count": 26,
-    "mean_ms": 1564.6538461538462,
-    "p50_ms": 1547.0,
-    "p95_ms": 1851.6
+    "mean_ms": 1630.5576923076924,
+    "p50_ms": 1591.25,
+    "p95_ms": 2008.5
   },
   "per_query": [
     {
@@ -128,6 +128,7 @@
       "style": "keyword",
       "category": "exact_name",
       "doc": "srd_5_1",
+      "query": "goblin armor class",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 1.0,
@@ -137,7 +138,7 @@
         "payload_chars": 36809,
         "dup_sections@10": 0
       },
-      "latency_ms": 1349.6,
+      "latency_ms": 1355.7,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -148,6 +149,7 @@
       "style": "nl",
       "category": "exact_name",
       "doc": "srd_5_1",
+      "query": "what armor class does a goblin have?",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 1.0,
@@ -157,7 +159,7 @@
         "payload_chars": 46260,
         "dup_sections@10": 0
       },
-      "latency_ms": 1660.1,
+      "latency_ms": 1743.4,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -168,6 +170,7 @@
       "style": "keyword",
       "category": "prose_rule",
       "doc": "srd_5_1",
+      "query": "fireball damage radius saving throw",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 0.6309297535714575,
@@ -177,7 +180,7 @@
         "payload_chars": 37977,
         "dup_sections@10": 0
       },
-      "latency_ms": 1700.1,
+      "latency_ms": 1749.7,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -188,6 +191,7 @@
       "style": "nl",
       "category": "prose_rule",
       "doc": "srd_5_1",
+      "query": "how much damage does a fireball deal and how large is the blast?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.38685280723454163,
@@ -197,7 +201,7 @@
         "payload_chars": 36853,
         "dup_sections@10": 0
       },
-      "latency_ms": 1774.5,
+      "latency_ms": 1812.3,
       "page_hit": false,
       "hit_rank": 5,
       "corrected_query": null
@@ -208,6 +212,7 @@
       "style": "keyword",
       "category": "cross_page",
       "doc": "srd_5_1",
+      "query": "kraken armor class ink cloud",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -217,7 +222,7 @@
         "payload_chars": 41695,
         "dup_sections@10": 0
       },
-      "latency_ms": 1496.0,
+      "latency_ms": 1504.6,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -228,6 +233,7 @@
       "style": "nl",
       "category": "cross_page",
       "doc": "srd_5_1",
+      "query": "what is the kraken's armor class and what does its ink cloud do?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -237,7 +243,7 @@
         "payload_chars": 28244,
         "dup_sections@10": 0
       },
-      "latency_ms": 1556.3,
+      "latency_ms": 1592.8,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -248,6 +254,7 @@
       "style": "keyword",
       "category": "paraphrase_control",
       "doc": "srd_5_1",
+      "query": "dying character zero health survival roll",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.43067655807339306,
@@ -257,7 +264,7 @@
         "payload_chars": 30984,
         "dup_sections@10": 0
       },
-      "latency_ms": 1132.5,
+      "latency_ms": 1153.9,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -268,6 +275,7 @@
       "style": "nl",
       "category": "paraphrase_control",
       "doc": "srd_5_1",
+      "query": "when my hero drops unconscious at 0 health, how do they cling to life?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -277,7 +285,7 @@
         "payload_chars": 30550,
         "dup_sections@10": 0
       },
-      "latency_ms": 1497.6,
+      "latency_ms": 1537.5,
       "page_hit": false,
       "hit_rank": 11,
       "corrected_query": null
@@ -288,6 +296,7 @@
       "style": "keyword",
       "category": "exact_name",
       "doc": "srd_5_2_1",
+      "query": "goblin warrior hit points",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.2890648263178879,
@@ -297,7 +306,7 @@
         "payload_chars": 16366,
         "dup_sections@10": 0
       },
-      "latency_ms": 1390.4,
+      "latency_ms": 1440.5,
       "page_hit": false,
       "hit_rank": 10,
       "corrected_query": null
@@ -308,6 +317,7 @@
       "style": "nl",
       "category": "exact_name",
       "doc": "srd_5_2_1",
+      "query": "how many hit points does a goblin warrior have?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -317,7 +327,7 @@
         "payload_chars": 38787,
         "dup_sections@10": 0
       },
-      "latency_ms": 1645.8,
+      "latency_ms": 1788.3,
       "page_hit": false,
       "hit_rank": 22,
       "corrected_query": null
@@ -328,6 +338,7 @@
       "style": "keyword",
       "category": "prose_rule",
       "doc": "cairn_1e",
+      "query": "cairn armor reduce damage weapon die",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 0.6309297535714575,
@@ -337,7 +348,7 @@
         "payload_chars": 32160,
         "dup_sections@10": 0
       },
-      "latency_ms": 1365.2,
+      "latency_ms": 1380.2,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -348,6 +359,7 @@
       "style": "nl",
       "category": "prose_rule",
       "doc": "cairn_1e",
+      "query": "how does armor reduce the damage you take in cairn?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -357,7 +369,7 @@
         "payload_chars": 39559,
         "dup_sections@10": 0
       },
-      "latency_ms": 1495.4,
+      "latency_ms": 1534.8,
       "page_hit": false,
       "hit_rank": 12,
       "corrected_query": null
@@ -368,6 +380,7 @@
       "style": "keyword",
       "category": "table_lookup",
       "doc": "cairn_1e",
+      "query": "cairn chainmail armor value slots",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.48247555939075504,
@@ -377,7 +390,7 @@
         "payload_chars": 35432,
         "dup_sections@10": 0
       },
-      "latency_ms": 1827.8,
+      "latency_ms": 1858.4,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -388,6 +401,7 @@
       "style": "nl",
       "category": "table_lookup",
       "doc": "cairn_1e",
+      "query": "how much armor does chainmail give you in cairn?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.38685280723454163,
@@ -397,7 +411,7 @@
         "payload_chars": 42559,
         "dup_sections@10": 1
       },
-      "latency_ms": 1615.5,
+      "latency_ms": 1637.5,
       "page_hit": false,
       "hit_rank": 5,
       "corrected_query": null
@@ -408,6 +422,7 @@
       "style": "keyword",
       "category": "prose_rule",
       "doc": "black_hack_2e",
+      "query": "black hack test attribute roll under d20",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 0.6309297535714575,
@@ -417,7 +432,7 @@
         "payload_chars": 14708,
         "dup_sections@10": 0
       },
-      "latency_ms": 1339.3,
+      "latency_ms": 1386.4,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -428,6 +443,7 @@
       "style": "nl",
       "category": "prose_rule",
       "doc": "black_hack_2e",
+      "query": "how do you resolve a risky action against an attribute in the black hack?",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 0.6309297535714575,
@@ -437,7 +453,7 @@
         "payload_chars": 39548,
         "dup_sections@10": 1
       },
-      "latency_ms": 1537.7,
+      "latency_ms": 1584.8,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -448,6 +464,7 @@
       "style": "keyword",
       "category": "table_lookup",
       "doc": "srd_5_1",
+      "query": "plate armor armor class cost strength",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.43067655807339306,
@@ -457,7 +474,7 @@
         "payload_chars": 48020,
         "dup_sections@10": 1
       },
-      "latency_ms": 1177.7,
+      "latency_ms": 1186.6,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -468,6 +485,7 @@
       "style": "nl",
       "category": "table_lookup",
       "doc": "srd_5_1",
+      "query": "what armor class and cost does plate armor have in 5e?",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 0.5,
@@ -477,7 +495,7 @@
         "payload_chars": 60215,
         "dup_sections@10": 0
       },
-      "latency_ms": 1782.6,
+      "latency_ms": 1889.9,
       "page_hit": false,
       "hit_rank": 3,
       "corrected_query": null
@@ -488,6 +506,7 @@
       "style": "keyword",
       "category": "prose_rule",
       "doc": "yze_srd",
+      "query": "year zero engine armor rating gear dice damage",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -497,7 +516,7 @@
         "payload_chars": 25558,
         "dup_sections@10": 0
       },
-      "latency_ms": 1145.0,
+      "latency_ms": 1184.4,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -508,6 +527,7 @@
       "style": "nl",
       "category": "prose_rule",
       "doc": "yze_srd",
+      "query": "how does armor reduce incoming damage in the year zero engine?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -517,7 +537,7 @@
         "payload_chars": 15366,
         "dup_sections@10": 0
       },
-      "latency_ms": 1452.7,
+      "latency_ms": 1519.8,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -528,6 +548,7 @@
       "style": "keyword",
       "category": "prose_rule",
       "doc": "osric_2e",
+      "query": "osric falling damage distance dice",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.0,
@@ -537,7 +558,7 @@
         "payload_chars": 39905,
         "dup_sections@10": 0
       },
-      "latency_ms": 1851.6,
+      "latency_ms": 1892.1,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -548,6 +569,7 @@
       "style": "nl",
       "category": "prose_rule",
       "doc": "osric_2e",
+      "query": "how much damage do you take from falling in osric?",
       "metrics": {
         "precision@3": 0.0,
         "ndcg@10": 0.38685280723454163,
@@ -557,7 +579,7 @@
         "payload_chars": 52731,
         "dup_sections@10": 0
       },
-      "latency_ms": 1581.3,
+      "latency_ms": 1592.2,
       "page_hit": true,
       "hit_rank": 5,
       "corrected_query": null
@@ -568,6 +590,7 @@
       "style": "keyword",
       "category": "table_lookup",
       "doc": "osric_2e",
+      "query": "osric thief climb walls pick pockets level 1",
       "metrics": {
         "precision@3": 0.6666666666666666,
         "ndcg@10": 1.0,
@@ -577,7 +600,7 @@
         "payload_chars": 58092,
         "dup_sections@10": 0
       },
-      "latency_ms": 1519.7,
+      "latency_ms": 1590.3,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -588,6 +611,7 @@
       "style": "nl",
       "category": "table_lookup",
       "doc": "osric_2e",
+      "query": "what chance does a first level osric thief have to pick pockets and climb walls?",
       "metrics": {
         "precision@3": 0.6666666666666666,
         "ndcg@10": 1.0,
@@ -597,7 +621,7 @@
         "payload_chars": 58758,
         "dup_sections@10": 0
       },
-      "latency_ms": 1623.7,
+      "latency_ms": 1765.6,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -608,6 +632,7 @@
       "style": "keyword",
       "category": "exact_name",
       "doc": "osric_2e",
+      "query": "osric paladin lay on hands healing",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 1.0,
@@ -617,7 +642,7 @@
         "payload_chars": 59293,
         "dup_sections@10": 1
       },
-      "latency_ms": 2313.2,
+      "latency_ms": 2704.3,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -628,6 +653,7 @@
       "style": "nl",
       "category": "exact_name",
       "doc": "osric_2e",
+      "query": "how many hit points can an osric paladin restore with lay on hands?",
       "metrics": {
         "precision@3": 0.3333333333333333,
         "ndcg@10": 1.0,
@@ -637,7 +663,7 @@
         "payload_chars": 44971,
         "dup_sections@10": 1
       },
-      "latency_ms": 1849.7,
+      "latency_ms": 2008.5,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
