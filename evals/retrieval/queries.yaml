@@ -27,7 +27,7 @@
   query: "goblin armor class"
   doc: srd_5_1
   answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
-  anchors: [["armor class", "ac"], "15", "leather armor"]
+  anchors: ["goblin", ["armor class", "ac"], "15", "leather armor"]
   pages: "315"
 - id: q002
   pair: goblin_ac
@@ -37,7 +37,7 @@
   query: "what armor class does a goblin have?"
   doc: srd_5_1
   answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
-  anchors: [["armor class", "ac"], "15", "leather armor"]
+  anchors: ["goblin", ["armor class", "ac"], "15", "leather armor"]
   pages: "315"
 
 - id: q003
@@ -129,7 +129,7 @@
   query: "armor reduce damage weapon die"
   doc: cairn_1e
   answer_ref: "cairn_1e/Cairn Markdown.md"
-  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor", ["unarmed", "1d4"]]
+  anchors: [["subtracts", "subtract"], "armor", ["damage", "weapon die", "hp"]]
 - id: q012
   pair: cairn_armor
   style: nl
@@ -138,7 +138,7 @@
   query: "how does armor reduce the damage you take?"
   doc: cairn_1e
   answer_ref: "cairn_1e/Cairn Markdown.md"
-  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor", ["unarmed", "1d4"]]
+  anchors: [["subtracts", "subtract"], "armor", ["damage", "weapon die", "hp"]]
 
 - id: q013
   pair: bh_stat_test
@@ -233,7 +233,7 @@
   query: "cairn armor weapon die reduce damage"
   doc: cairn_1e
   answer_ref: "cairn_1e/Cairn Markdown.md"
-  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor"]
+  anchors: [["subtracts", "subtract"], "armor", ["damage", "weapon die", "hp"]]
 - id: q022
   pair: cued_cairn_armor
   style: nl
@@ -242,7 +242,7 @@
   query: "how does armor reduce damage in cairn?"
   doc: cairn_1e
   answer_ref: "cairn_1e/Cairn Markdown.md"
-  anchors: [["weapon die", "weapon dice"], ["subtracts", "subtract"], "armor"]
+  anchors: [["subtracts", "subtract"], "armor", ["damage", "weapon die", "hp"]]
 
 - id: q023
   pair: cued_yze_armor
@@ -315,7 +315,7 @@
   query: "chain mail cost and armor class"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["chain mail", ["gp", "cost"], ["15", "16", "armor class"]]
+  anchors: ["chain mail", ["armor class", "ac"], ["15", "16"]]
 - id: q030
   pair: uncued_chain_mail
   style: nl
@@ -324,7 +324,7 @@
   query: "how much is chain mail and what armor class does it give?"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["chain mail", ["gp", "cost"], ["15", "16", "armor class"]]
+  anchors: ["chain mail", ["armor class", "ac"], ["15", "16"]]
 
 - id: q031
   pair: uncued_armor_reduce
