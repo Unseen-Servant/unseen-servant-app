@@ -20,12 +20,12 @@ from __future__ import annotations
 
 import re
 import sys
-import zipfile
 from pathlib import Path
 
 import yaml
 
 from evals.corpus import load_corpus
+from evals.extraction.ref_loader import ref_text  # shared md/html/odt loader
 
 QUERIES_PATH = Path(__file__).resolve().parent / "queries.yaml"
 
@@ -33,25 +33,6 @@ QUERIES_PATH = Path(__file__).resolve().parent / "queries.yaml"
 def norm(text: str) -> str:
     """Grader normalization, verbatim from sidecar/evals/scorer.py."""
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
-
-
-def _strip_markup(s: str) -> str:
-    s = re.sub(r"<(script|style)[\s\S]*?</\1>", " ", s)
-    s = re.sub(r"<[^>]+>", " ", s)
-    return s
-
-
-def ref_text(path: Path) -> str:
-    """Canonical text of a reference file (md/txt raw; html→text; odt→text)."""
-    suffix = path.suffix.lower()
-    if suffix in {".md", ".txt"}:
-        return path.read_text(encoding="utf-8", errors="ignore")
-    if suffix in {".html", ".htm"}:
-        return _strip_markup(path.read_text(encoding="utf-8", errors="ignore"))
-    if suffix == ".odt":
-        with zipfile.ZipFile(path) as z:
-            return _strip_markup(z.read("content.xml").decode("utf-8", "ignore"))
-    raise ValueError(f"unsupported reference type: {path}")
 
 
 def anchor_alts(anchor) -> list[str]:

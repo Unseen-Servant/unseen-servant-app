@@ -1,0 +1,53 @@
+# Golden page specs for the extraction-QA axis (v3 scaffold §2/§7 step 3).
+#
+# Each entry is hand-authored and verified by verify_golden.py: every phrase's
+# tokens must exist in BOTH the reference and the raw PDF page. grade.py then
+# measures whether the engine's extraction PIPELINE preserves them —
+#   content: fraction of phrases that survived (any-of via nested list)
+#   order:   fragments must appear in this reading order (inversions)
+#   cells:   table cells must survive CONTIGUOUS (header/value not split)
+# kind ∈ prose | table | two_column.
+
+# ── OSRIC (image-heavy stress book) ──────────────────────────────────
+- id: g01
+  doc: osric_2e
+  page: 135
+  kind: prose
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  content: ["distance fallen", "1d6", "3d6", "6d6", "20d6"]
+  order:   ["up to 10 ft", "distance fallen is 20 ft", "up to 30 ft", "over 50 ft"]
+
+- id: g02
+  doc: osric_2e
+  page: 40
+  kind: table
+  answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
+  content: ["thief skills", "climb walls", "pick pockets", "read languages"]
+  cells:   ["80 25 10 20 20 30 35"]   # level-1 row values, contiguous
+
+# ── Cairn (rules-light, two-column layout) ───────────────────────────
+- id: g03
+  doc: cairn_1e
+  page: 15
+  kind: two_column
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  content: ["weapon die", "subtracts", "armor", "unarmed", "1d4"]
+  order:   ["rolls their weapon die", "subtracts the target", "unarmed attacks always"]
+
+# ── D&D 5E SRD 5.1 (clean digital-native reference) ──────────────────
+- id: g04
+  doc: srd_5_1
+  page: 64
+  kind: table
+  answer_ref: "dnd_srd_51/04_Equipment/Armor.md"
+  content: ["armor class", "chain mail", "disadvantage"]
+  cells:   ["ring mail 30 gp 14", "chain mail 75 gp 16", "half plate 750 gp 15"]
+
+# ── Basic Fantasy RPG (odt reference; wide stat block) ───────────────
+- id: g05
+  doc: bfrpg_4e
+  page: 85
+  kind: table
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  content: ["cloud dragon", "armor class", "hit dice"]
+  cells:   ["armor class 22", "hit dice 11"]

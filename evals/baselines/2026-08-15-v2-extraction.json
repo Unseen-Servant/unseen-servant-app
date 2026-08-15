@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "engine": "v2",
+    "name": "extraction",
+    "date": "2026-08-15",
+    "docs": [
+      "bfrpg_4e",
+      "cairn_1e",
+      "osric_2e",
+      "srd_5_1"
+    ],
+    "n_pages": 5
+  },
+  "by_kind": {
+    "prose": {
+      "pages": 1,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": null
+    },
+    "all": {
+      "pages": 5,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 0.8888888888888888
+    },
+    "table": {
+      "pages": 3,
+      "content_recall": 1.0,
+      "reading_order": null,
+      "table_cells": 0.8888888888888888
+    },
+    "two_column": {
+      "pages": 1,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": null
+    }
+  },
+  "by_doc": {
+    "osric_2e": {
+      "pages": 2,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 1.0
+    },
+    "all": {
+      "pages": 5,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 0.8888888888888888
+    },
+    "cairn_1e": {
+      "pages": 1,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": null
+    },
+    "srd_5_1": {
+      "pages": 1,
+      "content_recall": 1.0,
+      "reading_order": null,
+      "table_cells": 0.6666666666666666
+    },
+    "bfrpg_4e": {
+      "pages": 1,
+      "content_recall": 1.0,
+      "reading_order": null,
+      "table_cells": 1.0
+    }
+  },
+  "pages": [
+    {
+      "id": "g01",
+      "doc": "osric_2e",
+      "page": 135,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g02",
+      "doc": "osric_2e",
+      "page": 40,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g03",
+      "doc": "cairn_1e",
+      "page": 15,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g04",
+      "doc": "srd_5_1",
+      "page": 64,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 0.6666666666666666
+    },
+    {
+      "id": "g05",
+      "doc": "bfrpg_4e",
+      "page": 85,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    }
+  ]
+}

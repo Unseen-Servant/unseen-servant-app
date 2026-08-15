@@ -101,6 +101,19 @@ class IndexReport:
         return not self.errors
 
 
+@dataclass
+class Page:
+    """One extracted page — the unit the extraction axis grades.
+
+    ``text`` is what the engine's real extraction pipeline produces for the
+    page (v2: heading-promoted, furniture-stripped markdown; v3: its layout
+    pipeline) — the same text that feeds indexing.
+    """
+
+    page_number: int  # 1-based physical page
+    text: str
+
+
 @runtime_checkable
 class Engine(Protocol):
     """The contract every pipeline adapter implements."""
@@ -110,6 +123,12 @@ class Engine(Protocol):
     def index(self, pdf_paths: Sequence[Path | str]) -> IndexReport:
         """Index the given PDFs with the engine's production pipeline.
         Idempotent: already-indexed files are skipped, not re-embedded."""
+        ...
+
+    def extract(self, pdf_path: Path | str) -> list["Page"]:
+        """Extract a PDF to per-page text with the engine's real pipeline —
+        the same extraction that feeds indexing. The extraction axis grades
+        this against golden page specs."""
         ...
 
     def warmup(self, options: SearchOptions | None = None) -> None:

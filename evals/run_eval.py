@@ -126,29 +126,111 @@ def render_md(meta: dict, result: dict) -> str:
     ])
 
 
+# ── extraction suite ──────────────────────────────────────────────────────
+
+def run_extraction(engine, corpus) -> dict:
+    """Extract each golden doc once (engine.extract, no Ollama needed) and
+    grade its golden pages against the hand-authored specs."""
+    from evals.extraction import grade as xgrade
+    from evals.extraction.verify_golden import load_golden
+
+    specs = load_golden()
+    if not specs:
+        raise SystemExit("no golden specs in evals/extraction/golden/ — author some first.")
+    doc_pdf = {d.id: d.pdf_path for d in corpus.documents}
+    pages_by_doc: dict[str, dict[int, str]] = {}
+    for d in sorted({s["doc"] for s in specs}):
+        print(f"extracting {d}…", flush=True)
+        pages_by_doc[d] = {p.page_number: p.text for p in engine.extract(doc_pdf[d])}
+
+    graded = []
+    for s in specs:
+        # Grade against a ±1-page window anchored on the golden page: pymupdf4llm
+        # (and v3's future extractor) attribute page-boundary content slightly
+        # differently than the fitz text we verify golden specs against, so an
+        # exact-page match would score segmenter drift, not extraction quality.
+        pages = pages_by_doc.get(s["doc"], {})
+        p = s["page"]
+        window = "\n\n".join(pages.get(pp, "") for pp in (p - 1, p, p + 1))
+        g = xgrade.grade_page(s, window)
+        graded.append(g)
+        scored = " ".join(f"{m}={g[m]:.2f}" for m in xgrade.METRICS if g.get(m) is not None)
+        print(f"  {s['id']} [{s['kind']:10}] {s['doc']} p.{s['page']}  {scored}", flush=True)
+    return {
+        "by_kind": xgrade.aggregate(graded, "kind"),
+        "by_doc": xgrade.aggregate(graded, "doc"),
+        "pages": graded,
+    }
+
+
+def extraction_report(summary: dict, title: str) -> str:
+    from evals.extraction.grade import METRICS as XM
+
+    header = f"{title:<16}{'pages':>7}" + "".join(f"{m:>16}" for m in XM)
+    lines = [header, "-" * len(header)]
+    for c in sorted(c for c in summary if c != "all") + ["all"]:
+        r = summary[c]
+        cells = "".join(
+            f"{(format(r[m], '.3f') if r.get(m) is not None else '—'):>16}" for m in XM)
+        lines.append(f"{c:<16}{r['pages']:>7}" + cells)
+    return "\n".join(lines)
+
+
+def extraction_md(meta: dict, result: dict) -> str:
+    return "\n".join([
+        f"# Extraction baseline — {meta['engine']} — {meta['name']}",
+        "", f"Date: {meta['date']}",
+        f"Golden pages: {meta['n_pages']} across {', '.join(meta['docs'])}",
+        "", "## By kind", "```", extraction_report(result["by_kind"], "kind"), "```",
+        "", "## By doc", "```", extraction_report(result["by_doc"], "doc"), "```", "",
+    ])
+
+
+# ── entry point ───────────────────────────────────────────────────────────
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--engine", default="v2", choices=["v2", "v3"])
-    ap.add_argument("--suite", default="retrieval", choices=["retrieval"])
-    ap.add_argument("--baseline", default="phase0", help="baseline name (rung)")
+    ap.add_argument("--suite", default="retrieval", choices=["retrieval", "extraction"])
+    ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
     ap.add_argument("--data-dir", type=Path, default=None)
     ap.add_argument("--n-results", type=int, default=SearchOptions.n_results)
-    ap.add_argument("--no-index", action="store_true", help="assume corpus already indexed")
-    ap.add_argument("--limit", type=int, default=None, help="run only the first N queries")
+    ap.add_argument("--no-index", action="store_true", help="retrieval: assume corpus already indexed")
+    ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
     args = ap.parse_args()
 
     corpus = require_corpus()  # refuses on any hash/digest drift (§1)
-    queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
-    if args.limit:
-        queries = queries[: args.limit]
-
-    opts = SearchOptions(n_results=args.n_results)
+    name = args.baseline or ("phase0" if args.suite == "retrieval" else "extraction")
+    date = datetime.date.today().isoformat()
+    stem = f"{date}-{args.engine}-{name}"
     engine = build_engine(args.engine, args.data_dir)
+
     try:
-        result = run(engine, queries, corpus, opts, do_index=not args.no_index)
+        if args.suite == "extraction":
+            result = run_extraction(engine, corpus)
+        else:
+            queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
+            if args.limit:
+                queries = queries[: args.limit]
+            opts = SearchOptions(n_results=args.n_results)
+            result = run(engine, queries, corpus, opts, do_index=not args.no_index)
     finally:
         engine.close()
+
+    if args.suite == "extraction":
+        print("\n## By kind\n" + extraction_report(result["by_kind"], "kind"))
+        print("\n## By doc\n" + extraction_report(result["by_doc"], "doc"))
+        meta = {"engine": args.engine, "name": name, "date": date,
+                "docs": sorted({p["doc"] for p in result["pages"]}),
+                "n_pages": len(result["pages"])}
+        if not args.no_write:
+            BASELINE_DIR.mkdir(exist_ok=True)
+            (BASELINE_DIR / f"{stem}.json").write_text(
+                json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
+            (BASELINE_DIR / f"{stem}.md").write_text(extraction_md(meta, result), encoding="utf-8")
+            print(f"\nwrote evals/baselines/{stem}.{{json,md}}")
+        return 0
 
     print("\n## By category\n" + metrics.format_report(result["by_category"], "category"))
     print("\n## By style\n" + metrics.format_report(result["by_style"], "style"))
@@ -156,8 +238,7 @@ def main() -> int:
     print(f"\nlatency: mean {lat['mean_ms']:.0f}ms  p50 {lat['p50_ms']:.0f}ms  p95 {lat['p95_ms']:.0f}ms")
 
     meta = {
-        "engine": args.engine, "name": args.baseline,
-        "date": datetime.date.today().isoformat(),
+        "engine": args.engine, "name": name, "date": date,
         "docs": sorted({q["doc"] for q in queries if q["doc"] != "any"}),
         "n_queries": len(queries), "n_pairs": len({q["pair"] for q in queries}),
         "n_results": args.n_results,
@@ -170,7 +251,6 @@ def main() -> int:
         from evals.retrieval import report
 
         BASELINE_DIR.mkdir(exist_ok=True)
-        stem = f"{meta['date']}-{args.engine}-{args.baseline}"
         # Retrieved chunks are pulled out of the committed baseline so its
         # diff stays a clean metrics review (§6); they live in a gitignored
         # side file that drives the HTML inspector.

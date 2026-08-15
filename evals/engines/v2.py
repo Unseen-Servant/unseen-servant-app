@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 from typing import Sequence
 
-from .base import IndexReport, SearchOptions, SearchResponse, SearchResult
+from .base import IndexReport, Page, SearchOptions, SearchResponse, SearchResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SIDECAR_DIR = REPO_ROOT / "sidecar"
@@ -54,6 +54,7 @@ def _import_sidecar():
         from fastapi.testclient import TestClient
         from server import (
             COLLECTION_METADATA,
+            _extract_pdf_pages,
             build_ollama_embedding_function,
             create_app,
             load_manifest,
@@ -68,6 +69,7 @@ def _import_sidecar():
         "chromadb": chromadb,
         "TestClient": TestClient,
         "COLLECTION_METADATA": COLLECTION_METADATA,
+        "_extract_pdf_pages": _extract_pdf_pages,
         "build_ollama_embedding_function": build_ollama_embedding_function,
         "create_app": create_app,
         "load_manifest": load_manifest,
@@ -136,6 +138,19 @@ class V2Engine:
             skipped=skipped,
             errors=body.get("errors", []),
         )
+
+    # -- extraction ----------------------------------------------------
+
+    def extract(self, pdf_path: Path | str) -> list[Page]:
+        """v2's real page extraction (pymupdf4llm + heading promotion +
+        furniture stripping) — no Chroma/Ollama needed, just the sidecar env."""
+        if self._mods is None:
+            self._mods = _import_sidecar()
+        path = Path(pdf_path).expanduser().resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"PDF not found: {path}")
+        pages = self._mods["_extract_pdf_pages"](path)
+        return [Page(page_number=p.page_number, text=p.markdown) for p in pages]
 
     # -- search --------------------------------------------------------
 
