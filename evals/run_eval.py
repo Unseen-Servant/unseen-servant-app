@@ -86,7 +86,7 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
                 "tier": r.tier,
                 "reranked": r.reranked,
                 "matched": bool(matched),
-                "snippet": (r.text or "").strip()[:200],
+                "snippet": (r.text or "").strip()[:600],
             }
             for i, (r, matched) in enumerate(zip(resp.results, g["rels"]), 1)
         ]
