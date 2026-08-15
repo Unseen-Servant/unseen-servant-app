@@ -4,6 +4,7 @@
     "name": "phase0",
     "date": "2026-08-15",
     "docs": [
+      "bfrpg_4e",
       "black_hack_2e",
       "cairn_1e",
       "osric_2e",
@@ -11,8 +12,8 @@
       "srd_5_2_1",
       "yze_srd"
     ],
-    "n_queries": 26,
-    "n_pairs": 13,
+    "n_queries": 32,
+    "n_pairs": 16,
     "n_results": 25,
     "opts": {
       "rerank": true,
@@ -23,34 +24,34 @@
   },
   "by_category": {
     "exact_name": {
-      "queries": 6,
-      "mrr@5": 0.6666666666666666,
-      "ndcg@10": 0.7148441377196479,
-      "recall@3": 0.6666666666666666,
-      "recall@5": 0.6666666666666666,
-      "recall@10": 0.8333333333333334,
-      "payload_chars": 40414.333333333336,
-      "dup_sections@10": 0.3333333333333333
+      "queries": 8,
+      "mrr@5": 0.5416666666666666,
+      "ndcg@10": 0.6313655416826004,
+      "recall@3": 0.75,
+      "recall@5": 0.75,
+      "recall@10": 0.875,
+      "payload_chars": 46090.0,
+      "dup_sections@10": 0.25
     },
     "all": {
-      "queries": 26,
-      "mrr@5": 0.37243589743589745,
-      "ndcg@10": 0.45450657453249554,
-      "recall@3": 0.4230769230769231,
-      "recall@5": 0.6538461538461539,
-      "recall@10": 0.6923076923076923,
-      "payload_chars": 38900.0,
-      "dup_sections@10": 0.19230769230769232
+      "queries": 32,
+      "mrr@5": 0.37395833333333334,
+      "ndcg@10": 0.4722273899031606,
+      "recall@3": 0.46875,
+      "recall@5": 0.65625,
+      "recall@10": 0.75,
+      "payload_chars": 43260.125,
+      "dup_sections@10": 0.15625
     },
     "prose_rule": {
-      "queries": 10,
-      "mrr@5": 0.24,
-      "ndcg@10": 0.32974246287549136,
-      "recall@3": 0.4,
-      "recall@5": 0.6,
-      "recall@10": 0.6,
-      "payload_chars": 33436.5,
-      "dup_sections@10": 0.1
+      "queries": 12,
+      "mrr@5": 0.2902777777777778,
+      "ndcg@10": 0.4071863549645614,
+      "recall@3": 0.4166666666666667,
+      "recall@5": 0.6666666666666666,
+      "recall@10": 0.75,
+      "payload_chars": 38678.416666666664,
+      "dup_sections@10": 0.08333333333333333
     },
     "cross_page": {
       "queries": 2,
@@ -59,67 +60,67 @@
       "recall@3": 0.0,
       "recall@5": 0.0,
       "recall@10": 0.0,
-      "payload_chars": 34969.5,
+      "payload_chars": 36757.5,
       "dup_sections@10": 0.0
     },
     "paraphrase_control": {
       "queries": 2,
-      "mrr@5": 0.125,
-      "ndcg@10": 0.21533827903669653,
+      "mrr@5": 0.0,
+      "ndcg@10": 0.0,
       "recall@3": 0.0,
-      "recall@5": 0.5,
-      "recall@10": 0.5,
-      "payload_chars": 30767.0,
+      "recall@5": 0.0,
+      "recall@10": 0.0,
+      "payload_chars": 32606.0,
       "dup_sections@10": 0.0
     },
     "table_lookup": {
-      "queries": 6,
-      "mrr@5": 0.5055555555555555,
-      "ndcg@10": 0.6333341541164482,
+      "queries": 8,
+      "mrr@5": 0.51875,
+      "ndcg@10": 0.6467644854831999,
       "recall@3": 0.5,
-      "recall@5": 1.0,
+      "recall@5": 0.875,
       "recall@10": 1.0,
-      "payload_chars": 50512.666666666664,
-      "dup_sections@10": 0.3333333333333333
+      "payload_chars": 51592.0,
+      "dup_sections@10": 0.25
     }
   },
   "by_style": {
     "keyword": {
-      "queries": 13,
-      "mrr@5": 0.40384615384615385,
-      "ndcg@10": 0.501975597120754,
-      "recall@3": 0.46153846153846156,
-      "recall@5": 0.6923076923076923,
-      "recall@10": 0.7692307692307693,
-      "payload_chars": 36692.230769230766,
-      "dup_sections@10": 0.15384615384615385
+      "queries": 16,
+      "mrr@5": 0.41875,
+      "ndcg@10": 0.5061727328795456,
+      "recall@3": 0.5,
+      "recall@5": 0.6875,
+      "recall@10": 0.75,
+      "payload_chars": 41177.75,
+      "dup_sections@10": 0.125
     },
     "all": {
-      "queries": 26,
-      "mrr@5": 0.37243589743589745,
-      "ndcg@10": 0.45450657453249554,
-      "recall@3": 0.4230769230769231,
-      "recall@5": 0.6538461538461539,
-      "recall@10": 0.6923076923076923,
-      "payload_chars": 38900.0,
-      "dup_sections@10": 0.19230769230769232
+      "queries": 32,
+      "mrr@5": 0.37395833333333334,
+      "ndcg@10": 0.4722273899031606,
+      "recall@3": 0.46875,
+      "recall@5": 0.65625,
+      "recall@10": 0.75,
+      "payload_chars": 43260.125,
+      "dup_sections@10": 0.15625
     },
     "nl": {
-      "queries": 13,
-      "mrr@5": 0.34102564102564104,
-      "ndcg@10": 0.40703755194423713,
-      "recall@3": 0.38461538461538464,
-      "recall@5": 0.6153846153846154,
-      "recall@10": 0.6153846153846154,
-      "payload_chars": 41107.769230769234,
-      "dup_sections@10": 0.23076923076923078
+      "queries": 16,
+      "mrr@5": 0.32916666666666666,
+      "ndcg@10": 0.4382820469267756,
+      "recall@3": 0.4375,
+      "recall@5": 0.625,
+      "recall@10": 0.75,
+      "payload_chars": 45342.5,
+      "dup_sections@10": 0.1875
     }
   },
   "latency": {
-    "count": 26,
-    "mean_ms": 1621.3807692307694,
-    "p50_ms": 1608.1,
-    "p95_ms": 1915.6
+    "count": 32,
+    "mean_ms": 1579.253125,
+    "p50_ms": 1626.65,
+    "p95_ms": 1940.0
   },
   "per_query": [
     {
@@ -130,17 +131,17 @@
       "doc": "srd_5_1",
       "query": "goblin armor class",
       "metrics": {
-        "mrr@5": 1.0,
-        "ndcg@10": 1.0,
+        "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 36809,
+        "payload_chars": 43382,
         "dup_sections@10": 0
       },
-      "latency_ms": 1383.8,
+      "latency_ms": 1463.6,
       "page_hit": true,
-      "hit_rank": 1,
+      "hit_rank": 2,
       "corrected_query": null
     },
     {
@@ -151,17 +152,17 @@
       "doc": "srd_5_1",
       "query": "what armor class does a goblin have?",
       "metrics": {
-        "mrr@5": 1.0,
-        "ndcg@10": 1.0,
+        "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 46260,
+        "payload_chars": 41615,
         "dup_sections@10": 0
       },
-      "latency_ms": 1697.1,
+      "latency_ms": 1665.6,
       "page_hit": true,
-      "hit_rank": 1,
+      "hit_rank": 2,
       "corrected_query": null
     },
     {
@@ -177,10 +178,10 @@
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 37977,
+        "payload_chars": 46940,
         "dup_sections@10": 0
       },
-      "latency_ms": 1767.6,
+      "latency_ms": 1750.8,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -198,10 +199,10 @@
         "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 36853,
+        "payload_chars": 48465,
         "dup_sections@10": 0
       },
-      "latency_ms": 1863.3,
+      "latency_ms": 1902.9,
       "page_hit": false,
       "hit_rank": 5,
       "corrected_query": null
@@ -219,10 +220,10 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
-        "payload_chars": 41695,
+        "payload_chars": 39880,
         "dup_sections@10": 0
       },
-      "latency_ms": 1537.0,
+      "latency_ms": 640.1,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -240,10 +241,10 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
-        "payload_chars": 28244,
+        "payload_chars": 33635,
         "dup_sections@10": 0
       },
-      "latency_ms": 1615.0,
+      "latency_ms": 1437.9,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -256,17 +257,17 @@
       "doc": "srd_5_1",
       "query": "dying character zero health survival roll",
       "metrics": {
-        "mrr@5": 0.25,
-        "ndcg@10": 0.43067655807339306,
+        "mrr@5": 0.0,
+        "ndcg@10": 0.0,
         "recall@3": 0.0,
-        "recall@5": 1.0,
-        "recall@10": 1.0,
-        "payload_chars": 30984,
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "payload_chars": 33196,
         "dup_sections@10": 0
       },
-      "latency_ms": 1169.2,
+      "latency_ms": 1204.4,
       "page_hit": false,
-      "hit_rank": 4,
+      "hit_rank": null,
       "corrected_query": null
     },
     {
@@ -282,12 +283,12 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
-        "payload_chars": 30550,
+        "payload_chars": 32016,
         "dup_sections@10": 0
       },
-      "latency_ms": 1593.1,
+      "latency_ms": 1556.3,
       "page_hit": false,
-      "hit_rank": 11,
+      "hit_rank": 13,
       "corrected_query": null
     },
     {
@@ -303,10 +304,10 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 1.0,
-        "payload_chars": 16366,
+        "payload_chars": 35527,
         "dup_sections@10": 0
       },
-      "latency_ms": 1448.2,
+      "latency_ms": 1404.9,
       "page_hit": false,
       "hit_rank": 10,
       "corrected_query": null
@@ -324,12 +325,12 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
-        "payload_chars": 38787,
+        "payload_chars": 48969,
         "dup_sections@10": 0
       },
-      "latency_ms": 1693.9,
+      "latency_ms": 1789.1,
       "page_hit": false,
-      "hit_rank": 22,
+      "hit_rank": 23,
       "corrected_query": null
     },
     {
@@ -340,17 +341,17 @@
       "doc": "cairn_1e",
       "query": "cairn armor reduce damage weapon die",
       "metrics": {
-        "mrr@5": 0.5,
-        "ndcg@10": 0.6309297535714575,
+        "mrr@5": 1.0,
+        "ndcg@10": 1.0,
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 32160,
+        "payload_chars": 31203,
         "dup_sections@10": 0
       },
-      "latency_ms": 1378.7,
+      "latency_ms": 1430.2,
       "page_hit": false,
-      "hit_rank": 2,
+      "hit_rank": 1,
       "corrected_query": null
     },
     {
@@ -362,16 +363,16 @@
       "query": "how does armor reduce the damage you take in cairn?",
       "metrics": {
         "mrr@5": 0.0,
-        "ndcg@10": 0.0,
+        "ndcg@10": 0.2890648263178879,
         "recall@3": 0.0,
         "recall@5": 0.0,
-        "recall@10": 0.0,
-        "payload_chars": 39559,
+        "recall@10": 1.0,
+        "payload_chars": 34168,
         "dup_sections@10": 0
       },
-      "latency_ms": 1601.2,
+      "latency_ms": 1455.8,
       "page_hit": false,
-      "hit_rank": 12,
+      "hit_rank": 10,
       "corrected_query": null
     },
     {
@@ -383,14 +384,14 @@
       "query": "cairn chainmail armor value slots",
       "metrics": {
         "mrr@5": 0.25,
-        "ndcg@10": 0.48247555939075504,
+        "ndcg@10": 0.46845052016107697,
         "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 35432,
+        "payload_chars": 36184,
         "dup_sections@10": 0
       },
-      "latency_ms": 1915.6,
+      "latency_ms": 1833.3,
       "page_hit": false,
       "hit_rank": 4,
       "corrected_query": null
@@ -403,17 +404,17 @@
       "doc": "cairn_1e",
       "query": "how much armor does chainmail give you in cairn?",
       "metrics": {
-        "mrr@5": 0.2,
-        "ndcg@10": 0.38685280723454163,
+        "mrr@5": 0.0,
+        "ndcg@10": 0.3010299956639812,
         "recall@3": 0.0,
-        "recall@5": 1.0,
+        "recall@5": 0.0,
         "recall@10": 1.0,
-        "payload_chars": 42559,
-        "dup_sections@10": 1
+        "payload_chars": 54039,
+        "dup_sections@10": 0
       },
-      "latency_ms": 1696.9,
+      "latency_ms": 1687.5,
       "page_hit": false,
-      "hit_rank": 5,
+      "hit_rank": 9,
       "corrected_query": null
     },
     {
@@ -429,10 +430,10 @@
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 14708,
+        "payload_chars": 16636,
         "dup_sections@10": 0
       },
-      "latency_ms": 1378.9,
+      "latency_ms": 1397.4,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -450,10 +451,10 @@
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 39548,
+        "payload_chars": 39442,
         "dup_sections@10": 1
       },
-      "latency_ms": 1587.7,
+      "latency_ms": 1605.0,
       "page_hit": false,
       "hit_rank": 2,
       "corrected_query": null
@@ -466,17 +467,17 @@
       "doc": "srd_5_1",
       "query": "plate armor armor class cost strength",
       "metrics": {
-        "mrr@5": 0.25,
-        "ndcg@10": 0.43067655807339306,
+        "mrr@5": 0.2,
+        "ndcg@10": 0.38685280723454163,
         "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 48020,
+        "payload_chars": 50624,
         "dup_sections@10": 1
       },
-      "latency_ms": 1194.6,
+      "latency_ms": 1094.9,
       "page_hit": false,
-      "hit_rank": 4,
+      "hit_rank": 5,
       "corrected_query": null
     },
     {
@@ -487,17 +488,17 @@
       "doc": "srd_5_1",
       "query": "what armor class and cost does plate armor have in 5e?",
       "metrics": {
-        "mrr@5": 0.3333333333333333,
-        "ndcg@10": 0.5,
-        "recall@3": 1.0,
+        "mrr@5": 0.2,
+        "ndcg@10": 0.38685280723454163,
+        "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 60215,
+        "payload_chars": 46083,
         "dup_sections@10": 0
       },
-      "latency_ms": 1820.8,
+      "latency_ms": 1732.8,
       "page_hit": false,
-      "hit_rank": 3,
+      "hit_rank": 5,
       "corrected_query": null
     },
     {
@@ -513,10 +514,10 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
-        "payload_chars": 25558,
+        "payload_chars": 24695,
         "dup_sections@10": 0
       },
-      "latency_ms": 1183.3,
+      "latency_ms": 1181.9,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -537,7 +538,7 @@
         "payload_chars": 15366,
         "dup_sections@10": 0
       },
-      "latency_ms": 1496.6,
+      "latency_ms": 1530.0,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -555,10 +556,10 @@
         "recall@3": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
-        "payload_chars": 39905,
+        "payload_chars": 39381,
         "dup_sections@10": 0
       },
-      "latency_ms": 1907.3,
+      "latency_ms": 1940.0,
       "page_hit": false,
       "hit_rank": null,
       "corrected_query": null
@@ -576,10 +577,10 @@
         "recall@3": 0.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 52731,
+        "payload_chars": 51613,
         "dup_sections@10": 0
       },
-      "latency_ms": 1659.3,
+      "latency_ms": 1722.7,
       "page_hit": true,
       "hit_rank": 5,
       "corrected_query": null
@@ -597,10 +598,10 @@
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 58092,
+        "payload_chars": 51133,
         "dup_sections@10": 0
       },
-      "latency_ms": 1548.1,
+      "latency_ms": 1477.1,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -618,10 +619,10 @@
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 58758,
+        "payload_chars": 56638,
         "dup_sections@10": 0
       },
-      "latency_ms": 1658.1,
+      "latency_ms": 1648.3,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -639,10 +640,10 @@
         "recall@3": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
-        "payload_chars": 59293,
+        "payload_chars": 60090,
         "dup_sections@10": 1
       },
-      "latency_ms": 2452.9,
+      "latency_ms": 1532.1,
       "page_hit": true,
       "hit_rank": 1,
       "corrected_query": null
@@ -663,9 +664,135 @@
         "payload_chars": 44971,
         "dup_sections@10": 1
       },
-      "latency_ms": 1907.7,
+      "latency_ms": 1899.5,
       "page_hit": true,
       "hit_rank": 1,
+      "corrected_query": null
+    },
+    {
+      "id": "q027",
+      "pair": "bfrpg_cloud_dragon",
+      "style": "keyword",
+      "category": "exact_name",
+      "doc": "bfrpg_4e",
+      "query": "cloud dragon armor class hit dice",
+      "metrics": {
+        "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "payload_chars": 40643,
+        "dup_sections@10": 0
+      },
+      "latency_ms": 1551.5,
+      "page_hit": true,
+      "hit_rank": 1,
+      "corrected_query": null
+    },
+    {
+      "id": "q028",
+      "pair": "bfrpg_cloud_dragon",
+      "style": "nl",
+      "category": "exact_name",
+      "doc": "bfrpg_4e",
+      "query": "what armor class and hit dice does a cloud dragon have in basic fantasy?",
+      "metrics": {
+        "mrr@5": 0.3333333333333333,
+        "ndcg@10": 0.5,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "payload_chars": 53523,
+        "dup_sections@10": 0
+      },
+      "latency_ms": 1953.7,
+      "page_hit": true,
+      "hit_rank": 3,
+      "corrected_query": null
+    },
+    {
+      "id": "q029",
+      "pair": "bfrpg_chain_mail",
+      "style": "keyword",
+      "category": "table_lookup",
+      "doc": "bfrpg_4e",
+      "query": "basic fantasy chain mail cost armor class",
+      "metrics": {
+        "mrr@5": 0.5,
+        "ndcg@10": 0.6309297535714575,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "payload_chars": 55624,
+        "dup_sections@10": 0
+      },
+      "latency_ms": 1677.3,
+      "page_hit": true,
+      "hit_rank": 2,
+      "corrected_query": null
+    },
+    {
+      "id": "q030",
+      "pair": "bfrpg_chain_mail",
+      "style": "nl",
+      "category": "table_lookup",
+      "doc": "bfrpg_4e",
+      "query": "how much does chain mail cost and what armor class does it give in basic fantasy?",
+      "metrics": {
+        "mrr@5": 1.0,
+        "ndcg@10": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "payload_chars": 62411,
+        "dup_sections@10": 1
+      },
+      "latency_ms": 1802.8,
+      "page_hit": true,
+      "hit_rank": 1,
+      "corrected_query": null
+    },
+    {
+      "id": "q031",
+      "pair": "bfrpg_turn_undead",
+      "style": "keyword",
+      "category": "prose_rule",
+      "doc": "bfrpg_4e",
+      "query": "basic fantasy cleric turn undead",
+      "metrics": {
+        "mrr@5": 0.25,
+        "ndcg@10": 0.43067655807339306,
+        "recall@3": 0.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "payload_chars": 53706,
+        "dup_sections@10": 0
+      },
+      "latency_ms": 1814.1,
+      "page_hit": true,
+      "hit_rank": 4,
+      "corrected_query": null
+    },
+    {
+      "id": "q032",
+      "pair": "bfrpg_turn_undead",
+      "style": "nl",
+      "category": "prose_rule",
+      "doc": "bfrpg_4e",
+      "query": "how does a cleric turn undead in basic fantasy?",
+      "metrics": {
+        "mrr@5": 0.3333333333333333,
+        "ndcg@10": 0.5,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "payload_chars": 62526,
+        "dup_sections@10": 0
+      },
+      "latency_ms": 1752.6,
+      "page_hit": true,
+      "hit_rank": 3,
       "corrected_query": null
     }
   ]

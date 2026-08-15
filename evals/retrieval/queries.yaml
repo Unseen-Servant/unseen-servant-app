@@ -1,6 +1,7 @@
-# First eval query set — Phase 0 retrieval suite (v3 scaffold §3).
+# Phase 0 retrieval suite (v3 scaffold §3).
 #
-# 10 intent pairs (keyword + nl style) = 20 queries, across 5 categories.
+# 16 intent pairs (keyword + nl style) = 32 queries, across 5 categories and
+# all 7 corpus systems.
 # Every anchor is verified in BOTH the digital-native reference and the PDF
 # by evals/retrieval/verify_anchors.py — do not hand-edit anchors without
 # re-running it (the old GT was once 30% wrong).
@@ -265,3 +266,63 @@
   answer_ref: "osric_2e/osric_chapter1 [Wiki and Other Goodies].html"
   anchors: ["lay on hands", "2 hit points", ["per day", "per level"]]
   pages: "34"
+
+# ───────────────────────── basic_fantasy (odt reference) ─────────────────────────
+# Unblocked once the extraction axis added the odt loader; the .odt is the
+# whole-book authoring source of the r142 PDF (releases must match).
+- id: q027
+  pair: bfrpg_cloud_dragon
+  style: keyword
+  category: exact_name
+  query: "cloud dragon armor class hit dice"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: [["cloud dragon", "dragon cloud"], "armor class 22", "hit dice 11"]
+  pages: "85"
+- id: q028
+  pair: bfrpg_cloud_dragon
+  style: nl
+  category: exact_name
+  query: "what armor class and hit dice does a cloud dragon have in basic fantasy?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: [["cloud dragon", "dragon cloud"], "armor class 22", "hit dice 11"]
+  pages: "85"
+
+- id: q029
+  pair: bfrpg_chain_mail
+  style: keyword
+  category: table_lookup
+  query: "basic fantasy chain mail cost armor class"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["chain mail", ["60 gp", "60gp"], "15"]
+  pages: "15"
+- id: q030
+  pair: bfrpg_chain_mail
+  style: nl
+  category: table_lookup
+  query: "how much does chain mail cost and what armor class does it give in basic fantasy?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: ["chain mail", ["60 gp", "60gp"], "15"]
+  pages: "15"
+
+- id: q031
+  pair: bfrpg_turn_undead
+  style: keyword
+  category: prose_rule
+  query: "basic fantasy cleric turn undead"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: [["turn", "turning"], "undead", ["automatically affected", "no roll needed"]]
+  pages: "62"
+- id: q032
+  pair: bfrpg_turn_undead
+  style: nl
+  category: prose_rule
+  query: "how does a cleric turn undead in basic fantasy?"
+  doc: bfrpg_4e
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  anchors: [["turn", "turning"], "undead", ["automatically affected", "no roll needed"]]
+  pages: "62"
