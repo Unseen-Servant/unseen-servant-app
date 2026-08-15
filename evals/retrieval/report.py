@@ -90,7 +90,7 @@ th{color:var(--text-secondary);text-align:right;font-weight:400;padding:3px 9px;
 th:first-child,td:first-child{text-align:left}
 td{padding:3px 9px;border-bottom:1px solid rgba(50,50,50,.5)}
 tr.all td{color:var(--text-accent);border-top:1px solid var(--border);font-weight:600}
-.tables{display:flex;gap:34px;flex-wrap:wrap} .tables>div{flex:1;min-width:420px}
+.tables>div{margin-bottom:18px}  /* stacked full-width; side-by-side collided once tables grew wide */
 .filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0 6px;font-size:13px}
 .filters .lbl{color:var(--text-tertiary);margin-right:2px}
 .chip{cursor:pointer;color:var(--text-secondary);padding:2px 9px;border-radius:3px;user-select:none;
