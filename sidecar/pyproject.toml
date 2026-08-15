@@ -23,7 +23,7 @@ dev = [
     "reportlab>=4.5.1",
 ]
 build = [
-    "pyinstaller>=6.0",
+    "pyinstaller>=6.22.0",
 ]
 
 # server.py and mcp_server.py are run directly, not installed as a package.
