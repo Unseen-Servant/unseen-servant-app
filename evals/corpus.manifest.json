@@ -29,23 +29,24 @@
       }
     },
     {
-      "id": "black_hack_2e",
+      "id": "black_hack_1e",
       "system": "The Black Hack",
       "pdf": {
-        "path": "black_hack/The_Black_Hack_Booklet_Second_Edition.pdf",
-        "sha256": "3355f28c53a260a24d91772c003b09a835329229399ceac151b65cf85aa9b57c",
+        "path": "black_hack/TheBlackHack1.2.pdf",
+        "sha256": "57cce91d626a134d58e5c452e5d7164f74d6637e185503cf087552f442ce1cf5",
         "source": {
-          "url": "<fill>"
+          "url": null
         },
-        "page_count": 26
+        "page_count": 20
       },
       "refs": {
-        "glob": "black_hack/The Black Hack -- English.html",
+        "glob": "black_hack/the-black-hack.md",
         "source": {
           "url": "https://the-black-hack.jehaisleprintemps.net/english/the-black-hack.md",
-          "retrieved": "2026-08-14"
+          "retrieved": "2026-08-15"
         },
-        "digest": "51c85597fa5df8630ce1b3d6f7a0ca72e7d219de3cb4fddadb63a182f2c6a0d3"
+        "digest": "92de4005081981a3bd040f15557cb6790f74fddd75480e2659557d078bdc79b0",
+        "note": "PDF is The Black Hack 1st ed (v1.2); the markdown ref is the same edition and matches the PDF text. Replaces the earlier 2e-PDF / 1e-markdown pairing, an edition mismatch that produced false-miss anchors."
       }
     },
     {
@@ -83,7 +84,7 @@
         "glob": "dnd_srd_51/**/*.md",
         "source": {
           "url": "https://github.com/oldmanumby/dnd.srd.5.1",
-          "rev": "<commit>",
+          "rev": null,
           "retrieved": "2026-08-14"
         },
         "digest": "08535017eb71b3246792432a409251c3eb6e7369d9fc38425924aec5a82d3c9c"
@@ -104,7 +105,7 @@
         "glob": "dnd_srd_52/**/*.md",
         "source": {
           "url": "https://github.com/oldmanumby/dnd.srd.5.2.1",
-          "rev": "<commit>",
+          "rev": null,
           "retrieved": "2026-08-14"
         },
         "digest": "865f14cbc11ad04e57924df3da27a3ffdc72263ecbb86723ce9fd323c2d2453a"
@@ -138,7 +139,7 @@
         "path": "year_zero/YZE-Standard-Reference-Document.pdf",
         "sha256": "5bd19db54f41631344b4e46adb1c7610794fbd80315b9c635111318453cf777a",
         "source": {
-          "url": "<fill>"
+          "url": null
         },
         "page_count": 45
       },

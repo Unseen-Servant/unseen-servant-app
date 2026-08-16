@@ -51,3 +51,28 @@
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
   content: ["cloud dragon", "armor class", "hit dice"]
   cells:   ["armor class 22", "hit dice 11"]
+
+# ── The Black Hack 1e (rules-light; PDF ↔ markdown exact-match pair) ──
+- id: g06
+  doc: black_hack_1e
+  page: 4
+  kind: table
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["usage die", "gambeson", "torches", "armor points"]
+  cells:   ["gambeson 50 2 armor points", "torches 6 1 d6", "preserved rations 15 d8", "quiver of arrows bolts 10 d10"]
+
+- id: g07
+  doc: black_hack_1e
+  page: 16
+  kind: table
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["fire beetle", "giant vampire bat", "goblin", "werewolf"]
+  cells:   ["fire beetle 1 light glands usage die d8", "goblin 1 only has 1d6 hp", "werewolf 4 only silver weapons"]
+
+- id: g08
+  doc: black_hack_1e
+  page: 6
+  kind: two_column
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["out of action", "unconscious", "1d4"]
+  order:   ["reduced to zero hit points", "taken out of action", "unconscious and cannot make any actions", "they gain 1d4 hp"]

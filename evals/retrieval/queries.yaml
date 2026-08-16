@@ -146,8 +146,8 @@
   scope: single
   category: prose_rule
   query: "test attribute roll under d20"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
+  doc: black_hack_1e
+  answer_ref: "black_hack/the-black-hack.md"
   anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
 - id: q014
   pair: bh_stat_test
@@ -155,8 +155,8 @@
   scope: single
   category: prose_rule
   query: "how do you resolve a risky action against an attribute?"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
+  doc: black_hack_1e
+  answer_ref: "black_hack/the-black-hack.md"
   anchors: [["roll below", "roll under"], "d20", ["attribute", "stat"]]
 
 - id: q015
@@ -460,16 +460,16 @@
   answer_ref: "cairn_1e/Cairn Markdown.md"
   anchors: ["10 inventory slots", "backpack with six slots", "bulky"]
 
-# Usage die is the Black Hack's signature and edition-invariant; the 1e HTML ref
-# and 2e PDF word advantage/disadvantage too differently to anchor safely.
+# Usage die is the Black Hack's signature mechanic and cleanly anchorable; PDF and
+# markdown ref are now the same edition (1e), so anchors verify against matching text.
 - id: q053
   pair: cued_blackhack_usage
   style: keyword
   scope: cued
   category: prose_rule
   query: "black hack usage die downgrade"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
+  doc: black_hack_1e
+  answer_ref: "black_hack/the-black-hack.md"
   anchors: ["usage die", "downgraded", "following chain"]
 - id: q054
   pair: cued_blackhack_usage
@@ -477,8 +477,8 @@
   scope: cued
   category: prose_rule
   query: "how does the usage die work in the black hack?"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
+  doc: black_hack_1e
+  answer_ref: "black_hack/the-black-hack.md"
   anchors: ["usage die", "downgraded", "following chain"]
 
 - id: q055
@@ -531,7 +531,7 @@
   query: "chain mail cost and armor class"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["chain mail", ["armor class", "ac"], ["15", "16"]]
+  anchors: [["chain mail", "mail hauberk"], ["armor class", "ac", "armor points", "ac rating"]]
 - id: q030
   pair: uncued_chain_mail
   style: nl
@@ -540,7 +540,7 @@
   query: "how much is chain mail and what armor class does it give?"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["chain mail", ["armor class", "ac"], ["15", "16"]]
+  anchors: [["chain mail", "mail hauberk"], ["armor class", "ac", "armor points", "ac rating"]]
 
 - id: q031
   pair: uncued_armor_reduce
@@ -608,7 +608,7 @@
   query: "saving throw against poison"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["saving throw", "poison"]
+  anchors: [["saving throw", "save", "stamina"], "poison"]
 - id: q060
   pair: uncued_saving_throw
   style: nl
@@ -617,7 +617,7 @@
   query: "what do you roll to save against poison?"
   doc: bfrpg_4e
   answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
-  anchors: ["saving throw", "poison"]
+  anchors: [["saving throw", "save", "stamina"], "poison"]
 
 - id: q061
   pair: uncued_initiative
@@ -627,7 +627,7 @@
   query: "how is initiative determined in combat"
   doc: osric_2e
   answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
-  anchors: ["initiative", ["d6", "segment"]]
+  anchors: ["initiative", ["d6", "segment", "d20", "dexterity", "order of turns", "turn order"]]
 - id: q062
   pair: uncued_initiative
   style: nl
@@ -636,7 +636,7 @@
   query: "who acts first in a combat round?"
   doc: osric_2e
   answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
-  anchors: ["initiative", ["d6", "segment"]]
+  anchors: ["initiative", ["d6", "segment", "d20", "dexterity", "order of turns", "turn order"]]
 
 - id: q063
   pair: uncued_longsword
@@ -663,18 +663,18 @@
   scope: uncued
   category: prose_rule
   query: "what happens at zero hit points"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
-  anchors: [["zero hit points", "0 hit points", "0hp", "0 hp"], ["out of action", "unconscious", "dying"]]
+  doc: black_hack_1e
+  answer_ref: "black_hack/the-black-hack.md"
+  anchors: [["zero hit points", "0 hit points", "0hp", "0 hp", "reach 0", "reduced to 0"], ["out of action", "unconscious", "dying", "death saving throw", "death save"]]
 - id: q066
   pair: uncued_zero_hp
   style: nl
   scope: uncued
   category: prose_rule
   query: "what happens when a character drops to 0 hit points?"
-  doc: black_hack_2e
-  answer_ref: "black_hack/The Black Hack -- English.html"
-  anchors: [["zero hit points", "0 hit points", "0hp", "0 hp"], ["out of action", "unconscious", "dying"]]
+  doc: black_hack_1e
+  answer_ref: "black_hack/the-black-hack.md"
+  anchors: [["zero hit points", "0 hit points", "0hp", "0 hp", "reach 0", "reduced to 0"], ["out of action", "unconscious", "dying", "death saving throw", "death save"]]
 
 - id: q067
   pair: uncued_surprise
@@ -684,7 +684,7 @@
   query: "surprise combat rules"
   doc: osric_2e
   answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
-  anchors: ["surprise", ["d6", "segment"]]
+  anchors: ["surprise", ["d6", "segment", "disadvantage", "unawares", "surprised", "initiative"]]
 - id: q068
   pair: uncued_surprise
   style: nl
@@ -693,4 +693,4 @@
   query: "how does being surprised affect combat?"
   doc: osric_2e
   answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
-  anchors: ["surprise", ["d6", "segment"]]
+  anchors: ["surprise", ["d6", "segment", "disadvantage", "unawares", "surprised", "initiative"]]

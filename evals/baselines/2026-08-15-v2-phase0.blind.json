@@ -5,15 +5,13 @@
     "q001": {
       "reviewed": true,
       "relevant": [
-        2,
         1
       ]
     },
     "q002": {
       "reviewed": true,
       "relevant": [
-        1,
-        2
+        1
       ]
     },
     "q003": {
@@ -56,18 +54,22 @@
     },
     "q009": {
       "reviewed": true,
-      "relevant": []
+      "relevant": [
+        2
+      ]
     },
     "q010": {
       "reviewed": true,
-      "relevant": []
+      "relevant": [
+        5
+      ]
     },
     "q011": {
       "reviewed": true,
       "relevant": [
+        1,
         2,
-        3,
-        1
+        3
       ]
     },
     "q012": {
@@ -81,7 +83,6 @@
     "q013": {
       "reviewed": true,
       "relevant": [
-        5,
         1,
         3,
         4
@@ -90,7 +91,7 @@
     "q014": {
       "reviewed": true,
       "relevant": [
-        2,
+        5,
         1
       ]
     },
@@ -98,9 +99,7 @@
       "reviewed": true,
       "relevant": [
         2,
-        5,
         1,
-        3,
         4
       ]
     },
@@ -118,7 +117,9 @@
     },
     "q018": {
       "reviewed": true,
-      "relevant": []
+      "relevant": [
+        5
+      ]
     },
     "q019": {
       "reviewed": true,
@@ -129,7 +130,7 @@
     "q020": {
       "reviewed": true,
       "relevant": [
-        1
+        2
       ]
     },
     "q021": {
@@ -141,7 +142,7 @@
     "q022": {
       "reviewed": true,
       "relevant": [
-        3
+        4
       ]
     },
     "q023": {
@@ -150,30 +151,35 @@
     },
     "q024": {
       "reviewed": true,
-      "relevant": [
-        5
-      ]
+      "relevant": []
     },
     "q025": {
       "reviewed": true,
-      "relevant": []
+      "relevant": [
+        1
+      ]
     },
     "q026": {
       "reviewed": true,
-      "relevant": []
+      "relevant": [
+        1
+      ]
     },
     "q027": {
       "reviewed": true,
       "relevant": [
         3,
         1,
-        4
+        5,
+        4,
+        2
       ]
     },
     "q028": {
       "reviewed": true,
       "relevant": [
         2,
+        3,
         1
       ]
     },
@@ -181,6 +187,7 @@
       "reviewed": true,
       "relevant": [
         5,
+        3,
         1,
         4,
         2
@@ -189,6 +196,8 @@
     "q030": {
       "reviewed": true,
       "relevant": [
+        2,
+        4,
         1,
         3
       ]
@@ -197,17 +206,20 @@
       "reviewed": true,
       "relevant": [
         1,
-        3
+        4,
+        2,
+        5
       ]
     },
     "q032": {
       "reviewed": true,
-      "relevant": []
+      "relevant": [
+        1
+      ]
     },
     "q033": {
       "reviewed": true,
       "relevant": [
-        5,
         1,
         2,
         3
@@ -216,10 +228,242 @@
     "q034": {
       "reviewed": true,
       "relevant": [
-        3,
         2,
         5,
         1
+      ]
+    },
+    "q035": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        1,
+        3
+      ]
+    },
+    "q036": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q037": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2,
+        4
+      ]
+    },
+    "q038": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2
+      ]
+    },
+    "q039": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q040": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q041": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3
+      ]
+    },
+    "q042": {
+      "reviewed": true,
+      "relevant": [
+        3,
+        1
+      ]
+    },
+    "q043": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ]
+    },
+    "q044": {
+      "reviewed": true,
+      "relevant": [
+        4
+      ]
+    },
+    "q045": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q046": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q047": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q048": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q049": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q050": {
+      "reviewed": true,
+      "relevant": []
+    },
+    "q051": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2
+      ]
+    },
+    "q052": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2
+      ]
+    },
+    "q053": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q054": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ]
+    },
+    "q055": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q056": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q057": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4
+      ]
+    },
+    "q058": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q059": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        1,
+        3,
+        5
+      ]
+    },
+    "q060": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1,
+        3,
+        5
+      ]
+    },
+    "q061": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        5,
+        1,
+        3,
+        2
+      ]
+    },
+    "q062": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        5,
+        3,
+        4
+      ]
+    },
+    "q063": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ]
+    },
+    "q064": {
+      "reviewed": true,
+      "relevant": [
+        3
+      ]
+    },
+    "q065": {
+      "reviewed": true,
+      "relevant": [
+        3,
+        1,
+        2,
+        4,
+        5
+      ]
+    },
+    "q066": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        2,
+        3
+      ]
+    },
+    "q067": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        1,
+        3,
+        2,
+        4
+      ]
+    },
+    "q068": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        1,
+        3,
+        5,
+        2
       ]
     }
   }

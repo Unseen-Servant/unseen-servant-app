@@ -4,9 +4,6 @@
     "bfrpg_4e": {
       "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt": "339c4c1a230d4536d6cca286045e83098b2cb936de9b2af0a4eb344a55692c7a"
     },
-    "black_hack_2e": {
-      "black_hack/The Black Hack -- English.html": "e503145a40f621751150b2b4c6c1e99ba788f7cc0fab0f9aa9c6e70640542d0d"
-    },
     "cairn_1e": {
       "cairn_1e/Cairn Markdown.md": "74ec1da7aa7463b868304cbd474a3daea568f8b24faffd81f6ebeb3725f346d0"
     },
@@ -2529,6 +2526,9 @@
     },
     "yze_srd": {
       "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html": "40c028750ba55ca5d2143e79aedcb5ae8d24fc44823905467701f56fe3f978b1"
+    },
+    "black_hack_1e": {
+      "black_hack/the-black-hack.md": "acfe94c13ddfa1601342324a5311b332137b8d78ac9d4292e29a8fcedf2f8edb"
     }
   }
 }
