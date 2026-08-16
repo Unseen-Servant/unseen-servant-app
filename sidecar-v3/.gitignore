@@ -1,0 +1,10 @@
+# Model assets (large; staged/downloaded locally — see index/assets.py)
+models/
+# Local index databases + scratch
+data/
+*.db
+*.db-wal
+*.db-shm
+# Python
+__pycache__/
+.pytest_cache/
