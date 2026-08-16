@@ -26,3 +26,24 @@ def test_embed_returns_normalized_distinct_vectors():
     assert v.shape == (2, DIM)
     assert np.allclose(np.linalg.norm(v, axis=1), 1.0, atol=1e-4)  # L2-normalized
     assert not np.allclose(v[0], v[1])  # distinct texts → distinct vectors
+
+
+@pytest.mark.skipif(not (MODEL and TOK), reason="bge-m3 ONNX/tokenizer not in HF cache")
+def test_embed_preserves_input_order_across_length_buckets():
+    # Throughput fix: embed() length-buckets units before batching (a 400-char
+    # unit batched with 25-char units wastes ~4x on padding). Bucketing must NOT
+    # scramble output order — row i must always be text i's vector, regardless of
+    # length. Varied lengths + a small batch force the reorder path.
+    e = Embedder(MODEL, TOK)
+    texts = [
+        "short",
+        "a much longer sentence about dungeons and dragons and goblins " * 6,
+        "medium length text about goblins and armor",
+        "x",
+        "another very long passage concerning spells and fireballs and damage " * 6,
+        "tiny",
+    ]
+    batched = e.embed(texts, batch=2)
+    assert batched.shape == (len(texts), DIM)
+    for i, t in enumerate(texts):
+        assert np.allclose(batched[i], e.embed([t])[0], atol=1e-4), f"row {i} misaligned to input"
