@@ -11,6 +11,9 @@ dependencies = [
     "numpy>=1.26",
     "pillow>=10.0",
     "onnxruntime>=1.18",
+    "apsw>=3.46",          # SQLite w/ loadable extensions (stdlib sqlite3 lacks it on macOS)
+    "sqlite-vec>=0.1.6",   # vector store: binary-quant prefilter + f32 rescore
+    "tokenizers>=0.20",    # bge-m3 tokenizer (Rust, no PyTorch — constitution #1)
     "fastapi>=0.115",
     "uvicorn>=0.30",
 ]
