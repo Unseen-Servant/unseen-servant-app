@@ -33,7 +33,9 @@ def build_engine(name: str, data_dir: Path | None):
 
         return V2Engine(data_dir=data_dir or DEFAULT_DATA_DIR)
     if name == "v3":
-        raise SystemExit("v3 engine is a stub until Phase 2 (scaffold §2).")
+        from evals.engines.v3 import V3Engine
+
+        return V3Engine()
     raise SystemExit(f"unknown engine {name!r}")
 
 
