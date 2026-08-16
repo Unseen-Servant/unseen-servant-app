@@ -76,3 +76,184 @@
   answer_ref: "black_hack/the-black-hack.md"
   content: ["out of action", "unconscious", "1d4"]
   order:   ["reduced to zero hit points", "taken out of action", "unconscious and cannot make any actions", "they gain 1d4 hp"]
+
+# ── D&D 5E SRD 5.2.1 (was uncovered; digital-native md reference) ─────
+- id: g09
+  doc: srd_5_2_1
+  page: 91
+  kind: table
+  answer_ref: "dnd_srd_52/06_Equipment/Equipment_Each/Weapons.md"
+  content: ["damage", "properties", ["simple melee", "martial melee"], "dagger"]
+  cells:   ["club 1d4 bludgeoning", "dagger 1d4 piercing", "handaxe 1d6 slashing", "spear 1d6 piercing"]
+
+- id: g10
+  doc: srd_5_2_1
+  page: 92
+  kind: prose
+  answer_ref: "dnd_srd_52/06_Equipment/Equipment_Each/Armor.md"
+  content: ["chain mail", "armor class", "16", "disadvantage"]
+  order:   ["category", "armor class", "strength", "stealth"]
+
+- id: g11
+  doc: srd_5_2_1
+  page: 131
+  kind: prose
+  answer_ref: "dnd_srd_52/07_Spells/Spells_Each/Fireball.md"
+  content: ["fireball", "8d6", ["20 foot", "20 foot radius"], "dexterity"]
+
+# ── D&D 5E SRD 5.1 (weapons table complements the g04 armor table) ────
+- id: g12
+  doc: srd_5_1
+  page: 66
+  kind: table
+  answer_ref: "dnd_srd_51/04_Equipment/Weapons.md"
+  content: ["dagger", ["simple ranged", "simple melee"], "shortbow", "damage"]
+  cells:   ["club 1 sp 1d4 bludgeoning", "dagger 2 gp 1d4 piercing", "spear 1 gp 1d6 piercing", "shortbow 25 gp 1d6 piercing"]
+
+# ── Basic Fantasy RPG (stat block + potions prose) ───────────────────
+- id: g13
+  doc: bfrpg_4e
+  page: 149
+  kind: table
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  content: ["skeleton", "armor class", "hit dice"]
+  cells:   ["armor class 13", "hit dice 1", "damage 1d6"]
+
+- id: g14
+  doc: bfrpg_4e
+  page: 176
+  kind: prose
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  content: ["giant strength", "healing", "cure light wounds"]
+  order:   ["giant strength", "growth", "healing", "heroism"]
+
+# ── Year Zero Engine (was uncovered; HTML reference) ─────────────────
+- id: g15
+  doc: yze_srd
+  page: 20
+  kind: table
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  content: ["weapon", "grip", "bonus", "damage"]
+  cells:   ["knife 1h 1 2", "sword 1h 2 2", "spear 1h 1 2"]
+
+- id: g16
+  doc: yze_srd
+  page: 9
+  kind: prose
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  content: ["push", "bane", ["reroll", "re roll"]]
+
+# ── The Black Hack 1e (core mechanic prose) ──────────────────────────
+- id: g17
+  doc: black_hack_1e
+  page: 3
+  kind: prose
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["core mechanic", "roll below", "d20", "3d6"]
+  order:   ["core mechanic", "roll below it on a d20", "rolling stats", "3d6"]
+
+# ── Batch 2 (→30): monster stat blocks, conditions, spells, class/weapon tables ──
+
+# D&D 5E SRD 5.2.1 — goblin stat blocks (v5.2 statblock layout) + magic missile
+- id: g18
+  doc: srd_5_2_1
+  page: 290
+  kind: table
+  answer_ref: "dnd_srd_52/11_Monsters/Monsters_Each/Goblin_Minion.md"
+  content: ["goblin minion", "nimble escape", "darkvision"]
+  cells:   ["ac 12", "hp 7 2d6"]
+
+- id: g27
+  doc: srd_5_2_1
+  page: 290
+  kind: table
+  answer_ref: "dnd_srd_52/11_Monsters/Monsters_Each/Goblin_Warrior.md"
+  content: ["goblin warrior", "goblinoid"]
+  cells:   ["ac 15"]
+
+- id: g29
+  doc: srd_5_2_1
+  page: 146
+  kind: prose
+  answer_ref: "dnd_srd_52/07_Spells/Spells_Each/Magic_Missile.md"
+  content: ["magic missile", "glowing darts", ["1d4 1 force", "force damage"]]
+
+# D&D 5E SRD 5.1 — goblin stat block, fireball, conditions appendix
+- id: g28
+  doc: srd_5_1
+  page: 315
+  kind: table
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Goblin.md"
+  content: ["goblin", "nimble escape", "scimitar", "darkvision"]
+  cells:   ["armor class 15", "hit points 7 2d6"]
+
+- id: g19
+  doc: srd_5_1
+  page: 144
+  kind: prose
+  answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Fireball.md"
+  content: ["fireball", "8d6", ["20 foot", "20 foot radius"], "dexterity"]
+
+- id: g20
+  doc: srd_5_1
+  page: 358
+  kind: prose
+  answer_ref: "dnd_srd_51/08_Gamemastering/Conditions.md"
+  content: ["blinded", "charmed", "deafened", "frightened", "invisible", "prone"]
+
+# Basic Fantasy RPG — magic-user spellcasting prose + weapons table
+- id: g21
+  doc: bfrpg_4e
+  page: 20
+  kind: prose
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  content: ["magic user", "spellbook", "read magic"]
+
+- id: g30
+  doc: bfrpg_4e
+  page: 170
+  kind: table
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  content: ["dagger", "mace", "sling", "spear", "two handed sword"]
+
+# Cairn — attributes prose + ability-score-loss reading order
+- id: g22
+  doc: cairn_1e
+  page: 6
+  kind: prose
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  content: ["strength", "dexterity", "willpower", "background"]
+
+- id: g23
+  doc: cairn_1e
+  page: 16
+  kind: prose
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  content: ["paralyzed", "delirious"]
+  order:   ["str is reduced to 0 they die", "dex is reduced to 0 they are paralyzed", "wil is reduced to 0 they are delirious"]
+
+# Year Zero Engine — cover/armor-rating table (content proven in both editions)
+- id: g24
+  doc: yze_srd
+  page: 21
+  kind: table
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  content: ["cover", "armor rating"]
+  cells:   ["wooden door 4 c", "stone wall 8 a"]
+
+# OSRIC — magic-user spell descriptions (ch.2 reference)
+- id: g26
+  doc: osric_2e
+  page: 95
+  kind: prose
+  answer_ref: "osric_2e/osric_chapter2 [Wiki and Other Goodies].html"
+  content: ["magic user spells", "flame arrow", "floating disk"]
+
+# The Black Hack 1e — Warrior class stat block
+- id: g25
+  doc: black_hack_1e
+  page: 9
+  kind: table
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["warrior", "starting hp", "special features"]
+  cells:   ["starting hp d10 4", "attack damage 1d8 1d6"]
