@@ -10,12 +10,14 @@ Stage F. Pure over the typed Blocks; no model, no import from sidecar/.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from typing import Sequence
 
 from domain.models import Block, BlockKind, Section
 
 _NUM = re.compile(r"\d+")
 _WS = re.compile(r"\s+")
+_HEADING_FONT_RATIO = 1.15  # a real heading is ≥15% larger than the modal body font
 
 
 def _norm(text: str) -> str:
@@ -41,8 +43,21 @@ def build_sections(
 ) -> tuple[tuple[Section, ...], dict[str, str | None]]:
     """Return (sections, block_id → section_id). Content before the first heading
     maps to None; heading blocks map to their own section."""
+    # Modal body font: the most common prose size. The layout model over-tags
+    # bold body-size lead-ins as paragraph_title, so a `heading` block only
+    # counts if it's ≥15% larger than body OR pinned by a TOC entry (the R2
+    # over-detection fix). No prose to compare against → gate disabled.
+    prose_sizes = [b.font_stats.size for b in blocks
+                   if b.kind is BlockKind.prose and b.font_stats is not None]
+    body_size = Counter(prose_sizes).most_common(1)[0][0] if prose_sizes else None
+    toc_titles = {_norm(title) for _, title, _ in toc}
+
     def is_heading(b: Block) -> bool:
-        return b.kind is BlockKind.heading and b.font_stats is not None and not _is_junk_heading(b.text)
+        if b.kind is not BlockKind.heading or b.font_stats is None or _is_junk_heading(b.text):
+            return False
+        if _norm(b.text) in toc_titles or body_size is None:
+            return True
+        return b.font_stats.size >= body_size * _HEADING_FONT_RATIO
 
     headings = [b for b in blocks if is_heading(b)]
     sizes = sorted({h.font_stats.size for h in headings}, reverse=True)

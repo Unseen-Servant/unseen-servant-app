@@ -62,6 +62,34 @@ def test_junk_stat_line_heading_rejected():
     assert len(sections) == 1 and sections[0].title == "Goblin"
 
 
+def test_body_size_heading_demoted():
+    # PP-DocLayout over-tags bold body-size lead-ins as paragraph_title; a
+    # "heading" at the modal body font size (and not TOC-pinned) is a false
+    # positive and must not open a section — this is the 364-sections/208pp
+    # over-detection that failed the Phase-2 junk-breadcrumb criterion.
+    blocks = [
+        H("real", "Combat", 0, 16, 0),
+        P("p1", "body one", 0, 1), P("p2", "body two", 0, 2), P("p3", "body three", 0, 3),
+        H("fake", "Bold lead-in", 0, 11, 4),  # same size as the modal body prose
+        P("p4", "body four", 0, 5),
+    ]
+    sections, assign = build_sections(blocks, toc=(), doc_id="d")
+    assert len(sections) == 1 and sections[0].title == "Combat"
+    assert assign["fake"] == sections[0].id  # demoted to content, not its own section
+
+
+def test_toc_pin_survives_body_size_gate():
+    # A heading at body size still counts when the TOC names it — an explicit
+    # TOC entry is corroboration the font gate must not override.
+    blocks = [
+        H("c", "Combat", 0, 16, 0),
+        P("p1", "body one", 0, 1), P("p2", "body two", 0, 2),
+        H("a", "Appendix", 5, 11, 3),  # body size, but in the TOC
+    ]
+    sections, _ = build_sections(blocks, toc=((1, "Appendix", 6),), doc_id="d")
+    assert any(s.title == "Appendix" for s in sections)
+
+
 def test_content_before_first_heading_has_no_section():
     blocks = [P("intro", "preamble", 0, 0), H("c", "Chapter", 0, 16, 1), P("body", "b", 0, 2)]
     _, assign = build_sections(blocks, toc=(), doc_id="d")
