@@ -25,13 +25,13 @@
       "pages": 30,
       "content_recall": 0.9888888888888889,
       "reading_order": 1.0,
-      "table_cells": 0.9047619047619048
+      "table_cells": 0.9404761904761905
     },
     "table": {
       "pages": 15,
       "content_recall": 1.0,
       "reading_order": null,
-      "table_cells": 0.9047619047619048
+      "table_cells": 0.9404761904761905
     },
     "two_column": {
       "pages": 2,
@@ -51,7 +51,7 @@
       "pages": 30,
       "content_recall": 0.9888888888888889,
       "reading_order": 1.0,
-      "table_cells": 0.9047619047619048
+      "table_cells": 0.9404761904761905
     },
     "cairn_1e": {
       "pages": 3,
@@ -75,7 +75,7 @@
       "pages": 5,
       "content_recall": 1.0,
       "reading_order": 1.0,
-      "table_cells": 0.7222222222222222
+      "table_cells": 0.8888888888888888
     },
     "srd_5_2_1": {
       "pages": 6,
@@ -320,7 +320,7 @@
       "page": 9,
       "kind": "table",
       "content_recall": 1.0,
-      "table_cells": 0.5
+      "table_cells": 1.0
     }
   ]
 }

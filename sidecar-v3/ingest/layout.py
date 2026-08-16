@@ -92,18 +92,29 @@ def _order(regions: Sequence[Region], page_w: float) -> list[Region]:
 
 
 def _linearize(spans: list[Span]) -> str:
-    """Row-major: bucket spans into rows by y, order each row left→right."""
+    """Row-major: bucket spans into rows by y, order each row left→right.
+
+    A span joins the current row only if it is vertically close AND a comparable
+    font size — a big heading span (tall bbox, centered on the next line) must
+    not absorb the smaller row below it, which would break table-cell contiguity
+    (the black_hack warrior stat-block g25 regression)."""
     if not spans:
         return ""
     spans = sorted(spans, key=lambda s: (s.bbox.y0, s.bbox.x0))
-    rows, cur, cy = [], [], None
+    rows: list[list[Span]] = []
+    cur: list[Span] = []
+    cy = csize = None
     for s in spans:
         yc = (s.bbox.y0 + s.bbox.y1) / 2
         h = s.bbox.y1 - s.bbox.y0
-        if cy is None or abs(yc - cy) <= max(3.0, h * 0.6):
-            cur.append(s); cy = yc if cy is None else (cy + yc) / 2
+        size_ok = csize is None or max(s.size, csize) <= 1.4 * max(min(s.size, csize), 1e-6)
+        if cy is not None and size_ok and abs(yc - cy) <= max(3.0, h * 0.6):
+            cur.append(s)
+            cy = (cy + yc) / 2
         else:
-            rows.append(cur); cur, cy = [s], yc
+            if cur:
+                rows.append(cur)
+            cur, cy, csize = [s], yc, s.size
     if cur:
         rows.append(cur)
     return "\n".join(" ".join(s.text for s in sorted(row, key=lambda s: s.bbox.x0)) for row in rows)

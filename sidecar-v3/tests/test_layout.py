@@ -73,6 +73,23 @@ def test_read_order_used_when_present():
     assert [b.text.strip() for b in blocks] == ["first", "second"]
 
 
+def test_tall_heading_span_does_not_merge_into_stat_row():
+    # Regression (black_hack warrior g25): a big-font title ("WARRIOR", size 24,
+    # tall bbox centered on the first stat line) must NOT merge into it — that
+    # broke the contiguous cell "Starting HP : d10 + 4" and cost the Phase-2 gate.
+    spans = [
+        span("WARRIOR", 150, 18, 230, 122, size=24.0, bold=True),
+        span("Starting HP :", 99, 63, 150, 78),
+        span("d10", 160, 63, 180, 78),
+        span("+ 4", 176, 64, 200, 78, size=10.0),
+    ]
+    b = layout_page(page(spans), [region("table", 95, 10, 240, 130)], "d")[0]
+    lines = [ln for ln in b.text.split("\n") if ln.strip()]
+    stat = next(ln for ln in lines if "Starting HP" in ln)
+    assert "d10" in stat and "+ 4" in stat and "WARRIOR" not in stat
+    assert any(ln.strip() == "WARRIOR" for ln in lines)
+
+
 def test_blocks_carry_page_bbox_readingorder_id_and_fontstats():
     b = layout_page(page([span("Title", 72, 80, 200, 100, size=18, bold=True)]),
                     [region("paragraph_title", 70, 78, 210, 102)], "d")[0]
