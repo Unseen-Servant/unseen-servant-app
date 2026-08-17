@@ -142,6 +142,15 @@ def test_hydrate_joins_unit_to_section_and_document(tmp_path):
     assert row["page_start"] == 1 and row["page_end"] == 1
 
 
+def test_hydrate_returns_parent_chunk_and_ids_for_dedupe(tmp_path):
+    # rung 4 needs the parent chunk text + chunk_id/section_id to dedupe and assemble.
+    s = Store.open(str(tmp_path / "idx.db"))
+    s.commit(_doc3(), _basis_vecs(), content_hash="h1")
+    row = s.hydrate(["d:c1:u0"])["d:c1:u0"]
+    assert row["chunk_id"] == "d:c1" and row["section_id"] == "d:s0"
+    assert row["chunk_text"] == "chunk 1"  # the parent's fuller text
+
+
 def test_vocab_deltas_accumulate(tmp_path):
     # Persisted, incremental per-document deltas (§3.3, Stage G line 115). This is
     # the schema + write API; population (which terms) is the Phase-3 spell rung.

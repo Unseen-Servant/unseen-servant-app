@@ -183,9 +183,9 @@ class Store:
             return {}
         ph = ",".join("?" * len(ids))
         out: dict[str, dict] = {}
-        for uid, text, ps, pe, doc_id, path, title, heading in self.db.execute(
+        for uid, text, ps, pe, doc_id, path, title, heading, chunk_id, section_id, chunk_text in self.db.execute(
             f"SELECT u.id, u.text, u.page_start, u.page_end, d.id, d.path, d.title, "
-            f"       COALESCE(s.title, '') "
+            f"       COALESCE(s.title, ''), c.id, c.section_id, c.text "
             f"FROM units u JOIN chunks c ON c.id=u.chunk_id "
             f"JOIN documents d ON d.id=u.doc_id "
             f"LEFT JOIN sections s ON s.id=c.section_id "
@@ -195,6 +195,7 @@ class Store:
                 "text": text, "section_heading": heading, "doc_id": doc_id,
                 "filename": path.rsplit("/", 1)[-1], "source": title,
                 "page_start": ps, "page_end": pe,
+                "chunk_id": chunk_id, "section_id": section_id, "chunk_text": chunk_text,
             }
         return out
 

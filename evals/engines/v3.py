@@ -37,7 +37,7 @@ def _import_v3():
         from domain.models import BlockKind
         from index import assets
         from index.store import Store
-        from query.pipeline import dense_search
+        from query.pipeline import dense_search, search
     except ImportError as exc:  # pragma: no cover - environment guard
         raise SystemExit(
             f"v3 engine needs the sidecar-v3 environment (missing: {exc}).\n"
@@ -47,7 +47,7 @@ def _import_v3():
     return {
         "extract": extract, "layout": layout, "LABELS_M": LABELS_M, "BlockKind": BlockKind,
         "assets": assets, "index_document": index_document, "make_layout_fn": make_layout_fn,
-        "Store": Store, "dense_search": dense_search,
+        "Store": Store, "dense_search": dense_search, "search": search,
     }
 
 
@@ -140,7 +140,7 @@ class V3Engine:
         m = self._load()
         store, embedder = self._ensure_store(), self._ensure_embedder()
         t0 = time.perf_counter()
-        rows = m["dense_search"](store, embedder.embed, query, k=opts.n_results)
+        rows = m["search"](store, embedder.embed, query, k=opts.n_results)  # rung 4: parents & dedupe
         latency_ms = (time.perf_counter() - t0) * 1000
         results = [
             SearchResult(

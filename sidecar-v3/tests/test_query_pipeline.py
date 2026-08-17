@@ -6,7 +6,7 @@ import numpy as np
 
 from domain.models import Chunk, ChunkKind, Document, Section, Unit
 from index.store import DIM, Store
-from query.pipeline import dense_search
+from query.pipeline import dense_search, search
 
 
 def _doc():
@@ -16,6 +16,22 @@ def _doc():
     units = tuple(Unit(id=f"d:c{i}:u0", chunk_id=f"d:c{i}", text=f"unit {i} body",
                        kind=ChunkKind.prose, page_start=i, page_end=i, lang="en") for i in range(3))
     return Document(id="d", path="/lib/phb.pdf", title="PHB", page_count=3,
+                    sections=sections, chunks=chunks, units=units)
+
+
+def _doc_2sec():
+    # two sections, one unit each — for the "distinct sections survive" case
+    sections = (Section(id="d:s0", title="A", level=1, parent_id=None, page_start=0, page_end=0),
+                Section(id="d:s1", title="B", level=1, parent_id=None, page_start=1, page_end=1))
+    chunks = (Chunk(id="d:c0", doc_id="d", section_id="d:s0", ordinal=0, kind=ChunkKind.prose,
+                    text="chunk zero", page_start=0, page_end=0, lang="en"),
+              Chunk(id="d:c1", doc_id="d", section_id="d:s1", ordinal=1, kind=ChunkKind.prose,
+                    text="chunk one", page_start=1, page_end=1, lang="en"))
+    units = (Unit(id="d:c0:u0", chunk_id="d:c0", text="unit zero", kind=ChunkKind.prose,
+                  page_start=0, page_end=0, lang="en"),
+             Unit(id="d:c1:u0", chunk_id="d:c1", text="unit one", kind=ChunkKind.prose,
+                  page_start=1, page_end=1, lang="en"))
+    return Document(id="d", path="/lib/phb.pdf", title="PHB", page_count=2,
                     sections=sections, chunks=chunks, units=units)
 
 
@@ -42,3 +58,31 @@ def test_dense_search_respects_k(tmp_path):
     v = _basis()
     s.commit(_doc(), v, content_hash="h1")
     assert len(dense_search(s, lambda t: np.array([v[0]], np.float32), "q", k=2)) == 2
+
+
+# -- rung 4: parents & dedupe (query-time) --
+
+def test_search_dedupes_by_section_and_returns_parent_text(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    v = _basis()
+    s.commit(_doc(), v, content_hash="h1")  # 3 units, all in section d:s0
+    res = search(s, lambda t: np.array([v[1]], np.float32), "q", k=5)
+    assert len(res) == 1                      # one section → one result, not three
+    assert res[0]["section_id"] == "d:s0"
+    assert res[0]["text"] == "chunk 1"        # parent chunk text (best-scoring unit c1)
+    assert res[0]["matched_text"] == "unit 1 body"
+
+
+def test_search_keeps_distinct_sections(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    vv = np.zeros((2, DIM), np.float32); vv[0, 0] = 1.0; vv[1, 100] = 1.0
+    s.commit(_doc_2sec(), vv, content_hash="h1")
+    res = search(s, lambda t: np.array([vv[0]], np.float32), "q", k=5)
+    assert {r["section_id"] for r in res} == {"d:s0", "d:s1"}  # both distinct sections kept
+
+
+def test_search_respects_k_after_dedupe(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    vv = np.zeros((2, DIM), np.float32); vv[0, 0] = 1.0; vv[1, 100] = 1.0
+    s.commit(_doc_2sec(), vv, content_hash="h1")
+    assert len(search(s, lambda t: np.array([vv[0]], np.float32), "q", k=1)) == 1
