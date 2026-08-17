@@ -153,5 +153,50 @@ class Store:
             "SELECT units.id FROM unit_fts JOIN units ON units.rowid=unit_fts.rowid "
             "WHERE unit_fts MATCH ? ORDER BY rank", (query,))]
 
+    def search_dense(self, qvec, k: int = 25, prefilter: int = 200) -> list[tuple[str, float]]:
+        """Dense KNN: binary-quantized hamming prefilter (the sqlite-vec vector-
+        spike config — a raw f32 scan is ~800 MB/query) then full-precision cosine
+        rescore. Returns (unit_id, cosine) descending; vectors are L2-normalized so
+        dot == cosine."""
+        q = np.asarray(qvec, np.float32)
+        rows = self.db.execute(
+            "SELECT rowid FROM unit_vec WHERE bvec MATCH vec_quantize_binary(?) AND k=? "
+            "ORDER BY distance", (q.tobytes(), prefilter)).fetchall()
+        if not rows:
+            return []
+        ids = [r[0] for r in rows]
+        ph = ",".join("?" * len(ids))
+        scored = [
+            (uid, float(q @ np.frombuffer(blob, np.float32)))
+            for uid, blob in self.db.execute(
+                f"SELECT units.id, unit_fvec.v FROM unit_fvec "
+                f"JOIN units ON units.rowid=unit_fvec.rowid WHERE unit_fvec.rowid IN ({ph})", ids)
+        ]
+        scored.sort(key=lambda x: -x[1])
+        return scored[:k]
+
+    def hydrate(self, unit_ids) -> dict[str, dict]:
+        """Join units → chunks → sections → documents into result rows for payload
+        assembly (query/). Missing section (content before the first heading) → ""."""
+        ids = list(unit_ids)
+        if not ids:
+            return {}
+        ph = ",".join("?" * len(ids))
+        out: dict[str, dict] = {}
+        for uid, text, ps, pe, doc_id, path, title, heading in self.db.execute(
+            f"SELECT u.id, u.text, u.page_start, u.page_end, d.id, d.path, d.title, "
+            f"       COALESCE(s.title, '') "
+            f"FROM units u JOIN chunks c ON c.id=u.chunk_id "
+            f"JOIN documents d ON d.id=u.doc_id "
+            f"LEFT JOIN sections s ON s.id=c.section_id "
+            f"WHERE u.id IN ({ph})", ids
+        ):
+            out[uid] = {
+                "text": text, "section_heading": heading, "doc_id": doc_id,
+                "filename": path.rsplit("/", 1)[-1], "source": title,
+                "page_start": ps, "page_end": pe,
+            }
+        return out
+
     def close(self) -> None:
         self.db.close()

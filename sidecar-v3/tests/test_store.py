@@ -92,6 +92,56 @@ def test_toc_and_page_labels_default_empty(tmp_path):
     assert s.get_toc("d") == () and s.get_page_labels("d") == ()
 
 
+def _doc3():
+    """A doc with 3 units in one section — for dense-search ranking tests."""
+    sections = (Section(id="d:s0", title="Combat", level=1, parent_id=None, page_start=0, page_end=2),)
+    chunks = tuple(
+        Chunk(id=f"d:c{i}", doc_id="d", section_id="d:s0", ordinal=i, kind=ChunkKind.prose,
+              text=f"chunk {i}", page_start=i, page_end=i, lang="en")
+        for i in range(3)
+    )
+    units = tuple(
+        Unit(id=f"d:c{i}:u0", chunk_id=f"d:c{i}", text=f"unit {i} body",
+             kind=ChunkKind.prose, page_start=i, page_end=i, lang="en")
+        for i in range(3)
+    )
+    return Document(id="d", path="/lib/monster_manual.pdf", title="Monster Manual",
+                    page_count=3, sections=sections, chunks=chunks, units=units)
+
+
+def _basis_vecs():
+    """3 near-orthogonal L2-normalized vectors so nearest-neighbour is unambiguous."""
+    v = np.zeros((3, DIM), np.float32)
+    for i in range(3):
+        v[i, i * 100] = 1.0
+    return v
+
+
+def test_search_dense_ranks_nearest_unit_first(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    v = _basis_vecs()
+    s.commit(_doc3(), v, content_hash="h1")
+    hits = s.search_dense(v[1], k=3)                 # query == unit 1's vector
+    assert [uid for uid, _ in hits][0] == "d:c1:u0"  # nearest ranks first
+    assert len(hits) == 3 and hits[0][1] > hits[1][1]  # scores descending
+
+
+def test_search_dense_respects_k(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    s.commit(_doc3(), _basis_vecs(), content_hash="h1")
+    assert len(s.search_dense(_basis_vecs()[0], k=2)) == 2
+
+
+def test_hydrate_joins_unit_to_section_and_document(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    s.commit(_doc3(), _basis_vecs(), content_hash="h1")
+    row = s.hydrate(["d:c1:u0"])["d:c1:u0"]
+    assert row["text"] == "unit 1 body"
+    assert row["section_heading"] == "Combat"
+    assert row["filename"] == "monster_manual.pdf" and row["source"] == "Monster Manual"
+    assert row["page_start"] == 1 and row["page_end"] == 1
+
+
 def test_vocab_deltas_accumulate(tmp_path):
     # Persisted, incremental per-document deltas (§3.3, Stage G line 115). This is
     # the schema + write API; population (which terms) is the Phase-3 spell rung.
