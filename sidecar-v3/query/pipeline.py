@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Sequence
 
+from query.boost import boost_order, detect_sources
 from query.fuse import rrf
 
 _TERMS = re.compile(r"[a-z0-9]+")
@@ -56,14 +57,15 @@ def dense_search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
 
 def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
            k: int = 25, pool: int = 200, assemble_parents: bool = True,
-           hybrid: bool = False, weights: Sequence[float] | None = None) -> list[dict]:
-    """Rungs 4–5 — fuse → dedupe → parents (query-time). Over-fetch dense units;
-    with `hybrid`, RRF-fuse them against the FTS/BM25 ranking (rung 5), dense-
-    leaning by default (`weights=[1.0, LEX_WEIGHT]`). Applied unconditionally — a
-    fairly-fed BM25 (heading-prepended FTS + stopword-cleaned match) pays on both
-    keyword and NL, so no query-shape gate. Then keep the best-scoring unit per
-    parent section so the same section never repeats; `matched_text` is the unit
-    that hit and, with `assemble_parents`, `text` is the fuller parent chunk."""
+           hybrid: bool = False, weights: Sequence[float] | None = None,
+           system_map: dict | None = None) -> list[dict]:
+    """Rungs 4–6 — fuse → boost → dedupe → parents (query-time). Over-fetch dense
+    units; with `hybrid`, RRF-fuse against FTS/BM25 (rung 5), dense-leaning by
+    default. With `system_map` ({keyword→sources}), if the query names a system
+    its sources are soft-boosted to the front (rung 6 disambiguation). Then keep
+    the best-scoring unit per parent section so the same section never repeats;
+    `matched_text` is the unit that hit and, with `assemble_parents`, `text` is
+    the fuller parent chunk."""
     qvec = embed_fn([query])[0]
     dense = store.search_dense(qvec, k=pool)  # [(uid, cosine)]
     dense_ids = [uid for uid, _ in dense]
@@ -76,6 +78,9 @@ def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
         ranked, relevance = dense_ids, dict(dense)
 
     meta = store.hydrate(ranked)
+    if system_map:  # rung 6: name a system → soft-boost its sources to the front
+        matched = detect_sources(query, system_map)
+        ranked = boost_order(ranked, {u: meta.get(u, {}).get("filename") for u in ranked}, matched)
     seen: set[str] = set()
     out: list[dict] = []
     for uid in ranked:

@@ -143,7 +143,8 @@ class V3Engine:
         extra = opts.extra or {}
         rows = m["search"](store, embedder.embed, query, k=opts.n_results,
                            hybrid=opts.hybrid,                       # rung 4 parents+dedupe, rung 5 fusion
-                           weights=extra.get("weights"))
+                           weights=extra.get("weights"),
+                           system_map=extra.get("system_map"))       # rung 6 system boost
         latency_ms = (time.perf_counter() - t0) * 1000
         results = [
             SearchResult(

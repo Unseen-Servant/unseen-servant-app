@@ -115,6 +115,35 @@ def _doc_lex_vs_dense():
                     sections=sections, chunks=chunks, units=units)
 
 
+def _two_systems():
+    # two single-file "systems": osric.pdf and other.pdf, one unit each
+    def doc(did, fn, title, text):
+        return Document(id=did, path=f"/lib/{fn}", title=title, page_count=1,
+                        sections=(Section(id=f"{did}:s0", title="Falling", level=1, parent_id=None,
+                                          page_start=0, page_end=0),),
+                        chunks=(Chunk(id=f"{did}:c0", doc_id=did, section_id=f"{did}:s0", ordinal=0,
+                                      kind=ChunkKind.prose, text=text, page_start=0, page_end=0, lang="en"),),
+                        units=(Unit(id=f"{did}:c0:u0", chunk_id=f"{did}:c0", text=text,
+                                    kind=ChunkKind.prose, page_start=0, page_end=0, lang="en"),))
+    return doc("A", "osric.pdf", "OSRIC", "falling damage 1d6 per distance"), \
+        doc("B", "other.pdf", "Other", "falling damage rules")
+
+
+def test_search_boosts_named_system_over_better_vector(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    a, b = _two_systems()
+    va = np.zeros((1, DIM), np.float32); va[0, 0] = 1.0
+    vb = np.zeros((1, DIM), np.float32); vb[0, 100] = 1.0
+    s.commit(a, va, content_hash="ha")
+    s.commit(b, vb, content_hash="hb")
+    embed_fn = lambda t: np.array([vb[0]], np.float32)  # query embeds closest to B (other.pdf)
+    smap = {"osric": {"osric.pdf"}}
+    assert search(s, embed_fn, "osric falling", k=2)[0]["filename"] == "other.pdf"  # no boost → B wins
+    boosted = search(s, embed_fn, "osric falling", k=2, system_map=smap)
+    assert boosted[0]["filename"] == "osric.pdf"  # boost lifts the named system above the better vector
+    assert {r["filename"] for r in boosted} == {"osric.pdf", "other.pdf"}  # soft — B still present
+
+
 def test_hybrid_fuses_lexical_hit_above_dense_only(tmp_path):
     s = Store.open(str(tmp_path / "idx.db"))
     vv = np.zeros((2, DIM), np.float32); vv[0, 0] = 1.0; vv[1, 100] = 1.0

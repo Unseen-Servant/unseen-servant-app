@@ -26,6 +26,27 @@ from evals.retrieval import grade, metrics
 QUERIES_PATH = Path(__file__).resolve().parent / "retrieval" / "queries.yaml"
 BASELINE_DIR = Path(__file__).resolve().parent / "baselines"
 
+# Rung-6 system-boost keyword map — the eval's stand-in for the product's tag
+# keyword lists (user-defined + defaults). Keyword → the doc ids it names; built
+# into {keyword: {filenames}} against the corpus. Production wires this to tags.
+SYSTEM_KEYWORDS = {
+    "bfrpg_4e": ["basic fantasy", "bfrpg"],
+    "black_hack_1e": ["black hack"],
+    "cairn_1e": ["cairn"],
+    "srd_5_1": ["dnd", "d&d", "5e"],
+    "srd_5_2_1": ["dnd", "d&d", "5e"],
+    "osric_2e": ["osric"],
+    "yze_srd": ["year zero", "yze"],
+}
+
+
+def _system_map(corpus) -> dict:
+    m: dict[str, set] = {}
+    for d in corpus.documents:
+        for kw in SYSTEM_KEYWORDS.get(d.id, []):
+            m.setdefault(kw, set()).add(d.pdf_path.name)
+    return m
+
 
 def build_engine(name: str, data_dir: Path | None):
     if name == "v2":
@@ -239,7 +260,7 @@ def main() -> int:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
                 queries = queries[: args.limit]
-            extra: dict = {}
+            extra: dict = {"system_map": _system_map(corpus)}  # rung 6 boost (no-op if no system named)
             if args.lex_weight is not None:
                 extra["weights"] = [1.0, args.lex_weight]
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid, extra=extra)
