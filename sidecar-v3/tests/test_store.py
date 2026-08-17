@@ -68,6 +68,16 @@ def test_fts_finds_unit_by_word(tmp_path):
     assert "d:c0:u0" in ids and "d:c1:u0" not in ids
 
 
+def test_commit_indexes_fts_texts_when_given(tmp_path):
+    # heading-prepended FTS: the lexical index gets the same breadcrumb-prefixed
+    # text the dense side embeds, so BM25 can match on section headings too.
+    s = Store.open(str(tmp_path / "idx.db"))
+    fts = ["Combat > Weapons\nunit 0 body", "Combat\nunit 1 body", "Combat\nunit 2 body"]
+    s.commit(_doc3(), _basis_vecs(), content_hash="h1", fts_texts=fts)
+    assert "d:c1:u0" in s.search_fts("combat")   # heading term now searchable
+    assert s.search_fts("weapons") == ["d:c0:u0"]  # term only in the prepended heading
+
+
 def test_document_row_records_pipeline_version(tmp_path):
     s = Store.open(str(tmp_path / "idx.db"))
     s.commit(_doc(), _vecs(2), content_hash="h1", pipeline_version=7)

@@ -6,7 +6,17 @@ import numpy as np
 
 from domain.models import Chunk, ChunkKind, Document, Section, Unit
 from index.store import DIM, Store
-from query.pipeline import dense_search, search
+from query.pipeline import _fts_query, dense_search, search
+
+
+def test_fts_query_drops_stopwords_to_content_terms():
+    # RRF fuses on rank, so a stopword match ("how","does") injects noise that
+    # displaces good dense hits — the FTS match should carry content terms only.
+    assert _fts_query("how does armor reduce damage") == "armor OR reduce OR damage"
+
+
+def test_fts_query_falls_back_when_all_stopwords():
+    assert _fts_query("what is it") != ""  # never emit an empty MATCH
 
 
 def _doc():
@@ -86,3 +96,32 @@ def test_search_respects_k_after_dedupe(tmp_path):
     vv = np.zeros((2, DIM), np.float32); vv[0, 0] = 1.0; vv[1, 100] = 1.0
     s.commit(_doc_2sec(), vv, content_hash="h1")
     assert len(search(s, lambda t: np.array([vv[0]], np.float32), "q", k=1)) == 1
+
+
+# -- rung 5: BM25/FTS fusion (query-time, --hybrid) --
+
+def _doc_lex_vs_dense():
+    sections = (Section(id="d:s0", title="Spells", level=1, parent_id=None, page_start=0, page_end=0),
+                Section(id="d:s1", title="Combat", level=1, parent_id=None, page_start=1, page_end=1))
+    chunks = (Chunk(id="d:c0", doc_id="d", section_id="d:s0", ordinal=0, kind=ChunkKind.prose,
+                    text="fireball deals 8d6 fire damage", page_start=0, page_end=0, lang="en"),
+              Chunk(id="d:c1", doc_id="d", section_id="d:s1", ordinal=1, kind=ChunkKind.prose,
+                    text="a goblin swings its club", page_start=1, page_end=1, lang="en"))
+    units = (Unit(id="d:c0:u0", chunk_id="d:c0", text="fireball deals 8d6 fire damage",
+                  kind=ChunkKind.prose, page_start=0, page_end=0, lang="en"),
+             Unit(id="d:c1:u0", chunk_id="d:c1", text="a goblin swings its club",
+                  kind=ChunkKind.prose, page_start=1, page_end=1, lang="en"))
+    return Document(id="d", path="/x.pdf", title="X", page_count=2,
+                    sections=sections, chunks=chunks, units=units)
+
+
+def test_hybrid_fuses_lexical_hit_above_dense_only(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    vv = np.zeros((2, DIM), np.float32); vv[0, 0] = 1.0; vv[1, 100] = 1.0
+    s.commit(_doc_lex_vs_dense(), vv, content_hash="h1")
+    # query text is "fireball" (lexical → u0) but embeds to u1's vector (dense → u1)
+    embed_fn = lambda t: np.array([vv[1]], np.float32)
+    dense = search(s, embed_fn, "fireball", k=2, hybrid=False)
+    hyb = search(s, embed_fn, "fireball", k=2, hybrid=True)
+    assert dense[0]["unit_id"] == "d:c1:u0"   # dense-only ranks the vector match first
+    assert hyb[0]["unit_id"] == "d:c0:u0"     # fusion lifts the lexical "fireball" hit to #1

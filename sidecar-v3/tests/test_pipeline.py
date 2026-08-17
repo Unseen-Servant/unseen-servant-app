@@ -42,6 +42,25 @@ def fake_embed(texts):
     return v / np.clip(np.linalg.norm(v, axis=1, keepdims=True), 1e-9, None)
 
 
+@pytest.fixture
+def pdf_heading_only(tmp_path):
+    # heading word ("Bestiary") absent from the body → only findable via FTS if the
+    # lexical index is heading-prepended.
+    doc = fitz.open()
+    p = doc.new_page(width=612, height=792)
+    p.insert_text((72, 90), "Bestiary", fontsize=18, fontname="hebo")
+    p.insert_text((72, 140), "a lone creature lurks in the dark.", fontsize=11, fontname="helv")
+    path = tmp_path / "b.pdf"
+    doc.save(path)
+    return str(path)
+
+
+def test_fts_is_heading_prepended(pdf_heading_only, tmp_path):
+    store = Store.open(str(tmp_path / "idx.db"))
+    index_document(pdf_heading_only, store, fake_layout, fake_embed, doc_id="b")
+    assert store.search_fts("bestiary")  # matchable only via the prepended heading
+
+
 def test_index_document_end_to_end(pdf, tmp_path):
     store = Store.open(str(tmp_path / "idx.db"))
     rep = index_document(pdf, store, fake_layout, fake_embed, doc_id="m")

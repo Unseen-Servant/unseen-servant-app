@@ -64,10 +64,14 @@ class Store:
         return bool(row) and row[0] == content_hash
 
     def commit(self, doc: Document, vectors: np.ndarray, content_hash: str,
-               pipeline_version: int = SCHEMA_VERSION) -> None:
+               pipeline_version: int = SCHEMA_VERSION, fts_texts=None) -> None:
         """One transaction: replace the document's rows and re-insert everything.
-        `vectors` is (len(doc.units), DIM), row-aligned to doc.units."""
+        `vectors` is (len(doc.units), DIM), row-aligned to doc.units. `fts_texts`
+        (also row-aligned) is what the FTS/BM25 index stores — pass the heading-
+        prepended embed inputs to make the lexical side heading-aware; defaults to
+        the raw unit text."""
         assert len(vectors) == len(doc.units), "one vector per unit"
+        assert fts_texts is None or len(fts_texts) == len(doc.units), "one fts text per unit"
         with self.db:  # apsw transaction
             for (rid,) in self.db.execute("SELECT rowid FROM units WHERE doc_id=?", (doc.id,)).fetchall():
                 self.db.execute("DELETE FROM unit_vec WHERE rowid=?", (rid,))
@@ -96,7 +100,7 @@ class Store:
                     " VALUES(?,?,?,?,?,?,?,?)",
                     (c.id, doc.id, c.section_id, c.ordinal, c.kind.value, c.text, c.page_start, c.page_end),
                 )
-            for u, vec in zip(doc.units, vectors):
+            for i, (u, vec) in enumerate(zip(doc.units, vectors)):
                 blob = np.asarray(vec, np.float32).tobytes()
                 self.db.execute(
                     "INSERT INTO units(id,chunk_id,doc_id,text,kind,page_start,page_end,lang)"
@@ -107,7 +111,8 @@ class Store:
                 self.db.execute("INSERT INTO unit_vec(rowid,doc_id,bvec) VALUES(?,?,vec_quantize_binary(?))",
                                 (rid, doc.id, blob))
                 self.db.execute("INSERT INTO unit_fvec(rowid,v) VALUES(?,?)", (rid, blob))
-                self.db.execute("INSERT INTO unit_fts(rowid,text) VALUES(?,?)", (rid, u.text))
+                self.db.execute("INSERT INTO unit_fts(rowid,text) VALUES(?,?)",
+                                (rid, fts_texts[i] if fts_texts is not None else u.text))
 
     # -- read-back --------------------------------------------------------
 

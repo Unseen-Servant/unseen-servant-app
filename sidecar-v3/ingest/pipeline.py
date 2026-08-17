@@ -81,15 +81,15 @@ def index_document(
     sections, assign = build_sections(blocks, raw.toc, raw.doc_id)
     chunks = chunk_blocks(blocks, assign, raw.doc_id)
     units = tuple(u for c in chunks for u in to_units(c))
-    vectors = (embed_fn(build_embed_inputs(units, chunks, sections)) if units
-               else np.zeros((0, DIM), np.float32))
+    embed_inputs = build_embed_inputs(units, chunks, sections)  # breadcrumb + unit text
+    vectors = embed_fn(embed_inputs) if units else np.zeros((0, DIM), np.float32)
 
     doc = Document(
         id=raw.doc_id, path=raw.path, title=raw.title, page_count=raw.page_count,
         needs_ocr=raw.needs_ocr, toc=raw.toc, page_labels=raw.page_labels,
         sections=sections, blocks=blocks, chunks=chunks, units=units,
     )
-    store.commit(doc, vectors, content_hash, pipeline_version)
+    store.commit(doc, vectors, content_hash, pipeline_version, fts_texts=embed_inputs)
     return IndexReport(raw.doc_id, len(sections), len(chunks), len(units), skipped=False)
 
 

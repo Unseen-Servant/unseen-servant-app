@@ -124,7 +124,7 @@ class V3Engine:
         # Ignore unimplemented knobs loudly, once (base.py contract): rung 1 is dense-only.
         if self._warned_knobs:
             return
-        pending = [k for k in ("rerank", "hybrid", "spell_correction", "variant_expansion")
+        pending = [k for k in ("rerank", "spell_correction", "variant_expansion")
                    if getattr(opts, k)]
         if pending:
             print(f"[v3] dense-only rung: ignoring not-yet-built knobs {pending}", file=sys.stderr)
@@ -140,7 +140,10 @@ class V3Engine:
         m = self._load()
         store, embedder = self._ensure_store(), self._ensure_embedder()
         t0 = time.perf_counter()
-        rows = m["search"](store, embedder.embed, query, k=opts.n_results)  # rung 4: parents & dedupe
+        extra = opts.extra or {}
+        rows = m["search"](store, embedder.embed, query, k=opts.n_results,
+                           hybrid=opts.hybrid,                       # rung 4 parents+dedupe, rung 5 fusion
+                           weights=extra.get("weights"))
         latency_ms = (time.perf_counter() - t0) * 1000
         results = [
             SearchResult(

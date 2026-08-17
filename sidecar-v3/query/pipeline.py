@@ -12,7 +12,32 @@ to SearchResult. No import from sidecar/ (v2).
 """
 from __future__ import annotations
 
+import re
 from typing import Callable, Sequence
+
+from query.fuse import rrf
+
+_TERMS = re.compile(r"[a-z0-9]+")
+LEX_WEIGHT = 0.3  # RRF lexical weight (dense=1.0). Dense-leaning: beat dense on every
+#                   metric AND both keyword/nl with no regression; ≥0.4 or 1:1 nicks NL.
+# Function words dropped from the FTS/BM25 match: RRF fuses on rank (not BM25's
+# IDF-weighted score), so a stopword hit still earns rank credit and displaces
+# good dense results. Matching on content terms only removes that noise (it was
+# the NL regression's cause).
+_STOPWORDS = frozenset(
+    "how what when where why who which whose whom does do did is are was were can "
+    "could should would will may might have has a an the of to in for on at by from "
+    "with as that this these those it its and or not you your they their he she his "
+    "her we our i me my but if then than into about over under out up down off no".split())
+
+
+def _fts_query(query: str) -> str:
+    """FTS5 MATCH string: OR the query's content terms (stopwords dropped; recall
+    over the strict implicit-AND default, BM25 handles precision). Falls back to
+    all terms if the query is only stopwords, so the match is never empty."""
+    terms = _TERMS.findall(query.lower())
+    content = [t for t in terms if t not in _STOPWORDS]
+    return " OR ".join(content or terms)
 
 
 def dense_search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
@@ -30,24 +55,41 @@ def dense_search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
 
 
 def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
-           k: int = 25, pool: int = 200, assemble_parents: bool = True) -> list[dict]:
-    """Rung 4 — parents & dedupe (query-time). Over-fetch units, keep the best-
-    scoring unit per parent section (chunk when the unit precedes any heading), so
-    the same section never repeats. `matched_text` is always the unit that hit;
-    with `assemble_parents` the result `text` is the fuller parent chunk (more
-    context, larger payload), else it stays the compact matched unit — the
-    payload/quality knob the ablation weighs against §3.5."""
-    hits = dense_search(store, embed_fn, query, k=pool)
+           k: int = 25, pool: int = 200, assemble_parents: bool = True,
+           hybrid: bool = False, weights: Sequence[float] | None = None) -> list[dict]:
+    """Rungs 4–5 — fuse → dedupe → parents (query-time). Over-fetch dense units;
+    with `hybrid`, RRF-fuse them against the FTS/BM25 ranking (rung 5), dense-
+    leaning by default (`weights=[1.0, LEX_WEIGHT]`). Applied unconditionally — a
+    fairly-fed BM25 (heading-prepended FTS + stopword-cleaned match) pays on both
+    keyword and NL, so no query-shape gate. Then keep the best-scoring unit per
+    parent section so the same section never repeats; `matched_text` is the unit
+    that hit and, with `assemble_parents`, `text` is the fuller parent chunk."""
+    qvec = embed_fn([query])[0]
+    dense = store.search_dense(qvec, k=pool)  # [(uid, cosine)]
+    dense_ids = [uid for uid, _ in dense]
+    if hybrid:
+        fq = _fts_query(query)
+        lex = store.search_fts(fq)[:pool] if fq else []
+        fused = rrf([dense_ids, lex], weights=weights or [1.0, LEX_WEIGHT])
+        ranked, relevance = [uid for uid, _ in fused], dict(fused)
+    else:
+        ranked, relevance = dense_ids, dict(dense)
+
+    meta = store.hydrate(ranked)
     seen: set[str] = set()
     out: list[dict] = []
-    for r in hits:
-        key = r.get("section_id") or f"c:{r.get('chunk_id')}"
+    for uid in ranked:
+        m = meta.get(uid)
+        if m is None:
+            continue
+        key = m.get("section_id") or f"c:{m.get('chunk_id')}"
         if key in seen:
             continue
         seen.add(key)
-        row = {**r, "rank": len(out), "matched_text": r["text"]}
+        row = {"unit_id": uid, "rank": len(out), "relevance": relevance.get(uid, 0.0),
+               **m, "matched_text": m["text"]}
         if assemble_parents:
-            row["text"] = r.get("chunk_text") or r["text"]
+            row["text"] = m.get("chunk_text") or m["text"]
         out.append(row)
         if len(out) >= k:
             break

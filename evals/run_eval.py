@@ -219,6 +219,9 @@ def main() -> int:
     ap.add_argument("--data-dir", type=Path, default=None)
     ap.add_argument("--n-results", type=int, default=SearchOptions.n_results)
     ap.add_argument("--no-index", action="store_true", help="retrieval: assume corpus already indexed")
+    ap.add_argument("--hybrid", action="store_true", help="retrieval: fuse dense + BM25/FTS (rung 5)")
+    ap.add_argument("--lex-weight", type=float, default=None,
+                    help="retrieval: RRF lexical weight (dense=1.0); sweep the fusion balance")
     ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
     args = ap.parse_args()
@@ -236,7 +239,10 @@ def main() -> int:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
                 queries = queries[: args.limit]
-            opts = SearchOptions(n_results=args.n_results)
+            extra: dict = {}
+            if args.lex_weight is not None:
+                extra["weights"] = [1.0, args.lex_weight]
+            opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid, extra=extra)
             result = run(engine, queries, corpus, opts, do_index=not args.no_index)
     finally:
         engine.close()
