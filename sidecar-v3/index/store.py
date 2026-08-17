@@ -9,6 +9,8 @@ lives in query/ (Phase 3); this is the write path. No import from sidecar/.
 """
 from __future__ import annotations
 
+import json
+
 import apsw
 import numpy as np
 import sqlite_vec
@@ -20,7 +22,8 @@ DIM = 1024  # bge-m3 (embed_parity spike)
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS documents(
   id TEXT PRIMARY KEY, path TEXT, title TEXT, page_count INTEGER,
-  content_hash TEXT, pipeline_version INTEGER, needs_ocr INTEGER, lang TEXT);
+  content_hash TEXT, pipeline_version INTEGER, needs_ocr INTEGER, lang TEXT,
+  toc TEXT, page_labels TEXT);
 CREATE TABLE IF NOT EXISTS sections(
   id TEXT PRIMARY KEY, doc_id TEXT, parent_id TEXT, level INTEGER,
   title TEXT, page_start INTEGER, page_end INTEGER);
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS units(
 CREATE VIRTUAL TABLE IF NOT EXISTS unit_vec USING vec0(doc_id text, bvec bit[{DIM}]);
 CREATE TABLE IF NOT EXISTS unit_fvec(rowid INTEGER PRIMARY KEY, v BLOB);
 CREATE VIRTUAL TABLE IF NOT EXISTS unit_fts USING fts5(text);
+CREATE TABLE IF NOT EXISTS vocab(term TEXT, lang TEXT, freq INTEGER, PRIMARY KEY(term, lang));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -75,10 +79,10 @@ class Store:
             self.db.execute("DELETE FROM documents WHERE id=?", (doc.id,))
 
             self.db.execute(
-                "INSERT INTO documents(id,path,title,page_count,content_hash,pipeline_version,needs_ocr,lang)"
-                " VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT INTO documents(id,path,title,page_count,content_hash,pipeline_version,"
+                "needs_ocr,lang,toc,page_labels) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (doc.id, doc.path, doc.title, doc.page_count, content_hash, pipeline_version,
-                 int(doc.needs_ocr), doc.lang),
+                 int(doc.needs_ocr), doc.lang, json.dumps(doc.toc), json.dumps(doc.page_labels)),
             )
             for s in doc.sections:
                 self.db.execute(
@@ -114,6 +118,28 @@ class Store:
     def pipeline_version(self, doc_id: str) -> int | None:
         row = self.db.execute("SELECT pipeline_version FROM documents WHERE id=?", (doc_id,)).fetchone()
         return row[0] if row else None
+
+    def get_toc(self, doc_id: str) -> tuple[tuple[int, str, int], ...]:
+        row = self.db.execute("SELECT toc FROM documents WHERE id=?", (doc_id,)).fetchone()
+        return tuple(tuple(e) for e in json.loads(row[0])) if row and row[0] else ()
+
+    def get_page_labels(self, doc_id: str) -> tuple[str, ...]:
+        row = self.db.execute("SELECT page_labels FROM documents WHERE id=?", (doc_id,)).fetchone()
+        return tuple(json.loads(row[0])) if row and row[0] else ()
+
+    # -- vocab (persisted, incremental per-document deltas — §3.3; populated in Phase 3) --
+
+    def add_vocab(self, counts) -> None:
+        """Accumulate (term, lang, freq) deltas into the persisted vocab table."""
+        self.db.executemany(
+            "INSERT INTO vocab(term,lang,freq) VALUES(?,?,?) "
+            "ON CONFLICT(term,lang) DO UPDATE SET freq=freq+excluded.freq",
+            [(t, l, f) for t, l, f in counts],
+        )
+
+    def vocab_freq(self, term: str, lang: str) -> int:
+        row = self.db.execute("SELECT freq FROM vocab WHERE term=? AND lang=?", (term, lang)).fetchone()
+        return row[0] if row else 0
 
     def get_vector(self, unit_id: str) -> np.ndarray:
         row = self.db.execute(

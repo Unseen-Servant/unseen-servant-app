@@ -66,7 +66,8 @@ def index_document(
 
     doc = Document(
         id=raw.doc_id, path=raw.path, title=raw.title, page_count=raw.page_count,
-        needs_ocr=raw.needs_ocr, sections=sections, blocks=blocks, chunks=chunks, units=units,
+        needs_ocr=raw.needs_ocr, toc=raw.toc, page_labels=raw.page_labels,
+        sections=sections, blocks=blocks, chunks=chunks, units=units,
     )
     store.commit(doc, vectors, content_hash, pipeline_version)
     return IndexReport(raw.doc_id, len(sections), len(chunks), len(units), skipped=False)

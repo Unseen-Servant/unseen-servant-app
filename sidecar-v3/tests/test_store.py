@@ -1,6 +1,8 @@
 """Stage G — the one-SQLite-file index commit (plan §3.2 G, §3.3). Tested with
 fake vectors (no embedder/model needed): schema, one-txn commit, idempotent
 re-index, content-hash change detection, vector round-trip, FTS."""
+import dataclasses
+
 import numpy as np
 
 from domain.models import Chunk, ChunkKind, Document, Section, Unit
@@ -70,3 +72,32 @@ def test_document_row_records_pipeline_version(tmp_path):
     s = Store.open(str(tmp_path / "idx.db"))
     s.commit(_doc(), _vecs(2), content_hash="h1", pipeline_version=7)
     assert s.pipeline_version("d") == 7
+
+
+def test_document_row_round_trips_toc_and_page_labels(tmp_path):
+    # Provenance the plan schema requires (§3.3): toc + printed page labels are
+    # extracted then were dropped at commit; Phase-3 result payloads need labels.
+    s = Store.open(str(tmp_path / "idx.db"))
+    doc = dataclasses.replace(_doc(),
+                              toc=((1, "Monsters", 3), (2, "Goblins", 4)),
+                              page_labels=("i", "ii", "1", "2"))
+    s.commit(doc, _vecs(2), content_hash="h1")
+    assert s.get_toc("d") == ((1, "Monsters", 3), (2, "Goblins", 4))
+    assert s.get_page_labels("d") == ("i", "ii", "1", "2")
+
+
+def test_toc_and_page_labels_default_empty(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    s.commit(_doc(), _vecs(2), content_hash="h1")  # _doc() carries neither
+    assert s.get_toc("d") == () and s.get_page_labels("d") == ()
+
+
+def test_vocab_deltas_accumulate(tmp_path):
+    # Persisted, incremental per-document deltas (§3.3, Stage G line 115). This is
+    # the schema + write API; population (which terms) is the Phase-3 spell rung.
+    s = Store.open(str(tmp_path / "idx.db"))
+    s.add_vocab([("goblin", "en", 3), ("armor", "en", 1)])
+    s.add_vocab([("goblin", "en", 2)])  # a second document's delta
+    assert s.vocab_freq("goblin", "en") == 5
+    assert s.vocab_freq("armor", "en") == 1
+    assert s.vocab_freq("missing", "en") == 0

@@ -137,6 +137,8 @@ class Document:
     page_count: int
     needs_ocr: bool = False  # any page lacked a text layer (opt-in slow OCR pass)
     lang: str | None = None
+    toc: tuple[tuple[int, str, int], ...] = ()  # (level, title, 1-based page) — provenance/nav
+    page_labels: tuple[str, ...] = ()  # printed page label per physical page (result citations)
     sections: tuple[Section, ...] = ()
     blocks: tuple[Block, ...] = ()
     chunks: tuple[Chunk, ...] = ()
