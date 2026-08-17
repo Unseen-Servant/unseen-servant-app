@@ -27,12 +27,22 @@ def test_labels_map_to_blockkinds():
     assert any(b.kind == BlockKind.prose and "body text" in b.text for b in blocks)
 
 
-def test_table_maps_to_table_and_linearizes_row_major():
+def test_table_maps_to_table_and_linearizes_row_major_with_cells():
     spans = [span("Club", 72, 100, 110, 112), span("1d4", 200, 100, 230, 112),
              span("Dagger", 72, 120, 120, 132), span("1d6", 200, 120, 230, 132)]
     b = layout_page(page(spans), [region("table", 70, 95, 240, 135)], "d")[0]
     assert b.kind == BlockKind.table
-    assert b.text.split() == ["Club", "1d4", "Dagger", "1d6"]  # row-major, cells contiguous
+    # rung 3: cells within a row are pipe-delimited (a wide x-gap = column break),
+    # rows newline-delimited — so linearize.py can pair headers with cells.
+    assert b.text == "Club | 1d4\nDagger | 1d6"
+
+
+def test_table_cells_split_on_large_x_gap_not_small():
+    # "Chain Mail" is one cell (tight inter-word gap); "15" a separate column (wide gap).
+    spans = [span("Chain", 72, 100, 100, 112), span("Mail", 102, 100, 130, 112),
+             span("15", 300, 100, 320, 112)]
+    b = layout_page(page(spans), [region("table", 70, 95, 340, 120)], "d")[0]
+    assert b.text == "Chain Mail | 15"
 
 
 def test_furniture_becomes_artifact_block():

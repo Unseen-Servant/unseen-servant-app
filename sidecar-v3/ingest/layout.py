@@ -91,15 +91,13 @@ def _order(regions: Sequence[Region], page_w: float) -> list[Region]:
     return _xy_cut(regions, page_w)
 
 
-def _linearize(spans: list[Span]) -> str:
-    """Row-major: bucket spans into rows by y, order each row left→right.
-
-    A span joins the current row only if it is vertically close AND a comparable
-    font size — a big heading span (tall bbox, centered on the next line) must
-    not absorb the smaller row below it, which would break table-cell contiguity
-    (the black_hack warrior stat-block g25 regression)."""
+def _rows(spans: list[Span]) -> list[list[Span]]:
+    """Bucket spans into rows by y. A span joins the current row only if it is
+    vertically close AND a comparable font size — a big heading span (tall bbox,
+    centered on the next line) must not absorb the smaller row below it, which
+    would break table-cell contiguity (the black_hack warrior g25 regression)."""
     if not spans:
-        return ""
+        return []
     spans = sorted(spans, key=lambda s: (s.bbox.y0, s.bbox.x0))
     rows: list[list[Span]] = []
     cur: list[Span] = []
@@ -117,7 +115,31 @@ def _linearize(spans: list[Span]) -> str:
             cur, cy, csize = [s], yc, s.size
     if cur:
         rows.append(cur)
-    return "\n".join(" ".join(s.text for s in sorted(row, key=lambda s: s.bbox.x0)) for row in rows)
+    return rows
+
+
+def _linearize(spans: list[Span]) -> str:
+    """Row-major prose/heading text: rows by y, each ordered left→right."""
+    return "\n".join(" ".join(s.text for s in sorted(row, key=lambda s: s.bbox.x0))
+                     for row in _rows(spans))
+
+
+def _cells(row: list[Span]) -> list[str]:
+    """Group a row's spans into cells: a horizontal gap wider than a column break
+    (≈1.3 font heights) starts a new cell; tight inter-word gaps stay in one."""
+    row = sorted(row, key=lambda s: s.bbox.x0)
+    cells: list[list[Span]] = [[row[0]]]
+    for prev, s in zip(row, row[1:]):
+        if s.bbox.x0 - prev.bbox.x1 > max(8.0, 1.3 * max(prev.size, s.size)):
+            cells.append([s])
+        else:
+            cells[-1].append(s)
+    return [" ".join(x.text for x in c) for c in cells]
+
+
+def _linearize_table(spans: list[Span]) -> str:
+    """Row-major with pipe-delimited cells, so Stage F can pair headers to cells."""
+    return "\n".join(" | ".join(_cells(row)) for row in _rows(spans))
 
 
 def _font_stats(spans: list[Span]) -> FontStats | None:
@@ -151,10 +173,12 @@ def layout_page(page: PageExtract, regions: Sequence[Region], doc_id: str) -> tu
         if not sps and kind is not BlockKind.image:
             continue  # empty non-image region — nothing to keep
         order = len(blocks)
+        text = "" if kind is BlockKind.image else (
+            _linearize_table(sps) if kind is BlockKind.table else _linearize(sps))
         blocks.append(Block(
             id=f"{doc_id}:p{page.page}:b{order}",
             kind=kind,
-            text="" if kind is BlockKind.image else _linearize(sps),
+            text=text,
             page=page.page,
             bbox=r.bbox,
             reading_order=order,
