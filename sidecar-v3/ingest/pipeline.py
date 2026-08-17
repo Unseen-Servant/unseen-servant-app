@@ -36,6 +36,25 @@ class IndexReport:
     skipped: bool = False
 
 
+def build_embed_inputs(units, chunks, sections) -> list[str]:
+    """Rung 2 (heading-prepend, plan §4 ladder): the EMBEDDED text is the section
+    breadcrumb (root→leaf titles) + the unit body, so short units (table rows,
+    one-line rules) carry their section context into the vector. Stored unit text
+    is unchanged. Output order follows `units` (vectors are row-aligned at commit)."""
+    section_by_id = {s.id: s for s in sections}
+    chunk_section = {c.id: c.section_id for c in chunks}
+
+    def crumb(section_id) -> str:
+        titles, sid = [], section_id
+        while sid is not None and (s := section_by_id.get(sid)) is not None:
+            titles.append(s.title.strip())
+            sid = s.parent_id
+        return " > ".join(reversed(titles))
+
+    return [f"{c}\n{u.text}" if (c := crumb(chunk_section.get(u.chunk_id))) else u.text
+            for u in units]
+
+
 def _sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -62,7 +81,8 @@ def index_document(
     sections, assign = build_sections(blocks, raw.toc, raw.doc_id)
     chunks = chunk_blocks(blocks, assign, raw.doc_id)
     units = tuple(u for c in chunks for u in to_units(c))
-    vectors = embed_fn([u.text for u in units]) if units else np.zeros((0, DIM), np.float32)
+    vectors = (embed_fn(build_embed_inputs(units, chunks, sections)) if units
+               else np.zeros((0, DIM), np.float32))
 
     doc = Document(
         id=raw.doc_id, path=raw.path, title=raw.title, page_count=raw.page_count,

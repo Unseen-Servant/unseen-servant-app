@@ -33,9 +33,9 @@ def build_engine(name: str, data_dir: Path | None):
 
         return V2Engine(data_dir=data_dir or DEFAULT_DATA_DIR)
     if name == "v3":
-        from evals.engines.v3 import V3Engine
+        from evals.engines.v3 import V3Engine, DEFAULT_DATA_DIR
 
-        return V3Engine()
+        return V3Engine(data_dir=data_dir or DEFAULT_DATA_DIR)
     raise SystemExit(f"unknown engine {name!r}")
 
 

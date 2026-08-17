@@ -6,10 +6,10 @@ import fitz
 import numpy as np
 import pytest
 
-from domain.models import Block, BlockKind, FontStats
+from domain.models import Block, BlockKind, Chunk, ChunkKind, FontStats, Section, Unit
 from index.embedder import DIM
 from index.store import Store
-from ingest.pipeline import IndexReport, index_document
+from ingest.pipeline import IndexReport, build_embed_inputs, index_document
 
 
 @pytest.fixture
@@ -70,3 +70,34 @@ def test_doc_id_defaults_to_filename_stem(pdf, tmp_path):
     store = Store.open(str(tmp_path / "idx.db"))
     rep = index_document(pdf, store, fake_layout, fake_embed)
     assert rep.doc_id == "m"
+
+
+# -- rung 2: heading-prepend embed inputs (plan §4 ladder) --
+
+def _u(uid, cid, text):
+    return Unit(id=uid, chunk_id=cid, text=text, kind=ChunkKind.prose, page_start=1, page_end=1)
+
+
+def _c(cid, section_id):
+    return Chunk(id=cid, doc_id="d", section_id=section_id, ordinal=0, kind=ChunkKind.prose,
+                 text="x", page_start=1, page_end=1)
+
+
+def test_heading_prepend_uses_full_breadcrumb():
+    sections = (
+        Section(id="s0", title="Rules", level=1, parent_id=None, page_start=0, page_end=9),
+        Section(id="s1", title="Combat", level=2, parent_id="s0", page_start=1, page_end=3),
+    )
+    inp = build_embed_inputs((_u("c0:u0", "c0", "armor reduces damage"),), (_c("c0", "s1"),), sections)
+    assert inp == ["Rules > Combat\narmor reduces damage"]  # breadcrumb + body
+
+
+def test_unit_without_section_is_bare_text():
+    inp = build_embed_inputs((_u("c0:u0", "c0", "preamble text"),), (_c("c0", None),), ())
+    assert inp == ["preamble text"]  # no section → no breadcrumb, no leading separator
+
+
+def test_order_matches_units_for_vector_alignment():
+    sections = (Section(id="s0", title="A", level=1, parent_id=None, page_start=0, page_end=1),)
+    units = (_u("c0:u0", "c0", "first"), _u("c0:u1", "c0", "second"))
+    assert build_embed_inputs(units, (_c("c0", "s0"),), sections) == ["A\nfirst", "A\nsecond"]
