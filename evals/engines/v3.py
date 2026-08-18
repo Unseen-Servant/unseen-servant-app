@@ -37,6 +37,7 @@ def _import_v3():
         from domain.models import BlockKind
         from index import assets
         from index.store import Store
+        from query.correct import correct
         from query.pipeline import dense_search, search
     except ImportError as exc:  # pragma: no cover - environment guard
         raise SystemExit(
@@ -47,7 +48,7 @@ def _import_v3():
     return {
         "extract": extract, "layout": layout, "LABELS_M": LABELS_M, "BlockKind": BlockKind,
         "assets": assets, "index_document": index_document, "make_layout_fn": make_layout_fn,
-        "Store": Store, "dense_search": dense_search, "search": search,
+        "Store": Store, "dense_search": dense_search, "search": search, "correct": correct,
     }
 
 
@@ -62,6 +63,7 @@ class V3Engine:
         self._session = None
         self._embedder = None
         self._store = None
+        self._vocab = None
         self._warned_knobs = False
 
     def _load(self):
@@ -84,6 +86,16 @@ class V3Engine:
             self.data_dir.mkdir(parents=True, exist_ok=True)
             self._store = self._load()["Store"].open(str(self.data_dir / "index.db"))
         return self._store
+
+    def _ensure_vocab(self):
+        # library vocab for spell correction; backfilled from the index if empty
+        # (warmup absorbs this one-time load, per the base contract).
+        if self._vocab is None:
+            store = self._ensure_store()
+            if not store.vocab_dict():
+                store.build_vocab()
+            self._vocab = store.vocab_dict()
+        return self._vocab
 
     def extract(self, pdf_path) -> list[Page]:
         m = self._load()
@@ -124,8 +136,7 @@ class V3Engine:
         # Ignore unimplemented knobs loudly, once (base.py contract): rung 1 is dense-only.
         if self._warned_knobs:
             return
-        pending = [k for k in ("rerank", "spell_correction", "variant_expansion")
-                   if getattr(opts, k)]
+        pending = [k for k in ("rerank", "variant_expansion") if getattr(opts, k)]
         if pending:
             print(f"[v3] dense-only rung: ignoring not-yet-built knobs {pending}", file=sys.stderr)
         self._warned_knobs = True
@@ -141,7 +152,13 @@ class V3Engine:
         store, embedder = self._ensure_store(), self._ensure_embedder()
         t0 = time.perf_counter()
         extra = opts.extra or {}
-        rows = m["search"](store, embedder.embed, query, k=opts.n_results,
+        q, corrected = query, None
+        if opts.spell_correction:                                    # rung 7: library-vocab correction
+            vocab = self._ensure_vocab()
+            fixed = m["correct"](query, lambda t: vocab.get(t, 0))
+            if fixed != query:
+                q, corrected = fixed, fixed
+        rows = m["search"](store, embedder.embed, q, k=opts.n_results,
                            hybrid=opts.hybrid,                       # rung 4 parents+dedupe, rung 5 fusion
                            weights=extra.get("weights"),
                            system_map=extra.get("system_map"))       # rung 6 system boost
@@ -161,7 +178,8 @@ class V3Engine:
             )
             for r in rows
         ]
-        return SearchResponse(results=results, latency_ms=round(latency_ms, 1))
+        return SearchResponse(results=results, latency_ms=round(latency_ms, 1),
+                              corrected_query=corrected)
 
     def close(self) -> None:
         if self._store is not None:

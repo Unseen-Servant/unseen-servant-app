@@ -10,10 +10,14 @@ lives in query/ (Phase 3); this is the write path. No import from sidecar/.
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
 
 import apsw
 import numpy as np
 import sqlite_vec
+
+_VOCAB_TERM = re.compile(r"[a-z0-9]+")
 
 from domain.models import SCHEMA_VERSION, Document
 
@@ -145,6 +149,23 @@ class Store:
     def vocab_freq(self, term: str, lang: str) -> int:
         row = self.db.execute("SELECT freq FROM vocab WHERE term=? AND lang=?", (term, lang)).fetchone()
         return row[0] if row else 0
+
+    def build_vocab(self, lang: str = "en") -> None:
+        """Backfill the library vocab (term → frequency) from the indexed unit
+        text — the dictionary spell-correction edit-distances against (rung 7).
+        Idempotent: clears this lang and rebuilds. No re-index."""
+        counts: Counter = Counter()
+        for (text,) in self.db.execute("SELECT text FROM units"):
+            counts.update(_VOCAB_TERM.findall(text.lower()))
+        with self.db:
+            self.db.execute("DELETE FROM vocab WHERE lang=?", (lang,))
+            self.add_vocab((t, lang, n) for t, n in counts.items())
+
+    def vocab_dict(self, lang: str = "en") -> dict[str, int]:
+        """Whole vocab as an in-memory {term: freq} — one load, O(1) lookups for
+        the corrector instead of a DB hit per edit candidate."""
+        return {t: f for t, f in self.db.execute(
+            "SELECT term, freq FROM vocab WHERE lang=?", (lang,))}
 
     def get_vector(self, unit_id: str) -> np.ndarray:
         row = self.db.execute(

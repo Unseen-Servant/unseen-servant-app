@@ -170,3 +170,15 @@ def test_vocab_deltas_accumulate(tmp_path):
     assert s.vocab_freq("goblin", "en") == 5
     assert s.vocab_freq("armor", "en") == 1
     assert s.vocab_freq("missing", "en") == 0
+
+
+def test_build_vocab_from_indexed_units(tmp_path):
+    # rung 7 backfill: library vocab (term frequencies) from the indexed unit text,
+    # no re-index. Idempotent — a second call rebuilds, doesn't double.
+    s = Store.open(str(tmp_path / "idx.db"))
+    s.commit(_doc(), _vecs(2), content_hash="h1")  # "a goblin has armor class 15" / "club 1d4"
+    s.build_vocab()
+    s.build_vocab()  # idempotent
+    assert s.vocab_freq("goblin", "en") == 1 and s.vocab_freq("armor", "en") == 1
+    d = s.vocab_dict()
+    assert d["goblin"] == 1 and "club" in d and d.get("missing", 0) == 0
