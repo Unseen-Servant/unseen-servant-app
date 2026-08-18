@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from domain.models import BBox
-from ingest.extract import extract, rasterize, Span, PageExtract, RawExtraction
+from ingest.extract import extract, rasterize, Span, PageExtract, RawExtraction, _norm_ws
 
 
 @pytest.fixture
@@ -21,6 +21,29 @@ def text_pdf(tmp_path):
     path = tmp_path / "text.pdf"
     doc.save(path)
     return str(path)
+
+
+def test_norm_ws_collapses_tab_cr_nbsp_runs():
+    # Some PDFs (e.g. the 5e SRD) embed \t\r\xa0 runs between every token; left
+    # raw they turn the chunk payload into "15\t\r \xa0(leather\t\r \xa0armor)".
+    assert _norm_ws("15\t\r \xa0(leather\t\r \xa0armor,\t\r \xa0shield)\t\r \xa0") \
+        == "15 (leather armor, shield)"
+    assert _norm_ws("Armor\xa0Class 15") == "Armor Class 15"
+    assert _norm_ws("  padded  ") == "padded"
+
+
+def test_spans_strip_embedded_whitespace_runs(tmp_path):
+    # A span whose text carries nbsp litter must be normalized at the source, so
+    # every downstream consumer (block, chunk payload, unit) sees clean text.
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 90), "Armor\xa0Class\xa015\xa0(leather\xa0armor)", fontsize=11, fontname="helv")
+    path = tmp_path / "litter.pdf"
+    doc.save(path)
+    ex = extract(str(path), doc_id="fix")
+    joined = " ".join(s.text for s in ex.pages[0].spans)
+    assert "\xa0" not in joined
+    assert "Armor Class 15 (leather armor)" in joined
 
 
 @pytest.fixture

@@ -11,6 +11,7 @@ Reuses the shared geometry type `domain.models.BBox`. No import from sidecar/.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +23,15 @@ from domain.models import BBox
 # PyMuPDF get_text("dict") span flag bits.
 _ITALIC = 1 << 1
 _BOLD = 1 << 4
+
+# Some PDFs embed \t \r \xa0 runs inside their text spans; collapse each run to a
+# single space at the source so no downstream consumer (block, chunk payload,
+# unit) has to. \s is Unicode-aware, so it also folds the non-breaking space.
+_WS_RUN = re.compile(r"\s+")
+
+
+def _norm_ws(text: str) -> str:
+    return _WS_RUN.sub(" ", text).strip()
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,13 +79,14 @@ def _page_spans(page) -> tuple[Span, ...]:
     for block in page.get_text("dict")["blocks"]:
         for line in block.get("lines", []):
             for s in line.get("spans", []):
-                if not s["text"].strip():
+                text = _norm_ws(s["text"])
+                if not text:
                     continue
                 font = s.get("font", "")
                 flags = s.get("flags", 0)
                 low = font.lower()
                 out.append(Span(
-                    text=s["text"],
+                    text=text,
                     bbox=BBox(*s["bbox"]),
                     size=round(float(s["size"]), 2),
                     font=font,
