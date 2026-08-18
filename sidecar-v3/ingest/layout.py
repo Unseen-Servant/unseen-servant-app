@@ -159,12 +159,24 @@ def layout_page(page: PageExtract, regions: Sequence[Region], doc_id: str) -> tu
     ordered = _order(regions, page.width)
     nonfurn = [i for i, r in enumerate(ordered) if _kind(r.label) is not BlockKind.artifact]
     buckets: list[list[Span]] = [[] for _ in ordered]
+    uncovered: list[Span] = []
     for sp in page.spans:
         host = next((i for i, r in enumerate(ordered) if _center_in(sp.bbox, r.bbox)), None)
-        if host is None and nonfurn:  # uncovered content → nearest non-furniture region
-            host = min(nonfurn, key=lambda i: _vdist(sp.bbox, ordered[i].bbox))
         if host is not None:
             buckets[host].append(sp)
+        else:
+            uncovered.append(sp)  # in a gap between regions → assign below, row-coherent
+    # Uncovered spans attach to the nearest non-furniture region a ROW AT A TIME,
+    # so a same-row label/value pair (Armor Class | 15) is never split across two
+    # regions — the SRD 5.1 stat-block pathology, where the AC/HP strip falls in a
+    # detection gap and per-span nearest sent the narrow label and wide value apart.
+    for row in _rows(uncovered):
+        if not nonfurn:
+            break
+        rb = BBox(min(s.bbox.x0 for s in row), min(s.bbox.y0 for s in row),
+                  max(s.bbox.x1 for s in row), max(s.bbox.y1 for s in row))
+        tgt = min(nonfurn, key=lambda i: _vdist(rb, ordered[i].bbox))
+        buckets[tgt].extend(row)
 
     blocks: list[Block] = []
     for i, r in enumerate(ordered):

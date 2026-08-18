@@ -67,6 +67,27 @@ def test_uncovered_span_attaches_to_nearest_region():
     assert "orphan" in b.text
 
 
+def test_uncovered_stat_rows_stay_row_coherent():
+    # SRD 5.1 goblin pathology: the AC/HP strip falls in a gap between the title
+    # region (above) and the next text region (below). Per-span nearest sends the
+    # narrow bold label to the title and the wide value to the text region — same
+    # row, two blocks — so "Armor Class 15" / "Hit Points 7" get torn apart. An
+    # uncovered ROW must attach to ONE region as a unit so label keeps its value.
+    spans = [
+        span("Goblin", 328, 175, 360, 184, size=12, bold=True),          # title region
+        span("Armor Class", 328, 208.6, 380, 220.6, bold=True),          # gap row 1 label
+        span("15 (leather armor)", 381, 208.6, 486, 220.6),              # gap row 1 value
+        span("Hit Points", 328, 223.9, 369, 235.9, bold=True),           # gap row 2 label
+        span("7 (2d6)", 370, 223.9, 402, 235.9),                         # gap row 2 value
+        span("Bite. Melee", 330, 260, 420, 272),                         # text region below the gap
+    ]
+    regions = [region("paragraph_title", 327, 174.9, 362, 184.1),
+               region("text", 330, 257.9, 554, 290)]
+    joined = "\n".join(b.text for b in layout_page(page(spans), regions, "d"))
+    assert "Armor Class 15 (leather armor)" in joined
+    assert "Hit Points 7 (2d6)" in joined
+
+
 def test_two_column_reading_order_via_xy_cut():
     spans = [span("L1", 72, 100, 200, 112), span("L2", 72, 400, 200, 412),
              span("R1", 340, 100, 500, 112), span("R2", 340, 400, 500, 412)]
