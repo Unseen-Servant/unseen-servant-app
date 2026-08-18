@@ -172,6 +172,31 @@ def test_vocab_deltas_accumulate(tmp_path):
     assert s.vocab_freq("missing", "en") == 0
 
 
+def test_search_scoped_to_one_doc(tmp_path):
+    # source_filter: single-scope search restricts to the intended file (dense + FTS).
+    s = Store.open(str(tmp_path / "idx.db"))
+
+    def mk(did, texts):
+        secs = (Section(id=f"{did}:s0", title="S", level=1, parent_id=None, page_start=0, page_end=0),)
+        chunks = tuple(Chunk(id=f"{did}:c{i}", doc_id=did, section_id=f"{did}:s0", ordinal=i,
+                             kind=ChunkKind.prose, text=t, page_start=0, page_end=0, lang="en")
+                       for i, t in enumerate(texts))
+        units = tuple(Unit(id=f"{did}:c{i}:u0", chunk_id=f"{did}:c{i}", text=t, kind=ChunkKind.prose,
+                           page_start=0, page_end=0, lang="en") for i, t in enumerate(texts))
+        return Document(id=did, path=f"/lib/{did}.pdf", title=did, page_count=1,
+                        sections=secs, chunks=chunks, units=units)
+
+    va = np.zeros((2, DIM), np.float32); va[0, 0] = 1.0; va[1, 1] = 1.0
+    vb = np.zeros((2, DIM), np.float32); vb[0, 2] = 1.0; vb[1, 3] = 1.0
+    s.commit(mk("A", ["goblin armor class", "fireball spell"]), va, content_hash="ha")
+    s.commit(mk("B", ["goblin armor class", "fireball spell"]), vb, content_hash="hb")
+
+    hits = s.search_dense(va[0], k=10, doc_id="A")
+    assert hits and all(u.startswith("A:") for u, _ in hits)     # dense scoped to A
+    ids = s.search_fts("goblin", doc_id="B")
+    assert ids and all(i.startswith("B:") for i in ids)          # FTS scoped to B
+
+
 def test_build_vocab_from_indexed_units(tmp_path):
     # rung 7 backfill: library vocab (term frequencies) from the indexed unit text,
     # no re-index. Idempotent — a second call rebuilds, doesn't double.

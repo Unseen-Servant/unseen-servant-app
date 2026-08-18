@@ -62,7 +62,7 @@ def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
            hybrid: bool = False, weights: Sequence[float] | None = None,
            system_map: dict | None = None,
            rerank_fn: Callable[[str, list], list] | None = None, rerank_pool: int = 50,
-           rerank_weight: float | None = None) -> list[dict]:
+           rerank_weight: float | None = None, doc_id: str | None = None) -> list[dict]:
     """Rungs 4–8 — fuse → rerank → boost → dedupe → parents (query-time). Over-
     fetch dense units; with `hybrid`, RRF-fuse against FTS/BM25 (rung 5). With
     `rerank_fn`, a cross-encoder re-scores the top `rerank_pool` and is **blended**
@@ -74,11 +74,11 @@ def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
     section; `matched_text` is the unit that hit and, with `assemble_parents`,
     `text` is the fuller parent chunk."""
     qvec = embed_fn([query])[0]
-    dense = store.search_dense(qvec, k=pool)  # [(uid, cosine)]
+    dense = store.search_dense(qvec, k=pool, doc_id=doc_id)  # [(uid, cosine)]; doc_id = source_filter
     dense_ids = [uid for uid, _ in dense]
     if hybrid:
         fq = _fts_query(query)
-        lex = store.search_fts(fq)[:pool] if fq else []
+        lex = store.search_fts(fq, doc_id=doc_id)[:pool] if fq else []
         fused = rrf([dense_ids, lex], weights=weights or [1.0, LEX_WEIGHT])
         ranked, relevance = [uid for uid, _ in fused], dict(fused)
     else:

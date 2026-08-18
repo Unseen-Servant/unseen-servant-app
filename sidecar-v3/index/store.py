@@ -174,20 +174,30 @@ class Store:
         ).fetchone()
         return np.frombuffer(row[0], np.float32)
 
-    def search_fts(self, query: str) -> list[str]:
+    def search_fts(self, query: str, doc_id: str | None = None) -> list[str]:
+        if doc_id is None:
+            return [r[0] for r in self.db.execute(
+                "SELECT units.id FROM unit_fts JOIN units ON units.rowid=unit_fts.rowid "
+                "WHERE unit_fts MATCH ? ORDER BY rank", (query,))]
         return [r[0] for r in self.db.execute(
             "SELECT units.id FROM unit_fts JOIN units ON units.rowid=unit_fts.rowid "
-            "WHERE unit_fts MATCH ? ORDER BY rank", (query,))]
+            "WHERE unit_fts MATCH ? AND units.doc_id=? ORDER BY rank", (query, doc_id))]
 
-    def search_dense(self, qvec, k: int = 25, prefilter: int = 200) -> list[tuple[str, float]]:
+    def search_dense(self, qvec, k: int = 25, prefilter: int = 200,
+                     doc_id: str | None = None) -> list[tuple[str, float]]:
         """Dense KNN: binary-quantized hamming prefilter (the sqlite-vec vector-
         spike config — a raw f32 scan is ~800 MB/query) then full-precision cosine
-        rescore. Returns (unit_id, cosine) descending; vectors are L2-normalized so
-        dot == cosine."""
+        rescore. `doc_id` scopes the search to one document (source_filter). Returns
+        (unit_id, cosine) descending; vectors are L2-normalized so dot == cosine."""
         q = np.asarray(qvec, np.float32)
-        rows = self.db.execute(
-            "SELECT rowid FROM unit_vec WHERE bvec MATCH vec_quantize_binary(?) AND k=? "
-            "ORDER BY distance", (q.tobytes(), prefilter)).fetchall()
+        if doc_id is None:
+            rows = self.db.execute(
+                "SELECT rowid FROM unit_vec WHERE bvec MATCH vec_quantize_binary(?) AND k=? "
+                "ORDER BY distance", (q.tobytes(), prefilter)).fetchall()
+        else:
+            rows = self.db.execute(
+                "SELECT rowid FROM unit_vec WHERE bvec MATCH vec_quantize_binary(?) AND k=? "
+                "AND doc_id=? ORDER BY distance", (q.tobytes(), prefilter, doc_id)).fetchall()
         if not rows:
             return []
         ids = [r[0] for r in rows]

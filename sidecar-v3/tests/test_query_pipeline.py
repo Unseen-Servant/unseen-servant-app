@@ -129,6 +129,18 @@ def _two_systems():
         doc("B", "other.pdf", "Other", "falling damage rules")
 
 
+def test_search_source_filter_scopes_to_doc(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    a, b = _two_systems()
+    va = np.zeros((1, DIM), np.float32); va[0, 0] = 1.0
+    vb = np.zeros((1, DIM), np.float32); vb[0, 100] = 1.0
+    s.commit(a, va, content_hash="ha")   # A = osric.pdf
+    s.commit(b, vb, content_hash="hb")   # B = other.pdf
+    embed_fn = lambda t: np.array([vb[0]], np.float32)  # dense favors B
+    out = search(s, embed_fn, "falling damage", k=5, doc_id="A")
+    assert out and all(r["doc_id"] == "A" for r in out)  # scoped to A despite B being the vector match
+
+
 def test_search_boosts_named_system_over_better_vector(tmp_path):
     s = Store.open(str(tmp_path / "idx.db"))
     a, b = _two_systems()

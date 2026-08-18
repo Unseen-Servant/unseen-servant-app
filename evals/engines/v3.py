@@ -165,11 +165,13 @@ class V3Engine:
             if fixed != query:
                 q, corrected = fixed, fixed
         rerank_fn = self._ensure_reranker().rerank if opts.rerank else None  # rung 8 cross-encoder
+        doc_id = Path(opts.source_filter).stem if opts.source_filter else None  # source_filter → doc_id
         rows = m["search"](store, embedder.embed, q, k=opts.n_results,
                            hybrid=opts.hybrid,                       # rung 4 parents+dedupe, rung 5 fusion
                            weights=extra.get("weights"),
                            system_map=extra.get("system_map"),       # rung 6 system boost
-                           rerank_fn=rerank_fn, rerank_weight=extra.get("rerank_weight"))
+                           rerank_fn=rerank_fn, rerank_weight=extra.get("rerank_weight"),
+                           doc_id=doc_id)
         latency_ms = (time.perf_counter() - t0) * 1000
         results = [
             SearchResult(
