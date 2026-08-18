@@ -243,6 +243,8 @@ def main() -> int:
     ap.add_argument("--hybrid", action="store_true", help="retrieval: fuse dense + BM25/FTS (rung 5)")
     ap.add_argument("--lex-weight", type=float, default=None,
                     help="retrieval: RRF lexical weight (dense=1.0); sweep the fusion balance")
+    ap.add_argument("--rerank-weight", type=float, default=None,
+                    help="retrieval: RRF rerank blend weight (retrieval=1.0); sweep the rerank pull")
     ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
     args = ap.parse_args()
@@ -263,6 +265,8 @@ def main() -> int:
             extra: dict = {"system_map": _system_map(corpus)}  # rung 6 boost (no-op if no system named)
             if args.lex_weight is not None:
                 extra["weights"] = [1.0, args.lex_weight]
+            if args.rerank_weight is not None:
+                extra["rerank_weight"] = args.rerank_weight
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid, extra=extra)
             result = run(engine, queries, corpus, opts, do_index=not args.no_index)
     finally:

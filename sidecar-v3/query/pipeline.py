@@ -21,6 +21,8 @@ from query.fuse import rrf
 _TERMS = re.compile(r"[a-z0-9]+")
 LEX_WEIGHT = 0.3  # RRF lexical weight (dense=1.0). Dense-leaning: beat dense on every
 #                   metric AND both keyword/nl with no regression; ≥0.4 or 1:1 nicks NL.
+RERANK_WEIGHT = 0.5  # RRF rerank blend weight (retrieval=1.0). A nudge: sweep sweet spot —
+#                      beats no-rerank on all aggregate metrics; a hard reorder regressed uncued/tables.
 # Function words dropped from the FTS/BM25 match: RRF fuses on rank (not BM25's
 # IDF-weighted score), so a stopword hit still earns rank credit and displaces
 # good dense results. Matching on content terms only removes that noise (it was
@@ -58,14 +60,19 @@ def dense_search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
 def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
            k: int = 25, pool: int = 200, assemble_parents: bool = True,
            hybrid: bool = False, weights: Sequence[float] | None = None,
-           system_map: dict | None = None) -> list[dict]:
-    """Rungs 4–6 — fuse → boost → dedupe → parents (query-time). Over-fetch dense
-    units; with `hybrid`, RRF-fuse against FTS/BM25 (rung 5), dense-leaning by
-    default. With `system_map` ({keyword→sources}), if the query names a system
-    its sources are soft-boosted to the front (rung 6 disambiguation). Then keep
-    the best-scoring unit per parent section so the same section never repeats;
-    `matched_text` is the unit that hit and, with `assemble_parents`, `text` is
-    the fuller parent chunk."""
+           system_map: dict | None = None,
+           rerank_fn: Callable[[str, list], list] | None = None, rerank_pool: int = 50,
+           rerank_weight: float | None = None) -> list[dict]:
+    """Rungs 4–8 — fuse → rerank → boost → dedupe → parents (query-time). Over-
+    fetch dense units; with `hybrid`, RRF-fuse against FTS/BM25 (rung 5). With
+    `rerank_fn`, a cross-encoder re-scores the top `rerank_pool` and is **blended**
+    into the ranking by RRF (`weights=[1.0, rerank_weight]`) — a nudge, not a hard
+    override, so it can't unilaterally demote a confident retrieval #1 (rung 8; a
+    hard reorder regressed uncued/tables). With `system_map`, a named system's
+    sources are soft-boosted to the front (rung 6) — AFTER rerank, keeping the
+    final say on disambiguation. Then keep the best-scoring unit per parent
+    section; `matched_text` is the unit that hit and, with `assemble_parents`,
+    `text` is the fuller parent chunk."""
     qvec = embed_fn([query])[0]
     dense = store.search_dense(qvec, k=pool)  # [(uid, cosine)]
     dense_ids = [uid for uid, _ in dense]
@@ -78,7 +85,19 @@ def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
         ranked, relevance = dense_ids, dict(dense)
 
     meta = store.hydrate(ranked)
-    if system_map:  # rung 6: name a system → soft-boost its sources to the front
+    reranked: set[str] = set()
+    if rerank_fn is not None and ranked:  # rung 8: cross-encoder re-score, blended by RRF
+        top = ranked[:rerank_pool]
+        docs = [f"{meta.get(u, {}).get('section_heading', '')}\n{meta.get(u, {}).get('text', '')}".strip()
+                for u in top]
+        scores = rerank_fn(query, docs)
+        rerank_order = [top[i] for i in sorted(range(len(top)), key=lambda i: -scores[i])]
+        w = RERANK_WEIGHT if rerank_weight is None else rerank_weight
+        blended = rrf([top, rerank_order], weights=[1.0, w])  # nudge, not override
+        ranked = [uid for uid, _ in blended] + ranked[rerank_pool:]
+        relevance.update(dict(blended))
+        reranked = set(top)
+    if system_map:  # rung 6: name a system → soft-boost its sources to the front (final say)
         matched = detect_sources(query, system_map)
         ranked = boost_order(ranked, {u: meta.get(u, {}).get("filename") for u in ranked}, matched)
     seen: set[str] = set()
@@ -92,7 +111,7 @@ def search(store, embed_fn: Callable[[Sequence[str]], object], query: str,
             continue
         seen.add(key)
         row = {"unit_id": uid, "rank": len(out), "relevance": relevance.get(uid, 0.0),
-               **m, "matched_text": m["text"]}
+               "reranked": uid in reranked, **m, "matched_text": m["text"]}
         if assemble_parents:
             row["text"] = m.get("chunk_text") or m["text"]
         out.append(row)

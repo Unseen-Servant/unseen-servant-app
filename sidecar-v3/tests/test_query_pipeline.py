@@ -144,6 +144,34 @@ def test_search_boosts_named_system_over_better_vector(tmp_path):
     assert {r["filename"] for r in boosted} == {"osric.pdf", "other.pdf"}  # soft — B still present
 
 
+def _doc_3sec():
+    secs = tuple(Section(id=f"d:s{i}", title=f"S{i}", level=1, parent_id=None, page_start=i, page_end=i)
+                 for i in range(3))
+    chunks = tuple(Chunk(id=f"d:c{i}", doc_id="d", section_id=f"d:s{i}", ordinal=i, kind=ChunkKind.prose,
+                         text=f"chunk {i}", page_start=i, page_end=i, lang="en") for i in range(3))
+    names = ["zero", "one", "two"]
+    units = tuple(Unit(id=f"d:c{i}:u0", chunk_id=f"d:c{i}", text=f"unit {names[i]}", kind=ChunkKind.prose,
+                       page_start=i, page_end=i, lang="en") for i in range(3))
+    return Document(id="d", path="/lib/phb.pdf", title="PHB", page_count=3,
+                    sections=secs, chunks=chunks, units=units)
+
+
+def test_search_rerank_blends_not_overrides(tmp_path):
+    s = Store.open(str(tmp_path / "idx.db"))
+    v = np.zeros((3, DIM), np.float32)
+    v[0, 0] = 1.0                       # u0: e0        (dense #1)
+    v[1, 0], v[1, 1] = 0.8, 0.6         # u1: cos 0.8   (dense #2)
+    v[2, 0], v[2, 2] = 0.6, 0.8         # u2: cos 0.6   (dense #3)
+    s.commit(_doc_3sec(), v, content_hash="h1")
+    embed_fn = lambda t: np.array([v[0]], np.float32)  # dense order s0, s1, s2
+    rr = lambda q, docs: [3.0 if "two" in d else (2.0 if "zero" in d else 1.0) for d in docs]  # prefers s2
+    out = search(s, embed_fn, "q", k=3, rerank_fn=rr)
+    order = [r["section_id"] for r in out]
+    assert order[0] == "d:s0"                                   # confident dense #1 not overridden
+    assert order.index("d:s2") < order.index("d:s1")           # rerank still promotes its pick
+    assert out[0]["reranked"] is True
+
+
 def test_hybrid_fuses_lexical_hit_above_dense_only(tmp_path):
     s = Store.open(str(tmp_path / "idx.db"))
     vv = np.zeros((2, DIM), np.float32); vv[0, 0] = 1.0; vv[1, 100] = 1.0

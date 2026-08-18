@@ -64,6 +64,7 @@ class V3Engine:
         self._embedder = None
         self._store = None
         self._vocab = None
+        self._reranker = None
         self._warned_knobs = False
 
     def _load(self):
@@ -96,6 +97,11 @@ class V3Engine:
                 store.build_vocab()
             self._vocab = store.vocab_dict()
         return self._vocab
+
+    def _ensure_reranker(self):
+        if self._reranker is None:
+            self._reranker = self._load()["assets"].load_reranker()
+        return self._reranker
 
     def extract(self, pdf_path) -> list[Page]:
         m = self._load()
@@ -136,7 +142,7 @@ class V3Engine:
         # Ignore unimplemented knobs loudly, once (base.py contract): rung 1 is dense-only.
         if self._warned_knobs:
             return
-        pending = [k for k in ("rerank", "variant_expansion") if getattr(opts, k)]
+        pending = [k for k in ("variant_expansion",) if getattr(opts, k)]
         if pending:
             print(f"[v3] dense-only rung: ignoring not-yet-built knobs {pending}", file=sys.stderr)
         self._warned_knobs = True
@@ -158,10 +164,12 @@ class V3Engine:
             fixed = m["correct"](query, lambda t: vocab.get(t, 0))
             if fixed != query:
                 q, corrected = fixed, fixed
+        rerank_fn = self._ensure_reranker().rerank if opts.rerank else None  # rung 8 cross-encoder
         rows = m["search"](store, embedder.embed, q, k=opts.n_results,
                            hybrid=opts.hybrid,                       # rung 4 parents+dedupe, rung 5 fusion
                            weights=extra.get("weights"),
-                           system_map=extra.get("system_map"))       # rung 6 system boost
+                           system_map=extra.get("system_map"),       # rung 6 system boost
+                           rerank_fn=rerank_fn, rerank_weight=extra.get("rerank_weight"))
         latency_ms = (time.perf_counter() - t0) * 1000
         results = [
             SearchResult(
@@ -173,7 +181,7 @@ class V3Engine:
                 page_end=r.get("page_end"),
                 relevance=float(r.get("relevance", 0.0)),
                 tier="dense",          # single tier until the calibration rung
-                reranked=False,
+                reranked=bool(r.get("reranked", False)),
                 raw=r,
             )
             for r in rows

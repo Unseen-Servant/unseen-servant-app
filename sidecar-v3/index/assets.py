@@ -51,6 +51,31 @@ def embed_model() -> tuple[str, str]:
     return onnx, tok
 
 
+def _hf_minilm(name: str) -> str | None:
+    hits = (sorted(HF.rglob(f"models--cross-encoder--ms-marco-MiniLM-L6-v2/**/{name}"))
+            if HF.exists() else [])
+    return str(hits[0]) if hits else None
+
+
+def rerank_model() -> tuple[str, str]:
+    """MiniLM cross-encoder (rerank_latency spike winner, int8 ONNX) + its BERT
+    tokenizer (HF cache). Model staged into models/ from the spike outputs."""
+    onnx = os.environ.get("LL_V3_RERANK_MODEL")
+    if not onnx:
+        p = MODELS / "minilm-rerank-int8.onnx"
+        onnx = str(p) if p.exists() else None
+    tok = os.environ.get("LL_V3_RERANK_TOKENIZER") or _hf_minilm("tokenizer.json")
+    if not (onnx and tok):
+        raise AssetError(
+            "MiniLM reranker ONNX/tokenizer not found. Copy "
+            "rerank_latency_spike/outputs/minilm-int8.onnx to "
+            "sidecar-v3/models/minilm-rerank-int8.onnx and ensure the "
+            "cross-encoder/ms-marco-MiniLM-L6-v2 tokenizer is in the HF cache "
+            "(or set $LL_V3_RERANK_MODEL / $LL_V3_RERANK_TOKENIZER)."
+        )
+    return onnx, tok
+
+
 def available() -> bool:
     try:
         layout_model()
@@ -75,3 +100,10 @@ def load_embedder():
 
     onnx, tok = embed_model()
     return Embedder(onnx, tok)
+
+
+def load_reranker():
+    from query.rerank import Reranker
+
+    onnx, tok = rerank_model()
+    return Reranker(onnx, tok)
