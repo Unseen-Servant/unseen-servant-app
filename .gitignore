@@ -19,6 +19,7 @@ evals/.eval_data/
 # regenerable from the committed baseline .json (report.py); keeping them
 # out preserves the clean metrics-only baseline review diff.
 evals/baselines/*.results.json
+evals/baselines/*.pages.json
 evals/baselines/*.html
 
 # Python sidecar

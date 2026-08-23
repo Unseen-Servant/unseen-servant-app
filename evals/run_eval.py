@@ -230,12 +230,48 @@ def extraction_md(meta: dict, result: dict) -> str:
     ])
 
 
+# ── corpus-wide extraction QA (recovery strategy W0.1) ────────────────────
+
+def run_corpus_qa(engine, corpus, saved_texts: dict | None = None) -> dict:
+    """Extract EVERY corpus page (engine.extract, no embedding) and grade each
+    against the PDF's own PyMuPDF text blocks — the interleave / torn-label
+    detector the 30-page golden mean cannot be. ``saved_texts`` (a prior run's
+    .pages.json) re-grades without re-extracting — the metric-work inner loop."""
+    import pymupdf
+
+    from evals.extraction import corpus_qa
+
+    pages: list[dict] = []
+    texts: dict[str, dict[int, str]] = {}   # engine page text, kept for drill-in (side file)
+    for d in corpus.documents:
+        if saved_texts is not None:
+            extracted = {int(k): v for k, v in saved_texts.get(d.id, {}).items()}
+        else:
+            print(f"extracting {d.id}…", flush=True)
+            extracted = {p.page_number: p.text for p in engine.extract(d.pdf_path)}
+        texts[d.id] = extracted
+        pdf = pymupdf.open(str(d.pdf_path))
+        for i, page in enumerate(pdf):
+            blocks = corpus_qa.native_blocks(page)
+            if not blocks:
+                continue
+            g = corpus_qa.grade_page(extracted.get(i + 1, ""), blocks)
+            pages.append({"doc": d.id, "page": i + 1, **g})
+        by_doc = corpus_qa.aggregate([p for p in pages if p["doc"] == d.id])[d.id]
+        print(f"  {d.id}: {by_doc['pages']} pages, {by_doc['broken']} broken blocks on "
+              f"{by_doc['pages_with_broken']} pages, label_integrity="
+              f"{by_doc['label_integrity'] if by_doc['label_integrity'] is None else round(by_doc['label_integrity'], 3)}",
+              flush=True)
+    return {"by_doc": corpus_qa.aggregate(pages), "worst": corpus_qa.worst_pages(pages),
+            "empty": corpus_qa.empty_pages(pages), "pages": pages, "texts": texts}
+
+
 # ── entry point ───────────────────────────────────────────────────────────
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--engine", default="v2", choices=["v2", "v3"])
-    ap.add_argument("--suite", default="retrieval", choices=["retrieval", "extraction"])
+    ap.add_argument("--suite", default="retrieval", choices=["retrieval", "extraction", "corpus-qa"])
     ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
     ap.add_argument("--data-dir", type=Path, default=None)
     ap.add_argument("--n-results", type=int, default=SearchOptions.n_results)
@@ -247,10 +283,13 @@ def main() -> int:
                     help="retrieval: RRF rerank blend weight (retrieval=1.0); sweep the rerank pull")
     ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
+    ap.add_argument("--pages", type=Path, default=None,
+                    help="corpus-qa: re-grade a prior run's .pages.json instead of re-extracting")
     args = ap.parse_args()
 
     corpus = require_corpus()  # refuses on any hash/digest drift (§1)
-    name = args.baseline or ("phase0" if args.suite == "retrieval" else "extraction")
+    name = args.baseline or {"retrieval": "phase0", "extraction": "extraction",
+                             "corpus-qa": "corpus-qa"}[args.suite]
     date = datetime.date.today().isoformat()
     stem = f"{date}-{args.engine}-{name}"
     engine = build_engine(args.engine, args.data_dir)
@@ -258,6 +297,9 @@ def main() -> int:
     try:
         if args.suite == "extraction":
             result = run_extraction(engine, corpus)
+        elif args.suite == "corpus-qa":
+            saved = json.loads(args.pages.read_text(encoding="utf-8")) if args.pages else None
+            result = run_corpus_qa(engine, corpus, saved_texts=saved)
         else:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
@@ -271,6 +313,25 @@ def main() -> int:
             result = run(engine, queries, corpus, opts, do_index=not args.no_index)
     finally:
         engine.close()
+
+    if args.suite == "corpus-qa":
+        from evals.extraction import corpus_qa
+
+        meta = {"engine": args.engine, "name": name, "date": date}
+        md = corpus_qa.render_md(meta, result)
+        print("\n" + md)
+        if not args.no_write:
+            BASELINE_DIR.mkdir(exist_ok=True)
+            # Engine page texts go to a gitignored side file (same convention as
+            # .results.json) so a worst-page drill-in never needs a re-extract.
+            texts = result.pop("texts")
+            (BASELINE_DIR / f"{stem}.json").write_text(
+                json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
+            (BASELINE_DIR / f"{stem}.md").write_text(md, encoding="utf-8")
+            (BASELINE_DIR / f"{stem}.pages.json").write_text(
+                json.dumps(texts, ensure_ascii=False), encoding="utf-8")
+            print(f"wrote evals/baselines/{stem}.{{json,md,pages.json}}")
+        return 0
 
     if args.suite == "extraction":
         print("\n## By kind\n" + extraction_report(result["by_kind"], "kind"))

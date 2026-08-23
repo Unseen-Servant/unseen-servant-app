@@ -43,6 +43,13 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --suite extraction
 # Author-time guard: every anchor present in BOTH reference and PDF (gates a
 # query commit; also confirms cross_page anchors really straddle a page break).
 uv run --project sidecar python -m evals.retrieval.verify_anchors
+
+# Corpus-wide extraction QA — EVERY page, the PDF as the oracle, no embedding
+# (~7 min). The inner loop for extraction work; v3 runs under its own env.
+uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite corpus-qa
+
+# Harness unit tests (pure, CI-safe).
+uv run --project sidecar-v3 pytest evals/tests
 ```
 
 ## What gates what
@@ -76,6 +83,20 @@ right order, with intact table cells? `Engine.extract()` returns typed pages;
 table_cells (contiguity) on hand-authored `golden/*.yaml` pages, over a ±1-page
 window so segmenter page-attribution drift doesn't confound the score.
 `verify_golden.py` re-verifies each golden fact in ref ∧ PDF, same as anchors.
+
+**Corpus QA** (`extraction/corpus_qa.py`) — the golden suite is 30 pages
+reported as a mean, which is how a column-interleaving layout defect on ~27 %
+of pages shipped three times as a GO (recovery strategy §1.4). This axis
+needs no spec: PyMuPDF's native text blocks are column-correct, so for every
+page it counts native blocks (≥ 120 chars) that survive the engine's page text
+**intact** (contiguous), **broken** (lines present, not contiguous — the
+interleave signature) or **missing** (dropped; running headers are dropped on
+purpose, so that is recall, not integrity), stat-block/spell **label lines**
+("Armor Class 15 …") that survive whole, and **adjacency** — stacked
+neighbouring blocks that are still consecutive (catches a stat line that
+survives intact but lands under another creature). Reports `block_integrity`,
+`block_recall`, `label_integrity`, `adjacency` per doc and the 20 worst pages.
+Gate on the worst pages, not the mean.
 
 ## Baselines & the blind round
 
