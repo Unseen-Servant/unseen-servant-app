@@ -37,8 +37,12 @@ up (query embedding); extraction does not.
 # already in evals/.eval_data/). Writes evals/baselines/<date>-v2-phase0.*
 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline phase0
 
-# Extraction QA — no Ollama; grades hand-authored golden pages.
+# Extraction QA — no Ollama; grades hand-authored golden pages. --gate fails
+# the run (exit 1) if ANY page's metric drops below the reference baseline —
+# the per-page min, not the mean, is what gates an extraction change.
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite extraction
+uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite extraction \
+    --gate evals/baselines/<last-committed>-v3-extraction.json
 
 # Author-time guard: every anchor present in BOTH reference and PDF (gates a
 # query commit; also confirms cross_page anchors really straddle a page break).
@@ -59,6 +63,7 @@ uv run --project sidecar-v3 pytest evals/tests
 | corpus PDF hash + reference digest | `corpus.py` (`require_corpus`) | any eval run, on drift |
 | every anchor in ref ∧ PDF | `retrieval/verify_anchors.py` (exit 1) | committing a query |
 | the committed baseline (MRR@5 etc.) | `evals/baselines/*.json` | a v3 rung that doesn't beat it |
+| every golden page ≥ its reference score | `extraction/gate.py` (`--gate`, exit 1) | an extraction change that helps the mean and hurts a page |
 | anchor grade vs a human (Cohen's κ) | `blind/score.py` | trusting the automated number |
 
 ## Suites

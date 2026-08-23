@@ -285,6 +285,9 @@ def main() -> int:
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
     ap.add_argument("--pages", type=Path, default=None,
                     help="corpus-qa: re-grade a prior run's .pages.json instead of re-extracting")
+    ap.add_argument("--gate", type=Path, default=None,
+                    help="extraction: reference baseline .json; exit 1 if ANY golden page's "
+                         "metric drops below it (per-page min, not the mean — W0.2)")
     args = ap.parse_args()
 
     corpus = require_corpus()  # refuses on any hash/digest drift (§1)
@@ -345,6 +348,15 @@ def main() -> int:
                 json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
             (BASELINE_DIR / f"{stem}.md").write_text(extraction_md(meta, result), encoding="utf-8")
             print(f"\nwrote evals/baselines/{stem}.{{json,md}}")
+        if args.gate:
+            from evals.extraction import gate
+
+            ref = json.loads(args.gate.read_text(encoding="utf-8"))["pages"]
+            regs = gate.page_regressions(result["pages"], ref)
+            print(f"\n## Per-page gate vs {args.gate.name}\n" + gate.format_regressions(regs))
+            if regs:
+                print(f"GATE FAILED: {len(regs)} page metric(s) below the reference")
+                return 1
         return 0
 
     print("\n## By scope\n" + metrics.format_report(result["by_scope"], "scope"))
