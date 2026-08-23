@@ -9,7 +9,9 @@ reports:
 - METRIC agreement per scope — auto MRR@5 / recall vs the same recomputed
   from the human labels (does the automated number track the human one?),
 - DISAGREEMENTS to act on — false-MISS (human relevant, anchor said no →
-  anchor too strict) and false-hit (anchor said yes, human said no).
+  anchor too strict) and false-hit (anchor said yes, human said no),
+- READABILITY — readable@5 = 1 − garbled/top per query (the "garbled" tick;
+  recovery strategy W0.4). Exports from before the tick score "—", not 1.0.
 
     uv run --project sidecar python -m evals.blind.score \
         evals/baselines/2026-08-15-v2-phase0
@@ -62,7 +64,8 @@ def score(stem) -> dict:
     pairs_by_scope: dict[str, list] = defaultdict(list)
     auto_by_scope: dict[str, list] = defaultdict(list)
     human_by_scope: dict[str, list] = defaultdict(list)
-    disagreements = []
+    readable_by_scope: dict[str, list] = defaultdict(list)   # (n_chunks, n_garbled) per query
+    disagreements, garbled_chunks = [], []
     reviewed = skipped = 0
 
     for qid, chunks in results.items():
@@ -73,7 +76,14 @@ def score(stem) -> dict:
         reviewed += 1
         scope = scope_of.get(qid, "cued")
         human_rel = set(lab.get("relevant", []))
+        garbled = set(lab["garbled"]) if "garbled" in lab else None   # None: sheet predates the tick
         top_chunks = sorted(chunks, key=lambda c: c["rank"])[:top]
+        if garbled is not None:
+            hit = [c for c in top_chunks if c["rank"] in garbled]
+            readable_by_scope[scope].append((len(top_chunks), len(hit)))
+            garbled_chunks += [{"query": query_of.get(qid, qid), "qid": qid, "scope": scope,
+                                "rank": c["rank"], "book": c["book"], "snippet": c["snippet"][:160]}
+                               for c in hit]
         auto_rels, human_rels = [], []
         for c in top_chunks:
             auto, human = bool(c["matched"]), c["rank"] in human_rel
@@ -109,8 +119,18 @@ def score(stem) -> dict:
                    "human": sum(h[m] for h in human) / len(human) if human else None}
                for m in COMPARE},
         }
+    readability = {}
+    for s in scopes:
+        rows = ([r for sc in readable_by_scope for r in readable_by_scope[sc]] if s == "all"
+                else readable_by_scope[s])
+        readability[s] = {
+            "queries": len(rows),
+            "garbled": sum(g for _, g in rows),
+            "readable@5": sum(1 - g / n for n, g in rows if n) / len(rows) if rows else None,
+        }
     return {"reviewed": reviewed, "skipped": skipped, "top": top,
-            "agreement": agreement, "metric_cmp": metric_cmp, "disagreements": disagreements}
+            "agreement": agreement, "metric_cmp": metric_cmp, "disagreements": disagreements,
+            "readability": readability, "garbled_chunks": garbled_chunks}
 
 
 def render_md(stem, r: dict) -> str:
@@ -130,7 +150,15 @@ def render_md(stem, r: dict) -> str:
 
     for s, m in r["metric_cmp"].items():
         lines.append(f"{s:<10}{m['queries']:>4}" + "".join(_cell(m[k]) for k in COMPARE))
-    lines += ["```", "", f"## Disagreements to act on ({len(r['disagreements'])})"]
+    lines += ["```", "", "## Readability (human: the garbled tick)", "```",
+              f"{'scope':<10}{'q':>4}{'garbled':>9}{'readable@5':>12}"]
+    for s, v in r["readability"].items():
+        rd = f"{v['readable@5']:.3f}" if v["readable@5"] is not None else "—"
+        lines.append(f"{s:<10}{v['queries']:>4}{v['garbled']:>9}{rd:>12}")
+    lines += ["```", "", f"## Garbled chunks ({len(r['garbled_chunks'])})"]
+    for g in r["garbled_chunks"]:
+        lines.append(f"- [{g['scope']}] {g['qid']} \"{g['query']}\" — #{g['rank']} {g['book']}  · {g['snippet']!r}")
+    lines += ["", f"## Disagreements to act on ({len(r['disagreements'])})"]
     for d in r["disagreements"]:
         lines.append(f"- [{d['scope']}] {d['qid']} \"{d['query']}\" — #{d['rank']} {d['book']}: "
                      f"**{d['kind']}**  · {d['snippet']!r}")

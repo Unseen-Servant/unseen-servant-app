@@ -65,6 +65,7 @@ uv run --project sidecar-v3 pytest evals/tests
 | the committed baseline (MRR@5 etc.) | `evals/baselines/*.json` | a v3 rung that doesn't beat it |
 | every golden page ≥ its reference score | `extraction/gate.py` (`--gate`, exit 1) | an extraction change that helps the mean and hurts a page |
 | anchor grade vs a human (Cohen's κ) | `blind/score.py` | trusting the automated number |
+| chunks a human can read (`readable@5`) | `blind/score.py` (the "garbled" tick) | calling a pipeline search-ready on anchors alone |
 
 ## Suites
 
@@ -114,8 +115,9 @@ which drives two viewers:
 uv run --project sidecar python -m evals.retrieval.report evals/baselines/<stem>
 
 # Blind manual round — the trust check. Score the shuffled, hint-stripped
-# scoresheet, Export, then compare to the anchor grade (per-chunk agreement +
-# Cohen's κ + the anchors to fix).
+# scoresheet (tick "relevant" on answers, "garbled" on unreadable chunks),
+# Export, then compare to the anchor grade (per-chunk agreement + Cohen's κ +
+# readable@5 + the anchors to fix).
 uv run --project sidecar python -m evals.blind.generate evals/baselines/<stem> --open
 uv run --project sidecar python -m evals.blind.score    evals/baselines/<stem>
 ```

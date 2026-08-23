@@ -3,9 +3,11 @@
 Renders a self-contained HTML scoresheet from a baseline's results: each
 query with its top-N retrieved chunks in RANDOM order, stripped of every
 pipeline hint (rank, tier, relevance) and of the auto ✓/· and the anchors.
-The human marks which snippets actually answer the query, ticks Reviewed,
-and Exports ``<stem>.blind.json``. blind/score.py then compares those labels
-to the deterministic anchor grade → a trust number + the anchors to fix.
+The human marks which snippets actually answer the query, ticks "garbled" on
+any snippet that is unreadable (interleaved columns, torn stat lines — the
+2026-08-17 v3 sheet; recovery strategy W0.4), ticks Reviewed, and Exports
+``<stem>.blind.json``. blind/score.py then compares those labels to the
+deterministic anchor grade → a trust number, readable@5, + the anchors to fix.
 
     uv run --project sidecar python -m evals.blind.generate \
         evals/baselines/2026-08-15-v2-phase0 [--top 5] [--open]
@@ -106,6 +108,9 @@ h1{font-size:20px;margin:0 0 4px;color:var(--text-accent);font-weight:600}
 .mark{cursor:pointer;user-select:none;flex:0 0 84px;height:fit-content;text-align:center;
   border:1px solid var(--border);border-radius:3px;padding:4px 0;font-size:12px;color:var(--text-tertiary)}
 .mark.on{color:var(--text-accent);border-color:var(--text-accent);background:rgba(182,159,129,.08)}
+.marks{display:flex;flex-direction:column;gap:4px;flex:0 0 84px}
+.marks .mark{flex:none}
+.garbled.on{color:#e15342;border-color:#e15342;background:rgba(225,83,66,.08)}
 .body{flex:1;min-width:0}
 .src{color:var(--text-secondary);font-size:12px;font-family:var(--font-mono)}
 .heading{color:var(--text-accent);font-size:13px}
@@ -123,18 +128,24 @@ h1{font-size:20px;margin:0 0 4px;color:var(--text-accent);font-weight:600}
 <div class="intro">For each query, mark the snippets that <b>correctly answer it</b> — no pipeline
 hints are shown, and the order is randomised. A query that <i>names a system</i> requires that
 system's answer; an ambiguous query accepts any system's. Tick <b>reviewed</b> when done with a
-query (even if nothing was relevant). Progress saves in this browser; <b>Export</b> when finished
-and hand back the downloaded file.</div>
+query (even if nothing was relevant). Tick <b>garbled</b> on a snippet you cannot read as prose —
+columns interleaved, a stat line torn from its label, sentences out of order — whether or not it
+is relevant. Progress saves in this browser; <b>Export</b> when finished and hand back the
+downloaded file.</div>
 <div id="app"></div>
 <div class="bar"><span class="progress" id="progress"></span>
   <button class="export" id="export">Export labels ↓</button></div>
 <script>
 const DATA = __DATA__;
 const KEY = "blind:" + DATA.baseline;
-const store = JSON.parse(localStorage.getItem(KEY) || "{}");   // {qid:{reviewed:bool, relevant:[rank]}}
+const store = JSON.parse(localStorage.getItem(KEY) || "{}");   // {qid:{reviewed:bool, relevant:[rank], garbled:[rank]}}
 const esc = s => (s==null?"":String(s)).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 function save(){ localStorage.setItem(KEY, JSON.stringify(store)); progress(); }
-function rec(qid){ return store[qid] || (store[qid]={reviewed:false, relevant:[]}); }
+function rec(qid){
+  const r = store[qid] || (store[qid]={reviewed:false, relevant:[], garbled:[]});
+  if(!r.garbled) r.garbled = [];   // sheets exported before the readability tick
+  return r;
+}
 function progress(){
   const done = DATA.queries.filter(q => (store[q.id]||{}).reviewed).length;
   document.getElementById("progress").textContent =
@@ -152,15 +163,25 @@ for(const q of DATA.queries){
     `<div class="qhead"><span class="qtext">${esc(q.query)}</span>`
     + `<span class="qid">${esc(q.id)}</span></div>`
     + q.chunks.map(c =>
-        `<div class="chunk"><span class="mark ${r.relevant.includes(c.rank)?'on':''}" data-rank="${c.rank}">`
+        `<div class="chunk"><div class="marks">`
+        + `<span class="mark ${r.relevant.includes(c.rank)?'on':''}" data-rank="${c.rank}">`
         + `${r.relevant.includes(c.rank)?'✓ relevant':'relevant?'}</span>`
+        + `<span class="mark garbled ${r.garbled.includes(c.rank)?'on':''}" data-garbled="${c.rank}">`
+        + `${r.garbled.includes(c.rank)?'✗ garbled':'garbled?'}</span></div>`
         + `<div class="body"><span class="src">${esc(c.book)} ${pages(c)}</span>`
         + ` <span class="heading">${esc(c.heading)||''}</span>`
         + `<div class="snippet">${esc(c.snippet)}</div></div></div>`).join("")
     + `<div style="margin-top:10px"><span class="reviewed-btn ${r.reviewed?'on':''}">`
     + `${r.reviewed?'✓ reviewed':'mark reviewed'}</span></div>`;
 
-  div.querySelectorAll(".mark").forEach(m => m.onclick = () => {
+  div.querySelectorAll(".garbled").forEach(m => m.onclick = () => {
+    const rank = Number(m.dataset.garbled), rr = rec(q.id);
+    const i = rr.garbled.indexOf(rank);
+    if(i>=0){ rr.garbled.splice(i,1); m.classList.remove("on"); m.textContent="garbled?"; }
+    else { rr.garbled.push(rank); m.classList.add("on"); m.textContent="✗ garbled"; }
+    save();
+  });
+  div.querySelectorAll(".mark:not(.garbled)").forEach(m => m.onclick = () => {
     const rank = Number(m.dataset.rank), rr = rec(q.id);
     const i = rr.relevant.indexOf(rank);
     if(i>=0){ rr.relevant.splice(i,1); m.classList.remove("on"); m.textContent="relevant?"; }
