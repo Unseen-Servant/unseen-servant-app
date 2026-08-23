@@ -12,57 +12,57 @@
       "srd_5_2_1",
       "yze_srd"
     ],
-    "n_pages": 30
+    "n_pages": 40
   },
   "by_kind": {
     "prose": {
-      "pages": 13,
-      "content_recall": 0.9743589743589743,
-      "reading_order": 1.0,
+      "pages": 15,
+      "content_recall": 0.9777777777777777,
+      "reading_order": 0.980952380952381,
       "table_cells": null
     },
     "all": {
-      "pages": 30,
-      "content_recall": 0.9888888888888889,
-      "reading_order": 1.0,
-      "table_cells": 0.9761904761904762
+      "pages": 40,
+      "content_recall": 0.9041666666666666,
+      "reading_order": 0.9071428571428571,
+      "table_cells": 0.7719298245614035
     },
     "table": {
-      "pages": 15,
-      "content_recall": 1.0,
+      "pages": 20,
+      "content_recall": 0.825,
       "reading_order": null,
-      "table_cells": 0.9761904761904762
+      "table_cells": 0.7719298245614035
     },
     "two_column": {
-      "pages": 2,
+      "pages": 5,
       "content_recall": 1.0,
-      "reading_order": 1.0,
+      "reading_order": 0.8038095238095238,
       "table_cells": null
     }
   },
   "by_doc": {
     "osric_2e": {
-      "pages": 3,
-      "content_recall": 0.8888888888888888,
-      "reading_order": 1.0,
-      "table_cells": 1.0
+      "pages": 6,
+      "content_recall": 0.7777777777777778,
+      "reading_order": 0.673015873015873,
+      "table_cells": 0.5
     },
     "all": {
-      "pages": 30,
-      "content_recall": 0.9888888888888889,
-      "reading_order": 1.0,
-      "table_cells": 0.9761904761904762
+      "pages": 40,
+      "content_recall": 0.9041666666666666,
+      "reading_order": 0.9071428571428571,
+      "table_cells": 0.7719298245614035
     },
     "cairn_1e": {
-      "pages": 3,
-      "content_recall": 1.0,
+      "pages": 5,
+      "content_recall": 0.6,
       "reading_order": 1.0,
-      "table_cells": null
+      "table_cells": 0.0
     },
     "srd_5_1": {
-      "pages": 5,
+      "pages": 8,
       "content_recall": 1.0,
-      "reading_order": null,
+      "reading_order": 1.0,
       "table_cells": 1.0
     },
     "bfrpg_4e": {
@@ -78,10 +78,10 @@
       "table_cells": 0.8888888888888888
     },
     "srd_5_2_1": {
-      "pages": 6,
-      "content_recall": 1.0,
-      "reading_order": 1.0,
-      "table_cells": 1.0
+      "pages": 8,
+      "content_recall": 0.9375,
+      "reading_order": 0.9333333333333333,
+      "table_cells": 0.75
     },
     "yze_srd": {
       "pages": 3,
@@ -321,6 +321,86 @@
       "kind": "table",
       "content_recall": 1.0,
       "table_cells": 1.0
+    },
+    {
+      "id": "g31",
+      "doc": "srd_5_1",
+      "page": 290,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g32",
+      "doc": "srd_5_1",
+      "page": 299,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g33",
+      "doc": "srd_5_1",
+      "page": 103,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g34",
+      "doc": "osric_2e",
+      "page": 156,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 0.6190476190476191
+    },
+    {
+      "id": "g35",
+      "doc": "osric_2e",
+      "page": 163,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 0.4
+    },
+    {
+      "id": "g36",
+      "doc": "osric_2e",
+      "page": 202,
+      "kind": "table",
+      "content_recall": 0.0,
+      "table_cells": 0.0
+    },
+    {
+      "id": "g37",
+      "doc": "srd_5_2_1",
+      "page": 34,
+      "kind": "table",
+      "content_recall": 0.5,
+      "table_cells": 0.0
+    },
+    {
+      "id": "g38",
+      "doc": "srd_5_2_1",
+      "page": 183,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 0.8666666666666667
+    },
+    {
+      "id": "g39",
+      "doc": "cairn_1e",
+      "page": 10,
+      "kind": "table",
+      "content_recall": 0.0,
+      "table_cells": 0.0
+    },
+    {
+      "id": "g40",
+      "doc": "cairn_1e",
+      "page": 11,
+      "kind": "table",
+      "content_recall": 0.0,
+      "table_cells": 0.0
     }
   ]
 }

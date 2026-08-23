@@ -257,3 +257,114 @@
   answer_ref: "black_hack/the-black-hack.md"
   content: ["warrior", "starting hp", "special features"]
   cells:   ["starting hp d10 4", "attack damage 1d8 1d6"]
+
+# ── Batch 3 (→40): recovery-strategy W0.3 — the regimes the 30-page set missed ──
+# Picked from the 2026-08-22 corpus-qa worst lists (docs/roadmap/2026-08-22-v3-
+# search-recovery-strategy.md §1.3): dense SRD 5.1 monster pages, OSRIC two-
+# column prose, pages the layout stage emitted blank (tables/lists), and the
+# SRD 5.2.1 within-column line reordering. YZE's chase-obstacle page (also
+# blank) has no counterpart in the YZE reference, so it cannot be golden.
+
+# D&D 5E SRD 5.1 — Young White Dragon stat block (nested label|value columns)
+- id: g31
+  doc: srd_5_1
+  page: 290
+  kind: table
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Young_White_Dragon_(Chromatic).md"
+  content: ["young white dragon", "ice walk", "cold breath", "multiattack"]
+  cells:   ["armor class 17", "hit points 133 14d10 56", "challenge 6 2 300 xp"]
+
+# D&D 5E SRD 5.1 — Ancient Gold Dragon, second page (the cross_page stat block)
+- id: g32
+  doc: srd_5_1
+  page: 299
+  kind: prose
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Ancient_Gold_Dragon_(Metallic).md"
+  content: ["fire breath", "weakening breath", "change shape", "13d10", "legendary actions"]
+  order:   ["fire breath", "weakening breath", "change shape", "legendary actions", "wing attack"]
+
+# D&D 5E SRD 5.1 — spell areas of effect (two columns of short headed paragraphs;
+# the worst srd_5_1 page for BOTH engines on corpus-qa)
+- id: g33
+  doc: srd_5_1
+  page: 103
+  kind: two_column
+  answer_ref: "dnd_srd_51/07_Spells/Spellcasting.md"
+  content: ["point of origin", "cone", "cube", "cylinder", "sphere", "schools of magic"]
+  order:   ["cone extends in a direction you choose", "you select a cube s point of origin",
+            "cylinder s point of origin is the center", "line extends from its point of origin",
+            "you select a sphere s point of origin", "many spells specify that a target can make a saving throw",
+            "some spells require the caster to make an attack roll", "academies of magic group spells"]
+
+# OSRIC — Searching the Dungeon (two-column prose; v3 corpus-qa #1 worst page: 13/13 blocks interleaved)
+- id: g34
+  doc: osric_2e
+  page: 156
+  kind: two_column
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  content: ["stuck door", "lock picking", "wandering monster", "mapping"]
+  order:   ["normally the gm rolls this die in secret", "balance this against the lethality of the dungeon",
+            "opening doors", "success by either indicates the door opens",
+            "lock picking attempts by thieves and assassins", "chopping down a door",
+            "mapping a key element of dungeon exploration"]
+
+# OSRIC — example dungeon + sample play session (two-column prose)
+- id: g35
+  doc: osric_2e
+  page: 163
+  kind: two_column
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  content: ["manticore", "arsenal", "dog kennel", "goods storage"]
+  order:   ["stuffed and mounted head of a manticore", "3 arsenal", "4 dog kennel", "5 goods storage",
+            "background a party of stalwart adventurers", "and out and most of the tracks appear fairly fresh",
+            "the elf will go down into the cave"]
+
+# OSRIC — dinosaur encounter tables (page emitted BLANK by v3: layout found only furniture)
+- id: g36
+  doc: osric_2e
+  page: 202
+  kind: table
+  answer_ref: "osric_2e/osric_chapter4 [Wiki and Other Goodies].html"
+  content: ["tyrannosaurids", "hadrosaurids", "sauropods", "ceratopsians"]
+  cells:   ["1 tyrannosaurids allosaurids", "2 hadrosaurids", "1 albertosaurus cretaceous",
+            "2 allosaurus jurassic", "6 tyrannosaurus cretaceous"]
+
+# D&D 5E SRD 5.2.1 — bard spell lists (page emitted BLANK by v3)
+- id: g37
+  doc: srd_5_2_1
+  page: 34
+  kind: table
+  answer_ref: "dnd_srd_52/03_Character_Classes/Character_Classes_Each/Bard.md"
+  content: ["level 3 bard spells", "level 4 bard spells", "school", "special"]
+  cells:   ["invisibility illusion c", "knock transmutation", "bestow curse necromancy c",
+            "dimension door conjuration", "hypnotic pattern illusion c"]
+
+# D&D 5E SRD 5.2.1 — rules glossary (v3 reorders lines WITHIN a column: the
+# "Assist an Attack Roll" lead-in printed after the sentence it opens)
+- id: g38
+  doc: srd_5_2_1
+  page: 183
+  kind: prose
+  answer_ref: "dnd_srd_52/08_Rules_Glossary/Rules_Glossary_All.md"
+  content: ["heroic inspiration", "hide", "high jump", "hit point dice", "hostile"]
+  order:   ["assist an attack roll", "an enemy within 5 feet of you",
+            "if you gain heroic inspiration but already have it", "it s lost unless you give it",
+            "with the hide action you try to hide yourself", "when you make a high jump"]
+
+# Cairn — spellbook d100 list (page emitted BLANK by v3)
+- id: g39
+  doc: cairn_1e
+  page: 10
+  kind: table
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  content: ["spellbooks", "adhere", "anthropomorphize", "mirror image"]
+  cells:   ["1 adhere", "4 anthropomorphize", "45 knock", "74 sleep"]
+
+# Cairn — equipment list (page emitted BLANK by v3)
+- id: g40
+  doc: cairn_1e
+  page: 11
+  kind: table
+  answer_ref: "cairn_1e/Cairn Markdown.md"
+  content: ["equipment list", "gambeson", "chainmail", "lockpicks", "grappling hook"]
+  cells:   ["chainmail 2 armor bulky 40", "plate 3 armor bulky 60", "book 50", "lockpicks 25", "grappling hook 25"]

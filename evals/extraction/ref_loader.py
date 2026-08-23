@@ -13,7 +13,11 @@ from pathlib import Path
 
 
 def _strip_markup(s: str) -> str:
-    s = re.sub(r"<(script|style)[\s\S]*?</\1>", " ", s)
+    # The tag name must END at script/style: ODT content.xml is full of
+    # <style:style .../> with no </style> closer, and a bare "<style" prefix
+    # lazily scanned to EOF for every one of them (9,483 × 3.9 M chars on the
+    # BFRPG reference — 27 min per verify run).
+    s = re.sub(r"<(script|style)(?![\w:-])[^>]*>[\s\S]*?</\1\s*>", " ", s)
     s = re.sub(r"<[^>]+>", " ", s)
     return s
 
