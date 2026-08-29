@@ -67,8 +67,8 @@ class FontStats:
 
 @dataclass(frozen=True, slots=True)
 class Block:
-    """An ordered, typed region of a page (plan §3.2 C/D) — the atom of layout.
-    Every block keeps page, bbox, and font_stats."""
+    """An ordered native PDF text block annotated by layout classification.
+    Every block keeps page, native bbox, and font_stats."""
 
     id: str
     kind: BlockKind

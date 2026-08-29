@@ -48,6 +48,34 @@ class Span:
 
 
 @dataclass(frozen=True, slots=True)
+class TextLine:
+    """One native PDF line. Its span order is the extractor's source order."""
+
+    bbox: BBox
+    spans: tuple[Span, ...]
+
+    @property
+    def text(self) -> str:
+        return " ".join(span.text for span in self.spans)
+
+
+@dataclass(frozen=True, slots=True)
+class TextBlock:
+    """One native PDF text block. Layout may classify it but never reshape it."""
+
+    bbox: BBox
+    lines: tuple[TextLine, ...]
+
+    @property
+    def text(self) -> str:
+        return "\n".join(line.text for line in self.lines)
+
+    @property
+    def spans(self) -> tuple[Span, ...]:
+        return tuple(span for line in self.lines for span in line.spans)
+
+
+@dataclass(frozen=True, slots=True)
 class PageExtract:
     """Raw extraction for one page. `raster` is produced on demand by
     `rasterize()` (transient, never persisted), not stored here."""
@@ -58,6 +86,7 @@ class PageExtract:
     spans: tuple[Span, ...]
     needs_ocr: bool  # no text layer but has image content (opt-in slow OCR pass)
     label: str  # printed page label (page.get_label()), "" if none
+    blocks: tuple[TextBlock, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,10 +103,12 @@ class RawExtraction:
     needs_ocr: bool  # any page lacked a text layer
 
 
-def _page_spans(page) -> tuple[Span, ...]:
-    out: list[Span] = []
+def _page_text_blocks(page) -> tuple[TextBlock, ...]:
+    out: list[TextBlock] = []
     for block in page.get_text("dict")["blocks"]:
+        lines: list[TextLine] = []
         for line in block.get("lines", []):
+            spans: list[Span] = []
             for s in line.get("spans", []):
                 text = _norm_ws(s["text"])
                 if not text:
@@ -85,7 +116,7 @@ def _page_spans(page) -> tuple[Span, ...]:
                 font = s.get("font", "")
                 flags = s.get("flags", 0)
                 low = font.lower()
-                out.append(Span(
+                spans.append(Span(
                     text=text,
                     bbox=BBox(*s["bbox"]),
                     size=round(float(s["size"]), 2),
@@ -93,6 +124,10 @@ def _page_spans(page) -> tuple[Span, ...]:
                     bold=bool(flags & _BOLD) or "bold" in low,
                     italic=bool(flags & _ITALIC) or "italic" in low or "oblique" in low,
                 ))
+            if spans:
+                lines.append(TextLine(BBox(*line["bbox"]), tuple(spans)))
+        if lines:
+            out.append(TextBlock(BBox(*block["bbox"]), tuple(lines)))
     return tuple(out)
 
 
@@ -104,7 +139,8 @@ def extract(pdf_path, doc_id: str | None = None) -> RawExtraction:
         pages: list[PageExtract] = []
         for i in range(doc.page_count):
             page = doc.load_page(i)
-            spans = _page_spans(page)
+            blocks = _page_text_blocks(page)
+            spans = tuple(span for block in blocks for span in block.spans)
             pages.append(PageExtract(
                 page=i,
                 width=float(page.rect.width),
@@ -112,6 +148,7 @@ def extract(pdf_path, doc_id: str | None = None) -> RawExtraction:
                 spans=spans,
                 needs_ocr=(not spans and bool(page.get_images())),
                 label=page.get_label() or "",
+                blocks=blocks,
             ))
         toc = tuple((lvl, title, pno) for lvl, title, pno in doc.get_toc())
         title = (doc.metadata or {}).get("title") or did

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from domain.models import BBox
-from ingest.extract import extract, rasterize, Span, PageExtract, RawExtraction, _norm_ws
+from ingest.extract import extract, rasterize, Span, PageExtract, RawExtraction, TextBlock, _norm_ws
 
 
 @pytest.fixture
@@ -70,6 +70,15 @@ def test_spans_carry_text_bbox_and_bold(text_pdf):
     assert isinstance(heading.bbox, BBox) and heading.bbox.x1 > heading.bbox.x0 > 0
 
 
+def test_native_blocks_preserve_line_order_and_bbox(text_pdf):
+    page = extract(text_pdf, doc_id="fix").pages[0]
+    assert page.blocks and all(isinstance(block, TextBlock) for block in page.blocks)
+    assert [line.text for block in page.blocks for line in block.lines] == [
+        "The Goblin", "A goblin has armor class 15."
+    ]
+    assert all(block.bbox.x1 > block.bbox.x0 for block in page.blocks)
+
+
 def test_reports_page_count_and_geometry(text_pdf):
     ex = extract(text_pdf, doc_id="fix")
     assert isinstance(ex, RawExtraction)
@@ -100,6 +109,7 @@ def test_image_only_page_flags_needs_ocr(image_only_pdf):
     assert ex.pages[0].needs_ocr is True
     assert ex.needs_ocr is True
     assert ex.pages[0].spans == ()
+    assert ex.pages[0].blocks == ()
 
 
 def test_rasterize_returns_rgb_uint8_at_dpi(text_pdf):

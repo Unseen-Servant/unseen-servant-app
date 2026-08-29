@@ -18,13 +18,15 @@ from typing import Callable, Sequence
 
 import numpy as np
 
-from domain.models import Block, Document, SCHEMA_VERSION
+from domain.models import Block, Document
 from index.embedder import DIM
 from ingest.chunk import chunk_blocks
 from ingest.extract import RawExtraction, extract
 from ingest.layout import LABELS_M, layout
 from ingest.linearize import to_units
 from ingest.structure import build_sections
+
+PIPELINE_VERSION = 2  # W1: native blocks carry text; prior indexes are invalid.
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,11 +72,11 @@ def index_document(
     embed_fn: Callable[[list[str]], np.ndarray],
     *,
     doc_id: str | None = None,
-    pipeline_version: int = SCHEMA_VERSION,
+    pipeline_version: int = PIPELINE_VERSION,
 ) -> IndexReport:
     raw = extract(pdf_path, doc_id)
     content_hash = _sha256(pdf_path)
-    if store.is_unchanged(raw.doc_id, content_hash):
+    if store.is_unchanged(raw.doc_id, content_hash, pipeline_version):
         return IndexReport(raw.doc_id, 0, 0, 0, skipped=True)
 
     blocks = tuple(layout_fn(raw))
@@ -93,6 +95,6 @@ def index_document(
     return IndexReport(raw.doc_id, len(sections), len(chunks), len(units), skipped=False)
 
 
-def make_layout_fn(session, labels: list[str] = LABELS_M):
+def make_layout_fn(session, labels: list[str] = LABELS_M, rasterizer=None):
     """Production layout callable from a loaded PP-DocLayout ONNX session."""
-    return lambda raw: layout(raw, session, labels)
+    return lambda raw: layout(raw, session, labels, rasterizer=rasterizer) if rasterizer else layout(raw, session, labels)

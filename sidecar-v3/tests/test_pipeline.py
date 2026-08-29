@@ -78,6 +78,14 @@ def test_reindex_skips_unchanged(pdf, tmp_path):
     assert store.counts("m")["units"] >= 1  # still indexed
 
 
+def test_reindex_runs_when_pipeline_version_changes(pdf, tmp_path):
+    store = Store.open(str(tmp_path / "idx.db"))
+    index_document(pdf, store, fake_layout, fake_embed, doc_id="m", pipeline_version=1)
+    rep = index_document(pdf, store, fake_layout, fake_embed, doc_id="m", pipeline_version=2)
+    assert rep.skipped is False
+    assert store.pipeline_version("m") == 2
+
+
 def test_every_unit_has_a_vector(pdf, tmp_path):
     store = Store.open(str(tmp_path / "idx.db"))
     index_document(pdf, store, fake_layout, fake_embed, doc_id="m")

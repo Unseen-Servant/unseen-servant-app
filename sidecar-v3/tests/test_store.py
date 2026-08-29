@@ -48,8 +48,9 @@ def test_recommit_replaces_not_duplicates(tmp_path):
 
 def test_change_detection(tmp_path):
     s = Store.open(str(tmp_path / "idx.db"))
-    s.commit(_doc(), _vecs(2), content_hash="h1")
-    assert s.is_unchanged("d", "h1") is True
+    s.commit(_doc(), _vecs(2), content_hash="h1", pipeline_version=7)
+    assert s.is_unchanged("d", "h1", 7) is True
+    assert s.is_unchanged("d", "h1", 8) is False
     assert s.is_unchanged("d", "h2") is False
     assert s.is_unchanged("missing", "h1") is False
 

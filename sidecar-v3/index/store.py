@@ -63,9 +63,12 @@ class Store:
 
     # -- write path -------------------------------------------------------
 
-    def is_unchanged(self, doc_id: str, content_hash: str) -> bool:
-        row = self.db.execute("SELECT content_hash FROM documents WHERE id=?", (doc_id,)).fetchone()
-        return bool(row) and row[0] == content_hash
+    def is_unchanged(self, doc_id: str, content_hash: str,
+                     pipeline_version: int = SCHEMA_VERSION) -> bool:
+        row = self.db.execute(
+            "SELECT content_hash, pipeline_version FROM documents WHERE id=?", (doc_id,)
+        ).fetchone()
+        return bool(row) and row[0] == content_hash and row[1] == pipeline_version
 
     def commit(self, doc: Document, vectors: np.ndarray, content_hash: str,
                pipeline_version: int = SCHEMA_VERSION, fts_texts=None) -> None:

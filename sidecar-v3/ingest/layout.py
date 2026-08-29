@@ -1,10 +1,10 @@
 """B/C/D. Layout → typed blocks (plan §3.2 B/C/D).
 
-The Stage-1 winner (PP-DocLayout-M ONNX, GO) detects page regions; we map each
-to a typed BlockKind, assign the Stage-A text spans, order them column-aware
-(the model's read_order if present, else a 2-column XY-cut — the R1 fix), drop
-furniture as `artifact` blocks (the R2/R4 fix, by classification not regex), and
-linearize each region row-major so table cells stay contiguous.
+The Stage-1 winner (PP-DocLayout-M ONNX, GO) detects page regions; we use those
+regions only to classify native Stage-A text blocks. Classification may split a
+raw block only at an existing line boundary; native lines carry their own text
+and order, then a column-aware XY-cut orders the resulting blocks. This
+prevents an incomplete detector from merging same-y spans across two columns.
 
 Split for testability: `layout_page()` is pure region→Block assembly (unit-
 tested with hand-crafted regions); `detect_regions()`/`layout()` are the thin
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from domain.models import BBox, Block, BlockKind, FontStats
-from ingest.extract import PageExtract, RawExtraction, Span, rasterize
+from ingest.extract import PageExtract, RawExtraction, Span, TextBlock, rasterize
 
 # PP-DocLayout label → BlockKind. Covers PP-DocLayout-M's 23 classes (the GO
 # model) plus V3's extras, so either model feeds the same assembly.
@@ -59,69 +59,35 @@ def _kind(label: str) -> BlockKind:
 
 # ---- pure assembly (unit-tested, no model) ----
 
-def _center_in(b: BBox, box: BBox) -> bool:
-    cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
-    return box.x0 <= cx <= box.x1 and box.y0 <= cy <= box.y1
-
-
-def _vdist(b: BBox, box: BBox) -> float:
-    cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
-    dx = max(box.x0 - cx, 0.0, cx - box.x1)
-    dy = max(box.y0 - cy, 0.0, cy - box.y1)
-    return dy * 3.0 + dx
-
-
-def _xy_cut(regions: Sequence[Region], page_w: float) -> list[Region]:
-    if len(regions) <= 1:
-        return list(regions)
+def _xy_cut(items: Sequence, page_w: float) -> list:
+    if len(items) <= 1:
+        return list(items)
     mid = page_w / 2.0
-    cx = lambda r: (r.bbox.x0 + r.bbox.x1) / 2.0
-    left = [r for r in regions if cx(r) < mid]
-    right = [r for r in regions if cx(r) >= mid]
-    full = [r for r in regions
-            if r.bbox.x0 < mid and r.bbox.x1 > mid and (r.bbox.x1 - r.bbox.x0) > page_w * 0.55]
-    if len(left) >= 2 and len(right) >= 2 and len(full) <= 1:
-        return sorted(left, key=lambda r: r.bbox.y0) + sorted(right, key=lambda r: r.bbox.y0)
-    return sorted(regions, key=lambda r: r.bbox.y0)
+    cx = lambda item: (item.bbox.x0 + item.bbox.x1) / 2.0
+    full = [item for item in items
+            if item.bbox.x0 < mid and item.bbox.x1 > mid
+            and (item.bbox.x1 - item.bbox.x0) > page_w * 0.55]
+    columns = [item for item in items if item not in full]
+    left = [item for item in columns if cx(item) < mid]
+    right = [item for item in columns if cx(item) >= mid]
+    if left and right:
+        def ordered_columns(group):
+            group_left = [item for item in group if cx(item) < mid]
+            group_right = [item for item in group if cx(item) >= mid]
+            return sorted(group_left, key=lambda item: item.bbox.y0) + sorted(group_right, key=lambda item: item.bbox.y0)
 
-
-def _order(regions: Sequence[Region], page_w: float) -> list[Region]:
-    if regions and all(r.read_order is not None for r in regions):
-        return sorted(regions, key=lambda r: r.read_order)
-    return _xy_cut(regions, page_w)
-
-
-def _rows(spans: list[Span]) -> list[list[Span]]:
-    """Bucket spans into rows by y. A span joins the current row only if it is
-    vertically close AND a comparable font size — a big heading span (tall bbox,
-    centered on the next line) must not absorb the smaller row below it, which
-    would break table-cell contiguity (the black_hack warrior g25 regression)."""
-    if not spans:
-        return []
-    spans = sorted(spans, key=lambda s: (s.bbox.y0, s.bbox.x0))
-    rows: list[list[Span]] = []
-    cur: list[Span] = []
-    cy = csize = None
-    for s in spans:
-        yc = (s.bbox.y0 + s.bbox.y1) / 2
-        h = s.bbox.y1 - s.bbox.y0
-        size_ok = csize is None or max(s.size, csize) <= 1.4 * max(min(s.size, csize), 1e-6)
-        if cy is not None and size_ok and abs(yc - cy) <= max(3.0, h * 0.6):
-            cur.append(s)
-            cy = (cy + yc) / 2
-        else:
-            if cur:
-                rows.append(cur)
-            cur, cy, csize = [s], yc, s.size
-    if cur:
-        rows.append(cur)
-    return rows
-
-
-def _linearize(spans: list[Span]) -> str:
-    """Row-major prose/heading text: rows by y, each ordered left→right."""
-    return "\n".join(" ".join(s.text for s in sorted(row, key=lambda s: s.bbox.x0))
-                     for row in _rows(spans))
+        # Full-width titles and tables partition a two-column page; they must
+        # not force the surrounding columns back into y-major interleaving.
+        out = []
+        remaining = columns
+        for item in sorted(full, key=lambda item: item.bbox.y0):
+            before = [candidate for candidate in remaining if candidate.bbox.y0 < item.bbox.y0]
+            out.extend(ordered_columns(before))
+            out.append(item)
+            remaining = [candidate for candidate in remaining if candidate not in before]
+        out.extend(ordered_columns(remaining))
+        return out
+    return sorted(items, key=lambda item: item.bbox.y0)
 
 
 def _cells(row: list[Span]) -> list[str]:
@@ -137,9 +103,9 @@ def _cells(row: list[Span]) -> list[str]:
     return [" ".join(x.text for x in c) for c in cells]
 
 
-def _linearize_table(spans: list[Span]) -> str:
+def _linearize_table(block: TextBlock) -> str:
     """Row-major with pipe-delimited cells, so Stage F can pair headers to cells."""
-    return "\n".join(" | ".join(_cells(row)) for row in _rows(spans))
+    return "\n".join(" | ".join(_cells(list(line.spans))) for line in block.lines)
 
 
 def _font_stats(spans: list[Span]) -> FontStats | None:
@@ -154,49 +120,81 @@ def _font_stats(spans: list[Span]) -> FontStats | None:
     )
 
 
-def layout_page(page: PageExtract, regions: Sequence[Region], doc_id: str) -> tuple[Block, ...]:
-    """Assemble typed Blocks for one page from detected regions + Stage-A spans."""
-    ordered = _order(regions, page.width)
-    nonfurn = [i for i, r in enumerate(ordered) if _kind(r.label) is not BlockKind.artifact]
-    buckets: list[list[Span]] = [[] for _ in ordered]
-    uncovered: list[Span] = []
-    for sp in page.spans:
-        host = next((i for i, r in enumerate(ordered) if _center_in(sp.bbox, r.bbox)), None)
-        if host is not None:
-            buckets[host].append(sp)
-        else:
-            uncovered.append(sp)  # in a gap between regions → assign below, row-coherent
-    # Uncovered spans attach to the nearest non-furniture region a ROW AT A TIME,
-    # so a same-row label/value pair (Armor Class | 15) is never split across two
-    # regions — the SRD 5.1 stat-block pathology, where the AC/HP strip falls in a
-    # detection gap and per-span nearest sent the narrow label and wide value apart.
-    for row in _rows(uncovered):
-        if not nonfurn:
-            break
-        rb = BBox(min(s.bbox.x0 for s in row), min(s.bbox.y0 for s in row),
-                  max(s.bbox.x1 for s in row), max(s.bbox.y1 for s in row))
-        tgt = min(nonfurn, key=lambda i: _vdist(rb, ordered[i].bbox))
-        buckets[tgt].extend(row)
+def _overlap_fraction(block: BBox, region: BBox) -> float:
+    width = max(0.0, min(block.x1, region.x1) - max(block.x0, region.x0))
+    height = max(0.0, min(block.y1, region.y1) - max(block.y0, region.y0))
+    area = max(0.0, block.x1 - block.x0) * max(0.0, block.y1 - block.y0)
+    return width * height / area if area else 0.0
 
+
+def _bbox(lines) -> BBox:
+    return BBox(
+        min(line.bbox.x0 for line in lines), min(line.bbox.y0 for line in lines),
+        max(line.bbox.x1 for line in lines), max(line.bbox.y1 for line in lines),
+    )
+
+
+def _classified_blocks(native: TextBlock, regions: Sequence[Region]) -> tuple[list[tuple[TextBlock, BlockKind]], set[int]]:
+    """Split only at native line boundaries when layout classification changes."""
+    out: list[tuple[TextBlock, BlockKind]] = []
+    covered_regions: set[int] = set()
+    lines = []
+    kind = None
+    for line in native.lines:
+        scored = [(_overlap_fraction(line.bbox, region.bbox), i) for i, region in enumerate(regions)]
+        fraction, region_i = max(scored, default=(0.0, -1))
+        line_kind = _kind(regions[region_i].label) if fraction > 0.5 else BlockKind.prose
+        # Detection labels are advisory, not permission to discard native text.
+        # The current model mislabels real tables and rule headings as images or
+        # furniture, so retain every text-bearing line until a separately
+        # validated furniture pass can prove it is safe to remove.
+        if line_kind in {BlockKind.image, BlockKind.artifact}:
+            line_kind = BlockKind.prose
+        if region_i >= 0 and fraction > 0.5:
+            covered_regions.add(region_i)
+        if lines and line_kind is not kind:
+            out.append((TextBlock(_bbox(lines), tuple(lines)), kind))
+            lines = []
+        lines.append(line)
+        kind = line_kind
+    if lines:
+        out.append((TextBlock(_bbox(lines), tuple(lines)), kind))
+    return out, covered_regions
+
+
+def layout_page(page: PageExtract, regions: Sequence[Region], doc_id: str) -> tuple[Block, ...]:
+    """Classify and order native text blocks without rewriting their content."""
     blocks: list[Block] = []
-    for i, r in enumerate(ordered):
-        kind = _kind(r.label)
-        sps = buckets[i]
-        if not sps and kind is not BlockKind.image:
-            continue  # empty non-image region — nothing to keep
-        order = len(blocks)
-        text = "" if kind is BlockKind.image else (
-            _linearize_table(sps) if kind is BlockKind.table else _linearize(sps))
-        blocks.append(Block(
-            id=f"{doc_id}:p{page.page}:b{order}",
-            kind=kind,
-            text=text,
-            page=page.page,
-            bbox=r.bbox,
-            reading_order=order,
-            font_stats=_font_stats(sps),
-            lang=None,
-        ))
+    covered_regions: set[int] = set()
+    classified: dict[int, list[tuple[TextBlock, BlockKind]]] = {}
+    for native in page.blocks:
+        parts, covered = _classified_blocks(native, regions)
+        classified[id(native)] = parts
+        covered_regions.update(covered)
+    for source_block in _xy_cut(page.blocks, page.width):
+        # Split parts inherit their raw block's page position but retain native
+        # line sequence. Re-sorting them by their aggregate bboxes can invert a
+        # heading and its following prose when PDFs report overlapping line boxes.
+        for native, kind in classified[id(source_block)]:
+            order = len(blocks)
+            text = _linearize_table(native) if kind is BlockKind.table else native.text
+            blocks.append(Block(
+                id=f"{doc_id}:p{page.page}:b{order}",
+                kind=kind,
+                text=text,
+                page=page.page,
+                bbox=native.bbox,
+                reading_order=order,
+                font_stats=_font_stats(list(native.spans)),
+                lang=None,
+            ))
+    for i, region in enumerate(regions):
+        if _kind(region.label) is BlockKind.image and i not in covered_regions:
+            order = len(blocks)
+            blocks.append(Block(
+                id=f"{doc_id}:p{page.page}:b{order}", kind=BlockKind.image, text="",
+                page=page.page, bbox=region.bbox, reading_order=order, font_stats=None, lang=None,
+            ))
     return tuple(blocks)
 
 
@@ -243,12 +241,13 @@ def _px_to_pt(regions: list[Region], dpi: int) -> list[Region]:
                    r.score, r.read_order) for r in regions]
 
 
-def layout(raw: RawExtraction, session, labels: list[str] = LABELS_M, dpi: int = 150) -> tuple[Block, ...]:
+def layout(raw: RawExtraction, session, labels: list[str] = LABELS_M, dpi: int = 150,
+           rasterizer=rasterize) -> tuple[Block, ...]:
     """Full Stage B over a document: rasterize each page → detect → assemble,
     with a document-global reading_order."""
     blocks: list[Block] = []
     for pe in raw.pages:
-        raster = rasterize(raw.path, pe.page, dpi=dpi)
+        raster = rasterizer(raw.path, pe.page, dpi=dpi)
         regions = _px_to_pt(detect_regions(raster, session, labels), dpi)
         for b in layout_page(pe, regions, raw.doc_id):
             blocks.append(Block(b.id, b.kind, b.text, b.page, b.bbox,
