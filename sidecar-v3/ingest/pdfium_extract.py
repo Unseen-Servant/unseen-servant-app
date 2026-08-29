@@ -17,7 +17,7 @@ from domain.models import BBox
 from ingest.extract import PageExtract, RawExtraction, Span, TextBlock, TextLine, _norm_ws
 
 
-def _line_spans(text_page) -> list[list[Span]]:
+def _line_spans(text_page, height: float) -> list[list[Span]]:
     chars: list[Span] = []
     pending_space = False
     for i in range(text_page.count_chars()):
@@ -30,8 +30,11 @@ def _line_spans(text_page) -> list[list[Span]]:
         x0, y0, x1, y1 = text_page.get_charbox(i)
         if x1 <= x0 or y1 <= y0:
             continue
+        # PDFium measures y up from the bottom of the page; BBox and every
+        # consumer of it use PyMuPDF's y-down top-left origin. Convert here so
+        # the row sort below reads the page top-to-bottom.
         chars.append(Span((" " if pending_space else "") + char,
-                          BBox(x0, y0, x1, y1), round(y1 - y0, 2), ""))
+                          BBox(x0, height - y1, x1, height - y0), round(y1 - y0, 2), ""))
         pending_space = False
     if not chars:
         return []
@@ -86,8 +89,8 @@ def _word(chars: list[Span]) -> Span:
     )
 
 
-def _page_blocks(page) -> tuple[TextBlock, ...]:
-    lines = _line_spans(page.get_textpage())
+def _page_blocks(page, height: float) -> tuple[TextBlock, ...]:
+    lines = _line_spans(page.get_textpage(), height)
     out = []
     for chars in lines:
         spans = _words(chars)
@@ -105,7 +108,7 @@ def extract(pdf_path, doc_id: str | None = None) -> RawExtraction:
     pages = []
     for i, page in enumerate(pdf):
         width, height = page.get_size()
-        blocks = _page_blocks(page)
+        blocks = _page_blocks(page, height)
         spans = tuple(span for block in blocks for span in block.spans)
         pages.append(PageExtract(i, width, height, spans, not spans, "", blocks))
     did = doc_id or Path(path).stem
