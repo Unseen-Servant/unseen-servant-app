@@ -423,11 +423,20 @@ thresholds must be relative to the row's own type size.
 
 **Interfaces:**
 - Consumes: `ingest.raw.Span`, `domain.models.BBox`.
-- Produces: `TUNING: dict[str, float]`; `em(chars: Sequence[Span]) -> float`;
-  `rows(chars: Sequence[Span], em: float) -> list[list[Span]]`;
+- Produces: `TUNING: dict[str, float]`; `em(spans: Sequence[Span]) -> float`;
+  `rows(spans: Sequence[Span], em: float) -> list[list[Span]]`;
   `cells(row: Sequence[Span], em: float) -> list[tuple[Span, ...]]` — each
-  returned tuple is one cell's **words**, not characters. Task 5 consumes
-  `cells`; Task 6 consumes `build`.
+  returned tuple is one cell's **words**. Task 5 consumes `cells`; Task 6
+  consumes `build`.
+
+**Each input Span is one PDFium text object, not one character.** Task 3
+measured that a text object never contains glyphs from two table columns: 1:1
+with PyMuPDF's cell-per-line output on three of four probe pages, and finer
+than cells (608 objects to 423 lines, per-glyph kerning) on the fourth — never
+coarser. Object membership is therefore a safe upper bound, and this module
+**merges** atomic objects upward into words and cells. It never splits one.
+That inversion is the whole point: splitting a character run on gap width is
+what merges a table row into a single line today.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -443,36 +452,44 @@ from ingest.raw import Span
 EM = 10.0
 
 
-def _chars(text: str, x: float, y: float = 0.0, advance: float = 6.0) -> list[Span]:
-    """One Span per character, laid out left to right on a 10pt em."""
-    return [Span(ch, BBox(x + i * advance, y, x + i * advance + 5.0, y + EM), EM, "")
-            for i, ch in enumerate(text)]
+def _obj(text: str, x: float, y: float = 0.0, width: float | None = None) -> Span:
+    """One Span per PDFium text object, laid out left to right on a 10pt em."""
+    return Span(text, BBox(x, y, x + (len(text) * 6.0 if width is None else width), y + EM), EM, "")
 
 
-def test_em_is_the_median_character_height():
-    assert em(_chars("abc", 0)) == EM
+def test_em_is_the_median_object_height():
+    assert em([_obj("abc", 0)]) == EM
 
 
 def test_a_wide_gap_starts_a_new_cell():
     """A table row's inter-cell gap is wide relative to the type size. The old
     absolute threshold (18pt) merged whole rows into one line."""
-    row = _chars("AB", 0) + _chars("CD", 100)
+    row = [_obj("AB", 0), _obj("CD", 100)]
     assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("AB",), ("CD",)]
 
 
 def test_a_space_sized_gap_starts_a_new_word_not_a_new_cell():
-    row = _chars("AB", 0) + _chars("CD", 15)
+    row = [_obj("AB", 0), _obj("CD", 15)]
     assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("AB", "CD")]
 
 
-def test_touching_characters_stay_one_word():
-    assert [tuple(w.text for w in cell) for cell in cells(_chars("ABCD", 0), EM)] == [("ABCD",)]
+def test_abutting_objects_merge_into_one_word():
+    """osric_2e p.40 splits words across text objects mid-word — 'Find ' + ' T'
+    + 'r' + 'aps '. Adjacent objects with no meaningful gap are one word."""
+    row = [_obj("Find", 0), _obj("T", 26), _obj("r", 32), _obj("aps", 38)]
+    assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("Find", "Traps")]
+
+
+def test_a_row_spanning_object_is_never_split():
+    """Objects are atomic. A wide object is one cell, not several — splitting on
+    internal gaps is the failure mode this design exists to remove."""
+    row = [_obj("A B", 0, width=200.0)]
+    assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("A B",)]
 
 
 def test_rows_group_by_baseline_and_order_top_to_bottom():
-    top = _chars("T", 0, y=0.0)
-    bottom = _chars("B", 0, y=40.0)
-    assert [[c.text for c in row] for row in rows(bottom + top, EM)] == [["T"], ["B"]]
+    assert [[s.text for s in row]
+            for row in rows([_obj("B", 0, y=40.0), _obj("T", 0, y=0.0)], EM)] == [["T"], ["B"]]
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
