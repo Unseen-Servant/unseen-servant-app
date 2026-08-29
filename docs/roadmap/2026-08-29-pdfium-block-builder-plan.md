@@ -52,7 +52,7 @@ Apache-2.0), pytest, ONNX Runtime for the layout model.
 |---|---|
 | `sidecar-v3/ingest/raw.py` | **create** — backend-neutral typed raw-extraction dataclasses (`Span`, `TextLine`, `TextBlock`, `PageExtract`, `RawExtraction`) and `_norm_ws`. Imports no PDF library. |
 | `sidecar-v3/ingest/extract.py` | **modify** — keeps only the PyMuPDF Stage-A implementation; imports its types from `raw.py`. |
-| `sidecar-v3/ingest/blocks.py` | **create** — all aggregation. `build(chars, width, height) -> tuple[TextBlock, ...]`. Imports no PDF library. |
+| `sidecar-v3/ingest/blocks.py` | **create** — all aggregation. `build(spans, width, height) -> tuple[TextBlock, ...]`, one Span per atomic text run. Imports no PDF library. |
 | `sidecar-v3/ingest/pdfium_extract.py` | **modify** — thin: PDFium characters → `Span`s → `blocks.build()` → `RawExtraction`, plus document metadata. |
 | `sidecar-v3/ingest/pdfium_meta.py` | **create** — title, TOC, and printed page labels from PDFium. |
 | `sidecar-v3/tests/test_blocks.py` | **create** — segmentation and banding on synthetic geometry. |
@@ -502,14 +502,19 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'ingest.blocks'`
 Create `sidecar-v3/ingest/blocks.py`:
 
 ```python
-"""Aggregation: characters with geometry into a block hierarchy.
+"""Aggregation: atomic text runs with geometry into a block hierarchy.
 
 PDF has no block primitive. MuPDF synthesizes blocks in stext-device.c by
 clustering characters into lines on baseline continuity and lines into blocks on
 flow proximity; PyMuPDF exposes that heuristic, and W1 depends on it. This
 module owns the equivalent aggregation for a permissively licensed backend.
 
-Imports no PDF library — the word source is swappable without touching this.
+Its input unit is one atomic run — a PDFium text object. Task 3 measured that
+such an object never spans two table columns, so this module only ever merges
+runs upward into words and cells; it never splits one. Splitting a run on gap
+width is what collapses a table row into a single line.
+
+Imports no PDF library — the run source is swappable without touching this.
 """
 from __future__ import annotations
 
@@ -530,63 +535,67 @@ TUNING = {
 }
 
 
-def em(chars: Sequence[Span]) -> float:
-    """The row's type size, taken as the median character height."""
-    return statistics.median(c.bbox.y1 - c.bbox.y0 for c in chars)
+def em(spans: Sequence[Span]) -> float:
+    """The type size, taken as the median run height."""
+    return statistics.median(s.bbox.y1 - s.bbox.y0 for s in spans)
 
 
-def rows(chars: Sequence[Span], em_: float) -> list[list[Span]]:
-    """Group characters into baseline rows, ordered top to bottom."""
+def rows(spans: Sequence[Span], em_: float) -> list[list[Span]]:
+    """Group runs into baseline rows, ordered top to bottom."""
     tol = max(2.0, em_ * TUNING["row_tol_em"])
     out: list[list[Span]] = []
-    for char in sorted(chars, key=lambda c: ((c.bbox.y0 + c.bbox.y1) / 2, c.bbox.x0)):
-        centre = (char.bbox.y0 + char.bbox.y1) / 2
+    for span in sorted(spans, key=lambda s: ((s.bbox.y0 + s.bbox.y1) / 2, s.bbox.x0)):
+        centre = (span.bbox.y0 + span.bbox.y1) / 2
         row = next((r for r in out
-                    if abs(centre - sum((c.bbox.y0 + c.bbox.y1) / 2 for c in r) / len(r)) <= tol),
+                    if abs(centre - sum((s.bbox.y0 + s.bbox.y1) / 2 for s in r) / len(r)) <= tol),
                    None)
         if row is None:
-            out.append([char])
+            out.append([span])
         else:
-            row.append(char)
+            row.append(span)
     for row in out:
-        row.sort(key=lambda c: c.bbox.x0)
+        row.sort(key=lambda s: s.bbox.x0)
     return out
 
 
-def _join(chars: list[Span]) -> Span:
+def _join(parts: list[Span]) -> Span:
+    """Concatenate abutting runs into one word. Runs carry their own trailing
+    spaces, so norm_ws collapses the seams."""
     return Span(
-        norm_ws("".join(c.text for c in chars)),
-        BBox(min(c.bbox.x0 for c in chars), min(c.bbox.y0 for c in chars),
-             max(c.bbox.x1 for c in chars), max(c.bbox.y1 for c in chars)),
-        round(statistics.median(c.size for c in chars), 2),
-        chars[0].font, chars[0].bold, chars[0].italic,
+        norm_ws("".join(p.text for p in parts)),
+        BBox(min(p.bbox.x0 for p in parts), min(p.bbox.y0 for p in parts),
+             max(p.bbox.x1 for p in parts), max(p.bbox.y1 for p in parts)),
+        round(statistics.median(p.size for p in parts), 2),
+        parts[0].font, parts[0].bold, parts[0].italic,
     )
 
 
 def cells(row: Sequence[Span], em_: float) -> list[tuple[Span, ...]]:
-    """Segment one baseline row into cells, each a tuple of words.
+    """Merge one baseline row's runs into cells, each a tuple of words.
 
-    Two thresholds on the same character stream: a space-sized gap ends a word,
-    a gap over an em ends a cell. A single absolute threshold cannot do both,
-    which is how a whole table row became one line.
+    Runs are atomic — a PDFium text object never spans two columns, so a cell
+    boundary is always a run boundary. Two thresholds decide how far to merge:
+    a gap under word_gap joins two runs into one word (pages that split words
+    mid-glyph), a gap under cell_gap keeps them in the same cell, anything
+    wider starts a new cell. Nothing here ever splits a run.
     """
     word_gap, cell_gap = em_ * TUNING["word_gap_em"], em_ * TUNING["cell_gap_em"]
     out: list[tuple[Span, ...]] = []
     words: list[Span] = []
-    chars: list[Span] = []
-    for char in row:
-        if chars:
-            gap = char.bbox.x0 - chars[-1].bbox.x1
+    parts: list[Span] = []
+    for span in row:
+        if parts:
+            gap = span.bbox.x0 - parts[-1].bbox.x1
             if gap > cell_gap:
-                words.append(_join(chars))
+                words.append(_join(parts))
                 out.append(tuple(words))
-                words, chars = [], []
+                words, parts = [], []
             elif gap > word_gap:
-                words.append(_join(chars))
-                chars = []
-        chars.append(char)
-    if chars:
-        words.append(_join(chars))
+                words.append(_join(parts))
+                parts = []
+        parts.append(span)
+    if parts:
+        words.append(_join(parts))
     if words:
         out.append(tuple(words))
     return out
@@ -628,8 +637,8 @@ git commit -m "feat(v3/ingest): em-relative word and cell segmentation"
 
 **Interfaces:**
 - Consumes: `em`, `rows`, `cells` from Task 4.
-- Produces: `bands(chars, width, em_) -> list[tuple[float, float]]` and
-  `build(chars: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]`.
+- Produces: `bands(spans, width, em_) -> list[tuple[float, float]]` and
+  `build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]`.
   Task 6 calls `build` only.
 
 - [ ] **Step 1: Write the failing tests**
@@ -647,7 +656,7 @@ def _two_columns() -> list[Span]:
     produces synthetic cross-column rows when a gutter is not detected."""
     out: list[Span] = []
     for i, y in enumerate((0.0, 20.0, 40.0)):
-        out += _chars(f"L{i}", 20.0, y=y) + _chars(f"R{i}", 240.0, y=y)
+        out += [_obj(f"L{i}", 20.0, y=y), _obj(f"R{i}", 240.0, y=y)]
     return out
 
 
@@ -658,7 +667,7 @@ def test_bands_find_the_gutter_between_two_columns():
 
 
 def test_a_single_column_page_is_one_band():
-    assert len(bands(_chars("ABC", 20.0), PAGE_W, EM)) == 1
+    assert len(bands([_obj("ABC", 20.0)], PAGE_W, EM)) == 1
 
 
 def test_build_reads_the_left_column_before_the_right():
@@ -666,10 +675,10 @@ def test_build_reads_the_left_column_before_the_right():
     assert text.index("L2") < text.index("R0"), text
 
 
-def test_build_conserves_every_character():
-    chars = _two_columns()
-    produced = "".join(s.text for b in build(chars, PAGE_W, PAGE_H) for s in b.spans)
-    assert sorted(produced.replace(" ", "")) == sorted("".join(c.text for c in chars))
+def test_build_conserves_every_run():
+    spans = _two_columns()
+    produced = "".join(s.text for b in build(spans, PAGE_W, PAGE_H) for s in b.spans)
+    assert sorted(produced.replace(" ", "")) == sorted("".join(s.text for s in spans).replace(" ", ""))
 
 
 def test_no_block_straddles_a_band_boundary():
@@ -698,15 +707,15 @@ Add to `TUNING` in `sidecar-v3/ingest/blocks.py`:
 Append to the module:
 
 ```python
-def bands(chars: Sequence[Span], width: float, em_: float) -> list[tuple[float, float]]:
+def bands(spans: Sequence[Span], width: float, em_: float) -> list[tuple[float, float]]:
     """Column bands, found as maximal x-runs no character crosses.
 
     Deliberately geometric: the layout model misses 50-65% of spans on dense
     pages, so it can classify columns but must never define them.
     """
     covered = [False] * (int(width) + 1)
-    for char in chars:
-        for x in range(max(0, int(char.bbox.x0)), min(int(width), int(char.bbox.x1)) + 1):
+    for span in spans:
+        for x in range(max(0, int(span.bbox.x0)), min(int(width), int(span.bbox.x1)) + 1):
             covered[x] = True
     if not any(covered):
         return [(0.0, width)]
@@ -726,8 +735,8 @@ def bands(chars: Sequence[Span], width: float, em_: float) -> list[tuple[float, 
     return out or [(float(first), float(last + 1))]
 
 
-def _band_of(char: Span, found: list[tuple[float, float]]) -> int:
-    centre = (char.bbox.x0 + char.bbox.x1) / 2
+def _band_of(span: Span, found: list[tuple[float, float]]) -> int:
+    centre = (span.bbox.x0 + span.bbox.x1) / 2
     for i, (x0, x1) in enumerate(found):
         if x0 <= centre <= x1:
             return i
@@ -735,19 +744,19 @@ def _band_of(char: Span, found: list[tuple[float, float]]) -> int:
                key=lambda i: min(abs(centre - found[i][0]), abs(centre - found[i][1])))
 
 
-def build(chars: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]:
-    """Characters with geometry into blocks: bands, then rows, then cells.
+def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]:
+    """Atomic runs with geometry into blocks: bands, then rows, then cells.
 
     Reading order is band order, then top to bottom. Nothing merges across a
     band, and no line merges across a cell boundary.
     """
-    if not chars:
+    if not spans:
         return ()
-    em_ = em(chars)
-    found = bands(chars, width, em_)
+    em_ = em(spans)
+    found = bands(spans, width, em_)
     out: list[TextBlock] = []
     for index in range(len(found)):
-        in_band = [c for c in chars if _band_of(c, found) == index]
+        in_band = [s for s in spans if _band_of(s, found) == index]
         if not in_band:
             continue
         for row in rows(in_band, em_):
@@ -776,7 +785,7 @@ git commit -m "feat(v3/ingest): geometric column bands with conservation and no-
 
 ---
 
-### Task 6: Rewire the PDFium adapter onto `blocks.build()`
+### Task 6: Rewire the PDFium adapter onto text objects and `blocks.build()`
 
 **Files:**
 - Modify: `sidecar-v3/ingest/pdfium_extract.py`
@@ -784,149 +793,109 @@ git commit -m "feat(v3/ingest): geometric column bands with conservation and no-
 
 **Interfaces:**
 - Consumes: `ingest.blocks.build`.
-- Produces: `_font(text_page, index) -> tuple[str, float, bool, bool]` and
-  `_chars(text_page, height, font_of=_font) -> tuple[Span, ...]`, plus
-  `extract(pdf_path, doc_id=None) -> RawExtraction` with real blocks. Task 8
-  gates it.
+- Produces: `_span(text, bounds, height, font, weight, italic_angle) -> Span | None`
+  (pure — converts one text object's raw values into a Span, or None if the
+  object carries nothing renderable) and `_objects(page, text_page) -> tuple[Span, ...]`
+  (walks PDFium). `extract(pdf_path, doc_id=None) -> RawExtraction` gains real
+  blocks. Task 8 gates it.
 
-The font lookup is injected rather than called inline so the geometry stays
-testable against a fake text page, and so the character index used for the font
-is the same index the geometry came from. The current adapter sets `font=""` and
-leaves `bold`/`italic` False on every span; `layout.py` builds `FontStats` from
-those fields to classify headings, so a candidate that drops them cannot reach
-the reference on heading-bearing pages.
+The split is deliberate: `_span` holds all the convention logic and is unit
+testable with plain values, while `_objects` needs real PDFium handles and is
+covered by corpus-backed integration tests.
+
+**Three PDFium facts, verified against the installed pypdfium2 5.13.0 — do not
+rediscover them:**
+1. `PdfObject` has **no** `get_pos()`. Bounds come from `obj.get_bounds()`,
+   returning `(left, bottom, right, top)` with y measured **up** from the page
+   bottom. `BBox` and every consumer use PyMuPDF's y-down top-left origin.
+2. `obj.type` works (a runtime instance attribute). `raw.FPDF_PAGEOBJ_TEXT == 1`.
+   `page.get_objects()` already recurses into form XObjects.
+3. `FPDFTextObj_GetFontSize` returns the **unscaled** text-space size — 1.0 on
+   real pages, because the scale lives in the object's matrix. Do not use it for
+   `Span.size`; take the size from the bounds height, as the previous adapter
+   did. Font name comes from `FPDFFont_GetBaseFontName(FPDFTextObj_GetFont(obj))`,
+   weight from `FPDFFont_GetWeight` (bold at >= 700), and slant from
+   `FPDFFont_GetItalicAngle`, which writes the angle through an `int*` out-param
+   and returns a success flag — read the out-param, not the return value.
 
 - [ ] **Step 1: Write the failing tests**
 
 Replace the body of `sidecar-v3/tests/test_pdfium_extract.py` with:
 
 ```python
-"""The PDFium adapter is thin: characters out of PDFium, aggregation in
+"""The PDFium adapter is thin: one Span per text object, all aggregation in
 ingest.blocks. These tests pin the seam, not the aggregation."""
 from domain.models import BBox
-from ingest.pdfium_extract import _chars
+from ingest.pdfium_extract import _span
 
 PAGE_HEIGHT = 100.0
-NO_FONT = lambda text_page, index: ("", 0.0, False, False)  # noqa: E731
+BOUNDS = (10.0, 80.0, 40.0, 90.0)  # PDFium: (left, bottom, right, top), y-up
 
 
-def _text_page(charboxes, text):
-    """Minimal PdfTextPage stand-in. Charboxes are PDFium page space:
-    (x0, y0, x1, y1) with y measured *up* from the bottom of the page."""
-    class TextPage:
-        def count_chars(self):
-            return len(charboxes)
-
-        def get_text_range(self, index, count):
-            return text[index:index + count]
-
-        def get_charbox(self, index):
-            return charboxes[index]
-    return TextPage()
-
-
-def test_chars_report_top_left_origin_boxes():
+def test_span_reports_top_left_origin_boxes():
     """PDFium measures y up from the bottom; BBox and every consumer of it use
     PyMuPDF's y-down top-left origin, the layout raster included."""
-    got = _chars(_text_page([(10, 80, 14, 90)], "T"), PAGE_HEIGHT, font_of=NO_FONT)
-    assert got[0].bbox == BBox(10, 10, 14, 20)
+    got = _span("Gambeson", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0)
+    assert got.bbox == BBox(10.0, 10.0, 40.0, 20.0)
 
 
-def test_chars_are_one_span_per_character():
-    """Aggregation belongs to ingest.blocks; the adapter must not pre-group."""
-    got = _chars(_text_page([(10, 80, 14, 90), (15, 80, 19, 90)], "AB"),
-                 PAGE_HEIGHT, font_of=NO_FONT)
-    assert [span.text for span in got] == ["A", "B"]
+def test_span_size_comes_from_the_bounds_not_the_font_size():
+    """FPDFTextObj_GetFontSize returns the unscaled text-space size (1.0 on real
+    pages); the rendered size is the height of the object's bounds."""
+    assert _span("Gambeson", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).size == 10.0
 
 
-def test_chars_drop_whitespace_and_degenerate_boxes():
-    boxes = [(10, 80, 14, 90), (14, 80, 18, 90), (30, 80, 30, 90)]
-    got = _chars(_text_page(boxes, "A C"), PAGE_HEIGHT, font_of=NO_FONT)
-    assert [span.text for span in got] == ["A"]
+def test_span_keeps_the_whole_object_as_one_run():
+    """Objects are atomic — the adapter must not pre-split or pre-group them."""
+    assert _span("2 Armor Points", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "2 Armor Points"
 
 
-def test_chars_preserve_ligature_codepoints():
-    """A ligature is one rendered character with one box; dropping or splitting
-    it silently corrupts words like 'find' and 'flail'."""
-    got = _chars(_text_page([(10, 80, 18, 90)], "\ufb01"), PAGE_HEIGHT, font_of=NO_FONT)
-    assert [span.text for span in got] == ["\ufb01"]
+def test_span_normalises_internal_whitespace():
+    assert _span("Find\tT raps ", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "Find T raps"
 
 
-def test_chars_ask_for_the_font_of_the_character_they_kept():
-    """Skipped whitespace must not shift the font index off its character."""
-    asked = []
-    boxes = [(10, 80, 14, 90), (14, 80, 18, 90), (20, 80, 24, 90)]
+def test_span_preserves_ligature_codepoints():
+    """A ligature is one rendered glyph; dropping it corrupts words like 'find'."""
+    assert _span("\ufb01nd", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "\ufb01nd"
 
-    def spy(text_page, index):
-        asked.append(index)
-        return ("Serif", 10.0, False, False)
 
-    _chars(_text_page(boxes, "A B"), PAGE_HEIGHT, font_of=spy)
-    assert asked == [0, 2]
+def test_span_reads_bold_from_weight_and_italic_from_angle():
+    bold = _span("x", BOUNDS, PAGE_HEIGHT, "Serif", 700, 0)
+    slanted = _span("x", BOUNDS, PAGE_HEIGHT, "Serif", 400, -12)
+    assert (bold.bold, bold.italic) == (True, False)
+    assert (slanted.bold, slanted.italic) == (False, True)
+
+
+def test_span_is_none_for_empty_or_degenerate_objects():
+    assert _span("   ", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0) is None
+    assert _span("x", (10.0, 80.0, 10.0, 90.0), PAGE_HEIGHT, "Serif", 400, 0) is None
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_pdfium_extract.py -q`
-Expected: FAIL — `TypeError: _chars() got an unexpected keyword argument 'font_of'`
-(after Task 5 the module still has the old helpers).
+Expected: FAIL — `ImportError: cannot import name '_span' from 'ingest.pdfium_extract'`
 
 - [ ] **Step 3: Rewrite the adapter**
 
 In `sidecar-v3/ingest/pdfium_extract.py`, delete `_line_spans`, `_words`,
-`_word`, and `_page_blocks` — `blocks.build()` replaces all four — and add:
-
-```python
-_ITALIC_FLAG = 1 << 6  # PDF font descriptor flag bit 7
-
-
-def _font(text_page, index: int) -> tuple[str, float, bool, bool]:
-    """(name, size, bold, italic) for one PDFium character index."""
-    flags = ctypes.c_int()
-    n = pdfium_raw.FPDFText_GetFontInfo(text_page.raw, index, None, 0,
-                                        ctypes.byref(flags))
-    name = ""
-    if n > 0:
-        buf = ctypes.create_string_buffer(n)
-        pdfium_raw.FPDFText_GetFontInfo(text_page.raw, index, buf, n,
-                                        ctypes.byref(flags))
-        name = buf.raw[:n - 1].decode("utf-8", "replace")
-    low = name.lower()
-    return (
-        name,
-        float(pdfium_raw.FPDFText_GetFontSize(text_page.raw, index)),
-        pdfium_raw.FPDFText_GetFontWeight(text_page.raw, index) >= 700 or "bold" in low,
-        bool(flags.value & _ITALIC_FLAG) or "italic" in low or "oblique" in low,
-    )
-
-
-def _chars(text_page, height: float, font_of=_font) -> tuple[Span, ...]:
-    """One Span per rendered character, in PyMuPDF's y-down top-left space.
-
-    PDFium measures y up from the bottom of the page; BBox and every consumer
-    of it — the layout raster included — measure it down from the top. The font
-    lookup is injected so geometry stays testable without a PDFium handle.
-    """
-    out: list[Span] = []
-    for i in range(text_page.count_chars()):
-        char = text_page.get_text_range(i, 1)
-        if not char or char.isspace():
-            continue
-        x0, y0, x1, y1 = text_page.get_charbox(i)
-        if x1 <= x0 or y1 <= y0:
-            continue
-        name, size, bold, italic = font_of(text_page, i)
-        out.append(Span(char, BBox(x0, height - y1, x1, height - y0),
-                        round(size or (y1 - y0), 2), name, bold, italic))
-    return tuple(out)
-```
+`_word`, and `_page_blocks` — `blocks.build()` replaces all four — and add
+`_span` and `_objects`. `_span` takes the raw values listed in the Interfaces
+block and returns a `Span` in y-down space with `size` from the bounds height,
+`text` passed through `norm_ws`, `bold` from `weight >= 700`, and `italic` from
+a non-zero italic angle; it returns `None` when the normalised text is empty or
+the bounds are degenerate. `_objects` walks `page.get_objects()`, keeps
+`obj.type == raw.FPDF_PAGEOBJ_TEXT`, reads each object's text with
+`FPDFTextObj_GetText` (call once with length 0 to size the buffer, decode
+UTF-16LE, strip the NUL terminator), reads its font values per fact 3 above,
+calls `_span`, and drops the Nones.
 
 Change the page loop inside `extract` to:
 
 ```python
         width, height = page.get_size()
         text_page = page.get_textpage()
-        blocks = build(_chars(text_page, height), width, height)
+        blocks = build(_objects(page, text_page), width, height)
         spans = tuple(span for block in blocks for span in block.spans)
 ```
 
@@ -936,12 +905,12 @@ Update the imports: drop `statistics`, add `import ctypes`,
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_pdfium_extract.py -q`
-Expected: PASS — all five tests.
+Expected: PASS — all seven tests.
 
 - [ ] **Step 5: Write the failing integration tests**
 
-Font metadata and rasterization need a real PDFium handle, so these run against
-the corpus and skip when it is absent. Append to the same test file:
+`_objects` and rasterization need real PDFium handles, so these run against the
+corpus and skip when it is absent. Append to the same test file:
 
 ```python
 import json
@@ -962,16 +931,31 @@ def _corpus_pdf(doc_id: str) -> Path:
     return path
 
 
-def test_spans_carry_font_name_and_weight():
+def test_objects_carry_text_font_and_weight():
     """layout.py builds FontStats from these fields to classify headings; an
     adapter that leaves them empty cannot reach the reference."""
     import pypdfium2
+    from ingest.pdfium_extract import _objects
 
     page = pypdfium2.PdfDocument(str(_corpus_pdf("osric_2e")))[155]
-    spans = _chars(page.get_textpage(), page.get_size()[1])
+    spans = _objects(page, page.get_textpage())
+    assert spans, "no text objects found on a text-bearing page"
     assert any(span.font for span in spans)
     assert any(span.bold for span in spans)
-    assert all(span.size > 0 for span in spans)
+    assert all(span.size > 0 and span.text.strip() for span in spans)
+
+
+def test_no_object_spans_two_columns_on_a_two_column_page():
+    """The property the whole design rests on (Task 3 finding). OSRIC p.156 is
+    a dense two-column page; its gutter sits near the page mid-line."""
+    import pypdfium2
+    from ingest.pdfium_extract import _objects
+
+    page = pypdfium2.PdfDocument(str(_corpus_pdf("osric_2e")))[155]
+    width = page.get_size()[0]
+    straddlers = [s.text for s in _objects(page, page.get_textpage())
+                  if s.bbox.x0 < width * 0.45 < s.bbox.x1 and s.bbox.x1 > width * 0.55]
+    assert not straddlers, f"objects crossing the gutter: {straddlers[:5]}"
 
 
 def test_rasterize_returns_rgb_pixels():
@@ -985,9 +969,11 @@ def test_rasterize_returns_rgb_pixels():
 - [ ] **Step 6: Run them**
 
 Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_pdfium_extract.py -q`
-Expected: PASS. If `test_spans_carry_font_name_and_weight` fails, `_font` is
-returning empty names — check the `FPDFText_GetFontInfo` buffer length handling
-before changing the assertion.
+Expected: PASS. If `test_objects_carry_text_font_and_weight` finds empty font
+names, check the `FPDFFont_GetBaseFontName` buffer sizing before changing the
+assertion. If `test_no_object_spans_two_columns_on_a_two_column_page` fails, stop
+and report — that property is what Task 4's design depends on, and a failure
+means the Task 3 finding does not generalise.
 
 - [ ] **Step 7: Run the full suite**
 
@@ -998,7 +984,7 @@ Expected: PASS — every test.
 
 ```bash
 git add sidecar-v3/ingest/pdfium_extract.py sidecar-v3/tests/test_pdfium_extract.py
-git commit -m "refactor(v3/ingest): PDFium adapter delegates aggregation to ingest.blocks, keeps font metadata"
+git commit -m "refactor(v3/ingest): one Span per PDFium text object, aggregation in ingest.blocks"
 ```
 
 ---
