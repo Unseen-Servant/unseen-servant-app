@@ -1,6 +1,6 @@
 # Permissive PDF Backend Replacement Plan
 
-**Date:** 2026-08-28
+**Date:** 2026-08-28 (revised 2026-08-29)
 
 **Status:** active research and implementation plan
 
@@ -23,6 +23,10 @@ an incompatible dependency. W1 fixed the material document-quality failure:
 native PDF text lines carry content; the layout model only classifies and orders
 them. It eliminated cross-column merges, torn stat blocks, and blank pages.
 
+Scope is v3 only. The v2 sidecar keeps `pymupdf4llm`, so
+`scripts/check-third-party.py --release` stays red until v3 becomes the shipping
+pipeline. That is an accepted consequence of the scope, not an oversight.
+
 ## 2. Quality Reference And Evidence So Far
 
 The reference configuration is `v3 --pdf-backend pymupdf` with W1 native-block
@@ -43,13 +47,62 @@ Two permissive experiments have been run. Neither is a replacement candidate:
 
 | backend | content | order | table cells | gate regressions | verdict |
 |---|---:|---:|---:|---:|---|
-| PDFium via pypdfium2 | 0.981 | 0.204 | 0.604 | 23 | no-go |
+| PDFium via pypdfium2 | 0.972 | 0.958 | 0.549 | 18 | no-go |
 | pdfplumber/pdfminer + PDFium rendering | 0.951 | 0.811 | 0.914 | 10 | no-go |
 
 The PDFium-only adapter required fragile character-to-word reconstruction.
 pdfplumber improves word geometry but still does not supply the stable block
 hierarchy needed for the OSRIC and SRD two-column layouts, as well as Cairn's
 equipment tables.
+
+### 2.1 What The Two NO-GOs Actually Established
+
+Re-measured on 2026-08-29 against the frozen reference
+`evals/baselines/2026-08-29-v3-w1-reference.json`, after two defects were fixed.
+
+**The first PDFium record was an artifact.** `ingest/pdfium_extract.py` sorted
+rows by y ascending, but PDFium's `get_charbox()` measures y *up* from the
+bottom of the page while `BBox` and every consumer use PyMuPDF's y-down
+top-left origin. Every page came out bottom-to-top. `reading_order` is
+`1 - inversions / C(n,2)`, so a fully inverted page scores 0.0 and the recorded
+0.204 was near-total inversion, not weak extraction. With the conversion applied
+at the source, PDFium scores **0.958**.
+
+**The reference itself was never frozen.** `evals/engines/v3.py` passed
+`rasterizer=None` for the default backend, which overrides `layout()`'s
+`rasterizer=rasterize` default instead of falling back to it, so every v3 run
+raised `TypeError: 'NoneType' object is not callable`. The W1 numbers in section
+2 therefore came from a pre-spike run that was never committed as a baseline.
+Both defects are fixed and the reference is now on disk.
+
+**The two candidates fail in opposite ways.** Per-kind, against that reference:
+
+| kind | PDFium content / order / cells | pdfplumber content / order / cells |
+|---|---|---|
+| prose | 0.956 / 0.929 / — | 0.967 / 0.917 / — |
+| table | 0.978 / — / **0.549** | 0.978 / — / **0.914** |
+| two_column | **1.000 / 1.000** / — | **0.800 / 0.600** / — |
+
+PDFium separates columns perfectly and destroys table cells: `_line_spans`
+splits a row only on gaps wider than `max(18.0, median_char_width * 6)`, so an
+entire table row merges into one line. On OSRIC p.40 the header row extracts as
+`Level Climb Walls Find Traps Hear Noise Shadows Move Quietly Open Locks Pick
+Pockets Lan` where PyMuPDF yields one line per cell. That is the synthetic row
+across columns which section 3 requirement 4 forbids. Thirteen of PDFium's
+eighteen regressions are `table_cells`.
+
+pdfplumber holds cells together and mangles columns instead, splitting on a flat
+18% of page width.
+
+Neither weakness belongs to its engine. Each lives in that adapter's hand-rolled
+aggregation, and each engine is strong exactly where the other is weak.
+
+The framing correction follows. PDF has no block primitive. MuPDF synthesizes
+blocks in `source/fitz/stext-device.c` - characters clustered into lines by
+baseline continuity, lines into blocks by flow proximity. PyMuPDF is not
+exposing structure the format contains, it is exposing *its aggregation
+heuristic*, and that heuristic is what W1 depends on. "Find an engine with a
+stable block hierarchy" is unsatisfiable. The aggregation is ours to own.
 
 ## 3. Non-Negotiable Requirements
 
@@ -125,6 +178,12 @@ Before running the full corpus, test the candidate against explicit fixtures:
 - Cairn pp.10-11: text in visually table-like pages is not dropped.
 - Black Hack class/stats: title and label/value rows remain separate.
 
+Every one of those pages already carries a golden spec, so the fixture set is
+`evals/extraction/golden/phase0.yaml` ids g28 and g33 (SRD 5.1 pp.315, 103),
+g09 and g10 (SRD 5.2.1 pp.91-92), g34 and g35 (OSRIC pp.156, 163), g39 and g40
+(Cairn pp.10-11), and g06 and g08 (Black Hack pp.4, 6). Fixture work reuses
+those phrase specs rather than inventing a parallel set.
+
 The local side-by-side inspector is the manual check:
 
 ```bash
@@ -145,28 +204,97 @@ same pages before treating aggregate scores as sufficient evidence.
    experimental evaluation paths; neither may feed retrieval baselines.
 4. Maintain the release license gate, which intentionally blocks shipping while
    PyMuPDF remains bundled.
+5. Freeze the W1 golden and corpus-QA reports as committed JSON artifacts before
+   any dependency removal. The fixture probe and
+   `evals/extraction/corpus_qa.py` both grade against PyMuPDF W1 output, so
+   dropping the dependency without a frozen reference blinds the very gates that
+   authorize the cutover.
 
-### P1: Select A Better Structural Candidate
+### P1: Screen - Resolved 2026-08-29
 
-1. Identify engines that expose genuine word/line/block primitives, not only a
-   character stream or pre-flattened page text.
-2. Eliminate candidates that fail the license review before adapter work.
-3. Run a one-page geometry spike on the fixtures in section 4.3.
-4. Choose at most one candidate for a full adapter. Do not accumulate partially
-   maintained extraction paths.
+The screen ran as a full-gate head-to-head rather than a fixture probe, because
+fixing the two defects in section 2.1 required those runs anyway. It settled the
+question it existed to settle:
 
-### P2: Implement The Adapter
+- **PDFium is the word source.** C++-backed, already vendored, already
+  allowlisted, and it separates columns perfectly (two_column 1.000 / 1.000).
+- **pdfplumber is retained as the cell-segmentation reference.** Its
+  `table_cells` 0.914 is the number PDFium has to reach.
+- **pdfminer.six `LTTextBox` is not probed.** PDFium already answers the
+  structural question, and pdfminer is pure Python with a live risk against the
+  15-minute / 400-page gate. Revisit only if P2 stalls.
 
-1. Add the adapter under `sidecar-v3/ingest/` and leave
-   `ingest/extract.py` unchanged until it passes its gate.
-2. Add unit tests for whitespace, ligatures, words, line reconstruction,
+One primitive question moves into P2 rather than staying a separate phase:
+whether PDFium page **text objects** (`FPDF_PAGEOBJ_TEXT` through
+`PdfPage.get_objects()`) separate table cells for free, since a cell is usually
+its own text-showing operator.
+
+Before further work, close a standing section 4.1 gap: `pdfplumber` and its
+`pdfminer.six` dependency were added to `sidecar-v3/pyproject.toml` by the first
+spike without an inventory record. Add both to `third_party/components.json` as
+`review_required` with their exact versions. The check script validates the
+records that exist; it cannot see a shipped dependency that was never declared.
+
+### P2: Own The Aggregation
+
+The aggregation is ours to write, on PDFium word geometry. Section 2.1 shows
+both candidate weaknesses live in hand-rolled aggregation rather than in either
+engine, so this is a bounded algorithm rather than an open-ended search. Two
+files, split so the algorithm never depends on a PDF library:
+
+- `sidecar-v3/ingest/blocks.py` — `build(spans, width, height) -> tuple[TextBlock, ...]`,
+  importing no PDF library. It is unit-testable on synthetic geometry, and the
+  word source stays swappable without touching it.
+- `sidecar-v3/ingest/<winner>_extract.py`, named for the engine P1 selects —
+  thin: open the PDF with that engine, produce `Span`s, call `blocks.build()`,
+  and assemble `PageExtract` and `RawExtraction`.
+
+The algorithm runs in three stages:
+
+1. **Column bands.** Vertical whitespace projection over word boxes; a gutter is
+   a maximal zero-coverage x-range spanning most of the page height. One band
+   when no gutter is found.
+2. **Lines within a band.** Baseline clustering on a tolerance derived from
+   median glyph height, ordered left to right.
+3. **Cells within a line.** Split a row wherever the horizontal gap exceeds the
+   page's own inter-word gap distribution, rather than a fixed point threshold.
+   This is the defect that costs PDFium 13 of its 18 regressions: a constant
+   `max(18.0, median_char_width * 6)` merges an entire table row into one line.
+   Evaluate PDFium text objects here first - if a cell is its own text-showing
+   operator, the boundary is given rather than inferred.
+4. **Blocks within a band.** Split the line sequence on a vertical gap greater
+   than k times median line spacing, a dominant font-size change, or an indent
+   change.
+
+Reading order is band order, then top to bottom. Nothing merges across bands,
+and no line merges across a cell boundary.
+
+Implementation requirements:
+
+1. Leave `ingest/extract.py` unchanged until the candidate passes its gate.
+2. Make the section 4.2 conservative invariant two property tests rather than a
+   comment, run over every fixture page: **conservation**, every input span
+   appears in exactly one output block; and **no-straddle**, no block's spans
+   cross a band boundary.
+3. Add unit tests for whitespace, ligatures, words, line reconstruction,
    two-column separation, font metadata, page dimensions, and rendering.
-3. Extend `V3Engine` and `evals.run_eval` with an explicit candidate backend
+4. Extend `V3Engine` and `evals.run_eval` with an explicit candidate backend
    selector used only by the extraction suites.
-4. Preserve the existing W1 layout contract: layout labels may classify text but
+5. Preserve the existing W1 layout contract: layout labels may classify text but
    must not own, merge, or discard text-bearing units.
-5. Add title, TOC, and printed-label parity tests, or document which fields need
-   a separate metadata reader.
+6. Supply title, page count, TOC, and printed page labels with parity tests, or
+   document a named replacement reader per field. This is a tracked gap, not a
+   footnote: both dead adapters returned an empty `toc` and empty `page_labels`,
+   and the v3 storage schema persists both. pdfminer exposes outlines and
+   pypdfium2 has `get_toc()`; printed page labels are the hard field and may
+   need a small standalone reader over the PDF `/PageLabels` number tree.
+
+**Anti-overfitting rule.** This is P2's real failure mode. Tunable constants live
+in a single dict at the top of `blocks.py` and may be tuned *only* against the
+ten section 4.3 fixture pages. The 40-page golden set is the gate: run after
+tuning, never during. A failing golden page earns a structural change to the
+algorithm, or becomes a new fixture by deliberate commit per section 7, never a
+constant nudged until that page goes green.
 
 ### P3: Evaluate And Decide
 
@@ -177,7 +305,9 @@ same pages before treating aggregate scores as sufficient evidence.
    empty, plus the focused fixtures.
 5. Measure wall time for extraction and rasterization on the 400-page corpus
    representative.
-6. Record the exact results and a Go/No-Go verdict in this document or a linked
+6. Verify title, page count, TOC, and printed page-label parity against the
+   frozen reference.
+7. Record the exact results and a Go/No-Go verdict in this document or a linked
    findings note.
 
 ### P4: Adopt Only After Parity
@@ -206,6 +336,7 @@ A candidate is a **GO** only if all requirements hold:
 | corpus pages | no empty pages created by extraction |
 | corpus integrity | block recall and label integrity at least the W1 reference |
 | manual review | no column merge, torn stat line, or table corruption on focused fixtures |
+| metadata | title, page count, TOC, and printed page labels match the frozen reference, or each gap has a named replacement reader |
 | performance | representative 400-page indexing within 15 minutes |
 | packaging | local macOS/Windows release smoke path works without network access |
 
@@ -222,6 +353,9 @@ it.
 | Layout classification drops candidate text | preserve text-bearing units as prose; classification is advisory, not permission to discard content |
 | PDF metadata is incomplete | use a separate approved metadata reader only if it preserves the single typed raw-extraction contract |
 | Candidate passes golden pages but fails corpus QA | no-go; expand the golden fixture set with the discovered page before evaluating another candidate |
+| The block builder passes its property tests but the golden gate still regresses | read the cluster: regressions concentrated on `two_column` pages mean the block abstraction itself is wrong, so open a line-based W1 contract as its own design with a retrieval regression pass; regressions scattered across `table` pages are Stage C linearization work, not Stage A |
+| Removing PyMuPDF deletes the oracle the gates depend on | freeze the W1 golden and corpus-QA outputs as committed artifacts before the dependency is dropped (P0.5) |
+| A permissive adapter has good text but no document metadata | supply title, TOC, and page labels from the same engine where possible, or a named standalone reader per field; empty `toc`/`page_labels` is a gate failure, not an acceptable default |
 
 ## 8. Definition Of Done
 
