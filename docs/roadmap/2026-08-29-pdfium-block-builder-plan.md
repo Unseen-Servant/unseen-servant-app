@@ -113,7 +113,7 @@ Insert into the `components` array of `third_party/components.json`, after the
 - [ ] **Step 3: Validate the inventory**
 
 Run: `uv run --frozen --project sidecar-v3 python scripts/check-third-party.py`
-Expected: `third-party inventory valid: 11 components, 6 pending release review`
+Expected: `third-party inventory valid: 11 components, 8 pending release review`
 
 - [ ] **Step 4: Commit**
 
@@ -168,10 +168,6 @@ def test_raw_imports_no_pdf_library():
     assert not PDF_LIBS_IN(_imported_modules("ingest.raw"))
 
 
-def test_blocks_imports_no_pdf_library():
-    assert not PDF_LIBS_IN(_imported_modules("ingest.blocks"))
-
-
 def PDF_LIBS_IN(modules: set[str]) -> set[str]:
     return {name for name in modules if name.split(".")[0] in PDF_LIBS}
 ```
@@ -179,7 +175,7 @@ def PDF_LIBS_IN(modules: set[str]) -> set[str]:
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_raw_is_backend_neutral.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'ingest.raw'` (and `ingest.blocks`, created in Task 4).
+Expected: FAIL — `ModuleNotFoundError: No module named 'ingest.raw'`
 
 - [ ] **Step 3: Create `ingest/raw.py`**
 
@@ -324,8 +320,10 @@ EOF
 
 - [ ] **Step 6: Run the raw half of the new test plus the full suite**
 
-Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_raw_is_backend_neutral.py::test_raw_imports_no_pdf_library sidecar-v3/tests evals/tests -q`
-Expected: `test_raw_imports_no_pdf_library` PASSES; every previously passing test still passes. `test_blocks_imports_no_pdf_library` still fails on `ingest.blocks` — it goes green in Task 4.
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests -q`
+Expected: PASS — every test, including the new `test_raw_imports_no_pdf_library`.
+The suite must be green at every task boundary; the `ingest.blocks` half of this
+test is added in Task 4, alongside the module it guards.
 
 - [ ] **Step 7: Commit**
 
@@ -582,10 +580,24 @@ def cells(row: Sequence[Span], em_: float) -> list[tuple[Span, ...]]:
 Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py sidecar-v3/tests/test_raw_is_backend_neutral.py -q`
 Expected: PASS — all five `test_blocks` tests plus both neutrality tests.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Guard the new module's backend neutrality**
+
+Append to `sidecar-v3/tests/test_raw_is_backend_neutral.py`:
+
+```python
+def test_blocks_imports_no_pdf_library():
+    assert not PDF_LIBS_IN(_imported_modules("ingest.blocks"))
+```
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests -q`
+Expected: PASS — every test. A failure here means `blocks.py` picked up a PDF
+library import; remove it rather than relaxing the test.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add sidecar-v3/ingest/blocks.py sidecar-v3/tests/test_blocks.py
+git add sidecar-v3/ingest/blocks.py sidecar-v3/tests/test_blocks.py \
+        sidecar-v3/tests/test_raw_is_backend_neutral.py
 git commit -m "feat(v3/ingest): em-relative word and cell segmentation"
 ```
 
