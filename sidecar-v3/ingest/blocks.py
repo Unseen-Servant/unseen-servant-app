@@ -18,7 +18,7 @@ import statistics
 from typing import Sequence
 
 from domain.models import BBox
-from ingest.raw import Span, norm_ws
+from ingest.raw import Span, TextBlock, TextLine, norm_ws
 
 # Tunable constants, expressed as multiples of the row's em (its type size) so
 # they scale with the page instead of assuming one. Per the plan's
@@ -28,6 +28,9 @@ TUNING = {
     "word_gap_em": 0.18,   # gap wider than this * em starts a new word
     "cell_gap_em": 1.20,   # gap wider than this * em starts a new cell
     "row_tol_em": 0.45,    # baseline clustering tolerance
+    "gutter_min_em": 1.50,    # narrowest zero-coverage x-run that can be a gutter
+    "gutter_cover": 0.60,     # fraction of rows a gutter must stay clear across
+    "block_gap_lines": 1.60,  # vertical gap > this * median line pitch splits a block
 }
 
 
@@ -95,3 +98,65 @@ def cells(row: Sequence[Span], em_: float) -> list[tuple[Span, ...]]:
     if words:
         out.append(tuple(words))
     return out
+
+
+def bands(spans: Sequence[Span], width: float, em_: float) -> list[tuple[float, float]]:
+    """Column bands, found as maximal x-runs no character crosses.
+
+    Deliberately geometric: the layout model misses 50-65% of spans on dense
+    pages, so it can classify columns but must never define them.
+    """
+    covered = [False] * (int(width) + 1)
+    for span in spans:
+        for x in range(max(0, int(span.bbox.x0)), min(int(width), int(span.bbox.x1)) + 1):
+            covered[x] = True
+    if not any(covered):
+        return [(0.0, width)]
+    first, last = covered.index(True), len(covered) - 1 - covered[::-1].index(True)
+    min_gutter = em_ * TUNING["gutter_min_em"]
+    out: list[tuple[float, float]] = []
+    start, run = first, 0
+    for x in range(first, last + 2):
+        if x <= last and not covered[x]:
+            run += 1
+            continue
+        if run >= min_gutter and start < x - run:
+            out.append((float(start), float(x - run)))
+            start = x
+        run = 0
+    out.append((float(start), float(last + 1)))
+    return out or [(float(first), float(last + 1))]
+
+
+def _band_of(span: Span, found: list[tuple[float, float]]) -> int:
+    centre = (span.bbox.x0 + span.bbox.x1) / 2
+    for i, (x0, x1) in enumerate(found):
+        if x0 <= centre <= x1:
+            return i
+    return min(range(len(found)),
+               key=lambda i: min(abs(centre - found[i][0]), abs(centre - found[i][1])))
+
+
+def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]:
+    """Atomic runs with geometry into blocks: bands, then rows, then cells.
+
+    Reading order is band order, then top to bottom. Nothing merges across a
+    band, and no line merges across a cell boundary.
+    """
+    if not spans:
+        return ()
+    em_ = em(spans)
+    found = bands(spans, width, em_)
+    out: list[TextBlock] = []
+    for index in range(len(found)):
+        in_band = [s for s in spans if _band_of(s, found) == index]
+        if not in_band:
+            continue
+        for row in rows(in_band, em_):
+            for cell in cells(row, em_):
+                if not cell:
+                    continue
+                box = BBox(min(w.bbox.x0 for w in cell), min(w.bbox.y0 for w in cell),
+                           max(w.bbox.x1 for w in cell), max(w.bbox.y1 for w in cell))
+                out.append(TextBlock(box, (TextLine(box, cell),)))
+    return tuple(out)
