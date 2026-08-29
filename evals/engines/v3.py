@@ -32,6 +32,8 @@ def _import_v3():
         sys.path.append(str(SIDECAR_V3))
     try:
         from ingest.extract import extract
+        from ingest.pdfium_extract import extract as extract_pdfium, rasterize as rasterize_pdfium
+        from ingest.pdfplumber_extract import extract as extract_pdfplumber
         from ingest.layout import LABELS_M, layout
         from ingest.pipeline import index_document, make_layout_fn
         from domain.models import BlockKind
@@ -46,7 +48,9 @@ def _import_v3():
             "    uv run --project sidecar-v3 python -m evals.run_eval --engine v3 ..."
         ) from exc
     return {
-        "extract": extract, "layout": layout, "LABELS_M": LABELS_M, "BlockKind": BlockKind,
+        "extract": extract, "extract_pdfium": extract_pdfium, "extract_pdfplumber": extract_pdfplumber,
+        "rasterize_pdfium": rasterize_pdfium,
+        "layout": layout, "LABELS_M": LABELS_M, "BlockKind": BlockKind,
         "assets": assets, "index_document": index_document, "make_layout_fn": make_layout_fn,
         "Store": Store, "dense_search": dense_search, "search": search, "correct": correct,
     }
@@ -57,8 +61,11 @@ class V3Engine:
 
     name = "v3"
 
-    def __init__(self, data_dir: Path | str = DEFAULT_DATA_DIR):
+    def __init__(self, data_dir: Path | str = DEFAULT_DATA_DIR, pdf_backend: str = "pymupdf"):
         self.data_dir = Path(data_dir)
+        if pdf_backend not in {"pymupdf", "pdfium", "pdfplumber"}:
+            raise ValueError(f"unknown PDF backend {pdf_backend!r}")
+        self.pdf_backend = pdf_backend
         self._mods = None
         self._session = None
         self._embedder = None
@@ -107,8 +114,10 @@ class V3Engine:
         m = self._load()
         BlockKind = m["BlockKind"]
         drop = {BlockKind.artifact, BlockKind.image}
-        raw = m["extract"](str(pdf_path))
-        blocks = m["layout"](raw, self._layout_session(), m["LABELS_M"])
+        extractors = {"pymupdf": m["extract"], "pdfium": m["extract_pdfium"], "pdfplumber": m["extract_pdfplumber"]}
+        raw = extractors[self.pdf_backend](str(pdf_path))
+        rasterizer = m["rasterize_pdfium"] if self.pdf_backend in {"pdfium", "pdfplumber"} else None
+        blocks = m["layout"](raw, self._layout_session(), m["LABELS_M"], rasterizer=rasterizer)
         by_page: dict[int, list[str]] = {}
         for b in sorted(blocks, key=lambda b: b.reading_order):
             if b.kind not in drop and b.text:

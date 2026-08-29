@@ -51,7 +51,7 @@ def _system_map(corpus) -> dict:
     return m
 
 
-def build_engine(name: str, data_dir: Path | None):
+def build_engine(name: str, data_dir: Path | None, pdf_backend: str = "pymupdf"):
     if name == "v2":
         from evals.engines.v2 import V2Engine, DEFAULT_DATA_DIR
 
@@ -59,7 +59,7 @@ def build_engine(name: str, data_dir: Path | None):
     if name == "v3":
         from evals.engines.v3 import V3Engine, DEFAULT_DATA_DIR
 
-        return V3Engine(data_dir=data_dir or DEFAULT_DATA_DIR)
+        return V3Engine(data_dir=data_dir or DEFAULT_DATA_DIR, pdf_backend=pdf_backend)
     raise SystemExit(f"unknown engine {name!r}")
 
 
@@ -335,6 +335,8 @@ def run_corpus_qa(engine, corpus, saved_texts: dict | None = None) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--engine", default="v2", choices=["v2", "v3"])
+    ap.add_argument("--pdf-backend", default="pymupdf", choices=["pymupdf", "pdfium", "pdfplumber"],
+                    help="v3 extraction backend; non-default backends are evaluation candidates")
     ap.add_argument("--suite", default="retrieval", choices=["retrieval", "extraction", "corpus-qa"])
     ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
     ap.add_argument("--data-dir", type=Path, default=None,
@@ -377,7 +379,9 @@ def main() -> int:
     if args.suite == "retrieval" and not args.reuse_index:
         temporary_index = tempfile.TemporaryDirectory(prefix=f"legend-lore-eval-{args.engine}-")
         data_dir = Path(temporary_index.name)
-    engine = build_engine(args.engine, data_dir)
+    if args.engine == "v2" and args.pdf_backend != "pymupdf":
+        raise SystemExit("non-default --pdf-backend values are available only with --engine v3")
+    engine = build_engine(args.engine, data_dir, args.pdf_backend)
 
     try:
         if args.suite == "extraction":
