@@ -55,7 +55,7 @@ Apache-2.0), pytest, ONNX Runtime for the layout model.
 | `sidecar-v3/ingest/blocks.py` | **create** — all aggregation. `build(spans, width, height) -> tuple[TextBlock, ...]`, one Span per atomic text run. Imports no PDF library. |
 | `sidecar-v3/ingest/pdfium_extract.py` | **modify** — thin: PDFium characters → `Span`s → `blocks.build()` → `RawExtraction`, plus document metadata. |
 | `sidecar-v3/ingest/pdfium_meta.py` | **create** — title, TOC, and printed page labels from PDFium. |
-| `sidecar-v3/tests/test_blocks.py` | **create** — segmentation and banding on synthetic geometry. |
+| `sidecar-v3/tests/test_blocks.py` | **create** — merging, banding, and block grouping on synthetic geometry. |
 | `sidecar-v3/tests/test_raw_is_backend_neutral.py` | **create** — asserts `ingest.raw` and `ingest.blocks` import no PDF library. |
 | `sidecar-v3/tests/test_pdfium_extract.py` | **modify** — rewired to the new seam. |
 | `sidecar-v3/tests/test_pdfium_meta.py` | **create** — metadata parity. |
@@ -410,7 +410,7 @@ git commit -m "spike(v3/ingest): do PDFium text objects bound table cells?"
 
 ---
 
-### Task 4: Character → word → cell segmentation in `ingest/blocks.py`
+### Task 4: Run → word → cell merging in `ingest/blocks.py`
 
 The defect that costs PDFium 13 of its 18 regressions. The current adapter
 splits a row only on gaps wider than `max(18.0, median_char_width * 6)` — an
@@ -426,7 +426,7 @@ thresholds must be relative to the row's own type size.
 - Produces: `TUNING: dict[str, float]`; `em(spans: Sequence[Span]) -> float`;
   `rows(spans: Sequence[Span], em: float) -> list[list[Span]]`;
   `cells(row: Sequence[Span], em: float) -> list[tuple[Span, ...]]` — each
-  returned tuple is one cell's **words**. Task 5 consumes `cells`; Task 6
+  returned tuple is one cell's **words**. Task 5 consumes `cells`; Task 7
   consumes `build`.
 
 **Each input Span is one PDFium text object, not one character.** Task 3
@@ -785,7 +785,153 @@ git commit -m "feat(v3/ingest): geometric column bands with conservation and no-
 
 ---
 
-### Task 6: Rewire the PDFium adapter onto text objects and `blocks.build()`
+### Task 6: Group prose rows into multi-line blocks
+
+`build()` currently emits one `TextBlock` per cell, so every block holds exactly
+one line. That is the same structural deficiency that disqualified the earlier
+pdfplumber adapter: no block hierarchy, so the W1 layout contract has nothing to
+classify above line level. The PyMuPDF reference this work is gated against
+groups a paragraph's lines into one block, and `TUNING["block_gap_lines"]` was
+added for this stage but is not yet read.
+
+The rule is geometric and needs no layout model. Within a band, a row that holds
+exactly one cell is prose and joins the paragraph above it when the leading is
+normal; a row holding several cells is a table row, and each of its cells stays
+its own single-line block so cell atomicity survives.
+
+**Files:**
+- Modify: `sidecar-v3/ingest/blocks.py`
+- Test: `sidecar-v3/tests/test_blocks.py`
+
+**Interfaces:**
+- Consumes: `rows`, `cells`, `TUNING` from Tasks 4 and 5.
+- Produces: no signature change — `build(spans, width, height)` keeps its
+  contract and its two invariants. Internally it delegates each band to a new
+  `_blocks_in_band(band_rows, em_) -> list[TextBlock]`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `sidecar-v3/tests/test_blocks.py`:
+
+```python
+def _prose(text: str, y: float) -> Span:
+    """A full-width prose line: one cell spanning the whole text column."""
+    return _obj(text, 20.0, y=y, width=300.0)
+
+
+def test_consecutive_prose_rows_become_one_block():
+    """PyMuPDF groups a paragraph's lines into a single block; one block per
+    line is the hierarchy failure that disqualified the pdfplumber adapter."""
+    spans = [_prose("first line", 0.0), _prose("second line", 12.0), _prose("third line", 24.0)]
+    blocks = build(spans, PAGE_W, PAGE_H)
+    assert len(blocks) == 1
+    assert [line.text for line in blocks[0].lines] == ["first line", "second line", "third line"]
+
+
+def test_a_wide_vertical_gap_starts_a_new_block():
+    spans = [_prose("end of one", 0.0), _prose("start of another", 60.0)]
+    assert len(build(spans, PAGE_W, PAGE_H)) == 2
+
+
+def test_a_multi_cell_row_stays_one_block_per_cell():
+    """Table rows keep cell atomicity — that is what table_cells measures."""
+    spans = [_obj("Gambeson", 20.0, y=0.0), _obj("50", 200.0, y=0.0)]
+    blocks = build(spans, PAGE_W, PAGE_H)
+    assert [b.text for b in blocks] == ["Gambeson", "50"]
+
+
+def test_a_table_row_interrupts_the_paragraph_above_it():
+    spans = [_prose("prose line", 0.0),
+             _obj("Gambeson", 20.0, y=12.0), _obj("50", 200.0, y=12.0),
+             _prose("more prose", 24.0)]
+    assert [b.text for b in build(spans, PAGE_W, PAGE_H)] == [
+        "prose line", "Gambeson", "50", "more prose"]
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py -q`
+Expected: FAIL — `test_consecutive_prose_rows_become_one_block` reports 3 blocks
+where 1 is expected, because `build()` emits one block per cell today.
+
+- [ ] **Step 3: Implement the grouping**
+
+Replace `build()`'s per-band inner loop with a call to a new helper. Add to
+`sidecar-v3/ingest/blocks.py`:
+
+```python
+def _bbox(spans: Sequence[Span]) -> BBox:
+    return BBox(min(s.bbox.x0 for s in spans), min(s.bbox.y0 for s in spans),
+                max(s.bbox.x1 for s in spans), max(s.bbox.y1 for s in spans))
+
+
+def _pitch(band_rows: Sequence[Sequence[Span]]) -> float:
+    """Median centre-to-centre distance between consecutive rows — the band's
+    own leading, so the block-splitting threshold scales with the page."""
+    centres = [sum((s.bbox.y0 + s.bbox.y1) / 2 for s in row) / len(row) for row in band_rows]
+    gaps = [b - a for a, b in zip(centres, centres[1:])]
+    return statistics.median(gaps) if gaps else 0.0
+
+
+def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float) -> list[TextBlock]:
+    """Rows into blocks. A row of one cell is prose and joins the paragraph
+    above it while the leading stays normal; a row of several cells is a table
+    row whose cells each stay their own block, so cell atomicity survives."""
+    limit = (_pitch(band_rows) or em_) * TUNING["block_gap_lines"]
+    out: list[TextBlock] = []
+    para: list[TextLine] = []
+
+    def flush() -> None:
+        if para:
+            out.append(TextBlock(_bbox([s for line in para for s in line.spans]), tuple(para)))
+            para.clear()
+
+    for row in band_rows:
+        row_cells = cells(row, em_)
+        lines = [TextLine(_bbox(cell), cell) for cell in row_cells]
+        if len(lines) == 1:
+            if para and lines[0].bbox.y0 - para[-1].bbox.y1 > limit:
+                flush()
+            para.append(lines[0])
+        else:
+            flush()
+            out.extend(TextBlock(line.bbox, (line,)) for line in lines)
+    flush()
+    return out
+```
+
+Then in `build()`, replace the `for row in rows(in_band, em_):` body with:
+
+```python
+        out.extend(_blocks_in_band(rows(in_band, em_), em_))
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py -q`
+Expected: PASS — all fifteen tests, including the conservation and no-straddle
+invariants from Task 5, which must still hold.
+
+- [ ] **Step 5: Remove the dead tuning key**
+
+`TUNING["gutter_cover"]` is never read: `bands()` requires an x-run no span
+crosses anywhere on the page, which is strictly stronger than covering a
+fraction of the page height. Delete the key and its comment rather than leaving
+configuration that does nothing.
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests -q`
+Expected: PASS — every test.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add sidecar-v3/ingest/blocks.py sidecar-v3/tests/test_blocks.py
+git commit -m "feat(v3/ingest): group prose rows into multi-line blocks"
+```
+
+---
+
+### Task 7: Rewire the PDFium adapter onto text objects and `blocks.build()`
 
 **Files:**
 - Modify: `sidecar-v3/ingest/pdfium_extract.py`
@@ -797,7 +943,7 @@ git commit -m "feat(v3/ingest): geometric column bands with conservation and no-
   (pure — converts one text object's raw values into a Span, or None if the
   object carries nothing renderable) and `_objects(page, text_page) -> tuple[Span, ...]`
   (walks PDFium). `extract(pdf_path, doc_id=None) -> RawExtraction` gains real
-  blocks. Task 8 gates it.
+  blocks. Task 9 gates it.
 
 The split is deliberate: `_span` holds all the convention logic and is unit
 testable with plain values, while `_objects` needs real PDFium handles and is
@@ -989,7 +1135,7 @@ git commit -m "refactor(v3/ingest): one Span per PDFium text object, aggregation
 
 ---
 
-### Task 7: Document metadata — title, TOC, printed page labels
+### Task 8: Document metadata — title, TOC, printed page labels
 
 Both dead adapters returned an empty `toc` and empty `page_labels`; the v3
 storage schema persists both. Spec section 6 makes metadata a gate row.
@@ -1146,14 +1292,14 @@ git commit -m "feat(v3/ingest): title, outline, and printed page labels from PDF
 
 ---
 
-### Task 8: Gate the candidate and record the verdict
+### Task 9: Gate the candidate and record the verdict
 
 **Files:**
 - Modify: `docs/roadmap/2026-08-28-permissive-pdf-backend-plan.md`
 - Create: `evals/baselines/` outputs (written by the runs)
 
 **Interfaces:**
-- Consumes: the adapter from Tasks 6 and 7.
+- Consumes: the adapter from Tasks 7 and 8.
 - Produces: a Go/No-Go verdict recorded in the spec.
 
 - [ ] **Step 1: Run the 40-page golden gate**
@@ -1223,11 +1369,11 @@ git commit -m "eval(v3/ingest): PDFium block-builder verdict against the W1 refe
 
 - **P4 cutover.** Making PDFium the default, removing `pymupdf` from
   `sidecar-v3/pyproject.toml`, deleting the losing adapters, bumping the
-  pipeline version, and reindexing all happen only after Task 8 returns a GO.
+  pipeline version, and reindexing all happen only after Task 9 returns a GO.
 - **The v2 sidecar.** `pymupdf4llm` keeps `check-third-party.py --release` red
   regardless of this plan's outcome. Scope is v3 only, by decision.
 - **The packaging gate.** Spec section 6's macOS/Windows release smoke path
   needs a real release build, so it is verified at P4 cutover, not here.
-- **A line-based W1 contract.** If Task 8 fails with regressions concentrated on
+- **A line-based W1 contract.** If Task 9 fails with regressions concentrated on
   `two_column` pages, the block abstraction is wrong and that contingency opens
   as its own design with a retrieval regression pass — not as a patch here.
