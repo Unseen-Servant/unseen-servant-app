@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from domain.models import BBox, Block, BlockKind, FontStats
-from ingest.extract import PageExtract, RawExtraction, Span, TextBlock, rasterize
+from ingest.extract import rasterize
+from ingest.raw import PageExtract, RawExtraction, Span, TextBlock
 
 # PP-DocLayout label → BlockKind. Covers PP-DocLayout-M's 23 classes (the GO
 # model) plus V3's extras, so either model feeds the same assembly.

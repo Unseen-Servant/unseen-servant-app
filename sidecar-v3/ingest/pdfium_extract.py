@@ -14,7 +14,7 @@ import numpy as np
 import pypdfium2
 
 from domain.models import BBox
-from ingest.extract import PageExtract, RawExtraction, Span, TextBlock, TextLine, _norm_ws
+from ingest.raw import PageExtract, RawExtraction, Span, TextBlock, TextLine, norm_ws as _norm_ws
 
 
 def _line_spans(text_page, height: float) -> list[list[Span]]:

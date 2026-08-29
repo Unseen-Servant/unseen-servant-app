@@ -21,7 +21,8 @@ import numpy as np
 from domain.models import Block, Document
 from index.embedder import DIM
 from ingest.chunk import chunk_blocks
-from ingest.extract import RawExtraction, extract
+from ingest.extract import extract
+from ingest.raw import RawExtraction
 from ingest.layout import LABELS_M, layout
 from ingest.linearize import to_units
 from ingest.structure import build_sections

@@ -6,7 +6,7 @@ from pathlib import Path
 import pdfplumber
 
 from domain.models import BBox
-from ingest.extract import PageExtract, RawExtraction, Span, TextBlock, TextLine
+from ingest.raw import PageExtract, RawExtraction, Span, TextBlock, TextLine
 
 
 def _blocks(page) -> tuple[TextBlock, ...]:
