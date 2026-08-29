@@ -27,11 +27,18 @@ SIDECAR_V3 = REPO_ROOT / "sidecar-v3"
 DEFAULT_DATA_DIR = REPO_ROOT / "evals" / ".eval_data" / "v3"
 
 
+def _rasterizer_name(backend: str) -> str:
+    """Candidate backends render through PDFium; the default renders through
+    PyMuPDF. Never None — `layout()` defaults to a rasterizer, and passing None
+    overrides that default rather than falling back to it."""
+    return "rasterize_pdfium" if backend in {"pdfium", "pdfplumber"} else "rasterize"
+
+
 def _import_v3():
     if str(SIDECAR_V3) not in sys.path:
         sys.path.append(str(SIDECAR_V3))
     try:
-        from ingest.extract import extract
+        from ingest.extract import extract, rasterize
         from ingest.pdfium_extract import extract as extract_pdfium, rasterize as rasterize_pdfium
         from ingest.pdfplumber_extract import extract as extract_pdfplumber
         from ingest.layout import LABELS_M, layout
@@ -49,7 +56,7 @@ def _import_v3():
         ) from exc
     return {
         "extract": extract, "extract_pdfium": extract_pdfium, "extract_pdfplumber": extract_pdfplumber,
-        "rasterize_pdfium": rasterize_pdfium,
+        "rasterize": rasterize, "rasterize_pdfium": rasterize_pdfium,
         "layout": layout, "LABELS_M": LABELS_M, "BlockKind": BlockKind,
         "assets": assets, "index_document": index_document, "make_layout_fn": make_layout_fn,
         "Store": Store, "dense_search": dense_search, "search": search, "correct": correct,
@@ -116,7 +123,7 @@ class V3Engine:
         drop = {BlockKind.artifact, BlockKind.image}
         extractors = {"pymupdf": m["extract"], "pdfium": m["extract_pdfium"], "pdfplumber": m["extract_pdfplumber"]}
         raw = extractors[self.pdf_backend](str(pdf_path))
-        rasterizer = m["rasterize_pdfium"] if self.pdf_backend in {"pdfium", "pdfplumber"} else None
+        rasterizer = m[_rasterizer_name(self.pdf_backend)]
         blocks = m["layout"](raw, self._layout_session(), m["LABELS_M"], rasterizer=rasterizer)
         by_page: dict[int, list[str]] = {}
         for b in sorted(blocks, key=lambda b: b.reading_order):
