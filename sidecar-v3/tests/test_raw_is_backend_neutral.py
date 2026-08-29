@@ -24,5 +24,9 @@ def test_raw_imports_no_pdf_library():
     assert not PDF_LIBS_IN(_imported_modules("ingest.raw"))
 
 
+def test_blocks_imports_no_pdf_library():
+    assert not PDF_LIBS_IN(_imported_modules("ingest.blocks"))
+
+
 def PDF_LIBS_IN(modules: set[str]) -> set[str]:
     return {name for name in modules if name.split(".")[0] in PDF_LIBS}
