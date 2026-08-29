@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from evals.corpus import load_corpus
+from evals.corpus import require_corpus
 from evals.extraction.ref_loader import ref_text
 from evals.retrieval.grade import normalize
 
@@ -53,7 +53,7 @@ def _pdf_page_text(pdf_path: Path, page: int) -> str:
 
 
 def main() -> int:
-    corpus = load_corpus()
+    corpus = require_corpus()
     by_id = {d.id: d for d in corpus.documents}
     specs = load_golden()
     if not specs:

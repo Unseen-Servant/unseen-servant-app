@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
+import subprocess
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -60,6 +63,61 @@ def build_engine(name: str, data_dir: Path | None):
     raise SystemExit(f"unknown engine {name!r}")
 
 
+def _jsonable(value):
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, set):
+        return sorted(_jsonable(v) for v in value)
+    return value
+
+
+def corpus_fingerprint(corpus) -> str:
+    """Stable identity for the exact PDF/reference inputs in an eval run."""
+    documents = [
+        {"id": d.id, "pdf_sha256": d.pdf_sha256, "ref_digest": d.ref_digest}
+        for d in sorted(corpus.documents, key=lambda d: d.id)
+    ]
+    payload = json.dumps(documents, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def git_revision() -> str | None:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def retrieval_regressions(current: dict, reference: dict, tol: float = 1e-6) -> list[dict]:
+    """Fail closed on a headline retrieval regression in any shared scope."""
+    out: list[dict] = []
+    current_scopes = current.get("by_scope", {})
+    reference_scopes = reference.get("by_scope", {})
+    for scope in sorted(set(current_scopes) & set(reference_scopes)):
+        for metric in ("mrr@5", "recall@3"):
+            cur = current_scopes[scope].get(metric)
+            ref = reference_scopes[scope].get(metric)
+            if cur is None or ref is None:
+                continue
+            if cur < ref - tol:
+                out.append({"scope": scope, "metric": metric, "ref": ref, "cur": cur})
+    return out
+
+
+def format_retrieval_regressions(regressions: list[dict]) -> str:
+    if not regressions:
+        return "no retrieval regressions"
+    return "\n".join(
+        f"  {r['scope']:8} {r['metric']:10} {r['ref']:.3f} → {r['cur']:.3f}"
+        for r in regressions
+    )
+
+
 def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool) -> dict:
     doc_file = {d.id: d.pdf_path.name for d in corpus.documents}
     doc_pdf = {d.id: d.pdf_path for d in corpus.documents}
@@ -67,11 +125,17 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
     if do_index:
         needed = sorted({q["doc"] for q in queries if q["doc"] != "any"})
         print(f"indexing {len(needed)} corpus PDFs (idempotent, one at a time)…", flush=True)
+        index_errors: list[tuple[str, list]] = []
         for i, d in enumerate(needed, 1):
             rep = engine.index([doc_pdf[d]])
             state = "skipped (already indexed)" if rep.skipped else f"indexed ({rep.indexed})"
             print(f"  [{i}/{len(needed)}] {d}: {state}"
                   + (f" errors={rep.errors}" if rep.errors else ""), flush=True)
+            if rep.errors:
+                index_errors.append((d, rep.errors))
+        if index_errors:
+            details = "; ".join(f"{doc}: {errors}" for doc, errors in index_errors)
+            raise SystemExit(f"indexing failed; retrieval results are invalid: {details}")
 
     print("warmup…", flush=True)
     engine.warmup(opts)
@@ -273,9 +337,12 @@ def main() -> int:
     ap.add_argument("--engine", default="v2", choices=["v2", "v3"])
     ap.add_argument("--suite", default="retrieval", choices=["retrieval", "extraction", "corpus-qa"])
     ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
-    ap.add_argument("--data-dir", type=Path, default=None)
+    ap.add_argument("--data-dir", type=Path, default=None,
+                    help="retrieval: existing index directory, only with --reuse-index")
     ap.add_argument("--n-results", type=int, default=SearchOptions.n_results)
     ap.add_argument("--no-index", action="store_true", help="retrieval: assume corpus already indexed")
+    ap.add_argument("--reuse-index", action="store_true",
+                    help="retrieval: use --data-dir for an exploratory, non-baseline run")
     ap.add_argument("--hybrid", action="store_true", help="retrieval: fuse dense + BM25/FTS (rung 5)")
     ap.add_argument("--lex-weight", type=float, default=None,
                     help="retrieval: RRF lexical weight (dense=1.0); sweep the fusion balance")
@@ -286,16 +353,31 @@ def main() -> int:
     ap.add_argument("--pages", type=Path, default=None,
                     help="corpus-qa: re-grade a prior run's .pages.json instead of re-extracting")
     ap.add_argument("--gate", type=Path, default=None,
-                    help="extraction: reference baseline .json; exit 1 if ANY golden page's "
-                         "metric drops below it (per-page min, not the mean — W0.2)")
+                    help="reference baseline .json; retrieval blocks headline scope regressions, "
+                         "extraction blocks any per-page metric regression")
     args = ap.parse_args()
+
+    if args.suite == "retrieval":
+        if args.reuse_index and args.data_dir is None:
+            raise SystemExit("--reuse-index requires --data-dir")
+        if args.data_dir is not None and not args.reuse_index:
+            raise SystemExit("retrieval --data-dir requires --reuse-index; normal runs use a fresh index")
+        if args.no_index and not args.reuse_index:
+            raise SystemExit("--no-index requires --reuse-index and --data-dir")
+        if args.reuse_index and not args.no_write:
+            raise SystemExit("reused-index retrieval runs cannot write a baseline; use a fresh index")
 
     corpus = require_corpus()  # refuses on any hash/digest drift (§1)
     name = args.baseline or {"retrieval": "phase0", "extraction": "extraction",
                              "corpus-qa": "corpus-qa"}[args.suite]
     date = datetime.date.today().isoformat()
     stem = f"{date}-{args.engine}-{name}"
-    engine = build_engine(args.engine, args.data_dir)
+    temporary_index = None
+    data_dir = args.data_dir
+    if args.suite == "retrieval" and not args.reuse_index:
+        temporary_index = tempfile.TemporaryDirectory(prefix=f"legend-lore-eval-{args.engine}-")
+        data_dir = Path(temporary_index.name)
+    engine = build_engine(args.engine, data_dir)
 
     try:
         if args.suite == "extraction":
@@ -316,6 +398,8 @@ def main() -> int:
             result = run(engine, queries, corpus, opts, do_index=not args.no_index)
     finally:
         engine.close()
+        if temporary_index is not None:
+            temporary_index.cleanup()
 
     if args.suite == "corpus-qa":
         from evals.extraction import corpus_qa
@@ -342,12 +426,6 @@ def main() -> int:
         meta = {"engine": args.engine, "name": name, "date": date,
                 "docs": sorted({p["doc"] for p in result["pages"]}),
                 "n_pages": len(result["pages"])}
-        if not args.no_write:
-            BASELINE_DIR.mkdir(exist_ok=True)
-            (BASELINE_DIR / f"{stem}.json").write_text(
-                json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
-            (BASELINE_DIR / f"{stem}.md").write_text(extraction_md(meta, result), encoding="utf-8")
-            print(f"\nwrote evals/baselines/{stem}.{{json,md}}")
         if args.gate:
             from evals.extraction import gate
 
@@ -357,6 +435,12 @@ def main() -> int:
             if regs:
                 print(f"GATE FAILED: {len(regs)} page metric(s) below the reference")
                 return 1
+        if not args.no_write:
+            BASELINE_DIR.mkdir(exist_ok=True)
+            (BASELINE_DIR / f"{stem}.json").write_text(
+                json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
+            (BASELINE_DIR / f"{stem}.md").write_text(extraction_md(meta, result), encoding="utf-8")
+            print(f"\nwrote evals/baselines/{stem}.{{json,md}}")
         return 0
 
     print("\n## By scope\n" + metrics.format_report(result["by_scope"], "scope"))
@@ -370,10 +454,22 @@ def main() -> int:
         "docs": sorted({q["doc"] for q in queries if q["doc"] != "any"}),
         "n_queries": len(queries), "n_pairs": len({q["pair"] for q in queries}),
         "n_results": args.n_results,
+        "corpus_fingerprint": corpus_fingerprint(corpus),
+        "git_revision": git_revision(),
+        "index": {"mode": "fresh", "pipeline_identity": "engine-managed"},
         "opts": {"rerank": opts.rerank, "hybrid": opts.hybrid,
                  "spell_correction": opts.spell_correction,
-                 "variant_expansion": opts.variant_expansion},
+                 "variant_expansion": opts.variant_expansion,
+                 "extra": _jsonable(opts.extra)},
     }
+
+    if args.gate:
+        reference = json.loads(args.gate.read_text(encoding="utf-8"))
+        regressions = retrieval_regressions(result, reference)
+        print(f"\n## Retrieval gate vs {args.gate.name}\n" + format_retrieval_regressions(regressions))
+        if regressions:
+            print(f"GATE FAILED: {len(regressions)} headline scope metric(s) below the reference")
+            return 1
 
     if not args.no_write:
         from evals.retrieval import report

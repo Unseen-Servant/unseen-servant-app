@@ -68,13 +68,13 @@ def sha256_file(path: Path) -> str:
 
 
 def _aggregate_digest(per_file: dict[str, str]) -> str:
-    """SHA-256 of the sorted per-file hashes (spec §1 wording).
+    """SHA-256 of sorted ``relative path:content hash`` entries.
 
-    Content-addressed: independent of filenames, so it pins *what the
-    reference says*, not how the tree is laid out. Path-level changes are
-    surfaced separately by diffing against the lock file.
+    Ground-truth references are addressed by path in ``answer_ref``. The
+    aggregate must therefore bind both content and tree layout, rather than
+    waiting for a content-only mismatch before consulting the lock file.
     """
-    joined = "\n".join(sorted(per_file.values()))
+    joined = "\n".join(f"{path}:{digest}" for path, digest in sorted(per_file.items()))
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 

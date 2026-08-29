@@ -24,7 +24,7 @@
           "release": "r-142",
           "retrieved": "2026-08-14"
         },
-        "digest": "2dc4006b4e878b8c7e3d83a060b43be8fd2223499561f3ad35c13c2f6a633bae",
+        "digest": "6ade8d1d63f5e0765c0c4cafdccae1de6b35db6569be26367612ac5e36ba9674",
         "note": "ODT is the authoring source of the PDF — release numbers MUST match"
       }
     },
@@ -45,7 +45,7 @@
           "url": "https://the-black-hack.jehaisleprintemps.net/english/the-black-hack.md",
           "retrieved": "2026-08-15"
         },
-        "digest": "92de4005081981a3bd040f15557cb6790f74fddd75480e2659557d078bdc79b0",
+        "digest": "f4c6c501dbafb1aa39513b95eaac36710e47292537315c125f5617480e40399e",
         "note": "PDF is The Black Hack 1st ed (v1.2); the markdown ref is the same edition and matches the PDF text. Replaces the earlier 2e-PDF / 1e-markdown pairing, an edition mismatch that produced false-miss anchors."
       }
     },
@@ -66,7 +66,7 @@
           "url": "https://drive.google.com/drive/folders/1PuclMn7cRrw2SxGoPUResjEPoF3MWMPQ",
           "retrieved": "2026-08-14"
         },
-        "digest": "c9e4f92cf88899b2ccdc457939bfc56eeaec8a465761d7f6be871e48b43d93ac"
+        "digest": "4302b63d2cc420f64553ac607dc128542af4ef9ecf0b632424d2fd558d74e622"
       }
     },
     {
@@ -87,7 +87,7 @@
           "rev": null,
           "retrieved": "2026-08-14"
         },
-        "digest": "08535017eb71b3246792432a409251c3eb6e7369d9fc38425924aec5a82d3c9c"
+        "digest": "8454a6568ac6c862f4923dbfe9eae59fa1e93fd04e0080eac83801dfee144a64"
       }
     },
     {
@@ -108,7 +108,7 @@
           "rev": null,
           "retrieved": "2026-08-14"
         },
-        "digest": "865f14cbc11ad04e57924df3da27a3ffdc72263ecbb86723ce9fd323c2d2453a"
+        "digest": "1cd6623b7fb6e940baddeae04b1885f96a91284665a266cff56a7bb65d340828"
       }
     },
     {
@@ -128,7 +128,7 @@
           "url": "https://osricwiki.presgas.name/doku.php?id=osric:index",
           "retrieved": "2026-08-14"
         },
-        "digest": "808634ceebaacd239cab967f1a7857cec447304087a9dacfa03c3514265741cc",
+        "digest": "3a7da138cade563f5805f839b4aa25615adc971e75b9e366b63e13ae76be57c7",
         "note": "6 osric_chapter*.html files with full rule text; replaced the earlier per-topic captures that were JS-rendered nav shells (no content)."
       }
     },
@@ -149,7 +149,7 @@
           "url": "https://frank-mitchell.com/rpg/year-zero-engine-ogl/",
           "retrieved": "2026-08-14"
         },
-        "digest": "fd9dbf52a6538d5a9e32a9007f2ade7e532e200bdc74dd8c2eea83e0f53acd2b"
+        "digest": "02e7bb5973a2cc908dfd3cb42fe422dae9d3df46287ab70aef2ea56f1f14cc7a"
       }
     }
   ]

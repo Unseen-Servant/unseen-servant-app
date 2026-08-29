@@ -33,9 +33,14 @@ All commands from the repo root, under the sidecar env. Retrieval needs Ollama
 up (query embedding); extraction does not.
 
 ```bash
-# Retrieval — scope-aware, MRR@5 headline. Indexing is idempotent (skips books
-# already in evals/.eval_data/). Writes evals/baselines/<date>-v2-phase0.*
+# Retrieval — scope-aware, MRR@5 headline. Each normal run builds a fresh,
+# temporary index, so a baseline cannot use stale chunks from an earlier
+# pipeline version. Writes evals/baselines/<date>-v2-phase0.*
 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline phase0
+
+# A candidate retrieval rung must not regress headline metrics in any scope.
+uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --baseline rung-9 \
+    --gate evals/baselines/<last-committed>-v3-<rung>.json
 
 # Extraction QA — no Ollama; grades hand-authored golden pages. --gate fails
 # the run (exit 1) if ANY page's metric drops below the reference baseline —
@@ -45,12 +50,18 @@ uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite extract
     --gate evals/baselines/<last-committed>-v3-extraction.json
 
 # Author-time guard: every anchor present in BOTH reference and PDF (gates a
-# query commit; also confirms cross_page anchors really straddle a page break).
+# query commit; also confirms cross_page anchors straddle their declared pages).
 uv run --project sidecar python -m evals.retrieval.verify_anchors
 
-# Corpus-wide extraction QA — EVERY page, the PDF as the oracle, no embedding
+# Corpus-wide extraction QA — every page with native text blocks, the PDF as
+# the oracle, no embedding
 # (~7 min). The inner loop for extraction work; v3 runs under its own env.
 uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite corpus-qa
+
+# Local visual review: original rendered page, v3 extraction, and native-text
+# oracle side by side. Start with the former trouble pages.
+uv run --project sidecar-v3 python -m evals.extraction.review \
+    --engine v3 --doc srd_5_2_1 --pages 30,183 --open
 
 # Harness unit tests (pure, CI-safe).
 uv run --project sidecar-v3 pytest evals/tests
@@ -60,9 +71,9 @@ uv run --project sidecar-v3 pytest evals/tests
 
 | gate | enforced by | blocks |
 |---|---|---|
-| corpus PDF hash + reference digest | `corpus.py` (`require_corpus`) | any eval run, on drift |
+| corpus PDF hash + path-sensitive reference digest | `corpus.py` (`require_corpus`) | any eval run, on drift |
 | every anchor in ref ∧ PDF | `retrieval/verify_anchors.py` (exit 1) | committing a query |
-| the committed baseline (MRR@5 etc.) | `evals/baselines/*.json` | a v3 rung that doesn't beat it |
+| the committed baseline (MRR@5, success@3) | `--gate` | a v3 rung that regresses in any scope |
 | every golden page ≥ its reference score | `extraction/gate.py` (`--gate`, exit 1) | an extraction change that helps the mean and hurts a page |
 | anchor grade vs a human (Cohen's κ) | `blind/score.py` | trusting the automated number |
 | chunks a human can read (`readable@5`) | `blind/score.py` (the "garbled" tick) | calling a pipeline search-ready on anchors alone |
@@ -107,6 +118,10 @@ Gate on the worst pages, not the mean.
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
+Every baseline records the corpus fingerprint, Git revision, and explicit query
+knobs. Retrieval baselines always use a fresh temporary index; exploratory
+reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a
+baseline.
 The retrieved chunks live in a gitignored `<stem>.results.json` (regenerable),
 which drives two viewers:
 
