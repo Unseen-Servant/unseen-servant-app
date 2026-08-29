@@ -32,6 +32,17 @@ def anchors_match(text: str, anchors: list) -> bool:
     return True
 
 
+def matched_anchor_indexes(text: str, anchors: list) -> set[int]:
+    """Return the query facts supplied by one evidence unit."""
+    haystack = f" {normalize(text)} "
+    matched: set[int] = set()
+    for i, anchor in enumerate(anchors):
+        alts = anchor if isinstance(anchor, list) else [anchor]
+        if any(f" {normalize(a)} " in haystack for a in alts):
+            matched.add(i)
+    return matched
+
+
 def _page_hit(result: SearchResult, pages: str | None) -> bool:
     """Soft check: does the result's page range overlap the declared range?"""
     if not pages or result.page_start is None:
@@ -54,6 +65,12 @@ def is_relevant(result: SearchResult, query: dict, doc_filename: str | None) -> 
     return anchors_match(result.grading_text, query["anchors"])
 
 
+def _matched_anchors(result: SearchResult, query: dict, doc_filename: str | None) -> set[int]:
+    if doc_filename is not None and result.filename != doc_filename:
+        return set()
+    return matched_anchor_indexes(result.grading_text, query["anchors"])
+
+
 def dup_sections_at(results: list[SearchResult], k: int = 10) -> int:
     """Repeated (file, section) among the top k — a redundancy/cost signal."""
     top = results[:k]
@@ -70,7 +87,16 @@ def dup_sections_at(results: list[SearchResult], k: int = 10) -> int:
 
 def grade_response(response: SearchResponse, query: dict, doc_filename: str | None) -> dict:
     """Judge one response: the relevance vector plus cost signals."""
-    rels = [is_relevant(r, query, doc_filename) for r in response.results]
+    if query.get("category") == "cross_page":
+        # A cross-page answer is complete when the retrieved evidence set
+        # covers every required fact, even when no single unit contains them.
+        covered: set[int] = set()
+        rels = []
+        for result in response.results:
+            covered.update(_matched_anchors(result, query, doc_filename))
+            rels.append(len(covered) == len(query["anchors"]))
+    else:
+        rels = [is_relevant(r, query, doc_filename) for r in response.results]
     return {
         "rels": rels,
         "payload_chars": response.payload_chars,

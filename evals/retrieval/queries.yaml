@@ -248,6 +248,7 @@
   doc: srd_5_1
   answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Ancient_Gold_Dragon_(Metallic).md"
   anchors: ["ancient gold dragon", "armor class 22", ["fire breath", "weakening breath"], ["change shape", "wing attack"]]
+  pages: "298-299"
 - id: q042
   pair: srd_gold_dragon
   style: nl
@@ -257,6 +258,7 @@
   doc: srd_5_1
   answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Ancient_Gold_Dragon_(Metallic).md"
   anchors: ["ancient gold dragon", "armor class 22", ["fire breath", "weakening breath"], ["change shape", "wing attack"]]
+  pages: "298-299"
 
 # ═══════════════════════════ CUED (unfiltered, query names the system) ═══════════════════════════
 # Target single-file systems so "right file" == "right system"; the named

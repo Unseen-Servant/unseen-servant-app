@@ -24,7 +24,7 @@ from pathlib import Path
 
 import yaml
 
-from evals.corpus import load_corpus
+from evals.corpus import require_corpus
 from evals.extraction.ref_loader import ref_text  # shared md/html/odt loader
 
 QUERIES_PATH = Path(__file__).resolve().parent / "queries.yaml"
@@ -86,7 +86,7 @@ class DocText:
 
 
 def main() -> int:
-    corpus = load_corpus()
+    corpus = require_corpus()
     by_id = {d.id: DocText(d) for d in corpus.documents}
     queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
 
@@ -111,9 +111,12 @@ def main() -> int:
 
         cross_note = ""
         if q["category"] == "cross_page":
-            page_sets = [set(dt.anchor_pages(a)) for a in q["anchors"]]
+            declared = _declared_pages(q.get("pages"))
+            if not declared:
+                fails.append("cross_page query has no valid declared pages")
+            page_sets = [set(dt.anchor_pages(a)) & declared for a in q["anchors"]]
             spanned = set().union(*page_sets) if page_sets else set()
-            straddles = len(spanned) >= 2 and any(
+            straddles = declared <= spanned and any(
                 page_sets[i] and page_sets[j] and page_sets[i].isdisjoint(page_sets[j])
                 for i in range(len(page_sets))
                 for j in range(i + 1, len(page_sets))
@@ -137,6 +140,19 @@ def main() -> int:
         return 1
     print("✓ all anchors verified in both reference and PDF.")
     return 0
+
+
+def _declared_pages(value: str | None) -> set[int]:
+    pages: set[int] = set()
+    for piece in str(value or "").split("|"):
+        lo, _, hi = piece.partition("-")
+        try:
+            start, end = int(lo), int(hi or lo)
+        except ValueError:
+            continue
+        if start <= end:
+            pages.update(range(start, end + 1))
+    return pages
 
 
 if __name__ == "__main__":
