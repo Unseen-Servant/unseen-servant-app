@@ -16,6 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Verify shipped component licenses
+        run: python scripts/check-third-party.py --release
+
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
@@ -152,6 +155,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Verify shipped component licenses
+        run: python scripts/check-third-party.py --release
 
       - name: Setup Node
         uses: actions/setup-node@v7
