@@ -32,6 +32,26 @@
       "replacement": "Candidate passed raw-text screening; verify bundled PDFium notices and typed-geometry parity before approval."
     },
     {
+      "name": "pdfplumber",
+      "version": "0.11.10",
+      "kind": "python-runtime",
+      "license": "MIT",
+      "upstream": "https://github.com/jsvine/pdfplumber",
+      "distribution": "v3 evaluation reference",
+      "status": "review_required",
+      "replacement": "Retained as the table-cell segmentation reference during the backend replacement; drop it or approve it with notices before v3 packaging."
+    },
+    {
+      "name": "pdfminer.six",
+      "version": "20260107",
+      "kind": "python-runtime",
+      "license": "MIT",
+      "upstream": "https://github.com/pdfminer/pdfminer.six",
+      "distribution": "v3 evaluation reference (pdfplumber dependency)",
+      "status": "review_required",
+      "replacement": "Transitive dependency of pdfplumber; drop with it or approve with notices before v3 packaging."
+    },
+    {
       "name": "ONNX Runtime",
       "version": ">=1.18",
       "kind": "python-runtime",
