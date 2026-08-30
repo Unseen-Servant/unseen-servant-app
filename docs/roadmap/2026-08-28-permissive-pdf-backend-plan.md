@@ -468,15 +468,33 @@ Within-paragraph whitespace is frequently negative — ascenders and descenders
 overlap — which is why it is a poor quantity to threshold. The current setting
 catches roughly 10% of true paragraph breaks and produces no false splits.
 
-Comparing pitch to pitch instead is dimensionally sound but not obviously
-better: the distributions still overlap (within p90 1.559 against break p50
-1.175), and the best separator catches about 72% of breaks at the cost of about
-19% false splits. Under-splitting was kept deliberately, consistent with this
-module never merging across a boundary it is unsure of.
+Comparing pitch to pitch is dimensionally sound but no better: the
+distributions still overlap (within p90 1.559 against break p50 1.175) and the
+best separator catches about 72% of breaks at the cost of about 19% false
+splits.
+
+**1.60 is not the best value in its own family, and it was kept for a reason
+unrelated to that.** The table above shows within-paragraph whitespace never
+exceeds 0.526 pitch while the median real break is 0.488, so a threshold
+anywhere in (0.53, 0.70] would keep false splits at zero while catching roughly
+45% of breaks — four to five times the current 10%, in the same dimension, at no
+measured cost. The reason not to adopt it is the plan's anti-overfitting rule:
+one of the four pages this distribution was measured on, black_hack_1e p.3, **is
+golden page g17**, so tuning the constant against this sample would be tuning
+against the gate. Re-deriving the threshold from prose pages disjoint from the
+40-page golden set is the correct follow-up, and it is not done here.
 
 The consequence is real and unmeasured by the extraction gate: paragraphs that
 should be separate blocks are merged, which contributes to the corpus
 `block_integrity` of 0.660 alongside the defects fixed after the final review.
+
+Note that 0.660 was measured **before** that fix wave and is stale. Corpus QA is
+a separate suite from the extraction gate, so re-running the gate did not
+re-measure it. The gutter fix changed emitted blocks in both directions: it stops
+folding a running header into a column, but a multi-line full-width element on a
+two-column page now fragments into one block per line where it was previously one
+(wrongly merged) block. Re-run `--suite corpus-qa` before quoting a block
+integrity figure.
 Retrieval consumes these blocks as chunks, so this belongs in any adoption
 decision.
 
