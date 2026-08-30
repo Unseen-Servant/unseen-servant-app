@@ -14,6 +14,7 @@ Imports no PDF library — the run source is swappable without touching this.
 """
 from __future__ import annotations
 
+import math
 import statistics
 from typing import Sequence
 
@@ -29,6 +30,9 @@ TUNING = {
     "cell_gap_em": 1.20,   # gap wider than this * em starts a new cell
     "row_tol_em": 0.45,    # baseline clustering tolerance
     "gutter_min_em": 1.50,    # narrowest zero-coverage x-run that can be a gutter
+    "gutter_cover": 0.90,     # fraction of rows an x must be clear across to
+                              # be gutter-eligible; a running header crossing
+                              # one row of many must not close a real gutter
     "block_gap_lines": 1.60,  # vertical gap > this * median line pitch splits a block
     "row_fill_table": 0.70,  # a run of consecutive multi-cell rows is a table
                              # when its median fill ratio (text width / row
@@ -103,23 +107,42 @@ def cells(row: Sequence[Span], em_: float) -> list[tuple[Span, ...]]:
 
 
 def bands(spans: Sequence[Span], width: float, em_: float) -> list[tuple[float, float]]:
-    """Column bands, found as maximal x-runs no character crosses.
+    """Column bands, found as maximal x-runs almost no row crosses.
+
+    Coverage is counted per row, not per span: a running header sits in one
+    row out of many and its x-range can cross the real gutter, but one row's
+    crossing must not erase it for the whole page. An x is gutter-eligible
+    when at most gutter_cover's complement of the page's rows have a span
+    covering it there — rounded up to a whole row, since a real body column
+    crosses nearly every row and a stray header only its own.
 
     Deliberately geometric: the layout model misses 50-65% of spans on dense
     pages, so it can classify columns but must never define them.
     """
-    covered = [False] * (int(width) + 1)
-    for span in spans:
-        for x in range(max(0, int(span.bbox.x0)), min(int(width), int(span.bbox.x1)) + 1):
-            covered[x] = True
-    if not any(covered):
+    row_groups = rows(spans, em_)
+    if not row_groups:
         return [(0.0, width)]
-    first, last = covered.index(True), len(covered) - 1 - covered[::-1].index(True)
+    w = int(width) + 1
+    row_count = [0] * w
+    for row in row_groups:
+        seen = [False] * w
+        for span in row:
+            for x in range(max(0, int(span.bbox.x0)), min(int(width), int(span.bbox.x1)) + 1):
+                seen[x] = True
+        for x, s in enumerate(seen):
+            if s:
+                row_count[x] += 1
+    limit = math.ceil(len(row_groups) * (1 - TUNING["gutter_cover"]))
+    eligible = [c <= limit for c in row_count]
+    if all(eligible):
+        return [(0.0, width)]
+    first = eligible.index(False)
+    last = len(eligible) - 1 - eligible[::-1].index(False)
     min_gutter = em_ * TUNING["gutter_min_em"]
     out: list[tuple[float, float]] = []
     start, run = first, 0
     for x in range(first, last + 2):
-        if x <= last and not covered[x]:
+        if x <= last and eligible[x]:
             run += 1
             continue
         if run >= min_gutter and start < x - run:

@@ -223,3 +223,20 @@ def test_two_column_prose_rows_never_share_a_block():
     though they sit at the same height."""
     for block in build(_two_column_prose(), PAGE_W, PAGE_H):
         assert not ("left" in block.text and "right" in block.text), block.text
+
+
+def test_a_running_header_does_not_erase_the_gutter():
+    """One span crossing the gutter on one row — a running header — must not
+    merge two prose columns for the whole page. This is g34/g35."""
+    spans = [_obj("RUNNING HEADER", 20.0, y=-20.0, width=340.0)]
+    for i, y in enumerate((0.0, 14.0, 28.0, 42.0, 56.0, 70.0)):
+        spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+    assert len(bands(spans, PAGE_W, EM)) == 2, bands(spans, PAGE_W, EM)
+
+
+def test_a_gutter_crossed_by_most_rows_is_not_a_gutter():
+    """The tolerance must not be so loose that full-width prose splits."""
+    spans = [_obj(f"full width line {i}", 20.0, y=y, width=340.0)
+             for i, y in enumerate((0.0, 14.0, 28.0, 42.0))]
+    assert len(bands(spans, PAGE_W, EM)) == 1
