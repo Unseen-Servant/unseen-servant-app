@@ -1656,7 +1656,110 @@ git commit -m "feat(v3/ingest): title, outline, and printed page labels from PDF
 
 ---
 
-### Task 12: Gate the candidate and record the verdict
+### Task 12: Keep the PDF's own word-boundary spaces
+
+The gate reads content 0.988 / order 0.964 / table_cells 0.877 with 6 regressions
+on 4 distinct pages. The worst two (g18 and g27, both srd_5_2_1 p.290,
+`table_cells` 1.000 → 0.000) have a single precise cause.
+
+Those pages are monster stat blocks. The golden expectations are label/value
+pairs — `'ac 12'`, `'hp 7 2d6'`, `'ac 15'`. We extract `'AC12'`; PyMuPDF extracts
+`'AC 12'`. Normalisation is token-boundary aware, so `'ac12'` does not match
+`'ac 12'` and the page scores zero.
+
+The PDF already carries the answer. Its raw text objects on that page are
+`'AC '` and `' 17 '` — with their own leading and trailing spaces, 0.3pt apart.
+But `_span` in `ingest/pdfium_extract.py` runs `norm_ws` on each object's text
+*individually*, stripping those spaces before `blocks._join` ever sees them, so
+`_join` concatenates `'AC'` + `'17'` into `'AC17'`.
+
+Keeping the raw text and normalising only at the seam yields
+`norm_ws('AC ' + ' 17 ')` = `'AC 17'`. The same change improves the OSRIC
+mid-word fragmentation case: `'Find '` + `' T'` + `'r'` + `'aps '` becomes
+`'Find Traps'` rather than two separate words. This uses the document's own
+word-boundary information instead of inferring it from geometry.
+
+**Files:**
+- Modify: `sidecar-v3/ingest/pdfium_extract.py`
+- Test: `sidecar-v3/tests/test_pdfium_extract.py`, `sidecar-v3/tests/test_blocks.py`
+
+**Interfaces:**
+- No signature changes. `_span` stops normalising; `blocks._join` already calls
+  `norm_ws` on the concatenation, so every emitted Span is still normalised.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `sidecar-v3/tests/test_pdfium_extract.py`, replace the whitespace-normalising
+expectation for `_span` with one that preserves the object's own spacing, and add:
+
+```python
+def test_span_keeps_the_objects_own_boundary_spaces():
+    """PDF text objects carry their own word-boundary spaces ('AC ', ' 17 ').
+    Stripping them per-object destroys the boundary before the joiner can use
+    it, turning 'AC 17' into 'AC17'."""
+    assert _span("AC ", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "AC "
+```
+
+In `sidecar-v3/tests/test_blocks.py`:
+
+```python
+def test_abutting_runs_keep_a_space_the_pdf_supplied():
+    """srd_5_2_1 p.290 stat blocks: 'AC ' and ' 17 ' sit 0.3pt apart, so they
+    merge into one word — but the PDF's own spaces mark the boundary."""
+    row = [_obj("AC ", 0, width=24.0), _obj(" 17 ", 24.3, width=20.0)]
+    assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("AC 17",)]
+```
+
+Note `_obj` builds a Span directly, so it is unaffected by `_span`'s change.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_pdfium_extract.py sidecar-v3/tests/test_blocks.py -q`
+Expected: both new tests FAIL — `'AC'` where `'AC '` is expected, and `('AC17',)`
+where `('AC 17',)` is expected.
+
+- [ ] **Step 3: Implement**
+
+In `_span`, stop calling `norm_ws` on the object's text. Keep the raw string.
+Two things must still hold: reject the object when its text is whitespace-only
+(test `.strip()`, not the normalised form), and leave every other field
+unchanged.
+
+`blocks._join` already wraps its concatenation in `norm_ws`, and `cells()` routes
+every word — including single-run words — through `_join`, so each emitted Span
+is still normalised. Verify that claim in the code rather than assuming it; if
+any path can emit an un-normalised Span, normalise there.
+
+- [ ] **Step 4: Run the full suite**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests -q`
+Expected: PASS. Some existing tests assert normalised `_span` output and will
+need their expectations updated to the raw form — that is correct, but update
+only expectations about *whitespace*, never an assertion about content or
+structure.
+
+- [ ] **Step 5: Re-run the gate**
+
+```bash
+uv run --frozen --project sidecar-v3 python -m evals.run_eval \
+  --engine v3 --suite extraction --pdf-backend pdfium --no-write \
+  --gate evals/baselines/2026-08-29-v3-w1-reference.json
+```
+
+Numbers to beat: content 0.988, order 0.964, `table_cells` 0.877, 6 regressions.
+Report the by-kind table verbatim and state which of g02, g17, g18, g27, g35
+recover. Do not tune any constant.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add sidecar-v3/ingest/pdfium_extract.py sidecar-v3/tests/
+git commit -m "fix(v3/ingest): keep the PDF's own word-boundary spaces"
+```
+
+---
+
+### Task 13: Gate the candidate and record the verdict
 
 **Files:**
 - Modify: `docs/roadmap/2026-08-28-permissive-pdf-backend-plan.md`
