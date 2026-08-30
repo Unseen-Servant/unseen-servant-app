@@ -47,17 +47,18 @@ def test_rows_group_by_baseline_and_order_top_to_bottom():
             for row in rows([_obj("B", 0, y=40.0), _obj("T", 0, y=0.0)], EM)] == [["T"], ["B"]]
 
 
-PAGE_W, PAGE_H = 400.0, 200.0
+PAGE_W, PAGE_H = 440.0, 200.0
 
 
 def _two_columns() -> list[Span]:
     """Left column at x=20, right at x=240, sharing baselines — real page
     columns, distinguishable from a table only by the gutter between them.
-    Widths are set to fill their column (not the label's literal length) so
-    the fixture models a real column's line rather than a sparse table cell."""
+    Widths are set to fill their column (not the label's literal length), and
+    wide enough that fill lands at 0.90 — inside the 0.85-0.95 range measured
+    on real two-column pages, not a hair above the row_fill_table cutoff."""
     out: list[Span] = []
     for i, y in enumerate((0.0, 20.0, 40.0)):
-        out += [_obj(f"L{i}", 20.0, y=y, width=120.0), _obj(f"R{i}", 240.0, y=y, width=120.0)]
+        out += [_obj(f"L{i}", 20.0, y=y, width=180.0), _obj(f"R{i}", 240.0, y=y, width=180.0)]
     return out
 
 
@@ -78,6 +79,18 @@ def test_build_reads_the_left_column_before_the_right():
 
 def test_build_conserves_every_run():
     spans = _two_columns()
+    produced = "".join(s.text for b in build(spans, PAGE_W, PAGE_H) for s in b.spans)
+    assert sorted(produced.replace(" ", "")) == sorted("".join(s.text for s in spans).replace(" ", ""))
+
+
+def test_build_conserves_every_run_across_a_table():
+    """_two_columns() never produces a table row, so it gives no conservation
+    coverage for the table-row path, which pulls its spans from a different
+    pool than column prose. Cover it with a fixture that has a real table
+    run mixed in."""
+    spans = [_prose("prose before the table", 0.0),
+             _obj("Gambeson", 20.0, y=12.0), _obj("50", 200.0, y=12.0),
+             _prose("prose after the table", 24.0)]
     produced = "".join(s.text for b in build(spans, PAGE_W, PAGE_H) for s in b.spans)
     assert sorted(produced.replace(" ", "")) == sorted("".join(s.text for s in spans).replace(" ", ""))
 
@@ -128,16 +141,31 @@ def test_a_table_row_does_not_join_the_paragraph_around_it():
     assert all(b.text == "Gambeson\n50" or "Gambeson" not in b.text for b in blocks)
 
 
+def test_a_table_row_interrupts_the_paragraph_around_it():
+    """A table row is pulled out of column_spans before paragraph grouping
+    runs, so the grouper never directly sees it sitting between two prose
+    rows in the same column. Without an explicit break, the prose before and
+    after would silently stitch back into one block across the gap where the
+    table used to be — this is what stayed untested when Task 9 renamed away
+    the old 4-block interruption test."""
+    spans = [_prose("prose before the table", 0.0),
+             _obj("Gambeson", 20.0, y=12.0), _obj("50", 200.0, y=12.0),
+             _prose("prose after the table", 24.0)]
+    texts = [b.text for b in build(spans, PAGE_W, PAGE_H)]
+    assert "prose before the table" in texts, texts
+    assert "prose after the table" in texts, texts
+
+
 def test_paragraph_grouping_never_merges_across_a_gutter():
     """With band assignment collapsed, left- and right-column prose lines at
     the same y would merge into one paragraph. cells() cannot prevent this —
     only correct band assignment can. The columns fill nearly their whole
-    width even sharing baselines, so fill ratio still reads this as two page
-    columns rather than a table (see test_a_table_reads_row_major)."""
+    width (0.90) even sharing baselines, so fill ratio still reads this as
+    two page columns rather than a table (see test_a_table_reads_row_major)."""
     spans = []
     for i, y in enumerate((0.0, 12.0, 24.0)):
-        spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
-        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+        spans.append(_obj(f"left{i}", 20.0, y=y, width=180.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y, width=180.0))
     blocks = build(spans, PAGE_W, PAGE_H)
     assert len(blocks) == 2, [b.text for b in blocks]
     assert [line.text for line in blocks[0].lines] == ["left0", "left1", "left2"]
@@ -155,12 +183,14 @@ def _table_page() -> list[Span]:
 
 def _two_column_prose() -> list[Span]:
     """Two prose columns sharing baselines — the shared-baseline-grid case
-    that must still read as page columns, not a table."""
+    that must still read as page columns, not a table. Widths give a 0.90
+    fill ratio, inside the 0.85-0.95 range measured on real two-column pages
+    rather than a hair above the row_fill_table cutoff."""
     out = []
     for i, y in enumerate((0.0, 14.0, 28.0)):
-        out.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+        out.append(_obj(f"left{i}", 20.0, y=y, width=180.0))
     for i, y in enumerate((0.0, 14.0, 28.0)):
-        out.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+        out.append(_obj(f"right{i}", 240.0, y=y, width=180.0))
     return out
 
 

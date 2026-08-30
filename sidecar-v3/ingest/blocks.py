@@ -155,13 +155,25 @@ def _pitch(band_rows: Sequence[Sequence[Span]]) -> float:
     return statistics.median(gaps) if len(gaps) >= 2 else 0.0
 
 
-def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float) -> list[TextBlock]:
+def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float,
+                     breaks: Sequence[tuple[float, float]] = ()) -> list[TextBlock]:
     """Rows into blocks. A row of one cell is prose and joins the paragraph
-    above it while the leading stays normal; a row of several cells is a table
-    row whose cells each stay their own block, so cell atomicity survives."""
+    above it while the leading stays normal and no table row falls between;
+    a row of several cells is a table row whose cells each stay their own
+    block, so cell atomicity survives.
+
+    `breaks` are the y-ranges of table rows build() already pulled out of
+    this band's spans. A table interrupts every column's flow at its own
+    height even though its own cells never reach this band, so without this
+    check the paragraph grouper — seeing only the two now-adjacent prose
+    rows — would silently stitch them back together across the table.
+    """
     limit = (_pitch(band_rows) or em_) * TUNING["block_gap_lines"]
     out: list[TextBlock] = []
     para: list[TextLine] = []
+
+    def crosses_a_break(y0: float, y1: float) -> bool:
+        return any(y0 <= (b0 + b1) / 2 <= y1 for b0, b1 in breaks)
 
     def flush() -> None:
         if para:
@@ -172,7 +184,8 @@ def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float) -> list[Tex
         row_cells = cells(row, em_)
         lines = [TextLine(_bbox(cell), cell) for cell in row_cells]
         if len(lines) == 1:
-            if para and lines[0].bbox.y0 - para[-1].bbox.y1 > limit:
+            if para and (lines[0].bbox.y0 - para[-1].bbox.y1 > limit
+                         or crosses_a_break(para[-1].bbox.y1, lines[0].bbox.y0)):
                 flush()
             para.append(lines[0])
         else:
@@ -214,7 +227,10 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
     consecutive rows that each segment into two or more cells is a table when
     its fill ratio is low; each of its rows becomes one atomic block, a line
     per cell, so a wide row survives downstream reordering intact. Every
-    other row is band-assigned and grouped into paragraphs as before.
+    other row is band-assigned and grouped into paragraphs as before — a
+    table row still interrupts that grouping at its own height (see
+    _blocks_in_band's `breaks`), even though it never reaches a band's span
+    list.
     """
     if not spans:
         return ()
@@ -237,10 +253,13 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
 
     out: list[TextBlock] = []
     column_spans: list[Span] = []
+    breaks: list[tuple[float, float]] = []
     for i, row in enumerate(all_rows):
         if i in table_rows:
             lines = tuple(TextLine(_bbox(cell), cell) for cell in row_cells[i])
-            out.append(TextBlock(_bbox(row), lines))
+            block = TextBlock(_bbox(row), lines)
+            out.append(block)
+            breaks.append((block.bbox.y0, block.bbox.y1))
         else:
             column_spans.extend(row)
 
@@ -248,7 +267,7 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
         found = bands(column_spans, width, em_)
         for index in range(len(found)):
             band_rows = rows([s for s in column_spans if _band_of(s, found) == index], em_)
-            out.extend(_blocks_in_band(band_rows, em_))
+            out.extend(_blocks_in_band(band_rows, em_, breaks))
 
     out.sort(key=lambda b: (b.bbox.y0, b.bbox.x0))
     return tuple(out)
