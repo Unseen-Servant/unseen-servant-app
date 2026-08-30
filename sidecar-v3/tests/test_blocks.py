@@ -86,3 +86,51 @@ def test_no_block_straddles_a_band_boundary():
     for block in build(_two_columns(), PAGE_W, PAGE_H):
         starts_left = block.bbox.x0 < boundary
         assert all((s.bbox.x0 < boundary) == starts_left for s in block.spans)
+
+
+def _prose(text: str, y: float) -> Span:
+    """A full-width prose line: one cell spanning the whole text column."""
+    return _obj(text, 20.0, y=y, width=300.0)
+
+
+def test_consecutive_prose_rows_become_one_block():
+    """PyMuPDF groups a paragraph's lines into a single block; one block per
+    line is the hierarchy failure that disqualified the pdfplumber adapter."""
+    spans = [_prose("first line", 0.0), _prose("second line", 12.0), _prose("third line", 24.0)]
+    blocks = build(spans, PAGE_W, PAGE_H)
+    assert len(blocks) == 1
+    assert [line.text for line in blocks[0].lines] == ["first line", "second line", "third line"]
+
+
+def test_a_wide_vertical_gap_starts_a_new_block():
+    spans = [_prose("end of one", 0.0), _prose("start of another", 60.0)]
+    assert len(build(spans, PAGE_W, PAGE_H)) == 2
+
+
+def test_a_multi_cell_row_stays_one_block_per_cell():
+    """Table rows keep cell atomicity — that is what table_cells measures."""
+    spans = [_obj("Gambeson", 20.0, y=0.0), _obj("50", 200.0, y=0.0)]
+    blocks = build(spans, PAGE_W, PAGE_H)
+    assert [b.text for b in blocks] == ["Gambeson", "50"]
+
+
+def test_a_table_row_interrupts_the_paragraph_above_it():
+    spans = [_prose("prose line", 0.0),
+             _obj("Gambeson", 20.0, y=12.0), _obj("50", 200.0, y=12.0),
+             _prose("more prose", 24.0)]
+    assert [b.text for b in build(spans, PAGE_W, PAGE_H)] == [
+        "prose line", "Gambeson", "50", "more prose"]
+
+
+def test_paragraph_grouping_never_merges_across_a_gutter():
+    """With band assignment collapsed, left- and right-column prose lines at the
+    same y would merge into one paragraph. cells() cannot prevent this — only
+    correct band assignment can."""
+    spans = []
+    for i, y in enumerate((0.0, 12.0, 24.0)):
+        spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+    blocks = build(spans, PAGE_W, PAGE_H)
+    assert len(blocks) == 2, [b.text for b in blocks]
+    assert [line.text for line in blocks[0].lines] == ["left0", "left1", "left2"]
+    assert [line.text for line in blocks[1].lines] == ["right0", "right1", "right2"]

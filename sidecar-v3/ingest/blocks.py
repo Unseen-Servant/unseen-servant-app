@@ -29,7 +29,6 @@ TUNING = {
     "cell_gap_em": 1.20,   # gap wider than this * em starts a new cell
     "row_tol_em": 0.45,    # baseline clustering tolerance
     "gutter_min_em": 1.50,    # narrowest zero-coverage x-run that can be a gutter
-    "gutter_cover": 0.60,     # fraction of rows a gutter must stay clear across
     "block_gap_lines": 1.60,  # vertical gap > this * median line pitch splits a block
 }
 
@@ -137,8 +136,52 @@ def _band_of(span: Span, found: list[tuple[float, float]]) -> int:
                key=lambda i: min(abs(centre - found[i][0]), abs(centre - found[i][1])))
 
 
+def _bbox(spans: Sequence[Span]) -> BBox:
+    return BBox(min(s.bbox.x0 for s in spans), min(s.bbox.y0 for s in spans),
+                max(s.bbox.x1 for s in spans), max(s.bbox.y1 for s in spans))
+
+
+def _pitch(band_rows: Sequence[Sequence[Span]]) -> float:
+    """Median centre-to-centre distance between consecutive rows — the band's
+    own leading, so the block-splitting threshold scales with the page. A
+    single gap is not a median of anything; it would just measure itself
+    against its own scaled value and could never count as wide, so that case
+    falls back to em_ like the empty-band case does."""
+    centres = [sum((s.bbox.y0 + s.bbox.y1) / 2 for s in row) / len(row) for row in band_rows]
+    gaps = [b - a for a, b in zip(centres, centres[1:])]
+    return statistics.median(gaps) if len(gaps) >= 2 else 0.0
+
+
+def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float) -> list[TextBlock]:
+    """Rows into blocks. A row of one cell is prose and joins the paragraph
+    above it while the leading stays normal; a row of several cells is a table
+    row whose cells each stay their own block, so cell atomicity survives."""
+    limit = (_pitch(band_rows) or em_) * TUNING["block_gap_lines"]
+    out: list[TextBlock] = []
+    para: list[TextLine] = []
+
+    def flush() -> None:
+        if para:
+            out.append(TextBlock(_bbox([s for line in para for s in line.spans]), tuple(para)))
+            para.clear()
+
+    for row in band_rows:
+        row_cells = cells(row, em_)
+        lines = [TextLine(_bbox(cell), cell) for cell in row_cells]
+        if len(lines) == 1:
+            if para and lines[0].bbox.y0 - para[-1].bbox.y1 > limit:
+                flush()
+            para.append(lines[0])
+        else:
+            flush()
+            out.extend(TextBlock(line.bbox, (line,)) for line in lines)
+    flush()
+    return out
+
+
 def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]:
-    """Atomic runs with geometry into blocks: bands, then rows, then cells.
+    """Atomic runs with geometry into blocks: bands, then rows, then cells,
+    then paragraph grouping.
 
     Reading order is band order, then top to bottom. Nothing merges across a
     band, and no line merges across a cell boundary.
@@ -152,11 +195,5 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
         in_band = [s for s in spans if _band_of(s, found) == index]
         if not in_band:
             continue
-        for row in rows(in_band, em_):
-            for cell in cells(row, em_):
-                if not cell:
-                    continue
-                box = BBox(min(w.bbox.x0 for w in cell), min(w.bbox.y0 for w in cell),
-                           max(w.bbox.x1 for w in cell), max(w.bbox.y1 for w in cell))
-                out.append(TextBlock(box, (TextLine(box, cell),)))
+        out.extend(_blocks_in_band(rows(in_band, em_), em_))
     return tuple(out)
