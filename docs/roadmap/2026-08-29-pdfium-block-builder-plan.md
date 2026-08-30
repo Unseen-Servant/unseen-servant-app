@@ -943,7 +943,7 @@ git commit -m "feat(v3/ingest): group prose rows into multi-line blocks"
   (pure — converts one text object's raw values into a Span, or None if the
   object carries nothing renderable) and `_objects(page, text_page) -> tuple[Span, ...]`
   (walks PDFium). `extract(pdf_path, doc_id=None) -> RawExtraction` gains real
-  blocks. Task 11 gates it.
+  blocks. Task 12 gates it.
 
 The split is deliberate: `_span` holds all the convention logic and is unit
 testable with plain values, while `_objects` needs real PDFium handles and is
@@ -1399,7 +1399,107 @@ git commit -m "fix(v3/ingest): a table row is one block, matching the reference 
 
 ---
 
-### Task 10: Document metadata — title, TOC, printed page labels
+### Task 10: Make `bands()` y-aware so a running header cannot erase a gutter
+
+After Task 9 the gate reads `table_cells` 0.877, `reading_order` 0.909, 7
+regressions, against a 0.982 / 1.000 / 0 reference. Two of those regressions are
+g34 and g35 (`reading_order` 1.000 → 0.619), and the aggregate `reading_order`
+dip traces to the same cause.
+
+`bands()` marks an x position covered if **any** span covers it, ignoring y
+entirely. On OSRIC p.156 the running header "hOW tO plaY" sits across the top of
+the page and its x-range crosses the real column gutter. One span, on one row,
+erases the gutter for the whole page: `bands()` returns a single band, the two
+prose columns are read as one, and reading order collapses.
+
+This is what `TUNING["gutter_cover"]` was for. Task 6 deleted it as dead
+configuration because `bands()` never read it — the key was not dead, it was
+premature.
+
+**Files:**
+- Modify: `sidecar-v3/ingest/blocks.py`
+- Test: `sidecar-v3/tests/test_blocks.py`
+
+**Interfaces:**
+- Consumes: `rows`, `em`, `TUNING`.
+- Produces: no signature change on `bands(spans, width, em_)`.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `sidecar-v3/tests/test_blocks.py`:
+
+```python
+def test_a_running_header_does_not_erase_the_gutter():
+    """One span crossing the gutter on one row — a running header — must not
+    merge two prose columns for the whole page. This is g34/g35."""
+    spans = [_obj("RUNNING HEADER", 20.0, y=-20.0, width=340.0)]
+    for i, y in enumerate((0.0, 14.0, 28.0, 42.0, 56.0, 70.0)):
+        spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+    assert len(bands(spans, PAGE_W, EM)) == 2, bands(spans, PAGE_W, EM)
+
+
+def test_a_gutter_crossed_by_most_rows_is_not_a_gutter():
+    """The tolerance must not be so loose that full-width prose splits."""
+    spans = [_obj(f"full width line {i}", 20.0, y=y, width=340.0)
+             for i, y in enumerate((0.0, 14.0, 28.0, 42.0))]
+    assert len(bands(spans, PAGE_W, EM)) == 1
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py -q`
+Expected: `test_a_running_header_does_not_erase_the_gutter` FAILS, reporting one
+band where two are expected. The second test should already pass.
+
+- [ ] **Step 3: Implement**
+
+Restore `TUNING["gutter_cover"] = 0.90` — the fraction of rows an x position must
+be clear across before it can be part of a gutter. A running header crossing one
+row of fifty is 2%; a genuine body column crosses nearly every row.
+
+Rewrite `bands()` to count coverage per row rather than per span:
+
+1. Group spans with `rows(spans, em_)`.
+2. For each x position, count how many *rows* have a span covering it.
+3. An x is gutter-eligible when that count is at most
+   `len(rows) * (1 - TUNING["gutter_cover"])`.
+4. Bound the scan to the text extent — the first and last x that are not
+   gutter-eligible — so page margins are not mistaken for gutters.
+5. As before, a gutter is a maximal eligible run at least
+   `em_ * TUNING["gutter_min_em"]` wide, and the bands are the spans between
+   gutters. One band when no gutter qualifies.
+
+Keep the existing docstring's reasoning about why columns are found
+geometrically rather than from the layout model.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests -q`
+Expected: PASS — every test, conservation and no-straddle included.
+
+- [ ] **Step 5: Re-run the diagnostic gate**
+
+```bash
+uv run --frozen --project sidecar-v3 python -m evals.run_eval \
+  --engine v3 --suite extraction --pdf-backend pdfium --no-write \
+  --gate evals/baselines/2026-08-29-v3-w1-reference.json
+```
+
+Numbers to beat: `table_cells` 0.877, `reading_order` 0.909, 7 regressions.
+Report the by-kind table verbatim and state explicitly whether g34 and g35
+`reading_order` return to 1.000. Do not tune any constant to chase the number.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add sidecar-v3/ingest/blocks.py sidecar-v3/tests/test_blocks.py
+git commit -m "fix(v3/ingest): count gutter coverage per row, not per span"
+```
+
+---
+
+### Task 11: Document metadata — title, TOC, printed page labels
 
 Both dead adapters returned an empty `toc` and empty `page_labels`; the v3
 storage schema persists both. Spec section 6 makes metadata a gate row.
@@ -1556,14 +1656,14 @@ git commit -m "feat(v3/ingest): title, outline, and printed page labels from PDF
 
 ---
 
-### Task 11: Gate the candidate and record the verdict
+### Task 12: Gate the candidate and record the verdict
 
 **Files:**
 - Modify: `docs/roadmap/2026-08-28-permissive-pdf-backend-plan.md`
 - Create: `evals/baselines/` outputs (written by the runs)
 
 **Interfaces:**
-- Consumes: the adapter from Tasks 7-10.
+- Consumes: the adapter from Tasks 7-11.
 - Produces: a Go/No-Go verdict recorded in the spec.
 
 - [ ] **Step 1: Run the 40-page golden gate**
@@ -1633,11 +1733,11 @@ git commit -m "eval(v3/ingest): PDFium block-builder verdict against the W1 refe
 
 - **P4 cutover.** Making PDFium the default, removing `pymupdf` from
   `sidecar-v3/pyproject.toml`, deleting the losing adapters, bumping the
-  pipeline version, and reindexing all happen only after Task 11 returns a GO.
+  pipeline version, and reindexing all happen only after Task 12 returns a GO.
 - **The v2 sidecar.** `pymupdf4llm` keeps `check-third-party.py --release` red
   regardless of this plan's outcome. Scope is v3 only, by decision.
 - **The packaging gate.** Spec section 6's macOS/Windows release smoke path
   needs a real release build, so it is verified at P4 cutover, not here.
-- **A line-based W1 contract.** If Task 11 fails with regressions concentrated on
+- **A line-based W1 contract.** If Task 12 fails with regressions concentrated on
   `two_column` pages, the block abstraction is wrong and that contingency opens
   as its own design with a retrieval regression pass — not as a patch here.
