@@ -14,10 +14,22 @@ def test_parse_pages_rejects_invalid_ranges(value):
 
 
 def test_render_escapes_extracted_text_and_embeds_page_image():
-    page = {"page": 3, "image": "abc", "extracted": "<rule>", "native": "native"}
-    report = render("Review", [page])
+    page = {"page": 3, "image": "abc", "extracted": {"v3": "<rule>"}, "native": "native"}
+    report = render("Review", [page], ["v3"])
     assert "data:image/png;base64,abc" in report
     assert "&lt;rule&gt;" in report
+
+
+def test_render_puts_one_column_per_engine():
+    """The point of the comparison view: each engine's text sits beside the
+    others under its own heading, so a difference is visible rather than
+    inferred."""
+    page = {"page": 3, "image": "abc",
+            "extracted": {"v2": "from v2", "v3 (pdfium)": "from v3"}, "native": "native"}
+    report = render("Review", [page], ["v2", "v3 (pdfium)"])
+    assert "<h3>v2</h3>" in report
+    assert "<h3>v3 (pdfium)</h3>" in report
+    assert report.index("from v2") < report.index("from v3")
 
 
 def test_native_text_converts_structured_pymupdf_blocks():
