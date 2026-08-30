@@ -16,6 +16,7 @@ import pypdfium2.raw as pdfium_raw
 
 from domain.models import BBox
 from ingest.blocks import build
+from ingest.pdfium_meta import page_labels, title, toc
 from ingest.raw import PageExtract, RawExtraction, Span, norm_ws
 
 
@@ -76,15 +77,16 @@ def _objects(page, text_page) -> tuple[Span, ...]:
 def extract(pdf_path, doc_id: str | None = None) -> RawExtraction:
     path = str(pdf_path)
     pdf = pypdfium2.PdfDocument(path)
+    did = doc_id or Path(path).stem
+    labels = page_labels(pdf, len(pdf))
     pages = []
     for i, page in enumerate(pdf):
         width, height = page.get_size()
         text_page = page.get_textpage()
         blocks = build(_objects(page, text_page), width, height)
         spans = tuple(span for block in blocks for span in block.spans)
-        pages.append(PageExtract(i, width, height, spans, not spans, "", blocks))
-    did = doc_id or Path(path).stem
-    return RawExtraction(did, path, did, len(pdf), (), tuple("" for _ in pages), tuple(pages), any(p.needs_ocr for p in pages))
+        pages.append(PageExtract(i, width, height, spans, not spans, labels[i], blocks))
+    return RawExtraction(did, path, title(pdf, did), len(pdf), toc(pdf), labels, tuple(pages), any(p.needs_ocr for p in pages))
 
 
 def rasterize(pdf_path, page_index: int, dpi: int = 150) -> np.ndarray:
