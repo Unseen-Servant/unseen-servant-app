@@ -25,8 +25,18 @@ def test_span_keeps_the_whole_object_as_one_run():
     assert _span("2 Armor Points", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "2 Armor Points"
 
 
-def test_span_normalises_internal_whitespace():
-    assert _span("Find\tT raps ", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "Find T raps"
+def test_span_keeps_the_objects_own_internal_whitespace():
+    """_span no longer normalises: blocks._join normalises at the seam once
+    runs are concatenated, using the object's own whitespace as boundary
+    information (see test_span_keeps_the_objects_own_boundary_spaces)."""
+    assert _span("Find\tT raps ", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "Find\tT raps "
+
+
+def test_span_keeps_the_objects_own_boundary_spaces():
+    """PDF text objects carry their own word-boundary spaces ('AC ', ' 17 ').
+    Stripping them per-object destroys the boundary before the joiner can use
+    it, turning 'AC 17' into 'AC17'."""
+    assert _span("AC ", BOUNDS, PAGE_HEIGHT, "Serif", 400, 0).text == "AC "
 
 
 def test_span_preserves_ligature_codepoints():

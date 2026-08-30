@@ -35,6 +35,13 @@ def test_abutting_objects_merge_into_one_word():
     assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("Find", "Traps")]
 
 
+def test_abutting_runs_keep_a_space_the_pdf_supplied():
+    """srd_5_2_1 p.290 stat blocks: 'AC ' and ' 17 ' sit 0.3pt apart, so they
+    merge into one word — but the PDF's own spaces mark the boundary."""
+    row = [_obj("AC ", 0, width=24.0), _obj(" 17 ", 24.3, width=20.0)]
+    assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("AC 17",)]
+
+
 def test_a_row_spanning_object_is_never_split():
     """Objects are atomic. A wide object is one cell, not several — splitting on
     internal gaps is the failure mode this design exists to remove."""

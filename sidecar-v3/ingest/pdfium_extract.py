@@ -17,13 +17,15 @@ import pypdfium2.raw as pdfium_raw
 from domain.models import BBox
 from ingest.blocks import build
 from ingest.pdfium_meta import page_labels, title, toc
-from ingest.raw import PageExtract, RawExtraction, Span, norm_ws
+from ingest.raw import PageExtract, RawExtraction, Span
 
 
 def _span(text: str, bounds: tuple[float, float, float, float], height: float,
           font: str, weight: int, italic_angle: int) -> Span | None:
-    text = norm_ws(text)
-    if not text:
+    # Keep the object's raw text, including its own leading/trailing spaces —
+    # they are the PDF's own word-boundary information (e.g. 'AC ' + ' 17 ').
+    # blocks._join normalises at the seam once runs are concatenated.
+    if not text.strip():
         return None
     left, bottom, right, top = bounds
     if right <= left or top <= bottom:
