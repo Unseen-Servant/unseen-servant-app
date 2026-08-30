@@ -943,7 +943,7 @@ git commit -m "feat(v3/ingest): group prose rows into multi-line blocks"
   (pure — converts one text object's raw values into a Span, or None if the
   object carries nothing renderable) and `_objects(page, text_page) -> tuple[Span, ...]`
   (walks PDFium). `extract(pdf_path, doc_id=None) -> RawExtraction` gains real
-  blocks. Task 9 gates it.
+  blocks. Task 10 gates it.
 
 The split is deliberate: `_span` holds all the convention logic and is unit
 testable with plain values, while `_objects` needs real PDFium handles and is
@@ -1135,7 +1135,136 @@ git commit -m "refactor(v3/ingest): one Span per PDFium text object, aggregation
 
 ---
 
-### Task 8: Document metadata — title, TOC, printed page labels
+### Task 8: Order table rows row-major, page columns band-major
+
+The diagnostic gate run after Task 7 scored `table_cells` **0.408** against a
+0.982 reference, with 14 of 18 regressions on table pages, while
+`content_recall` reached 0.988. All the text is present; the order is wrong.
+
+`bands()` uses a global x-projection, which cannot tell a page-column gutter
+from the gap between a table's own columns. On black_hack_1e p.4 it finds four
+bands — `ITEM`, `COST`, `USAGE DIE`, `NOTES` — and `build()`, iterating bands
+outermost, emits each entire column as one block:
+
+```
+'ITEM\nGambeson\nLeather\nChain Mail…'
+'COST\n50\n100\n350…'
+```
+
+The golden `cells` expectations are whole rows (`'gambeson 50 2 armor points'`,
+`'80 25 10 20 20 30 35'`), so `table_cells` is really measuring row coherence.
+Column-major emission destroys it. MuPDF never hits this because it groups
+locally by text flow rather than by a global projection.
+
+**The discriminator is baseline alignment.** In a table, cells in adjacent
+columns share row baselines. In two-column prose, the columns have independent
+baselines — a left-column line almost never shares a baseline with a
+right-column line. So adjacent bands whose rows align are one table and must be
+read row-major; adjacent bands whose rows do not align are page columns and must
+be read band-major.
+
+**Files:**
+- Modify: `sidecar-v3/ingest/blocks.py`
+- Test: `sidecar-v3/tests/test_blocks.py`
+
+**Interfaces:**
+- Consumes: `bands`, `rows`, `cells`, `_blocks_in_band` from Tasks 4-6.
+- Produces: no signature change. `build()` keeps its contract and both
+  invariants. Internally it groups adjacent aligned bands and orders those
+  row-major.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `sidecar-v3/tests/test_blocks.py`:
+
+```python
+def _table_page() -> list[Span]:
+    """Three rows x two columns on shared baselines — a table."""
+    out = []
+    for i, y in enumerate((0.0, 20.0, 40.0)):
+        out.append(_obj(f"item{i}", 20.0, y=y, width=80.0))
+        out.append(_obj(f"cost{i}", 200.0, y=y, width=60.0))
+    return out
+
+
+def _two_column_prose() -> list[Span]:
+    """Two prose columns on deliberately unaligned baselines."""
+    out = []
+    for i, y in enumerate((0.0, 14.0, 28.0)):
+        out.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+    for i, y in enumerate((7.0, 21.0, 35.0)):
+        out.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+    return out
+
+
+def test_a_table_reads_row_major():
+    """Golden cell expectations are whole rows, so a row's cells must stay
+    contiguous and in order."""
+    text = " ".join(b.text for b in build(_table_page(), PAGE_W, PAGE_H))
+    assert "item0 cost0" in text, text
+    assert "item1 cost1" in text, text
+
+
+def test_two_column_prose_still_reads_band_major():
+    """The failure this whole design exists to prevent: a left-column line
+    followed by a right-column line at the same height."""
+    text = " ".join(b.text for b in build(_two_column_prose(), PAGE_W, PAGE_H))
+    assert text.index("left2") < text.index("right0"), text
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py -q`
+Expected: `test_a_table_reads_row_major` FAILS — the text reads
+`item0 item1 item2 cost0 cost1 cost2`. `test_two_column_prose_still_reads_band_major`
+should already PASS; if it does not, say so before changing anything.
+
+- [ ] **Step 3: Implement the discriminator**
+
+Add a `TUNING` key `"row_align_frac": 0.60` with a comment saying it is the
+fraction of a band's rows that must share a baseline with the neighbouring band
+before the two are read as one table.
+
+Add a helper that decides whether two adjacent bands are row-aligned: take each
+band's row centres (reuse `rows()`), and compute the fraction of the smaller
+band's centres that fall within `row_tol_em * em` of some centre in the other.
+Aligned when that fraction is at least `row_align_frac`.
+
+Then in `build()`, partition the bands into runs of mutually aligned
+neighbours. For a run of one band, emit `_blocks_in_band` as today. For a run of
+two or more, emit row-major: walk the run's rows by y, and within each row emit
+that row's cells left to right across the whole run, one block per cell. Never
+merge spans from different bands into one block — the no-straddle invariant
+still holds.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py -q`
+Expected: PASS — every test, including conservation, no-straddle, the gutter
+test, and the paragraph-grouping tests from Task 6.
+
+- [ ] **Step 5: Re-run the diagnostic gate**
+
+```bash
+uv run --frozen --project sidecar-v3 python -m evals.run_eval \
+  --engine v3 --suite extraction --pdf-backend pdfium --no-write \
+  --gate evals/baselines/2026-08-29-v3-w1-reference.json
+```
+
+Record the by-kind table in your report. The number to beat is `table_cells`
+0.408 with 18 regressions; the reference is 0.982 with 0. Do **not** tune any
+`TUNING` constant to chase this number — report what you get.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add sidecar-v3/ingest/blocks.py sidecar-v3/tests/test_blocks.py
+git commit -m "fix(v3/ingest): read aligned bands row-major so table rows stay coherent"
+```
+
+---
+
+### Task 9: Document metadata — title, TOC, printed page labels
 
 Both dead adapters returned an empty `toc` and empty `page_labels`; the v3
 storage schema persists both. Spec section 6 makes metadata a gate row.
@@ -1292,14 +1421,14 @@ git commit -m "feat(v3/ingest): title, outline, and printed page labels from PDF
 
 ---
 
-### Task 9: Gate the candidate and record the verdict
+### Task 10: Gate the candidate and record the verdict
 
 **Files:**
 - Modify: `docs/roadmap/2026-08-28-permissive-pdf-backend-plan.md`
 - Create: `evals/baselines/` outputs (written by the runs)
 
 **Interfaces:**
-- Consumes: the adapter from Tasks 7 and 8.
+- Consumes: the adapter from Tasks 7, 8 and 9.
 - Produces: a Go/No-Go verdict recorded in the spec.
 
 - [ ] **Step 1: Run the 40-page golden gate**
@@ -1369,11 +1498,11 @@ git commit -m "eval(v3/ingest): PDFium block-builder verdict against the W1 refe
 
 - **P4 cutover.** Making PDFium the default, removing `pymupdf` from
   `sidecar-v3/pyproject.toml`, deleting the losing adapters, bumping the
-  pipeline version, and reindexing all happen only after Task 9 returns a GO.
+  pipeline version, and reindexing all happen only after Task 10 returns a GO.
 - **The v2 sidecar.** `pymupdf4llm` keeps `check-third-party.py --release` red
   regardless of this plan's outcome. Scope is v3 only, by decision.
 - **The packaging gate.** Spec section 6's macOS/Windows release smoke path
   needs a real release build, so it is verified at P4 cutover, not here.
-- **A line-based W1 contract.** If Task 9 fails with regressions concentrated on
+- **A line-based W1 contract.** If Task 10 fails with regressions concentrated on
   `two_column` pages, the block abstraction is wrong and that contingency opens
   as its own design with a retrieval regression pass — not as a patch here.
