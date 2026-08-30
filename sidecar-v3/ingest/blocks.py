@@ -38,20 +38,28 @@ TUNING = {
     "gutter_cover": 0.90,     # fraction of rows an x must be clear across to
                               # be gutter-eligible; a running header crossing
                               # one row of many must not close a real gutter
-    # Deliberately conservative, and NOT dimensionally comparable to its own
-    # unit: the quantity tested is the whitespace between two rows, while the
-    # unit is centre-to-centre pitch, so the effective bar is several normal
-    # gaps. Measured against PyMuPDF's paragraph blocks over four prose pages,
-    # within-paragraph whitespace runs to 0.53 pitch (often negative, since
-    # ascenders and descenders overlap) while real breaks have a median of
-    # 0.49 — the distributions overlap, and no threshold separates them
-    # cleanly. At 1.60 this splits ~10% of true paragraph breaks and produces
-    # no false splits. Comparing pitch to pitch instead would catch ~72% of
-    # breaks at the cost of ~19% false splits; under-splitting was preferred,
-    # consistent with this module never merging across a boundary it is unsure
-    # of. The residual under-splitting is a known contributor to the corpus
-    # block_integrity divergence recorded in the spec's section 9.
-    "block_gap_lines": 1.60,
+    # A paragraph splits when the whitespace between two rows exceeds this
+    # many multiples of the median centre-to-centre pitch. The two quantities
+    # are not dimensionally comparable, so the number reads larger than it
+    # behaves; it is calibrated empirically rather than derived.
+    #
+    # Measured against PyMuPDF's paragraph blocks over 26 pages sampled across
+    # all seven corpus documents, chosen disjoint from the 40-page golden set
+    # so this does not tune against the gate. Within-paragraph whitespace
+    # reaches 0.770 pitch (frequently negative — ascenders and descenders
+    # overlap); real breaks have a median of 0.368. The distributions overlap,
+    # so no value separates them cleanly:
+    #
+    #   0.90 -> 0.0% false splits, 11.9% of breaks caught
+    #   0.70 -> 0.8%              , 15.9%
+    #   0.60 -> 1.5%              , 22.4%
+    #   1.60 -> 0.0%              ,  7.4%   (previous value)
+    #
+    # 0.90 is the largest value that still splits nothing it should not, and it
+    # strictly dominates the previous 1.60 — same zero false splits, 60% more
+    # breaks found. Going lower trades real false splits for recall, and there
+    # is no evidence yet on which of the two hurts retrieval more.
+    "block_gap_lines": 0.90,
     "row_fill_table": 0.70,  # a run of consecutive multi-cell rows is a table
                              # when its median fill ratio (text width / row
                              # width) is below this; measured, not tuned here

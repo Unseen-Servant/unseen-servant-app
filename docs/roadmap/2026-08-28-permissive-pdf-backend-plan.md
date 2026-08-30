@@ -473,28 +473,44 @@ distributions still overlap (within p90 1.559 against break p50 1.175) and the
 best separator catches about 72% of breaks at the cost of about 19% false
 splits.
 
-**1.60 is not the best value in its own family, and it was kept for a reason
-unrelated to that.** The table above shows within-paragraph whitespace never
-exceeds 0.526 pitch while the median real break is 0.488, so a threshold
-anywhere in (0.53, 0.70] would keep false splits at zero while catching roughly
-45% of breaks — four to five times the current 10%, in the same dimension, at no
-measured cost. The reason not to adopt it is the plan's anti-overfitting rule:
-one of the four pages this distribution was measured on, black_hack_1e p.3, **is
-golden page g17**, so tuning the constant against this sample would be tuning
-against the gate. Re-deriving the threshold from prose pages disjoint from the
-40-page golden set is the correct follow-up, and it is not done here.
+**The threshold was re-derived on 2026-08-30 and lowered to 0.90.** The four
+pages above include black_hack_1e p.3, which is golden page g17, so that sample
+could not be used to set a constant without tuning against the gate. The sweep
+was redone over 26 pages sampled across all seven corpus documents and chosen
+disjoint from the 40-page golden set (1,485 gaps):
+
+| threshold | false splits | breaks caught |
+|---:|---:|---:|
+| 1.60 (previous) | 0.0% | 7.4% |
+| **0.90 (current)** | **0.0%** | **11.9%** |
+| 0.70 | 0.8% | 15.9% |
+| 0.60 | 1.5% | 22.4% |
+| 0.40 | 3.2% | 40.4% |
+
+On this larger sample within-paragraph whitespace reaches 0.770 pitch, not the
+0.526 the four-page sample suggested — so values in (0.53, 0.70] are not in fact
+free. 0.90 is the largest setting that still splits nothing it should not, and it
+strictly dominates 1.60: identical zero false splits, 60% more breaks found. The
+40-page gate is unchanged by the switch (0.994 / 0.978 / 0.982, the same three
+regressions), confirming it neither helps nor harms the measured axes.
+
+Going below 0.90 buys recall at the cost of real false splits, and there is no
+evidence yet on which of over- and under-splitting hurts retrieval more. That is
+a retrieval question, not an extraction one.
 
 The consequence is real and unmeasured by the extraction gate: paragraphs that
 should be separate blocks are merged, which contributes to the corpus
 `block_integrity` of 0.660 alongside the defects fixed after the final review.
 
-Note that 0.660 was measured **before** that fix wave and is stale. Corpus QA is
-a separate suite from the extraction gate, so re-running the gate did not
-re-measure it. The gutter fix changed emitted blocks in both directions: it stops
-folding a running header into a column, but a multi-line full-width element on a
-two-column page now fragments into one block per line where it was previously one
-(wrongly merged) block. Re-run `--suite corpus-qa` before quoting a block
-integrity figure.
+Corpus QA was re-run after the fix wave (2026-08-30) and 0.660 is **unchanged** —
+block recall 0.998, label integrity 0.997, adjacency 0.885, 0 empty pages, with
+only trivial per-document movement (osric 1489 → 1487 broken, srd_5_1 706 → 707)
+netting to the same 3,506. The gutter fix moved blocks in both directions and the
+effects cancelled: it stops folding a running header into a column, but a
+multi-line full-width element on a two-column page now fragments into one block
+per line where it was previously one wrongly merged block.
+
+The divergence is therefore real and not an artifact of any defect since fixed.
 Retrieval consumes these blocks as chunks, so this belongs in any adoption
 decision.
 
