@@ -448,6 +448,38 @@ is about 1.4x tighter in practice than the module's former docstring wording
 ("multiples of the row's em, its type size") implied. That wording has been
 corrected in-code to describe what is actually measured.
 
+### Paragraph under-splitting, measured
+
+`blocks.py` splits a paragraph when the whitespace between two rows exceeds
+`block_gap_lines` (1.60) times the median centre-to-centre pitch. Those two
+quantities are not dimensionally comparable, so the effective bar is several
+normal line gaps.
+
+Measured against PyMuPDF's paragraph blocks over four prose pages
+(black_hack_1e p.3, osric_2e p.135, srd_5_2_1 p.92, bfrpg_4e p.176), as a
+fraction of pitch:
+
+| | p50 | p90 | max |
+|---|---:|---:|---:|
+| whitespace within a paragraph | -0.021 | 0.320 | 0.526 |
+| whitespace at a real break | 0.488 | 1.630 | 11.344 |
+
+Within-paragraph whitespace is frequently negative — ascenders and descenders
+overlap — which is why it is a poor quantity to threshold. The current setting
+catches roughly 10% of true paragraph breaks and produces no false splits.
+
+Comparing pitch to pitch instead is dimensionally sound but not obviously
+better: the distributions still overlap (within p90 1.559 against break p50
+1.175), and the best separator catches about 72% of breaks at the cost of about
+19% false splits. Under-splitting was kept deliberately, consistent with this
+module never merging across a boundary it is unsure of.
+
+The consequence is real and unmeasured by the extraction gate: paragraphs that
+should be separate blocks are merged, which contributes to the corpus
+`block_integrity` of 0.660 alongside the defects fixed after the final review.
+Retrieval consumes these blocks as chunks, so this belongs in any adoption
+decision.
+
 ### What was corrected along the way
 
 Two defects invalidated the earlier evidence and are fixed:

@@ -38,7 +38,20 @@ TUNING = {
     "gutter_cover": 0.90,     # fraction of rows an x must be clear across to
                               # be gutter-eligible; a running header crossing
                               # one row of many must not close a real gutter
-    "block_gap_lines": 1.60,  # vertical gap > this * median line pitch splits a block
+    # Deliberately conservative, and NOT dimensionally comparable to its own
+    # unit: the quantity tested is the whitespace between two rows, while the
+    # unit is centre-to-centre pitch, so the effective bar is several normal
+    # gaps. Measured against PyMuPDF's paragraph blocks over four prose pages,
+    # within-paragraph whitespace runs to 0.53 pitch (often negative, since
+    # ascenders and descenders overlap) while real breaks have a median of
+    # 0.49 — the distributions overlap, and no threshold separates them
+    # cleanly. At 1.60 this splits ~10% of true paragraph breaks and produces
+    # no false splits. Comparing pitch to pitch instead would catch ~72% of
+    # breaks at the cost of ~19% false splits; under-splitting was preferred,
+    # consistent with this module never merging across a boundary it is unsure
+    # of. The residual under-splitting is a known contributor to the corpus
+    # block_integrity divergence recorded in the spec's section 9.
+    "block_gap_lines": 1.60,
     "row_fill_table": 0.70,  # a run of consecutive multi-cell rows is a table
                              # when its median fill ratio (text width / row
                              # width) is below this; measured, not tuned here
