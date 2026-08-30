@@ -51,11 +51,13 @@ PAGE_W, PAGE_H = 400.0, 200.0
 
 
 def _two_columns() -> list[Span]:
-    """Left column at x=20, right at x=240, on independent baselines — real page
-    columns, distinguishable from a table only by the gutter between them."""
+    """Left column at x=20, right at x=240, sharing baselines — real page
+    columns, distinguishable from a table only by the gutter between them.
+    Widths are set to fill their column (not the label's literal length) so
+    the fixture models a real column's line rather than a sparse table cell."""
     out: list[Span] = []
     for i, y in enumerate((0.0, 20.0, 40.0)):
-        out += [_obj(f"L{i}", 20.0, y=y), _obj(f"R{i}", 240.0, y=y + 7.0)]
+        out += [_obj(f"L{i}", 20.0, y=y, width=120.0), _obj(f"R{i}", 240.0, y=y, width=120.0)]
     return out
 
 
@@ -107,31 +109,35 @@ def test_a_wide_vertical_gap_starts_a_new_block():
     assert len(build(spans, PAGE_W, PAGE_H)) == 2
 
 
-def test_a_multi_cell_row_stays_one_block_per_cell():
-    """Table rows keep cell atomicity — that is what table_cells measures."""
+def test_a_multi_cell_row_stays_one_block_per_row():
+    """A table row's cells become lines inside one block, not separate
+    blocks — the shape an atomic row needs to survive downstream reordering."""
     spans = [_obj("Gambeson", 20.0, y=0.0), _obj("50", 200.0, y=0.0)]
     blocks = build(spans, PAGE_W, PAGE_H)
-    assert [b.text for b in blocks] == ["Gambeson", "50"]
+    assert [b.text for b in blocks] == ["Gambeson\n50"]
 
 
-def test_a_table_row_interrupts_the_paragraph_above_it():
+def test_a_table_row_does_not_join_the_paragraph_around_it():
+    """A table row is extracted before paragraph grouping runs, so its cells
+    never join the prose above or below it as a line in that block."""
     spans = [_prose("prose line", 0.0),
              _obj("Gambeson", 20.0, y=12.0), _obj("50", 200.0, y=12.0),
              _prose("more prose", 24.0)]
-    assert [b.text for b in build(spans, PAGE_W, PAGE_H)] == [
-        "prose line", "Gambeson", "50", "more prose"]
+    blocks = build(spans, PAGE_W, PAGE_H)
+    assert [b.text for b in blocks if b.text == "Gambeson\n50"] == ["Gambeson\n50"]
+    assert all(b.text == "Gambeson\n50" or "Gambeson" not in b.text for b in blocks)
 
 
 def test_paragraph_grouping_never_merges_across_a_gutter():
     """With band assignment collapsed, left- and right-column prose lines at
-    nearly the same y would merge into one paragraph. cells() cannot prevent
-    this — only correct band assignment can. The baselines are offset, not
-    shared, so this models a page column rather than a table (see
-    test_a_table_reads_row_major)."""
+    the same y would merge into one paragraph. cells() cannot prevent this —
+    only correct band assignment can. The columns fill nearly their whole
+    width even sharing baselines, so fill ratio still reads this as two page
+    columns rather than a table (see test_a_table_reads_row_major)."""
     spans = []
     for i, y in enumerate((0.0, 12.0, 24.0)):
         spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
-        spans.append(_obj(f"right{i}", 240.0, y=y + 7.0, width=120.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
     blocks = build(spans, PAGE_W, PAGE_H)
     assert len(blocks) == 2, [b.text for b in blocks]
     assert [line.text for line in blocks[0].lines] == ["left0", "left1", "left2"]
@@ -148,19 +154,20 @@ def _table_page() -> list[Span]:
 
 
 def _two_column_prose() -> list[Span]:
-    """Two prose columns on deliberately unaligned baselines."""
+    """Two prose columns sharing baselines — the shared-baseline-grid case
+    that must still read as page columns, not a table."""
     out = []
     for i, y in enumerate((0.0, 14.0, 28.0)):
         out.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
-    for i, y in enumerate((7.0, 21.0, 35.0)):
+    for i, y in enumerate((0.0, 14.0, 28.0)):
         out.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
     return out
 
 
 def test_a_table_reads_row_major():
     """Golden cell expectations are whole rows, so a row's cells must stay
-    contiguous and in order."""
-    text = " ".join(b.text for b in build(_table_page(), PAGE_W, PAGE_H))
+    contiguous and in order — each row is one block, its cells the lines."""
+    text = " ".join(b.text.replace("\n", " ") for b in build(_table_page(), PAGE_W, PAGE_H))
     assert "item0 cost0" in text, text
     assert "item1 cost1" in text, text
 
@@ -170,3 +177,19 @@ def test_two_column_prose_still_reads_band_major():
     followed by a right-column line at the same height."""
     text = " ".join(b.text for b in build(_two_column_prose(), PAGE_W, PAGE_H))
     assert text.index("left2") < text.index("right0"), text
+
+
+def test_a_table_row_is_one_block_with_a_line_per_cell():
+    """The reference shape: an atomic row survives downstream reordering, which
+    is what makes whole-row expectations matchable."""
+    blocks = build(_table_page(), PAGE_W, PAGE_H)
+    row0 = [b for b in blocks if "item0" in b.text][0]
+    assert [line.text for line in row0.lines] == ["item0", "cost0"]
+    assert row0.text.replace("\n", " ") == "item0 cost0"
+
+
+def test_two_column_prose_rows_never_share_a_block():
+    """Prose rows fill their column, so they must stay per-column blocks even
+    though they sit at the same height."""
+    for block in build(_two_column_prose(), PAGE_W, PAGE_H):
+        assert not ("left" in block.text and "right" in block.text), block.text

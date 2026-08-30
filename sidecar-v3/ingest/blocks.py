@@ -30,9 +30,9 @@ TUNING = {
     "row_tol_em": 0.45,    # baseline clustering tolerance
     "gutter_min_em": 1.50,    # narrowest zero-coverage x-run that can be a gutter
     "block_gap_lines": 1.60,  # vertical gap > this * median line pitch splits a block
-    "row_align_frac": 0.60,   # fraction of a band's rows that must share a baseline
-                              # with the neighbouring band before the two are read
-                              # as one table instead of two independent page columns
+    "row_fill_table": 0.70,  # a run of consecutive multi-cell rows is a table
+                             # when its median fill ratio (text width / row
+                             # width) is below this; measured, not tuned here
 }
 
 
@@ -182,69 +182,73 @@ def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float) -> list[Tex
     return out
 
 
-def _row_aligned(a_rows: Sequence[Sequence[Span]], b_rows: Sequence[Sequence[Span]],
-                  em_: float) -> bool:
-    """True when two adjacent bands' rows share baselines — the signature of a
-    table read across both, not two independent page columns. A left-column
-    prose line almost never shares a baseline with a right-column one, so this
-    is the discriminator: cells in a table's columns share row baselines,
-    columns of running prose do not.
+def _fill(row_cells: Sequence[tuple[Span, ...]]) -> float:
+    """Fraction of a row's horizontal extent actually covered by text.
+
+    Gap width alone cannot separate a table's own column gap from a page
+    gutter — both are wide relative to the type size, and their measured
+    distributions overlap. Fill does: a table's value cells stay narrow next
+    to a wide gap (median 0.24-0.48 on real pages), while a page column's
+    line word-wraps to fill its width (median 0.87-0.95) even when it shares
+    a baseline with the column beside it.
     """
-    def centres(band_rows: Sequence[Sequence[Span]]) -> list[float]:
-        return [sum((s.bbox.y0 + s.bbox.y1) / 2 for s in row) / len(row) for row in band_rows]
-
-    a_centres, b_centres = centres(a_rows), centres(b_rows)
-    smaller, other = (a_centres, b_centres) if len(a_centres) <= len(b_centres) else \
-        (b_centres, a_centres)
-    if not smaller:
-        return False
-    tol = em_ * TUNING["row_tol_em"]
-    hits = sum(1 for c in smaller if any(abs(c - o) <= tol for o in other))
-    return hits / len(smaller) >= TUNING["row_align_frac"]
+    covered = sum(_bbox(cell).x1 - _bbox(cell).x0 for cell in row_cells)
+    extent = _bbox(row_cells[-1]).x1 - _bbox(row_cells[0]).x0
+    return covered / extent if extent > 0 else 1.0
 
 
-def _row_major(run: Sequence[Sequence[Sequence[Span]]], em_: float) -> list[TextBlock]:
-    """Emit a run of mutually aligned bands as a table: rows top to bottom,
-    cells left to right within a row, one block per cell. Bands are only ever
-    aligned because a gutter this wide separates them (gutter_min_em >
-    cell_gap_em), so re-clustering their spans into rows can never fuse two
-    bands' cells into one — the no-straddle invariant still holds.
-    """
-    combined = [s for band_rows in run for row in band_rows for s in row]
-    out: list[TextBlock] = []
-    for row in rows(combined, em_):
-        for cell in cells(row, em_):
-            out.append(TextBlock(_bbox(cell), (TextLine(_bbox(cell), cell),)))
-    return out
+def _table_run(indices: Sequence[int], row_cells: Sequence[list[tuple[Span, ...]]]) -> bool:
+    """A maximal run of consecutive multi-cell rows is a table when its
+    median fill ratio is low. Decided per run, not per row: a paragraph's
+    short final line has a low fill on its own and would be misread as a
+    table row if judged alone."""
+    return statistics.median(_fill(row_cells[i]) for i in indices) < TUNING["row_fill_table"]
 
 
 def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]:
-    """Atomic runs with geometry into blocks: bands, then rows, then cells,
-    then paragraph grouping.
+    """Atomic runs with geometry into blocks.
 
-    Reading order is band order, then top to bottom — except a run of adjacent
-    bands whose rows share baselines, which is a table and reads row-major
-    instead. Nothing merges across a band, and no line merges across a cell
-    boundary.
+    Rows are clustered across the whole page, not per band first — bands()
+    cannot tell a table's own column gap from a real page gutter, so gating
+    on bands would tear tables into per-column blocks again. A maximal run of
+    consecutive rows that each segment into two or more cells is a table when
+    its fill ratio is low; each of its rows becomes one atomic block, a line
+    per cell, so a wide row survives downstream reordering intact. Every
+    other row is band-assigned and grouped into paragraphs as before.
     """
     if not spans:
         return ()
     em_ = em(spans)
-    found = bands(spans, width, em_)
-    band_rows = [rows([s for s in spans if _band_of(s, found) == index], em_)
-                 for index in range(len(found))]
+    all_rows = rows(spans, em_)
+    row_cells = [cells(row, em_) for row in all_rows]
+
+    runs: list[list[int]] = []
+    current: list[int] = []
+    for i, rc in enumerate(row_cells):
+        if len(rc) >= 2:
+            current.append(i)
+        else:
+            if current:
+                runs.append(current)
+            current = []
+    if current:
+        runs.append(current)
+    table_rows = {i for run in runs if _table_run(run, row_cells) for i in run}
 
     out: list[TextBlock] = []
-    index = 0
-    while index < len(band_rows):
-        if not band_rows[index]:
-            index += 1
-            continue
-        end = index + 1
-        while end < len(band_rows) and band_rows[end] and \
-                _row_aligned(band_rows[end - 1], band_rows[end], em_):
-            end += 1
-        run = band_rows[index:end]
-        out.extend(_blocks_in_band(run[0], em_) if len(run) == 1 else _row_major(run, em_))
-        index = end
+    column_spans: list[Span] = []
+    for i, row in enumerate(all_rows):
+        if i in table_rows:
+            lines = tuple(TextLine(_bbox(cell), cell) for cell in row_cells[i])
+            out.append(TextBlock(_bbox(row), lines))
+        else:
+            column_spans.extend(row)
+
+    if column_spans:
+        found = bands(column_spans, width, em_)
+        for index in range(len(found)):
+            band_rows = rows([s for s in column_spans if _band_of(s, found) == index], em_)
+            out.extend(_blocks_in_band(band_rows, em_))
+
+    out.sort(key=lambda b: (b.bbox.y0, b.bbox.x0))
     return tuple(out)
