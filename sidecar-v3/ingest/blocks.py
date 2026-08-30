@@ -30,6 +30,9 @@ TUNING = {
     "row_tol_em": 0.45,    # baseline clustering tolerance
     "gutter_min_em": 1.50,    # narrowest zero-coverage x-run that can be a gutter
     "block_gap_lines": 1.60,  # vertical gap > this * median line pitch splits a block
+    "row_align_frac": 0.60,   # fraction of a band's rows that must share a baseline
+                              # with the neighbouring band before the two are read
+                              # as one table instead of two independent page columns
 }
 
 
@@ -179,21 +182,69 @@ def _blocks_in_band(band_rows: Sequence[Sequence[Span]], em_: float) -> list[Tex
     return out
 
 
+def _row_aligned(a_rows: Sequence[Sequence[Span]], b_rows: Sequence[Sequence[Span]],
+                  em_: float) -> bool:
+    """True when two adjacent bands' rows share baselines — the signature of a
+    table read across both, not two independent page columns. A left-column
+    prose line almost never shares a baseline with a right-column one, so this
+    is the discriminator: cells in a table's columns share row baselines,
+    columns of running prose do not.
+    """
+    def centres(band_rows: Sequence[Sequence[Span]]) -> list[float]:
+        return [sum((s.bbox.y0 + s.bbox.y1) / 2 for s in row) / len(row) for row in band_rows]
+
+    a_centres, b_centres = centres(a_rows), centres(b_rows)
+    smaller, other = (a_centres, b_centres) if len(a_centres) <= len(b_centres) else \
+        (b_centres, a_centres)
+    if not smaller:
+        return False
+    tol = em_ * TUNING["row_tol_em"]
+    hits = sum(1 for c in smaller if any(abs(c - o) <= tol for o in other))
+    return hits / len(smaller) >= TUNING["row_align_frac"]
+
+
+def _row_major(run: Sequence[Sequence[Sequence[Span]]], em_: float) -> list[TextBlock]:
+    """Emit a run of mutually aligned bands as a table: rows top to bottom,
+    cells left to right within a row, one block per cell. Bands are only ever
+    aligned because a gutter this wide separates them (gutter_min_em >
+    cell_gap_em), so re-clustering their spans into rows can never fuse two
+    bands' cells into one — the no-straddle invariant still holds.
+    """
+    combined = [s for band_rows in run for row in band_rows for s in row]
+    out: list[TextBlock] = []
+    for row in rows(combined, em_):
+        for cell in cells(row, em_):
+            out.append(TextBlock(_bbox(cell), (TextLine(_bbox(cell), cell),)))
+    return out
+
+
 def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock, ...]:
     """Atomic runs with geometry into blocks: bands, then rows, then cells,
     then paragraph grouping.
 
-    Reading order is band order, then top to bottom. Nothing merges across a
-    band, and no line merges across a cell boundary.
+    Reading order is band order, then top to bottom — except a run of adjacent
+    bands whose rows share baselines, which is a table and reads row-major
+    instead. Nothing merges across a band, and no line merges across a cell
+    boundary.
     """
     if not spans:
         return ()
     em_ = em(spans)
     found = bands(spans, width, em_)
+    band_rows = [rows([s for s in spans if _band_of(s, found) == index], em_)
+                 for index in range(len(found))]
+
     out: list[TextBlock] = []
-    for index in range(len(found)):
-        in_band = [s for s in spans if _band_of(s, found) == index]
-        if not in_band:
+    index = 0
+    while index < len(band_rows):
+        if not band_rows[index]:
+            index += 1
             continue
-        out.extend(_blocks_in_band(rows(in_band, em_), em_))
+        end = index + 1
+        while end < len(band_rows) and band_rows[end] and \
+                _row_aligned(band_rows[end - 1], band_rows[end], em_):
+            end += 1
+        run = band_rows[index:end]
+        out.extend(_blocks_in_band(run[0], em_) if len(run) == 1 else _row_major(run, em_))
+        index = end
     return tuple(out)

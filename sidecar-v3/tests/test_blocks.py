@@ -51,11 +51,11 @@ PAGE_W, PAGE_H = 400.0, 200.0
 
 
 def _two_columns() -> list[Span]:
-    """Left column at x=20, right at x=240, sharing baselines — the layout that
-    produces synthetic cross-column rows when a gutter is not detected."""
+    """Left column at x=20, right at x=240, on independent baselines — real page
+    columns, distinguishable from a table only by the gutter between them."""
     out: list[Span] = []
     for i, y in enumerate((0.0, 20.0, 40.0)):
-        out += [_obj(f"L{i}", 20.0, y=y), _obj(f"R{i}", 240.0, y=y)]
+        out += [_obj(f"L{i}", 20.0, y=y), _obj(f"R{i}", 240.0, y=y + 7.0)]
     return out
 
 
@@ -123,14 +123,50 @@ def test_a_table_row_interrupts_the_paragraph_above_it():
 
 
 def test_paragraph_grouping_never_merges_across_a_gutter():
-    """With band assignment collapsed, left- and right-column prose lines at the
-    same y would merge into one paragraph. cells() cannot prevent this — only
-    correct band assignment can."""
+    """With band assignment collapsed, left- and right-column prose lines at
+    nearly the same y would merge into one paragraph. cells() cannot prevent
+    this — only correct band assignment can. The baselines are offset, not
+    shared, so this models a page column rather than a table (see
+    test_a_table_reads_row_major)."""
     spans = []
     for i, y in enumerate((0.0, 12.0, 24.0)):
         spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
-        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y + 7.0, width=120.0))
     blocks = build(spans, PAGE_W, PAGE_H)
     assert len(blocks) == 2, [b.text for b in blocks]
     assert [line.text for line in blocks[0].lines] == ["left0", "left1", "left2"]
     assert [line.text for line in blocks[1].lines] == ["right0", "right1", "right2"]
+
+
+def _table_page() -> list[Span]:
+    """Three rows x two columns on shared baselines — a table."""
+    out = []
+    for i, y in enumerate((0.0, 20.0, 40.0)):
+        out.append(_obj(f"item{i}", 20.0, y=y, width=80.0))
+        out.append(_obj(f"cost{i}", 200.0, y=y, width=60.0))
+    return out
+
+
+def _two_column_prose() -> list[Span]:
+    """Two prose columns on deliberately unaligned baselines."""
+    out = []
+    for i, y in enumerate((0.0, 14.0, 28.0)):
+        out.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+    for i, y in enumerate((7.0, 21.0, 35.0)):
+        out.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+    return out
+
+
+def test_a_table_reads_row_major():
+    """Golden cell expectations are whole rows, so a row's cells must stay
+    contiguous and in order."""
+    text = " ".join(b.text for b in build(_table_page(), PAGE_W, PAGE_H))
+    assert "item0 cost0" in text, text
+    assert "item1 cost1" in text, text
+
+
+def test_two_column_prose_still_reads_band_major():
+    """The failure this whole design exists to prevent: a left-column line
+    followed by a right-column line at the same height."""
+    text = " ".join(b.text for b in build(_two_column_prose(), PAGE_W, PAGE_H))
+    assert text.index("left2") < text.index("right0"), text
