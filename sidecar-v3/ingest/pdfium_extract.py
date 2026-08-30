@@ -1,104 +1,75 @@
-"""PDFium Stage-A candidate: character geometry -> safe native line blocks.
+"""PDFium Stage-A adapter: one Span per text object, y-up flipped to y-down.
 
-PDFium exposes text as a character stream rather than PyMuPDF-style blocks.
-This adapter deliberately keeps its own units to one reconstructed line: a
-later layout pass may order and classify lines, but it never has permission to
-merge same-y content across columns.
+PDFium exposes text as page objects, not PyMuPDF-style blocks. This adapter's
+only job is to turn each text object into a Span in the pipeline's convention
+and hand the page's spans to ingest.blocks.build(), which owns all
+aggregation — words, cells, and blocks are never grouped here.
 """
 from __future__ import annotations
 
-import statistics
+import ctypes
 from pathlib import Path
 
 import numpy as np
 import pypdfium2
+import pypdfium2.raw as pdfium_raw
 
 from domain.models import BBox
-from ingest.raw import PageExtract, RawExtraction, Span, TextBlock, TextLine, norm_ws as _norm_ws
+from ingest.blocks import build
+from ingest.raw import PageExtract, RawExtraction, Span, norm_ws
 
 
-def _line_spans(text_page, height: float) -> list[list[Span]]:
-    chars: list[Span] = []
-    pending_space = False
-    for i in range(text_page.count_chars()):
-        char = text_page.get_text_range(i, 1)
-        if not char:
-            continue
-        if char.isspace():
-            pending_space = True
-            continue
-        x0, y0, x1, y1 = text_page.get_charbox(i)
-        if x1 <= x0 or y1 <= y0:
-            continue
-        # PDFium measures y up from the bottom of the page; BBox and every
-        # consumer of it use PyMuPDF's y-down top-left origin. Convert here so
-        # the row sort below reads the page top-to-bottom.
-        chars.append(Span((" " if pending_space else "") + char,
-                          BBox(x0, height - y1, x1, height - y0), round(y1 - y0, 2), ""))
-        pending_space = False
-    if not chars:
-        return []
-
-    height = statistics.median(char.bbox.y1 - char.bbox.y0 for char in chars)
-    rows: list[list[Span]] = []
-    for char in sorted(chars, key=lambda item: ((item.bbox.y0 + item.bbox.y1) / 2, item.bbox.x0)):
-        center = (char.bbox.y0 + char.bbox.y1) / 2
-        row = next((candidate for candidate in rows
-                    if abs(center - sum((item.bbox.y0 + item.bbox.y1) / 2 for item in candidate) / len(candidate))
-                    <= max(2.0, height * 0.45)), None)
-        if row is None:
-            rows.append([char])
-        else:
-            row.append(char)
-
-    lines: list[list[Span]] = []
-    for row in rows:
-        row.sort(key=lambda item: item.bbox.x0)
-        widths = [item.bbox.x1 - item.bbox.x0 for item in row]
-        split_gap = max(18.0, statistics.median(widths) * 6)
-        line: list[Span] = []
-        for char in row:
-            if line and char.bbox.x0 - line[-1].bbox.x1 > split_gap:
-                lines.append(line)
-                line = []
-            line.append(char)
-        if line:
-            lines.append(line)
-    return lines
+def _span(text: str, bounds: tuple[float, float, float, float], height: float,
+          font: str, weight: int, italic_angle: int) -> Span | None:
+    text = norm_ws(text)
+    if not text:
+        return None
+    left, bottom, right, top = bounds
+    if right <= left or top <= bottom:
+        return None
+    # PDFium measures y up from the bottom of the page; BBox and every
+    # consumer of it (blocks.build, the layout raster) use PyMuPDF's y-down
+    # top-left origin. Convert here, at the source.
+    bbox = BBox(left, height - top, right, height - bottom)
+    return Span(text, bbox, round(bbox.y1 - bbox.y0, 2), font, weight >= 700, italic_angle != 0)
 
 
-def _words(chars: list[Span]) -> tuple[Span, ...]:
-    words: list[Span] = []
-    current: list[Span] = []
-    for char in chars:
-        if current and char.bbox.x0 - current[-1].bbox.x1 > 3.0:
-            words.append(_word(current))
-            current = []
-        current.append(char)
-    if current:
-        words.append(_word(current))
-    return tuple(words)
+def _object_text(obj, text_page) -> str:
+    length = pdfium_raw.FPDFTextObj_GetText(obj.raw, text_page.raw, None, 0)
+    if length <= 0:
+        return ""
+    buf = ctypes.create_string_buffer(length)
+    pdfium_raw.FPDFTextObj_GetText(obj.raw, text_page.raw, ctypes.cast(buf, ctypes.POINTER(ctypes.c_ushort)), length)
+    return buf.raw[:length].decode("utf-16-le", errors="ignore").rstrip("\x00")
 
 
-def _word(chars: list[Span]) -> Span:
-    return Span(
-        _norm_ws("".join(char.text for char in chars)),
-        BBox(min(char.bbox.x0 for char in chars), min(char.bbox.y0 for char in chars),
-             max(char.bbox.x1 for char in chars), max(char.bbox.y1 for char in chars)),
-        round(statistics.median(char.size for char in chars), 2), "",
-    )
+def _object_font(obj) -> tuple[str, int, int]:
+    font = pdfium_raw.FPDFTextObj_GetFont(obj.raw)
+    length = pdfium_raw.FPDFFont_GetBaseFontName(font, None, 0)
+    name = ""
+    if length > 0:
+        buf = ctypes.create_string_buffer(length)
+        pdfium_raw.FPDFFont_GetBaseFontName(font, buf, length)
+        name = buf.value.decode("utf-8", errors="replace")
+    weight = pdfium_raw.FPDFFont_GetWeight(font)
+    angle = ctypes.c_int(0)
+    pdfium_raw.FPDFFont_GetItalicAngle(font, ctypes.byref(angle))
+    return name, weight, angle.value
 
 
-def _page_blocks(page, height: float) -> tuple[TextBlock, ...]:
-    lines = _line_spans(page.get_textpage(), height)
+def _objects(page, text_page) -> tuple[Span, ...]:
+    height = page.get_size()[1]
     out = []
-    for chars in lines:
-        spans = _words(chars)
-        if not spans:
+    for obj in page.get_objects():
+        if obj.type != pdfium_raw.FPDF_PAGEOBJ_TEXT:
             continue
-        bbox = BBox(min(span.bbox.x0 for span in spans), min(span.bbox.y0 for span in spans),
-                    max(span.bbox.x1 for span in spans), max(span.bbox.y1 for span in spans))
-        out.append(TextBlock(bbox, (TextLine(bbox, spans),)))
+        text = _object_text(obj, text_page)
+        if not text:
+            continue
+        font, weight, angle = _object_font(obj)
+        span = _span(text, obj.get_bounds(), height, font, weight, angle)
+        if span is not None:
+            out.append(span)
     return tuple(out)
 
 
@@ -108,7 +79,8 @@ def extract(pdf_path, doc_id: str | None = None) -> RawExtraction:
     pages = []
     for i, page in enumerate(pdf):
         width, height = page.get_size()
-        blocks = _page_blocks(page, height)
+        text_page = page.get_textpage()
+        blocks = build(_objects(page, text_page), width, height)
         spans = tuple(span for block in blocks for span in block.spans)
         pages.append(PageExtract(i, width, height, spans, not spans, "", blocks))
     did = doc_id or Path(path).stem
