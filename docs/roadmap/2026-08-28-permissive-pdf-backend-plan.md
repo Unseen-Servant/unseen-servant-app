@@ -47,7 +47,8 @@ Two permissive experiments have been run. Neither is a replacement candidate:
 
 | backend | content | order | table cells | gate regressions | verdict |
 |---|---:|---:|---:|---:|---|
-| PDFium via pypdfium2 | 0.972 | 0.958 | 0.549 | 18 | no-go |
+| PDFium via pypdfium2 (thin adapter) | 0.972 | 0.958 | 0.549 | 18 | superseded |
+| **PDFium + `ingest/blocks.py`** | **0.994** | **0.978** | **0.982** | **3** | **near-miss, see §9** |
 | pdfplumber/pdfminer + PDFium rendering | 0.951 | 0.811 | 0.914 | 10 | no-go |
 
 The PDFium-only adapter required fragile character-to-word reconstruction.
@@ -356,6 +357,70 @@ it.
 | The block builder passes its property tests but the golden gate still regresses | read the cluster: regressions concentrated on `two_column` pages mean the block abstraction itself is wrong, so open a line-based W1 contract as its own design with a retrieval regression pass; regressions scattered across `table` pages are Stage C linearization work, not Stage A |
 | Removing PyMuPDF deletes the oracle the gates depend on | freeze the W1 golden and corpus-QA outputs as committed artifacts before the dependency is dropped (P0.5) |
 | A permissive adapter has good text but no document metadata | supply title, TOC, and page labels from the same engine where possible, or a named standalone reader per field; empty `toc`/`page_labels` is a gate failure, not an acceptable default |
+
+## 9. Verdict — 2026-08-29
+
+**NO-GO by the letter of section 6**, on three per-page regressions. The
+candidate is far closer than any previous one, and the failures are specific
+rather than systemic.
+
+### What was built
+
+PDFium supplies one `Span` per page text object; `sidecar-v3/ingest/blocks.py`
+owns all aggregation — runs into words and cells, cells into rows, rows into
+column-bounded blocks. PyMuPDF is no longer imported by any aggregation or
+candidate-backend module (`ingest/raw.py` holds the shared types).
+
+### Measured results
+
+| gate row | result | reference | verdict |
+|---|---|---|---|
+| licensing | pypdfium2 BSD-3-Clause / Apache-2.0, inventory complete | allowlisted | **PASS** |
+| golden content | 0.994 | 1.000 | **FAIL** — g02 1.000 → 0.750 |
+| golden order | 0.978 | 1.000 | **FAIL** — g17 1.000 → 0.833, g35 1.000 → 0.905 |
+| golden tables | 0.982 | 0.982 | **PASS** — no per-page table_cells regression |
+| corpus pages | 0 empty of 1,440 | 0 | **PASS** |
+| corpus integrity | block recall 0.998, label integrity 0.997 | 1.000 / 1.000 | **FAIL** — marginal |
+| metadata | exact TOC and page-label parity | parity | **PASS** |
+| performance | 208 pages in 3.55s; a 400-page book ≈ 7s | under 15 min | **PASS** |
+| manual review | not performed — the side-by-side inspector needs a browser | no corruption | **NOT DONE** |
+| packaging | deferred to P4 cutover | smoke path works | **DEFERRED** |
+
+### The three surviving regressions
+
+Independent of one another — different documents, layout regimes, and metrics:
+
+- **g02** `osric_2e` p.40, content_recall 0.750. The thief-skills table, whose
+  source kerning splits words mid-glyph.
+- **g17** `black_hack_1e` p.3, reading_order 0.833. A plain prose page.
+- **g35** `osric_2e` p.163, reading_order 0.905. A numbered room list interleaved
+  with prose.
+
+None share a cause, so no single further fix closes the gate.
+
+### The finding that deserves the most weight
+
+Corpus-wide `block_integrity` is **0.660** — 3,506 of 10,319 blocks are
+segmented differently from PyMuPDF — and `adjacency` is 0.885, meaning about
+11% of neighbouring block pairs are ordered differently. Some of that is by
+construction: this design deliberately emits table rows as blocks and groups
+prose into paragraphs, which is not how MuPDF segments. But a third of blocks
+differing is a real structural difference, it is invisible to the extraction
+gate, and chunking and retrieval consume exactly this structure. Any decision to
+adopt should measure retrieval, not just extraction.
+
+### What was corrected along the way
+
+Two defects invalidated the earlier evidence and are fixed:
+
+1. The recorded PDFium `reading_order` 0.204 was a y-axis convention bug in the
+   adapter, not an engine limit. PDFium measures y up from the page bottom;
+   `BBox` measures it down from the top. Corrected, the same code scores 0.958.
+2. `evals/engines/v3.py` passed `rasterizer=None` for the default backend,
+   overriding `layout()`'s default, so **every** v3 evaluation run raised
+   `TypeError` from commit b7c295d onward. The W1 reference in section 2 had
+   therefore never been committed; it is now frozen at
+   `evals/baselines/2026-08-29-v3-w1-reference.json`.
 
 ## 8. Definition Of Done
 
