@@ -943,7 +943,7 @@ git commit -m "feat(v3/ingest): group prose rows into multi-line blocks"
   (pure — converts one text object's raw values into a Span, or None if the
   object carries nothing renderable) and `_objects(page, text_page) -> tuple[Span, ...]`
   (walks PDFium). `extract(pdf_path, doc_id=None) -> RawExtraction` gains real
-  blocks. Task 10 gates it.
+  blocks. Task 11 gates it.
 
 The split is deliberate: `_span` holds all the convention logic and is unit
 testable with plain values, while `_objects` needs real PDFium handles and is
@@ -1264,7 +1264,142 @@ git commit -m "fix(v3/ingest): read aligned bands row-major so table rows stay c
 
 ---
 
-### Task 9: Document metadata — title, TOC, printed page labels
+### Task 9: Emit table rows as single blocks, matching the reference shape
+
+Task 8 confirmed `build()` orders table cells row-major, yet the gate barely
+moved (`table_cells` 0.408 → 0.439) because `layout.py`'s `_xy_cut` partitions
+blocks at a fixed page midpoint and tears a wide table row apart again. It also
+cost two real two-column pages (g34/g35, `reading_order` 1.000 → 0.619), because
+the baseline-alignment discriminator misfires on books that share a baseline grid
+across columns.
+
+**The reference shows the shape to aim for.** On `black_hack_1e` p.4, PyMuPDF
+emits one block per table *row*, spanning the full table width, with each cell a
+line inside it:
+
+```
+x0=40.0 x1=342.4  'Gambeson | 50 | - | 2 Armor Points'
+x0=40.0 x1=342.3  'Leather | 100 | - | 4 Armor Points'
+```
+
+An atomic row survives `_xy_cut` and makes the whole-row golden expectations
+matchable. Our model is inverted — blocks as paragraphs of lines, where the
+reference uses blocks as rows of cells.
+
+**The discriminator, measured rather than assumed.** Gap width does not separate
+tables from page columns; the distributions overlap (table 2.99-24.52 em, prose
+2.65-36.22 em). Row *fill ratio* does — the fraction of a row's horizontal extent
+actually covered by text:
+
+| page kind | median fill | p25 |
+|---|---:|---:|
+| table (black_hack p.4, srd_5_2_1 p.34, cairn_1e p.11) | 0.24 / 0.48 / 0.27 | 0.18 / 0.39 / 0.22 |
+| two-column prose (osric p.156, p.163, srd_5_1 p.103) | 0.95 / 0.95 / 0.87 | 0.95 / 0.93 / 0.82 |
+
+Decide per **run** of consecutive multi-cell rows, not per row: a paragraph's
+short final line has a low fill on its own, and the run median absorbs it.
+
+**Files:**
+- Modify: `sidecar-v3/ingest/blocks.py`
+- Test: `sidecar-v3/tests/test_blocks.py`
+
+**Interfaces:**
+- Consumes: `bands`, `rows`, `cells`, `_blocks_in_band`, `_bbox` from Tasks 4-6.
+- Produces: no signature change on `build()`. Removes the band-major global
+  ordering and the baseline-alignment helper added in Task 8.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `sidecar-v3/tests/test_blocks.py`:
+
+```python
+def test_a_table_row_is_one_block_with_a_line_per_cell():
+    """The reference shape: an atomic row survives downstream reordering, which
+    is what makes whole-row expectations matchable."""
+    blocks = build(_table_page(), PAGE_W, PAGE_H)
+    row0 = [b for b in blocks if "item0" in b.text][0]
+    assert [line.text for line in row0.lines] == ["item0", "cost0"]
+    assert row0.text.replace("\n", " ") == "item0 cost0"
+
+
+def test_two_column_prose_rows_never_share_a_block():
+    """Prose rows fill their column, so they must stay per-column blocks even
+    though they sit at the same height."""
+    for block in build(_two_column_prose(), PAGE_W, PAGE_H):
+        assert not ("left" in block.text and "right" in block.text), block.text
+```
+
+Task 8 added `_table_page()` and `_two_column_prose()` helpers — reuse them. If
+Task 8's `_two_column_prose` offsets its right column's baselines, remove that
+offset so both columns share baselines: the fill-ratio discriminator must handle
+the shared-baseline-grid case that broke g34/g35.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests/test_blocks.py -q`
+Expected: `test_a_table_row_is_one_block_with_a_line_per_cell` FAILS — each cell
+is its own block today.
+
+- [ ] **Step 3: Implement**
+
+Replace `TUNING["row_align_frac"]` from Task 8 with `"row_fill_table": 0.70` —
+the fill ratio below which a run of multi-cell rows is a table. 0.70 sits
+between the tables' p75 (0.55) and the prose pages' p25 (0.82).
+
+Delete Task 8's baseline-alignment helper and its band-run partitioning. In
+`build()`:
+
+1. Compute `rows()` over the whole page.
+2. Partition into maximal runs of consecutive rows that segment into two or more
+   cells.
+3. For each run, take the median fill ratio — for a row, the sum of its cells'
+   widths over the distance from its first cell's left edge to its last cell's
+   right edge.
+4. A run whose median fill is below `row_fill_table` is a table: emit one
+   `TextBlock` per row, its lines being that row's cells left to right, its bbox
+   the union.
+5. Every other row belongs to a column: assign it to a band via the existing
+   `bands()`/`_band_of()`, and emit `_blocks_in_band` per band as before.
+
+Emit blocks sorted by `(bbox.y0, bbox.x0)`. Do **not** re-impose band-major
+global ordering — `layout.py`'s `_xy_cut` owns reading order, and it is the same
+code path that gives the PyMuPDF reference 0.982.
+
+Conservation and no-straddle must still hold. Note that no-straddle now means no
+block crosses a *page-column* boundary; a table row block legitimately spans the
+table's own columns.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests -q`
+Expected: PASS — every test.
+
+- [ ] **Step 5: Re-run the diagnostic gate**
+
+```bash
+uv run --frozen --project sidecar-v3 python -m evals.run_eval \
+  --engine v3 --suite extraction --pdf-backend pdfium --no-write \
+  --gate evals/baselines/2026-08-29-v3-w1-reference.json
+```
+
+Numbers to beat: `table_cells` 0.439, `reading_order` 0.937, 18 regressions.
+Reference is 0.982 / 1.000 / 0. Report what you get verbatim. Do **not** tune any
+constant to chase it — `row_fill_table` was set from measured distributions and
+stays at 0.70 for this run.
+
+Also confirm g34 and g35 `reading_order` are back to 1.000; they are the
+regression Task 8 introduced.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add sidecar-v3/ingest/blocks.py sidecar-v3/tests/test_blocks.py
+git commit -m "fix(v3/ingest): a table row is one block, matching the reference shape"
+```
+
+---
+
+### Task 10: Document metadata — title, TOC, printed page labels
 
 Both dead adapters returned an empty `toc` and empty `page_labels`; the v3
 storage schema persists both. Spec section 6 makes metadata a gate row.
@@ -1421,14 +1556,14 @@ git commit -m "feat(v3/ingest): title, outline, and printed page labels from PDF
 
 ---
 
-### Task 10: Gate the candidate and record the verdict
+### Task 11: Gate the candidate and record the verdict
 
 **Files:**
 - Modify: `docs/roadmap/2026-08-28-permissive-pdf-backend-plan.md`
 - Create: `evals/baselines/` outputs (written by the runs)
 
 **Interfaces:**
-- Consumes: the adapter from Tasks 7, 8 and 9.
+- Consumes: the adapter from Tasks 7-10.
 - Produces: a Go/No-Go verdict recorded in the spec.
 
 - [ ] **Step 1: Run the 40-page golden gate**
@@ -1498,11 +1633,11 @@ git commit -m "eval(v3/ingest): PDFium block-builder verdict against the W1 refe
 
 - **P4 cutover.** Making PDFium the default, removing `pymupdf` from
   `sidecar-v3/pyproject.toml`, deleting the losing adapters, bumping the
-  pipeline version, and reindexing all happen only after Task 10 returns a GO.
+  pipeline version, and reindexing all happen only after Task 11 returns a GO.
 - **The v2 sidecar.** `pymupdf4llm` keeps `check-third-party.py --release` red
   regardless of this plan's outcome. Scope is v3 only, by decision.
 - **The packaging gate.** Spec section 6's macOS/Windows release smoke path
   needs a real release build, so it is verified at P4 cutover, not here.
-- **A line-based W1 contract.** If Task 10 fails with regressions concentrated on
+- **A line-based W1 contract.** If Task 11 fails with regressions concentrated on
   `two_column` pages, the block abstraction is wrong and that contingency opens
   as its own design with a retrieval regression pass — not as a patch here.
