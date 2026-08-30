@@ -409,6 +409,45 @@ differing is a real structural difference, it is invisible to the extraction
 gate, and chunking and retrieval consume exactly this structure. Any decision to
 adopt should measure retrieval, not just extraction.
 
+### Residual risk not measured by the gate: `Span.size` is ink height, not declared type size
+
+`pdfium_extract._span` sets `Span.size` from the text object's own bounding
+box (`bbox.y1 - bbox.y0` — glyph ink height); PyMuPDF sets it from the PDF's
+declared font size. The two correlate but are not the same quantity: ink
+height is roughly 0.7x declared size, and — unlike declared size, which takes
+one of a handful of values per document — it varies continuously per run,
+since kerning, ascenders/descenders, and per-glyph rendering all move the ink
+bbox a little.
+
+Measured: `black_hack_1e` p.4 yields 18 distinct block sizes under PDFium
+versus 3 under PyMuPDF; `osric_2e` p.40 gives 13 versus 4.
+
+This matters because `sidecar-v3/ingest/structure.py`'s `build_sections`
+takes `body_size` as the mode of prose sizes and derives heading levels from
+the sorted set of distinct heading sizes (`_HEADING_FONT_RATIO = 1.15`).
+Continuous ink-heights push every heading toward its own distinct level, and
+turn the `>= body * 1.15` comparison into noise rather than a clean signal —
+because two runs set at the same declared type size can still land on either
+side of that ratio purely from ink-height jitter. Retrieval consumes sections
+as chunk parents, so a degraded section tree degrades retrieval quality one
+step downstream of anything the extraction gate checks.
+
+**No gate row measures this.** The extraction gate scores content, reading
+order, and table cells — never section-tree shape — so this risk is currently
+invisible to every number in the table above.
+
+To be clear about what this is *not*: the underlying text content is
+demonstrably correct (content_recall 0.994, table_cells 0.982). This is a
+risk to the section tree PDFium-backed documents would build downstream, not
+to extraction itself, and it is unmeasured rather than confirmed to cause a
+retrieval regression.
+
+Corollary: `blocks.em()` is the median run's ink height, roughly 0.7x the
+declared type size, so every `TUNING` constant in `sidecar-v3/ingest/blocks.py`
+is about 1.4x tighter in practice than the module's former docstring wording
+("multiples of the row's em, its type size") implied. That wording has been
+corrected in-code to describe what is actually measured.
+
 ### What was corrected along the way
 
 Two defects invalidated the earlier evidence and are fixed:

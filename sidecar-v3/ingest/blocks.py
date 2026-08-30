@@ -21,8 +21,13 @@ from typing import Sequence
 from domain.models import BBox
 from ingest.raw import Span, TextBlock, TextLine, norm_ws
 
-# Tunable constants, expressed as multiples of the row's em (its type size) so
-# they scale with the page instead of assuming one. Per the plan's
+# Tunable constants, expressed as multiples of the row's em so they scale with
+# the page instead of assuming one. `em_` is the median run's ink height
+# (bbox.y1 - bbox.y0), not the PDF's declared type size — PDFium reports the
+# former, not the latter. Ink height runs roughly 0.7x declared size, so every
+# constant below is about 1.4x tighter than a "multiples of type size" reading
+# would suggest. See plan §9's residual-risk note for the measured spread this
+# produces in structure.py's heading-size clustering. Per the plan's
 # anti-overfitting rule these may be tuned ONLY against the ten section 4.3
 # fixture pages; the 40-page golden set is the gate, never the tuning set.
 TUNING = {
@@ -41,7 +46,13 @@ TUNING = {
 
 
 def em(spans: Sequence[Span]) -> float:
-    """The type size, taken as the median run height."""
+    """The row's em, taken as the median run's ink height (bbox.y1 - bbox.y0).
+
+    This is glyph ink height, not the PDF's declared type size — PDFium does
+    not expose the latter. The two correlate but are not equal (ink height is
+    roughly 0.7x declared size) and, unlike declared size, ink height varies
+    continuously per run rather than clustering into a handful of type sizes.
+    See plan §9's residual-risk note."""
     return statistics.median(s.bbox.y1 - s.bbox.y0 for s in spans)
 
 
@@ -145,12 +156,12 @@ def bands(spans: Sequence[Span], width: float, em_: float) -> list[tuple[float, 
         if x <= last and eligible[x]:
             run += 1
             continue
-        if run >= min_gutter and start < x - run:
+        if run >= min_gutter:
             out.append((float(start), float(x - run)))
             start = x
         run = 0
     out.append((float(start), float(last + 1)))
-    return out or [(float(first), float(last + 1))]
+    return out
 
 
 def _band_of(span: Span, found: list[tuple[float, float]]) -> int:
@@ -160,6 +171,25 @@ def _band_of(span: Span, found: list[tuple[float, float]]) -> int:
             return i
     return min(range(len(found)),
                key=lambda i: min(abs(centre - found[i][0]), abs(centre - found[i][1])))
+
+
+def _straddles_gutter(bbox: BBox, found: list[tuple[float, float]]) -> bool:
+    """True when bbox's centre falls inside no band yet its extent truly
+    spans a real gutter between two adjacent bands — not merely a span near a
+    page edge with nowhere else to land.
+
+    This is the running-header case: a header printed as one wide run whose
+    centre lands in the gutter itself. _band_of's nearest-edge fallback would
+    fold such a run into whichever column happens to be closest, producing a
+    block that spans the very boundary bands() just drew. A row like this
+    must be pulled out as its own block instead (see build()), the same way
+    a table row is pulled out before column assignment.
+    """
+    centre = (bbox.x0 + bbox.x1) / 2
+    if any(x0 <= centre <= x1 for x0, x1 in found):
+        return False
+    return any(bbox.x0 < x1 and bbox.x1 > nxt0
+               for (_, x1), (nxt0, _) in zip(found, found[1:]))
 
 
 def _bbox(spans: Sequence[Span]) -> BBox:
@@ -253,7 +283,15 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
     other row is band-assigned and grouped into paragraphs as before — a
     table row still interrupts that grouping at its own height (see
     _blocks_in_band's `breaks`), even though it never reaches a band's span
-    list.
+    list. A row that straddles a real gutter (see `_straddles_gutter`) is
+    pulled out the same way, so it becomes its own block instead of folding
+    into whichever column's paragraph flow is nearest.
+
+    Emitted order is whatever the extraction above produces (table rows,
+    then gutter rows, then each band's paragraphs) — not sorted into a single
+    top-to-bottom sequence, because the only consumer of a page's blocks is
+    layout.py's `_xy_cut`, which re-derives reading order from geometry
+    regardless of input order; sorting here would be redundant work.
     """
     if not spans:
         return ()
@@ -275,7 +313,7 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
     table_rows = {i for run in runs if _table_run(run, row_cells) for i in run}
 
     out: list[TextBlock] = []
-    column_spans: list[Span] = []
+    column_rows: list[int] = []
     breaks: list[tuple[float, float]] = []
     for i, row in enumerate(all_rows):
         if i in table_rows:
@@ -284,13 +322,25 @@ def build(spans: Sequence[Span], width: float, height: float) -> tuple[TextBlock
             out.append(block)
             breaks.append((block.bbox.y0, block.bbox.y1))
         else:
-            column_spans.extend(row)
+            column_rows.append(i)
 
-    if column_spans:
-        found = bands(column_spans, width, em_)
-        for index in range(len(found)):
-            band_rows = rows([s for s in column_spans if _band_of(s, found) == index], em_)
-            out.extend(_blocks_in_band(band_rows, em_, breaks))
+    if column_rows:
+        found = bands([s for i in column_rows for s in all_rows[i]], width, em_)
+        # A row that straddles a real gutter (a running header printed as one
+        # wide run) is pulled out as its own block before band assignment,
+        # the same way a table row is — otherwise _band_of's nearest-edge
+        # fallback would fold it into whichever column is closest.
+        gutter_rows = {i for i in column_rows
+                       if any(_straddles_gutter(_bbox(cell), found) for cell in row_cells[i])}
+        for i in gutter_rows:
+            lines = tuple(TextLine(_bbox(cell), cell) for cell in row_cells[i])
+            block = TextBlock(_bbox(all_rows[i]), lines)
+            out.append(block)
+            breaks.append((block.bbox.y0, block.bbox.y1))
+        column_spans = [s for i in column_rows if i not in gutter_rows for s in all_rows[i]]
+        if column_spans:
+            for index in range(len(found)):
+                band_rows = rows([s for s in column_spans if _band_of(s, found) == index], em_)
+                out.extend(_blocks_in_band(band_rows, em_, breaks))
 
-    out.sort(key=lambda b: (b.bbox.y0, b.bbox.x0))
     return tuple(out)

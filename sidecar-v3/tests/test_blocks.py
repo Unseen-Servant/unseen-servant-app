@@ -42,9 +42,12 @@ def test_abutting_runs_keep_a_space_the_pdf_supplied():
     assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("AC 17",)]
 
 
-def test_a_row_spanning_object_is_never_split():
-    """Objects are atomic. A wide object is one cell, not several — splitting on
-    internal gaps is the failure mode this design exists to remove."""
+def test_a_wide_single_span_row_still_returns_as_one_cell():
+    """cells() only ever measures the gap BETWEEN spans in a row; a row of one
+    span has nothing to compare against, so this is a structural guarantee of
+    cells()'s signature (Sequence[Span] -> it groups spans, never subdivides
+    one) rather than something a fixture can make fail. Kept as a smoke test:
+    the wide object comes back whole, not silently dropped or truncated."""
     row = [_obj("A B", 0, width=200.0)]
     assert [tuple(w.text for w in cell) for cell in cells(row, EM)] == [("A B",)]
 
@@ -76,7 +79,13 @@ def test_bands_find_the_gutter_between_two_columns():
 
 
 def test_a_single_column_page_is_one_band():
-    assert len(bands([_obj("ABC", 20.0)], PAGE_W, EM)) == 1
+    """Many rows, no gap anywhere — genuinely single-column content. A
+    one-span page (the old fixture) has exactly one row, and bands() returns
+    early on `all(eligible)` for any one-row page regardless of gutter_cover,
+    so it never reached the run-detection logic this test means to cover."""
+    spans = [_obj(f"full width line {i}", 20.0, y=y, width=340.0)
+             for i, y in enumerate((0.0, 14.0, 28.0, 42.0))]
+    assert len(bands(spans, PAGE_W, EM)) == 1
 
 
 def test_build_reads_the_left_column_before_the_right():
@@ -103,11 +112,30 @@ def test_build_conserves_every_run_across_a_table():
 
 
 def test_no_block_straddles_a_band_boundary():
+    """A per-x0 check alone can't catch a straddling block: the running-header
+    bug below produces a merged block whose x0 still reads as "starts left"
+    even though it reaches all the way into the right column. Assert the
+    band-crossing directly instead — no ordinary paragraph block may reach
+    past the boundary on both sides — and use the g34/g35 running-header
+    fixture, which used to fold the header into the left column's flow."""
     found = bands(_two_columns(), PAGE_W, EM)
     boundary = (found[0][1] + found[1][0]) / 2
     for block in build(_two_columns(), PAGE_W, PAGE_H):
         starts_left = block.bbox.x0 < boundary
         assert all((s.bbox.x0 < boundary) == starts_left for s in block.spans)
+
+    spans = [_obj("RUNNING HEADER", 20.0, y=-20.0, width=340.0)]
+    for i, y in enumerate((0.0, 14.0, 28.0, 42.0, 56.0, 70.0)):
+        spans.append(_obj(f"left{i}", 20.0, y=y, width=120.0))
+        spans.append(_obj(f"right{i}", 240.0, y=y, width=120.0))
+    band0, band1 = bands(spans, PAGE_W, EM)
+    blocks = build(spans, PAGE_W, PAGE_H)
+    header = [b for b in blocks if "RUNNING HEADER" in b.text]
+    assert len(header) == 1 and header[0].text == "RUNNING HEADER", blocks
+    for block in blocks:
+        if block is header[0]:
+            continue  # deliberately full-width: a running header, not a straddle
+        assert block.bbox.x1 <= band0[1] or block.bbox.x0 >= band1[0], block.bbox
 
 
 def _prose(text: str, y: float) -> Span:
@@ -243,7 +271,17 @@ def test_a_running_header_does_not_erase_the_gutter():
 
 
 def test_a_gutter_crossed_by_most_rows_is_not_a_gutter():
-    """The tolerance must not be so loose that full-width prose splits."""
-    spans = [_obj(f"full width line {i}", 20.0, y=y, width=340.0)
-             for i, y in enumerate((0.0, 14.0, 28.0, 42.0))]
+    """The tolerance must not be so loose that full-width prose splits: a
+    candidate gutter x-range that most rows actually cross must stay
+    non-eligible even when a minority of rows do have a real gap there. The
+    old fixture's rows were all identical and full-width — with no row ever
+    having a gap anywhere, the result held for any gutter_cover in (0, 1]
+    and exercised no tolerance boundary at all. Here 8 of 10 rows are
+    full-width and 2 are genuinely two-column; at gutter_cover's default of
+    0.90 the 8-row majority keeps the middle non-eligible (one band), but at
+    a looser cover (e.g. 0.2) the same fixture would split into two."""
+    spans = [_obj(f"full width line {i}", 20.0, y=i * 14.0, width=340.0) for i in range(8)]
+    for i, y in enumerate((112.0, 126.0)):
+        spans.append(_obj(f"L{i}", 20.0, y=y, width=120.0))
+        spans.append(_obj(f"R{i}", 240.0, y=y, width=120.0))
     assert len(bands(spans, PAGE_W, EM)) == 1
