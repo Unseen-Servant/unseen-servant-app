@@ -247,6 +247,27 @@ async def list_collections() -> str:
 
 
 @mcp.tool()
+def _page_span(result: dict) -> str:
+    """Cite the page a reader can actually turn to.
+
+    TTRPG PDFs carry covers, front matter and ads, so a book's printed page
+    numbers commonly sit 20-40 short of the PDF's own index. When the printed
+    label is known it leads, and the physical page follows for PDF viewers.
+    Returns "" when the result carries no usable page span.
+    """
+    start, end = result.get("page_start"), result.get("page_end")
+    if not (start and end):
+        return ""
+    physical = f"p.{start}" if start == end else f"pp.{start}\u2013{end}"
+    label_start = result.get("page_label_start") or ""
+    label_end = result.get("page_label_end") or ""
+    if not (label_start and label_end):
+        return physical
+    printed = (f"p.{label_start}" if label_start == label_end
+               else f"pp.{label_start}\u2013{label_end}")
+    return f"{printed} (PDF {physical})"
+
+
 async def search_library(
     query: str,
     n_results: int = 15,
@@ -333,13 +354,9 @@ async def search_library(
         system_tag = r.get('game_system', 'unknown')
         lines.append(f"Source: {r['filename']} [{system_tag}]")
         heading = _strip_bold(r.get("section_heading") or "") or "(no section)"
-        page_start = r.get("page_start")
-        page_end = r.get("page_end")
-        if page_start and page_end:
-            page_span = f"p.{page_start}" if page_start == page_end else f"pp.{page_start}–{page_end}"
-            lines.append(f"Section: {heading} ({page_span})")
-        else:
-            lines.append(f"Section: {heading}")
+        page_span = _page_span(r)
+        lines.append(f"Section: {heading} ({page_span})" if page_span
+                     else f"Section: {heading}")
         lines.append(r["text"])
         lines.append("")
 

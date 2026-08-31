@@ -488,6 +488,24 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
     ]
 
 
+def _page_labels(pdf_path: Path) -> dict[int, str]:
+    """Map 1-based physical page numbers to the label printed on the page.
+
+    TTRPG PDFs carry covers, front matter and ads, so physical page 312 is
+    routinely printed as 276 — and a page number a GM cannot find at the table
+    is not a useful citation. Entries whose label already equals the physical
+    number carry no information and are omitted; consumers fall back to
+    page_start.
+    """
+    labels: dict[int, str] = {}
+    with pymupdf.open(pdf_path) as doc:
+        for i in range(doc.page_count):
+            label = (doc.load_page(i).get_label() or "").strip()
+            if label and label != str(i + 1):
+                labels[i + 1] = label
+    return labels
+
+
 def _extract_pdf_text(pdf_path: Path) -> str:
     """Flat-string view of the PDF — used by game-system detection."""
     return "\n\n".join(p.markdown for p in _extract_pdf_pages(pdf_path))
@@ -1028,7 +1046,9 @@ def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
     return f"{path_hash}_{pdf_path.stem}"
 
 
-def _embed_unit_metadata(pdf_path: Path, eu: EmbedUnit, game_system: str) -> dict:
+def _embed_unit_metadata(pdf_path: Path, eu: EmbedUnit, game_system: str,
+                         page_labels: dict[int, str] | None = None) -> dict:
+    labels = page_labels or {}
     return {
         "source": str(pdf_path),
         "filename": pdf_path.name,
@@ -1038,6 +1058,9 @@ def _embed_unit_metadata(pdf_path: Path, eu: EmbedUnit, game_system: str) -> dic
         "section_heading": eu.section_heading or "",
         "page_start": eu.page_start,
         "page_end": eu.page_end,
+        # Printed labels, "" when the PDF numbers its pages the obvious way.
+        "page_label_start": labels.get(eu.page_start, ""),
+        "page_label_end": labels.get(eu.page_end, ""),
         "parent_id": eu.parent_id,
         "chunker_version": CHUNKER_VERSION,
         "embedding_model": EMBEDDING_MODEL,
@@ -1124,12 +1147,14 @@ def _upsert_batch(
     pdf_path: Path,
     game_system: str,
     prefix: str,
+    page_labels: dict[int, str] | None = None,
 ) -> None:
     """Upsert a pre-embedded batch with stored text and metadata."""
     collection.upsert(
         embeddings=embeddings,
         documents=[eu.text for eu in batch],
-        metadatas=[_embed_unit_metadata(pdf_path, eu, game_system) for eu in batch],
+        metadatas=[_embed_unit_metadata(pdf_path, eu, game_system, page_labels)
+                   for eu in batch],
         ids=[f"{prefix}_{eu.ordinal}" for eu in batch],
     )
 
@@ -1155,6 +1180,7 @@ def _embed_and_upsert_units(
     prefix: str,
     batch_size: int = EMBED_BATCH_SIZE,
     concurrency: int = EMBED_CONCURRENCY,
+    page_labels: dict[int, str] | None = None,
 ):
     """Embed batches concurrently, upsert serially in submission order.
 
@@ -1178,7 +1204,8 @@ def _embed_and_upsert_units(
         try:
             for batch, fut in zip(batches, futures):
                 embeddings = fut.result()
-                _upsert_batch(collection, batch, embeddings, pdf_path, game_system, prefix)
+                _upsert_batch(collection, batch, embeddings, pdf_path, game_system,
+                              prefix, page_labels)
                 yield len(batch)
         except EmbedBatchError:
             raise
@@ -1216,6 +1243,7 @@ def _atomic_index_pdf(
     collection,
     data_dir: Path | None,
     batch_size: int = EMBED_BATCH_SIZE,
+    page_labels: dict[int, str] | None = None,
 ):
     """Generator: stage new chunks under a fresh prefix, then swap atomically.
 
@@ -1234,7 +1262,7 @@ def _atomic_index_pdf(
     try:
         for n in _embed_and_upsert_units(
             collection, embed_units, pdf_path, game_system, new_prefix,
-            batch_size=batch_size,
+            batch_size=batch_size, page_labels=page_labels,
         ):
             yield n
     except EmbedBatchError:
@@ -1276,7 +1304,7 @@ def _index_chunks(
     embed_units, parents = build_granularity(chunks)
     return sum(_atomic_index_pdf(
         pdf_path, game_system, embed_units, parents, collection, data_dir,
-        batch_size=batch_size,
+        batch_size=batch_size, page_labels=_page_labels(pdf_path),
     ))
 
 
@@ -2184,6 +2212,11 @@ def _search_sync(
                 "section_heading": section_heading,
                 "page_start": parent.page_start if parent else metadata.get("page_start", 0),
                 "page_end": parent.page_end if parent else metadata.get("page_end", 0),
+                # The number printed on the paper, "" when it matches the
+                # physical page. A citation a GM cannot find at the table is
+                # not a citation.
+                "page_label_start": metadata.get("page_label_start", ""),
+                "page_label_end": metadata.get("page_label_end", ""),
                 "game_system": metadata.get("game_system") or "unknown",
                 "relevance": relevance,
                 "tier": _tier_for(relevance, p["reranked"]),
@@ -2588,7 +2621,7 @@ def create_app(
             try:
                 for n in _atomic_index_pdf(
                     pdf_path, detected_system, embed_units, parents,
-                    collection, data_dir,
+                    collection, data_dir, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
@@ -2643,7 +2676,7 @@ def create_app(
             try:
                 for n in _atomic_index_pdf(
                     pdf_path, detected_system, embed_units, parents,
-                    collection, data_dir,
+                    collection, data_dir, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
