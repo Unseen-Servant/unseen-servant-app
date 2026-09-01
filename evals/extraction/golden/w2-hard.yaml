@@ -1,0 +1,163 @@
+# Golden page specs — round two: the pages extraction actually fails on.
+#
+# phase0.yaml covers all 7 systems and is saturated (v3 W1 scores 1.000 /
+# 1.000 / 0.982), so it can only detect regressions on layouts it already
+# holds. These 14 pages were selected from the two committed corpus-QA
+# baselines by layout pathology — broken native blocks, displaced adjacency —
+# excluding the 40 already specced, capped at 4 per book so the set does not
+# become an OSRIC regression test.
+#
+# Same contract as phase0.yaml: every phrase is verified by verify_golden.py
+# in BOTH the reference and the raw PDF page. Fragments in `order` span the
+# left column and then the right, so a column interleave registers as an
+# inversion — the failure mode that shipped three times as a GO.
+#
+# Note on phrasing: several of these PDFs break words at ligatures ("fi nd",
+# "ﬂ ame") or soft-hyphenate across lines ("arche­ type"). normalize() splits
+# on every non-alphanumeric, so those words can never match — phrases here
+# avoid them deliberately.
+#
+# Measured 2026-08-31 against v2, v3/pymupdf and v3/pdfium. Four pages separate
+# the configs today — h03 (pdfium order 0.667), h04 (v2 content 0.750, cells
+# 0.800), h10 (v2 0.833 / pdfium 0.667), h14 (v2 0.700 / pdfium 0.900). The
+# other ten score 1.000 everywhere: they are tripwires, not separators, and
+# gate.py is per-page, so they cost the gate nothing and fail the moment
+# anything breaks them. Neither corpus-QA block damage nor a multi-column
+# layout statistic predicted which pages would separate — the four winners rank
+# LOW on both. Discrimination was found by authoring and measuring, ~30% yield.
+
+# ── OSRIC (two-column, image-heavy; the worst book on both engines) ───
+- id: h01
+  doc: osric_2e
+  page: 157
+  kind: two_column
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  content: ["trailing map", "standard exploration speed", "negotiated searches", "disarming traps"]
+  order:   ["Many players hate mapping", "quick GM-drawn sketch", "The GM must adjudicate these negotiated searches", "Traps neither avoided nor disarmed"]
+
+- id: h02
+  doc: osric_2e
+  page: 165
+  kind: two_column
+  answer_ref: "osric_2e/osric_chapter3 [Wiki and Other Goodies].html"
+  content: ["Dogs of War", "trip-wire", "orcish", "2 dozen silver"]
+  order:   ["Can we chase them", "We look around the room", "beat a retreat back to the surface", "What are you doing", "something to remember us by"]
+
+# Two stat blocks on one page, the second continuing into the right column —
+# the adjacency failure where a stat line survives intact under the wrong creature.
+- id: h03
+  doc: osric_2e
+  page: 310
+  kind: two_column
+  answer_ref: "osric_2e/osric_chapter5 [Wiki and Other Goodies].html"
+  content: ["rot grubs", "rust monster", "prehensile antennae", "iron spikes"]
+  order:   ["Although rot grubs can be found in animal waste", "Rust monsters are creatures vaguely resembling", "Rust monsters are motivated by animal intelligence"]
+  cells:   ["hit dice 1 hit point", "no encountered 1d2", "move 180 ft", "level xp 3 185 4 per hp"]
+
+- id: h04
+  doc: osric_2e
+  page: 368
+  kind: table
+  answer_ref: "osric_2e/osric_chapter6 [Wiki and Other Goodies].html"
+  content: ["ring of weakness", "remove curse", "ring of the berserker", "shocking grasp"]
+  cells:   ["01 02 flying", "07 08 shocking grasp", "03 04 invisibility", "09 10 spell turning", "11 12 strength 18 99"]
+
+# ── D&D 5E SRD 5.1 (stat blocks; the ability-score row is one table row) ──
+- id: h05
+  doc: srd_5_1
+  page: 266
+  kind: table
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Behir.md"
+  content: ["behir", "lightning breath", "darkvision 90 ft", "draconic"]
+  cells:   ["23 6 16 3 18 4", "skills perception 6 stealth 7", "challenge 11 7 200 xp", "senses darkvision 90 ft passive perception 16"]
+
+- id: h06
+  doc: srd_5_1
+  page: 278
+  kind: table
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Lemure_(Devil).md"
+  content: ["lemure", "armor class 7", "darkvision 120 ft", "understands Infernal"]
+  cells:   ["hit points 13 3d8", "damage immunities fire poison", "condition immunities charmed frightened poisoned", "challenge 0 10 xp"]
+
+- id: h07
+  doc: srd_5_1
+  page: 293
+  kind: prose
+  answer_ref: "dnd_srd_51/10_Monsters/Monsters_Each/Wyrmling_Brass_Dragon_(Metallic).md"
+  content: ["fire breath", "sleep breath", "sleep gas", "fall unconscious"]
+  order:   ["Melee Weapon Attack", "The dragon uses one of the following breath weapons", "The dragon exhales fire", "The dragon exhales sleep gas"]
+
+# ── D&D 5E SRD 5.2.1 (two-column spell pages; the within-column reorder) ──
+- id: h08
+  doc: srd_5_2_1
+  page: 108
+  kind: two_column
+  answer_ref: "dnd_srd_52/docs_compiled/dnd_srd_5.2.1_compiled.md"
+  content: ["animal messenger", "animate dead", "twenty-five words", "morsel of food"]
+  order:   ["Animal Messenger", "A Tiny Beast of your choice", "Animate Dead", "Animate Objects"]
+  cells:   ["casting time action or ritual", "range 30 feet", "duration 24 hours"]
+
+- id: h09
+  doc: srd_5_2_1
+  page: 175
+  kind: two_column
+  answer_ref: "dnd_srd_52/docs_compiled/dnd_srd_5.2.1_compiled.md"
+  content: ["wish", "word of recall", "zone of truth", "25,000 GP"]
+  order:   ["Wish is the mightiest spell a mortal can cast", "Object Creation", "Word of Recall", "Zone of Truth"]
+
+# ── Year Zero Engine (two-column with inline rating tables) ───────────
+- id: h10
+  doc: yze_srd
+  page: 4
+  kind: two_column
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  # The blog SRD numbers the creation steps 10, the PDF seven — the shared
+  # phrase is the unnumbered one.
+  content: ["steps of creation", "character sheet", "key attribute", "empathy"]
+  order:   ["your most important asset", "STEPS OF CREATION", "Your character has four attributes", "you can have a maximum score of 5 in your key attribute"]
+  cells:   ["strength raw muscle power and brawn",
+            "agility body control speed and motor skills",
+            "wits sensory perception intelligence and sanity",
+            "empathy personal charisma and ability to manipulate others"]
+
+- id: h11
+  doc: yze_srd
+  page: 19
+  kind: two_column
+  answer_ref: "year_zero/Year Zero Engine OGL SRD | Frank Mitchell's Blog.html"
+  # The reference has no ammo-dice section; phrases stay on what both carry.
+  content: ["full-auto fire", "overwatch position", "rate of fire", "supply roll"]
+  order:   ["Some weapons are capable of full automatic fire", "you must make a supply roll", "LOSING OVERWATCH", "Using a weapon will greatly improve your effectiveness"]
+  cells:   ["bonus indicates any bonus base dice", "range indicates the maximum range category", "weight indicates how many regular items"]
+
+# ── The Black Hack 1e (spell lists whose level numbers sit in a margin) ──
+- id: h12
+  doc: black_hack_1e
+  page: 14
+  kind: table
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["cure light wounds", "speak with dead", "cure serious wounds", "hold person"]
+  cells:   ["cure light wounds heal 1d8 hp to a nearby target",
+            "hold person paralyse 1d4 nearby targets",
+            "speak with dead ask a nearby corpse 3 questions",
+            "create food water create enough food water for all nearby creatures for a day"]
+
+- id: h13
+  doc: black_hack_1e
+  page: 15
+  kind: table
+  answer_ref: "black_hack/the-black-hack.md"
+  content: ["magic missile", "dimension door", "read language", "levitate"]
+  cells:   ["magic missile a nearby far away or distant target takes 1d4 damage level",
+            "sleep puts 4d6 hd worth of beings to sleep 8hrs",
+            "knock a nearby door or lock is opened",
+            "fireball 1d6 nearby creatures take 1d6 level damage"]
+
+# ── Basic Fantasy RPG (multi-column module list; v2 displaces 9 of 13) ──
+- id: h14
+  doc: bfrpg_4e
+  page: 208
+  kind: two_column
+  answer_ref: "basic_fantasy/Basic-Fantasy-RPG-Rules-r142.odt"
+  content: ["Morgansfort", "Chaotic Caves", "Laughing Dragon", "Blackapple Brugh"]
+  order:   ["Starting Adventures", "BF1 Morgansfort", "JN1 The Chaotic Caves", "DC1 Tales From the Laughing Dragon", "Community"]
