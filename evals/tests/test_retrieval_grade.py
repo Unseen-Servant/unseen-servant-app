@@ -32,3 +32,27 @@ def test_cross_page_answer_respects_source_scope():
 
 def test_declared_pages_support_multiple_ranges():
     assert _declared_pages("4-5|9") == {4, 5, 9}
+
+
+def _from(filename: str, text: str) -> SearchResult:
+    return SearchResult(
+        text=text, filename=filename, source=filename, section_heading="Magic Missile",
+        page_start=1, page_end=1, relevance=1.0, tier="strong", reranked=False,
+    )
+
+
+def test_doc_set_accepts_any_listed_file():
+    query = {"category": "exact_name", "anchors": ["magic missile", "1d4 1"]}
+    response = SearchResponse(results=[
+        _from("OSRIC.pdf", "magic missile 1d4 1"),
+        _from("SRD_CC_v5.2.1.pdf", "magic missile 1d4 1"),
+        _from("SRD_CC_v5.1.pdf", "magic missile 1d4 1"),
+    ], latency_ms=1.0)
+    rels = grade_response(response, query, {"SRD_CC_v5.1.pdf", "SRD_CC_v5.2.1.pdf"})["rels"]
+    assert rels == [False, True, True]
+
+
+def test_doc_string_still_means_exactly_one_file():
+    query = {"category": "exact_name", "anchors": ["magic missile"]}
+    response = SearchResponse(results=[_from("SRD_CC_v5.2.1.pdf", "magic missile")], latency_ms=1.0)
+    assert grade_response(response, query, "SRD_CC_v5.1.pdf")["rels"] == [False]

@@ -128,3 +128,45 @@ def test_run_skips_tagging_when_engine_lacks_the_hook(tmp_path):
     result = run(NoTag(), [_query("q1", "osric_2e")], _corpus(tmp_path, "osric_2e"),
                  SearchOptions(), do_index=True, tags={"osric_2e": ("OSRIC", ["osric"])})
     assert result["per_query"][0]["hit_rank"] is None
+
+
+from evals.engines.base import SearchResult
+from evals.run_eval import query_docs
+
+
+class _TwinEngine:
+    """Returns the 5.2.1 twin at rank 1 and 5.1 at rank 2 for every query."""
+
+    def index(self, _paths):
+        return IndexReport(requested=1, indexed=0, skipped=1)
+
+    def warmup(self, _opts):
+        pass
+
+    def search(self, _query, _opts):
+        def hit(fn):
+            return SearchResult(text="magic missile 1d4 1", filename=fn, source=fn,
+                                section_heading="", page_start=1, page_end=1,
+                                relevance=1.0, tier="strong", reranked=False)
+        return SearchResponse(results=[hit("srd_5_2_1.pdf"), hit("srd_5_1.pdf")], latency_ms=1.0)
+
+
+def test_query_docs_normalises_str_list_and_any():
+    assert query_docs({"doc": "srd_5_1"}) == ["srd_5_1"]
+    assert query_docs({"doc": ["srd_5_1", "srd_5_2_1"]}) == ["srd_5_1", "srd_5_2_1"]
+    assert query_docs({"doc": "any"}) == []
+
+
+def test_cued_query_with_doc_list_accepts_the_twin(tmp_path):
+    corpus = _corpus(tmp_path, "srd_5_1", "srd_5_2_1")
+    q = _query("q043", ["srd_5_1", "srd_5_2_1"])
+    q["anchors"] = ["magic missile", "1d4 1"]
+    result = run(_TwinEngine(), [q], corpus, SearchOptions(), do_index=False)
+    assert result["per_query"][0]["hit_rank"] == 1
+
+
+def test_single_scope_rejects_a_doc_list(tmp_path):
+    corpus = _corpus(tmp_path, "srd_5_1", "srd_5_2_1")
+    q = _query("q001", ["srd_5_1", "srd_5_2_1"], scope="single")
+    with pytest.raises(SystemExit, match="single-scope"):
+        run(_TwinEngine(), [q], corpus, SearchOptions(), do_index=False)

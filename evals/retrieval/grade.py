@@ -59,14 +59,24 @@ def _page_hit(result: SearchResult, pages: str | None) -> bool:
     return False
 
 
-def is_relevant(result: SearchResult, query: dict, doc_filename: str | None) -> bool:
-    if doc_filename is not None and result.filename != doc_filename:
+def _allowed(doc_filename: str | set[str] | None) -> set[str] | None:
+    """None = any file; a str = exactly that file; a set = any of those
+    (edition twins such as SRD 5.1 / 5.2.1 for a 'dnd 5e' cue)."""
+    if doc_filename is None:
+        return None
+    return {doc_filename} if isinstance(doc_filename, str) else set(doc_filename)
+
+
+def is_relevant(result: SearchResult, query: dict, doc_filename: str | set[str] | None) -> bool:
+    allowed = _allowed(doc_filename)
+    if allowed is not None and result.filename not in allowed:
         return False
     return anchors_match(result.grading_text, query["anchors"])
 
 
-def _matched_anchors(result: SearchResult, query: dict, doc_filename: str | None) -> set[int]:
-    if doc_filename is not None and result.filename != doc_filename:
+def _matched_anchors(result: SearchResult, query: dict, doc_filename: str | set[str] | None) -> set[int]:
+    allowed = _allowed(doc_filename)
+    if allowed is not None and result.filename not in allowed:
         return set()
     return matched_anchor_indexes(result.grading_text, query["anchors"])
 
@@ -85,7 +95,7 @@ def dup_sections_at(results: list[SearchResult], k: int = 10) -> int:
     return dups
 
 
-def grade_response(response: SearchResponse, query: dict, doc_filename: str | None) -> dict:
+def grade_response(response: SearchResponse, query: dict, doc_filename: str | set[str] | None) -> dict:
     """Judge one response: the relevance vector plus cost signals."""
     if query.get("category") == "cross_page":
         # A cross-page answer is complete when the retrieved evidence set

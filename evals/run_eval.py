@@ -68,6 +68,15 @@ SYSTEM_TAGS: dict[str, tuple[str, list[str]]] = {
 }
 
 
+def query_docs(q: dict) -> list[str]:
+    """A query's doc ids. ``doc`` is a str, a list (edition twins for one
+    cue — any listed file is the right file), or ``"any"`` (→ [])."""
+    doc = q["doc"]
+    if doc == "any":
+        return []
+    return list(doc) if isinstance(doc, list) else [doc]
+
+
 def build_engine(name: str, data_dir: Path | None, pdf_backend: str = "pymupdf"):
     if name == "v2":
         from evals.engines.v2 import V2Engine, DEFAULT_DATA_DIR
@@ -139,7 +148,7 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         tags: dict[str, tuple[str, list[str]]] | None = None) -> dict:
     doc_file = {d.id: d.pdf_path.name for d in corpus.documents}
     doc_pdf = {d.id: d.pdf_path for d in corpus.documents}
-    needed = sorted({q["doc"] for q in queries if q["doc"] != "any"})
+    needed = sorted({d for q in queries for d in query_docs(q)})
 
     if do_index:
         print(f"indexing {len(needed)} corpus PDFs (idempotent, one at a time)…", flush=True)
@@ -180,13 +189,15 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         #            file (a correct answer from any system counts). `doc` is
         #            kept as the representative for anchor verification only.
         scope = q.get("scope", "cued")
-        doc_fn = None if q["doc"] == "any" else doc_file.get(q["doc"])
+        docs = query_docs(q)
         if scope == "single":
-            q_opts, grade_doc = replace(opts, source_filter=doc_fn), None
+            if len(docs) != 1:
+                raise SystemExit(f"{q['id']}: single-scope queries need exactly one doc (got {docs})")
+            q_opts, grade_doc = replace(opts, source_filter=doc_file[docs[0]]), None
         elif scope == "uncued":
             q_opts, grade_doc = opts, None
-        else:  # cued
-            q_opts, grade_doc = opts, doc_fn
+        else:  # cued: the right file must win; a list means any listed file is right
+            q_opts, grade_doc = opts, {doc_file[d] for d in docs} or None
         resp = engine.search(q["query"], q_opts)
         g = grade.grade_response(resp, q, grade_doc)
         # Trimmed retrieved chunks for the HTML inspector (gitignored side file).
@@ -484,7 +495,7 @@ def main() -> int:
 
     meta = {
         "engine": args.engine, "name": name, "date": date,
-        "docs": sorted({q["doc"] for q in queries if q["doc"] != "any"}),
+        "docs": sorted({d for q in queries for d in query_docs(q)}),
         "n_queries": len(queries), "n_pairs": len({q["pair"] for q in queries}),
         "n_results": args.n_results,
         "corpus_fingerprint": corpus_fingerprint(corpus),

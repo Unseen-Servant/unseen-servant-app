@@ -85,54 +85,67 @@ class DocText:
         ]
 
 
+def verify_query(q: dict, by_id: dict) -> list[str]:
+    """Failure strings for one query (empty = fully verified).
+
+    ``doc`` may be a list: the first doc is the primary and must hold every
+    anchor in BOTH its reference and its PDF; each secondary (an edition
+    twin) must hold every anchor in its PDF (its reference tree is a
+    different edition, so ``answer_ref`` does not apply to it).
+    """
+    docs = q["doc"] if isinstance(q["doc"], list) else [q["doc"]]
+    fails: list[str] = []
+    primary = by_id.get(docs[0])
+    if primary is None:
+        return [f"unknown doc {docs[0]!r}"]
+    ref_n = primary.ref_norm(q.get("answer_ref"))
+    pdf_n = primary.pdf_norm()
+    for a in q["anchors"]:
+        in_ref, in_pdf = _hit(ref_n, a), _hit(pdf_n, a)
+        if not (in_ref and in_pdf):
+            where = "ref" if not in_ref else ""
+            where += ("+" if where and not in_pdf else "") + ("pdf" if not in_pdf else "")
+            fails.append(f"{a!r} (missing in {where})")
+    for doc_id in docs[1:]:
+        dt = by_id.get(doc_id)
+        if dt is None:
+            fails.append(f"unknown secondary doc {doc_id!r}")
+            continue
+        sec_pdf = dt.pdf_norm()
+        for a in q["anchors"]:
+            if not _hit(sec_pdf, a):
+                fails.append(f"{a!r} missing in secondary {doc_id} pdf")
+    if q["category"] == "cross_page":
+        declared = _declared_pages(q.get("pages"))
+        if not declared:
+            fails.append("cross_page query has no valid declared pages")
+        page_sets = [set(primary.anchor_pages(a)) & declared for a in q["anchors"]]
+        spanned = set().union(*page_sets) if page_sets else set()
+        straddles = declared <= spanned and any(
+            page_sets[i] and page_sets[j] and page_sets[i].isdisjoint(page_sets[j])
+            for i in range(len(page_sets))
+            for j in range(i + 1, len(page_sets))
+        )
+        if not straddles:
+            fails.append("cross_page anchors do NOT straddle a page break")
+    return fails
+
+
 def main() -> int:
     corpus = require_corpus()
     by_id = {d.id: DocText(d) for d in corpus.documents}
     queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
-
     total_fail = 0
     for q in queries:
-        doc_id = q["doc"]
-        dt = by_id.get(doc_id)
-        if dt is None:
-            print(f"✗ {q['id']}: unknown doc {doc_id!r}")
-            total_fail += 1
-            continue
-        ref_n = dt.ref_norm(q.get("answer_ref"))
-        pdf_n = dt.pdf_norm()
-
-        fails = []
-        for a in q["anchors"]:
-            in_ref, in_pdf = _hit(ref_n, a), _hit(pdf_n, a)
-            if not (in_ref and in_pdf):
-                where = "ref" if not in_ref else ""
-                where += ("+" if where and not in_pdf else "") + ("pdf" if not in_pdf else "")
-                fails.append(f"{a!r} (missing in {where})")
-
-        cross_note = ""
-        if q["category"] == "cross_page":
-            declared = _declared_pages(q.get("pages"))
-            if not declared:
-                fails.append("cross_page query has no valid declared pages")
-            page_sets = [set(dt.anchor_pages(a)) & declared for a in q["anchors"]]
-            spanned = set().union(*page_sets) if page_sets else set()
-            straddles = declared <= spanned and any(
-                page_sets[i] and page_sets[j] and page_sets[i].isdisjoint(page_sets[j])
-                for i in range(len(page_sets))
-                for j in range(i + 1, len(page_sets))
-            )
-            cross_note = f"  pages={sorted(spanned)} straddle={'yes' if straddles else 'NO'}"
-            if not straddles:
-                fails.append("cross_page anchors do NOT straddle a page break")
-
+        fails = verify_query(q, by_id)
+        label = q["doc"] if isinstance(q["doc"], str) else "+".join(q["doc"])
         if fails:
             total_fail += 1
-            print(f"✗ {q['id']:5} [{q['category']:17}] {doc_id}")
+            print(f"✗ {q['id']:5} [{q['category']:17}] {label}")
             for f in fails:
                 print(f"      {f}")
         else:
-            print(f"✓ {q['id']:5} [{q['category']:17}] {doc_id}{cross_note}")
-
+            print(f"✓ {q['id']:5} [{q['category']:17}] {label}")
     n = len(queries)
     print(f"\n{n - total_fail}/{n} queries fully verified (ref ∧ pdf).")
     if total_fail:

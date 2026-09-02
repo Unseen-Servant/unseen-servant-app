@@ -373,7 +373,7 @@
   scope: cued
   category: exact_name
   query: "dnd 5e magic missile darts damage"
-  doc: srd_5_1
+  doc: [srd_5_1, srd_5_2_1]   # "dnd 5e" names both SRD editions; either is the right file
   answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Magic_Missile.md"
   anchors: ["magic missile", "1d4 1", ["three glowing darts", "force"], "120 feet"]
 - id: q044
@@ -382,7 +382,7 @@
   scope: cued
   category: exact_name
   query: "how much damage does magic missile deal in dnd 5e?"
-  doc: srd_5_1
+  doc: [srd_5_1, srd_5_2_1]   # "dnd 5e" names both SRD editions; either is the right file
   answer_ref: "dnd_srd_51/07_Spells/Spells_Each/Magic_Missile.md"
   anchors: ["magic missile", "1d4 1", ["three glowing darts", "force"], "120 feet"]
 
