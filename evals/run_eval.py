@@ -51,6 +51,23 @@ def _system_map(corpus) -> dict:
     return m
 
 
+# The same information as SYSTEM_KEYWORDS, in the shape the v2 product stores
+# it: a tag per book (custom systems for the five books game_systems.py does
+# not know; the built-in "D&D 5E" for both SRDs) plus the keywords that make
+# detect_systems_in_query recognise the tag in a query. Without this the v2
+# eval index is untagged and _system_boost_factors is a no-op on 5 of 7 books
+# (roadmap §1.5). Production wires the same thing to the user's tag lists.
+SYSTEM_TAGS: dict[str, tuple[str, list[str]]] = {
+    "bfrpg_4e": ("Basic Fantasy RPG", SYSTEM_KEYWORDS["bfrpg_4e"]),
+    "black_hack_1e": ("The Black Hack", SYSTEM_KEYWORDS["black_hack_1e"]),
+    "cairn_1e": ("Cairn", SYSTEM_KEYWORDS["cairn_1e"]),
+    "srd_5_1": ("D&D 5E", SYSTEM_KEYWORDS["srd_5_1"]),
+    "srd_5_2_1": ("D&D 5E", SYSTEM_KEYWORDS["srd_5_2_1"]),
+    "osric_2e": ("OSRIC", SYSTEM_KEYWORDS["osric_2e"]),
+    "yze_srd": ("Year Zero Engine", SYSTEM_KEYWORDS["yze_srd"]),
+}
+
+
 def build_engine(name: str, data_dir: Path | None, pdf_backend: str = "pymupdf"):
     if name == "v2":
         from evals.engines.v2 import V2Engine, DEFAULT_DATA_DIR
@@ -118,12 +135,13 @@ def format_retrieval_regressions(regressions: list[dict]) -> str:
     )
 
 
-def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool) -> dict:
+def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool,
+        tags: dict[str, tuple[str, list[str]]] | None = None) -> dict:
     doc_file = {d.id: d.pdf_path.name for d in corpus.documents}
     doc_pdf = {d.id: d.pdf_path for d in corpus.documents}
+    needed = sorted({q["doc"] for q in queries if q["doc"] != "any"})
 
     if do_index:
-        needed = sorted({q["doc"] for q in queries if q["doc"] != "any"})
         print(f"indexing {len(needed)} corpus PDFs (idempotent, one at a time)…", flush=True)
         index_errors: list[tuple[str, list]] = []
         for i, d in enumerate(needed, 1):
@@ -136,6 +154,16 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         if index_errors:
             details = "; ".join(f"{doc}: {errors}" for doc, errors in index_errors)
             raise SystemExit(f"indexing failed; retrieval results are invalid: {details}")
+
+    # Tag after indexing (set-game-systems rewrites the chunk metadata of an
+    # indexed file) and before warmup, so the boost sees the tags on every run.
+    tag_fn = getattr(engine, "tag_systems", None)
+    if tags and tag_fn is not None:
+        for d in needed:
+            if d in tags:
+                tag, keywords = tags[d]
+                tag_fn(doc_file[d], tag, keywords)
+                print(f"  tagged {d} as {tag!r}", flush=True)
 
     print("warmup…", flush=True)
     engine.warmup(opts)
@@ -399,7 +427,8 @@ def main() -> int:
             if args.rerank_weight is not None:
                 extra["rerank_weight"] = args.rerank_weight
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid, extra=extra)
-            result = run(engine, queries, corpus, opts, do_index=not args.no_index)
+            result = run(engine, queries, corpus, opts, do_index=not args.no_index,
+                         tags=SYSTEM_TAGS if args.engine == "v2" else None)
     finally:
         engine.close()
         if temporary_index is not None:
@@ -465,6 +494,7 @@ def main() -> int:
                  "spell_correction": opts.spell_correction,
                  "variant_expansion": opts.variant_expansion,
                  "extra": _jsonable(opts.extra)},
+        "system_tags": _jsonable(SYSTEM_TAGS) if args.engine == "v2" else None,
     }
 
     if args.gate:

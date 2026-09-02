@@ -116,7 +116,12 @@ class Page:
 
 @runtime_checkable
 class Engine(Protocol):
-    """The contract every pipeline adapter implements."""
+    """The contract every pipeline adapter implements.
+
+    Optional adapter hooks the runner probes with ``getattr``:
+      ``tag_systems(filename, tag, keywords)`` — stamp an indexed file with a
+      game-system tag the way the product does (v2: custom system + tag).
+    """
 
     name: str
 

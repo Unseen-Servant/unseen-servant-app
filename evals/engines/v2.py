@@ -139,6 +139,21 @@ class V2Engine:
             errors=body.get("errors", []),
         )
 
+    def tag_systems(self, filename: str, tag: str, keywords: list[str]) -> None:
+        """Tag an indexed file with a game system through the product's own
+        endpoints: create (or update) a custom system carrying the keywords
+        that let ``detect_systems_in_query`` recognise it, then stamp the
+        file's chunks + manifest entry. Idempotent."""
+        client = self._ensure_client()
+        body = {"tag": tag, "keywords": list(keywords)}
+        resp = client.post("/api/custom-game-systems", json=body)
+        if resp.status_code == 409:  # already created by an earlier doc sharing the tag
+            resp = client.put(f"/api/custom-game-systems/{tag}", json=body)
+        resp.raise_for_status()
+        client.post(
+            "/api/set-game-systems", json={"filename": filename, "game_systems": [tag]}
+        ).raise_for_status()
+
     # -- extraction ----------------------------------------------------
 
     def extract(self, pdf_path: Path | str) -> list[Page]:
