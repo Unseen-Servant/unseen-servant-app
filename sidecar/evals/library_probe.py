@@ -24,7 +24,6 @@ SQLite.
 """
 
 import argparse
-import re
 import signal
 import subprocess
 import sys
@@ -56,29 +55,14 @@ DEFAULT_QUERIES = [
     "what does a critical hit do",
 ]
 
-# Extraction damage in section headings. Both matter more than they look:
-# the heading is prepended to the embedded text (chunker._embed_text) and to
-# the cross-encoder input (server._search_sync), so damage here degrades
-# retrieval itself, not just what the UI renders.
-INLINE_TAGS = re.compile(r"</?(?:mark|u|b|i|em|strong)>", re.I)
-# Extraction splits a letter off a word: "Dexterity" -> "Dexterit y",
-# "Spells" -> "S ells". Detected as a stranded single-letter token, excluding
-# the only legitimate ones ("a", "I") — matching on the *split* instead
-# ("word space short-word") just finds ordinary English like "a pit".
-LONE_LETTER = re.compile(r"(?<![\w'])(?![aAI](?![\w']))[A-Za-z](?![\w'])")
+# The detector is shared with the graded harness so the real-library probe
+# and the corpus baseline report the same flaws (evals/retrieval/breadcrumb_qa.py).
+sys.path.insert(0, str(SIDECAR_DIR.parent))
+from evals.retrieval.breadcrumb_qa import flaws as _flaws, strip_markup  # noqa: E402
 
 
 def heading_flaws(heading: str) -> list[str]:
-    flaws = []
-    if INLINE_TAGS.search(heading or ""):
-        flaws.append("inline-tags")
-    if LONE_LETTER.search(strip_markup(heading)):
-        flaws.append("split-words")
-    return flaws
-
-
-def strip_markup(heading: str) -> str:
-    return re.sub(r"\*\*|</?[a-z]+>", "", heading or "")
+    return sorted(_flaws(heading))
 
 
 def start_sidecar(data_dir: Path, log_path: Path):

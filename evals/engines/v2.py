@@ -54,6 +54,7 @@ def _import_sidecar():
         from fastapi.testclient import TestClient
         from server import (
             COLLECTION_METADATA,
+            _extract_and_chunk,
             _extract_pdf_pages,
             build_ollama_embedding_function,
             create_app,
@@ -69,6 +70,7 @@ def _import_sidecar():
         "chromadb": chromadb,
         "TestClient": TestClient,
         "COLLECTION_METADATA": COLLECTION_METADATA,
+        "_extract_and_chunk": _extract_and_chunk,
         "_extract_pdf_pages": _extract_pdf_pages,
         "build_ollama_embedding_function": build_ollama_embedding_function,
         "create_app": create_app,
@@ -166,6 +168,24 @@ class V2Engine:
             raise FileNotFoundError(f"PDF not found: {path}")
         pages = self._mods["_extract_pdf_pages"](path)
         return [Page(page_number=p.page_number, text=p.markdown) for p in pages]
+
+    def chunks(self, pdf_path: Path | str) -> list[dict]:
+        """v2's real chunker output for one PDF (pymupdf4llm → promotion →
+        cleanup → structure_aware), no Chroma/Ollama. What breadcrumb-qa
+        grades: the heading each chunk would carry into the embedding."""
+        if self._mods is None:
+            self._mods = _import_sidecar()
+        path = Path(pdf_path).expanduser().resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"PDF not found: {path}")
+        chunks, _system, _systems, error = self._mods["_extract_and_chunk"](path, None, None)
+        if error:
+            raise RuntimeError(error)
+        return [
+            {"section_heading": c.section_heading, "chunk_type": str(c.chunk_type),
+             "page_start": c.page_start, "page_end": c.page_end, "chars": len(c.text)}
+            for c in chunks
+        ]
 
     # -- search --------------------------------------------------------
 

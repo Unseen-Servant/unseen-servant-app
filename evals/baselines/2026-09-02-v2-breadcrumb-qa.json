@@ -1,0 +1,332 @@
+{
+  "meta": {
+    "engine": "v2",
+    "name": "breadcrumb-qa",
+    "date": "2026-09-02"
+  },
+  "by_doc": {
+    "bfrpg_4e": {
+      "chunks": 1195,
+      "markup": 201,
+      "markup_rate": 0.1682008368200837,
+      "split_letter": 0,
+      "split_letter_rate": 0.0,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 3,
+      "furniture_root_rate": 0.002510460251046025,
+      "no_heading": 1,
+      "no_heading_rate": 0.0008368200836820083
+    },
+    "all": {
+      "chunks": 11165,
+      "markup": 10080,
+      "markup_rate": 0.9028213166144201,
+      "split_letter": 3537,
+      "split_letter_rate": 0.31679355127630987,
+      "mixed_case": 2878,
+      "mixed_case_rate": 0.25776981639050606,
+      "furniture_root": 2669,
+      "furniture_root_rate": 0.23905060456784594,
+      "no_heading": 5,
+      "no_heading_rate": 0.0004478280340349306
+    },
+    "black_hack_1e": {
+      "chunks": 94,
+      "markup": 14,
+      "markup_rate": 0.14893617021276595,
+      "split_letter": 1,
+      "split_letter_rate": 0.010638297872340425,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 1,
+      "no_heading_rate": 0.010638297872340425
+    },
+    "cairn_1e": {
+      "chunks": 102,
+      "markup": 101,
+      "markup_rate": 0.9901960784313726,
+      "split_letter": 0,
+      "split_letter_rate": 0.0,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 1,
+      "no_heading_rate": 0.00980392156862745
+    },
+    "srd_5_1": {
+      "chunks": 3244,
+      "markup": 3242,
+      "markup_rate": 0.9993834771886559,
+      "split_letter": 1985,
+      "split_letter_rate": 0.6118988902589396,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 0,
+      "no_heading_rate": 0.0
+    },
+    "srd_5_2_1": {
+      "chunks": 3455,
+      "markup": 3455,
+      "markup_rate": 1.0,
+      "split_letter": 1431,
+      "split_letter_rate": 0.4141823444283647,
+      "mixed_case": 206,
+      "mixed_case_rate": 0.059623733719247465,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 0,
+      "no_heading_rate": 0.0
+    },
+    "osric_2e": {
+      "chunks": 2706,
+      "markup": 2705,
+      "markup_rate": 0.999630450849963,
+      "split_letter": 115,
+      "split_letter_rate": 0.04249815225424981,
+      "mixed_case": 2672,
+      "mixed_case_rate": 0.9874353288987435,
+      "furniture_root": 2664,
+      "furniture_root_rate": 0.9844789356984479,
+      "no_heading": 1,
+      "no_heading_rate": 0.0003695491500369549
+    },
+    "yze_srd": {
+      "chunks": 369,
+      "markup": 362,
+      "markup_rate": 0.981029810298103,
+      "split_letter": 5,
+      "split_letter_rate": 0.013550135501355014,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 2,
+      "furniture_root_rate": 0.005420054200542005,
+      "no_heading": 1,
+      "no_heading_rate": 0.0027100271002710027
+    }
+  },
+  "docs": [
+    {
+      "doc": "bfrpg_4e",
+      "chunks": 1195,
+      "markup": 201,
+      "split_letter": 0,
+      "mixed_case": 0,
+      "furniture_root": 3,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "PART 6:  MONSTERS",
+          563
+        ],
+        [
+          "PART 3:  SPELLS",
+          169
+        ],
+        [
+          "PART 8:  GAME MASTER INFORMATION",
+          142
+        ],
+        [
+          "PART 7:  TREASURE",
+          115
+        ],
+        [
+          "PART 2:  PLAYER CHARACTERS",
+          66
+        ]
+      ]
+    },
+    {
+      "doc": "black_hack_1e",
+      "chunks": 94,
+      "markup": 14,
+      "split_letter": 1,
+      "mixed_case": 0,
+      "furniture_root": 0,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "CONJURER",
+          28
+        ],
+        [
+          "EXAMPLE OF PLAY",
+          11
+        ],
+        [
+          "CONVERTING SAVES",
+          6
+        ],
+        [
+          "CLERIC",
+          5
+        ],
+        [
+          "ARMOR POINTS",
+          3
+        ]
+      ]
+    },
+    {
+      "doc": "cairn_1e",
+      "chunks": 102,
+      "markup": 101,
+      "split_letter": 0,
+      "mixed_case": 0,
+      "furniture_root": 0,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "Rules",
+          30
+        ],
+        [
+          "100 Spells",
+          10
+        ],
+        [
+          "Rules Summary",
+          10
+        ],
+        [
+          "Character Traits (d10)",
+          7
+        ],
+        [
+          "Bestiary",
+          6
+        ]
+      ]
+    },
+    {
+      "doc": "srd_5_1",
+      "chunks": 3244,
+      "markup": 3242,
+      "split_letter": 1985,
+      "mixed_case": 0,
+      "furniture_root": 0,
+      "no_heading": 0,
+      "top_roots": [
+        [
+          "S eed p",
+          719
+        ],
+        [
+          "Ran er S ells g p",
+          591
+        ],
+        [
+          "Paired Items",
+          372
+        ],
+        [
+          "Creatures",
+          344
+        ],
+        [
+          "Me hits p",
+          173
+        ]
+      ]
+    },
+    {
+      "doc": "srd_5_2_1",
+      "chunks": 3455,
+      "markup": 3455,
+      "split_letter": 1431,
+      "mixed_case": 206,
+      "furniture_root": 0,
+      "no_heading": 0,
+      "top_roots": [
+        [
+          "Monsters A\u2013Z",
+          806
+        ],
+        [
+          "Casting Spells",
+          525
+        ],
+        [
+          "Classes",
+          477
+        ],
+        [
+          "Magic Item Categories",
+          444
+        ],
+        [
+          "sEllinG EquipMEnt",
+          187
+        ]
+      ]
+    },
+    {
+      "doc": "osric_2e",
+      "chunks": 2706,
+      "markup": 2705,
+      "split_letter": 115,
+      "mixed_case": 2672,
+      "furniture_root": 2664,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:",
+          2664
+        ],
+        [
+          "T",
+          18
+        ],
+        [
+          "final author and editor in chief: Stuart Marshall",
+          2
+        ],
+        [
+          "A",
+          2
+        ],
+        [
+          "Old SchOOl RefeRence and Index cOmpIlatIOn",
+          1
+        ]
+      ]
+    },
+    {
+      "doc": "yze_srd",
+      "chunks": 369,
+      "markup": 362,
+      "split_letter": 5,
+      "mixed_case": 0,
+      "furniture_root": 2,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "COMBAT & DAMAGE",
+          105
+        ],
+        [
+          "LEARNING MAGIC",
+          91
+        ],
+        [
+          "OTHER SKILLS",
+          75
+        ],
+        [
+          "PLAYER CHARACTERS",
+          34
+        ],
+        [
+          "TRAVEL MAPS",
+          33
+        ]
+      ]
+    }
+  ]
+}

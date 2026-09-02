@@ -63,6 +63,11 @@ uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite corpus-
 uv run --project sidecar-v3 python -m evals.extraction.review \
     --engine v3 --doc srd_5_2_1 --pages 30,183 --open
 
+# Breadcrumb QA — every chunk's section_heading graded for markup, split
+# letters, small-caps damage, furniture roots (no Ollama, ~3 min). The gate
+# Phase 1's heading work must clear. Writes evals/baselines/<date>-v2-breadcrumb-qa.*
+uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa
+
 # Harness unit tests (pure, CI-safe).
 uv run --project sidecar-v3 pytest evals/tests
 ```
@@ -77,6 +82,7 @@ uv run --project sidecar-v3 pytest evals/tests
 | every golden page ≥ its reference score | `extraction/gate.py` (`--gate`, exit 1) | an extraction change that helps the mean and hurts a page |
 | anchor grade vs a human (Cohen's κ) | `blind/score.py` | trusting the automated number |
 | chunks a human can read (`readable@5`) | `blind/score.py` (the "garbled" tick) | calling a pipeline search-ready on anchors alone |
+| breadcrumb flaws per doc | breadcrumb-qa baseline (Phase 1 gate: markup 0, split 0, furniture roots 0) | a heading change that helps the mean and hurts a book |
 
 ## Suites
 

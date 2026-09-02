@@ -370,6 +370,27 @@ def run_corpus_qa(engine, corpus, saved_texts: dict | None = None) -> dict:
             "empty": corpus_qa.empty_pages(pages), "pages": pages, "texts": texts}
 
 
+# ── breadcrumb QA (roadmap 2026-09-02 Phase 0.2) ──────────────────────────
+
+def run_breadcrumb_qa(engine, corpus) -> dict:
+    """Chunk every corpus PDF (engine.chunks, no embedding) and grade each
+    chunk's section_heading — the string the embedder and reranker see."""
+    from evals.retrieval import breadcrumb_qa
+
+    chunks_fn = getattr(engine, "chunks", None)
+    if chunks_fn is None:
+        raise SystemExit(f"engine {engine.name!r} has no chunks() hook; breadcrumb-qa needs it")
+    rows = []
+    for d in corpus.documents:
+        print(f"chunking {d.id}…", flush=True)
+        g = breadcrumb_qa.grade_doc(d.id, chunks_fn(d.pdf_path))
+        rows.append(g)
+        print(f"  {d.id}: {g['chunks']} chunks, markup {g['markup']}, split {g['split_letter']}, "
+              f"furniture roots {g['furniture_root']}; top root {g['top_roots'][0] if g['top_roots'] else '—'}",
+              flush=True)
+    return {"by_doc": breadcrumb_qa.aggregate(rows), "docs": rows}
+
+
 # ── entry point ───────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -377,7 +398,8 @@ def main() -> int:
     ap.add_argument("--engine", default="v2", choices=["v2", "v3"])
     ap.add_argument("--pdf-backend", default="pymupdf", choices=["pymupdf", "pdfium", "pdfplumber"],
                     help="v3 extraction backend; non-default backends are evaluation candidates")
-    ap.add_argument("--suite", default="retrieval", choices=["retrieval", "extraction", "corpus-qa"])
+    ap.add_argument("--suite", default="retrieval",
+                    choices=["retrieval", "extraction", "corpus-qa", "breadcrumb-qa"])
     ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
     ap.add_argument("--data-dir", type=Path, default=None,
                     help="retrieval: existing index directory, only with --reuse-index")
@@ -411,7 +433,7 @@ def main() -> int:
 
     corpus = require_corpus()  # refuses on any hash/digest drift (§1)
     name = args.baseline or {"retrieval": "phase0", "extraction": "extraction",
-                             "corpus-qa": "corpus-qa"}[args.suite]
+                             "corpus-qa": "corpus-qa", "breadcrumb-qa": "breadcrumb-qa"}[args.suite]
     date = datetime.date.today().isoformat()
     stem = f"{date}-{args.engine}-{name}"
     temporary_index = None
@@ -429,6 +451,8 @@ def main() -> int:
         elif args.suite == "corpus-qa":
             saved = json.loads(args.pages.read_text(encoding="utf-8")) if args.pages else None
             result = run_corpus_qa(engine, corpus, saved_texts=saved)
+        elif args.suite == "breadcrumb-qa":
+            result = run_breadcrumb_qa(engine, corpus)
         else:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
@@ -463,6 +487,20 @@ def main() -> int:
             (BASELINE_DIR / f"{stem}.pages.json").write_text(
                 json.dumps(texts, ensure_ascii=False), encoding="utf-8")
             print(f"wrote evals/baselines/{stem}.{{json,md,pages.json}}")
+        return 0
+
+    if args.suite == "breadcrumb-qa":
+        from evals.retrieval import breadcrumb_qa
+
+        meta = {"engine": args.engine, "name": name, "date": date}
+        md = breadcrumb_qa.render_md(meta, result)
+        print("\n" + md)
+        if not args.no_write:
+            BASELINE_DIR.mkdir(exist_ok=True)
+            (BASELINE_DIR / f"{stem}.json").write_text(
+                json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
+            (BASELINE_DIR / f"{stem}.md").write_text(md, encoding="utf-8")
+            print(f"wrote evals/baselines/{stem}.{{json,md}}")
         return 0
 
     if args.suite == "extraction":

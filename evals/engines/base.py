@@ -121,6 +121,9 @@ class Engine(Protocol):
     Optional adapter hooks the runner probes with ``getattr``:
       ``tag_systems(filename, tag, keywords)`` — stamp an indexed file with a
       game-system tag the way the product does (v2: custom system + tag).
+      ``chunks(pdf_path) -> list[dict]`` — the engine's chunker output
+      (section_heading, chunk_type, page_start, page_end, chars) for the
+      breadcrumb-qa suite; no embedding.
     """
 
     name: str
