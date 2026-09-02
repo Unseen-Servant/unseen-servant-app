@@ -22,6 +22,17 @@ def normalize(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
+BUDGET_CHARS = 8000  # the 4B-model context budget (roadmap §4 Phase 0.7 / Phase 2.2)
+
+
+def top3_fits(response: SearchResponse, budget: int = BUDGET_CHARS) -> float:
+    """1.0 when the top-3 results (heading + text) fit inside the budget.
+    Tracks compactness before the Phase-2 packer exists, so 'payload shrank'
+    and 'the answer still ships' are measured together."""
+    top = response.results[:3]
+    return 1.0 if sum(len(r.text) + len(r.section_heading) for r in top) <= budget else 0.0
+
+
 def anchors_match(text: str, anchors: list) -> bool:
     """Every anchor present; an anchor that is a list means any-of."""
     haystack = f" {normalize(text)} "
@@ -111,6 +122,7 @@ def grade_response(response: SearchResponse, query: dict, doc_filename: str | se
         "rels": rels,
         "payload_chars": response.payload_chars,
         "dup_sections@10": dup_sections_at(response.results, 10),
+        "top3_fit@8k": top3_fits(response),
         # secondary: did the anchor-relevant hit also land on the GT page(s)?
         "page_hit": any(
             _page_hit(r, query.get("pages"))

@@ -126,7 +126,7 @@ tr.all td{color:var(--text-accent);border-top:1px solid var(--border);font-weigh
 <script>
 const DATA = __DATA__;
 const R = DATA.results || {}, M = DATA.meta || {};
-const METRICS = ["mrr@5","ndcg@10","recall@3","recall@5","recall@10","payload_chars","dup_sections@10"];
+const METRICS = ["mrr@5","ndcg@10","recall@3","recall@5","recall@10","payload_chars","dup_sections@10","top3_fit@8k"];
 const esc = s => (s==null?"":String(s)).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const fmt = (m,v) => m==="payload_chars" ? Math.round(v).toLocaleString() : Number(v).toFixed(3);
 

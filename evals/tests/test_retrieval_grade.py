@@ -56,3 +56,27 @@ def test_doc_string_still_means_exactly_one_file():
     query = {"category": "exact_name", "anchors": ["magic missile"]}
     response = SearchResponse(results=[_from("SRD_CC_v5.2.1.pdf", "magic missile")], latency_ms=1.0)
     assert grade_response(response, query, "SRD_CC_v5.1.pdf")["rels"] == [False]
+
+
+from evals.retrieval import metrics
+from evals.retrieval.grade import BUDGET_CHARS, top3_fits
+
+
+def test_top3_fits_when_three_results_fit_the_budget():
+    response = SearchResponse(results=[_result("a" * 2000)] * 3 + [_result("b" * 9000)], latency_ms=1.0)
+    assert top3_fits(response) == 1.0
+
+
+def test_top3_does_not_fit_when_the_third_result_overflows():
+    response = SearchResponse(results=[_result("a" * 3000), _result("a" * 3000), _result("a" * 3000)],
+                              latency_ms=1.0)
+    assert top3_fits(response) == 0.0
+
+
+def test_grade_response_reports_the_budget_column():
+    query = {"category": "prose_rule", "anchors": ["kraken"]}
+    response = SearchResponse(results=[_result("Kraken")], latency_ms=1.0)
+    g = grade_response(response, query, None)
+    assert g["top3_fit@8k"] == 1.0
+    assert "top3_fit@8k" in metrics.COST_METRICS
+    assert BUDGET_CHARS == 8000

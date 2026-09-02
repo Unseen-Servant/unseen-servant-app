@@ -21,7 +21,7 @@ from collections import defaultdict
 # interpretable hit-rate that precision@3 was poorly approximating.
 RANK_METRICS = ["mrr@5", "ndcg@10", "recall@3", "recall@5", "recall@10"]
 # Cost metrics averaged alongside them (from the SearchResponse, not rels).
-COST_METRICS = ["payload_chars", "dup_sections@10"]
+COST_METRICS = ["payload_chars", "dup_sections@10", "top3_fit@8k"]
 
 
 def mrr_at(rels: list[bool], k: int = 5) -> float:
@@ -97,7 +97,7 @@ def format_report(summary: dict[str, dict], title: str = "category") -> str:
     metrics = RANK_METRICS + COST_METRICS
     cats = sorted(c for c in summary if c != "all") + ["all"]
     widths = {"mrr@5": 9, "ndcg@10": 10, "recall@3": 11, "recall@5": 11,
-              "recall@10": 11, "payload_chars": 15, "dup_sections@10": 16}
+              "recall@10": 11, "payload_chars": 15, "dup_sections@10": 16, "top3_fit@8k": 13}
 
     def cell(m: str, v: float) -> str:
         return f"{int(round(v)):>{widths[m]}}" if m == "payload_chars" else f"{v:>{widths[m]}.3f}"
