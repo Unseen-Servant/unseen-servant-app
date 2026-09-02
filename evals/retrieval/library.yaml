@@ -1,0 +1,21 @@
+# Local-only library tier — roadmap 2026-09-02 §4 Phase 0.4.
+#
+# Books are pinned by the SHA-256 the sidecar stores as `content_hash` in the
+# v2 data dir's index_manifest.json. No path, no PDF in git. A query whose
+# book is not in the index being read is skipped and reported.
+#
+# Get a book's sha256 from your indexed library:
+#   python3 -c "import json,sys;m=json.load(open(sys.argv[1]));[print(e['content_hash'],e['filename']) for e in m['files'].values()]" \
+#     "$HOME/Library/Application Support/games.unseenservant.legendlore/chroma_db/index_manifest.json"
+#
+# Query fields are identical to queries.yaml (id, pair, style, scope, category,
+# query, doc, anchors, pages). Use ids L001… so they never collide. Author in
+# the confusable regime: things that exist in several books at once.
+# `doc` must always name a declared book — for uncued queries it is the
+# representative used for anchor verification (same rule as queries.yaml;
+# `any` is not accepted here).
+#
+# Verify anchors against the PDFs before committing:
+#   uv run --project sidecar python -m evals.retrieval.verify_anchors --library "<data dir>"
+docs: []
+queries: []

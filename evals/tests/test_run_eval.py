@@ -114,6 +114,13 @@ def test_run_tags_every_needed_doc_after_indexing(tmp_path):
     ]
 
 
+def test_run_never_tags_a_reused_index(tmp_path):
+    engine = _TagRecorder()
+    run(engine, [_query("q1", "osric_2e")], _corpus(tmp_path, "osric_2e"),
+        SearchOptions(), do_index=False, tags={"osric_2e": ("OSRIC", ["osric"])})
+    assert engine.tagged == []
+
+
 def test_run_skips_tagging_when_engine_lacks_the_hook(tmp_path):
     class NoTag:
         def index(self, _paths):

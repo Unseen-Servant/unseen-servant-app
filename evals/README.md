@@ -64,7 +64,7 @@ uv run --project sidecar-v3 python -m evals.extraction.review \
     --engine v3 --doc srd_5_2_1 --pages 30,183 --open
 
 # Breadcrumb QA — every chunk's section_heading graded for markup, split
-# letters, small-caps damage, furniture roots (no Ollama, ~3 min). The gate
+# letters, small-caps damage, furniture roots (no Ollama, ~8 min). The gate
 # Phase 1's heading work must clear. Writes evals/baselines/<date>-v2-breadcrumb-qa.*
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa
 
@@ -120,6 +120,14 @@ neighbouring blocks that are still consecutive (catches a stat line that
 survives intact but lands under another creature). Reports `block_integrity`,
 `block_recall`, `label_integrity`, `adjacency` per doc and the 20 worst pages.
 Gate on the worst pages, not the mean.
+
+**Library tier** (`retrieval/library.yaml`, `evals/library.py`) — graded queries
+against YOUR indexed library, the confusable regime the 7-book corpus cannot
+create. Books are pinned by the sidecar's own `content_hash`; the harness reads
+the app's index (quit the app first), never indexes, and skips queries whose
+book is absent. Local-only by construction: the YAML commits hashes + anchors,
+never a PDF. `--suite library --data-dir <app data dir>`; verify with
+`verify_anchors --library <app data dir>`.
 
 ## Baselines & the blind round
 

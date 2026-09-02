@@ -18,6 +18,7 @@ Exit non-zero if any anchor fails, so this can gate a commit.
 """
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -85,6 +86,34 @@ class DocText:
         ]
 
 
+class PdfText:
+    """PDF-only oracle for a real-library book (no digital-native reference)."""
+
+    def __init__(self, pdf_path: Path):
+        self.pdf_path = pdf_path
+        self._pages_norm: list[str] | None = None
+
+    def _load(self):
+        import fitz
+
+        with fitz.open(self.pdf_path) as pdf:
+            self._pages_norm = [norm(p.get_text()) for p in pdf]
+
+    def ref_norm(self, _answer_ref):   # no reference: the PDF stands in for it
+        return self.pdf_norm()
+
+    def pdf_norm(self) -> str:
+        if self._pages_norm is None:
+            self._load()
+        return "\n".join(self._pages_norm)
+
+    def anchor_pages(self, anchor) -> list[int]:
+        if self._pages_norm is None:
+            self._load()
+        return [i + 1 for i, pg in enumerate(self._pages_norm)
+                if any(norm(alt) in pg for alt in anchor_alts(anchor))]
+
+
 def verify_query(q: dict, by_id: dict) -> list[str]:
     """Failure strings for one query (empty = fully verified).
 
@@ -132,9 +161,23 @@ def verify_query(q: dict, by_id: dict) -> list[str]:
 
 
 def main() -> int:
-    corpus = require_corpus()
-    by_id = {d.id: DocText(d) for d in corpus.documents}
-    queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--library", type=Path, default=None,
+                    help="verify evals/retrieval/library.yaml against the PDFs of this v2 data dir")
+    args = ap.parse_args()
+    if args.library:
+        from evals import library as lib
+
+        spec = lib.load_library()
+        corpus, missing = lib.resolve(spec, lib.manifest_files(args.library))
+        by_id = {d.id: PdfText(d.pdf_path) for d in corpus.documents}
+        queries, skipped = lib.select_queries(spec["queries"], set(by_id))
+        if missing or skipped:
+            print(f"not in this index — docs: {missing}  queries: {skipped}")
+    else:
+        corpus = require_corpus()
+        by_id = {d.id: DocText(d) for d in corpus.documents}
+        queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
     total_fail = 0
     for q in queries:
         fails = verify_query(q, by_id)

@@ -166,8 +166,10 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
 
     # Tag after indexing (set-game-systems rewrites the chunk metadata of an
     # indexed file) and before warmup, so the boost sees the tags on every run.
+    # Gated on do_index: tagging is a write, and a run that reuses an existing
+    # --data-dir must never mutate it.
     tag_fn = getattr(engine, "tag_systems", None)
-    if tags and tag_fn is not None:
+    if do_index and tags and tag_fn is not None:
         for d in needed:
             if d in tags:
                 tag, keywords = tags[d]
@@ -399,7 +401,7 @@ def main() -> int:
     ap.add_argument("--pdf-backend", default="pymupdf", choices=["pymupdf", "pdfium", "pdfplumber"],
                     help="v3 extraction backend; non-default backends are evaluation candidates")
     ap.add_argument("--suite", default="retrieval",
-                    choices=["retrieval", "extraction", "corpus-qa", "breadcrumb-qa"])
+                    choices=["retrieval", "extraction", "corpus-qa", "breadcrumb-qa", "library"])
     ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
     ap.add_argument("--data-dir", type=Path, default=None,
                     help="retrieval: existing index directory, only with --reuse-index")
@@ -430,10 +432,17 @@ def main() -> int:
             raise SystemExit("--no-index requires --reuse-index and --data-dir")
         if args.reuse_index and not args.no_write:
             raise SystemExit("reused-index retrieval runs cannot write a baseline; use a fresh index")
+    if args.suite == "library":
+        if args.data_dir is None:
+            raise SystemExit("--suite library reads an existing v2 index: pass --data-dir <app data dir>")
+        if (args.data_dir / "sidecar.port").exists():
+            raise SystemExit("a sidecar is running on that data dir — quit Legend Lore first "
+                             "(two processes on one ChromaDB fight over SQLite)")
 
-    corpus = require_corpus()  # refuses on any hash/digest drift (§1)
+    corpus = require_corpus() if args.suite != "library" else None  # refuses on any hash/digest drift (§1)
     name = args.baseline or {"retrieval": "phase0", "extraction": "extraction",
-                             "corpus-qa": "corpus-qa", "breadcrumb-qa": "breadcrumb-qa"}[args.suite]
+                             "corpus-qa": "corpus-qa", "breadcrumb-qa": "breadcrumb-qa",
+                             "library": "library"}[args.suite]
     date = datetime.date.today().isoformat()
     stem = f"{date}-{args.engine}-{name}"
     temporary_index = None
@@ -453,6 +462,25 @@ def main() -> int:
             result = run_corpus_qa(engine, corpus, saved_texts=saved)
         elif args.suite == "breadcrumb-qa":
             result = run_breadcrumb_qa(engine, corpus)
+        elif args.suite == "library":
+            from evals import library as lib
+
+            spec = lib.load_library()
+            corpus, missing = lib.resolve(spec, lib.manifest_files(data_dir))
+            present = {d.id for d in corpus.documents}
+            queries, skipped = lib.select_queries(spec["queries"], present)
+            if missing:
+                print(f"library docs not in this index (skipped): {', '.join(missing)}")
+            if skipped:
+                print(f"queries skipped: {', '.join(skipped)}")
+            if not queries:
+                raise SystemExit("no runnable library queries — author some in evals/retrieval/library.yaml")
+            if args.limit:
+                queries = queries[: args.limit]
+            opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
+                                 extra={"system_map": {}})
+            result = run(engine, queries, corpus, opts, do_index=False)
+            result["skipped_queries"], result["missing_docs"] = skipped, missing
         else:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
@@ -539,12 +567,17 @@ def main() -> int:
         "n_results": args.n_results,
         "corpus_fingerprint": corpus_fingerprint(corpus),
         "git_revision": git_revision(),
-        "index": {"mode": "fresh", "pipeline_identity": "engine-managed"},
+        "index": ({"mode": "library", "data_dir": str(data_dir),
+                   "pipeline_identity": getattr(engine, "pipeline_identity", lambda: "unknown")()}
+                  if args.suite == "library" else
+                  {"mode": "fresh", "pipeline_identity": "engine-managed"}),
+        "skipped_queries": result.get("skipped_queries", []),
+        "missing_docs": result.get("missing_docs", []),
         "opts": {"rerank": opts.rerank, "hybrid": opts.hybrid,
                  "spell_correction": opts.spell_correction,
                  "variant_expansion": opts.variant_expansion,
                  "extra": _jsonable(opts.extra)},
-        "system_tags": _jsonable(SYSTEM_TAGS) if args.engine == "v2" else None,
+        "system_tags": _jsonable(SYSTEM_TAGS) if (args.engine == "v2" and args.suite == "retrieval") else None,
     }
 
     if args.gate:
