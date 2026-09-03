@@ -177,3 +177,15 @@ def test_single_scope_rejects_a_doc_list(tmp_path):
     q = _query("q001", ["srd_5_1", "srd_5_2_1"], scope="single")
     with pytest.raises(SystemExit, match="single-scope"):
         run(_TwinEngine(), [q], corpus, SearchOptions(), do_index=False)
+
+
+def test_v2_request_body_is_json_serialisable_with_default_extra():
+    """The v2 adapter posts opts.extra as JSON; the runner must not hand it
+    v3's system_map (a dict of sets) — v2 gets tags instead."""
+    import json
+
+    from evals.engines.v2 import V2Engine
+
+    body = V2Engine(data_dir="/nonexistent")._request_body("q", SearchOptions())
+    json.dumps(body)
+    assert "system_map" not in body

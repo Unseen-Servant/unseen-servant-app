@@ -485,7 +485,10 @@ def main() -> int:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
                 queries = queries[: args.limit]
-            extra: dict = {"system_map": _system_map(corpus)}  # rung 6 boost (no-op if no system named)
+            # v3 takes the rung-6 keyword map in-process; v2 gets the same
+            # information as tags (SYSTEM_TAGS) and its request body is JSON,
+            # which a dict of sets is not.
+            extra: dict = {"system_map": _system_map(corpus)} if args.engine == "v3" else {}
             if args.lex_weight is not None:
                 extra["weights"] = [1.0, args.lex_weight]
             if args.rerank_weight is not None:
