@@ -1,7 +1,7 @@
 # v2 Retrieval Improvement Roadmap — the pymupdf4llm baseline
 
 **Date:** 2026-09-02
-**Status:** proposal — awaiting Jerome's call before any code.
+**Status:** approved 2026-09-02 (phase order kept). Phase 0 in progress — see §8 for the `phase0b` re-baseline.
 **Decision this builds on:** v2 ingestion (pymupdf4llm → Markdown → heading promotion → structure-aware chunking) stays. The v3 layout-model pipeline is closed as research; `sidecar-v3/` becomes a parts bin whose measured query-side bricks are ported into `sidecar/`.
 **Supersedes:** W2–W4 of [2026-08-22-v3-search-recovery-strategy.md](2026-08-22-v3-search-recovery-strategy.md) for the shipping pipeline. The eval harness, the corpus, and the ladder evidence are all kept as-is.
 **Objective:** the same one as the rebuild plan — search that is much faster *and* much more relevant than today's v2, for the app UI, Claude, and 4B-class local models — reached by improving what ships, not by replacing it.
@@ -200,20 +200,23 @@ Two independent swaps, both lifted from `sidecar-v3/index/` where they already p
 
 | gate | bar | why |
 |---|---|---|
-| auto all MRR@5 | ≥ 0.75 (phase0 0.701) | the ladder's bricks are worth more than this on a clean base |
-| auto single MRR@5 | ≥ 0.75 (0.683) | section parents fix the four stat-block "misses" |
-| auto cued MRR@5 | ≥ 0.65 (0.519) | tags + boost-after-rerank; v3 reached 0.675 |
-| keyword-style MRR@5 | ≥ nl-style + 0.03, and ≥ 0.78 (0.726) | hybrid is default-on; lexical must show up where it is supposed to |
+| auto all MRR@5 | ≥ 0.82 (phase0b 0.766; was ≥ 0.75 against 08-15's 0.701) | the ladder's bricks are worth more than this on a clean base |
+| auto single MRR@5 | ≥ 0.82 (phase0b 0.753) | section parents fix the four stat-block "misses" |
+| auto cued MRR@5 | ≥ 0.72 (phase0b 0.632) | boost-after-rerank + clean breadcrumbs; v3 reached 0.675 on scrambled extraction |
+| keyword-style MRR@5 | ≥ nl-style + 0.03, and ≥ 0.85 (phase0b 0.810 / nl 0.722) | hybrid is default-on; lexical must show up where it is supposed to |
 | **human** single MRR@5 (blind) | ≥ 0.90 (0.87) | the metric that inverted two verdicts |
 | readable@5 (blind) | ≥ 0.95 | first time it is scored for v2 |
-| cross_page recall@10 | ≥ 0.5 (0.0) | section parents |
+| cross_page MRR@5 | ≥ 0.75 (phase0b 0.417; recall@10 is already 1.0 under the 08-29 evidence-set grading) | section parents put the whole stat block in one result |
 | dup_sections@10, uncued | < 0.1 (0.35) | edition twin |
-| warm p50 / p95 | ≤ 500 ms / ≤ 1 s (1 464 / 1 896) | single-pass blended rerank + no N+1 |
+| warm p50 / p95 | ≤ 500 ms / ≤ 1 s (phase0b 1 274 / 1 706) | single-pass blended rerank + no N+1 |
 | payload @ 8 000-char budget | ≤ 8 000, top-3 intact | 4B-model consumer |
 | breadcrumb QA, real library | markup ≤ 2 %, furniture roots 0, split letters 0 | #367 / #328 |
 | tiers, real library | ≤ 35 % `strong` | #366 |
 | golden extraction gate | byte-identical to `2026-08-31-v2-extraction` | this roadmap does not touch extraction |
 | library tier + probe | top-1 correct on all queries; no regression vs its first baseline | the confusable regime |
+
+
+*Bars re-set 2026-09-02 after `phase0b`: the original bars were written against the untagged 08-15 baseline, and the corrected base already cleared three of them (all ≥ 0.75, keyword ≥ 0.78, cross_page recall@10 ≥ 0.5). The new values are proposed, not yet confirmed by Jerome.*
 
 ---
 
