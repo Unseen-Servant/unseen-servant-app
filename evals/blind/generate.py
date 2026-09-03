@@ -12,6 +12,10 @@ deterministic anchor grade → a trust number, readable@5, + the anchors to fix.
     uv run --project sidecar python -m evals.blind.generate \
         evals/baselines/2026-08-15-v2-phase0 [--top 5] [--open]
 
+Snippets render as Markdown (marked.js from cdnjs, GFM tables) so the judge
+sees the extraction the way a reader would — a torn table shows as a torn
+table, not as a wall of pipes. Offline, the sheet falls back to raw text.
+
 The scoresheet is gitignored (regenerable); the exported labels are the
 human artifact worth committing.
 """
@@ -114,7 +118,15 @@ h1{font-size:20px;margin:0 0 4px;color:var(--text-accent);font-weight:600}
 .body{flex:1;min-width:0}
 .src{color:var(--text-secondary);font-size:12px;font-family:var(--font-mono)}
 .heading{color:var(--text-accent);font-size:13px}
-.snippet{color:var(--text-primary);font-size:13.5px;white-space:pre-wrap;word-break:break-word;margin-top:2px}
+.snippet{color:var(--text-primary);font-size:13.5px;word-break:break-word;margin-top:2px}
+.snippet pre{white-space:pre-wrap;font:inherit;margin:0}
+.snippet p{margin:0 0 .5em}
+.snippet h1,.snippet h2,.snippet h3,.snippet h4{font-size:14px;margin:6px 0 2px;color:var(--text-accent);font-weight:600}
+.snippet ul,.snippet ol{margin:2px 0 6px;padding-left:20px}
+.snippet table{border-collapse:collapse;margin:4px 0;font-size:12.5px}
+.snippet th,.snippet td{border:1px solid var(--border);padding:2px 7px;text-align:left;vertical-align:top}
+.snippet th{color:var(--text-accent)}
+.raw-note{color:var(--text-tertiary);font-size:12px;margin:0 0 12px}
 .bar{position:fixed;left:0;right:0;bottom:0;background:#111;border-top:1px solid var(--border);
   padding:10px 26px;display:flex;justify-content:space-between;align-items:center;
   max-width:900px;margin:0 auto}
@@ -132,14 +144,21 @@ query (even if nothing was relevant). Tick <b>garbled</b> on a snippet you canno
 columns interleaved, a stat line torn from its label, sentences out of order — whether or not it
 is relevant. Progress saves in this browser; <b>Export</b> when finished and hand back the
 downloaded file.</div>
+<div class="raw-note" id="raw-note" hidden>Markdown renderer did not load (offline?) — snippets shown as raw text.</div>
 <div id="app"></div>
 <div class="bar"><span class="progress" id="progress"></span>
   <button class="export" id="export">Export labels ↓</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script>
 const DATA = __DATA__;
 const KEY = "blind:" + DATA.baseline;
 const store = JSON.parse(localStorage.getItem(KEY) || "{}");   // {qid:{reviewed:bool, relevant:[rank], garbled:[rank]}}
 const esc = s => (s==null?"":String(s)).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+// Escape first (chunk text is never trusted as HTML), then render the
+// Markdown the extractor emitted; breaks:true keeps its line structure.
+const MD = typeof marked !== "undefined";
+document.getElementById("raw-note").hidden = MD;
+const render = s => MD ? marked.parse(esc(s), {gfm:true, breaks:true}) : `<pre>${esc(s)}</pre>`;
 function save(){ localStorage.setItem(KEY, JSON.stringify(store)); progress(); }
 function rec(qid){
   const r = store[qid] || (store[qid]={reviewed:false, relevant:[], garbled:[]});
@@ -170,7 +189,7 @@ for(const q of DATA.queries){
         + `${r.garbled.includes(c.rank)?'✗ garbled':'garbled?'}</span></div>`
         + `<div class="body"><span class="src">${esc(c.book)} ${pages(c)}</span>`
         + ` <span class="heading">${esc(c.heading)||''}</span>`
-        + `<div class="snippet">${esc(c.snippet)}</div></div></div>`).join("")
+        + `<div class="snippet">${render(c.snippet)}</div></div></div>`).join("")
     + `<div style="margin-top:10px"><span class="reviewed-btn ${r.reviewed?'on':''}">`
     + `${r.reviewed?'✓ reviewed':'mark reviewed'}</span></div>`;
 
