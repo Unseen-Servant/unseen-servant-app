@@ -132,6 +132,8 @@ never a PDF. `--suite library --data-dir <app data dir>`; verify with
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
+The v2 reference for the 2026-09-02 roadmap is `2026-09-02-v2-phase0b` (tags + twin rule +
+budget column); gate against it, not `2026-08-15-v2-phase0`.
 Every baseline records the corpus fingerprint, Git revision, and explicit query
 knobs. Retrieval baselines always use a fresh temporary index; exploratory
 reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a
