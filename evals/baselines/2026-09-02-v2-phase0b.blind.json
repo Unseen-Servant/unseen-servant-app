@@ -1,0 +1,544 @@
+{
+  "baseline": "2026-09-02-v2-phase0b",
+  "top": 5,
+  "labels": {
+    "q001": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q002": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q003": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4
+      ],
+      "garbled": []
+    },
+    "q004": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ],
+      "garbled": []
+    },
+    "q005": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ],
+      "garbled": []
+    },
+    "q006": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        2,
+        1
+      ],
+      "garbled": []
+    },
+    "q007": {
+      "reviewed": true,
+      "relevant": [
+        5
+      ],
+      "garbled": []
+    },
+    "q008": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q009": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ],
+      "garbled": [
+        2
+      ]
+    },
+    "q010": {
+      "reviewed": true,
+      "relevant": [
+        5
+      ],
+      "garbled": [
+        5
+      ]
+    },
+    "q011": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2,
+        3
+      ],
+      "garbled": []
+    },
+    "q012": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3,
+        2
+      ],
+      "garbled": []
+    },
+    "q013": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": [
+        4
+      ]
+    },
+    "q014": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": [
+        5
+      ]
+    },
+    "q015": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1,
+        4
+      ],
+      "garbled": []
+    },
+    "q016": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1
+      ],
+      "garbled": []
+    },
+    "q017": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q018": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": [
+        5,
+        2
+      ]
+    },
+    "q019": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ],
+      "garbled": []
+    },
+    "q020": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q021": {
+      "reviewed": true,
+      "relevant": [
+        3
+      ],
+      "garbled": []
+    },
+    "q022": {
+      "reviewed": true,
+      "relevant": [
+        5
+      ],
+      "garbled": []
+    },
+    "q023": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q024": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q025": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q026": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q027": {
+      "reviewed": true,
+      "relevant": [
+        3,
+        1,
+        2,
+        4
+      ],
+      "garbled": []
+    },
+    "q028": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        3,
+        1
+      ],
+      "garbled": []
+    },
+    "q029": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        3,
+        1,
+        2
+      ],
+      "garbled": []
+    },
+    "q030": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        4,
+        1
+      ],
+      "garbled": []
+    },
+    "q031": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4,
+        2
+      ],
+      "garbled": []
+    },
+    "q032": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q033": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        1,
+        2,
+        3
+      ],
+      "garbled": []
+    },
+    "q034": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        5,
+        1
+      ],
+      "garbled": []
+    },
+    "q035": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q036": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q037": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4
+      ],
+      "garbled": []
+    },
+    "q038": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q039": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q040": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q041": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3
+      ],
+      "garbled": [
+        3
+      ]
+    },
+    "q042": {
+      "reviewed": true,
+      "relevant": [
+        3,
+        1
+      ],
+      "garbled": [
+        3
+      ]
+    },
+    "q043": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q044": {
+      "reviewed": true,
+      "relevant": [
+        3
+      ],
+      "garbled": []
+    },
+    "q045": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q046": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q047": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": [
+        5
+      ]
+    },
+    "q048": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q049": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q050": {
+      "reviewed": true,
+      "relevant": [],
+      "garbled": []
+    },
+    "q051": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2
+      ],
+      "garbled": []
+    },
+    "q052": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        2
+      ],
+      "garbled": [
+        3,
+        5
+      ]
+    },
+    "q053": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q054": {
+      "reviewed": true,
+      "relevant": [
+        2
+      ],
+      "garbled": [
+        4
+      ]
+    },
+    "q055": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q056": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q057": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4
+      ],
+      "garbled": []
+    },
+    "q058": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q059": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        4,
+        2,
+        3
+      ],
+      "garbled": []
+    },
+    "q060": {
+      "reviewed": true,
+      "relevant": [
+        2,
+        1,
+        3,
+        4
+      ],
+      "garbled": []
+    },
+    "q061": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        5,
+        1,
+        3,
+        2
+      ],
+      "garbled": []
+    },
+    "q062": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3,
+        4
+      ],
+      "garbled": []
+    },
+    "q063": {
+      "reviewed": true,
+      "relevant": [
+        1
+      ],
+      "garbled": []
+    },
+    "q064": {
+      "reviewed": true,
+      "relevant": [
+        3
+      ],
+      "garbled": []
+    },
+    "q065": {
+      "reviewed": true,
+      "relevant": [
+        1,
+        3,
+        2
+      ],
+      "garbled": []
+    },
+    "q066": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        2
+      ],
+      "garbled": []
+    },
+    "q067": {
+      "reviewed": true,
+      "relevant": [
+        5,
+        1,
+        3,
+        2,
+        4
+      ],
+      "garbled": []
+    },
+    "q068": {
+      "reviewed": true,
+      "relevant": [
+        4,
+        1,
+        3,
+        5,
+        2
+      ],
+      "garbled": []
+    }
+  }
+}
