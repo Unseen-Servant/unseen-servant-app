@@ -59,6 +59,12 @@ def test_heading_stack_pops_to_correct_level():
     assert "Monsters > Goblins" in breadcrumbs
 
 
+def test_breadcrumb_never_carries_markup():
+    pages = [_page(1, "## **<mark>Medusa</mark>**\n\n### <u>Actions</u>\n\nBite.")]
+    chunks = structure_aware(pages, source_pdf="x.pdf")
+    assert chunks[0].section_heading == "Medusa > Actions"
+
+
 def test_pipe_table_emitted_atomically():
     md = (
         "## Cloud Dragon\n\n"

@@ -208,3 +208,36 @@ def test_build_font_cluster_levels_handles_no_rows():
     out = build_font_cluster_levels([])
     assert out["modal_sig"] is None
     assert out["level_by_sig"] == {}
+
+
+def test_rows_are_sanitised_before_signatures():
+    md = "# **S eed** **<u>p</u>**\n\nBody."
+    pages = [{"page_number": 1, "markdown": md}]
+    spans_pages = [{"page_number": 1, "spans": _spans([("Kraken", 13.9, True), ("Speed ", 9.8, True)])}]
+    rows = collect_heading_signatures(pages, spans_pages)
+    assert rows[0]["text"] == "Speed"
+    assert rows[0]["parts"] == [("Speed", (9.8, True))]
+    assert rows[0]["sig"] == (9.8, True)
+
+
+def test_promote_rewrites_a_merged_line_as_two_headings():
+    # Two 13.9pt rows make that signature the modal cluster (level 2); the
+    # lone 18pt part is then the larger cluster and lands at level 1.
+    md = "# **Halfling Halflin Traits** **<u>g</u>**\n\nBody.\n\n## Elf Traits\n\nMore.\n\n## Dwarf Traits\n\nEnd."
+    pages = [{"page_number": 1, "markdown": md}]
+    spans_pages = [{"page_number": 1, "spans": _spans([
+        ("Halfling ", 18.0, True), ("Halfling Traits ", 13.9, True), ("Elf Traits", 13.9, True),
+        ("Dwarf Traits", 13.9, True), ("body", 9.8, False)])}]
+    promoted, _ = promote_markdown(pages, spans_pages, {"entries": []}, strategy="font_cluster")
+    lines = promoted[0]["markdown"].split("\n")
+    assert lines[0] == "# Halfling"
+    assert lines[1] == "## Halfling Traits"
+    assert "## Elf Traits" in lines
+
+
+def test_promote_strips_markup_and_small_caps_from_every_heading():
+    md = "## **chaRacteR RaceS**\n\nBody."
+    pages = [{"page_number": 1, "markdown": md}]
+    spans_pages = [{"page_number": 1, "spans": _spans([("chaRacteR RaceS", 11.0, True)])}]
+    promoted, _ = promote_markdown(pages, spans_pages, {"entries": []}, strategy="font_cluster")
+    assert promoted[0]["markdown"].split("\n")[0] == "## Character Races"

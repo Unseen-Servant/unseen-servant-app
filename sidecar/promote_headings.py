@@ -39,6 +39,8 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+from heading_text import sanitize
+
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _TOKEN_SPLIT_RE = re.compile(r"\W+", re.UNICODE)
 
@@ -108,12 +110,19 @@ def collect_heading_signatures(
         page_num = page["page_number"]
         page_spans = spans_by_page.get(page_num, [])
         for line_idx, level, text in _md_heading_lines(page["markdown"]):
-            sig = _heading_font_signature(text, page_spans)
+            parts = sanitize(text, page_spans)
+            if not parts:
+                rows.append({"page_number": page_num, "line_idx": line_idx,
+                             "original_level": level, "text": "", "parts": [], "sig": None})
+                continue
+            first_text, first_sig = parts[0]
+            sig = first_sig or _heading_font_signature(first_text, page_spans)
             rows.append({
                 "page_number": page_num,
                 "line_idx": line_idx,
                 "original_level": level,
-                "text": text,
+                "text": first_text,
+                "parts": parts,
                 "sig": sig,
             })
     return rows
@@ -209,23 +218,34 @@ def _rewrite_page_md(
     md: str,
     rows_for_page: list[dict],
     level_by_loc: dict[tuple[int, int], int],
+    level_by_sig: dict[tuple[float, bool], int] | None = None,
 ) -> str:
-    """Replace each heading line on a page with its promoted level.
+    """Replace each heading line with its sanitised text at its promoted
+    level. A line the span oracle resolved to several headings (a merged
+    18pt + 13.9pt pair) becomes several lines; parts after the first take
+    the level of their own font signature, else one level deeper. An empty
+    sanitised heading (pure markup) is dropped.
 
     Splits/rejoins on ``\\n`` only so any ``\\r`` characters embedded in
     non-heading lines (the SRD's CR-fragmented prose) survive verbatim
     for R1 downstream.
     """
+    level_by_sig = level_by_sig or {}
     lines = md.split("\n")
     for r in rows_for_page:
         loc = (r["page_number"], r["line_idx"])
-        new_level = level_by_loc.get(loc, r["original_level"])
-        new_level = max(1, min(6, int(new_level)))
-        m = HEADING_RE.match(lines[r["line_idx"]])
-        if not m:
+        if not HEADING_RE.match(lines[r["line_idx"]]):
             continue
-        text = m.group(2)
-        lines[r["line_idx"]] = ("#" * new_level) + " " + text
+        parts = r.get("parts") or [(r["text"], r.get("sig"))]
+        if not parts or not parts[0][0]:
+            lines[r["line_idx"]] = ""
+            continue
+        first_level = max(1, min(6, int(level_by_loc.get(loc, r["original_level"]))))
+        out = [("#" * first_level) + " " + parts[0][0]]
+        for text, sig in parts[1:]:
+            level = level_by_sig.get(sig, min(6, first_level + 1))
+            out.append(("#" * max(1, min(6, int(level)))) + " " + text)
+        lines[r["line_idx"]] = "\n".join(out)
     return "\n".join(lines)
 
 
@@ -287,7 +307,7 @@ def promote_markdown(
     new_pages: list[dict] = []
     for page in pages:
         page_rows = rows_by_page.get(page["page_number"], [])
-        new_md = _rewrite_page_md(page["markdown"], page_rows, level_by_loc)
+        new_md = _rewrite_page_md(page["markdown"], page_rows, level_by_loc, font_info["level_by_sig"])
         new_pages.append({**page, "markdown": new_md})
 
     level_distribution = Counter(level_by_loc.values())

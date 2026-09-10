@@ -14,6 +14,8 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from heading_text import strip_markup
+
 
 CHUNKER_VERSION = "structure_aware-v2"
 EMBEDDING_MODEL = "bge-m3"
@@ -182,11 +184,12 @@ def structure_aware(
             hm = _HEADING_RE.match(line)
             if hm:
                 level = len(hm.group(1))
-                text = hm.group(2).strip()
+                text = strip_markup(hm.group(2))
                 flush_prose()
                 while heading_stack and heading_stack[-1][0] >= level:
                     heading_stack.pop()
-                heading_stack.append((level, text))
+                if text:
+                    heading_stack.append((level, text))
                 i += 1
                 continue
 
