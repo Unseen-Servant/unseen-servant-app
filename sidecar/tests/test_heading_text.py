@@ -10,9 +10,11 @@ def test_strip_markup_removes_emphasis_tags_and_hash():
         == "Monsters A–Z > Medusa > Actions"
     assert strip_markup("*sEllinG EquipMEnt**") == "sEllinG EquipMEnt"
     assert strip_markup("_Gargantuan_ **_,_** chaotic") == "Gargantuan , chaotic"
-    assert strip_markup("# Combat<br>Grappling") == "CombatGrappling"
+    assert strip_markup("# Combat<br>Grappling") == "Combat Grappling"
     assert strip_markup("Snake_eyes Tavern") == "Snake_eyes Tavern"
     assert strip_markup("  Two   spaces ") == "Two spaces"
+    assert strip_markup("<Character Name> > Sheet") == "<Character Name> > Sheet"
+    assert strip_markup("<MARK>Medusa</MARK>") == "Medusa"
 
 
 def test_normalize_small_caps_title_cases_only_mixed_words():
@@ -54,6 +56,14 @@ def test_repair_leaves_a_clean_heading_alone():
 def test_repair_ignores_spans_below_min_size():
     spans = [_sp("Speed", 9.8, bold=False)]
     assert repair_from_spans("S eed p", spans, min_size=12.0) == [("S eed p", None)]
+
+
+def test_repair_ignores_letters_joined_by_dashes_or_apostrophes():
+    assert repair_from_spans("Monsters A–Z", [_sp("Monsters A-Z", 18.0)]) == [("Monsters A–Z", None)]
+    assert repair_from_spans("NATURE’S CURE", [_sp("NATURE'S CURE", 12.0)]) == [("NATURE’S CURE", None)]
+    # a real stranded letter must still repair
+    spans = [_sp("Kraken", 13.9), _sp("Speed ", 9.8, bold=True), _sp("30 ft.", 9.8, bold=False)]
+    assert repair_from_spans("S eed p", spans) == [("Speed", (9.8, True))]
 
 
 def test_sanitize_chains_the_three_rules():

@@ -16,16 +16,32 @@ from __future__ import annotations
 
 import re
 
-_MARKUP_RE = re.compile(r"</?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?>|\*+|(?<!\w)_+|_+(?!\w)|`|^#+\s*")
+# <br>/<br/>/<br /> is whitespace, not a delete — it separates two words that
+# would otherwise run together ("Combat<br>Grappling"). Handled before the
+# tag rule, which only deletes a whitelisted set of inline HTML tags (never
+# a bracketed placeholder like "<Character Name>").
+_BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_INLINE_TAGS = r"br|u|mark|sup|sub|b|i|em|strong|span|small|s|del|ins|a|code|kbd"
+_MARKUP_RE = re.compile(
+    rf"</?(?:{_INLINE_TAGS})(?:\s[^>]*)?>|\*+|(?<!\w)_+|_+(?!\w)|`|^#+\s*", re.IGNORECASE
+)
 _WS_RE = re.compile(r"\s+")
 _MIXED_RE = re.compile(r"[a-z][A-Z]")
-_LONE_RE = re.compile(r"(?<![\w'])(?![aAI](?![\w']))[A-Za-z](?![\w'])")
+# A stranded single letter, excluding the legitimate ones ("a", "I"). A
+# letter joined to its neighbour by a hyphen/dash (A–Z, MM-B, Will-o'-Wisp),
+# an apostrophe (NATURE'S, Player's), or followed by % (die notation d%) is
+# part of a word, not stranded.
+_JOINERS = "\\w'\u2019\\-\u2010\u2011\u2012\u2013\u2014\u00ad"
+_LONE_RE = re.compile(
+    rf"(?<![{_JOINERS}])(?![aAI](?![{_JOINERS}]))[A-Za-z](?![{_JOINERS}%])"
+)
 _NON_ALPHA_RE = re.compile(r"[^a-z]")
 _MAX_RUN = 4
 
 
 def strip_markup(text: str) -> str:
-    return _WS_RE.sub(" ", _MARKUP_RE.sub("", text or "")).strip()
+    text = _BR_RE.sub(" ", text or "")
+    return _WS_RE.sub(" ", _MARKUP_RE.sub("", text)).strip()
 
 
 def normalize_small_caps(text: str) -> str:
