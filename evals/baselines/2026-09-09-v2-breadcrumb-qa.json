@@ -22,8 +22,8 @@
       "chunks": 11165,
       "markup": 0,
       "markup_rate": 0.0,
-      "split_letter": 1208,
-      "split_letter_rate": 0.10819525302283924,
+      "split_letter": 85,
+      "split_letter_rate": 0.00761307657859382,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 2669,
@@ -35,8 +35,8 @@
       "chunks": 94,
       "markup": 0,
       "markup_rate": 0.0,
-      "split_letter": 1,
-      "split_letter_rate": 0.010638297872340425,
+      "split_letter": 0,
+      "split_letter_rate": 0.0,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 0,
@@ -61,8 +61,8 @@
       "chunks": 3244,
       "markup": 0,
       "markup_rate": 0.0,
-      "split_letter": 134,
-      "split_letter_rate": 0.04130702836004932,
+      "split_letter": 11,
+      "split_letter_rate": 0.0033908754623921083,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 0,
@@ -74,8 +74,8 @@
       "chunks": 3455,
       "markup": 0,
       "markup_rate": 0.0,
-      "split_letter": 954,
-      "split_letter_rate": 0.2761215629522431,
+      "split_letter": 6,
+      "split_letter_rate": 0.0017366136034732273,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 0,
@@ -87,8 +87,8 @@
       "chunks": 2706,
       "markup": 0,
       "markup_rate": 0.0,
-      "split_letter": 114,
-      "split_letter_rate": 0.04212860310421286,
+      "split_letter": 68,
+      "split_letter_rate": 0.025129342202512936,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 2664,
@@ -100,8 +100,8 @@
       "chunks": 369,
       "markup": 0,
       "markup_rate": 0.0,
-      "split_letter": 5,
-      "split_letter_rate": 0.013550135501355014,
+      "split_letter": 0,
+      "split_letter_rate": 0.0,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 2,
@@ -146,7 +146,7 @@
       "doc": "black_hack_1e",
       "chunks": 94,
       "markup": 0,
-      "split_letter": 1,
+      "split_letter": 0,
       "mixed_case": 0,
       "furniture_root": 0,
       "no_heading": 1,
@@ -208,7 +208,7 @@
       "doc": "srd_5_1",
       "chunks": 3244,
       "markup": 0,
-      "split_letter": 134,
+      "split_letter": 11,
       "mixed_case": 0,
       "furniture_root": 0,
       "no_heading": 0,
@@ -239,7 +239,7 @@
       "doc": "srd_5_2_1",
       "chunks": 3455,
       "markup": 0,
-      "split_letter": 954,
+      "split_letter": 6,
       "mixed_case": 0,
       "furniture_root": 0,
       "no_heading": 0,
@@ -270,7 +270,7 @@
       "doc": "osric_2e",
       "chunks": 2706,
       "markup": 0,
-      "split_letter": 114,
+      "split_letter": 68,
       "mixed_case": 0,
       "furniture_root": 2664,
       "no_heading": 1,
@@ -301,7 +301,7 @@
       "doc": "yze_srd",
       "chunks": 369,
       "markup": 0,
-      "split_letter": 5,
+      "split_letter": 0,
       "mixed_case": 0,
       "furniture_root": 2,
       "no_heading": 1,
@@ -349,12 +349,7 @@
     },
     "black_hack_1e": {
       "markup": [],
-      "split_letter": [
-        [
-          "WHAT\u2019S THIS?",
-          1
-        ]
-      ],
+      "split_letter": [],
       "mixed_case": [],
       "furniture_root": [],
       "no_heading": [
@@ -380,36 +375,36 @@
       "markup": [],
       "split_letter": [
         [
-          "Appendix MM-B: Nonplayer Characters > Priest",
-          5
+          "Spellcasting > Range: 120 feet Components: V, S, M (a small block of granite) Duration: Concentration, up to 10 minutes",
+          2
         ],
         [
-          "Monsters > Will-\u00ad\u2010o\u2019-\u00ad\u2010Wisp",
-          4
+          "Ability Scores and Modifiers > S ecial T es of Movement p yp",
+          1
         ],
         [
-          "Appendix MM-B: Nonplayer Characters > Archmage",
-          4
+          "Ability Scores and Modifiers > Dro in to 0 Hit Points pp g",
+          1
         ],
         [
-          "Appendix MM-B: Nonplayer Characters > Acolyte",
-          3
+          "Spellcasting > Verbal (V)",
+          1
         ],
         [
-          "Appendix MM-B: Nonplayer Characters > Archmage > Actions",
-          3
+          "Spellcasting > Somatic (S)",
+          1
         ],
         [
-          "Appendix MM-B: Nonplayer Characters > Bandit Captain",
-          3
+          "Spellcasting > Material (M)",
+          1
         ],
         [
-          "Appendix MM-B: Nonplayer Characters > Berserker",
-          3
+          "Spellcasting > Branding Smite > V",
+          1
         ],
         [
-          "Appendix MM-B: Nonplayer Characters > Commoner",
-          3
+          "Spellcasting > Hunter\u2019s Mark > V",
+          1
         ]
       ],
       "mixed_case": [],
@@ -420,36 +415,28 @@
       "markup": [],
       "split_letter": [
         [
-          "Monsters A\u2013Z > Young Gold Dragon > Actions",
-          4
+          "The Six Abilities > Dro in to 0 Hit Points pp g",
+          1
         ],
         [
-          "Monsters A\u2013Z > Axe Beak",
-          3
+          "Casting Spells > Verbal (V)",
+          1
         ],
         [
-          "Monsters A\u2013Z > Azer Sentinel",
-          3
+          "Casting Spells > Somatic (S)",
+          1
         ],
         [
-          "Monsters A\u2013Z > Basilisk",
-          3
+          "Casting Spells > Material (M)",
+          1
         ],
         [
-          "Monsters A\u2013Z > Behir",
-          3
+          "Gameplay Toolbox > Sli er Ice pp y",
+          1
         ],
         [
-          "Monsters A\u2013Z > Berserker",
-          3
-        ],
-        [
-          "Monsters A\u2013Z > Black Pudding",
-          3
-        ],
-        [
-          "Monsters A\u2013Z > Bugbear Stalker",
-          3
+          "Monsters A\u2013Z > Copper Dragons > Co er Dra on W rmlin pp g y g",
+          1
         ]
       ],
       "mixed_case": [],
@@ -459,10 +446,6 @@
     "osric_2e": {
       "markup": [],
       "split_letter": [
-        [
-          "For Free Updates, Errata and Other OSRIc Support, VISIt: > Adventure and Exploration > Don\u2019t forget, monsters can hear the party in the same way as the party can hear them!",
-          24
-        ],
         [
           "For Free Updates, Errata and Other OSRIc Support, VISIt: > class d demon > (Nalfeshnee and others)",
           9
@@ -476,20 +459,24 @@
           7
         ],
         [
-          "For Free Updates, Errata and Other OSRIc Support, VISIt: > Jewellery Table > roll d% and d10",
-          5
-        ],
-        [
-          "For Free Updates, Errata and Other OSRIc Support, VISIt: > Dungeons > features table (d%)",
-          4
-        ],
-        [
           "For Free Updates, Errata and Other OSRIc Support, VISIt: > class c demon > (Glabrezu)",
           4
         ],
         [
-          "For Free Updates, Errata and Other OSRIc Support, VISIt: > Dungeons > attributes (d%)",
+          "For Free Updates, Errata and Other OSRIc Support, VISIt: > class B demon > (Hezrou)",
           3
+        ],
+        [
+          "For Free Updates, Errata and Other OSRIc Support, VISIt: > monster Summoning IV > (Monster Summoning V)",
+          2
+        ],
+        [
+          "For Free Updates, Errata and Other OSRIc Support, VISIt: > Shocking Grasp > area of effect: See below components: V,S,M casting time: 1 segment Saving throw: None",
+          2
+        ],
+        [
+          "For Free Updates, Errata and Other OSRIc Support, VISIt: > Blindness > components: V,S,M casting time: 5 segments Saving throw: See below",
+          2
         ]
       ],
       "mixed_case": [],
@@ -536,28 +523,7 @@
     },
     "yze_srd": {
       "markup": [],
-      "split_letter": [
-        [
-          "LEARNING MAGIC > NATURE\u2019S CURE",
-          1
-        ],
-        [
-          "LEARNING MAGIC > CAT\u2019S PAW",
-          1
-        ],
-        [
-          "LEARNING MAGIC > HAWK\u2019S EYE",
-          1
-        ],
-        [
-          "LEARNING MAGIC > BEAR\u2019S CLAW",
-          1
-        ],
-        [
-          "LEARNING MAGIC > DEER\u2019S DASH",
-          1
-        ]
-      ],
+      "split_letter": [],
       "mixed_case": [],
       "furniture_root": [
         [

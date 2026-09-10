@@ -28,9 +28,15 @@ FLAWS = ["markup", "split_letter", "mixed_case", "furniture_root", "no_heading"]
 # leading Markdown heading marker. An underscore inside a word (snake_case
 # names in some indie titles) is not markup.
 _MARKUP = re.compile(r"\*+|(?<!\w)_+|_+(?!\w)|</?[a-z][a-z0-9]*(?:\s[^>]*)?>|`|^#+\s*")
-# A stranded single letter, excluding the legitimate ones ("a", "I"). Matching
-# the split ("word space short-word") finds ordinary English like "a pit".
-_LONE_LETTER = re.compile(r"(?<![\w'])(?![aAI](?![\w']))[A-Za-z](?![\w'])")
+# A stranded single letter, excluding the legitimate ones ("a", "I"). A
+# letter joined to its neighbour by a hyphen/dash (A–Z, MM-B, Will-o'-Wisp),
+# an apostrophe (NATURE'S, Player's), or followed by % (die notation d%) is
+# part of a word, not stranded. Matching the split ("word space short-word")
+# finds ordinary English like "a pit".
+_JOINERS = "\\w'\u2019\\-\u2010\u2011\u2012\u2013\u2014\u00ad"
+_LONE_LETTER = re.compile(
+    rf"(?<![{_JOINERS}])(?![aAI](?![{_JOINERS}]))[A-Za-z](?![{_JOINERS}%])"
+)
 # A lowercase run followed by an uppercase letter inside one word: a small-caps
 # display font read back as mixed case. "THAC0" (all caps) does not match.
 _MIXED_CASE = re.compile(r"\b[a-z]+[A-Z][A-Za-z]*\b")

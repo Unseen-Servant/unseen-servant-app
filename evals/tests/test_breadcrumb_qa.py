@@ -88,3 +88,15 @@ def test_regressions_flag_a_rate_that_rose_on_any_doc():
 
 def test_regressions_ignore_docs_missing_on_either_side():
     assert regressions({"a": {"markup_rate": 0.5}}, {"b": {"markup_rate": 0.0}}) == []
+
+
+def test_split_letter_ignores_letters_joined_by_dashes_apostrophes_or_die_percent():
+    for h in ("Monsters A–Z > Young Gold Dragon", "Appendix MM-B: Nonplayer Characters > Priest",
+              "Monsters > Will-­‐o’-­‐Wisp", "LEARNING MAGIC > NATURE’S CURE",
+              "Jewellery Table > roll d% and d10", "Rules > Player's Guide"):
+        assert "split_letter" not in flaws(h), h
+
+
+def test_split_letter_still_flags_real_stranded_letters():
+    for h in ("S eed p > Goblin", "Dexterit y > Grappling", "Le endar Actions g y", "Ran er S ells g p"):
+        assert "split_letter" in flaws(h), h
