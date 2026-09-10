@@ -382,15 +382,13 @@ def run_breadcrumb_qa(engine, corpus) -> dict:
     chunks_fn = getattr(engine, "chunks", None)
     if chunks_fn is None:
         raise SystemExit(f"engine {engine.name!r} has no chunks() hook; breadcrumb-qa needs it")
-    rows = []
+    rows, res = [], {}
     for d in corpus.documents:
-        print(f"chunking {d.id}…", flush=True)
-        g = breadcrumb_qa.grade_doc(d.id, chunks_fn(d.pdf_path))
-        rows.append(g)
-        print(f"  {d.id}: {g['chunks']} chunks, markup {g['markup']}, split {g['split_letter']}, "
-              f"furniture roots {g['furniture_root']}; top root {g['top_roots'][0] if g['top_roots'] else '—'}",
-              flush=True)
-    return {"by_doc": breadcrumb_qa.aggregate(rows), "docs": rows}
+        chunks = chunks_fn(d.pdf_path)
+        rows.append(breadcrumb_qa.grade_doc(d.id, chunks))
+        res[d.id] = {f: [list(t) for t in v] for f, v in breadcrumb_qa.residue(d.id, chunks).items()}
+        print(f"  {d.id}: {rows[-1]['chunks']} chunks")
+    return {"by_doc": breadcrumb_qa.aggregate(rows), "docs": rows, "residue": res}
 
 
 # ── entry point ───────────────────────────────────────────────────────────
@@ -420,7 +418,8 @@ def main() -> int:
                     help="corpus-qa: re-grade a prior run's .pages.json instead of re-extracting")
     ap.add_argument("--gate", type=Path, default=None,
                     help="reference baseline .json; retrieval blocks headline scope regressions, "
-                         "extraction blocks any per-page metric regression")
+                         "extraction blocks any per-page metric regression, breadcrumb-qa blocks "
+                         "any per-doc flaw-rate rise")
     args = ap.parse_args()
 
     if args.suite == "retrieval":
@@ -532,6 +531,16 @@ def main() -> int:
                 json.dumps({"meta": meta, **result}, indent=2), encoding="utf-8")
             (BASELINE_DIR / f"{stem}.md").write_text(md, encoding="utf-8")
             print(f"wrote evals/baselines/{stem}.{{json,md}}")
+        if args.gate is not None:
+            ref = json.loads(args.gate.read_text(encoding="utf-8"))["by_doc"]
+            regs = breadcrumb_qa.regressions(result["by_doc"], ref)
+            print(f"\n## Breadcrumb gate vs {args.gate.name}")
+            for r in regs:
+                print(f"  {r['doc']:<14}{r['flaw']:<16}{r['ref']:.4f} → {r['cur']:.4f}")
+            if regs:
+                print(f"GATE FAILED: {len(regs)} breadcrumb flaw rate(s) above the reference")
+                return 1
+            print("  no flaw rate rose on any doc")
         return 0
 
     if args.suite == "extraction":

@@ -54,3 +54,37 @@ def test_aggregate_rates_and_all_bucket():
     assert s["a"]["markup_rate"] == 1.0 and s["b"]["markup_rate"] == 0.0
     assert s["all"]["chunks"] == 2 and s["all"]["markup_rate"] == 0.5
     assert "markup_rate" in bq.format_report(s)
+
+
+from evals.retrieval.breadcrumb_qa import flaws, regressions, residue
+
+
+def test_markup_catches_single_star_underscore_and_hash():
+    assert "markup" in flaws("*sEllinG EquipMEnt** > **Vex**")
+    assert "markup" in flaws("_Gargantuan_ > Kraken")
+    assert "markup" in flaws("# Combat > Grappling")
+    assert "markup" not in flaws("Snake_eyes Tavern > Bar")   # underscore inside a word
+
+
+def test_residue_lists_the_most_frequent_flawed_headings():
+    chunks = [{"section_heading": "**S eed** **<u>p</u>** > **Goblin**"}] * 3 \
+        + [{"section_heading": "chaRacteR RaceS > Elves"}] * 2 \
+        + [{"section_heading": "Combat > Grappling"}]
+    r = residue("srd", chunks, per_flaw=5)
+    assert r["markup"][0] == ("**S eed** **<u>p</u>** > **Goblin**", 3)
+    assert r["split_letter"][0][1] == 3
+    assert r["mixed_case"] == [("chaRacteR RaceS > Elves", 2)]
+    assert r["furniture_root"] == []
+
+
+def test_regressions_flag_a_rate_that_rose_on_any_doc():
+    ref = {"osric_2e": {"markup_rate": 0.0, "split_letter_rate": 0.0},
+           "all": {"markup_rate": 0.0, "split_letter_rate": 0.0}}
+    cur = {"osric_2e": {"markup_rate": 0.0, "split_letter_rate": 0.02},
+           "all": {"markup_rate": 0.0, "split_letter_rate": 0.001}}
+    regs = regressions(cur, ref)
+    assert {(r["doc"], r["flaw"]) for r in regs} == {("osric_2e", "split_letter"), ("all", "split_letter")}
+
+
+def test_regressions_ignore_docs_missing_on_either_side():
+    assert regressions({"a": {"markup_rate": 0.5}}, {"b": {"markup_rate": 0.0}}) == []

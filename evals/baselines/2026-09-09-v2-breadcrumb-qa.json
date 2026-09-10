@@ -1,0 +1,873 @@
+{
+  "meta": {
+    "engine": "v2",
+    "name": "breadcrumb-qa",
+    "date": "2026-09-09"
+  },
+  "by_doc": {
+    "bfrpg_4e": {
+      "chunks": 1195,
+      "markup": 201,
+      "markup_rate": 0.1682008368200837,
+      "split_letter": 0,
+      "split_letter_rate": 0.0,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 3,
+      "furniture_root_rate": 0.002510460251046025,
+      "no_heading": 1,
+      "no_heading_rate": 0.0008368200836820083
+    },
+    "all": {
+      "chunks": 11165,
+      "markup": 10080,
+      "markup_rate": 0.9028213166144201,
+      "split_letter": 3537,
+      "split_letter_rate": 0.31679355127630987,
+      "mixed_case": 2878,
+      "mixed_case_rate": 0.25776981639050606,
+      "furniture_root": 2669,
+      "furniture_root_rate": 0.23905060456784594,
+      "no_heading": 5,
+      "no_heading_rate": 0.0004478280340349306
+    },
+    "black_hack_1e": {
+      "chunks": 94,
+      "markup": 14,
+      "markup_rate": 0.14893617021276595,
+      "split_letter": 1,
+      "split_letter_rate": 0.010638297872340425,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 1,
+      "no_heading_rate": 0.010638297872340425
+    },
+    "cairn_1e": {
+      "chunks": 102,
+      "markup": 101,
+      "markup_rate": 0.9901960784313726,
+      "split_letter": 0,
+      "split_letter_rate": 0.0,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 1,
+      "no_heading_rate": 0.00980392156862745
+    },
+    "srd_5_1": {
+      "chunks": 3244,
+      "markup": 3242,
+      "markup_rate": 0.9993834771886559,
+      "split_letter": 1985,
+      "split_letter_rate": 0.6118988902589396,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 0,
+      "no_heading_rate": 0.0
+    },
+    "srd_5_2_1": {
+      "chunks": 3455,
+      "markup": 3455,
+      "markup_rate": 1.0,
+      "split_letter": 1431,
+      "split_letter_rate": 0.4141823444283647,
+      "mixed_case": 206,
+      "mixed_case_rate": 0.059623733719247465,
+      "furniture_root": 0,
+      "furniture_root_rate": 0.0,
+      "no_heading": 0,
+      "no_heading_rate": 0.0
+    },
+    "osric_2e": {
+      "chunks": 2706,
+      "markup": 2705,
+      "markup_rate": 0.999630450849963,
+      "split_letter": 115,
+      "split_letter_rate": 0.04249815225424981,
+      "mixed_case": 2672,
+      "mixed_case_rate": 0.9874353288987435,
+      "furniture_root": 2664,
+      "furniture_root_rate": 0.9844789356984479,
+      "no_heading": 1,
+      "no_heading_rate": 0.0003695491500369549
+    },
+    "yze_srd": {
+      "chunks": 369,
+      "markup": 362,
+      "markup_rate": 0.981029810298103,
+      "split_letter": 5,
+      "split_letter_rate": 0.013550135501355014,
+      "mixed_case": 0,
+      "mixed_case_rate": 0.0,
+      "furniture_root": 2,
+      "furniture_root_rate": 0.005420054200542005,
+      "no_heading": 1,
+      "no_heading_rate": 0.0027100271002710027
+    }
+  },
+  "docs": [
+    {
+      "doc": "bfrpg_4e",
+      "chunks": 1195,
+      "markup": 201,
+      "split_letter": 0,
+      "mixed_case": 0,
+      "furniture_root": 3,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "PART 6:  MONSTERS",
+          563
+        ],
+        [
+          "PART 3:  SPELLS",
+          169
+        ],
+        [
+          "PART 8:  GAME MASTER INFORMATION",
+          142
+        ],
+        [
+          "PART 7:  TREASURE",
+          115
+        ],
+        [
+          "PART 2:  PLAYER CHARACTERS",
+          66
+        ]
+      ]
+    },
+    {
+      "doc": "black_hack_1e",
+      "chunks": 94,
+      "markup": 14,
+      "split_letter": 1,
+      "mixed_case": 0,
+      "furniture_root": 0,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "CONJURER",
+          28
+        ],
+        [
+          "EXAMPLE OF PLAY",
+          11
+        ],
+        [
+          "CONVERTING SAVES",
+          6
+        ],
+        [
+          "CLERIC",
+          5
+        ],
+        [
+          "ARMOR POINTS",
+          3
+        ]
+      ]
+    },
+    {
+      "doc": "cairn_1e",
+      "chunks": 102,
+      "markup": 101,
+      "split_letter": 0,
+      "mixed_case": 0,
+      "furniture_root": 0,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "Rules",
+          30
+        ],
+        [
+          "100 Spells",
+          10
+        ],
+        [
+          "Rules Summary",
+          10
+        ],
+        [
+          "Character Traits (d10)",
+          7
+        ],
+        [
+          "Bestiary",
+          6
+        ]
+      ]
+    },
+    {
+      "doc": "srd_5_1",
+      "chunks": 3244,
+      "markup": 3242,
+      "split_letter": 1985,
+      "mixed_case": 0,
+      "furniture_root": 0,
+      "no_heading": 0,
+      "top_roots": [
+        [
+          "S eed p",
+          719
+        ],
+        [
+          "Ran er S ells g p",
+          591
+        ],
+        [
+          "Paired Items",
+          372
+        ],
+        [
+          "Creatures",
+          344
+        ],
+        [
+          "Me hits p",
+          173
+        ]
+      ]
+    },
+    {
+      "doc": "srd_5_2_1",
+      "chunks": 3455,
+      "markup": 3455,
+      "split_letter": 1431,
+      "mixed_case": 206,
+      "furniture_root": 0,
+      "no_heading": 0,
+      "top_roots": [
+        [
+          "Monsters A\u2013Z",
+          806
+        ],
+        [
+          "Casting Spells",
+          525
+        ],
+        [
+          "Classes",
+          477
+        ],
+        [
+          "Magic Item Categories",
+          444
+        ],
+        [
+          "sEllinG EquipMEnt",
+          187
+        ]
+      ]
+    },
+    {
+      "doc": "osric_2e",
+      "chunks": 2706,
+      "markup": 2705,
+      "split_letter": 115,
+      "mixed_case": 2672,
+      "furniture_root": 2664,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:",
+          2664
+        ],
+        [
+          "T",
+          18
+        ],
+        [
+          "final author and editor in chief: Stuart Marshall",
+          2
+        ],
+        [
+          "A",
+          2
+        ],
+        [
+          "Old SchOOl RefeRence and Index cOmpIlatIOn",
+          1
+        ]
+      ]
+    },
+    {
+      "doc": "yze_srd",
+      "chunks": 369,
+      "markup": 362,
+      "split_letter": 5,
+      "mixed_case": 0,
+      "furniture_root": 2,
+      "no_heading": 1,
+      "top_roots": [
+        [
+          "COMBAT & DAMAGE",
+          105
+        ],
+        [
+          "LEARNING MAGIC",
+          91
+        ],
+        [
+          "OTHER SKILLS",
+          75
+        ],
+        [
+          "PLAYER CHARACTERS",
+          34
+        ],
+        [
+          "TRAVEL MAPS",
+          33
+        ]
+      ]
+    }
+  ],
+  "residue": {
+    "bfrpg_4e": {
+      "markup": [
+        [
+          "PART 6:  MONSTERS > **Mountain Dragon Age Table**",
+          14
+        ],
+        [
+          "PART 3:  SPELLS > **Ice Storm** Range: 300'+30'/level Magic-User 4 Duration: 1 round",
+          10
+        ],
+        [
+          "PART 3:  SPELLS > **Cure Serious Wounds*** > BASIC FANTASY RPG",
+          9
+        ],
+        [
+          "PART 6:  MONSTERS > **Forest Dragon Age Table**",
+          8
+        ],
+        [
+          "PART 3:  SPELLS > **Cure Serious Wounds***",
+          7
+        ],
+        [
+          "PART 3:  SPELLS > **Lightning Bolt** Range: 100'+10'/level Magic-User 3 Duration: instantaneous",
+          7
+        ],
+        [
+          "PART 3:  SPELLS > **Lightning Bolt** Range: 100'+10'/level Magic-User 3 Duration: instantaneous > BASIC FANTASY RPG",
+          7
+        ],
+        [
+          "PART 3:  SPELLS > **Mirror Image** Range: self Magic-User 2 Duration: 1 turn/level > BASIC FANTASY RPG",
+          7
+        ]
+      ],
+      "split_letter": [],
+      "mixed_case": [],
+      "furniture_root": [
+        [
+          "TABLE OF CONTENTS",
+          3
+        ]
+      ],
+      "no_heading": [
+        [
+          "",
+          1
+        ]
+      ]
+    },
+    "black_hack_1e": {
+      "markup": [
+        [
+          "CONJURER > **6**",
+          5
+        ],
+        [
+          "CONJURER > **4**",
+          2
+        ],
+        [
+          "**An \u2018OSR\u2019 First Edition Hack**",
+          1
+        ],
+        [
+          "USAGE DIE > **d20  >  d12  >  d10  >  d8  >  d6  >  d4**",
+          1
+        ],
+        [
+          "CONJURER > **5**",
+          1
+        ],
+        [
+          "CONJURER > **7**",
+          1
+        ],
+        [
+          "CONJURER > **1**",
+          1
+        ],
+        [
+          "CONJURER > **2**",
+          1
+        ]
+      ],
+      "split_letter": [
+        [
+          "WHAT\u2019S THIS?",
+          1
+        ]
+      ],
+      "mixed_case": [],
+      "furniture_root": [],
+      "no_heading": [
+        [
+          "",
+          1
+        ]
+      ]
+    },
+    "cairn_1e": {
+      "markup": [
+        [
+          "**100 Spells** > **11. Beast Form:** You and your",
+          9
+        ],
+        [
+          "**Character Traits (d10)** > **4. Face**",
+          6
+        ],
+        [
+          "**Rules** > **Scars**",
+          4
+        ],
+        [
+          "**Name & Background (d20)**",
+          2
+        ],
+        [
+          "**Rules** > **Reactions**",
+          2
+        ],
+        [
+          "**Classless**",
+          1
+        ],
+        [
+          "**Neutrality**",
+          1
+        ],
+        [
+          "**Death**",
+          1
+        ]
+      ],
+      "split_letter": [],
+      "mixed_case": [],
+      "furniture_root": [],
+      "no_heading": [
+        [
+          "",
+          1
+        ]
+      ]
+    },
+    "srd_5_1": {
+      "markup": [
+        [
+          "**Equipment** > **Adventuring Gear**",
+          15
+        ],
+        [
+          "**Equipment** > **Lifestyle Expenses**",
+          8
+        ],
+        [
+          "**Monsters** > **Type**",
+          8
+        ],
+        [
+          "**Equipment** > **Tools**",
+          7
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > _Mechanical trap_",
+          7
+        ],
+        [
+          "**Paired Items** > **Deck of Many Things** > _Wondrous item, legendary_",
+          7
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **1st Level**",
+          6
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **Sam le Poisons** **<u>p</u>**",
+          6
+        ]
+      ],
+      "split_letter": [
+        [
+          "**Ran er S ells** **<u>g p</u>** > _Mechanical trap_",
+          7
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **1st Level**",
+          6
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **Sam le Poisons** **<u>p</u>**",
+          6
+        ],
+        [
+          "**S eed** **<u>p</u>** > **Ancient Gold Dragon** > **Actions**",
+          6
+        ],
+        [
+          "**S hinxes** **<u>p</u>** > **Vampire**",
+          6
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **Control Water**",
+          5
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **Prismatic Wall** > _9th-\u00ad\u2010\u2011level abjuration_",
+          5
+        ],
+        [
+          "**Ran er S ells** **<u>g p</u>** > **Symbol**",
+          5
+        ]
+      ],
+      "mixed_case": [],
+      "furniture_root": [],
+      "no_heading": []
+    },
+    "srd_5_2_1": {
+      "markup": [
+        [
+          "**Classes** > **As a Level 1 Character**",
+          12
+        ],
+        [
+          "**Classes** > **As a Multiclass Character**",
+          12
+        ],
+        [
+          "**Classes** > **Level 4: Ability Score Improvement**",
+          12
+        ],
+        [
+          "**Classes** > **Level 19: Epic Boon**",
+          12
+        ],
+        [
+          "**Classes** > **Level 1: Spellcasting**",
+          11
+        ],
+        [
+          "**Magic Item Categories** > **Mysterious Deck**",
+          10
+        ],
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **Trinkets** > **1d100 Trinket**",
+          6
+        ],
+        [
+          "**Magic Item Categories** > _Potion, Rare_",
+          6
+        ]
+      ],
+      "split_letter": [
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **Trinkets** > **1d100 Trinket**",
+          6
+        ],
+        [
+          "**Magic Item Categories** > **<mark>Giant Fl</mark>** **<u><mark>y</mark></u>**",
+          6
+        ],
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **Level 1 Hit Points by Class**",
+          4
+        ],
+        [
+          "**Monsters A\u2013Z** > **<mark>Young Gold Dragon</mark>** > <u>Actions</u>",
+          4
+        ],
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **Choose a Background** > **Ability Scores and Backgrounds**",
+          3
+        ],
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **Gainin a Level** **<u>g</u>** > **Fixed Hit Points by Class**",
+          3
+        ],
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **Spellcasting**",
+          3
+        ],
+        [
+          "**Casting Spells** > **<mark>Otherworldl Steed</mark>** **<u><mark>y</mark></u>**",
+          3
+        ]
+      ],
+      "mixed_case": [
+        [
+          "**sEllinG EquipMEnt** > **Ammunition (Varies)** > **Adventuring Gear**",
+          3
+        ],
+        [
+          "**sEllinG EquipMEnt** > **Food, Drink, and Lodging**",
+          3
+        ],
+        [
+          "**The Six Abilities** > **Your Turn** > **playinG on a Grid**",
+          2
+        ],
+        [
+          "**The Six Abilities** > **unsEEn attackErs and tarGEts**",
+          2
+        ],
+        [
+          "**Ste 2: Character Ori in** **<u>p g</u>** > **The Nine Alignments** > **unaliGnEd crEaturEs**",
+          2
+        ],
+        [
+          "**Classes** > **Level 3: Channel Divinity** > **BrEakinG your oatH**",
+          2
+        ],
+        [
+          "**Classes** > **Level 3: Wizard Subclass** > **ExpandinG and rEplacinG a spEllBook**",
+          2
+        ],
+        [
+          "**sEllinG EquipMEnt** > **Armor**",
+          2
+        ]
+      ],
+      "furniture_root": [],
+      "no_heading": []
+    },
+    "osric_2e": {
+      "markup": [
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **MISCELLANEOUS MAGIC** > **Bag of Tricks Colour**",
+          126
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **CURSED ITEMS** > **Table of Common Item Curses**",
+          47
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **POTIONS** > **Potion Admixture Results Table**",
+          34
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **StandaRd hIRelInGS** > **EXPERT HIRELINGS**",
+          30
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > Don\u2019t forget, monsters can hear the party in the same way as the party can hear them!",
+          24
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **RINGS**",
+          21
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > **SeaRchInG the dUnGeOn**",
+          17
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **cOmBat**",
+          16
+        ]
+      ],
+      "split_letter": [
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > Don\u2019t forget, monsters can hear the party in the same way as the party can hear them!",
+          24
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **class d demon** _(Nalfeshnee and others)_",
+          9
+        ],
+        [
+          "**T** > **OSRIc Open license:**",
+          9
+        ],
+        [
+          "**T** > **Open Game lIcenSe Version 1.0a**",
+          7
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **Jewellery Table** > **roll d% and d10**",
+          5
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **dUnGeOnS** > **features table (d%)**",
+          4
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **class c demon** _(Glabrezu)_",
+          4
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **dUnGeOnS** > **attributes (d%)**",
+          3
+        ]
+      ],
+      "mixed_case": [
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **MISCELLANEOUS MAGIC** > **Bag of Tricks Colour**",
+          126
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **CURSED ITEMS** > **Table of Common Item Curses**",
+          47
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **POTIONS** > **Potion Admixture Results Table**",
+          34
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **StandaRd hIRelInGS** > **EXPERT HIRELINGS**",
+          30
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > Don\u2019t forget, monsters can hear the party in the same way as the party can hear them!",
+          24
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **RINGS**",
+          21
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > **SeaRchInG the dUnGeOn**",
+          17
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **cOmBat**",
+          16
+        ]
+      ],
+      "furniture_root": [
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **MISCELLANEOUS MAGIC** > **Bag of Tricks Colour**",
+          126
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **CURSED ITEMS** > **Table of Common Item Curses**",
+          47
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **POTIONS** > **Potion Admixture Results Table**",
+          34
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **StandaRd hIRelInGS** > **EXPERT HIRELINGS**",
+          30
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > Don\u2019t forget, monsters can hear the party in the same way as the party can hear them!",
+          24
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **RINGS**",
+          21
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **adVentURe and explORatIOn** > **SeaRchInG the dUnGeOn**",
+          17
+        ],
+        [
+          "**fOR fRee UpdateS, eRRata and OtheR OSRIc SUppORt, VISIt:** > **cOmBat**",
+          16
+        ]
+      ],
+      "no_heading": [
+        [
+          "",
+          1
+        ]
+      ]
+    },
+    "yze_srd": {
+      "markup": [
+        [
+          "PLAYER CHARACTERS > **PERSONALITY TRAITS**",
+          4
+        ],
+        [
+          "**OTHER SKILLS** > **COST OF PUSHING**",
+          3
+        ],
+        [
+          "**OTHER SKILLS** > **DIFFICULTY**",
+          3
+        ],
+        [
+          "COMBAT & DAMAGE > **DEATH** > **CRITICAL INJURIES \u2013 PHYSICAL**",
+          3
+        ],
+        [
+          "COMBAT & DAMAGE > **DEATH** > **CRITICAL INJURIES \u2013 MENTAL**",
+          3
+        ],
+        [
+          "COMBAT & DAMAGE > **CHASE OBSTACLES**",
+          3
+        ],
+        [
+          "**TRAVEL MAPS** > **TERRAIN TYPES**",
+          3
+        ],
+        [
+          "**TRAVEL MAPS** > **MAKING CAMP**",
+          3
+        ]
+      ],
+      "split_letter": [
+        [
+          "**LEARNING MAGIC** > **NATURE\u2019S CURE**",
+          1
+        ],
+        [
+          "**LEARNING MAGIC** > **CAT\u2019S PAW**",
+          1
+        ],
+        [
+          "**LEARNING MAGIC** > **HAWK\u2019S EYE**",
+          1
+        ],
+        [
+          "**LEARNING MAGIC** > **BEAR\u2019S CLAW**",
+          1
+        ],
+        [
+          "**LEARNING MAGIC** > **DEER\u2019S DASH**",
+          1
+        ]
+      ],
+      "mixed_case": [],
+      "furniture_root": [
+        [
+          "<u>CONTENTS</u>",
+          2
+        ]
+      ],
+      "no_heading": [
+        [
+          "",
+          1
+        ]
+      ]
+    }
+  }
+}

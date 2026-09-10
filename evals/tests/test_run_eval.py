@@ -179,6 +179,20 @@ def test_single_scope_rejects_a_doc_list(tmp_path):
         run(_TwinEngine(), [q], corpus, SearchOptions(), do_index=False)
 
 
+def test_breadcrumb_qa_result_carries_residue(tmp_path):
+    from evals.run_eval import run_breadcrumb_qa
+
+    class Eng:
+        name = "fake"
+        def chunks(self, _p):
+            return [{"section_heading": "**Bold** > Sub"}, {"section_heading": "Clean > Sub"}]
+
+    corpus = SimpleNamespace(documents=[SimpleNamespace(id="d1", pdf_path=tmp_path / "d1.pdf")])
+    out = run_breadcrumb_qa(Eng(), corpus)
+    assert out["residue"]["d1"]["markup"] == [["**Bold** > Sub", 1]]
+    assert out["by_doc"]["d1"]["markup_rate"] == 0.5
+
+
 def test_v2_request_body_is_json_serialisable_with_default_extra():
     """The v2 adapter posts opts.extra as JSON; the runner must not hand it
     v3's system_map (a dict of sets) — v2 gets tags instead."""
