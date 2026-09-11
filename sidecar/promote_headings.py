@@ -32,7 +32,9 @@ Heading text recovery — pymupdf4llm corrupts some SRD heading text
 (lowercase tokens, length ≥ 2) tolerates both: any token-overlap with a
 page span counts as a match. The (size, bold) representative is taken
 from the LARGEST-font matching span. Unmatched headings fall back to
-their original level — conservative, never destructive.
+their original level, floored at 2 — conservative, never destructive,
+and never a root (#328: an unmatched ``#`` was how corrupted lines
+became breadcrumb roots).
 """
 from __future__ import annotations
 
@@ -43,6 +45,34 @@ from heading_text import sanitize
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _TOKEN_SPLIT_RE = re.compile(r"\W+", re.UNICODE)
+_NUM_RE = re.compile(r"\d+")
+_CAPTION_RE = re.compile(r"^(table|figure|fig\.|chart|map|illustration)\s+[\dA-Z][\w.-]*\s*[:.\-–]", re.IGNORECASE)
+_URL_RE = re.compile(r"www\.|https?://|\.(com|net|org)\b", re.IGNORECASE)
+_SINGLE_LETTER_RE = re.compile(r"\W*[A-Za-z]\W*")
+_JUNK_MAX_LEN = 80
+
+
+def is_junk_heading(text: str) -> bool:
+    """Shapes that are never section headings (v3 structure.py rule +
+    #328's caption/lead-in/URL cases). Stat lines carry ≥ 2 numbers;
+    ``Chapter 3`` / ``Level 1 Spells`` keep one. A heading that, stripped
+    of non-word characters, is exactly one alphabetic character is junk
+    too — OSRIC's drop-cap letters (``I``, ``T``, ``A``) get promoted as
+    headings and become spurious breadcrumb roots otherwise; a die code
+    (``d6``, ``1d6``) or module code (``B2``) keeps its digits and is not
+    junk by this rule."""
+    t = text.strip()
+    if not t or len(t) > _JUNK_MAX_LEN:
+        return True
+    if not any(ch.isalpha() for ch in t):
+        return True
+    if _SINGLE_LETTER_RE.fullmatch(t):
+        return True
+    if len(_NUM_RE.findall(t)) >= 2:
+        return True
+    if _CAPTION_RE.match(t) or _URL_RE.search(t) or t.endswith(":"):
+        return True
+    return False
 
 
 def _tokenize(s: str) -> set[str]:
@@ -132,7 +162,8 @@ def build_font_cluster_levels(rows: list[dict]) -> dict:
     """Map each (size, bold) signature → promoted level.
 
     Modal cluster stays at level 2; larger clusters get level 1 (top
-    cluster) or level 2 (the rest); smaller clusters get level 3.
+    cluster) or level 2 (the rest); smaller clusters get distinct
+    descending levels 3, 4, 5, 6 (capped at 6).
     """
     hist = Counter(r["sig"] for r in rows if r["sig"] is not None)
     if not hist:
@@ -157,8 +188,8 @@ def build_font_cluster_levels(rows: list[dict]) -> dict:
 
     level_by_sig[modal_sig] = 2
 
-    for s in smaller_than_modal:
-        level_by_sig[s] = 3
+    for k, s in enumerate(smaller_than_modal):
+        level_by_sig[s] = min(6, 3 + k)
 
     histogram = [
         {"size": s[0], "bold": s[1], "count": c, "promoted_level": level_by_sig.get(s)}
@@ -224,7 +255,15 @@ def _rewrite_page_md(
     level. A line the span oracle resolved to several headings (a merged
     18pt + 13.9pt pair) becomes several lines; parts after the first take
     the level of their own font signature, else one level deeper. An empty
-    sanitised heading (pure markup) is dropped.
+    sanitised heading (pure markup) is dropped. Junk is decided PER PART
+    (a stat line merged with a real heading on one line must not lose the
+    real heading, nor let a junk part downstream slip through as one): the
+    first part uses the row-level ``r["junk"]`` (also what gates the font
+    histogram), later parts are judged independently via
+    ``is_junk_heading``; a junk part is emitted as a bold paragraph line,
+    a non-junk part as a heading line — the first non-junk part at
+    ``first_level``, later non-junk parts at their own font signature's
+    level (else one level deeper).
 
     Splits/rejoins on ``\\n`` only so any ``\\r`` characters embedded in
     non-heading lines (the SRD's CR-fragmented prose) survive verbatim
@@ -241,12 +280,36 @@ def _rewrite_page_md(
             lines[r["line_idx"]] = ""
             continue
         first_level = max(1, min(6, int(level_by_loc.get(loc, r["original_level"]))))
-        out = [("#" * first_level) + " " + parts[0][0]]
-        for text, sig in parts[1:]:
-            level = level_by_sig.get(sig, min(6, first_level + 1))
+        out = []
+        first_heading_done = False
+        for i, (text, sig) in enumerate(parts):
+            is_junk_part = r.get("junk") if i == 0 else is_junk_heading(text)
+            if is_junk_part:
+                out.append(f"**{text}**")
+                continue
+            if not first_heading_done:
+                level = first_level
+                first_heading_done = True
+            else:
+                level = level_by_sig.get(sig, min(6, first_level + 1))
             out.append(("#" * max(1, min(6, int(level)))) + " " + text)
         lines[r["line_idx"]] = "\n".join(out)
     return "\n".join(lines)
+
+
+def _junk_part_count(r: dict) -> int:
+    """Count the junk parts within a (possibly merged) heading row, per
+    the same per-part rule ``_rewrite_page_md`` uses: first part via
+    ``r["junk"]``, later parts via ``is_junk_heading``. A row whose parts
+    are empty (dropped upstream, never emitted as any line) counts 0."""
+    parts = r.get("parts") or [(r["text"], r.get("sig"))]
+    if not parts or not parts[0][0]:
+        return 0
+    return sum(
+        1
+        for i, (text, _sig) in enumerate(parts)
+        if (r["junk"] if i == 0 else is_junk_heading(text))
+    )
 
 
 def promote_markdown(
@@ -264,7 +327,10 @@ def promote_markdown(
 
     rows = collect_heading_signatures(pages, spans_pages)
 
-    font_info = build_font_cluster_levels(rows)
+    for r in rows:
+        r["junk"] = is_junk_heading(r["text"])
+
+    font_info = build_font_cluster_levels([r for r in rows if not r["junk"]])
     toc_info = build_toc_levels(rows, toc.get("entries", []) or [])
 
     level_by_loc: dict[tuple[int, int], int] = {}
@@ -295,7 +361,7 @@ def promote_markdown(
                 font_used += 1
 
         if new_level is None:
-            new_level = r["original_level"]
+            new_level = max(2, r["original_level"])
             fallback_count += 1
 
         level_by_loc[loc] = new_level
@@ -318,6 +384,7 @@ def promote_markdown(
         "toc_used": toc_used,
         "font_used": font_used,
         "fallback_count": fallback_count,
+        "junk_demoted": sum(_junk_part_count(r) for r in rows),
         "promoted_level_distribution": dict(level_distribution),
         "font_histogram": font_info["histogram"],
         "modal_sig": font_info.get("modal_sig"),

@@ -6,8 +6,10 @@ based on per-document font histograms and (optionally) TOC entries.
 """
 
 from promote_headings import (
+    _rewrite_page_md,
     build_font_cluster_levels,
     collect_heading_signatures,
+    is_junk_heading,
     promote_markdown,
 )
 
@@ -75,19 +77,19 @@ def test_font_cluster_modal_stays_at_level_two():
     """If every heading shares the same (size, bold) signature, the
     modal cluster level must be 2 — the chunker's natural section
     level. Single-cluster docs should round-trip unchanged."""
-    md = "## A\n\nB.\n\n## C\n\nD.\n\n## E\n\nF."
+    md = "## Intro\n\nB.\n\n## Combat\n\nD.\n\n## Magic\n\nF."
     pages = [{"page_number": 1, "markdown": md}]
     spans_pages = [{
         "page_number": 1,
-        "spans": _spans([("A", 18.0, True), ("C", 18.0, True), ("E", 18.0, True)]),
+        "spans": _spans([("Intro", 18.0, True), ("Combat", 18.0, True), ("Magic", 18.0, True)]),
     }]
     promoted, _ = promote_markdown(
         pages, spans_pages, {"entries": []}, strategy="font_cluster"
     )
     out = promoted[0]["markdown"]
-    assert "## A" in out
-    assert "## C" in out
-    assert "## E" in out
+    assert "## Intro" in out
+    assert "## Combat" in out
+    assert "## Magic" in out
 
 
 def test_toc_strategy_uses_toc_entry_depth():
@@ -241,3 +243,80 @@ def test_promote_strips_markup_and_small_caps_from_every_heading():
     spans_pages = [{"page_number": 1, "spans": _spans([("chaRacteR RaceS", 11.0, True)])}]
     promoted, _ = promote_markdown(pages, spans_pages, {"entries": []}, strategy="font_cluster")
     assert promoted[0]["markdown"].split("\n")[0] == "## Character Races"
+
+
+def test_junk_shapes():
+    assert is_junk_heading("Armor Class 12 Hit Points 7 Speed 30")     # ≥ 2 numbers
+    assert is_junk_heading("Table 3-1: Weapons")                        # caption
+    assert is_junk_heading("Figure 2. The map")
+    assert is_junk_heading("For free updates, errata and other OSRIC support, visit:")  # lead-in
+    assert is_junk_heading("www.knights-n-knaves.com/osric")
+    assert not is_junk_heading("Chapter 3")
+    assert not is_junk_heading("Level 1 Spells")
+    assert not is_junk_heading("THAC0")
+    assert not is_junk_heading("Combat")
+    assert is_junk_heading("This is a long sentence that explains at length what the reader is about to see next in the text")
+    # OSRIC drop-cap letters (I, T, A) are promoted as headings and become
+    # breadcrumb roots; a single alphabetic character is junk.
+    assert is_junk_heading("I")
+    assert is_junk_heading("T")
+    # Die codes and module codes keep their digits — not junk by the
+    # single-letter rule (stripped of non-word chars must be ONE letter).
+    assert not is_junk_heading("d6")
+    assert not is_junk_heading("B2")
+    assert is_junk_heading("I.")
+
+
+def test_junk_heading_is_demoted_to_bold_paragraph():
+    md = "# Armor Class 12 Hit Points 7\n\nBody.\n\n## Combat\n\nMore."
+    pages = [{"page_number": 1, "markdown": md}]
+    spans_pages = [{"page_number": 1, "spans": _spans([("Armor Class 12 Hit Points 7", 9.8, True), ("Combat", 12.0, True)])}]
+    promoted, report = promote_markdown(pages, spans_pages, {"entries": []}, strategy="font_cluster")
+    lines = promoted[0]["markdown"].split("\n")
+    assert lines[0] == "**Armor Class 12 Hit Points 7**"
+    assert report["junk_demoted"] == 1
+
+
+def test_sub_modal_signatures_get_distinct_levels():
+    rows = [{"sig": (12.0, True)}] * 5 + [{"sig": (10.0, True)}] * 2 + [{"sig": (9.0, True)}] * 2 + [{"sig": (8.0, False)}]
+    out = build_font_cluster_levels(rows)
+    assert out["level_by_sig"] == {(12.0, True): 2, (10.0, True): 3, (9.0, True): 4, (8.0, False): 5}
+
+
+def test_unmatched_heading_never_becomes_a_root():
+    md = "# Zzqx\n\nBody.\n\n## Combat\n\nMore."
+    pages = [{"page_number": 1, "markdown": md}]
+    spans_pages = [{"page_number": 1, "spans": _spans([("Combat", 12.0, True), ("Grappling", 12.0, True)])}]
+    promoted, report = promote_markdown(pages, spans_pages, {"entries": []}, strategy="font_cluster")
+    assert promoted[0]["markdown"].split("\n")[0] == "## Zzqx"
+    assert report["fallback_count"] == 1
+
+
+def test_merged_line_junk_decided_per_part_first_junk_second_real():
+    out = _rewrite_page_md(
+        "# x\n\nBody.",
+        [{"page_number": 1, "line_idx": 0, "original_level": 1,
+          "text": "Armor Class 12 Hit Points 7",
+          "parts": [("Armor Class 12 Hit Points 7", (9.8, True)), ("Kraken", (13.9, True))],
+          "sig": (9.8, True), "junk": True}],
+        {(1, 0): 2},
+        {(13.9, True): 2},
+    )
+    lines = out.split("\n")
+    assert lines[0] == "**Armor Class 12 Hit Points 7**"
+    assert lines[1] == "## Kraken"
+
+
+def test_merged_line_junk_decided_per_part_first_real_second_junk():
+    out = _rewrite_page_md(
+        "# x\n\nBody.",
+        [{"page_number": 1, "line_idx": 0, "original_level": 1,
+          "text": "Kraken",
+          "parts": [("Kraken", (13.9, True)), ("Armor Class 12 Hit Points 7", (9.8, True))],
+          "sig": (13.9, True), "junk": False}],
+        {(1, 0): 2},
+        {(9.8, True): 3},
+    )
+    lines = out.split("\n")
+    assert lines[0] == "## Kraken"
+    assert lines[1] == "**Armor Class 12 Hit Points 7**"
