@@ -19,7 +19,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -46,7 +46,8 @@ from cleanup import clean_pages
 from promote_headings import promote_markdown
 from granularity import EmbedUnit, ParentDoc, build as build_granularity
 from parents_store import (
-    upsert_parents, fetch_parents_extended,
+    upsert_parents, fetch_parents, fetch_sections,
+    open_store, section_root_for,
     delete_parents_for_source,
     clear_all_parents,
     upsert_units_fts,
@@ -2162,26 +2163,42 @@ def _search_sync(
                 ordered_distances = head_distances + ordered_distances[pool:]
                 ordered_docs = head_docs + ordered_docs[pool:]
 
-        # Dedupe by parent_id, keeping the first hit per parent (the
-        # iteration order is the re-ranked-then-cosine order from above).
+        # Dedupe by assembled section, keeping the first hit per section
+        # (the iteration order is the re-ranked-then-cosine order from
+        # above). The store picks each candidate's section root before we
+        # decide — one cheap aggregate query per candidate, all on the
+        # same connection — so two hits inside one section collapse to
+        # one result even when they sit in different parents. Legacy rows
+        # without a section_path keep the old parent_id key.
         seen: set[str] = set()
         picked: list[dict] = []
-        for i, (metadata, distance) in enumerate(
-            zip(ordered_metadatas, ordered_distances)
-        ):
-            pid = metadata.get("parent_id")
-            if not pid or pid in seen:
-                continue
-            seen.add(pid)
-            picked.append({
-                "metadata": metadata,
-                "distance": distance,
-                "doc": ordered_docs[i],
-                "reranked": rerank_applied and i < pool,
-                "boost": boost_factors[i] if boost_factors is not None else 1.0,
-            })
-            if len(picked) >= request.n_results:
-                break
+        with open_store(data_dir) if data_dir else nullcontext(None) as conn:
+            for i, (metadata, distance) in enumerate(
+                zip(ordered_metadatas, ordered_distances)
+            ):
+                pid = metadata.get("parent_id")
+                if not pid:
+                    continue
+                path = metadata.get("section_path") or None
+                source = metadata.get("source") or None
+                if conn is not None and path and source:
+                    key = section_root_for(conn, source, path)
+                else:
+                    key = pid
+                if key in seen:
+                    continue
+                seen.add(key)
+                picked.append({
+                    "metadata": metadata,
+                    "distance": distance,
+                    "doc": ordered_docs[i],
+                    "reranked": rerank_applied and i < pool,
+                    "boost": (
+                        boost_factors[i] if boost_factors is not None else 1.0
+                    ),
+                })
+                if len(picked) >= request.n_results:
+                    break
 
         # Single-scale page (issue #306): when the reranker ran, picked
         # results that came from the cosine tail are rescored with the
@@ -2213,7 +2230,20 @@ def _search_sync(
                         )
                     )
 
-        parent_docs = fetch_parents_extended(
+        # The section each hit is answered with, plus the hit's own
+        # parent (one batched IN query) for the narrower `chunk_text`.
+        sections = fetch_sections(
+            data_dir,
+            [
+                (
+                    p["metadata"]["parent_id"],
+                    p["metadata"].get("section_path") or None,
+                    p["metadata"].get("source"),
+                )
+                for p in picked
+            ],
+        ) if data_dir else {}
+        parents = fetch_parents(
             data_dir, [p["metadata"]["parent_id"] for p in picked]
         ) if data_dir else {}
 
@@ -2222,28 +2252,41 @@ def _search_sync(
             metadata = p["metadata"]
             distance = p["distance"]
             pid = metadata["parent_id"]
-            parent = parent_docs.get(pid)
-            # Fall back to the embed unit text if the parent row is
-            # missing (shouldn't happen post-reindex; defensive).
-            text = parent.text if parent else p["doc"]
-            # ParentDoc.section_heading is Optional[str] (granularity.py),
-            # so the chain "" or parent.section_heading can leak None into
-            # the response. Trailing `or ""` coerces back to a string —
-            # the Tauri SearchResultItem decoder requires String, not
-            # null, and would otherwise reject the whole response.
+            sec = sections.get(pid)
+            parent = parents.get(pid)
+            # Fall back to the embed unit text if the rows are missing
+            # (shouldn't happen post-reindex; defensive).
+            text = sec.text if sec else p["doc"]
+            chunk_text = parent.text if parent else p["doc"]
+            # SectionDoc/ParentDoc.section_heading is Optional[str], so
+            # the chain can leak None into the response. Trailing `or ""`
+            # coerces back to a string — the Tauri SearchResultItem
+            # decoder requires String, not null, and would otherwise
+            # reject the whole response.
             section_heading = (
-                metadata.get("section_heading")
-                or (parent.section_heading if parent else None)
+                (sec.section_heading if sec else None)
+                or metadata.get("section_heading")
                 or ""
             )
             relevance = round(max(0.0, min(1.0, 1 - distance)), 3)
             formatted.append({
                 "text": text,
+                # The unit that actually matched, and the parent it sits
+                # in — `text` is now the whole section, so a consumer
+                # that wants the narrow hit needs it named.
+                "matched_text": p["doc"],
+                "chunk_text": chunk_text,
+                "section_id": (
+                    sec.section_id if sec else (metadata.get("section_id") or "")
+                ),
+                "section_path": (
+                    sec.root_path if sec else (metadata.get("section_path") or "")
+                ),
                 "filename": metadata["filename"],
                 "source": metadata.get("source", ""),
                 "section_heading": section_heading,
-                "page_start": parent.page_start if parent else metadata.get("page_start", 0),
-                "page_end": parent.page_end if parent else metadata.get("page_end", 0),
+                "page_start": sec.page_start if sec else metadata.get("page_start", 0),
+                "page_end": sec.page_end if sec else metadata.get("page_end", 0),
                 # The number printed on the paper, "" when it matches the
                 # physical page. A citation a GM cannot find at the table is
                 # not a citation.

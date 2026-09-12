@@ -245,6 +245,7 @@ class V2Engine:
                 tier=r.get("tier", ""),
                 reranked=bool(r.get("reranked", False)),
                 raw=r,
+                matched_text=r.get("matched_text", "") or "",
             )
             for r in data.get("results", [])
         ]

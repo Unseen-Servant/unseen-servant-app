@@ -91,6 +91,11 @@ def _txn(data_dir: Path):
         conn.close()
 
 
+# Public alias: the search path holds one connection open across the
+# dedupe loop (one section_root_for query per candidate).
+open_store = _txn
+
+
 def upsert_parents(
     data_dir: Path, source: str, parents: list[ParentDoc]
 ) -> None:

@@ -53,8 +53,8 @@ class SearchResult:
     """One result, normalized across engines.
 
     ``raw`` keeps the engine's untouched result dict so graders can reach
-    engine-specific fields (e.g. a future v3 ``matched_text``/``bbox``)
-    without the shared contract having to grow speculatively.
+    engine-specific fields (e.g. a future v3 ``bbox``) without the shared
+    contract having to grow speculatively.
     """
 
     text: str
@@ -67,6 +67,10 @@ class SearchResult:
     tier: str
     reranked: bool
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
+    # The narrow unit that matched, when the engine reports one (v2 since
+    # roadmap 2.1, where ``text`` became the assembled section). Graded
+    # text is unchanged — ``grading_text`` still reads heading + body.
+    matched_text: str = ""
 
     @property
     def grading_text(self) -> str:
