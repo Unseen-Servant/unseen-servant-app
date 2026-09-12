@@ -7,6 +7,7 @@
 
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
+  export let outdatedFileCount: number = 0;
   export let totalFilesFound: number = 0;
   export let totalChunks: number = 0;
   export let storageBytes: number = 0;
@@ -357,6 +358,12 @@
           <span class="row-title">Re-index all files</span>
           Re-extracts and re-embeds every file in your index. Use after the
           extractor has been upgraded, or if search results look stale.
+          {#if outdatedFileCount > 0}
+            <span class="row-note">
+              {outdatedFileCount} {outdatedFileCount === 1 ? 'file was' : 'files were'} indexed
+              with an older pipeline — re-index to pick up the current one.
+            </span>
+          {/if}
         </span>
         <ActionButton
           label={isSyncing ? 'Sync in progress…' : 'Re-index all'}
@@ -636,6 +643,12 @@
   .danger-caption {
     color: var(--text-danger);
     opacity: 0.85;
+  }
+
+  .row-note {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-accent);
   }
 
   .btn-icon {

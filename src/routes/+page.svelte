@@ -3959,6 +3959,7 @@
   onSystemsChanged={refreshKnownSystems}
   {selectedFolder}
   indexedFileCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+  outdatedFileCount={indexStatus?.summary?.outdated ?? 0}
   {totalFilesFound}
   {totalChunks}
   {storageBytes}

@@ -15,6 +15,7 @@
   export let onSystemsChanged: () => void = () => {};
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
+  export let outdatedFileCount: number = 0;
   export let totalFilesFound: number = 0;
   export let totalChunks: number = 0;
   export let storageBytes: number = 0;
@@ -89,6 +90,7 @@
       <LibrarySettings
         {selectedFolder}
         {indexedFileCount}
+        {outdatedFileCount}
         {totalFilesFound}
         {totalChunks}
         {storageBytes}

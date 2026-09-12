@@ -100,6 +100,20 @@ def test_index_status_up_to_date(client, sample_pdf_path, tmp_path):
     assert data["summary"]["add"] == 0
 
 
+def test_index_status_counts_files_indexed_by_an_older_pipeline(client, sample_pdf_path, tmp_path):
+    """Files whose manifest entry predates PIPELINE_VERSION should be reported outdated."""
+    from server import load_manifest, save_manifest
+    client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
+    m = load_manifest(tmp_path)
+    m.files[str(sample_pdf_path)].pipeline_version = "structure_aware-v2/bge-m3"
+    save_manifest(tmp_path, m)
+    r = client.post("/api/index-status", json={"selected_paths": [str(sample_pdf_path)]})
+    body = r.json()
+    assert body["summary"]["outdated"] == 1
+    assert body["outdated"] == [str(sample_pdf_path)]
+    assert body["up_to_date"][0]["pipeline_version"] == "structure_aware-v2/bge-m3"
+
+
 def test_index_status_missing_file_on_disk(client, tmp_path):
     """Selected paths that don't exist and aren't indexed should be stale."""
     response = client.post("/api/index-status", json={
@@ -123,7 +137,7 @@ def test_index_status_empty_selection(client):
     data = response.json()
     assert data["summary"] == {
         "add": 0, "remove": 0, "auto_remove": 0, "rename": 0, "update": 0,
-        "up_to_date": 0, "errors": 0, "stale": 0,
+        "up_to_date": 0, "errors": 0, "stale": 0, "outdated": 0,
     }
 
 
@@ -268,6 +282,16 @@ def test_index_files_writes_manifest(client, sample_pdf_path, tmp_path):
     assert str(sample_pdf_path) in manifest_raw["files"]
 
 
+def test_index_files_records_pipeline_version(client, sample_pdf_path, tmp_path):
+    """Successful indexing should stamp the manifest entry with PIPELINE_VERSION."""
+    from chunker import PIPELINE_VERSION
+    from server import load_manifest
+    r = client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
+    assert r.status_code == 200
+    entry = load_manifest(tmp_path).files[str(sample_pdf_path)]
+    assert entry.pipeline_version == PIPELINE_VERSION
+
+
 # ---------------------------------------------------------------------------
 # Game system in manifest
 # ---------------------------------------------------------------------------
@@ -382,6 +406,15 @@ def test_manifest_backward_compat_missing_game_system(tmp_path):
     from server import load_manifest
     manifest = load_manifest(tmp_path)
     assert manifest.files["/old/book.pdf"].game_system == "unknown"
+
+
+def test_manifest_backward_compat_missing_pipeline_version(tmp_path):
+    """Old manifests without pipeline_version should load with an empty default."""
+    from server import IndexManifest, ManifestEntry
+    raw = {"version": 1, "files": {"/a.pdf": {"filename": "a.pdf", "mtime": 1.0, "chunk_count": 1,
+                                                 "indexed_at": "2026-01-01T00:00:00+00:00"}}}
+    m = IndexManifest(**raw)
+    assert m.files["/a.pdf"].pipeline_version == ""
 
 
 # ---------------------------------------------------------------------------

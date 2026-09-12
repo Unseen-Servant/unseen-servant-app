@@ -53,9 +53,8 @@ def _import_sidecar():
         import chromadb
         from fastapi.testclient import TestClient
         from server import (
-            CHUNKER_VERSION,
             COLLECTION_METADATA,
-            EMBEDDING_MODEL,
+            PIPELINE_VERSION,
             _extract_and_chunk,
             _extract_pdf_pages,
             build_ollama_embedding_function,
@@ -72,8 +71,7 @@ def _import_sidecar():
         "chromadb": chromadb,
         "TestClient": TestClient,
         "COLLECTION_METADATA": COLLECTION_METADATA,
-        "CHUNKER_VERSION": CHUNKER_VERSION,
-        "EMBEDDING_MODEL": EMBEDDING_MODEL,
+        "PIPELINE_VERSION": PIPELINE_VERSION,
         "_extract_and_chunk": _extract_and_chunk,
         "_extract_pdf_pages": _extract_pdf_pages,
         "build_ollama_embedding_function": build_ollama_embedding_function,
@@ -125,7 +123,7 @@ class V2Engine:
         library-tier baseline, since that index was not built by the run."""
         if self._mods is None:
             self._mods = _import_sidecar()
-        return f"{self._mods['CHUNKER_VERSION']}/{self._mods['EMBEDDING_MODEL']}"
+        return self._mods["PIPELINE_VERSION"]
 
     # -- indexing ------------------------------------------------------
 

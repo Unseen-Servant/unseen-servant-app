@@ -37,6 +37,7 @@ import uvicorn
 from chunker import (
     CHUNKER_VERSION,
     EMBEDDING_MODEL,
+    PIPELINE_VERSION,
     Chunk,
     PageMarkdown,
     structure_aware,
@@ -715,6 +716,7 @@ class ManifestEntry(BaseModel):
     game_systems: list[str] = []
     content_hash: str = ""
     file_size: int = 0
+    pipeline_version: str = ""
     # Set when the most recent re-index attempt failed. The previous
     # successful index (chunk_count, indexed_at, content_hash, ...) is
     # preserved so search keeps working until the next sync retries.
@@ -1587,6 +1589,7 @@ def compute_diff(
     to_update = []
     up_to_date = []
     errors = []
+    outdated: list[str] = []
     missing_indexed: list[tuple[str, ManifestEntry]] = []
 
     stale_paths: list[str] = []
@@ -1617,7 +1620,10 @@ def compute_diff(
                         "game_system": entry.game_system,
                         "game_systems": list(entry.game_systems),
                         "indexed_at": entry.indexed_at,
+                        "pipeline_version": entry.pipeline_version,
                     })
+                    if entry.pipeline_version != PIPELINE_VERSION:
+                        outdated.append(path_str)
                 else:
                     up_to_date.append({
                         "path": path_str,
@@ -1626,7 +1632,10 @@ def compute_diff(
                         "game_system": entry.game_system,
                         "game_systems": list(entry.game_systems),
                         "indexed_at": entry.indexed_at,
+                        "pipeline_version": entry.pipeline_version,
                     })
+                    if entry.pipeline_version != PIPELINE_VERSION:
+                        outdated.append(path_str)
 
     # --- Resolve missing indexed files ---
     # For each missing file, check if its parent directory is accessible.
@@ -1761,6 +1770,7 @@ def compute_diff(
         "up_to_date": up_to_date,
         "errors": errors,
         "stale_paths": stale_paths,
+        "outdated": outdated,
     }
 
 
@@ -2414,6 +2424,7 @@ def create_app(
                         game_systems=detected_systems,
                         content_hash=file_content_hash(pdf_path),
                         file_size=os.path.getsize(pdf_path),
+                        pipeline_version=PIPELINE_VERSION,
                     )
 
         if manifest and data_dir:
@@ -2468,6 +2479,7 @@ def create_app(
                     game_systems=detected_systems,
                     content_hash=file_content_hash(pdf_path),
                     file_size=os.path.getsize(pdf_path),
+                    pipeline_version=PIPELINE_VERSION,
                 )
                 save_manifest(data_dir, manifest)
 
@@ -2503,6 +2515,7 @@ def create_app(
                 "up_to_date": len(diff["up_to_date"]),
                 "errors": len(diff["errors"]),
                 "stale": len(diff["stale_paths"]),
+                "outdated": len(diff["outdated"]),
             },
         }
 
@@ -2585,6 +2598,7 @@ def create_app(
                 )
                 transferred = len(results["ids"])
 
+            old_entry = manifest.files[old_path_str]
             del manifest.files[old_path_str]
             manifest.files[entry["new_path"]] = ManifestEntry(
                 filename=new_path.name,
@@ -2595,6 +2609,7 @@ def create_app(
                 game_systems=list(entry.get("game_systems", [])),
                 content_hash=entry["content_hash"],
                 file_size=os.path.getsize(new_path),
+                pipeline_version=old_entry.pipeline_version,
             )
             save_manifest(data_dir, manifest)
             renamed += 1
@@ -2649,6 +2664,7 @@ def create_app(
                 game_systems=detected_systems,
                 content_hash=file_content_hash(pdf_path),
                 file_size=os.path.getsize(pdf_path),
+                pipeline_version=PIPELINE_VERSION,
             )
             save_manifest(data_dir, manifest)
             yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
@@ -2702,6 +2718,7 @@ def create_app(
                 game_systems=detected_systems,
                 content_hash=file_content_hash(pdf_path),
                 file_size=os.path.getsize(pdf_path),
+                pipeline_version=PIPELINE_VERSION,
             )
             save_manifest(data_dir, manifest)
             yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
@@ -2949,6 +2966,7 @@ def create_app(
                 game_systems=list(old_entry.game_systems),
                 content_hash=old_entry.content_hash,
                 file_size=old_entry.file_size,
+                pipeline_version=old_entry.pipeline_version,
             )
             save_manifest(data_dir, manifest)
 
@@ -3077,6 +3095,7 @@ def create_app(
                     game_systems=list(old_entry.game_systems),
                     content_hash=old_entry.content_hash,
                     file_size=old_entry.file_size,
+                    pipeline_version=old_entry.pipeline_version,
                 )
                 renamed_files += 1
 

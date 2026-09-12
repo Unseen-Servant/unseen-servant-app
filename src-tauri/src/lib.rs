@@ -59,6 +59,8 @@ struct IndexStatusSummary {
     up_to_date: u32,
     errors: u32,
     stale: u32,
+    #[serde(default)]
+    outdated: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -84,6 +86,8 @@ struct IndexStatusResult {
     up_to_date: Vec<FileStatusEntry>,
     errors: Vec<FileErrorEntry>,
     stale_paths: Vec<String>,
+    #[serde(default)]
+    outdated: Vec<String>,
     summary: IndexStatusSummary,
 }
 

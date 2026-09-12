@@ -52,6 +52,7 @@ export interface IndexStatusSummary {
   up_to_date: number;
   errors: number;
   stale: number;
+  outdated: number;
 }
 
 export interface RenameEntry {
@@ -69,6 +70,7 @@ export interface IndexStatusResult {
   up_to_date: FileStatusEntry[];
   errors: FileErrorEntry[];
   stale_paths: string[];
+  outdated: string[];
   summary: IndexStatusSummary;
 }
 

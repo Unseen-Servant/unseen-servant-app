@@ -329,6 +329,30 @@ def test_sync_rename_preserves_chunks(client, sample_pdf_path, tmp_path):
     assert data["total_indexed"] == original_total
 
 
+def test_sync_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_path):
+    """Rename should copy the old entry's pipeline_version, never recompute it."""
+    from server import load_manifest, save_manifest
+
+    client.post("/api/sync-index", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    manifest = load_manifest(tmp_path)
+    manifest.files[str(sample_pdf_path)].pipeline_version = "old/x"
+    save_manifest(tmp_path, manifest)
+
+    new_path = tmp_path / "renamed_monsters.pdf"
+    shutil.copy2(sample_pdf_path, new_path)
+
+    response = client.post("/api/sync-index", json={
+        "selected_paths": [str(new_path)]
+    })
+    assert response.status_code == 200
+    assert response.json()["renamed"] == 1
+
+    manifest = load_manifest(tmp_path)
+    assert manifest.files[str(new_path)].pipeline_version == "old/x"
+
+
 def test_sync_rename_updates_metadata(client, sample_pdf_path, tmp_path):
     """After rename, chunk metadata should reflect the new path/filename."""
     # Index the file
