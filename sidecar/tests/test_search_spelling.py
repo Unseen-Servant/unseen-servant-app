@@ -7,11 +7,12 @@ The corrected query must drive every downstream consumer of the query
 text — the dense embed, the BM25 side when `hybrid` is on — and surface
 in the response as `corrected_query` plus a note in the `message`
 channel. `spell_correction: false` bypasses everything; the vocabulary
-rebuilds when the chunk count changes (same trigger as the lexical
-index).
+rebuilds when the chunk count changes.
 """
 
 import pytest
+
+from parents_store import upsert_units_fts
 
 
 def _meta(parent_id: str, filename: str) -> dict:
@@ -92,7 +93,7 @@ def test_spell_correction_false_bypasses_everything(capture_client):
     assert "message" not in body
 
 
-def test_composes_with_hybrid(client, test_collection, monkeypatch):
+def test_composes_with_hybrid(client, test_collection, tmp_path, monkeypatch):
     """The BM25 side must search the corrected text: 'owlber' matches
     nothing lexically, so the stat block (missed by the fake dense pool)
     only surfaces when the corrected 'owlbear' reaches FTS5."""
@@ -102,6 +103,10 @@ def test_composes_with_hybrid(client, test_collection, monkeypatch):
         documents=[prose_doc, STAT_DOC],
         metadatas=[_meta("p-prose", "rules.pdf"), _meta("p-stat", "monsters.pdf")],
     )
+    upsert_units_fts(tmp_path, "/corpus/rules.pdf", [
+        ("c-prose", 0, "rules.pdf", "OSR", "p-prose", prose_doc)])
+    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
+        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
     fake_dense = {
         "ids": [["c-prose"]],
         "documents": [[prose_doc]],
@@ -123,8 +128,8 @@ def test_composes_with_hybrid(client, test_collection, monkeypatch):
 
 
 def test_vocabulary_rebuilds_when_chunk_count_changes(client, test_collection):
-    """Same trigger as the lexical index: a term indexed after the first
-    search becomes a correction target on the next one."""
+    """A term indexed after the first search becomes a correction target
+    on the next one."""
     test_collection.add(
         ids=["c1"],
         documents=[STAT_DOC],

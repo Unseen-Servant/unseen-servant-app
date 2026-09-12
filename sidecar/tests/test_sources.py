@@ -2,6 +2,8 @@
 Tests for GET /api/sources and DELETE /api/source/{filename}.
 """
 
+from parents_store import count_units_fts
+
 
 def test_sources_empty(client):
     """No indexed docs means empty sources list."""
@@ -36,7 +38,7 @@ def test_sources_sorted_alphabetically(client, sample_pdf_path, large_text_pdf_p
     assert filenames == sorted(filenames)
 
 
-def test_delete_source(client, sample_pdf_path, test_collection):
+def test_delete_source(client, sample_pdf_path, test_collection, tmp_path):
     """Deleting a source should remove all its chunks."""
     client.post("/api/index-files", json={
         "paths": [str(sample_pdf_path)]
@@ -44,6 +46,7 @@ def test_delete_source(client, sample_pdf_path, test_collection):
 
     # Verify it exists
     assert test_collection.count() > 0
+    assert count_units_fts(tmp_path) > 0
 
     # Delete it
     response = client.delete("/api/source/dragonbane_monsters.pdf")
@@ -52,6 +55,7 @@ def test_delete_source(client, sample_pdf_path, test_collection):
 
     # Verify it's gone
     assert test_collection.count() == 0
+    assert count_units_fts(tmp_path) == 0
 
 
 def test_delete_nonexistent_source(client):

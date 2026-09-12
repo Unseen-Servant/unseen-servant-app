@@ -14,6 +14,8 @@ BM25 ranking joins the same fusion.
 
 import pytest
 
+from parents_store import upsert_units_fts
+
 
 def _meta(parent_id: str, filename: str) -> dict:
     return {
@@ -153,7 +155,7 @@ def test_fused_distance_is_minimum_across_rankings(
     assert [r["relevance"] for r in body["results"]] == [0.9]
 
 
-def test_composes_with_hybrid(client, test_collection, monkeypatch):
+def test_composes_with_hybrid(client, test_collection, tmp_path, monkeypatch):
     """BM25 joins the same fusion. The stat doc says only "owlbear", so
     FTS5 can't reach it from the query "owl bear" — it surfaces solely
     through the dense variant ranking, next to the BM25-only chunk."""
@@ -164,6 +166,10 @@ def test_composes_with_hybrid(client, test_collection, monkeypatch):
         documents=[stat_doc, lex_doc],
         metadatas=[_meta("p-stat", "monsters.pdf"), _meta("p-lex", "lex.pdf")],
     )
+    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
+        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", stat_doc)])
+    upsert_units_fts(tmp_path, "/corpus/lex.pdf", [
+        ("c-lex", 0, "lex.pdf", "OSR", "p-lex", lex_doc)])
     rankings = {
         "owl bear": ("c-prose", PROSE_DOC, _meta("p-prose", "rules.pdf"), 0.4),
         "owlbear": ("c-stat", stat_doc, _meta("p-stat", "monsters.pdf"), 0.2),

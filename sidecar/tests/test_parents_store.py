@@ -8,6 +8,13 @@ from parents_store import (
     delete_parents_for_source,
     clear_all_parents,
     count_parents,
+    upsert_units_fts,
+    search_units_fts,
+    delete_units_fts_for_source,
+    count_units_fts,
+    rename_source,
+    update_units_fts_game_system,
+    where_to_sql,
 )
 
 
@@ -260,3 +267,53 @@ def test_extended_stops_at_section_id_boundary_even_with_equal_headings(tmp_path
     ])
     got = fetch_parents_extended(tmp_path, ["p1"])
     assert got["p1"].text == "a" * 10
+
+
+# ---------------------------------------------------------------------------
+# unit_fts — persisted FTS5 lexical index (roadmap 1.6, S5)
+# ---------------------------------------------------------------------------
+
+
+def test_fts_rows_follow_units_per_source(tmp_path):
+    upsert_units_fts(tmp_path, "a.pdf", [("a_0", 0, "a.pdf", "OSR", "p1", "Combat\n\nthe owlbear has THAC0 15"),
+                                         ("a_1", 1, "a.pdf", "OSR", "p1", "rounds have phases")])
+    upsert_units_fts(tmp_path, "b.pdf", [("b_0", 0, "b.pdf", "5E", "p2", "fireball deals 8d6")])
+    assert count_units_fts(tmp_path) == 3
+    upsert_units_fts(tmp_path, "a.pdf", [("a_9", 0, "a.pdf", "OSR", "p1", "replaced")])
+    assert count_units_fts(tmp_path, "a.pdf") == 1
+    assert delete_units_fts_for_source(tmp_path, "b.pdf") == 1
+    assert count_units_fts(tmp_path) == 1
+
+
+def test_fts_search_is_scoped_by_where(tmp_path):
+    upsert_units_fts(tmp_path, "/lib/a.pdf", [("a_0", 0, "a.pdf", "OSR", "p1", "owlbear THAC0 15")])
+    upsert_units_fts(tmp_path, "/lib/b.pdf", [("b_0", 0, "b.pdf", "5E", "p2", "owlbear AC 13")])
+    assert set(search_units_fts(tmp_path, '"owlbear"', 10, None)) == {"a_0", "b_0"}
+    assert search_units_fts(tmp_path, '"owlbear"', 10, {"filename": "b.pdf"}) == ["b_0"]
+    assert search_units_fts(tmp_path, '"owlbear"', 10, {"source": {"$in": ["/lib/a.pdf"]}}) == ["a_0"]
+    assert search_units_fts(tmp_path, '"owlbear"', 10, {"$and": [{"game_system": "5E"}, {"filename": "b.pdf"}]}) == ["b_0"]
+
+
+def test_where_to_sql_rejects_unknown_operators():
+    import pytest
+    with pytest.raises(ValueError):
+        where_to_sql({"filename": {"$ne": "x"}})
+    with pytest.raises(ValueError):
+        where_to_sql({"page_start": 3})
+
+
+def test_rename_source_rewrites_ids_from_ordinals(tmp_path):
+    upsert_parents(tmp_path, "/old/a.pdf", [_parent("p1", "/old/a.pdf")])
+    upsert_units_fts(tmp_path, "/old/a.pdf", [("h_a_0", 0, "a.pdf", "OSR", "p1", "text"), ("h_a_1", 1, "a.pdf", "OSR", "p1", "more")])
+    rename_source(tmp_path, "/old/a.pdf", "/new/b.pdf", "b.pdf", "deadbeef_b")
+    assert count_units_fts(tmp_path, "/old/a.pdf") == 0
+    assert search_units_fts(tmp_path, '"more"', 5, {"filename": "b.pdf"}) == ["deadbeef_b_1"]
+    assert fetch_parents(tmp_path, ["p1"])["p1"].source_pdf == "/new/b.pdf"
+
+
+def test_update_units_fts_game_system_retags_one_source(tmp_path):
+    upsert_units_fts(tmp_path, "/lib/a.pdf", [("a_0", 0, "a.pdf", "OSR", "p1", "owlbear THAC0 15")])
+    upsert_units_fts(tmp_path, "/lib/b.pdf", [("b_0", 0, "b.pdf", "OSR", "p2", "owlbear AC 13")])
+    assert update_units_fts_game_system(tmp_path, "/lib/a.pdf", "5E") == 1
+    assert search_units_fts(tmp_path, '"owlbear"', 5, {"game_system": "5E"}) == ["a_0"]
+    assert search_units_fts(tmp_path, '"owlbear"', 5, {"game_system": "OSR"}) == ["b_0"]

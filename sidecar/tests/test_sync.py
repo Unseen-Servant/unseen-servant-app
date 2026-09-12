@@ -10,6 +10,7 @@ import json
 import os
 import time
 
+from parents_store import count_units_fts
 from server import MANIFEST_FILENAME, IndexManifest, ManifestEntry
 
 
@@ -479,6 +480,7 @@ def test_delete_index_clears_manifest_and_chunks(
     collection_name = test_collection.name
     chunks_before = test_collection.count()
     assert chunks_before > 0
+    assert count_units_fts(tmp_path) > 0
 
     manifest_path = tmp_path / MANIFEST_FILENAME
     assert json.loads(manifest_path.read_text())["files"]
@@ -491,6 +493,7 @@ def test_delete_index_clears_manifest_and_chunks(
 
     fresh_collection = test_chroma_client.get_collection(name=collection_name)
     assert fresh_collection.count() == 0
+    assert count_units_fts(tmp_path) == 0
     assert json.loads(manifest_path.read_text())["files"] == {}
 
 

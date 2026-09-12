@@ -20,6 +20,7 @@ from server import (
     load_manifest,
 )
 from granularity import EmbedUnit, ParentDoc
+from parents_store import count_units_fts
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +236,9 @@ def test_atomic_index_pdf_swaps_in_new_chunks_on_success(tmp_path):
 
     assert len(v2_ids) == 4
     assert v2_ids.isdisjoint(v1_ids)
+    # The FTS rows swap with the chunks — one row per surviving unit,
+    # under the same ids.
+    assert count_units_fts(tmp_path, str(pdf_path)) == 4
 
 
 # ---------------------------------------------------------------------------

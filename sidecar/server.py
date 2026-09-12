@@ -49,8 +49,12 @@ from parents_store import (
     upsert_parents, fetch_parents_extended,
     delete_parents_for_source,
     clear_all_parents,
+    upsert_units_fts,
+    delete_units_fts_for_source,
+    rename_source,
+    update_units_fts_game_system,
 )
-from lexical import LexicalIndex, matches_where, rrf_fuse
+from lexical import PersistedLexicalIndex, rrf_fuse
 from reranker import rerank_scores
 from spelling import SpellCorrector
 
@@ -1279,6 +1283,11 @@ def _atomic_index_pdf(
         collection.delete(ids=stale)
     if data_dir:
         upsert_parents(data_dir, str(pdf_path), parents)
+        upsert_units_fts(data_dir, str(pdf_path), [
+            (f"{new_prefix}_{eu.ordinal}", eu.ordinal, pdf_path.name, game_system,
+             eu.parent_id, _embed_text(eu))
+            for eu in embed_units
+        ])
 
 
 def _index_chunks(
@@ -1554,7 +1563,8 @@ def delete_source_chunks(
 
     Uses the full ``source`` metadata field to avoid collisions when two PDFs
     share the same filename in different directories. Also drops the source's
-    parent rows from the parents store so re-indexes don't accumulate orphans.
+    parent and lexical (FTS) rows from the parents store so re-indexes don't
+    accumulate orphans.
 
     Returns the number of deleted chunks, or 0 if not found.
     """
@@ -1566,6 +1576,7 @@ def delete_source_chunks(
 
     if data_dir:
         delete_parents_for_source(data_dir, source_path)
+        delete_units_fts_for_source(data_dir, source_path)
 
     return len(ids_to_delete)
 
@@ -2026,15 +2037,18 @@ def _search_sync(
                         or dist < dense_best[cid][1]
                     ):
                         dense_best[cid] = (meta, dist, doc)
-            lex = None
+            lex_rows: dict[str, tuple[dict, str]] = {}
             if knobs.hybrid:
                 lex = get_lexical_index()
-                lex_where = query_kwargs.get("where")
-                rankings.append(lex.search(
+                lex_ids = lex.search(
                     query_text,
                     k=request.n_results * 10,
-                    allowed=lambda m: matches_where(m, lex_where),
-                ))
+                    where=query_kwargs.get("where"),
+                )
+                rankings.append(lex_ids)
+                lex_rows = lex.lookup(
+                    [cid for cid in lex_ids if cid not in dense_best]
+                )
             fused_metadatas, fused_distances = [], []
             fused_docs, fused_scores = [], []
             for cid, score in rrf_fuse(rankings):
@@ -2043,10 +2057,14 @@ def _search_sync(
                     fused_metadatas.append(meta)
                     fused_distances.append(dist)
                     fused_docs.append(doc)
-                else:
-                    fused_metadatas.append(lex.metadatas[cid])
+                elif cid in lex_rows:
+                    meta, doc = lex_rows[cid]
+                    fused_metadatas.append(meta)
                     fused_distances.append(1.0)
-                    fused_docs.append(lex.documents[cid])
+                    fused_docs.append(doc)
+                else:
+                    # FTS row whose Chroma twin is gone mid-reindex.
+                    continue
                 fused_scores.append(score)
             ordered_metadatas = fused_metadatas
             ordered_distances = fused_distances
@@ -2585,7 +2603,10 @@ def create_app(
             if results["ids"]:
                 collection.delete(ids=results["ids"])
                 prefix = chunk_id_prefix(new_path)
-                new_ids = [f"{prefix}_{i}" for i in range(len(results["ids"]))]
+                # Ids rebuild from the stored ordinal, not the list
+                # position, so they match what rename_source writes to
+                # the FTS rows.
+                new_ids = [f"{prefix}_{m['chunk']}" for m in results["metadatas"]]
                 new_metadatas = [
                     {**m, "source": str(new_path), "filename": new_path.name}
                     for m in results["metadatas"]
@@ -2595,6 +2616,9 @@ def create_app(
                     documents=results["documents"],
                     embeddings=results["embeddings"],
                     metadatas=new_metadatas,
+                )
+                rename_source(
+                    data_dir, old_path_str, str(new_path), new_path.name, prefix
                 )
                 transferred = len(results["ids"])
 
@@ -2943,7 +2967,8 @@ def create_app(
             if results["ids"]:
                 collection.delete(ids=results["ids"])
                 prefix = chunk_id_prefix(new_path)
-                new_ids = [f"{prefix}_{i}" for i in range(len(results["ids"]))]
+                # Ordinal-derived ids: see the sync rename phase.
+                new_ids = [f"{prefix}_{m['chunk']}" for m in results["metadatas"]]
                 new_metadatas = [
                     {**m, "source": new_path_str, "filename": new_path.name}
                     for m in results["metadatas"]
@@ -2953,6 +2978,9 @@ def create_app(
                     documents=results["documents"],
                     embeddings=results["embeddings"],
                     metadatas=new_metadatas,
+                )
+                rename_source(
+                    data_dir, old_path_str, new_path_str, new_path.name, prefix
                 )
 
             # Update manifest
@@ -3072,7 +3100,10 @@ def create_app(
                 if results["ids"]:
                     collection.delete(ids=results["ids"])
                     prefix = chunk_id_prefix(new_path)
-                    new_ids = [f"{prefix}_{i}" for i in range(len(results["ids"]))]
+                    # Ordinal-derived ids: see the sync rename phase.
+                    new_ids = [
+                        f"{prefix}_{m['chunk']}" for m in results["metadatas"]
+                    ]
                     new_metadatas = [
                         {**m, "source": new_path_str, "filename": new_path.name}
                         for m in results["metadatas"]
@@ -3082,6 +3113,10 @@ def create_app(
                         documents=results["documents"],
                         embeddings=results["embeddings"],
                         metadatas=new_metadatas,
+                    )
+                    rename_source(
+                        data_dir, old_path_str, new_path_str,
+                        new_path.name, prefix,
                     )
 
                 # Update manifest
@@ -3387,6 +3422,8 @@ def create_app(
                 ids=results["ids"][start:end],
                 metadatas=updated_metadatas[start:end],
             )
+
+        update_units_fts_game_system(data_dir, source_path, primary)
 
         if manifest:
             for entry in manifest.files.values():
@@ -3744,27 +3781,19 @@ def create_app(
         return {"name": new_name, "file_count": len(coll.file_paths)}
 
     # Experimental BM25 hybrid (default-off `hybrid` search flag): the
-    # lexical index is built lazily on the first hybrid search and rebuilt
-    # whenever the chunk count changes (reindex/delete). Held in memory —
-    # acceptable for the experimental flag, revisit before any default-on.
-    #
-    # Both lazy caches are guarded by a lock: since #344 the search body
-    # runs in a worker thread, so two concurrent searches can race here on
-    # a cold cache and each pay the full build cost.
-    lexical_cache: dict = {"count": None, "index": None}
-    lexical_lock = threading.Lock()
+    # lexical rows are written at index time into the parents SQLite, so
+    # there is nothing to build, cache or invalidate here. Constructed per
+    # call — it is two attributes, and `collection` is rebound when
+    # /api/delete-index recreates the collection, so a handle captured
+    # once would go stale.
+    def _get_lexical_index() -> PersistedLexicalIndex:
+        return PersistedLexicalIndex(data_dir, collection)
 
-    def _get_lexical_index() -> LexicalIndex:
-        count = collection.count()
-        with lexical_lock:
-            if lexical_cache["index"] is None or lexical_cache["count"] != count:
-                lexical_cache["index"] = LexicalIndex.from_collection(collection)
-                lexical_cache["count"] = count
-            return lexical_cache["index"]
-
-    # Spell-correction vocabulary: same lifecycle as the lexical index —
-    # built lazily on first use, rebuilt when the chunk count changes
-    # (reindex/delete).
+    # Spell-correction vocabulary: built lazily on first use, rebuilt when
+    # the chunk count changes (reindex/delete). The lazy cache is guarded
+    # by a lock: since #344 the search body runs in a worker thread, so two
+    # concurrent searches can race here on a cold cache and each pay the
+    # full build cost.
     spell_cache: dict = {"count": None, "corrector": None}
     spell_lock = threading.Lock()
 

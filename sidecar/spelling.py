@@ -10,7 +10,7 @@ derives spacing-variant queries from the same vocabulary.
 
 The vocabulary is a term → frequency map over the indexed chunks —
 lowercased, unstemmed, same ``[A-Za-z0-9]+`` token alphabet as
-``lexical.py``. It is a separate pass, not a reuse of ``LexicalIndex``:
+``lexical.py``. It is a separate pass, not a reuse of the lexical index:
 the FTS5 index is porter-stemmed, the wrong surface forms for a spell
 dictionary. Terms below ``MIN_VOCAB_FREQ`` are treated as extraction
 junk ("byweapon"): they are neither protected from correction nor

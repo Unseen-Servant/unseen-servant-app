@@ -9,8 +9,11 @@ next auto-sync poll to discover the change.
 
 import json
 import shutil
+import sqlite3
+from pathlib import Path
 
-from server import MANIFEST_FILENAME
+from parents_store import PARENTS_FILENAME, count_units_fts
+from server import MANIFEST_FILENAME, chunk_id_prefix
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +119,54 @@ def test_file_rename_preserves_chunk_count(client, sample_pdf_path, tmp_path):
 
     manifest = read_manifest(tmp_path)
     assert manifest["files"][new_path]["chunk_count"] == chunks_before
+
+
+def test_file_rename_moves_the_lexical_rows(
+    client, large_text_pdf_path, test_collection, tmp_path, monkeypatch
+):
+    """The persisted FTS rows follow the file and keep the ids Chroma has.
+
+    Both sides rebuild the id from the chunk's stored ordinal, so they
+    agree even though ChromaDB promises no ordering for ``get`` — the
+    reversed ``get`` here stands in for any order but insertion order.
+    """
+    index_pdfs(client, large_text_pdf_path)
+    old_path = str(large_text_pdf_path)
+    units = count_units_fts(tmp_path, old_path)
+    assert units > 1  # a single-chunk file could not detect a reordering
+
+    orig_get = type(test_collection).get
+
+    def reversed_get(self, **kwargs):
+        got = orig_get(self, **kwargs)
+        for key in ("ids", "documents", "metadatas", "embeddings"):
+            if got.get(key) is not None:
+                got[key] = list(reversed(got[key]))
+        return got
+
+    monkeypatch.setattr(type(test_collection), "get", reversed_get)
+    new_path = str(tmp_path / "renamed_lexical.pdf")
+    resp = client.post("/api/file-rename", json={
+        "old_path": old_path,
+        "new_path": new_path,
+    })
+    assert resp.json()["renamed"] is True
+    monkeypatch.undo()
+
+    assert count_units_fts(tmp_path, old_path) == 0
+    assert count_units_fts(tmp_path, new_path) == units
+
+    conn = sqlite3.connect(tmp_path / PARENTS_FILENAME)
+    fts_ids = {
+        r[0] for r in conn.execute(
+            "SELECT chunk_id FROM unit_fts WHERE source = ?", (new_path,)
+        )
+    }
+    conn.close()
+    got = test_collection.get(where={"source": new_path}, include=["metadatas"])
+    prefix = chunk_id_prefix(Path(new_path))
+    assert fts_ids == set(got["ids"])
+    assert got["ids"] == [f"{prefix}_{m['chunk']}" for m in got["metadatas"]]
 
 
 def test_file_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_path):

@@ -8,6 +8,7 @@ Tests for game system management endpoints.
 
 import json
 
+from parents_store import search_units_fts
 from server import MANIFEST_FILENAME
 
 
@@ -55,7 +56,7 @@ def test_game_systems_sorted(client, dnd5e_pdf_path, dragonbane_pdf_path):
 # ---------------------------------------------------------------------------
 
 def test_set_game_system_updates_metadata(
-    client, untagged_pdf_path, test_collection
+    client, untagged_pdf_path, test_collection, tmp_path
 ):
     """Setting game system should update all chunk metadata."""
     client.post("/api/index-files", json={
@@ -76,6 +77,16 @@ def test_set_game_system_updates_metadata(
     results = test_collection.get(include=["metadatas"])
     for metadata in results["metadatas"]:
         assert metadata["game_system"] == "Savage Worlds"
+
+    # The persisted FTS rows carry the same scope columns, so the retag
+    # has to reach them too or a game_system-scoped hybrid search would
+    # still see the old tag.
+    assert search_units_fts(
+        tmp_path, '"tables"', 10, {"game_system": "Savage Worlds"}
+    )
+    assert search_units_fts(
+        tmp_path, '"tables"', 10, {"game_system": "unknown"}
+    ) == []
 
 
 def test_set_game_system_updates_manifest(
