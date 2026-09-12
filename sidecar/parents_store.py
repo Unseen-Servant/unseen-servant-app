@@ -37,15 +37,29 @@ CREATE TABLE IF NOT EXISTS parents (
     section_heading TEXT,
     page_start INTEGER NOT NULL,
     page_end INTEGER NOT NULL,
-    chunk_type TEXT NOT NULL
+    chunk_type TEXT NOT NULL,
+    section_id TEXT,
+    section_path TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_parents_source ON parents(source);
 """
+
+SCHEMA_COLUMNS = {"section_id": "TEXT", "section_path": "TEXT"}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after a store was created (ALTER TABLE is
+    idempotent here because we check PRAGMA first)."""
+    have = {row[1] for row in conn.execute("PRAGMA table_info(parents)")}
+    for col, typ in SCHEMA_COLUMNS.items():
+        if col not in have:
+            conn.execute(f"ALTER TABLE parents ADD COLUMN {col} {typ}")
 
 
 def _connect(data_dir: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(data_dir / PARENTS_FILENAME))
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     return conn
 
 
@@ -75,13 +89,14 @@ def upsert_parents(
             """
             INSERT INTO parents
                 (parent_id, source, text, section_heading,
-                 page_start, page_end, chunk_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                 page_start, page_end, chunk_type, section_id, section_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
                     p.parent_id, source, p.text, p.section_heading,
                     p.page_start, p.page_end, p.chunk_type,
+                    p.section_id, p.section_path,
                 )
                 for p in parents
             ],
@@ -101,7 +116,7 @@ def fetch_parents(
         rows = conn.execute(
             f"""
             SELECT parent_id, source, text, section_heading,
-                   page_start, page_end, chunk_type
+                   page_start, page_end, chunk_type, section_id, section_path
             FROM parents WHERE parent_id IN ({placeholders})
             """,
             parent_ids,
@@ -115,9 +130,15 @@ def fetch_parents(
             page_start=row[4],
             page_end=row[5],
             chunk_type=row[6],
+            section_id=row[7],
+            section_path=row[8],
         )
         for row in rows
     }
+
+
+def _same_section(r_sid, r_heading, sid, heading) -> bool:
+    return r_sid == sid if (sid is not None and r_sid is not None) else r_heading == heading
 
 
 def _extend_one(
@@ -126,25 +147,27 @@ def _extend_one(
     max_extra_chars: int,
 ) -> ParentDoc | None:
     """Fetch one parent and stitch contiguous sibling parents that share
-    its source + section_heading, capped at `max_extra_chars`.
+    its source + section, capped at `max_extra_chars`.
 
     Adjacency uses SQLite rowid order. Within a single source, rowid
     order equals document order because upsert_parents does
     delete-then-insert in chunk order. Walks rowid neighbors outward;
-    stops on the first neighbor with a different section_heading or
-    when adding the neighbor would exceed the budget.
+    stops on the first neighbor in a different section (compared by
+    section_id when both rows have one, else by section_heading — for
+    legacy rows predating the section_id migration) or when adding the
+    neighbor would exceed the budget.
     """
     target = conn.execute(
         """
         SELECT rowid, parent_id, source, text, section_heading,
-               page_start, page_end, chunk_type
+               page_start, page_end, chunk_type, section_id, section_path
         FROM parents WHERE parent_id = ?
         """,
         (parent_id,),
     ).fetchone()
     if not target:
         return None
-    target_rowid, pid, source, text, section, ps, pe, ctype = target
+    target_rowid, pid, source, text, section, ps, pe, ctype, sid, spath = target
 
     parts = [text]
     page_start, page_end = ps, pe
@@ -154,7 +177,7 @@ def _extend_one(
     while budget > 0:
         row = conn.execute(
             """
-            SELECT rowid, text, section_heading, page_start, page_end
+            SELECT rowid, text, section_heading, page_start, page_end, section_id
             FROM parents WHERE source = ? AND rowid < ?
             ORDER BY rowid DESC LIMIT 1
             """,
@@ -162,8 +185,8 @@ def _extend_one(
         ).fetchone()
         if not row:
             break
-        r_rowid, r_text, r_section, r_ps, r_pe = row
-        if r_section != section:
+        r_rowid, r_text, r_section, r_ps, r_pe, r_sid = row
+        if not _same_section(r_sid, r_section, sid, section):
             break
         cost = len(r_text) + 2  # "\n\n" join
         if cost > budget:
@@ -177,7 +200,7 @@ def _extend_one(
     while budget > 0:
         row = conn.execute(
             """
-            SELECT rowid, text, section_heading, page_start, page_end
+            SELECT rowid, text, section_heading, page_start, page_end, section_id
             FROM parents WHERE source = ? AND rowid > ?
             ORDER BY rowid ASC LIMIT 1
             """,
@@ -185,8 +208,8 @@ def _extend_one(
         ).fetchone()
         if not row:
             break
-        r_rowid, r_text, r_section, r_ps, r_pe = row
-        if r_section != section:
+        r_rowid, r_text, r_section, r_ps, r_pe, r_sid = row
+        if not _same_section(r_sid, r_section, sid, section):
             break
         cost = len(r_text) + 2
         if cost > budget:
@@ -204,6 +227,8 @@ def _extend_one(
         page_start=page_start,
         page_end=page_end,
         chunk_type=ctype,
+        section_id=sid,
+        section_path=spath,
     )
 
 

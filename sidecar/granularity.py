@@ -60,6 +60,8 @@ class EmbedUnit:
     page_start: int
     page_end: int
     ordinal: int
+    section_id: str | None = None
+    section_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,8 @@ class ParentDoc:
     source_pdf: str
     page_start: int
     page_end: int
+    section_id: str | None = None
+    section_path: str | None = None
 
 
 def _split_prose(text: str, target: int = SMALL_TARGET) -> list[str]:
@@ -142,19 +146,31 @@ def _make_parent_id(source_pdf: str, group_idx: int, label_text: str | None) -> 
     return f"p_{digest}"
 
 
+def _same_section(a_id: str | None, a_heading: str | None,
+                   b_id: str | None, b_heading: str | None) -> bool:
+    """Section-identity comparison for grouping. Compares section_id when
+    both sides carry one (the normal, chunker-produced case); falls back
+    to breadcrumb equality for chunks with no section_id (legacy/synthetic
+    chunks, e.g. hand-built in tests)."""
+    if a_id is not None and b_id is not None:
+        return a_id == b_id
+    return a_heading == b_heading
+
+
 def _group_into_parents(chunks: list[Chunk]) -> list[list[Chunk]]:
     """Walk chunks in document order. Start a new parent every time the
-    breadcrumb changes OR the running text size would exceed
-    PARENT_HARD_CAP. Same-breadcrumb-but-non-adjacent chunks become
+    section changes OR the running text size would exceed
+    PARENT_HARD_CAP. Same-section-but-non-adjacent chunks become
     distinct parents."""
     groups: list[list[Chunk]] = []
     current: list[Chunk] = []
     current_size = 0
-    prev_bc: str | None | object = object()
+    prev: tuple[str | None, str | None] | None = None
     for c in chunks:
-        bc = c.section_heading
+        bc = (c.section_id, c.section_heading)
         next_size = current_size + len(c.text) + 2
-        if (bc != prev_bc) or (current and next_size > PARENT_HARD_CAP):
+        same = prev is not None and _same_section(prev[0], prev[1], bc[0], bc[1])
+        if (not same) or (current and next_size > PARENT_HARD_CAP):
             if current:
                 groups.append(current)
             current = [c]
@@ -162,7 +178,7 @@ def _group_into_parents(chunks: list[Chunk]) -> list[list[Chunk]]:
         else:
             current.append(c)
             current_size = next_size
-        prev_bc = bc
+        prev = bc
     if current:
         groups.append(current)
     return groups
@@ -194,6 +210,8 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
             source_pdf=group[0].source_pdf,
             page_start=min(c.page_start for c in group),
             page_end=max(c.page_end for c in group),
+            section_id=group[0].section_id,
+            section_path=group[0].section_path,
         ))
         for c in group:
             chunk_to_pid[c.ordinal] = pid
@@ -220,6 +238,8 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
                         page_start=c.page_start,
                         page_end=c.page_end,
                         ordinal=embed_ordinal,
+                        section_id=c.section_id,
+                        section_path=c.section_path,
                     ))
                     embed_ordinal += 1
             else:
@@ -234,6 +254,8 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
                     page_start=c.page_start,
                     page_end=c.page_end,
                     ordinal=embed_ordinal,
+                    section_id=c.section_id,
+                    section_path=c.section_path,
                 ))
                 embed_ordinal += 1
             continue
@@ -248,6 +270,8 @@ def build(chunks: list[Chunk]) -> tuple[list[EmbedUnit], list[ParentDoc]]:
                 page_start=c.page_start,
                 page_end=c.page_end,
                 ordinal=embed_ordinal,
+                section_id=c.section_id,
+                section_path=c.section_path,
             ))
             embed_ordinal += 1
 

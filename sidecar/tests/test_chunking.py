@@ -188,6 +188,34 @@ def test_chunks_before_first_heading_have_no_breadcrumb():
     assert chunks[0].section_heading is None
 
 
+# ─────────────────────── section identity ───────────────────────
+
+
+def test_chunks_carry_section_id_and_path():
+    pages = [_page(1, "# Monsters\n\n## Kraken\n\nbody\n\n### Actions\n\nbite\n\n## Medusa\n\ngaze\n\n### Actions\n\nglare")]
+    chunks = structure_aware(pages, source_pdf="x.pdf")
+    by_heading = {c.section_heading: c for c in chunks}
+    kraken, kraken_actions = by_heading["Monsters > Kraken"], by_heading["Monsters > Kraken > Actions"]
+    medusa_actions = by_heading["Monsters > Medusa > Actions"]
+    assert kraken.section_id and kraken.section_id.startswith("s_")
+    assert kraken_actions.section_path.startswith(kraken.section_path + "/")
+    assert not medusa_actions.section_path.startswith(kraken.section_path + "/")
+    assert kraken_actions.section_id != medusa_actions.section_id   # same title, different section
+
+
+def test_section_ids_are_stable_across_runs():
+    pages = [_page(1, "# A\n\n## B\n\ntext")]
+    a = structure_aware(pages, source_pdf="x.pdf")
+    b = structure_aware(pages, source_pdf="x.pdf")
+    assert [c.section_id for c in a] == [c.section_id for c in b]
+
+
+def test_pipeline_version_names_chunker_and_embedder():
+    from chunker import CHUNKER_VERSION, EMBEDDING_MODEL, PIPELINE_VERSION
+    assert CHUNKER_VERSION == "structure_aware-v3"
+    assert PIPELINE_VERSION == f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
+
+
 # ─────────────────────── hard-cap enforcement ───────────────────────
 
 

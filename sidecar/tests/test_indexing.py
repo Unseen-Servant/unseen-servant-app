@@ -52,9 +52,53 @@ def test_index_stores_correct_metadata(client, sample_pdf_path, test_collection)
         # Parent-document retrieval (#146): every embed unit points at a parent
         assert "parent_id" in metadata
         assert metadata["parent_id"].startswith("p_")
+        # Section identity (roadmap 1.3): every embed unit carries its section
+        # (this fixture's plain-text PDF yields no markdown headings, so
+        # both fields may legitimately be "" — same tolerance as
+        # section_heading above)
+        assert "section_id" in metadata
+        assert "section_path" in metadata
+        if metadata["section_id"]:
+            assert metadata["section_id"].startswith("s_")
+        if metadata["section_path"]:
+            assert "/" in metadata["section_path"] or metadata["section_path"].startswith("s_")
         # Version stamps for the diagnostics tab (#147)
-        assert metadata["chunker_version"] == "structure_aware-v2"
+        assert metadata["chunker_version"] == "structure_aware-v3"
         assert metadata["embedding_model"]
+
+
+def test_embed_unit_metadata_carries_section_identity():
+    """Direct check on the field mapping (the sample PDF fixture has no
+    real headings, so the endpoint-level test above can't exercise a
+    populated section_id/section_path)."""
+    from pathlib import Path
+    from granularity import EmbedUnit
+    from server import _embed_unit_metadata
+
+    eu = EmbedUnit(
+        chunk_id="c1", text="t", parent_id="p_1", chunk_type="prose",
+        section_heading="Monsters > Kraken", source_pdf="x.pdf",
+        page_start=1, page_end=1, ordinal=0,
+        section_id="s_abc123", section_path="s_111/s_abc123",
+    )
+    meta = _embed_unit_metadata(Path("x.pdf"), eu, "5e")
+    assert meta["section_id"] == "s_abc123"
+    assert meta["section_path"] == "s_111/s_abc123"
+
+
+def test_embed_unit_metadata_section_identity_defaults_to_empty_string():
+    from pathlib import Path
+    from granularity import EmbedUnit
+    from server import _embed_unit_metadata
+
+    eu = EmbedUnit(
+        chunk_id="c1", text="t", parent_id="p_1", chunk_type="prose",
+        section_heading=None, source_pdf="x.pdf",
+        page_start=1, page_end=1, ordinal=0,
+    )
+    meta = _embed_unit_metadata(Path("x.pdf"), eu, "5e")
+    assert meta["section_id"] == ""
+    assert meta["section_path"] == ""
 
 
 def test_index_chunk_ids_follow_pattern(client, sample_pdf_path, test_collection):

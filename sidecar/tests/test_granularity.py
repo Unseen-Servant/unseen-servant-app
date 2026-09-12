@@ -26,6 +26,7 @@ def _chunk(
     text: str, heading: str | None, ordinal: int,
     chunk_type: str = "prose",
     page_start: int = 1, page_end: int = 1,
+    section_id: str | None = None, section_path: str | None = None,
 ) -> Chunk:
     return Chunk(
         text=text,
@@ -36,6 +37,8 @@ def _chunk(
         source_pdf="test.pdf",
         chunker="structure_aware-v2",
         ordinal=ordinal,
+        section_id=section_id,
+        section_path=section_path,
     )
 
 
@@ -258,3 +261,14 @@ def test_build_empty_input():
     embed_units, parents = build([])
     assert embed_units == []
     assert parents == []
+
+
+# ─────────────────────── section identity ───────────────────────
+
+
+def test_parents_and_units_carry_section_identity():
+    chunks = [_chunk("a", "H", 0, "prose", 1, 1), _chunk("b", "H", 1, "prose", 1, 1)]
+    chunks = [Chunk(**{**c.__dict__, "section_id": "s_1", "section_path": "s_0/s_1"}) for c in chunks]
+    units, parents = build(chunks)
+    assert parents[0].section_id == "s_1" and parents[0].section_path == "s_0/s_1"
+    assert {u.section_id for u in units} == {"s_1"}

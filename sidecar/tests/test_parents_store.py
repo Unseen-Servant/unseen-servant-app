@@ -19,6 +19,8 @@ def _p(
     page_start: int = 1,
     page_end: int = 1,
     chunk_type: str = "prose",
+    sid: str | None = None,
+    path: str | None = None,
 ) -> ParentDoc:
     return ParentDoc(
         parent_id=pid,
@@ -28,6 +30,8 @@ def _p(
         source_pdf=source_pdf,
         page_start=page_start,
         page_end=page_end,
+        section_id=sid,
+        section_path=path,
     )
 
 
@@ -229,3 +233,30 @@ def test_extended_stops_partway_when_third_neighbor_breaks_section(tmp_path):
     fetched = fetch_parents_extended(tmp_path, ["p_a"])
     assert fetched["p_a"].text == "a-text\n\nb-text"
     assert fetched["p_a"].page_end == 2
+
+
+# ---------------------------------------------------------------------------
+# section_id migration + stitching (roadmap 1.3)
+# ---------------------------------------------------------------------------
+
+
+def test_migrate_adds_section_columns_to_an_old_store(tmp_path):
+    import sqlite3
+    db = tmp_path / "parents.sqlite3"
+    conn = sqlite3.connect(db)
+    conn.executescript("""CREATE TABLE parents (parent_id TEXT PRIMARY KEY, source TEXT NOT NULL,
+        text TEXT NOT NULL, section_heading TEXT, page_start INTEGER NOT NULL,
+        page_end INTEGER NOT NULL, chunk_type TEXT NOT NULL);""")
+    conn.execute("INSERT INTO parents VALUES ('p1','old.pdf','t','H',1,1,'prose')")
+    conn.commit(); conn.close()
+    got = fetch_parents(tmp_path, ["p1"])
+    assert got["p1"].section_id is None and got["p1"].section_heading == "H"
+
+
+def test_extended_stops_at_section_id_boundary_even_with_equal_headings(tmp_path):
+    upsert_parents(tmp_path, "x.pdf", [
+        _p("p1", "x.pdf", "a" * 10, "Actions", sid="s_k"),
+        _p("p2", "x.pdf", "b" * 10, "Actions", sid="s_m"),
+    ])
+    got = fetch_parents_extended(tmp_path, ["p1"])
+    assert got["p1"].text == "a" * 10

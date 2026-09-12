@@ -10,6 +10,7 @@ https://github.com/Unseen-Servant/unseen-legend-lore-experiments/blob/main/chunk
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from typing import Literal
@@ -17,8 +18,9 @@ from typing import Literal
 from heading_text import strip_markup
 
 
-CHUNKER_VERSION = "structure_aware-v2"
+CHUNKER_VERSION = "structure_aware-v3"
 EMBEDDING_MODEL = "bge-m3"
+PIPELINE_VERSION = f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
 SOFT_CAP = 1000
 HARD_CAP = 20000
 
@@ -45,12 +47,23 @@ class Chunk:
     source_pdf: str
     chunker: str
     ordinal: int
+    section_id: str | None = None
+    section_path: str | None = None
 
 
-def _breadcrumb(stack: list[tuple[int, str]]) -> str | None:
+def _breadcrumb(stack: list[tuple[int, str, str]]) -> str | None:
     if not stack:
         return None
-    return " > ".join(text for _, text in stack)
+    return " > ".join(text for _, text, _ in stack)
+
+
+def _section_id(source_pdf: str, ordinal: int, path_titles: list[str]) -> str:
+    digest = hashlib.sha256(f"{source_pdf}::{ordinal}::{' > '.join(path_titles)}".encode()).hexdigest()[:16]
+    return f"s_{digest}"
+
+
+def _section_path(stack: list[tuple[int, str, str]]) -> str | None:
+    return "/".join(sid for _, _, sid in stack) if stack else None
 
 
 def _emit_prose(
@@ -58,6 +71,8 @@ def _emit_prose(
     page_start: int,
     page_end: int,
     heading: str | None,
+    section_id: str | None,
+    section_path: str | None,
     source_pdf: str,
     start_ordinal: int,
     soft_cap: int,
@@ -83,6 +98,8 @@ def _emit_prose(
                 source_pdf=source_pdf,
                 chunker=CHUNKER_VERSION,
                 ordinal=ordinal,
+                section_id=section_id,
+                section_path=section_path,
             ))
             ordinal += 1
         buf = para
@@ -96,6 +113,8 @@ def _emit_prose(
             source_pdf=source_pdf,
             chunker=CHUNKER_VERSION,
             ordinal=ordinal,
+            section_id=section_id,
+            section_path=section_path,
         ))
     return chunks
 
@@ -142,7 +161,8 @@ def structure_aware(
     """Walk Markdown pages, emit chunks at heading and table boundaries."""
     chunks: list[Chunk] = []
     ordinal = 0
-    heading_stack: list[tuple[int, str]] = []
+    section_counter = 0
+    heading_stack: list[tuple[int, str, str]] = []
     buffer_lines: list[str] = []
     buffer_page_start: int | None = None
     buffer_page_end: int | None = None
@@ -160,6 +180,8 @@ def structure_aware(
             buffer_page_start,
             buffer_page_end or buffer_page_start,
             _breadcrumb(heading_stack),
+            heading_stack[-1][2] if heading_stack else None,
+            _section_path(heading_stack),
             source_pdf,
             ordinal,
             soft_cap,
@@ -189,7 +211,13 @@ def structure_aware(
                 while heading_stack and heading_stack[-1][0] >= level:
                     heading_stack.pop()
                 if text:
-                    heading_stack.append((level, text))
+                    section_counter += 1
+                    sid = _section_id(
+                        source_pdf,
+                        section_counter,
+                        [t for _, t, _ in heading_stack] + [text],
+                    )
+                    heading_stack.append((level, text, sid))
                 i += 1
                 continue
 
@@ -210,6 +238,8 @@ def structure_aware(
                     source_pdf=source_pdf,
                     chunker=CHUNKER_VERSION,
                     ordinal=ordinal,
+                    section_id=heading_stack[-1][2] if heading_stack else None,
+                    section_path=_section_path(heading_stack),
                 ))
                 ordinal += 1
                 i = j

@@ -39,6 +39,8 @@ def _make_units(n: int) -> list[EmbedUnit]:
             page_start=1,
             page_end=1,
             ordinal=i,
+            section_id=None,
+            section_path=None,
         )
         for i in range(n)
     ]

@@ -1062,6 +1062,8 @@ def _embed_unit_metadata(pdf_path: Path, eu: EmbedUnit, game_system: str,
         "page_label_start": labels.get(eu.page_start, ""),
         "page_label_end": labels.get(eu.page_end, ""),
         "parent_id": eu.parent_id,
+        "section_id": eu.section_id or "",
+        "section_path": eu.section_path or "",
         "chunker_version": CHUNKER_VERSION,
         "embedding_model": EMBEDDING_MODEL,
     }
