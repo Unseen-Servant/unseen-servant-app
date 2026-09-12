@@ -203,6 +203,26 @@ def test_chunks_carry_section_id_and_path():
     assert kraken_actions.section_id != medusa_actions.section_id   # same title, different section
 
 
+def test_composed_pipeline_produces_real_section_metadata():
+    """Full pipeline: chunker -> granularity -> Chroma metadata mapping,
+    using real distinct sections (not hand-built stand-ins) to check the
+    fields actually survive composition, not just each module in isolation."""
+    from pathlib import Path
+    from granularity import build
+    from server import _embed_unit_metadata
+
+    pages = [_page(1, "# Monsters\n\n## Kraken\n\nbody\n\n### Actions\n\nbite\n\n## Medusa\n\ngaze\n\n### Actions\n\nglare")]
+    chunks = structure_aware(pages, source_pdf="x.pdf")
+    units, _parents = build(chunks)
+
+    meta0 = _embed_unit_metadata(Path("x.pdf"), units[0], "unknown")
+    assert meta0["section_id"].startswith("s_")
+
+    actions_unit = next(u for u in units if u.section_heading and u.section_heading.endswith("Actions"))
+    meta_actions = _embed_unit_metadata(Path("x.pdf"), actions_unit, "unknown")
+    assert "/" in meta_actions["section_path"]
+
+
 def test_section_ids_are_stable_across_runs():
     pages = [_page(1, "# A\n\n## B\n\ntext")]
     a = structure_aware(pages, source_pdf="x.pdf")

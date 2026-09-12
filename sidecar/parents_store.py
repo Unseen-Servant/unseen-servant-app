@@ -238,7 +238,8 @@ def fetch_parents_extended(
     max_extra_chars: int = SECTION_EXPANSION_MAX_EXTRA_CHARS,
 ) -> dict[str, ParentDoc]:
     """Like `fetch_parents`, but stitches each parent with rowid-adjacent
-    sibling parents that share the same source + section_heading.
+    sibling parents that share the same source + section identity
+    (section_id when both rows carry one, else section_heading).
 
     Section-aware result expansion: a section that exceeded
     PARENT_HARD_CAP at indexing time was split across multiple parents.

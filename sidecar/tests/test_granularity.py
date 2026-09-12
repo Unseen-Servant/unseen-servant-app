@@ -272,3 +272,13 @@ def test_parents_and_units_carry_section_identity():
     units, parents = build(chunks)
     assert parents[0].section_id == "s_1" and parents[0].section_path == "s_0/s_1"
     assert {u.section_id for u in units} == {"s_1"}
+
+
+def test_group_splits_on_section_id_with_equal_headings():
+    """Two chunks share a section_heading but carry different section_ids
+    (e.g. two monsters' "Actions" subsections promoted to the same
+    breadcrumb text) — grouping must key off section_id, not the
+    breadcrumb string, or these would wrongly merge into one parent."""
+    chunks = [_chunk("a", "Combat", 0, section_id="s_1"),
+              _chunk("b", "Combat", 1, section_id="s_2")]
+    assert len(_group_into_parents(chunks)) == 2
