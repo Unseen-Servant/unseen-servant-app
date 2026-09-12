@@ -4062,15 +4062,27 @@ def create_app(
         return PersistedLexicalIndex(data_dir, collection)
 
     # Spell-correction vocabulary: built lazily on first use (and at boot
-    # by ``warm_search_stack``), rebuilt when the index changes. With
-    # persisted FTS rows it is one SQLite read keyed on the manifest
-    # digest, so a re-index that happens to leave the chunk count
-    # unchanged still invalidates it; a legacy index predating unit_fts
-    # keeps the chunk-count key and the full Chroma scan (issue #343). The
-    # cache is guarded by a lock: since #344 the search body runs in a
-    # worker thread, so two concurrent searches can race here on a cold
-    # cache and each pay the full build cost.
-    spell_cache: dict = {"key": None, "corrector": None}
+    # by ``warm_search_stack``), rebuilt when the index changes. On an
+    # indexed library the key is the manifest digest, so a re-index that
+    # happens to leave the chunk count unchanged still invalidates it;
+    # with nothing indexed the chunk count is all there is (issue #343).
+    #
+    # Where the vocabulary is read from is decided once per key, on a
+    # cache miss, by coverage: the persisted FTS rows only when they
+    # cover every indexed chunk, otherwise the full Chroma scan.
+    # All-or-nothing because a part-migrated library's FTS rows are a
+    # subset of the library — building from them would leave the
+    # un-migrated books' proper nouns out of the vocabulary, and
+    # ``correct()`` would rewrite them as typos. That is a change in
+    # search results, which this path must not make. Coverage is also
+    # the reason the check is per-key: ``count_units_fts`` is an O(rows)
+    # scan (~37 ms at 100k rows), and a per-search check would pay it
+    # once per query — twice under variant expansion.
+    #
+    # The cache is guarded by a lock: since #344 the search body runs in
+    # a worker thread, so two concurrent searches can race here on a
+    # cold cache and each pay the full build cost.
+    spell_cache: dict = {"key": None, "corrector": None, "mode": None}
     spell_lock = threading.Lock()
 
     def _get_spell_corrector(
@@ -4078,20 +4090,31 @@ def create_app(
     ) -> SpellCorrector:
         """``manifest`` is the caller's already-loaded manifest, so the
         search path does not re-read it just to check the cache key."""
-        from_store = bool(data_dir) and count_units_fts(data_dir) > 0
-        if from_store:
+        expected_units = 0
+        if data_dir:
             if manifest is None:
                 manifest = load_manifest(data_dir)
-            key = manifest_digest(manifest)
-        else:
-            key = collection.count()
+            expected_units = sum(
+                e.chunk_count for e in manifest.files.values()
+            )
+        key = (
+            manifest_digest(manifest) if expected_units
+            else collection.count()
+        )
         with spell_lock:
             if spell_cache["corrector"] is None or spell_cache["key"] != key:
+                mode = (
+                    "store"
+                    if expected_units
+                    and count_units_fts(data_dir) >= expected_units
+                    else "chroma"
+                )
                 spell_cache["corrector"] = (
-                    SpellCorrector.from_store(data_dir) if from_store
+                    SpellCorrector.from_store(data_dir) if mode == "store"
                     else SpellCorrector.from_collection(collection)
                 )
                 spell_cache["key"] = key
+                spell_cache["mode"] = mode
             return spell_cache["corrector"]
 
     # Exposed for the boot warm-up thread in __main__.

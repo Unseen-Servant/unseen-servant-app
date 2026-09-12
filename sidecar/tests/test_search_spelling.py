@@ -7,12 +7,16 @@ The corrected query must drive every downstream consumer of the query
 text — the dense embed, the BM25 side when `hybrid` is on — and surface
 in the response as `corrected_query` plus a note in the `message`
 channel. `spell_correction: false` bypasses everything; the vocabulary
-rebuilds when the chunk count changes.
+rebuilds when the manifest content digest changes; legacy stores (no
+persisted FTS rows) key on the chunk count instead.
 """
 
 import pytest
 
+import server
+import spelling
 from parents_store import upsert_units_fts
+from server import IndexManifest, ManifestEntry, save_manifest
 
 
 def _meta(parent_id: str, filename: str) -> dict:
@@ -160,18 +164,23 @@ def _fake_stat_pool():
     }
 
 
-def _manifest(tmp_path, content_hash: str) -> None:
-    from server import IndexManifest, ManifestEntry, save_manifest
-
-    save_manifest(tmp_path, IndexManifest(files={"/corpus/monsters.pdf": ManifestEntry(
-        filename="monsters.pdf",
-        mtime=1.0,
-        chunk_count=1,
-        indexed_at="2026-09-12T00:00:00+00:00",
-        game_system="OSR",
-        content_hash=content_hash,
-        pipeline_version="p1",
-    )}))
+def _manifest(
+    tmp_path, content_hash: str = "h1", sources: dict[str, int] | None = None
+) -> None:
+    """Write a manifest; ``sources`` maps source path -> chunk_count."""
+    sources = sources or {"/corpus/monsters.pdf": 1}
+    save_manifest(tmp_path, IndexManifest(files={
+        path: ManifestEntry(
+            filename=path.rsplit("/", 1)[-1],
+            mtime=1.0,
+            chunk_count=chunk_count,
+            indexed_at="2026-09-12T00:00:00+00:00",
+            game_system="OSR",
+            content_hash=content_hash,
+            pipeline_version="p1",
+        )
+        for path, chunk_count in sources.items()
+    }))
 
 
 def test_spell_vocab_comes_from_unit_fts(
@@ -224,3 +233,92 @@ def test_spell_vocab_invalidates_on_manifest_digest_change(
     _manifest(tmp_path, "h2")  # re-indexed: new content hash
     assert _search(client)["corrected_query"] == "owlbear claws"
     assert len(builds) == 2
+
+
+def test_spell_mode_is_decided_once_per_manifest_digest(
+    client, test_collection, tmp_path, monkeypatch
+):
+    """Coverage is a cache-miss question, not a per-search one:
+    `count_units_fts` is an O(rows) scan (~37 ms at 100k rows), and
+    variant expansion would pay it twice per search."""
+    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
+        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
+    _manifest(tmp_path)
+    monkeypatch.setattr(
+        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
+
+    counted = []
+    real_count = server.count_units_fts
+
+    def counting(data_dir, source=None):
+        counted.append(data_dir)
+        return real_count(data_dir, source)
+
+    monkeypatch.setattr(server, "count_units_fts", counting)
+
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert len(counted) == 1
+
+
+def test_partial_fts_coverage_falls_back_to_the_chroma_scan(
+    client, test_collection, tmp_path, monkeypatch
+):
+    """A part-migrated library (FTS rows for some books only) must not
+    build the vocabulary from the migrated subset: the missing books'
+    proper nouns would read as OOV and get rewritten — a change in search
+    results, on a perf-only change. Full coverage or nothing."""
+    test_collection.add(
+        ids=["c-stat"],
+        documents=[STAT_DOC],
+        metadatas=[_meta("p-stat", "monsters.pdf")],
+    )
+    # rules.pdf has its FTS rows; monsters.pdf (which holds 'owlbear')
+    # has not been re-indexed yet.
+    upsert_units_fts(tmp_path, "/corpus/rules.pdf", [
+        ("c-prose", 0, "rules.pdf", "OSR", "p-prose", "combat in rounds"),
+        ("c-prose2", 1, "rules.pdf", "OSR", "p-prose", "each round has phases"),
+    ])
+    _manifest(tmp_path, sources={"/corpus/rules.pdf": 2, "/corpus/monsters.pdf": 2})
+
+    def no_store(*args, **kwargs):
+        raise AssertionError("built the vocabulary from partial FTS coverage")
+
+    monkeypatch.setattr(spelling, "build_vocabulary_from_store", no_store)
+    monkeypatch.setattr(
+        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
+
+    assert _search(client)["corrected_query"] == "owlbear claws"
+
+
+def test_spell_vocab_survives_a_chunk_count_change_with_the_same_digest(
+    client, test_collection, tmp_path, monkeypatch
+):
+    """The negative of the invalidation test: on a migrated index the key
+    is the digest, so rows appearing in Chroma without a re-index must
+    not throw the vocabulary away."""
+    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
+        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
+    _manifest(tmp_path)
+    monkeypatch.setattr(
+        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
+
+    builds = []
+    real_build = spelling.build_vocabulary_from_store
+
+    def counting(data_dir):
+        builds.append(data_dir)
+        return real_build(data_dir)
+
+    monkeypatch.setattr(spelling, "build_vocabulary_from_store", counting)
+
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert len(builds) == 1
+
+    test_collection.add(
+        ids=["c-extra"],
+        documents=["a later section about torches and rations"],
+        metadatas=[_meta("p-extra", "monsters.pdf")],
+    )
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert len(builds) == 1

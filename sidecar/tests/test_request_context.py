@@ -126,11 +126,14 @@ def fake_pool_client(client, test_collection, tmp_path, monkeypatch):
     monkeypatch.setattr(
         type(test_collection), "query", lambda self, **kw: FAKE_RESULTS)
     save_manifest(tmp_path, MANIFEST)
-    # FTS rows present, as in any index built since roadmap 1.6 — so the
-    # spell corrector takes its manifest-digest cache path and must reuse
-    # the request's manifest rather than reading its own.
+    # FTS rows covering every indexed chunk, as in any index built since
+    # roadmap 1.6 — so the spell corrector takes its manifest-digest,
+    # store-backed path and must reuse the request's manifest rather than
+    # reading its own.
     upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
         ("c-osr", 0, "monsters.pdf", "OSR", "p-osr", "osr fireball text")])
+    upsert_units_fts(tmp_path, "/corpus/SRD_CC_v5.1.pdf", [
+        ("c-srd", 0, "SRD_CC_v5.1.pdf", "D&D 5E", "p-srd", "srd fireball text")])
     return client
 
 
