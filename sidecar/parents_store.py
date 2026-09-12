@@ -78,6 +78,9 @@ def _connect(data_dir: Path) -> sqlite3.Connection:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_parents_section ON parents(source, section_path)"
     )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_parents_section_id ON parents(section_id)"
+    )
     return conn
 
 
@@ -416,21 +419,45 @@ def fetch_section_by_id(data_dir: Path, section_id: str) -> SectionDoc | None:
     Unlike `fetch_sections`/`section_root_for`, this is not capped up to a
     shallower ancestor — the caller asked for exactly this section (e.g. the
     `section_id` a search result printed), so its own `section_path` is the
-    assembly root. `None` when no row carries that id, or a legacy row
+    assembly root. `None` when no row lies under that id, or a legacy row
     predating the section_id/section_path columns.
+
+    The id is resolved as a path *segment*, not via the section_id column:
+    a heading immediately followed by a sub-heading owns no chunk of its
+    own, so no row carries its id — yet `section_root_for` prefers it as
+    the shallowest fitting ancestor and search advertises it. Such a
+    container is only ever found through its descendants' paths.
     """
     if not data_dir or not section_id:
         return None
     with _txn(data_dir) as conn:
+        # The common case — the section owns a row — is an indexed lookup.
         row = conn.execute(
             "SELECT parent_id, source, section_path FROM parents "
             "WHERE section_id = ? ORDER BY rowid LIMIT 1",
             (section_id,),
         ).fetchone()
-        if not row or not row[2]:
-            return None
-        parent_id, source, section_path = row
-        return assemble_section(conn, source, section_path, parent_id)
+        if row and row[2]:
+            parent_id, source, section_path = row
+            return assemble_section(conn, source, section_path, parent_id)
+        # Container root: find any descendant whose path contains the id as
+        # a segment. LIKE is only a pre-filter (a section id contains '_',
+        # LIKE's single-character wildcard), so every candidate is verified
+        # in Python; the first by rowid is the section's own first row.
+        rows = conn.execute(
+            "SELECT parent_id, source, section_path FROM parents "
+            "WHERE section_path LIKE '%' || ? || '%' ORDER BY rowid",
+            (section_id,),
+        ).fetchall()
+        for parent_id, source, path in rows:
+            if not path:
+                continue
+            segments = path.split("/")
+            if section_id not in segments:
+                continue
+            root_path = "/".join(segments[: segments.index(section_id) + 1])
+            return assemble_section(conn, source, root_path, parent_id)
+        return None
 
 
 def fetch_sections(data_dir: Path, hits: list[tuple[str, str | None, str | None]],

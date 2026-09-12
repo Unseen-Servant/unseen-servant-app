@@ -20,6 +20,7 @@ from parents_store import (
     _prefix_range,
     _txn,
     assemble_section,
+    fetch_section_by_id,
     fetch_sections,
     section_root_for,
 )
@@ -463,3 +464,56 @@ def test_fetch_sections_uses_a_root_the_caller_already_computed(tmp_path):
                          roots={"p_kra_act": "s_m/s_k"})
     assert got["p_kra_act"].root_path == "s_m/s_k"
     assert "Medusa" not in got["p_kra_act"].text
+
+
+# ---------------------------------------------------------------------------
+# fetch_section_by_id — resolve an advertised id, row of its own or not
+# ---------------------------------------------------------------------------
+
+def test_fetch_section_by_id_assembles_a_section_that_owns_a_row(tmp_path):
+    _monster_tree(tmp_path)
+    doc = fetch_section_by_id(tmp_path, "s_k")
+    assert doc is not None
+    assert doc.section_id == "s_k" and doc.root_path == "s_m/s_k"
+    assert "Ink cloud" in doc.text and "Medusa" not in doc.text
+
+
+def test_fetch_section_by_id_resolves_a_container_with_no_row_of_its_own(tmp_path):
+    """A heading immediately followed by a sub-heading owns no chunk, so
+    no parents row carries its section_id — yet `section_root_for` picks
+    it as the section root and search advertises that id. Resolution has
+    to go through the path segments, not the section_id column."""
+    upsert_parents(tmp_path, "x.pdf", [
+        _p("p_kra", "x.pdf", "Kraken AC 18 " * 5, "Monsters > Kraken",
+           2, 2, sid="s_k", path="s_m/s_k"),
+        _p("p_med", "x.pdf", "Medusa AC 15 " * 5, "Monsters > Medusa",
+           4, 4, sid="s_d", path="s_m/s_d"),
+    ])
+    doc = fetch_section_by_id(tmp_path, "s_m")
+    assert doc is not None
+    assert doc.section_id == "s_m" and doc.root_path == "s_m"
+    assert "Kraken" in doc.text and "Medusa" in doc.text
+    assert doc.section_heading == "Monsters"
+    assert (doc.page_start, doc.page_end) == (2, 4)
+
+
+def test_fetch_section_by_id_resolves_a_middle_segment(tmp_path):
+    """The id can sit anywhere in the path: here `s_k` is a middle
+    segment whose own row was never written."""
+    upsert_parents(tmp_path, "x.pdf", [
+        _p("p_act", "x.pdf", "Tentacle attack " * 5,
+           "Monsters > Kraken > Actions", 2, 3, sid="s_ka",
+           path="s_m/s_k/s_ka"),
+        _p("p_leg", "x.pdf", "Ink cloud " * 5,
+           "Monsters > Kraken > Legendary Actions", 3, 3, sid="s_kl",
+           path="s_m/s_k/s_kl"),
+    ])
+    doc = fetch_section_by_id(tmp_path, "s_k")
+    assert doc is not None
+    assert doc.root_path == "s_m/s_k" and doc.section_id == "s_k"
+    assert "Tentacle" in doc.text and "Ink cloud" in doc.text
+
+
+def test_fetch_section_by_id_unknown_id_is_none(tmp_path):
+    _monster_tree(tmp_path)
+    assert fetch_section_by_id(tmp_path, "s_nowhere") is None

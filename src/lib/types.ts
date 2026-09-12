@@ -172,6 +172,12 @@ export interface SearchResultItem {
 export interface SearchResponse {
   results: SearchResultItem[];
   message?: string;
+  /** The backend ran out of distinct sections before filling n_results —
+   * the only honest end-of-list signal. A short result list is not one:
+   * section dedupe, near-dup collapse and context packing all shorten it
+   * while more sections remain for a larger request. Always present (the
+   * Rust command defaults it to false). */
+  exhausted: boolean;
 }
 
 export type BucketPolicy = 'silent' | 'ask';

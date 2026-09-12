@@ -159,6 +159,35 @@ def section_client_no_parents(client, test_collection, tmp_path, monkeypatch):
     return client
 
 
+@pytest.fixture
+def section_client_three_sections(client, test_collection, tmp_path, monkeypatch):
+    """The same three units, but each in a section of its own — a pool the
+    dedupe loop can either satisfy or drain, which is what `exhausted`
+    reports."""
+    units = [
+        (uid, doc, {**meta, "section_id": sid, "section_path": sid})
+        for (uid, doc, meta), sid in zip(UNITS, ["s_a", "s_b", "s_c"])
+    ]
+    test_collection.add(
+        ids=[u[0] for u in units],
+        documents=[u[1] for u in units],
+        metadatas=[u[2] for u in units],
+    )
+    upsert_parents(tmp_path, SOURCE, [
+        _parent(m["parent_id"], m["section_heading"], m["section_id"],
+                m["section_path"])
+        for _, _, m in units
+    ])
+    fake = {
+        "ids": [[u[0] for u in units]],
+        "documents": [[u[1] for u in units]],
+        "metadatas": [[u[2] for u in units]],
+        "distances": [[0.2, 0.3, 0.4]],
+    }
+    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    return client
+
+
 def _search(client, **overrides):
     """POST /api/search with every pipeline knob pinned."""
     payload = {
@@ -284,3 +313,29 @@ def test_cross_edition_twin_collapses_into_also_in(client, test_collection, monk
     assert len(r) == 1
     assert len(r[0]["also_in"]) == 1
     assert r[0]["also_in"][0]["filename"] == "SRD_5.2.1.pdf"
+
+
+# ---------------------------------------------------------------------------
+# `exhausted` — the paging invariant the frontend needs (roadmap 2.x)
+# ---------------------------------------------------------------------------
+
+def test_exhausted_is_false_while_the_pool_still_has_sections(
+    section_client_three_sections
+):
+    """Three sections, two asked for: a bigger request would find more, so
+    the frontend must keep scroll-load alive even if dedupe, near-dup
+    collapse or packing shortened the returned list."""
+    data = _search(section_client_three_sections, n_results=2)
+    assert data["exhausted"] is False
+
+
+def test_exhausted_is_true_when_the_pool_runs_dry(section_client_three_sections):
+    data = _search(section_client_three_sections, n_results=5)
+    assert data["exhausted"] is True
+
+
+def test_exhausted_is_true_when_a_filter_returns_nothing(section_client):
+    """The early returns are ends of the road too — no amount of paging
+    turns an unresolvable filter into results."""
+    data = _search(section_client, game_system="Not A Real System")
+    assert data["results"] == [] and data["exhausted"] is True

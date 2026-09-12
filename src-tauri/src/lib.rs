@@ -431,6 +431,11 @@ struct SearchResponse {
     results: Vec<SearchResultItem>,
     #[serde(default)]
     message: Option<String>,
+    /// True when the sidecar's candidate pool ran dry before it had
+    /// `n_results` distinct sections — the frontend's end-of-list signal.
+    /// Defaults to false so an older sidecar just keeps paging.
+    #[serde(default)]
+    exhausted: bool,
 }
 
 // ---------------------------------------------------------------------------

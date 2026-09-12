@@ -324,8 +324,8 @@
   let filterPanelComponent: FilterPanel | undefined;
   // Lazy result loading: start with 25, grow by 25 each scroll-to-bottom,
   // hard cap at 100 to keep us out of the long tail of low-relevance hits.
-  // reachedEnd flips when the backend returns fewer than requested — we've
-  // drained the post-dedup pool, no point asking for more.
+  // reachedEnd follows the backend's `exhausted` flag — it drained its
+  // candidate pool, no point asking for more.
   const PAGE_SIZE_INITIAL = 25;
   const PAGE_SIZE_STEP = 25;
   const PAGE_SIZE_MAX = 100;
@@ -540,9 +540,10 @@
       });
       if (seq !== searchSeq) return;
       const next = response.results ?? [];
-      // Backend returned fewer than asked → there's nothing more to fetch
-      // even if pageSize hasn't hit the cap. Stops scroll-load from spinning.
-      reachedEnd = next.length < requestedPageSize;
+      // The backend says whether its pool ran dry. A short list doesn't:
+      // dedupe, near-dup collapse and packing all shorten a response that
+      // a larger request would still grow.
+      reachedEnd = response.exhausted;
       // Preserve selection across grow-fetches: when the new result list
       // contains the previously-selected row in place, leave selectedIndex
       // alone. Only reset for fresh queries (first page) or shrinkage.

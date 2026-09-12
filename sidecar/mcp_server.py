@@ -318,14 +318,22 @@ async def search_library(
         collection: Optional collection name to search within
                     (see list_collections for available collections).
         max_context_chars: Character budget for the sidecar's own section
-                           assembly (default 8000).
+                           assembly (default 8000). Applies to full_text
+                           mode only — compact results are already bounded
+                           by their snippet length.
         full_text: Print each result's full section instead of the
                    compact matched snippet (default False).
     """
     payload = {
         "query": query,
         "n_results": n_results,
-        "max_context_chars": max_context_chars,
+        # Compact mode prints at most MATCHED_SNIPPET_CHARS per result, so
+        # the payload is bounded by n_results already. Sending a budget
+        # anyway makes the server bill whole sections against it and drop
+        # results we were never going to print in full — asking for eight
+        # and receiving two. The budget belongs to full_text mode, where
+        # the sections really are what gets printed.
+        "max_context_chars": max_context_chars if full_text else None,
     }
     if source_filter:
         payload["source_filter"] = source_filter
@@ -386,7 +394,9 @@ async def search_library(
         section_line = (f"Section: {heading} ({page_span})" if page_span
                         else f"Section: {heading}")
         lines.append(f"{section_line}  id={section_id}")
-        if full_text:
+        if full_text or not section_id:
+            # No section_id means a legacy row with nothing to drill into:
+            # a snippet would strand the rest of the text unreachable.
             lines.append(r.get("text", ""))
         else:
             matched = r.get("matched_text") or r.get("text", "")
@@ -421,6 +431,12 @@ async def get_section(section_id: str) -> str:
     heading = _strip_bold(data.get("section_heading") or "") or "(no section)"
     page_span = _page_span(data)
     lines = [f"Section: {heading}"]
+    if data.get("windowed"):
+        # The store returned a window grown around the match, not the whole
+        # subtree — say so, or a truncated rule reads as a complete one.
+        lines.append(
+            "(partial: this section exceeds the cap; showing its first part)"
+        )
     source_line = f"Source: {data.get('filename', '')}"
     if page_span:
         source_line += f" ({page_span})"

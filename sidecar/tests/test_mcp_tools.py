@@ -297,11 +297,17 @@ async def test_search_library_compact_trims_long_matches(mock_sidecar):
 
 
 @pytest.mark.asyncio
-async def test_search_library_omits_full_section_line_when_no_section_id(mock_sidecar):
+async def test_search_library_prints_whole_text_when_there_is_no_section_id(mock_sidecar):
+    """A legacy row has no section to drill into, so the compact snippet
+    would strand the rest of its text with no way to ask for it — print
+    the whole thing and omit the (useless) get_section pointer."""
+    body = "Legacy body. " * 80          # well past MATCHED_SNIPPET_CHARS
     mock_sidecar.set_post("/api/search", {
-        "results": [_section_result(section_id="")],
+        "results": [_section_result(section_id="", matched="Legacy body.",
+                                    text=body)],
     })
     result = await search_library("anything")
+    assert body in result
     assert "Full section:" not in result
 
 
@@ -334,7 +340,11 @@ async def test_search_library_full_text_still_offers_get_section_when_truncated(
 
 
 @pytest.mark.asyncio
-async def test_search_library_always_sends_max_context_chars(mock_sidecar):
+async def test_search_library_compact_sends_no_context_budget(mock_sidecar):
+    """Compact mode prints at most MATCHED_SNIPPET_CHARS per result, so the
+    payload is already bounded by n_results. Billing the full sections
+    against an 8k budget instead starves the list down to two or three
+    results — the server packs whole sections, we print snippets."""
     captured = {}
 
     def capture_payload(json_data):
@@ -344,11 +354,12 @@ async def test_search_library_always_sends_max_context_chars(mock_sidecar):
     mock_sidecar.set_post("/api/search", capture_payload)
 
     await search_library("anything")
-    assert captured.get("max_context_chars") == 8000
+    assert "max_context_chars" in captured
+    assert captured["max_context_chars"] is None
 
 
 @pytest.mark.asyncio
-async def test_search_library_max_context_chars_override(mock_sidecar):
+async def test_search_library_full_text_sends_the_budget(mock_sidecar):
     captured = {}
 
     def capture_payload(json_data):
@@ -357,7 +368,23 @@ async def test_search_library_max_context_chars_override(mock_sidecar):
 
     mock_sidecar.set_post("/api/search", capture_payload)
 
-    await search_library("anything", max_context_chars=2000)
+    await search_library("anything", full_text=True)
+    assert captured.get("max_context_chars") == 8000
+
+
+@pytest.mark.asyncio
+async def test_search_library_max_context_chars_override(mock_sidecar):
+    """The budget is a full_text-mode knob: it caps what the server
+    assembles for the sections we are about to print in full."""
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+
+    await search_library("anything", max_context_chars=2000, full_text=True)
     assert captured.get("max_context_chars") == 2000
 
 
@@ -380,6 +407,41 @@ async def test_get_section_formats_heading_and_text(mock_sidecar):
     assert "Section: Monsters > Kraken" in result
     assert "monsters.pdf" in result
     assert "Kraken. AC 18, HP 472. A gargantuan monstrosity." in result
+
+
+@pytest.mark.asyncio
+async def test_get_section_flags_a_windowed_section(mock_sidecar):
+    """A section bigger than the assembly cap comes back as a window, not
+    the whole thing — say so, or the model reads a truncated rule as
+    complete."""
+    mock_sidecar.set_get("/api/section/s_big", {
+        "section_id": "s_big",
+        "section_heading": "Combat",
+        "text": "Combat rules, part one.",
+        "filename": "core.pdf",
+        "source": "/corpus/core.pdf",
+        "page_start": 10,
+        "page_end": 14,
+        "windowed": True,
+    })
+    result = await get_section("s_big")
+    assert "(partial: this section exceeds the cap; showing its first part)" in result
+
+
+@pytest.mark.asyncio
+async def test_get_section_does_not_flag_a_whole_section(mock_sidecar):
+    mock_sidecar.set_get("/api/section/s_k", {
+        "section_id": "s_k",
+        "section_heading": "Monsters > Kraken",
+        "text": "Kraken. AC 18, HP 472.",
+        "filename": "monsters.pdf",
+        "source": "/corpus/monsters.pdf",
+        "page_start": 10,
+        "page_end": 11,
+        "windowed": False,
+    })
+    result = await get_section("s_k")
+    assert "partial:" not in result
 
 
 @pytest.mark.asyncio

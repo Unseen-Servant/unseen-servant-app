@@ -28,7 +28,7 @@ import chromadb
 from chromadb.utils import embedding_functions
 import pymupdf
 import pymupdf4llm
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -2004,6 +2004,7 @@ def _search_sync(
                     "results": [],
                     "message": "Collection has no indexed files.",
                     "effective_collection": effective_collection,
+                    "exhausted": True,
                 }
             where_clauses.append({"source": {"$in": coll_paths}})
         if request.source_paths:
@@ -2049,6 +2050,7 @@ def _search_sync(
                                 f'"{request.source_filter}". {hint}'
                             ),
                             "effective_collection": effective_collection,
+                            "exhausted": True,
                         }
             if request.game_system:
                 known_tags = sorted({
@@ -2076,6 +2078,7 @@ def _search_sync(
                                 f'value or without the filter.'
                             ),
                             "effective_collection": effective_collection,
+                            "exhausted": True,
                         }
 
         if request.source_filter:
@@ -2128,6 +2131,7 @@ def _search_sync(
                 "message": " ".join([*filter_notes, "No results found."]),
                 "corrected_query": corrected_query,
                 "effective_collection": effective_collection,
+                "exhausted": True,
             }
 
         ordered_metadatas = results["metadatas"][0]
@@ -2331,6 +2335,15 @@ def _search_sync(
                 if len(picked) >= request.n_results:
                     break
 
+        # Whether a larger request could find more (roadmap 2.x): the
+        # overfetch pool ran out before n_results distinct sections were
+        # picked. Measured here, before near-dup collapse and packing —
+        # those shorten the returned list without meaning the library has
+        # nothing left, which is exactly the confusion that made
+        # "fewer results than asked for" an unusable end-of-list signal
+        # for the frontend's scroll-load.
+        exhausted = len(picked) < request.n_results
+
         # Single-scale page (issue #306): when the reranker ran, picked
         # results that came from the cosine tail are rescored with the
         # cross-encoder in one small batch (≤ n_results pairs), so every
@@ -2453,6 +2466,7 @@ def _search_sync(
             "results": formatted,
             "corrected_query": corrected_query,
             "effective_collection": effective_collection,
+            "exhausted": exhausted,
         }
         if filter_notes:
             response["message"] = " ".join(filter_notes)
@@ -3867,10 +3881,17 @@ def create_app(
             "source": sec.source_pdf,
             "page_start": sec.page_start,
             "page_end": sec.page_end,
+            # False means "this is the whole section"; True means the
+            # assembly cap forced a window around the match.
+            "windowed": sec.windowed,
         }
 
     @app.get("/api/source/{filename}/pages")
-    async def get_source_pages(filename: str, start: int, end: int):
+    async def get_source_pages(
+        filename: str,
+        start: int = Query(..., ge=1),
+        end: int = Query(..., ge=1),
+    ):
         """Fetch the raw text of a page range directly from the PDF.
 
         Resolves `filename` through the manifest, like `/content` does.

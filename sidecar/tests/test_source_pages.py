@@ -63,6 +63,21 @@ def test_get_section_returns_the_same_heading(section_client):
     assert (data["page_start"], data["page_end"]) == (10, 10)
 
 
+def test_get_section_container_id_assembles_the_chapter(section_client):
+    """`s_m` owns no parents row — a heading immediately followed by a
+    sub-heading emits no chunk — but it is the id search advertises for a
+    Kraken hit, so the drill-in must resolve it."""
+    response = section_client.get("/api/section/s_m")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["section_id"] == "s_m"
+    assert "gargantuan monstrosity" in data["text"]
+    # Whether what came back is the whole section or a window around the
+    # match is something the caller has to be able to see.
+    assert data["windowed"] is False
+
+
 def test_get_section_unknown_id_404(section_client):
     response = section_client.get("/api/section/does-not-exist")
     assert response.status_code == 404
@@ -113,6 +128,19 @@ def test_get_pages_end_before_start_is_400(client, sample_pdf_path):
     )
 
     assert response.status_code == 400
+
+
+def test_get_pages_zero_start_is_422(client, sample_pdf_path):
+    """Pages are 1-based. start=0 is a malformed request, not an inverted
+    pair to be reasoned about downstream."""
+    _index(client, sample_pdf_path)
+
+    response = client.get(
+        "/api/source/dragonbane_monsters.pdf/pages",
+        params={"start": 0, "end": 0},
+    )
+
+    assert response.status_code == 422
 
 
 def test_get_pages_unindexed_filename_404(client):
