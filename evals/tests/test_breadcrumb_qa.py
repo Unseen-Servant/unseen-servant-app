@@ -70,7 +70,7 @@ def test_residue_lists_the_most_frequent_flawed_headings():
     chunks = [{"section_heading": "**S eed** **<u>p</u>** > **Goblin**"}] * 3 \
         + [{"section_heading": "chaRacteR RaceS > Elves"}] * 2 \
         + [{"section_heading": "Combat > Grappling"}]
-    r = residue("srd", chunks, per_flaw=5)
+    r = residue(chunks, per_flaw=5)
     assert r["markup"][0] == ("**S eed** **<u>p</u>** > **Goblin**", 3)
     assert r["split_letter"][0][1] == 3
     assert r["mixed_case"] == [("chaRacteR RaceS > Elves", 2)]

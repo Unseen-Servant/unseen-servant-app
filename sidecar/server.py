@@ -483,7 +483,9 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
         f"toc_used={promo_report['toc_used']} "
         f"font_used={promo_report['font_used']} "
         f"fallback={promo_report['fallback_count']} "
-        f"distribution={promo_report['promoted_level_distribution']}"
+        f"distribution={promo_report['promoted_level_distribution']} "
+        f"junk={promo_report.get('junk_demoted', 0)} "
+        f"toc_depth={promo_report.get('toc_effective_depth', 1)}"
     )
     cleaned, report = clean_pages([p["markdown"] for p in promoted])
     print(f"[cleanup] {pdf_path.name}: {report.summary()}")

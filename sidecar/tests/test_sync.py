@@ -11,7 +11,7 @@ import os
 import time
 
 from parents_store import count_units_fts
-from server import MANIFEST_FILENAME, IndexManifest, ManifestEntry
+from server import MANIFEST_FILENAME, PIPELINE_VERSION, IndexManifest, ManifestEntry
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +87,7 @@ def test_index_status_up_to_date(client, sample_pdf_path, tmp_path):
             mtime=current_mtime,
             chunk_count=5,
             indexed_at="2026-01-01T00:00:00Z",
+            pipeline_version=PIPELINE_VERSION,
         )
     })
     (tmp_path / MANIFEST_FILENAME).write_text(manifest.model_dump_json())
@@ -99,6 +100,7 @@ def test_index_status_up_to_date(client, sample_pdf_path, tmp_path):
     assert len(data["up_to_date"]) == 1
     assert data["summary"]["up_to_date"] == 1
     assert data["summary"]["add"] == 0
+    assert data["summary"]["outdated"] == 0
 
 
 def test_index_status_counts_files_indexed_by_an_older_pipeline(client, sample_pdf_path, tmp_path):

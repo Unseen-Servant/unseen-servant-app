@@ -102,7 +102,7 @@ def aggregate(rows: list[dict]) -> dict[str, dict]:
     return out
 
 
-def residue(doc_id: str, chunks: list[dict], per_flaw: int = 8) -> dict[str, list[tuple[str, int]]]:
+def residue(chunks: list[dict], per_flaw: int = 8) -> dict[str, list[tuple[str, int]]]:
     """Per flaw, the most frequent headings that carry it — what a fix
     would have to handle next. Keys are every flaw, empty when clean."""
     counts: dict[str, Counter] = {f: Counter() for f in FLAWS}
@@ -113,7 +113,7 @@ def residue(doc_id: str, chunks: list[dict], per_flaw: int = 8) -> dict[str, lis
     return {f: counts[f].most_common(per_flaw) for f in FLAWS}
 
 
-def regressions(current: dict, reference: dict, tol: float = 1e-6) -> list[dict]:
+def regressions(current: dict, reference: dict) -> list[dict]:
     """Fail closed: any per-doc flaw count that rose vs the reference."""
     out = []
     for doc, ref in reference.items():

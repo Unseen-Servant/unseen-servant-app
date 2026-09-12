@@ -386,7 +386,7 @@ def run_breadcrumb_qa(engine, corpus) -> dict:
     for d in corpus.documents:
         chunks = chunks_fn(d.pdf_path)
         rows.append(breadcrumb_qa.grade_doc(d.id, chunks))
-        res[d.id] = {f: [list(t) for t in v] for f, v in breadcrumb_qa.residue(d.id, chunks).items()}
+        res[d.id] = {f: [list(t) for t in v] for f, v in breadcrumb_qa.residue(chunks).items()}
         print(f"  {d.id}: {rows[-1]['chunks']} chunks")
     return {"by_doc": breadcrumb_qa.aggregate(rows), "docs": rows, "residue": res}
 
@@ -536,9 +536,9 @@ def main() -> int:
             regs = breadcrumb_qa.regressions(result["by_doc"], ref)
             print(f"\n## Breadcrumb gate vs {args.gate.name}")
             for r in regs:
-                print(f"  {r['doc']:<14}{r['flaw']:<16}{r['ref']:.4f} → {r['cur']:.4f}")
+                print(f"  {r['doc']:<14}{r['flaw']:<16}{r['ref']} → {r['cur']}")
             if regs:
-                print(f"GATE FAILED: {len(regs)} breadcrumb flaw rate(s) above the reference")
+                print(f"GATE FAILED: {len(regs)} breadcrumb flaw count(s) above the reference")
                 return 1
             print("  no flaw rate rose on any doc")
         return 0

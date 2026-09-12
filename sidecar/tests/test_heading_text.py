@@ -11,6 +11,7 @@ def test_strip_markup_removes_emphasis_tags_and_hash():
     assert strip_markup("*sEllinG EquipMEnt**") == "sEllinG EquipMEnt"
     assert strip_markup("_Gargantuan_ **_,_** chaotic") == "Gargantuan , chaotic"
     assert strip_markup("# Combat<br>Grappling") == "Combat Grappling"
+    assert strip_markup('Combat<br class="x">Grappling') == "Combat Grappling"
     assert strip_markup("Snake_eyes Tavern") == "Snake_eyes Tavern"
     assert strip_markup("  Two   spaces ") == "Two spaces"
     assert strip_markup("<Character Name> > Sheet") == "<Character Name> > Sheet"

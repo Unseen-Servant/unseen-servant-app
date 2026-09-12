@@ -20,7 +20,7 @@ import re
 # would otherwise run together ("Combat<br>Grappling"). Handled before the
 # tag rule, which only deletes a whitelisted set of inline HTML tags (never
 # a bracketed placeholder like "<Character Name>").
-_BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_BR_RE = re.compile(r"<br[^>]*>", re.IGNORECASE)
 _INLINE_TAGS = r"br|u|mark|sup|sub|b|i|em|strong|span|small|s|del|ins|a|code|kbd"
 _MARKUP_RE = re.compile(
     rf"</?(?:{_INLINE_TAGS})(?:\s[^>]*)?>|\*+|(?<!\w)_+|_+(?!\w)|`|^#+\s*", re.IGNORECASE
