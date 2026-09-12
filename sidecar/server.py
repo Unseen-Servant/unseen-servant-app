@@ -48,6 +48,7 @@ from granularity import EmbedUnit, ParentDoc, build as build_granularity
 from parents_store import (
     upsert_parents, fetch_parents, fetch_sections,
     open_store, section_root_for,
+    fetch_section_by_id,
     delete_parents_for_source,
     clear_all_parents,
     upsert_units_fts,
@@ -3746,6 +3747,70 @@ def create_app(
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/section/{section_id}")
+    async def get_section(section_id: str):
+        """Fetch one assembled section by its id (a search result's `section_id`).
+
+        Drill-in counterpart to the compact search results the MCP tool
+        returns by default: the model pulls the full section text only
+        when it needs it, instead of paying its cost on every result.
+        """
+        sec = fetch_section_by_id(data_dir, section_id) if data_dir else None
+        if sec is None:
+            raise HTTPException(
+                status_code=404, detail=f"Section not found: {section_id}"
+            )
+
+        return {
+            "section_id": sec.section_id,
+            "section_heading": sec.section_heading or "",
+            "text": sec.text,
+            "filename": Path(sec.source_pdf).name,
+            "source": sec.source_pdf,
+            "page_start": sec.page_start,
+            "page_end": sec.page_end,
+        }
+
+    @app.get("/api/source/{filename}/pages")
+    async def get_source_pages(filename: str, start: int, end: int):
+        """Fetch the raw text of a page range directly from the PDF.
+
+        Resolves `filename` through the manifest, like `/content` does.
+        Another drill-in for the MCP tools: content a section-based search
+        doesn't surface well (a table of contents, a map, an appendix).
+        """
+        if end < start or end - start > 20:
+            raise HTTPException(
+                status_code=400,
+                detail="end must be >= start and span at most 20 pages",
+            )
+
+        manifest = load_manifest(data_dir) if data_dir else IndexManifest()
+        source_path = None
+        for path_str, entry in manifest.files.items():
+            if entry.filename == filename:
+                source_path = path_str
+                break
+
+        if not source_path:
+            raise HTTPException(
+                status_code=404, detail=f"Source not found: {filename}"
+            )
+
+        try:
+            with pymupdf.open(source_path) as doc:
+                lo = max(1, start)
+                hi = min(doc.page_count, end)
+                text = "\n\n".join(
+                    doc[p - 1].get_text("text") for p in range(lo, hi + 1)
+                )
+        except Exception:
+            raise HTTPException(
+                status_code=404, detail=f"Source not found: {filename}"
+            )
+
+        return {"filename": filename, "start": lo, "end": hi, "text": text}
 
     # ------------------------------------------------------------------
     # Collections endpoints

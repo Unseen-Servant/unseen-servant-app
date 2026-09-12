@@ -41,6 +41,11 @@ HEARTBEAT_INTERVAL_SECONDS = 30
 
 _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 
+# search_library's compact default prints this much of the matched unit per
+# result (roadmap 2.2): enough to judge relevance, small enough that many
+# results fit an 8k context budget. get_section fetches the rest on demand.
+MATCHED_SNIPPET_CHARS = 600
+
 
 def _strip_bold(s: str) -> str:
     """Remove **...** wrapping from breadcrumb text for display.
@@ -213,7 +218,13 @@ mcp = MCPServer(
         "library first — even if you haven't seen it mentioned before.\n"
         "- Always cite the source filename when referencing content.\n"
         "- If a search returns no results, try alternative terms or broader "
-        "queries before concluding the content isn't indexed."
+        "queries before concluding the content isn't indexed.\n"
+        "- search_library's results are compact by default (a short matched "
+        "snippet per result) — call get_section() with a result's id to read "
+        "its full section, or pass search_library's full_text=True to get "
+        "full sections for every result up front.\n"
+        "- Use get_pages() to read a specific page range straight from a PDF "
+        "(e.g. a table of contents or a map) when search doesn't surface it."
     ),
 )
 
@@ -270,10 +281,12 @@ def _page_span(result: dict) -> str:
 @mcp.tool()
 async def search_library(
     query: str,
-    n_results: int = 15,
+    n_results: int = 8,
     source_filter: str | None = None,
     game_system: str | None = None,
     collection: str | None = None,
+    max_context_chars: int = 8000,
+    full_text: bool = False,
 ) -> str:
     """Search your TTRPG PDF library for relevant content.
 
@@ -281,10 +294,15 @@ async def search_library(
     lore, or game content. Always search before telling the user something
     isn't available.
 
+    Results are compact by default: each shows a short matched snippet plus
+    an `id=` you can pass to get_section() to read that result's full
+    section. Pass full_text=True to get full sections for every result
+    up front instead — useful for a small n_results, costly for a large one.
+
     Args:
         query: What to search for (e.g., "grappling rules",
                "fire drake stats", "healing potions")
-        n_results: How many results to return (default 15)
+        n_results: How many results to return (default 8)
         source_filter: Optional PDF filename to restrict search
                        to one book (e.g., "dragonbane_core.pdf").
                        Matched case/accent-insensitively; an unambiguous
@@ -298,8 +316,16 @@ async def search_library(
                      available systems.
         collection: Optional collection name to search within
                     (see list_collections for available collections).
+        max_context_chars: Character budget for the sidecar's own section
+                           assembly (default 8000).
+        full_text: Print each result's full section instead of the
+                   compact matched snippet (default False).
     """
-    payload = {"query": query, "n_results": n_results}
+    payload = {
+        "query": query,
+        "n_results": n_results,
+        "max_context_chars": max_context_chars,
+    }
     if source_filter:
         payload["source_filter"] = source_filter
     if game_system:
@@ -355,11 +381,75 @@ async def search_library(
         lines.append(f"Source: {r['filename']} [{system_tag}]")
         heading = _strip_bold(r.get("section_heading") or "") or "(no section)"
         page_span = _page_span(r)
-        lines.append(f"Section: {heading} ({page_span})" if page_span
-                     else f"Section: {heading}")
-        lines.append(r["text"])
+        section_id = r.get("section_id") or ""
+        section_line = (f"Section: {heading} ({page_span})" if page_span
+                        else f"Section: {heading}")
+        lines.append(f"{section_line}  id={section_id}")
+        if full_text:
+            lines.append(r.get("text", ""))
+        else:
+            matched = r.get("matched_text") or r.get("text", "")
+            if len(matched) > MATCHED_SNIPPET_CHARS:
+                matched = matched[:MATCHED_SNIPPET_CHARS] + "…"
+            lines.append(matched)
+        # Shown whenever what's printed above isn't the whole section: always
+        # in compact mode, and in full_text mode too when the server's own
+        # budget (max_context_chars) truncated this result down to its
+        # matched unit (pack_results swaps `text` for `matched_text` then).
+        if section_id and (not full_text or r.get("truncated")):
+            lines.append(f'Full section: get_section("{section_id}")')
         lines.append("")
 
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def get_section(section_id: str) -> str:
+    """Fetch the full text of one section from search_library's compact output.
+
+    Use the `id=` value printed under a search_library result to read its
+    complete section instead of the short matched snippet.
+
+    Args:
+        section_id: The id from a search_library result's Section line.
+    """
+    data = await sidecar.get(f"/api/section/{section_id}")
+    if isinstance(data, str):
+        return data  # Error message
+
+    heading = _strip_bold(data.get("section_heading") or "") or "(no section)"
+    page_span = _page_span(data)
+    lines = [f"Section: {heading}"]
+    source_line = f"Source: {data.get('filename', '')}"
+    if page_span:
+        source_line += f" ({page_span})"
+    lines.append(source_line)
+    lines.append("")
+    lines.append(data.get("text", ""))
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def get_pages(filename: str, start: int, end: int) -> str:
+    """Fetch the raw text of a page range directly from an indexed PDF.
+
+    Use this for content search_library doesn't surface well, like a table
+    of contents, a map key, or an appendix — a page span of at most 20 pages.
+
+    Args:
+        filename: Indexed PDF filename (e.g., "dragonbane_core.pdf").
+        start: First page to fetch, 1-based inclusive.
+        end: Last page to fetch, 1-based inclusive (at most 20 pages from start).
+    """
+    data = await sidecar.get(f"/api/source/{filename}/pages?start={start}&end={end}")
+    if isinstance(data, str):
+        return data  # Error message
+
+    lines = [
+        f"Pages {data['start']}–{data['end']} of {data['filename']}",
+        "",
+        data.get("text", ""),
+    ]
     return "\n".join(lines)
 
 

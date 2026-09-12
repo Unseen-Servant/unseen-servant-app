@@ -1,0 +1,124 @@
+"""
+Tests for GET /api/section/{section_id} and GET /api/source/{filename}/pages.
+
+These back the MCP drill-in tools (`get_section`, `get_pages`): compact
+search hands the model a `section_id` or a page range instead of the full
+section text, and these endpoints let it pull the full text on demand.
+
+`/api/section/{id}` is exercised against a parents row staged directly
+(the same technique test_search_sections.py uses) rather than a PDF run
+through the real heading-detection pipeline — the plain-text fixture PDFs
+in conftest.py produce no headings at all (`n_headings=0`), so a real
+index of them never carries a resolvable `section_id`. `/pages` needs a
+real file on disk (it opens the PDF with pymupdf), so it uses the
+`sample_pdf_path` + `/api/index-files` pattern other endpoint tests use.
+"""
+
+import pytest
+
+from granularity import ParentDoc
+from parents_store import upsert_parents
+
+SOURCE = "/corpus/monsters.pdf"
+
+
+def _parent(pid, heading, section_id, section_path, text, pages=(10, 10)):
+    return ParentDoc(
+        parent_id=pid,
+        text=text,
+        section_heading=heading,
+        chunk_type="prose",
+        source_pdf=SOURCE,
+        page_start=pages[0],
+        page_end=pages[1],
+        section_id=section_id,
+        section_path=section_path,
+    )
+
+
+@pytest.fixture
+def section_client(client, tmp_path):
+    """One staged section (`s_k`) in the parents store `client` reads from."""
+    upsert_parents(tmp_path, SOURCE, [
+        _parent("p-k", "Monsters > Kraken", "s_k", "s_m/s_k",
+                "Kraken. AC 18, HP 472. A gargantuan monstrosity."),
+    ])
+    return client
+
+
+# ---------------------------------------------------------------------------
+# GET /api/section/{section_id}
+# ---------------------------------------------------------------------------
+
+def test_get_section_returns_the_same_heading(section_client):
+    response = section_client.get("/api/section/s_k")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["section_id"] == "s_k"
+    assert data["section_heading"] == "Monsters > Kraken"
+    assert data["filename"] == "monsters.pdf"
+    assert data["source"] == SOURCE
+    assert "gargantuan monstrosity" in data["text"]
+    assert (data["page_start"], data["page_end"]) == (10, 10)
+
+
+def test_get_section_unknown_id_404(section_client):
+    response = section_client.get("/api/section/does-not-exist")
+    assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /api/source/{filename}/pages
+# ---------------------------------------------------------------------------
+
+def _index(client, pdf_path):
+    resp = client.post("/api/index-files", json={"paths": [str(pdf_path)]})
+    assert resp.status_code == 200, resp.text
+
+
+def test_get_pages_returns_the_first_pages_text(client, sample_pdf_path):
+    _index(client, sample_pdf_path)
+
+    response = client.get(
+        "/api/source/dragonbane_monsters.pdf/pages",
+        params={"start": 1, "end": 1},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["filename"] == "dragonbane_monsters.pdf"
+    assert data["start"] == 1
+    assert data["end"] == 1
+    assert "Fire Drake" in data["text"]
+
+
+def test_get_pages_range_too_wide_is_400(client, sample_pdf_path):
+    _index(client, sample_pdf_path)
+
+    response = client.get(
+        "/api/source/dragonbane_monsters.pdf/pages",
+        params={"start": 1, "end": 25},
+    )
+
+    assert response.status_code == 400
+
+
+def test_get_pages_end_before_start_is_400(client, sample_pdf_path):
+    _index(client, sample_pdf_path)
+
+    response = client.get(
+        "/api/source/dragonbane_monsters.pdf/pages",
+        params={"start": 3, "end": 1},
+    )
+
+    assert response.status_code == 400
+
+
+def test_get_pages_unindexed_filename_404(client):
+    response = client.get(
+        "/api/source/nonexistent.pdf/pages",
+        params={"start": 1, "end": 1},
+    )
+
+    assert response.status_code == 404

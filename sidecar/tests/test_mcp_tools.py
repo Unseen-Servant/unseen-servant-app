@@ -20,6 +20,8 @@ sys.argv = ["mcp_server.py"]
 
 from mcp_server import (
     search_library,
+    get_section,
+    get_pages,
     list_sources,
     list_game_systems,
     list_collections,
@@ -246,6 +248,181 @@ async def test_search_library_no_divider_when_all_strong(mock_sidecar):
 
 
 # ---------------------------------------------------------------------------
+# search_library — compact output under an 8k budget (roadmap 2.2)
+# ---------------------------------------------------------------------------
+
+def _section_result(section_id="s_abc123", matched="Short match.", text=None,
+                     tier="strong"):
+    return {
+        "text": text if text is not None else matched,
+        "matched_text": matched,
+        "filename": "book.pdf",
+        "source": "/book.pdf",
+        "section_id": section_id,
+        "section_heading": "Monsters > Kraken",
+        "page_start": 10,
+        "page_end": 10,
+        "game_system": "D&D 5E",
+        "relevance": 0.9,
+        "tier": tier,
+        "reranked": True,
+        "truncated": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_library_compact_shows_id_and_snippet(mock_sidecar):
+    mock_sidecar.set_post("/api/search", {
+        "results": [_section_result(matched="The kraken makes three tentacle attacks.")],
+    })
+    result = await search_library("kraken attacks")
+    assert "id=s_abc123" in result
+    assert "The kraken makes three tentacle attacks." in result
+    assert 'Full section: get_section("s_abc123")' in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_compact_trims_long_matches(mock_sidecar):
+    """A per-result block stays small even when the full section is huge —
+    the compact default is what makes an 8k budget hold many results."""
+    long_match = "x" * 900
+    mock_sidecar.set_post("/api/search", {
+        "results": [_section_result(matched=long_match, text=long_match * 5)],
+    })
+    result = await search_library("anything")
+    assert long_match not in result
+    assert "…" in result  # trailing ellipsis marks the cut
+    block = result.split("--- Result 1")[1]
+    assert len(block) < 800  # snippet cap + a few header lines, nowhere near 4500
+
+
+@pytest.mark.asyncio
+async def test_search_library_omits_full_section_line_when_no_section_id(mock_sidecar):
+    mock_sidecar.set_post("/api/search", {
+        "results": [_section_result(section_id="")],
+    })
+    result = await search_library("anything")
+    assert "Full section:" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_full_text_prints_whole_text(mock_sidecar):
+    full_text = "Kraken. AC 18, HP 472. " * 10
+    mock_sidecar.set_post("/api/search", {
+        "results": [_section_result(matched="Short match.", text=full_text)],
+    })
+    result = await search_library("kraken", full_text=True)
+    assert full_text in result
+    # Not truncated and full_text=True: the printed text already is the
+    # whole section, so there's nothing more for get_section to add.
+    assert "Full section:" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_full_text_still_offers_get_section_when_truncated(
+    mock_sidecar
+):
+    """Even with full_text=True, a result the server's own budget truncated
+    shows only its matched unit (pack_results swaps text -> matched_text) —
+    the pointer to the real full section still belongs on screen."""
+    result_data = _section_result(matched="Short match.")
+    result_data["truncated"] = True
+    result_data["text"] = result_data["matched_text"]  # what pack_results does
+    mock_sidecar.set_post("/api/search", {"results": [result_data]})
+    result = await search_library("kraken", full_text=True)
+    assert 'Full section: get_section("s_abc123")' in result
+
+
+@pytest.mark.asyncio
+async def test_search_library_always_sends_max_context_chars(mock_sidecar):
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+
+    await search_library("anything")
+    assert captured.get("max_context_chars") == 8000
+
+
+@pytest.mark.asyncio
+async def test_search_library_max_context_chars_override(mock_sidecar):
+    captured = {}
+
+    def capture_payload(json_data):
+        captured.update(json_data)
+        return {"results": []}
+
+    mock_sidecar.set_post("/api/search", capture_payload)
+
+    await search_library("anything", max_context_chars=2000)
+    assert captured.get("max_context_chars") == 2000
+
+
+# ---------------------------------------------------------------------------
+# get_section
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_section_formats_heading_and_text(mock_sidecar):
+    mock_sidecar.set_get("/api/section/s_k", {
+        "section_id": "s_k",
+        "section_heading": "Monsters > Kraken",
+        "text": "Kraken. AC 18, HP 472. A gargantuan monstrosity.",
+        "filename": "monsters.pdf",
+        "source": "/corpus/monsters.pdf",
+        "page_start": 10,
+        "page_end": 11,
+    })
+    result = await get_section("s_k")
+    assert "Section: Monsters > Kraken" in result
+    assert "monsters.pdf" in result
+    assert "Kraken. AC 18, HP 472. A gargantuan monstrosity." in result
+
+
+@pytest.mark.asyncio
+async def test_get_section_not_found(mock_sidecar):
+    mock_sidecar.set_get("/api/section/nope", "Sidecar error: 404 — Section not found: nope")
+    result = await get_section("nope")
+    assert "404" in result
+
+
+@pytest.mark.asyncio
+async def test_get_section_sidecar_down(mock_sidecar):
+    mock_sidecar.set_get("/api/section/s_k", "Cannot connect to Legend Lore app.")
+    result = await get_section("s_k")
+    assert "Cannot connect" in result
+
+
+# ---------------------------------------------------------------------------
+# get_pages
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_pages_formats_range_and_text(mock_sidecar):
+    mock_sidecar.set_get("/api/source/X.pdf/pages?start=3&end=4", {
+        "filename": "X.pdf",
+        "start": 3,
+        "end": 4,
+        "text": "Page three text.\n\nPage four text.",
+    })
+    result = await get_pages("X.pdf", 3, 4)
+    assert "Pages 3–4 of X.pdf" in result
+    assert "Page three text." in result
+
+
+@pytest.mark.asyncio
+async def test_get_pages_sidecar_down(mock_sidecar):
+    mock_sidecar.set_get(
+        "/api/source/X.pdf/pages?start=1&end=1", "Cannot connect to Legend Lore app."
+    )
+    result = await get_pages("X.pdf", 1, 1)
+    assert "Cannot connect" in result
+
+
+# ---------------------------------------------------------------------------
 # list_collections
 # ---------------------------------------------------------------------------
 
@@ -415,5 +592,7 @@ def test_registered_tools_are_the_public_surface():
     from mcp_server import mcp
     names = {t.name for t in asyncio.run(mcp.list_tools())}
     assert "search_library" in names
+    assert "get_section" in names
+    assert "get_pages" in names
     assert "_page_span" not in names
 

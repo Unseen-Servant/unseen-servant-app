@@ -410,6 +410,29 @@ def assemble_section(conn, source: str, root_path: str, matched_parent_id: str,
     )
 
 
+def fetch_section_by_id(data_dir: Path, section_id: str) -> SectionDoc | None:
+    """Look up one section by its id and assemble it fresh.
+
+    Unlike `fetch_sections`/`section_root_for`, this is not capped up to a
+    shallower ancestor — the caller asked for exactly this section (e.g. the
+    `section_id` a search result printed), so its own `section_path` is the
+    assembly root. `None` when no row carries that id, or a legacy row
+    predating the section_id/section_path columns.
+    """
+    if not data_dir or not section_id:
+        return None
+    with _txn(data_dir) as conn:
+        row = conn.execute(
+            "SELECT parent_id, source, section_path FROM parents "
+            "WHERE section_id = ? ORDER BY rowid LIMIT 1",
+            (section_id,),
+        ).fetchone()
+        if not row or not row[2]:
+            return None
+        parent_id, source, section_path = row
+        return assemble_section(conn, source, section_path, parent_id)
+
+
 def fetch_sections(data_dir: Path, hits: list[tuple[str, str | None, str | None]],
                    cap: int = SECTION_CAP,
                    roots: dict[str, str] | None = None,
