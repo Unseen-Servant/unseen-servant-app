@@ -66,10 +66,28 @@ def _section_path(stack: list[tuple[int, str, str]]) -> str | None:
     return "/".join(sid for _, _, sid in stack) if stack else None
 
 
+def _paragraphs(lines: list[tuple[str, int]]) -> list[tuple[str, int, int]]:
+    """Group buffered (line, page) pairs into paragraphs split on blank
+    lines; each paragraph carries the first and last page it touches."""
+    out: list[tuple[str, int, int]] = []
+    buf: list[str] = []
+    ps = pe = None
+    for line, page in lines:
+        if not line.strip():
+            if buf:
+                out.append(("\n".join(buf).strip(), ps, pe))
+                buf, ps, pe = [], None, None
+            continue
+        buf.append(line)
+        ps = page if ps is None else ps
+        pe = page
+    if buf:
+        out.append(("\n".join(buf).strip(), ps, pe))
+    return [p for p in out if p[0]]
+
+
 def _emit_prose(
-    body_lines: list[str],
-    page_start: int,
-    page_end: int,
+    paragraphs: list[tuple[str, int, int]],
     heading: str | None,
     section_id: str | None,
     section_path: str | None,
@@ -77,45 +95,28 @@ def _emit_prose(
     start_ordinal: int,
     soft_cap: int,
 ) -> list[Chunk]:
-    text = "\n".join(body_lines).strip()
-    if not text:
-        return []
     chunks: list[Chunk] = []
     ordinal = start_ordinal
-    buf = ""
-    for para in re.split(r"\n\s*\n", text):
+    buf, bps, bpe = "", None, None
+
+    def flush():
+        nonlocal buf, bps, bpe, ordinal
+        if buf.strip():
+            chunks.append(Chunk(text=buf, page_start=bps, page_end=bpe, chunk_type="prose",
+                                section_heading=heading, section_id=section_id,
+                                section_path=section_path, source_pdf=source_pdf,
+                                chunker=CHUNKER_VERSION, ordinal=ordinal))
+            ordinal += 1
+        buf, bps, bpe = "", None, None
+
+    for para, ps, pe in paragraphs:
         candidate = (buf + "\n\n" + para).strip() if buf else para
         if len(candidate) <= soft_cap:
-            buf = candidate
+            buf, bps, bpe = candidate, (ps if bps is None else bps), pe
             continue
-        if buf:
-            chunks.append(Chunk(
-                text=buf,
-                page_start=page_start,
-                page_end=page_end,
-                chunk_type="prose",
-                section_heading=heading,
-                source_pdf=source_pdf,
-                chunker=CHUNKER_VERSION,
-                ordinal=ordinal,
-                section_id=section_id,
-                section_path=section_path,
-            ))
-            ordinal += 1
-        buf = para
-    if buf.strip():
-        chunks.append(Chunk(
-            text=buf,
-            page_start=page_start,
-            page_end=page_end,
-            chunk_type="prose",
-            section_heading=heading,
-            source_pdf=source_pdf,
-            chunker=CHUNKER_VERSION,
-            ordinal=ordinal,
-            section_id=section_id,
-            section_path=section_path,
-        ))
+        flush()
+        buf, bps, bpe = para, ps, pe
+    flush()
     return chunks
 
 
@@ -163,22 +164,15 @@ def structure_aware(
     ordinal = 0
     section_counter = 0
     heading_stack: list[tuple[int, str, str]] = []
-    buffer_lines: list[str] = []
-    buffer_page_start: int | None = None
-    buffer_page_end: int | None = None
+    buffer_lines: list[tuple[str, int]] = []
     current_page = 0
 
     def flush_prose():
-        nonlocal ordinal, buffer_lines, buffer_page_start, buffer_page_end
-        if not buffer_lines or buffer_page_start is None:
-            buffer_lines = []
-            buffer_page_start = None
-            buffer_page_end = None
+        nonlocal ordinal, buffer_lines
+        if not buffer_lines:
             return
         emitted = _emit_prose(
-            buffer_lines,
-            buffer_page_start,
-            buffer_page_end or buffer_page_start,
+            _paragraphs(buffer_lines),
             _breadcrumb(heading_stack),
             heading_stack[-1][2] if heading_stack else None,
             _section_path(heading_stack),
@@ -189,8 +183,6 @@ def structure_aware(
         chunks.extend(emitted)
         ordinal += len(emitted)
         buffer_lines = []
-        buffer_page_start = None
-        buffer_page_end = None
 
     for page in pages:
         current_page = page.page_number
@@ -245,10 +237,7 @@ def structure_aware(
                 i = j
                 continue
 
-            if buffer_page_start is None:
-                buffer_page_start = current_page
-            buffer_page_end = current_page
-            buffer_lines.append(line)
+            buffer_lines.append((line, current_page))
             i += 1
 
     flush_prose()

@@ -158,6 +158,19 @@ def test_multi_page_input_tracks_page_range():
     assert prose[0].page_end == 2
 
 
+def test_prose_chunks_report_only_the_pages_they_touch():
+    # Each page ends with a blank line, as pymupdf4llm output does; without
+    # it consecutive pages' lines would form one paragraph.
+    pages = [_page(1, "# Part\n\n" + ("alpha " * 150) + "\n\n" + ("beta " * 150) + "\n\n"),
+             _page(2, ("gamma " * 150) + "\n\n"), _page(3, ("delta " * 150) + "\n\n")]
+    chunks = structure_aware(pages, source_pdf="x.pdf", soft_cap=1000)
+    spans = [(c.page_start, c.page_end) for c in chunks]
+    assert spans[0] == (1, 1)
+    assert spans[-1][0] >= 2
+    assert all(ps <= pe for ps, pe in spans)
+    assert (1, 3) not in spans
+
+
 def test_table_spanning_pages_stays_atomic_within_page():
     """Tables don't merge across pages — each page's table block emits separately.
 
