@@ -45,6 +45,7 @@ class SearchOptions:
     source_filter: str | None = None   # filename (v2 semantics)
     game_system: str | None = None
     collection: str | None = None
+    max_context_chars: int | None = None  # roadmap 2.2 packer budget; None = unlimited
     extra: dict[str, Any] = field(default_factory=dict)  # engine-specific
 
 

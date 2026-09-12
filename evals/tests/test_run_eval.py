@@ -203,3 +203,16 @@ def test_v2_request_body_is_json_serialisable_with_default_extra():
     body = V2Engine(data_dir="/nonexistent")._request_body("q", SearchOptions())
     json.dumps(body)
     assert "system_map" not in body
+
+
+def test_v2_request_body_always_sends_max_context_chars():
+    """roadmap 2.2: the packer knob is explicit like every other pipeline
+    knob, so persisted search_settings.json can never leak into it."""
+    from evals.engines.v2 import V2Engine
+
+    default_body = V2Engine(data_dir="/nonexistent")._request_body("q", SearchOptions())
+    assert default_body["max_context_chars"] is None
+
+    set_body = V2Engine(data_dir="/nonexistent")._request_body(
+        "q", SearchOptions(max_context_chars=250))
+    assert set_body["max_context_chars"] == 250

@@ -413,6 +413,8 @@ def main() -> int:
     ap.add_argument("--rerank-weight", type=float, default=None,
                     help="retrieval: RRF rerank blend weight (retrieval=1.0); sweep the rerank pull")
     ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
+    ap.add_argument("--max-context-chars", type=int, default=None,
+                    help="retrieval: cap total packed result chars (roadmap 2.2); default unlimited")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
     ap.add_argument("--pages", type=Path, default=None,
                     help="corpus-qa: re-grade a prior run's .pages.json instead of re-extracting")
@@ -477,6 +479,7 @@ def main() -> int:
             if args.limit:
                 queries = queries[: args.limit]
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
+                                 max_context_chars=args.max_context_chars,
                                  extra={"system_map": {}})
             result = run(engine, queries, corpus, opts, do_index=False)
             result["skipped_queries"], result["missing_docs"] = skipped, missing
@@ -492,7 +495,8 @@ def main() -> int:
                 extra["weights"] = [1.0, args.lex_weight]
             if args.rerank_weight is not None:
                 extra["rerank_weight"] = args.rerank_weight
-            opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid, extra=extra)
+            opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
+                                 max_context_chars=args.max_context_chars, extra=extra)
             result = run(engine, queries, corpus, opts, do_index=not args.no_index,
                          tags=SYSTEM_TAGS if args.engine == "v2" else None)
     finally:
@@ -588,6 +592,7 @@ def main() -> int:
         "opts": {"rerank": opts.rerank, "hybrid": opts.hybrid,
                  "spell_correction": opts.spell_correction,
                  "variant_expansion": opts.variant_expansion,
+                 "max_context_chars": opts.max_context_chars,
                  "extra": _jsonable(opts.extra)},
         "system_tags": _jsonable(SYSTEM_TAGS) if (args.engine == "v2" and args.suite == "retrieval") else None,
     }

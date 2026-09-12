@@ -208,6 +208,7 @@ class V2Engine:
             "hybrid": opts.hybrid,
             "spell_correction": opts.spell_correction,
             "variant_expansion": opts.variant_expansion,
+            "max_context_chars": opts.max_context_chars,
         }
         if opts.source_filter:
             body["source_filter"] = opts.source_filter

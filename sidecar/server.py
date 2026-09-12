@@ -31,7 +31,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 import uvicorn
 
 from chunker import (
@@ -227,6 +227,25 @@ def _tier_for(relevance: float, reranked: bool) -> str:
     if relevance >= weak:
         return "good"
     return "weak"
+
+
+def pack_results(results: list[dict], budget: int | None) -> list[dict]:
+    """Fill in rank order under a character budget; the first result that
+    does not fit is cut to its matched unit (if that fits) and ends the list."""
+    if budget is None:
+        return [{**r, "truncated": False} for r in results]
+    out: list[dict] = []
+    used = 0
+    for r in results:
+        cost = len(r["text"]) + len(r["section_heading"])
+        if used + cost <= budget:
+            out.append({**r, "truncated": False}); used += cost
+            continue
+        short = len(r["matched_text"]) + len(r["section_heading"])
+        if used + short <= budget:
+            out.append({**r, "text": r["matched_text"], "truncated": True})
+        break
+    return out
 
 
 def detect_game_systems(
@@ -597,6 +616,11 @@ class SearchRequest(BaseModel):
     # already absorb spacing) and clean queries regressed
     # (evals/baselines/2026-07-10-variant-expansion.md).
     variant_expansion: bool | None = None
+    # max_context_chars: cap the total `len(text) + len(section_heading)`
+    # across returned results (roadmap 2.2). None (default) is unlimited;
+    # otherwise results are packed in rank order and the first one that
+    # doesn't fit is cut to its matched unit — see `pack_results`.
+    max_context_chars: int | None = Field(default=None, ge=1)
 
 
 # ---------------------------------------------------------------------------
@@ -2324,6 +2348,8 @@ def _search_sync(
                 "tier": _tier_for(relevance, p["reranked"]),
                 "reranked": p["reranked"],
             })
+
+        formatted = pack_results(formatted, request.max_context_chars)
 
         response: dict = {
             "results": formatted,
