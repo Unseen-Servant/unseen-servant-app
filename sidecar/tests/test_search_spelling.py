@@ -145,3 +145,82 @@ def test_vocabulary_rebuilds_when_chunk_count_changes(client, test_collection):
     )
     after = _search(client, query="grimlok lair")
     assert after["corrected_query"] == "grimlock lair"
+
+
+# ---------------------------------------------------------------------------
+# Vocabulary source and invalidation (#343)
+# ---------------------------------------------------------------------------
+
+def _fake_stat_pool():
+    return {
+        "ids": [["c-stat"]],
+        "documents": [[STAT_DOC]],
+        "metadatas": [[_meta("p-stat", "monsters.pdf")]],
+        "distances": [[0.2]],
+    }
+
+
+def _manifest(tmp_path, content_hash: str) -> None:
+    from server import IndexManifest, ManifestEntry, save_manifest
+
+    save_manifest(tmp_path, IndexManifest(files={"/corpus/monsters.pdf": ManifestEntry(
+        filename="monsters.pdf",
+        mtime=1.0,
+        chunk_count=1,
+        indexed_at="2026-09-12T00:00:00+00:00",
+        game_system="OSR",
+        content_hash=content_hash,
+        pipeline_version="p1",
+    )}))
+
+
+def test_spell_vocab_comes_from_unit_fts(
+    client, test_collection, tmp_path, monkeypatch
+):
+    """The vocabulary is read from the persisted FTS rows — whose text is
+    exactly the heading-prepended embed text — not by paging the whole
+    Chroma collection back over the wire."""
+    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
+        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
+    _manifest(tmp_path, "h1")
+
+    def no_scan(*args, **kwargs):
+        raise AssertionError("Chroma scanned to build the spell vocabulary")
+
+    monkeypatch.setattr(type(test_collection), "get", no_scan)
+    monkeypatch.setattr(
+        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
+
+    body = _search(client)
+    assert body["corrected_query"] == "owlbear claws"
+
+
+def test_spell_vocab_invalidates_on_manifest_digest_change(
+    client, test_collection, tmp_path, monkeypatch
+):
+    """Cached across searches, rebuilt when a re-index moves the digest."""
+    import spelling
+
+    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
+        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
+    _manifest(tmp_path, "h1")
+    monkeypatch.setattr(
+        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
+
+    builds = []
+    real_build = spelling.build_vocabulary_from_store
+
+    def counting(data_dir):
+        builds.append(data_dir)
+        return real_build(data_dir)
+
+    monkeypatch.setattr(spelling, "build_vocabulary_from_store", counting)
+
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert len(builds) == 1
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert len(builds) == 1  # same index, same vocabulary
+
+    _manifest(tmp_path, "h2")  # re-indexed: new content hash
+    assert _search(client)["corrected_query"] == "owlbear claws"
+    assert len(builds) == 2

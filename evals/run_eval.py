@@ -409,6 +409,8 @@ def main() -> int:
     ap.add_argument("--reuse-index", action="store_true",
                     help="retrieval: use --data-dir for an exploratory, non-baseline run")
     ap.add_argument("--hybrid", action="store_true", help="retrieval: fuse dense + BM25/FTS (rung 5)")
+    ap.add_argument("--no-rerank", action="store_true",
+                    help="retrieval: search with the cross-encoder off (latency measurement)")
     ap.add_argument("--lex-weight", type=float, default=None,
                     help="retrieval: RRF lexical weight (dense=1.0); sweep the fusion balance")
     ap.add_argument("--rerank-weight", type=float, default=None,
@@ -480,6 +482,7 @@ def main() -> int:
             if args.limit:
                 queries = queries[: args.limit]
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
+                                 rerank=not args.no_rerank,
                                  max_context_chars=args.max_context_chars,
                                  extra={"system_map": {}})
             result = run(engine, queries, corpus, opts, do_index=False)
@@ -497,6 +500,7 @@ def main() -> int:
             if args.rerank_weight is not None:
                 extra["rerank_weight"] = args.rerank_weight
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
+                                 rerank=not args.no_rerank,
                                  max_context_chars=args.max_context_chars, extra=extra)
             result = run(engine, queries, corpus, opts, do_index=not args.no_index,
                          tags=SYSTEM_TAGS if args.engine == "v2" else None)

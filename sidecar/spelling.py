@@ -20,8 +20,11 @@ from __future__ import annotations
 
 import re
 from importlib.resources import files
+from pathlib import Path
 
 from symspellpy import SymSpell, Verbosity
+
+from parents_store import open_store
 
 # A term is in-vocab (protected, and a valid correction target) only at
 # this frequency or above. Start 3 per the design; tune during eval.
@@ -85,6 +88,24 @@ def build_vocabulary(collection, batch_size: int = 1000) -> dict[str, int]:
     return vocab
 
 
+def build_vocabulary_from_store(data_dir: Path) -> dict[str, int]:
+    """Term → frequency over the persisted embed units (``unit_fts``).
+
+    Same counting as ``build_vocabulary``, one SQLite read instead of a
+    full Chroma scan: ``unit_fts.text`` is written as ``_embed_text(eu)``,
+    i.e. exactly the heading-prepended text ``build_vocabulary``
+    reassembles from documents + metadata. Used whenever the store has
+    rows; a legacy index predating ``unit_fts`` still needs the Chroma
+    path.
+    """
+    vocab: dict[str, int] = {}
+    with open_store(data_dir) as conn:
+        for (text,) in conn.execute("SELECT text FROM unit_fts"):
+            for token in _TOKEN_RE.findall(text.lower()):
+                vocab[token] = vocab.get(token, 0) + 1
+    return vocab
+
+
 class SpellCorrector:
     """Rewrites OOV query tokens to the closest in-vocabulary term."""
 
@@ -101,6 +122,10 @@ class SpellCorrector:
     @classmethod
     def from_collection(cls, collection) -> "SpellCorrector":
         return cls(build_vocabulary(collection))
+
+    @classmethod
+    def from_store(cls, data_dir: Path) -> "SpellCorrector":
+        return cls(build_vocabulary_from_store(data_dir))
 
     def correct(self, query: str) -> str | None:
         """The corrected query, or ``None`` when nothing was rewritten.

@@ -8,7 +8,12 @@ embedder, and failures that never escape.
 
 import threading
 
-from server import keep_embedder_warm
+import server
+from server import (
+    EMBED_KEEPALIVE_INTERVAL_SECONDS,
+    keep_embedder_warm,
+    warm_search_stack,
+)
 
 
 def test_ticker_embeds_on_each_interval():
@@ -70,3 +75,58 @@ def test_ticker_waits_before_the_first_embed():
     keep_embedder_warm(embed_fn=lambda t: calls.append(t), interval=60, stop=stop)
 
     assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# Boot warm-up (#341): pay the lazy loads before the first search does
+# ---------------------------------------------------------------------------
+
+def test_keepalive_default_interval_is_120s():
+    """Ollama unloads an idle model after ~5 minutes; 240 s left no margin
+    for a slow or skipped tick."""
+    assert EMBED_KEEPALIVE_INTERVAL_SECONDS == 120.0
+
+
+def test_warm_search_stack_loads_reranker_and_vocabulary(monkeypatch):
+    monkeypatch.delenv("RERANK_DISABLED", raising=False)
+    reranked = []
+    monkeypatch.setattr(
+        server, "rerank_scores",
+        lambda query, docs: reranked.append((query, docs)) or [0.0])
+    built = []
+
+    warm_search_stack(lambda: built.append(1))
+
+    assert reranked == [("warm", ["warm"])]
+    assert built == [1]
+
+
+def test_warm_search_stack_skips_the_reranker_when_disabled(monkeypatch):
+    """RERANK_DISABLED means the model is never loaded — warming it would
+    only burn a thread on a load that is going to be refused."""
+    monkeypatch.setenv("RERANK_DISABLED", "1")
+    reranked = []
+    monkeypatch.setattr(
+        server, "rerank_scores", lambda query, docs: reranked.append(1))
+    built = []
+
+    warm_search_stack(lambda: built.append(1))
+
+    assert reranked == []
+    assert built == [1]  # the vocabulary is still worth warming
+
+
+def test_warm_search_stack_survives_a_failing_reranker(monkeypatch):
+    """Same diagnostics-grade contract as the keepalive ticker: a warm-up
+    failure must never take the sidecar down at boot."""
+    monkeypatch.delenv("RERANK_DISABLED", raising=False)
+
+    def boom(query, docs):
+        raise RuntimeError("no model")
+
+    monkeypatch.setattr(server, "rerank_scores", boom)
+    built = []
+
+    warm_search_stack(lambda: built.append(1))  # must not raise
+
+    assert built == [1]

@@ -20,6 +20,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,6 +48,7 @@ from promote_headings import promote_markdown
 from granularity import EmbedUnit, ParentDoc, build as build_granularity
 from parents_store import (
     upsert_parents, fetch_parents, fetch_sections,
+    count_units_fts,
     open_store, section_root_for,
     fetch_section_by_id,
     delete_parents_for_source,
@@ -340,6 +342,7 @@ def _system_boost_factors(
     target_systems: set[str],
     data_dir: Path | None,
     known_systems: dict[str, list[str]],
+    manifest: "IndexManifest | None" = None,
 ) -> list[float]:
     """Per-candidate boost factor by system-match against the query.
 
@@ -349,8 +352,13 @@ def _system_boost_factors(
     on the source path. The fallback is what makes the boost work
     without a re-index on libraries whose chunks were stamped "unknown"
     before a KNOWN_SYSTEMS keyword existed.
+
+    ``manifest`` is the caller's already-loaded manifest (the search path
+    reads it once per request); loading it here is the fallback.
     """
-    manifest_files = load_manifest(data_dir).files if data_dir else {}
+    if manifest is None:
+        manifest = load_manifest(data_dir) if data_dir else IndexManifest()
+    manifest_files = manifest.files
     by_source: dict[str, float] = {}
     factors: list[float] = []
     for meta in metadatas:
@@ -681,14 +689,21 @@ def save_search_settings(data_dir: Path, settings: SearchSettings) -> None:
 
 
 def resolve_search_knobs(
-    request: SearchRequest, data_dir: Path | None
+    request: SearchRequest,
+    data_dir: Path | None,
+    settings: SearchSettings | None = None,
 ) -> SearchSettings:
     """Effective knobs for one search: request field > persisted > default.
 
     Returns a validated SearchSettings (pool size clamped), so the search
     handler reads every knob from one object regardless of its origin.
+    ``settings`` is the caller's already-loaded persisted settings (the
+    search path reads them once per request); loading them is the fallback.
     """
-    base = load_search_settings(data_dir) if data_dir else SearchSettings()
+    if settings is not None:
+        base = settings
+    else:
+        base = load_search_settings(data_dir) if data_dir else SearchSettings()
     overrides = {
         k: getattr(request, k)
         for k in SearchSettings.model_fields
@@ -774,6 +789,22 @@ def load_manifest(data_dir: Path) -> IndexManifest:
         raw = json.loads(manifest_path.read_text())
         return IndexManifest(**raw)
     return IndexManifest()
+
+
+def manifest_digest(manifest: IndexManifest) -> str:
+    """Content fingerprint of an index: what is indexed, at what version.
+
+    Sorted ``(path, content_hash, pipeline_version)`` triples, hashed. It
+    moves whenever a file is added, removed, re-indexed with different
+    content, or re-run through a different pipeline — and not when an
+    unrelated field (mtime, last_error, a game-system retag) is rewritten.
+    Caches derived from the indexed text key on it.
+    """
+    payload = "\n".join(
+        f"{path}\t{entry.content_hash}\t{entry.pipeline_version}"
+        for path, entry in sorted(manifest.files.items())
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
@@ -1033,7 +1064,7 @@ def probe_embed_truncation(embed_fn=None) -> None:
 # event loop. Re-embedding a single token well inside that window resets the
 # idle timer for a few milliseconds of work. Issue #341.
 EMBED_KEEPALIVE_INTERVAL_SECONDS = float(
-    os.getenv("OLLAMA_KEEPALIVE_INTERVAL_SECONDS", "240")
+    os.getenv("OLLAMA_KEEPALIVE_INTERVAL_SECONDS", "120")
 )
 
 
@@ -1064,6 +1095,29 @@ def keep_embedder_warm(
             embed_fn(["ping"])
         except Exception:
             pass
+
+
+def warm_search_stack(get_spell_corrector) -> None:
+    """Pay search's lazy loads at boot rather than in the first query.
+
+    Two things in the search path build themselves on first use: the
+    cross-encoder (a ~120 MB ONNX model, seconds to load) and the
+    spell-correction vocabulary. Whoever searches first after a start
+    pays both — the keep-warm ticker only covers Ollama. Issue #341.
+
+    Diagnostics-grade error handling, like ``keep_embedder_warm``: a
+    warm-up that fails must never take the sidecar down at boot, and the
+    next real search reports the problem with far better context.
+    """
+    if os.getenv("RERANK_DISABLED") != "1":
+        try:
+            rerank_scores("warm", ["warm"])
+        except Exception:
+            pass
+    try:
+        get_spell_corrector()
+    except Exception:
+        pass
 
 
 def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
@@ -1830,6 +1884,41 @@ SEARCH_CONCURRENCY = 4
 _search_semaphore = threading.Semaphore(SEARCH_CONCURRENCY)
 
 
+@dataclass
+class RequestContext:
+    """The on-disk state one search reads, loaded once (issue #343).
+
+    A single search used to re-read ``index_manifest.json`` up to four
+    times — collection scope, source_filter/game_system resolution,
+    secondary game-system tags, and the system soft-boost — plus
+    ``search_settings.json`` and, when scoped, ``collections.json``. On a
+    library of a few thousand PDFs that is megabytes of JSON parsed per
+    keystroke-driven search. Reading them once per request is also more
+    consistent, not less: the old reads could straddle a concurrent
+    re-index and disagree with each other.
+    """
+
+    settings: SearchSettings
+    manifest: IndexManifest
+    collections: CollectionsStore | None = None
+
+
+def _build_request_context(
+    request: "SearchRequest", data_dir: Path | None
+) -> RequestContext:
+    """Read this request's settings/manifest (and the collections store
+    only when the request is collection-scoped)."""
+    if not data_dir:
+        return RequestContext(
+            settings=SearchSettings(), manifest=IndexManifest()
+        )
+    return RequestContext(
+        settings=load_search_settings(data_dir),
+        manifest=load_manifest(data_dir),
+        collections=load_collections(data_dir) if request.collection else None,
+    )
+
+
 def _search_sync(
     request: "SearchRequest",
     *,
@@ -1867,19 +1956,25 @@ def _search_sync(
         # zero overhead for the common case.
         # Effective pipeline knobs for this request: explicit request
         # fields win, then the persisted search settings, then the
-        # built-in defaults.
-        knobs = resolve_search_knobs(request, data_dir)
+        # built-in defaults. Settings, manifest and collections are read
+        # once here and shared by every step below (issue #343).
+        ctx = _build_request_context(request, data_dir)
+        knobs = resolve_search_knobs(request, data_dir, settings=ctx.settings)
 
         corrected_query: str | None = None
         if knobs.spell_correction:
-            corrected_query = get_spell_corrector().correct(request.query)
+            corrected_query = get_spell_corrector(ctx.manifest).correct(
+                request.query
+            )
         query_text = (
             corrected_query if corrected_query is not None
             else request.query
         )
         variant_queries: list[str] = []
         if knobs.variant_expansion:
-            variant_queries = get_spell_corrector().expand(query_text)
+            variant_queries = get_spell_corrector(ctx.manifest).expand(
+                query_text
+            )
 
         # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
         query_kwargs = {
@@ -1895,15 +1990,14 @@ def _search_sync(
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
                 )
-            store = load_collections(data_dir)
+            store = ctx.collections
             if effective_collection not in store.collections:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Collection not found: {effective_collection}",
                 )
-            manifest = load_manifest(data_dir)
             coll_paths = resolve_collection_paths(
-                store.collections[effective_collection], manifest
+                store.collections[effective_collection], ctx.manifest
             )
             if not coll_paths:
                 return {
@@ -1926,7 +2020,7 @@ def _search_sync(
         if corrected_query is not None:
             filter_notes.append(f'Query corrected to "{corrected_query}".')
         if data_dir and (request.source_filter or request.game_system):
-            filt_manifest = load_manifest(data_dir)
+            filt_manifest = ctx.manifest
             if request.source_filter:
                 known_files = sorted(
                     {e.filename for e in filt_manifest.files.values()}
@@ -2000,8 +2094,7 @@ def _search_sync(
             # file in another folder can't ride along (issue #308).
             secondary_paths: list[str] = []
             if data_dir:
-                search_manifest = load_manifest(data_dir)
-                for path, entry in search_manifest.files.items():
+                for path, entry in ctx.manifest.files.items():
                     if entry.game_system in requested:
                         continue
                     if any(t in requested for t in entry.game_systems):
@@ -2118,7 +2211,7 @@ def _search_sync(
             if target_systems:
                 boost_factors = _system_boost_factors(
                     ordered_metadatas, target_systems,
-                    data_dir, merged["known"],
+                    data_dir, merged["known"], manifest=ctx.manifest,
                 )
                 # Hybrid candidates are ordered by RRF score, not
                 # cosine — boost whichever scale ordered the pool.
@@ -3968,21 +4061,41 @@ def create_app(
     def _get_lexical_index() -> PersistedLexicalIndex:
         return PersistedLexicalIndex(data_dir, collection)
 
-    # Spell-correction vocabulary: built lazily on first use, rebuilt when
-    # the chunk count changes (reindex/delete). The lazy cache is guarded
-    # by a lock: since #344 the search body runs in a worker thread, so two
-    # concurrent searches can race here on a cold cache and each pay the
-    # full build cost.
-    spell_cache: dict = {"count": None, "corrector": None}
+    # Spell-correction vocabulary: built lazily on first use (and at boot
+    # by ``warm_search_stack``), rebuilt when the index changes. With
+    # persisted FTS rows it is one SQLite read keyed on the manifest
+    # digest, so a re-index that happens to leave the chunk count
+    # unchanged still invalidates it; a legacy index predating unit_fts
+    # keeps the chunk-count key and the full Chroma scan (issue #343). The
+    # cache is guarded by a lock: since #344 the search body runs in a
+    # worker thread, so two concurrent searches can race here on a cold
+    # cache and each pay the full build cost.
+    spell_cache: dict = {"key": None, "corrector": None}
     spell_lock = threading.Lock()
 
-    def _get_spell_corrector() -> SpellCorrector:
-        count = collection.count()
+    def _get_spell_corrector(
+        manifest: IndexManifest | None = None
+    ) -> SpellCorrector:
+        """``manifest`` is the caller's already-loaded manifest, so the
+        search path does not re-read it just to check the cache key."""
+        from_store = bool(data_dir) and count_units_fts(data_dir) > 0
+        if from_store:
+            if manifest is None:
+                manifest = load_manifest(data_dir)
+            key = manifest_digest(manifest)
+        else:
+            key = collection.count()
         with spell_lock:
-            if spell_cache["corrector"] is None or spell_cache["count"] != count:
-                spell_cache["corrector"] = SpellCorrector.from_collection(collection)
-                spell_cache["count"] = count
+            if spell_cache["corrector"] is None or spell_cache["key"] != key:
+                spell_cache["corrector"] = (
+                    SpellCorrector.from_store(data_dir) if from_store
+                    else SpellCorrector.from_collection(collection)
+                )
+                spell_cache["key"] = key
             return spell_cache["corrector"]
+
+    # Exposed for the boot warm-up thread in __main__.
+    app.state.get_spell_corrector = _get_spell_corrector
 
     @app.post("/api/search")
     async def search(request: SearchRequest, http_req: Request):
@@ -4081,6 +4194,16 @@ if __name__ == "__main__":
     threading.Thread(target=keep_embedder_warm, daemon=True).start()
 
     application = create_app()
+
+    # Same deal one layer up: the first search would otherwise load the
+    # cross-encoder and build the spell vocabulary itself (issue #341).
+    # Needs the app, so it starts here rather than beside the ticker.
+    threading.Thread(
+        target=warm_search_stack,
+        args=(application.state.get_spell_corrector,),
+        daemon=True,
+    ).start()
+
     config = uvicorn.Config(application, log_level="info")
     server = uvicorn.Server(config)
     try:
