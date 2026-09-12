@@ -35,8 +35,10 @@ def _meta(parent_id: str, section_id: str, section_path: str, heading: str) -> d
         "section_heading": heading,
         "page_start": 10,
         "page_end": 10,
-        "page_label_start": "",
-        "page_label_end": "",
+        # Front matter puts the printed number well ahead of the physical
+        # one, as in a real book.
+        "page_label_start": "326",
+        "page_label_end": "326",
     }
 
 
@@ -58,15 +60,16 @@ PARENT_TEXTS = {
 
 
 def _parent(pid: str, heading: str, section_id: str | None,
-            section_path: str | None, text: str | None = None) -> ParentDoc:
+            section_path: str | None, text: str | None = None,
+            pages: tuple[int, int] = (10, 11)) -> ParentDoc:
     return ParentDoc(
         parent_id=pid,
         text=text if text is not None else PARENT_TEXTS[pid],
         section_heading=heading,
         chunk_type="prose",
         source_pdf=SOURCE,
-        page_start=10,
-        page_end=11,
+        page_start=pages[0],
+        page_end=pages[1],
         section_id=section_id,
         section_path=section_path,
     )
@@ -116,7 +119,10 @@ def section_client(client, test_collection, tmp_path, monkeypatch):
 @pytest.fixture
 def section_client_legacy(client, test_collection, tmp_path, monkeypatch):
     """An index predating the section columns: parents carry no
-    section_id/section_path and the units' metadata has section_path ""."""
+    section_id/section_path and the units' metadata has section_path "".
+
+    Each parent covers exactly its unit's page, so nothing widens the span
+    — the hit keeps its printed page labels."""
     legacy_units = [
         (uid, doc, {**meta, "section_id": "", "section_path": ""})
         for uid, doc, meta in UNITS
@@ -127,9 +133,10 @@ def section_client_legacy(client, test_collection, tmp_path, monkeypatch):
         metadatas=[u[2] for u in legacy_units],
     )
     upsert_parents(tmp_path, SOURCE, [
-        _parent("p-k", "Monsters > Kraken", None, None),
-        _parent("p-ka", "Monsters > Kraken > Actions", None, None),
-        _parent("p-kl", "Monsters > Kraken > Legendary Actions", None, None),
+        _parent("p-k", "Monsters > Kraken", None, None, pages=(10, 10)),
+        _parent("p-ka", "Monsters > Kraken > Actions", None, None, pages=(10, 10)),
+        _parent("p-kl", "Monsters > Kraken > Legendary Actions", None, None,
+                pages=(10, 10)),
     ])
     picked = [legacy_units[1], legacy_units[2]]
     fake = {
@@ -139,6 +146,16 @@ def section_client_legacy(client, test_collection, tmp_path, monkeypatch):
         "distances": [[0.2, 0.3]],
     }
     monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    return client
+
+
+@pytest.fixture
+def section_client_no_parents(client, test_collection, tmp_path, monkeypatch):
+    """Units in Chroma whose parents rows are gone (cleared store, or a
+    half-finished reindex): every subtree measures 0 chars, so nothing may
+    be allowed to "fit" at depth 1."""
+    _stage_units(test_collection)
+    _fake_dense(monkeypatch, test_collection, ["u-ka", "u-kl"])
     return client
 
 
@@ -161,10 +178,12 @@ def _search(client, **overrides):
 def test_hit_returns_the_whole_section_and_the_matched_unit(section_client):
     r = _search(section_client, query="kraken ink cloud", rerank=False)["results"]
     assert r[0]["section_id"] == "s_k"
+    assert r[0]["section_path"] == "s_m/s_k"
     assert "AC 18" in r[0]["text"] and "Ink cloud" in r[0]["text"]     # the section, not the parent
     assert r[0]["matched_text"] == "Tentacle attack text"               # the unit that hit
     assert r[0]["chunk_text"].startswith("Tentacle")                    # its parent
     assert r[0]["section_heading"] == "Monsters > Kraken"
+    assert (r[0]["page_start"], r[0]["page_end"]) == (10, 11)           # the section's span
 
 
 def test_two_hits_in_one_section_dedupe_to_one_result(section_client):
@@ -175,3 +194,55 @@ def test_two_hits_in_one_section_dedupe_to_one_result(section_client):
 def test_legacy_rows_without_section_path_still_return(section_client_legacy):
     r = _search(section_client_legacy, query="kraken", rerank=False)["results"]
     assert r and r[0]["section_id"] == "" and r[0]["matched_text"]
+
+
+def test_the_roots_found_while_deduping_are_handed_to_fetch_sections(
+    section_client, monkeypatch
+):
+    """The dedupe loop already paid for each candidate's root; assembling
+    the sections must not compute them a second time."""
+    import server
+
+    seen: dict = {}
+    real = server.fetch_sections
+
+    def spy(data_dir, hits, **kwargs):
+        seen["hits"] = hits
+        seen.update(kwargs)
+        return real(data_dir, hits, **kwargs)
+
+    monkeypatch.setattr(server, "fetch_sections", spy)
+    assert _search(section_client, query="kraken")["results"]
+    assert all(pid in seen["roots"] for pid, _, _ in seen["hits"])
+    assert seen["roots"]["p-ka"] == "s_m/s_k"
+    # One shared aggregate memo across the request's candidates.
+    assert (SOURCE, "s_m") in seen["cache"]
+
+
+def test_units_whose_parents_are_missing_stay_one_result_each(
+    section_client_no_parents
+):
+    """A source with no parent rows measures 0 chars at every depth. If
+    that counted as "fits", both hits would share the depth-1 key and the
+    whole book would answer with a single result."""
+    r = _search(section_client_no_parents, query="kraken")["results"]
+    assert len(r) == 2
+    assert [x["matched_text"] for x in r] == [
+        "Tentacle attack text", "Ink cloud text"]
+    assert [x["text"] for x in r] == ["Tentacle attack text", "Ink cloud text"]
+
+
+def test_a_widened_span_drops_the_matched_units_page_labels(section_client):
+    """`page_start`/`page_end` are now the section's. Keeping the unit's
+    printed labels would cite "p.326 (PDF pp.10-11)"."""
+    r = _search(section_client, query="kraken")["results"]
+    assert (r[0]["page_start"], r[0]["page_end"]) == (10, 11)
+    assert r[0]["page_label_start"] == "" and r[0]["page_label_end"] == ""
+
+
+def test_a_hit_whose_span_did_not_widen_keeps_its_page_labels(
+    section_client_legacy
+):
+    r = _search(section_client_legacy, query="kraken")["results"]
+    assert (r[0]["page_start"], r[0]["page_end"]) == (10, 10)
+    assert r[0]["page_label_start"] == "326" and r[0]["page_label_end"] == "326"

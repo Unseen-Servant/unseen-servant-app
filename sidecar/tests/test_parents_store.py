@@ -412,3 +412,54 @@ def test_fetch_sections_batches_and_keys_by_parent_id(tmp_path):
     got = fetch_sections(tmp_path, [("p_kra_act", "s_m/s_k/s_ka", "x.pdf"), ("p_med", "s_m/s_d", "x.pdf")])
     assert set(got) == {"p_kra_act", "p_med"}
     assert got["p_kra_act"].root_path == got["p_med"].root_path == "s_m"   # both fit under the chapter at 6 000
+
+
+def _count_aggregates(conn) -> list[str]:
+    """Collect the subtree-size aggregates SQLite actually runs."""
+    sql: list[str] = []
+    conn.set_trace_callback(
+        lambda s: sql.append(s) if "SUM(LENGTH(text))" in s else None)
+    return sql
+
+
+def test_section_root_for_memoises_the_subtree_aggregates(tmp_path):
+    """The depth-1 aggregate re-sums the whole chapter's text; candidates
+    from one chapter must pay for it once per request, not once each."""
+    _monster_tree(tmp_path)
+    with _txn(tmp_path) as conn:
+        sql = _count_aggregates(conn)
+        assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka") == "s_m"
+        assert section_root_for(conn, "x.pdf", "s_m/s_d/s_da") == "s_m"
+        assert len(sql) == 2                      # uncached: one each
+
+        sql.clear()
+        cache = {}
+        assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka", cache=cache) == "s_m"
+        assert section_root_for(conn, "x.pdf", "s_m/s_d/s_da", cache=cache) == "s_m"
+        assert len(sql) == 1                      # the second call is all cache
+        conn.set_trace_callback(None)
+
+
+def test_section_root_for_is_none_when_the_source_has_no_parents(tmp_path):
+    """An empty subtree measures 0 chars and would otherwise "fit" at
+    depth 1, collapsing every hit in the book onto one root."""
+    _monster_tree(tmp_path)
+    with _txn(tmp_path) as conn:
+        assert section_root_for(conn, "gone.pdf", "s_m/s_k/s_ka") is None
+        assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka") == "s_m"
+
+
+def test_fetch_sections_omits_a_hit_whose_source_has_no_parents(tmp_path):
+    _monster_tree(tmp_path)
+    assert fetch_sections(tmp_path, [("ghost", "s_m/s_k", "gone.pdf")]) == {}
+
+
+def test_fetch_sections_uses_a_root_the_caller_already_computed(tmp_path):
+    """The search path picks each hit's root while deduping and hands it
+    over; the assembly must take it rather than recompute (which would
+    return the whole chapter here)."""
+    _monster_tree(tmp_path)
+    got = fetch_sections(tmp_path, [("p_kra_act", "s_m/s_k/s_ka", "x.pdf")],
+                         roots={"p_kra_act": "s_m/s_k"})
+    assert got["p_kra_act"].root_path == "s_m/s_k"
+    assert "Medusa" not in got["p_kra_act"].text

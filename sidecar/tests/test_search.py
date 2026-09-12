@@ -60,6 +60,11 @@ def test_search_result_fields_never_null(client, large_text_pdf_path):
         assert isinstance(r["filename"], str)
         assert isinstance(r["source"], str)
         assert isinstance(r["text"], str)
+        # Section fields (roadmap 2.1) are strings on the same contract —
+        # the decoder rejects a null in any of them.
+        for key in ("matched_text", "chunk_text", "section_id", "section_path"):
+            assert isinstance(r[key], str), \
+                f"{key} must be str, got {type(r[key])}"
 
 
 def test_search_result_shape(indexed_client):

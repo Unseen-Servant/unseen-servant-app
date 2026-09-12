@@ -308,7 +308,19 @@ def _prefix_range(path: str) -> tuple[str, str]:
     return path, path + "0"
 
 
-def _subtree_size(conn, source: str, path: str) -> int:
+def _subtree_stats(
+    conn, source: str, path: str,
+    cache: dict[tuple[str, str], tuple[int, int]] | None = None,
+) -> tuple[int, int]:
+    """Assembled size (text + the "\\n\\n" joins) and row count of a subtree.
+
+    The SUM re-reads every row's text under the prefix, so the shallow
+    candidates are the expensive ones. `cache`, keyed (source, prefix),
+    memoises them for the caller's lifetime — one search asks for the same
+    chapter once per candidate otherwise.
+    """
+    if cache is not None and (source, path) in cache:
+        return cache[(source, path)]
     lo, hi = _prefix_range(path)
     row = conn.execute(
         "SELECT COALESCE(SUM(LENGTH(text)), 0), COUNT(*) FROM parents "
@@ -316,15 +328,33 @@ def _subtree_size(conn, source: str, path: str) -> int:
         (source, lo, hi),
     ).fetchone()
     total, n = row
-    return total + 2 * max(0, n - 1)
+    stats = (total + 2 * max(0, n - 1), n)
+    if cache is not None:
+        cache[(source, path)] = stats
+    return stats
 
 
-def section_root_for(conn, source: str, section_path: str, cap: int = SECTION_CAP) -> str:
-    """Shallowest ancestor (or the leaf) whose whole subtree fits in `cap`."""
+def section_root_for(
+    conn, source: str, section_path: str, cap: int = SECTION_CAP,
+    cache: dict[tuple[str, str], tuple[int, int]] | None = None,
+) -> str | None:
+    """Shallowest ancestor (or the leaf) whose whole subtree fits in `cap`.
+
+    `None` when the source has no parent rows at all under the path's first
+    segment — a Chroma index whose parents rows were cleared or never
+    written. Without that guard an empty subtree measures 0, "fits" at
+    depth 1, and every hit in the book collapses onto one section key.
+
+    `cache` is passed straight to `_subtree_stats`; share one dict across
+    the candidates of a single request.
+    """
     ids = section_path.split("/")
     for depth in range(1, len(ids) + 1):
         candidate = "/".join(ids[:depth])
-        if _subtree_size(conn, source, candidate) <= cap:
+        size, rows = _subtree_stats(conn, source, candidate, cache)
+        if depth == 1 and rows == 0:
+            return None
+        if size <= cap:
             return candidate
     return section_path
 
@@ -381,15 +411,29 @@ def assemble_section(conn, source: str, root_path: str, matched_parent_id: str,
 
 
 def fetch_sections(data_dir: Path, hits: list[tuple[str, str | None, str | None]],
-                   cap: int = SECTION_CAP) -> dict[str, SectionDoc]:
+                   cap: int = SECTION_CAP,
+                   roots: dict[str, str] | None = None,
+                   cache: dict[tuple[str, str], tuple[int, int]] | None = None,
+                   ) -> dict[str, SectionDoc]:
     """Assemble one section per hit `(parent_id, section_path, source)`; legacy
-    rows (no section_path) take the heading walk of `_extend_one`."""
+    rows (no section_path, or a source with no parent rows) take the heading
+    walk of `_extend_one`.
+
+    `roots` supplies roots the caller already computed (the search path picks
+    each candidate's root while deduping), keyed by parent_id; `cache` is the
+    `_subtree_stats` memo for whatever is left to compute.
+    """
     if not data_dir or not hits:
         return {}
     out: dict[str, SectionDoc] = {}
     with _txn(data_dir) as conn:
         for pid, path, source in hits:
-            if not path or not source:
+            root = None
+            if path and source:
+                root = (roots or {}).get(pid)
+                if root is None:
+                    root = section_root_for(conn, source, path, cap, cache)
+            if root is None:
                 legacy = _extend_one(conn, pid, SECTION_EXPANSION_MAX_EXTRA_CHARS)
                 if legacy is not None:
                     out[pid] = SectionDoc(root_path="", section_id=legacy.section_id or "",
@@ -397,7 +441,6 @@ def fetch_sections(data_dir: Path, hits: list[tuple[str, str | None, str | None]
                                           page_start=legacy.page_start, page_end=legacy.page_end,
                                           source_pdf=legacy.source_pdf, windowed=False)
                 continue
-            root = section_root_for(conn, source, path, cap)
             doc = assemble_section(conn, source, root, pid, cap)
             if doc is not None:
                 out[pid] = doc

@@ -2166,10 +2166,18 @@ def _search_sync(
         # Dedupe by assembled section, keeping the first hit per section
         # (the iteration order is the re-ranked-then-cosine order from
         # above). The store picks each candidate's section root before we
-        # decide — one cheap aggregate query per candidate, all on the
-        # same connection — so two hits inside one section collapse to
-        # one result even when they sit in different parents. Legacy rows
-        # without a section_path keep the old parent_id key.
+        # decide, so two hits inside one section collapse to one result
+        # even when they sit in different parents. Legacy rows (no
+        # section_path, or a source with no parent rows at all) keep the
+        # old parent_id key.
+        #
+        # One connection for the whole loop, and `size_cache` memoises the
+        # subtree aggregates for this request — candidates from the same
+        # chapter otherwise re-sum that chapter's text once each.
+        # `root_by_pid` then hands the roots to fetch_sections so they are
+        # not computed a second time.
+        size_cache: dict[tuple[str, str], tuple[int, int]] = {}
+        root_by_pid: dict[str, str] = {}
         seen: set[str] = set()
         picked: list[dict] = []
         with open_store(data_dir) if data_dir else nullcontext(None) as conn:
@@ -2181,10 +2189,14 @@ def _search_sync(
                     continue
                 path = metadata.get("section_path") or None
                 source = metadata.get("source") or None
+                root = None
                 if conn is not None and path and source:
-                    key = section_root_for(conn, source, path)
-                else:
-                    key = pid
+                    root = section_root_for(
+                        conn, source, path, cache=size_cache
+                    )
+                if root is not None:
+                    root_by_pid[pid] = root
+                key = root or pid
                 if key in seen:
                     continue
                 seen.add(key)
@@ -2242,6 +2254,8 @@ def _search_sync(
                 )
                 for p in picked
             ],
+            roots=root_by_pid,
+            cache=size_cache,
         ) if data_dir else {}
         parents = fetch_parents(
             data_dir, [p["metadata"]["parent_id"] for p in picked]
@@ -2269,6 +2283,15 @@ def _search_sync(
                 or ""
             )
             relevance = round(max(0.0, min(1.0, 1 - distance)), 3)
+            page_start = sec.page_start if sec else metadata.get("page_start", 0)
+            page_end = sec.page_end if sec else metadata.get("page_end", 0)
+            # The printed labels describe the matched unit's pages. When the
+            # returned span is the wider section, they would mislabel it
+            # ("p.326 (PDF pp.324-331)"), so blank them — blank means "cite
+            # the physical span" downstream (mcp_server._page_span).
+            same_span = (page_start, page_end) == (
+                metadata.get("page_start", 0), metadata.get("page_end", 0)
+            )
             formatted.append({
                 "text": text,
                 # The unit that actually matched, and the parent it sits
@@ -2285,13 +2308,17 @@ def _search_sync(
                 "filename": metadata["filename"],
                 "source": metadata.get("source", ""),
                 "section_heading": section_heading,
-                "page_start": sec.page_start if sec else metadata.get("page_start", 0),
-                "page_end": sec.page_end if sec else metadata.get("page_end", 0),
+                "page_start": page_start,
+                "page_end": page_end,
                 # The number printed on the paper, "" when it matches the
                 # physical page. A citation a GM cannot find at the table is
                 # not a citation.
-                "page_label_start": metadata.get("page_label_start", ""),
-                "page_label_end": metadata.get("page_label_end", ""),
+                "page_label_start": (
+                    metadata.get("page_label_start", "") if same_span else ""
+                ),
+                "page_label_end": (
+                    metadata.get("page_label_end", "") if same_span else ""
+                ),
                 "game_system": metadata.get("game_system") or "unknown",
                 "relevance": relevance,
                 "tier": _tier_for(relevance, p["reranked"]),
