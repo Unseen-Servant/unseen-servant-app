@@ -122,3 +122,34 @@ def test_get_pages_unindexed_filename_404(client):
     )
 
     assert response.status_code == 404
+
+
+def test_get_pages_start_beyond_document_is_404(client, sample_pdf_path):
+    """sample_pdf_path is a single-page PDF: a range starting past page 1
+    must 404 with a page-count-aware message, not 200 with an inverted
+    (lo > hi) pair and empty text."""
+    _index(client, sample_pdf_path)
+
+    response = client.get(
+        "/api/source/dragonbane_monsters.pdf/pages",
+        params={"start": 5, "end": 10},
+    )
+
+    assert response.status_code == 404
+    assert "beyond the last page (1)" in response.json()["detail"]
+
+
+def test_get_pages_end_beyond_document_is_clamped_and_reported(client, sample_pdf_path):
+    """start is in range but end overshoots: clamp end to the document's
+    last page, and say so in the response body (not just the text)."""
+    _index(client, sample_pdf_path)
+
+    response = client.get(
+        "/api/source/dragonbane_monsters.pdf/pages",
+        params={"start": 1, "end": 10},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["start"] == 1
+    assert data["end"] == 1

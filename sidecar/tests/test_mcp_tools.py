@@ -422,6 +422,24 @@ async def test_get_pages_sidecar_down(mock_sidecar):
     assert "Cannot connect" in result
 
 
+@pytest.mark.asyncio
+async def test_get_pages_url_encodes_special_characters_in_filename(mock_sidecar):
+    """A raw '#' in the filename would otherwise be read as a URL fragment
+    delimiter (truncating the path, dropping the query) and a raw '?' as
+    the start of the query string — both must be percent-encoded."""
+    mock_sidecar.set_get(
+        "/api/source/Dragon%20Magazine%20%23237.pdf/pages?start=1&end=1",
+        {
+            "filename": "Dragon Magazine #237.pdf",
+            "start": 1,
+            "end": 1,
+            "text": "Editorial.",
+        },
+    )
+    result = await get_pages("Dragon Magazine #237.pdf", 1, 1)
+    assert "Editorial." in result
+
+
 # ---------------------------------------------------------------------------
 # list_collections
 # ---------------------------------------------------------------------------

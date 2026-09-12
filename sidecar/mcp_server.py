@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 from mcp.server.mcpserver import MCPServer
@@ -413,7 +414,7 @@ async def get_section(section_id: str) -> str:
     Args:
         section_id: The id from a search_library result's Section line.
     """
-    data = await sidecar.get(f"/api/section/{section_id}")
+    data = await sidecar.get(f"/api/section/{quote(section_id, safe='')}")
     if isinstance(data, str):
         return data  # Error message
 
@@ -441,7 +442,9 @@ async def get_pages(filename: str, start: int, end: int) -> str:
         start: First page to fetch, 1-based inclusive.
         end: Last page to fetch, 1-based inclusive (at most 20 pages from start).
     """
-    data = await sidecar.get(f"/api/source/{filename}/pages?start={start}&end={end}")
+    data = await sidecar.get(
+        f"/api/source/{quote(filename, safe='')}/pages?start={start}&end={end}"
+    )
     if isinstance(data, str):
         return data  # Error message
 

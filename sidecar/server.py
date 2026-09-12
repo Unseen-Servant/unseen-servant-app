@@ -3799,16 +3799,28 @@ def create_app(
             )
 
         try:
-            with pymupdf.open(source_path) as doc:
-                lo = max(1, start)
-                hi = min(doc.page_count, end)
-                text = "\n\n".join(
-                    doc[p - 1].get_text("text") for p in range(lo, hi + 1)
-                )
+            doc = pymupdf.open(source_path)
         except Exception:
             raise HTTPException(
                 status_code=404, detail=f"Source not found: {filename}"
             )
+
+        try:
+            if start > doc.page_count:
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Page {start} is beyond the last page "
+                        f"({doc.page_count}) of {filename}"
+                    ),
+                )
+            lo = max(1, start)
+            hi = min(doc.page_count, end)
+            text = "\n\n".join(
+                doc[p - 1].get_text("text") for p in range(lo, hi + 1)
+            )
+        finally:
+            doc.close()
 
         return {"filename": filename, "start": lo, "end": hi, "text": text}
 
