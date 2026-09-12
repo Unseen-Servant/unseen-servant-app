@@ -38,6 +38,13 @@ up (query embedding); extraction does not.
 # pipeline version. Writes evals/baselines/<date>-v2-phase0.*
 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline phase0
 
+# --max-context-chars N packs the response into an N-char budget (rank
+# order, last result truncated to its matched unit).
+uv run --project sidecar python -m evals.run_eval --engine v2 --baseline sections-8k --max-context-chars 8000
+
+# --no-rerank skips the cross-encoder pass, to measure latency without it.
+uv run --project sidecar python -m evals.run_eval --engine v2 --baseline sections-norerank --no-rerank
+
 # A candidate retrieval rung must not regress headline metrics in any scope.
 uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --baseline rung-9 \
     --gate evals/baselines/<last-committed>-v3-<rung>.json
@@ -75,6 +82,10 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa \
     --gate evals/baselines/<last-committed>-v2-breadcrumb-qa.json
 
+# Idle-cliff probe (hand-run against a live sidecar): searches once, sleeps
+# 600 s, searches again, and prints both latencies.
+uv run --project sidecar python -m evals.retrieval.idle_probe
+
 # Harness unit tests (pure, CI-safe).
 uv run --project sidecar-v3 pytest evals/tests
 ```
@@ -104,7 +115,8 @@ requirement):
 | `uncued` | unfiltered, no system named | anchors match, **any** file | ambiguous search |
 
 Metrics (`metrics.py`): **MRR@5** (headline, known-item), nDCG@10, recall@3/@5/@10,
-payload_chars (the small-model budget), dup_sections@10, latency p50/p95 —
+payload_chars (the small-model budget), dup_sections@10, dup_titles@10
+(post-collapse residue — reported, not gated), latency p50/p95 —
 macro-averaged by scope, category, and style.
 
 **Extraction** (`extraction/`) — did the extractor get the right text, in the
@@ -139,7 +151,7 @@ never a PDF. `--suite library --data-dir <app data dir>`; verify with
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
-The v2 reference for Phase 2+ is `2026-09-12-v2-headings`; gate against it, not phase0b.
+The v2 reference for Phase 3+ is `2026-09-12-v2-sections`; gate against it, not headings.
 Every baseline records the corpus fingerprint, Git revision, and explicit query
 knobs. Retrieval baselines always use a fresh temporary index; exploratory
 reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a
@@ -164,3 +176,11 @@ uv run --project sidecar python -m evals.blind.score    evals/baselines/<stem>
 `engines/base.py` is the `Engine` protocol (index / warmup / search / extract /
 close). `engines/v2.py` drives the live sidecar in-process (its real pipeline).
 `engines/v3.py` is a stub until sidecar-v3 has a pipeline (Phase 2).
+
+## MCP tools
+
+The agent-facing surface over the same pipeline: `search_library` (compact
+by default — a matched snippet plus a `get_section` pointer, under an 8 000-char
+budget; `full_text=True` prints whole sections instead), `get_section(section_id)`
+(resolves a section id, including container roots, to its full assembled text),
+and `get_pages(filename, start, end)` (raw PDF text for a page range, ≤ 20 pages).

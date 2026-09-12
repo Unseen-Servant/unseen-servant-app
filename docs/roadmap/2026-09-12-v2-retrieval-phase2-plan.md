@@ -517,6 +517,8 @@ def test_same_file_is_never_collapsed():
 
 - [ ] **Step 4: Commit** — `feat(sidecar): cross-edition near-dup collapse with also_in; harness dup_titles@10 (roadmap 2.3)`.
 
+*Outcome: dup_titles@10 uncued 1.350 — residue is same-titled, differently-worded sections across books (kept by design).*
+
 ---
 
 ### Task 7: Request-scoped reads, persisted spell vocabulary, boot warm-up (roadmap 2.4; #343, #341)
@@ -561,6 +563,9 @@ Splitting a Markdown document into three renders can break a table or list that 
 ### Task 9: Baselines, gate, roadmap **[executor with Ollama; blind round Jerome]**
 
 - [ ] **Step 1:** `OLLAMA_CONTEXT_LENGTH=8192 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline sections --gate evals/baselines/2026-09-12-v2-headings.json` (~40 min). Expected: cross_page recall@10 ≥ 0.5 and MRR@5 up (q005/q006/q041/q042 flip — the kraken/dragon section now carries AC and the ability), single MRR ≥ 0.767, uncued dup_sections@10 0.400 → < 0.1, no scope's mrr@5/recall@3 below headings. If the gate fails on a single-query row, classify per query as in Phase 1 Task 10 and rule; do not loosen the gate.
+
+*Outcome 2026-09-12: gate passed; all 0.862, single 0.948, cross_page 1.000; 8 better / 0 worse.*
+
 - [ ] **Step 2:** the budget baseline: same command with `--baseline sections-8k --max-context-chars 8000 --no-gate`… the gate is against headings; run it *with* the gate too: MRR must be unchanged vs `sections` at ranks whose text survived, and `payload_chars ≤ 8 000`, `top3_fit@8k = 1.0` on every query by construction.
 - [ ] **Step 3:** blind sheet on `sections` [Jerome scores]; bars: readable@5 ≥ 0.965, human single ≥ 0.87.
 - [ ] **Step 4:** roadmap §5 current values (cross_page, dup_sections, payload, p50 rerank-off), §8 two rows (Phase 2 landed; the `dup_sections@10` metric finding and the `dup_titles@10` replacement), README (`--max-context-chars`, the two new MCP tools, `2026-…-v2-sections` as the Phase 3 reference). Commit with the baselines.
@@ -574,3 +579,4 @@ Splitting a Markdown document into three renders can break a table or list that 
 - **Type consistency.** `SectionDoc` fields are used identically in Tasks 2, 3, 5. `pack_results` reads `text`, `matched_text`, `section_heading` and writes `truncated` — the same keys Task 3 emits and Task 8 decodes. `also_in` entries have the same seven keys in Task 6's Python and Task 8's Rust struct. `SearchRequest.max_context_chars` ↔ `SearchOptions.max_context_chars` ↔ Rust `max_context_chars: Option<u32>`.
 - **Placeholders.** Task 5 and Task 7 Steps 1–2 describe tests and implementation in prose with exact names and shapes rather than full code; their executors have the store/server interfaces from Tasks 2–4 in this document. Task 7 Step 3's `--no-rerank` flag: `run_eval.py` already exposes rerank via `SearchOptions.rerank`; if no CLI flag exists, add `--no-rerank` in Task 7 (it sets `opts.rerank = False`).
 - **Known risk.** `section_root_for` picks the shallowest ancestor that fits, so a short book chapter (< 6 000 chars) is returned whole even for a hit in one of its sub-sections — intended (the roadmap's "Kraken section" rule generalises to "the largest enclosing section that fits"). If the blind round finds this too wide, `SECTION_CAP` is the knob and `windowed` tells the reader which results were cut.
+- **Post-commit integration fixes (b1dd374).** The whole-branch review of Tasks 1–8, done once every task had landed, found three defects visible only in combination: MCP compact search sent `max_context_chars=8000` while printing 600-char snippets, so the server billed whole sections against the budget and packed eight requested results down to about two (compact mode now sends no budget; `full_text` keeps the 8 000); `get_section(id)` 404'd for container roots — a heading immediately followed by a sub-heading owns no chunk, yet `section_root_for` prefers it as the shallowest fitting ancestor and search advertises that id (resolved as a path segment: indexed exact lookup, then a `LIKE` pre-filter verified segment-wise); and paging read "fewer results than `n_results`" as end-of-list, which section dedupe, near-dup collapse and the packer all break (`/api/search` now reports `exhausted`, and the app follows it). Ranking unchanged; no reindex.
