@@ -246,7 +246,6 @@ async def list_collections() -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
 def _page_span(result: dict) -> str:
     """Cite the page a reader can actually turn to.
 
@@ -268,6 +267,7 @@ def _page_span(result: dict) -> str:
     return f"{printed} (PDF {physical})"
 
 
+@mcp.tool()
 async def search_library(
     query: str,
     n_results: int = 15,

@@ -12,6 +12,7 @@ simulate those HTTP responses to verify formatting and error handling.
 """
 
 import sys
+import asyncio
 import pytest
 
 # Prevent argparse from reading pytest's arguments
@@ -409,4 +410,10 @@ async def test_search_library_without_collection(mock_sidecar):
     await search_library("fire drake")
     assert "collection" not in captured
 
+
+def test_registered_tools_are_the_public_surface():
+    from mcp_server import mcp
+    names = {t.name for t in asyncio.run(mcp.list_tools())}
+    assert "search_library" in names
+    assert "_page_span" not in names
 
