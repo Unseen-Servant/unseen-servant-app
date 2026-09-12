@@ -57,6 +57,7 @@ from parents_store import (
     update_units_fts_game_system,
 )
 from lexical import PersistedLexicalIndex, rrf_fuse
+from near_dup import collapse_near_dups
 from reranker import rerank_scores
 from spelling import SpellCorrector
 
@@ -2350,6 +2351,9 @@ def _search_sync(
                 "reranked": p["reranked"],
             })
 
+        # Cross-edition twins (roadmap 2.3): fold before packing, so the
+        # budget sees the collapsed list. May shorten it below n_results.
+        formatted = collapse_near_dups(formatted)
         formatted = pack_results(formatted, request.max_context_chars)
 
         response: dict = {

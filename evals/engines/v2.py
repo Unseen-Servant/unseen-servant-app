@@ -247,6 +247,7 @@ class V2Engine:
                 reranked=bool(r.get("reranked", False)),
                 raw=r,
                 matched_text=r.get("matched_text", "") or "",
+                also_in=r.get("also_in", []),
             )
             for r in data.get("results", [])
         ]

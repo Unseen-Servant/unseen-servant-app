@@ -80,3 +80,31 @@ def test_grade_response_reports_the_budget_column():
     assert g["top3_fit@8k"] == 1.0
     assert "top3_fit@8k" in metrics.COST_METRICS
     assert BUDGET_CHARS == 8000
+
+
+from evals.retrieval.grade import dup_titles_at
+
+
+def test_dup_titles_at_counts_a_cross_edition_repeat():
+    assert dup_titles_at([
+        _from("SRD_5.1.pdf", "text"), _from("SRD_5.2.1.pdf", "text"),
+    ]) == 1
+
+
+def test_dup_titles_at_ignores_same_file_repeats():
+    assert dup_titles_at([
+        _from("SRD_5.1.pdf", "text"), _from("SRD_5.1.pdf", "text"),
+    ]) == 0
+
+
+def _unheaded(filename: str) -> SearchResult:
+    return SearchResult(
+        text="text", filename=filename, source=filename, section_heading="",
+        page_start=1, page_end=1, relevance=1.0, tier="strong", reranked=False,
+    )
+
+
+def test_dup_titles_at_never_counts_an_empty_leaf_title():
+    """"" == "" is not "same leaf_title" — two un-headed results from
+    different files must never count as a duplicate."""
+    assert dup_titles_at([_unheaded("A.pdf"), _unheaded("B.pdf")]) == 0

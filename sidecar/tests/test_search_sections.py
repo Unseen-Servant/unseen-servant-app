@@ -246,3 +246,41 @@ def test_a_hit_whose_span_did_not_widen_keeps_its_page_labels(
     r = _search(section_client_legacy, query="kraken")["results"]
     assert (r[0]["page_start"], r[0]["page_end"]) == (10, 10)
     assert r[0]["page_label_start"] == "326" and r[0]["page_label_end"] == "326"
+
+
+def test_cross_edition_twin_collapses_into_also_in(client, test_collection, monkeypatch):
+    """Two editions of the same rule (identical matched_text, same leaf
+    title, different files) are one result with the twin in `also_in`
+    (roadmap 2.3) — no parents/sections needed, same as the no-parents
+    fixture above."""
+    twins = [
+        ("u-51", "You create three glowing darts of magical force.",
+         {"parent_id": "p-51", "section_id": "s_51", "section_path": "",
+          "filename": "SRD_5.1.pdf", "source": "/l/SRD_5.1.pdf",
+          "game_system": "5e", "section_heading": "Spells > Magic Missile",
+          "page_start": 1, "page_end": 1,
+          "page_label_start": "", "page_label_end": ""}),
+        ("u-521", "You create three glowing darts of magical force.",
+         {"parent_id": "p-521", "section_id": "s_521", "section_path": "",
+          "filename": "SRD_5.2.1.pdf", "source": "/l/SRD_5.2.1.pdf",
+          "game_system": "5e", "section_heading": "Spells > Magic Missile",
+          "page_start": 1, "page_end": 1,
+          "page_label_start": "", "page_label_end": ""}),
+    ]
+    test_collection.add(
+        ids=[u[0] for u in twins],
+        documents=[u[1] for u in twins],
+        metadatas=[u[2] for u in twins],
+    )
+    fake = {
+        "ids": [[u[0] for u in twins]],
+        "documents": [[u[1] for u in twins]],
+        "metadatas": [[u[2] for u in twins]],
+        "distances": [[0.1, 0.2]],
+    }
+    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+
+    r = _search(client, query="magic missile", rerank=False)["results"]
+    assert len(r) == 1
+    assert len(r[0]["also_in"]) == 1
+    assert r[0]["also_in"][0]["filename"] == "SRD_5.2.1.pdf"

@@ -226,6 +226,7 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
                 **metrics.rank_metrics(g["rels"]),
                 "payload_chars": g["payload_chars"],
                 "dup_sections@10": g["dup_sections@10"],
+                "dup_titles@10": g["dup_titles@10"],
                 "top3_fit@8k": g["top3_fit@8k"],
             },
             "latency_ms": resp.latency_ms,

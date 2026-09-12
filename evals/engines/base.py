@@ -72,6 +72,10 @@ class SearchResult:
     # roadmap 2.1, where ``text`` became the assembled section). Graded
     # text is unchanged — ``grading_text`` still reads heading + body.
     matched_text: str = ""
+    # Cross-edition twins folded in by the engine's near-dup collapse
+    # (roadmap 2.3), each `{"filename","source","page_start","page_end",
+    # "page_label_start","page_label_end","section_id"}`.
+    also_in: list[dict] = field(default_factory=list)
 
     @property
     def grading_text(self) -> str:

@@ -14,8 +14,17 @@ srd_5_1 slice stays comparable.
 from __future__ import annotations
 
 import re
+import sys
+from pathlib import Path
 
 from evals.engines.base import SearchResponse, SearchResult
+
+# leaf_title lives in sidecar/near_dup.py (roadmap 2.3). APPEND (never
+# insert): both the repo root and sidecar/ contain a package named
+# `evals`, and the top-level one — this harness — must keep winning the
+# import race (same pattern as evals/engines/v2.py._import_sidecar).
+sys.path.append(str(Path(__file__).resolve().parents[2] / "sidecar"))
+from near_dup import leaf_title  # noqa: E402
 
 
 def normalize(text: str) -> str:
@@ -106,6 +115,24 @@ def dup_sections_at(results: list[SearchResult], k: int = 10) -> int:
     return dups
 
 
+def dup_titles_at(results: list[SearchResult], k: int = 10) -> int:
+    """Cross-edition twins among the top k: a result whose `leaf_title`
+    matches an earlier one's from a DIFFERENT file — the user-visible
+    duplicate `dup_sections@10` cannot see, because it keys on the full
+    breadcrumb and an SRD 5.1/5.2.1 twin never shares that key. An empty
+    `leaf_title` (an un-headed result, a normal pipeline output) never
+    counts — "" == "" is not "same leaf_title"."""
+    top = results[:k]
+    seen: list[tuple[str, str]] = []  # (leaf_title, filename) so far
+    dups = 0
+    for r in top:
+        title = leaf_title(r.section_heading)
+        if title and any(t == title and fn != r.filename for t, fn in seen):
+            dups += 1
+        seen.append((title, r.filename))
+    return dups
+
+
 def grade_response(response: SearchResponse, query: dict, doc_filename: str | set[str] | None) -> dict:
     """Judge one response: the relevance vector plus cost signals."""
     if query.get("category") == "cross_page":
@@ -122,6 +149,7 @@ def grade_response(response: SearchResponse, query: dict, doc_filename: str | se
         "rels": rels,
         "payload_chars": response.payload_chars,
         "dup_sections@10": dup_sections_at(response.results, 10),
+        "dup_titles@10": dup_titles_at(response.results, 10),
         "top3_fit@8k": top3_fits(response),
         # secondary: did the anchor-relevant hit also land on the GT page(s)?
         "page_hit": any(
