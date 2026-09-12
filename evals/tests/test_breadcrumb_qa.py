@@ -77,17 +77,23 @@ def test_residue_lists_the_most_frequent_flawed_headings():
     assert r["furniture_root"] == []
 
 
-def test_regressions_flag_a_rate_that_rose_on_any_doc():
-    ref = {"osric_2e": {"markup_rate": 0.0, "split_letter_rate": 0.0},
-           "all": {"markup_rate": 0.0, "split_letter_rate": 0.0}}
-    cur = {"osric_2e": {"markup_rate": 0.0, "split_letter_rate": 0.02},
-           "all": {"markup_rate": 0.0, "split_letter_rate": 0.001}}
+def test_regressions_flag_a_count_that_rose_on_any_doc():
+    ref = {"osric_2e": {"markup": 0, "split_letter": 0},
+           "all": {"markup": 0, "split_letter": 0}}
+    cur = {"osric_2e": {"markup": 0, "split_letter": 2},
+           "all": {"markup": 0, "split_letter": 1}}
     regs = regressions(cur, ref)
     assert {(r["doc"], r["flaw"]) for r in regs} == {("osric_2e", "split_letter"), ("all", "split_letter")}
 
 
 def test_regressions_ignore_docs_missing_on_either_side():
-    assert regressions({"a": {"markup_rate": 0.5}}, {"b": {"markup_rate": 0.0}}) == []
+    assert regressions({"a": {"markup": 5}}, {"b": {"markup": 0}}) == []
+
+
+def test_regressions_ignore_a_rate_rise_with_equal_counts():
+    ref = {"osric_2e": {"markup": 3, "markup_rate": 0.0025}}
+    cur = {"osric_2e": {"markup": 3, "markup_rate": 0.0026}}
+    assert regressions(cur, ref) == []
 
 
 def test_split_letter_ignores_letters_joined_by_dashes_apostrophes_or_die_percent():

@@ -419,7 +419,7 @@ def main() -> int:
     ap.add_argument("--gate", type=Path, default=None,
                     help="reference baseline .json; retrieval blocks headline scope regressions, "
                          "extraction blocks any per-page metric regression, breadcrumb-qa blocks "
-                         "any per-doc flaw-rate rise")
+                         "any per-doc flaw count rise")
     args = ap.parse_args()
 
     if args.suite == "retrieval":

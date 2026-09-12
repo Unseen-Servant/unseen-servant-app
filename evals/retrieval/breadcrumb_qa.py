@@ -114,16 +114,15 @@ def residue(doc_id: str, chunks: list[dict], per_flaw: int = 8) -> dict[str, lis
 
 
 def regressions(current: dict, reference: dict, tol: float = 1e-6) -> list[dict]:
-    """Fail closed: any per-doc flaw rate that rose vs the reference."""
+    """Fail closed: any per-doc flaw count that rose vs the reference."""
     out = []
     for doc, ref in reference.items():
         cur = current.get(doc)
         if cur is None:
             continue
         for f in FLAWS:
-            key = f"{f}_rate"
-            if key in ref and key in cur and cur[key] > ref[key] + tol:
-                out.append({"doc": doc, "flaw": f, "ref": ref[key], "cur": cur[key]})
+            if f in ref and f in cur and cur[f] > ref[f]:
+                out.append({"doc": doc, "flaw": f, "ref": ref[f], "cur": cur[f]})
     return out
 
 

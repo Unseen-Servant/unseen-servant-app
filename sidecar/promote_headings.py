@@ -158,12 +158,16 @@ def collect_heading_signatures(
     return rows
 
 
-def build_font_cluster_levels(rows: list[dict]) -> dict:
+def build_font_cluster_levels(rows: list[dict], min_root_count: int = 2) -> dict:
     """Map each (size, bold) signature → promoted level.
 
     Modal cluster stays at level 2; larger clusters get level 1 (top
     cluster) or level 2 (the rest); smaller clusters get distinct
-    descending levels 3, 4, 5, 6 (capped at 6).
+    descending levels 3, 4, 5, 6 (capped at 6). A signature seen fewer
+    than ``min_root_count`` times cannot own level 1 — a one-off larger
+    signature (a front-matter footer, say) is demoted to level 2 rather
+    than crowning it the root; the top cluster with ≥ ``min_root_count``
+    rows takes level 1 instead.
     """
     hist = Counter(r["sig"] for r in rows if r["sig"] is not None)
     if not hist:
@@ -178,13 +182,10 @@ def build_font_cluster_levels(rows: list[dict]) -> dict:
     larger_than_modal = [s for s in sorted_sigs_desc if s[0] > modal_size or (s[0] == modal_size and s[1] and not modal_bold)]
     smaller_than_modal = [s for s in sorted_sigs_desc if s[0] < modal_size or (s[0] == modal_size and not s[1] and modal_bold)]
 
-    larger_count = len(larger_than_modal)
-    if larger_count >= 2:
-        level_by_sig[larger_than_modal[0]] = 1
-        for s in larger_than_modal[1:]:
-            level_by_sig[s] = 2
-    elif larger_count == 1:
-        level_by_sig[larger_than_modal[0]] = 1
+    eligible = [s for s in larger_than_modal if hist[s] >= min_root_count]
+    root = eligible[0] if eligible else None
+    for s in larger_than_modal:
+        level_by_sig[s] = 1 if s == root else 2
 
     level_by_sig[modal_sig] = 2
 
@@ -208,11 +209,23 @@ def build_toc_levels(
 ) -> dict:
     """Match each TOC entry to a heading row by page + token-overlap.
 
-    Returns {(page_number, line_idx): toc_level} for matched rows.
+    Levels are relative to the *effective* top depth — the shallowest
+    depth with ≥ 2 entries (a lone depth-1 book title doesn't count as
+    the book's real top level; falls back to the shallowest depth
+    present when no depth has 2+ entries). An entry at the effective
+    depth reports level 1; entries shallower than it (the lone book
+    title) are skipped.
+
+    Returns {(page_number, line_idx): relative_level} for matched rows,
+    plus the effective depth used.
     """
     by_page_idx: dict[tuple[int, int], int] = {}
     if not toc_entries:
-        return {"level_by_row": by_page_idx, "matched": 0, "total": len(rows)}
+        return {"level_by_row": by_page_idx, "matched": 0, "total": len(rows), "effective_depth": 1}
+
+    depth_counts = Counter(int(e[0]) for e in toc_entries if len(e) >= 3)
+    effective_depth = next((d for d in sorted(depth_counts) if depth_counts[d] >= 2),
+                           min(depth_counts) if depth_counts else 1)
 
     rows_by_page: dict[int, list[dict]] = {}
     for r in rows:
@@ -238,11 +251,14 @@ def build_toc_levels(
                 if overlap > best_overlap:
                     best, best_overlap = r, overlap
             if best is not None and best_overlap > 0:
-                by_page_idx[(best["page_number"], best["line_idx"])] = int(toc_level)
-                matched += 1
+                rel = int(toc_level) - effective_depth + 1
+                if rel >= 1:
+                    by_page_idx[(best["page_number"], best["line_idx"])] = rel
+                    matched += 1
                 break
 
-    return {"level_by_row": by_page_idx, "matched": matched, "total": len(rows)}
+    return {"level_by_row": by_page_idx, "matched": matched, "total": len(rows),
+            "effective_depth": effective_depth}
 
 
 def _rewrite_page_md(
@@ -388,5 +404,6 @@ def promote_markdown(
         "promoted_level_distribution": dict(level_distribution),
         "font_histogram": font_info["histogram"],
         "modal_sig": font_info.get("modal_sig"),
+        "toc_effective_depth": toc_info["effective_depth"],
     }
     return new_pages, report

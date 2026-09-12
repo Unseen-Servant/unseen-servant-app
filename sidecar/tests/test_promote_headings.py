@@ -8,6 +8,7 @@ based on per-document font histograms and (optionally) TOC entries.
 from promote_headings import (
     _rewrite_page_md,
     build_font_cluster_levels,
+    build_toc_levels,
     collect_heading_signatures,
     is_junk_heading,
     promote_markdown,
@@ -37,6 +38,8 @@ def test_promote_unknown_strategy_raises():
 def test_font_cluster_promotes_three_clusters():
     """Three distinct (size, bold) clusters → modal stays at level 2,
     the larger cluster becomes level 1, the smaller becomes level 3.
+    The larger cluster needs ≥ 2 rows to own level 1 — a singleton
+    can't be the root — so there are two 24pt headings here.
 
     Heading words must be distinct across font sizes — the token-
     overlap signature matcher picks the largest-font matching span,
@@ -45,6 +48,7 @@ def test_font_cluster_promotes_three_clusters():
     """
     md = (
         "## Foreword\n\nBody.\n\n"
+        "## Prologue\n\nBody.\n\n"
         "## Spells\n\nBody.\n\n"
         "## Monsters\n\nBody.\n\n"
         "## Items\n\nBody.\n\n"
@@ -53,6 +57,7 @@ def test_font_cluster_promotes_three_clusters():
     pages = [{"page_number": 1, "markdown": md}]
     spans = [
         ("Foreword", 24.0, True),
+        ("Prologue", 24.0, True),
         ("Spells", 18.0, True),
         ("Monsters", 18.0, True),
         ("Items", 18.0, True),
@@ -64,11 +69,12 @@ def test_font_cluster_promotes_three_clusters():
     )
     out = promoted[0]["markdown"]
     assert "# Foreword" in out and "## Foreword" not in out
+    assert "# Prologue" in out
     assert "## Spells" in out
     assert "## Monsters" in out
     assert "## Items" in out
     assert "### Footnote" in out
-    assert report["promoted_level_distribution"][1] == 1
+    assert report["promoted_level_distribution"][1] == 2
     assert report["promoted_level_distribution"][2] == 3
     assert report["promoted_level_distribution"][3] == 1
 
@@ -94,14 +100,16 @@ def test_font_cluster_modal_stays_at_level_two():
 
 def test_toc_strategy_uses_toc_entry_depth():
     """When the TOC has a depth-1 entry that token-overlaps a heading
-    on the same page, promote that heading to level 1."""
+    on the same page, promote that heading to level 1. A second depth-1
+    entry (unmatched here) makes depth 1 the effective top depth via the
+    ≥ 2 rule, not the single-entry fallback."""
     md = "## Chapter One\n\nIntro."
     pages = [{"page_number": 1, "markdown": md}]
     spans_pages = [{
         "page_number": 1,
         "spans": _spans([("Chapter One", 18.0, True)]),
     }]
-    toc = {"entries": [[1, "Chapter One", 1]]}
+    toc = {"entries": [[1, "Chapter One", 1], [1, "Chapter Two", 20]]}
     promoted, _ = promote_markdown(pages, spans_pages, toc, strategy="toc")
     assert "# Chapter One" in promoted[0]["markdown"]
 
@@ -122,8 +130,12 @@ def test_toc_then_font_depth_two_falls_through_to_font():
     }]
     # Cloud Dragon Age Table is depth-2 in the TOC; under toc_then_font,
     # it must fall through to font_cluster (which puts both at modal
-    # level 2 since they share a font signature).
-    toc = {"entries": [[2, "Cloud Dragon Age Table", 1]]}
+    # level 2 since they share a font signature). Two depth-1 entries
+    # (unmatched here — they don't share a page with any row) pin the
+    # effective top depth at 1, so the depth-2 entry stays relative
+    # level 2, not the lone-depth-1 fallback that would make it "1".
+    toc = {"entries": [[1, "Front Matter", 50], [1, "Appendix", 60],
+                        [2, "Cloud Dragon Age Table", 1]]}
     promoted, report = promote_markdown(
         pages, spans_pages, toc, strategy="toc_then_font"
     )
@@ -136,14 +148,16 @@ def test_toc_then_font_depth_two_falls_through_to_font():
 def test_toc_then_font_depth_one_takes_precedence():
     """A TOC depth-1 entry overrides the font signature — chapter
     titles should land at level 1 even when font analysis would
-    place them differently."""
+    place them differently. A second depth-1 entry (unmatched here)
+    makes depth 1 the effective top depth via the ≥ 2 rule, not the
+    single-entry fallback."""
     md = "## Part 6: Monsters\n\nIntro."
     pages = [{"page_number": 1, "markdown": md}]
     spans_pages = [{
         "page_number": 1,
         "spans": _spans([("Part 6: Monsters", 14.0, True)]),
     }]
-    toc = {"entries": [[1, "Part 6: Monsters", 1]]}
+    toc = {"entries": [[1, "Part 6: Monsters", 1], [1, "Part 7: Treasure", 30]]}
     promoted, report = promote_markdown(
         pages, spans_pages, toc, strategy="toc_then_font"
     )
@@ -223,18 +237,27 @@ def test_rows_are_sanitised_before_signatures():
 
 
 def test_promote_rewrites_a_merged_line_as_two_headings():
-    # Two 13.9pt rows make that signature the modal cluster (level 2); the
-    # lone 18pt part is then the larger cluster and lands at level 1.
-    md = "# **Halfling Halflin Traits** **<u>g</u>**\n\nBody.\n\n## Elf Traits\n\nMore.\n\n## Dwarf Traits\n\nEnd."
+    # The 18pt part needs a second row (added below as "# Dwarf") to keep
+    # level 1 — a singleton signature can't be the root. That makes the
+    # 18pt cluster 2 rows, so the 13.9pt cluster needs a third ("Orc
+    # Traits", alongside "Elf Traits" and "Gnome Traits") to stay
+    # strictly larger and keep the modal (level 2) slot. "Dwarf" is kept
+    # out of every 13.9pt heading's text — a shared word across sizes
+    # makes the token-overlap signature matcher pick the larger span for
+    # both headings, mis-promoting the smaller one.
+    md = ("# **Halfling Halflin Traits** **<u>g</u>**\n\nBody.\n\n## Elf Traits\n\nMore.\n\n"
+          "## Gnome Traits\n\nMore.\n\n## Orc Traits\n\nEnd.\n\n# Dwarf\n\nBody.")
     pages = [{"page_number": 1, "markdown": md}]
     spans_pages = [{"page_number": 1, "spans": _spans([
         ("Halfling ", 18.0, True), ("Halfling Traits ", 13.9, True), ("Elf Traits", 13.9, True),
-        ("Dwarf Traits", 13.9, True), ("body", 9.8, False)])}]
+        ("Gnome Traits", 13.9, True), ("Orc Traits", 13.9, True), ("body", 9.8, False),
+        ("Dwarf ", 18.0, True)])}]
     promoted, _ = promote_markdown(pages, spans_pages, {"entries": []}, strategy="font_cluster")
     lines = promoted[0]["markdown"].split("\n")
     assert lines[0] == "# Halfling"
     assert lines[1] == "## Halfling Traits"
     assert "## Elf Traits" in lines
+    assert "# Dwarf" in lines
 
 
 def test_promote_strips_markup_and_small_caps_from_every_heading():
@@ -281,6 +304,33 @@ def test_sub_modal_signatures_get_distinct_levels():
     rows = [{"sig": (12.0, True)}] * 5 + [{"sig": (10.0, True)}] * 2 + [{"sig": (9.0, True)}] * 2 + [{"sig": (8.0, False)}]
     out = build_font_cluster_levels(rows)
     assert out["level_by_sig"] == {(12.0, True): 2, (10.0, True): 3, (9.0, True): 4, (8.0, False): 5}
+
+
+def test_singleton_largest_signature_is_not_the_root():
+    rows = [{"sig": (30.0, True)}] + [{"sig": (24.0, True)}] * 3 + [{"sig": (11.0, True)}] * 10
+    out = build_font_cluster_levels(rows)
+    assert out["level_by_sig"][(24.0, True)] == 1
+    assert out["level_by_sig"][(30.0, True)] == 2
+    assert out["level_by_sig"][(11.0, True)] == 2
+
+
+def test_toc_effective_depth_shifts_when_depth_one_is_a_lone_book_title():
+    rows = [
+        {"page_number": 3, "line_idx": 0, "original_level": 1, "text": "Contributors", "sig": None},
+        {"page_number": 15, "line_idx": 0, "original_level": 1, "text": "Combat", "sig": None},
+    ]
+    toc = [[1, "OSRIC", 1], [2, "Contributors", 3], [2, "Combat", 15], [3, "Initiative", 16]]
+    out = build_toc_levels(rows, toc)
+    assert out["effective_depth"] == 2
+    assert out["level_by_row"] == {(3, 0): 1, (15, 0): 1}
+
+
+def test_toc_effective_depth_is_one_when_depth_one_has_chapters():
+    rows = [{"page_number": 5, "line_idx": 0, "original_level": 1, "text": "Combat", "sig": None}]
+    toc = [[1, "Characters", 1], [1, "Combat", 5], [2, "Initiative", 6]]
+    out = build_toc_levels(rows, toc)
+    assert out["effective_depth"] == 1
+    assert out["level_by_row"] == {(5, 0): 1}
 
 
 def test_unmatched_heading_never_becomes_a_root():

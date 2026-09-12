@@ -228,7 +228,10 @@ def test_promotion_anchors_stat_block_subsection_to_parent():
     title heading at the largest font, multiple monster-name
     headings at the modal font (so they constitute the modal
     cluster), and per-monster sub-section headings at the smaller
-    font.
+    font. A second, off-page "Monsters" heading keeps the chapter
+    title's signature at 2 rows — a signature seen once can't own
+    level 1 (v2 retrieval Phase 1 furniture-roots rule) — without
+    touching the chunked page itself.
     """
     md = (
         "## Monsters\n\nThe creatures of the world.\n\n"
@@ -239,7 +242,10 @@ def test_promotion_anchors_stat_block_subsection_to_parent():
         "## Legendary Actions\n\nThe kraken can submerge.\n\n"
         "## Lich\n\nA lich is an undead spellcaster."
     )
-    pages = [{"page_number": 1, "markdown": md}]
+    pages = [
+        {"page_number": 1, "markdown": md},
+        {"page_number": 2, "markdown": "## Monsters\n\nSee page 1."},
+    ]
     spans_pages = [{
         "page_number": 1,
         "spans": [
@@ -253,6 +259,9 @@ def test_promotion_anchors_stat_block_subsection_to_parent():
             {"text": "Legendary Actions", "size": 12.0, "bold": True},
             {"text": "Legendary Actions", "size": 12.0, "bold": True},
         ],
+    }, {
+        "page_number": 2,
+        "spans": [{"text": "Monsters", "size": 24.0, "bold": True}],
     }]
     toc = {"entries": []}
     promoted, _report = promote_markdown(
