@@ -120,7 +120,7 @@ p50 1 464 ms. From the 07-10 ablation, rerank-off runs at ~195 ms mean vs ~1 400
 2. **One reindex, batched.** Everything index-side (headings, `section_id`, `pipeline_version`, page spans) lands together; Jerome triggers it. Query-time work is measured with `--no-index` in minutes.
 3. **A knob must work on real, unlabeled queries** to ship default-on; otherwise it ships as a flag. Hybrid must pay unconditioned.
 4. **A harness GO is necessary, not sufficient, for anything the user sees in the list.** Rerank, ordering, dedupe and tier changes are checked on the real library (`library_probe.py` + Jerome's own search) before the default flips; the knob stays.
-5. **Gate on the worst scope and the worst page, not the mean.** `--gate` per scope for retrieval, per page for extraction (which must stay byte-identical: this roadmap does not touch extraction).
+5. **Gate on the worst scope and the worst page, not the mean.** `--gate` per scope for retrieval, per page for extraction (whose per-page metrics must not regress: this roadmap does not touch the pymupdf4llm call, only promotion and cleanup downstream of it).
 6. **One commit, one baseline.** Every rung commits its `evals/baselines/<date>-v2-<rung>.*`.
 
 ---
@@ -151,7 +151,7 @@ Targets [#367](https://github.com/Unseen-Servant/unseen-legend-lore/issues/367),
 | 1.4 | **`pipeline_version` read back** ([#15](2026-07-01-retrieval-pipeline-improvement-roadmap.md)/R5): written to the manifest at index time, compared in `/api/index-status`, surfaced as "N files indexed with an older pipeline — re-index" in Library settings. Ships with this reindex so the fix actually reaches indexed libraries. | test: bump version → status reports stale; UI banner |
 | 1.5 | Riding the reindex: tighten prose page-spans (heading-sparse runs stamp every chunk with the whole span, `chunker.py:139`). | page spans per chunk ≤ the pages the chunk's text touches |
 | 1.6 | **Persisted FTS5 index for hybrid search** (replaces `lexical.py`'s in-memory BM25 rebuilt from a full collection scan on first use, S5). One `unit_fts` table in the parents SQLite (porter, unicode61), written per document inside the same staged/atomic commit as the Chroma upsert, deleted with the source; row text = the *sanitised* breadcrumb + unit text, exactly what the embedder sees (v3 rung 5's precondition). Metadata columns (`source`, `filename`, `game_system`, `parent_id`) so the dense `where` scope applies to the lexical side without a Python filter. | FTS row count = unit count per source after index/delete/rename; scope parity test (a source-filtered FTS query never returns another file); first-search cost after boot ≤ 50 ms (no rebuild) |
-| 1.7 | **Reindex the eval corpus; baseline `v2-headings`.** | retrieval: no scope regresses vs phase0b; single and uncued expected up (the v3 ladder's +0.205 was heading quality); extraction gate byte-identical; breadcrumb-qa on the real library after Jerome reindexes: markup ≤ 2 %, furniture roots 0 |
+| 1.7 | **Reindex the eval corpus; baseline `v2-headings`.** | retrieval: no scope regresses vs phase0b; single and uncued expected up (the v3 ladder's +0.205 was heading quality); extraction gate: no per-page regression (promotion/cleanup output changes; the pymupdf4llm call does not); breadcrumb-qa on the real library after Jerome reindexes: markup ≤ 2 %, furniture roots 0 |
 
 ### Phase 2 — Query-time structure (≈ 1 week, no reindex)
 
@@ -200,19 +200,19 @@ Two independent swaps, both lifted from `sidecar-v3/index/` where they already p
 
 | gate | bar | why |
 |---|---|---|
-| auto all MRR@5 | ≥ 0.82 (phase0b 0.766; was ≥ 0.75 against 08-15's 0.701) | the ladder's bricks are worth more than this on a clean base |
-| auto single MRR@5 | ≥ 0.82 (phase0b 0.753) | section parents fix the four stat-block "misses" |
-| auto cued MRR@5 | ≥ 0.72 (phase0b 0.632) | boost-after-rerank + clean breadcrumbs; v3 reached 0.675 on scrambled extraction |
+| auto all MRR@5 | ≥ 0.82 (headings 0.790; phase0b 0.766) | the ladder's bricks are worth more than this on a clean base |
+| auto single MRR@5 | ≥ 0.82 (headings 0.767) | section parents fix the four stat-block "misses" |
+| auto cued MRR@5 | ≥ 0.72 (headings 0.701) | boost-after-rerank + clean breadcrumbs; v3 reached 0.675 on scrambled extraction |
 | keyword-style MRR@5 | ≥ nl-style + 0.03, and ≥ 0.85 (phase0b 0.810 / nl 0.722) | hybrid is default-on; lexical must show up where it is supposed to |
 | **human** single MRR@5 (blind) | ≥ 0.90 (phase0b 0.87; auto 0.75) | the metric that inverted two verdicts |
 | readable@5 (blind) | ≥ 0.98 (phase0b 0.965: 12 garbled chunks, all torn tables or a prose chunk cut from its table) | scored for v2 on 2026-09-09; the bar sits above the base so Phase 1/2 must not tear tables further |
-| cross_page MRR@5 | ≥ 0.75 (phase0b 0.417; recall@10 is already 1.0 under the 08-29 evidence-set grading) | section parents put the whole stat block in one result |
+| cross_page MRR@5 | ≥ 0.75 (headings 0.354; phase0b 0.417) | section parents put the whole stat block in one result |
 | dup_sections@10, uncued | < 0.1 (0.35) | edition twin |
-| warm p50 / p95 | ≤ 500 ms / ≤ 1 s (phase0b 1 274 / 1 706) | single-pass blended rerank + no N+1 |
+| warm p50 / p95 | ≤ 500 ms / ≤ 1 s (phase0b 1 274 / 1 706; headings p50 1 094) | single-pass blended rerank + no N+1 |
 | payload @ 8 000-char budget | ≤ 8 000, top-3 intact | 4B-model consumer |
-| breadcrumb QA, real library | markup ≤ 2 %, furniture roots 0, split letters 0 | #367 / #328 |
+| breadcrumb QA, real library | markup ≤ 2 %, furniture roots 0, split letters 0; eval corpus 2026-09-11: markup 0, mixed_case 0, split ≤ 1 %, furniture ≤ 1 % on all 7 books; real library pending reindex | #367 / #328 |
 | tiers, real library | ≤ 35 % `strong` | #366 |
-| golden extraction gate | byte-identical to `2026-08-31-v2-extraction` | this roadmap does not touch extraction |
+| golden extraction gate | no per-page regression vs 2026-08-31-v2-extraction (promotion/cleanup output changes; the pymupdf4llm call does not) | the extraction adapter grades post-promotion text |
 | library tier + probe | top-1 correct on all queries; no regression vs its first baseline | the confusable regime |
 
 
@@ -257,3 +257,5 @@ Reindexes are triggered by Jerome, as before. Each rung is one commit with its b
 | Hybrid search ships default-on, with v3's recipe; the harness sets the weight | keyword queries are a first-class entry mode; the 07-09 NO-GO tested the weakest recipe (1:1, no stopword strip, per-boot in-memory index); v3's unconditioned recipe paid on both styles (+0.029 all, keyword +0.048) | the sweep finds no non-regressing weight → ship the best one and record it; query-shape conditioning stays rejected (real-query rule) |
 | Two-tier eval corpus (committed CC + local-only library tier) | the confusable regime cannot be committed; anchors + PDF hashes can | — |
 | Store (Chroma → sqlite-vec) and runtime (Ollama → ONNX) swaps are Phase 5, decided at the end of Phase 3 | the bricks that move relevance are store- and runtime-agnostic; swapping mid-ladder confounds baselines; both swaps are vector migrations, not reindexes, so deferring costs users nothing; Chroma's licence (Apache-2.0) is not a driver, its metadata/transaction limits and footprint are | p50 > 500 ms, a Chroma limitation leaks into shipped behaviour, package size/first launch becomes the complaint, or Ollama onboarding pain |
+| Phase 1 landed 2026-09-12 (commits bfcf2c1..15a9f74 + fix wave) | heading sanitation + promotion quality landed and the eval corpus was reindexed; breadcrumb-qa 2026-09-02 → 2026-09-11: markup 0.903 → 0, mixed_case 0.258 → 0, split_letter 0.317 → ≤ 0.010 (srd_5_1 13, srd_5_2_1 7, osric_2e 28, others 0; residue is legitimate single-letter words, spell components, OSRIC drop-caps), furniture_root 0.239 → ≤ 0.009 (osric_2e 23/2671 its own contents pages, bfrpg 3, yze 2, others 0; OSRIC's 2664/2706 footer root gone) — every book's top root is now a chapter title; retrieval `2026-09-12-v2-headings` vs `2026-09-02-v2-phase0b`: all MRR@5 0.766 → 0.790, single 0.753 → 0.767, cued 0.632 → 0.701, uncued 0.942 → 0.925, cross_page 0.417 → 0.354, recall@3 all 0.868 → 0.868, p50 1 274 → 1 094 ms, top3_fit@8k 0.838; gate FAILED on two rows (single recall@3 0.875 → 0.833, q041 rank 3 → 4, sibling dragon stat blocks; uncued mrr@5 0.942 → 0.925, q063 rank 1 → 2, OSRIC's now-clean `CHAPTER VI: TREASURE > MAGIC SWORDS` edges the 5.2.1 weapons table) against 10 per-query improvements and 5 one-rank regressions, inside a measured ≈ 0.01–0.02 run-to-run noise floor (two reruns of identical code scored all 0.798 and 0.790); controller ruling: **ACCEPTED** as the Phase 1 reference — the failing rows are single-query moves at the noise floor whose causes are Phase 2 (section parents) and Phase 3 (hybrid) work, and the gate stays fail-closed for ranking rungs; blind round on `2026-09-12-v2-headings` is generated but not yet scored | the blind round's readable@5 drops below 0.965 or the real-library probe shows furniture roots |
+| Heading oracle = the page's own spans; no staleness cap; count-based breadcrumb gate | 2026-09-09 probe: the page's own text is a reliable oracle for rejoining split headings, so no TOC/vocabulary fallback was needed; heading-span measurement: p99 = 2 pages, max 16 — the tail is legitimate 4–5-page leaf sections, not staleness, so no cap was built; breadcrumb-qa's regression gate compares per-doc flaw counts, not rates, because denominators move when sections merge or split across a heading change; the junk-shape rule (titles with ≥ 2 numbers or > 80 chars) has known false positives but caused no corpus damage in Phase 1 — watch `junk=` in the `[promote]` log on the real library | a book's spans are themselves scrambled (then a TOC/vocabulary fallback is the next rule), or a childless heading > 10 pages appears on the real library |

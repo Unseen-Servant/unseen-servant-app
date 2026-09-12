@@ -59,7 +59,7 @@ Phase 0 deferred three harness minors that matter now: `_MARKUP` misses a single
 - Test: `evals/tests/test_breadcrumb_qa.py`, `evals/tests/test_run_eval.py`
 
 **Interfaces:**
-- Produces: `breadcrumb_qa.residue(doc_id, chunks, per_flaw=8) -> dict[str, list[tuple[str, int]]]` — flaw → most frequent flawed headings with counts. `breadcrumb_qa.regressions(current_by_doc, reference_by_doc, tol=1e-6) -> list[dict]` — `{doc, flaw, ref, cur}` for every per-doc `<flaw>_rate` that rose. Baseline JSON gains `"residue": {doc_id: {flaw: [[heading, n], ...]}}`.
+- Produces: `breadcrumb_qa.residue(chunks, per_flaw=8) -> dict[str, list[tuple[str, int]]]` — flaw → most frequent flawed headings with counts. `breadcrumb_qa.regressions(current_by_doc, reference_by_doc) -> list[dict]` — `{doc, flaw, ref, cur}` for every per-doc `<flaw>` count that rose. Baseline JSON gains `"residue": {doc_id: {flaw: [[heading, n], ...]}}`.
 
 - [ ] **Step 1: Write the failing detector tests**
 
@@ -80,7 +80,7 @@ def test_residue_lists_the_most_frequent_flawed_headings():
     chunks = [{"section_heading": "**S eed** **<u>p</u>** > **Goblin**"}] * 3 \
         + [{"section_heading": "chaRacteR RaceS > Elves"}] * 2 \
         + [{"section_heading": "Combat > Grappling"}]
-    r = residue("srd", chunks, per_flaw=5)
+    r = residue(chunks, per_flaw=5)
     assert r["markup"][0] == ("**S eed** **<u>p</u>** > **Goblin**", 3)
     assert r["split_letter"][0][1] == 3
     assert r["mixed_case"] == [("chaRacteR RaceS > Elves", 2)]
@@ -117,7 +117,7 @@ _MARKUP = re.compile(r"\*+|(?<!\w)_+|_+(?!\w)|</?[a-z][a-z0-9]*(?:\s[^>]*)?>|`|^
 ```
 
 ```python
-def residue(doc_id: str, chunks: list[dict], per_flaw: int = 8) -> dict[str, list[tuple[str, int]]]:
+def residue(chunks: list[dict], per_flaw: int = 8) -> dict[str, list[tuple[str, int]]]:
     """Per flaw, the most frequent headings that carry it — what a fix
     would have to handle next. Keys are every flaw, empty when clean."""
     counts: dict[str, Counter] = {f: Counter() for f in FLAWS}
@@ -128,17 +128,16 @@ def residue(doc_id: str, chunks: list[dict], per_flaw: int = 8) -> dict[str, lis
     return {f: counts[f].most_common(per_flaw) for f in FLAWS}
 
 
-def regressions(current: dict, reference: dict, tol: float = 1e-6) -> list[dict]:
-    """Fail closed: any per-doc flaw rate that rose vs the reference."""
+def regressions(current: dict, reference: dict) -> list[dict]:
+    """Fail closed: any per-doc flaw count that rose vs the reference."""
     out = []
     for doc, ref in reference.items():
         cur = current.get(doc)
         if cur is None:
             continue
         for f in FLAWS:
-            key = f"{f}_rate"
-            if key in ref and key in cur and cur[key] > ref[key] + tol:
-                out.append({"doc": doc, "flaw": f, "ref": ref[key], "cur": cur[key]})
+            if f in ref and f in cur and cur[f] > ref[f]:
+                out.append({"doc": doc, "flaw": f, "ref": ref[f], "cur": cur[f]})
     return out
 ```
 
@@ -930,6 +929,8 @@ Record `p50/p90/p99/max` and the 15 worst leaves in the task report.
 
 **Decision rule:** if `p99 ≤ 3` pages and the 15 worst are all under 10 pages, there is no tail — set `LEAF_PAGE_CAP = None`, skip Step 3, and record "no cap needed after Tasks 2–4" in the commit. Otherwise `N = ceil(p99)` and implement Step 3.
 
+*Outcome 2026-09-11: p99 = 2 pages, max 16; the tail was legitimate leaf sections, so no cap was built (ruling in the Phase 1 ledger).*
+
 - [ ] **Step 3 (conditional): Implement the cap in the chunker**
 
 In `sidecar/chunker.py`, add `LEAF_PAGE_CAP: int | None = <N>` under `HARD_CAP`, add the parameter `leaf_page_cap: int | None = LEAF_PAGE_CAP` to `structure_aware`, track `(level, text, page_pushed, had_child)` on the stack, and at the top of the `for page in pages:` loop:
@@ -1611,6 +1612,8 @@ OLLAMA_CONTEXT_LENGTH=8192 uv run --project sidecar python -m evals.run_eval --e
 ```
 
 Expected: gate passes (no scope's MRR@5 / recall@3 below phase0b); single and uncued expected up (v3's ladder put +0.205 on heading quality); cued not down. Record `by_scope` and `cross_page`, `top3_fit@8k`, p50 in the §8 row. If the gate fails, do **not** loosen it: run the per-query diff (`/Users/jay/.claude/jobs/d5944035/tmp/diff_phase0b.py` pattern — copy it into `evals/retrieval/diff_baselines.py` if it is still useful) and classify each regressed query as (a) breadcrumb now *more* specific and the anchor sits in a sibling section, (b) a page-span change moved the anchor page, or (c) ranking noise; report before deciding.
+
+*Outcome 2026-09-12: gate failed on two single-query rows (q041, q063); accepted by controller ruling — see roadmap §8.*
 
 - [ ] **Step 4: Blind sheet [Jerome scores]**
 

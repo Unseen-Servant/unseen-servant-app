@@ -70,7 +70,8 @@ uv run --project sidecar-v3 python -m evals.extraction.review \
 # a fix can see what it did not catch.
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa
 
-# A candidate heading change must not raise any per-doc flaw rate.
+# A candidate heading change must not raise any per-doc flaw count (the gate
+# compares raw counts, not rates — denominators move when sections merge).
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa \
     --gate evals/baselines/<last-committed>-v2-breadcrumb-qa.json
 
@@ -88,7 +89,7 @@ uv run --project sidecar-v3 pytest evals/tests
 | every golden page ≥ its reference score | `extraction/gate.py` (`--gate`, exit 1) | an extraction change that helps the mean and hurts a page |
 | anchor grade vs a human (Cohen's κ) | `blind/score.py` | trusting the automated number |
 | chunks a human can read (`readable@5`) | `blind/score.py` (the "garbled" tick) | calling a pipeline search-ready on anchors alone |
-| no per-doc breadcrumb flaw-rate rise | `breadcrumb_qa.regressions` (`--gate`, exit 1) | a heading change that helps the mean and hurts a book |
+| no per-doc breadcrumb flaw-count rise | `breadcrumb_qa.regressions` (`--gate`, exit 1) | a heading change that helps the mean and hurts a book |
 
 ## Suites
 
@@ -138,8 +139,7 @@ never a PDF. `--suite library --data-dir <app data dir>`; verify with
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
-The v2 reference for the 2026-09-02 roadmap is `2026-09-02-v2-phase0b` (tags + twin rule +
-budget column); gate against it, not `2026-08-15-v2-phase0`.
+The v2 reference for Phase 2+ is `2026-09-12-v2-headings`; gate against it, not phase0b.
 Every baseline records the corpus fingerprint, Git revision, and explicit query
 knobs. Retrieval baselines always use a fresh temporary index; exploratory
 reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a

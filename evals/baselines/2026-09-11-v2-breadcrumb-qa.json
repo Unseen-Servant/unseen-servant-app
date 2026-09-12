@@ -6,7 +6,7 @@
   },
   "by_doc": {
     "bfrpg_4e": {
-      "chunks": 1194,
+      "chunks": 1193,
       "markup": 0,
       "markup_rate": 0.0,
       "split_letter": 0,
@@ -14,22 +14,22 @@
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 3,
-      "furniture_root_rate": 0.002512562814070352,
+      "furniture_root_rate": 0.002514668901927913,
       "no_heading": 1,
-      "no_heading_rate": 0.0008375209380234506
+      "no_heading_rate": 0.0008382229673093043
     },
     "all": {
-      "chunks": 11099,
+      "chunks": 11092,
       "markup": 0,
       "markup_rate": 0.0,
       "split_letter": 48,
-      "split_letter_rate": 0.00432471393819263,
+      "split_letter_rate": 0.00432744320230797,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 28,
-      "furniture_root_rate": 0.002522749797279034,
+      "furniture_root_rate": 0.0025243418680129825,
       "no_heading": 5,
-      "no_heading_rate": 0.00045049103522839894
+      "no_heading_rate": 0.00045077533357374685
     },
     "black_hack_1e": {
       "chunks": 87,
@@ -58,11 +58,11 @@
       "no_heading_rate": 0.010869565217391304
     },
     "srd_5_1": {
-      "chunks": 3237,
+      "chunks": 3235,
       "markup": 0,
       "markup_rate": 0.0,
       "split_letter": 13,
-      "split_letter_rate": 0.004016064257028112,
+      "split_letter_rate": 0.00401854714064915,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 0,
@@ -71,11 +71,11 @@
       "no_heading_rate": 0.0
     },
     "srd_5_2_1": {
-      "chunks": 3445,
+      "chunks": 3444,
       "markup": 0,
       "markup_rate": 0.0,
       "split_letter": 7,
-      "split_letter_rate": 0.0020319303338171262,
+      "split_letter_rate": 0.0020325203252032522,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 0,
@@ -84,17 +84,17 @@
       "no_heading_rate": 0.0
     },
     "osric_2e": {
-      "chunks": 2674,
+      "chunks": 2671,
       "markup": 0,
       "markup_rate": 0.0,
       "split_letter": 28,
-      "split_letter_rate": 0.010471204188481676,
+      "split_letter_rate": 0.010482965181579932,
       "mixed_case": 0,
       "mixed_case_rate": 0.0,
       "furniture_root": 23,
-      "furniture_root_rate": 0.008601346297681375,
+      "furniture_root_rate": 0.008611007113440658,
       "no_heading": 1,
-      "no_heading_rate": 0.00037397157816005983
+      "no_heading_rate": 0.00037439161362785476
     },
     "yze_srd": {
       "chunks": 370,
@@ -113,7 +113,7 @@
   "docs": [
     {
       "doc": "bfrpg_4e",
-      "chunks": 1194,
+      "chunks": 1193,
       "markup": 0,
       "split_letter": 0,
       "mixed_case": 0,
@@ -130,7 +130,7 @@
         ],
         [
           "PART 8: GAME MASTER INFORMATION",
-          130
+          129
         ],
         [
           "PART 7: TREASURE",
@@ -206,7 +206,7 @@
     },
     {
       "doc": "srd_5_1",
-      "chunks": 3237,
+      "chunks": 3235,
       "markup": 0,
       "split_letter": 13,
       "mixed_case": 0,
@@ -215,11 +215,11 @@
       "top_roots": [
         [
           "Monsters",
-          1001
+          1000
         ],
         [
           "Spellcasting",
-          650
+          649
         ],
         [
           "Paired Items",
@@ -237,7 +237,7 @@
     },
     {
       "doc": "srd_5_2_1",
-      "chunks": 3445,
+      "chunks": 3444,
       "markup": 0,
       "split_letter": 7,
       "mixed_case": 0,
@@ -250,7 +250,7 @@
         ],
         [
           "Casting Spells",
-          526
+          525
         ],
         [
           "Classes",
@@ -268,7 +268,7 @@
     },
     {
       "doc": "osric_2e",
-      "chunks": 2674,
+      "chunks": 2671,
       "markup": 0,
       "split_letter": 28,
       "mixed_case": 0,
@@ -277,11 +277,11 @@
       "top_roots": [
         [
           "Monsters",
-          822
+          821
         ],
         [
           "CHAPTER II: Spells",
-          610
+          609
         ],
         [
           "CHAPTER VI: TREASURE",
@@ -293,7 +293,7 @@
         ],
         [
           "CHAPTER I: Creating a Character",
-          201
+          200
         ]
       ]
     },

@@ -1,0 +1,522 @@
+{
+  "meta": {
+    "engine": "v2",
+    "name": "extraction",
+    "date": "2026-09-11",
+    "docs": [
+      "bfrpg_4e",
+      "black_hack_1e",
+      "cairn_1e",
+      "osric_2e",
+      "srd_5_1",
+      "srd_5_2_1",
+      "yze_srd"
+    ],
+    "n_pages": 54
+  },
+  "by_kind": {
+    "prose": {
+      "pages": 16,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": null
+    },
+    "all": {
+      "pages": 54,
+      "content_recall": 0.9916666666666666,
+      "reading_order": 0.9777777777777779,
+      "table_cells": 0.9529761904761905
+    },
+    "table": {
+      "pages": 25,
+      "content_recall": 0.982,
+      "reading_order": null,
+      "table_cells": 0.9451388888888889
+    },
+    "two_column": {
+      "pages": 13,
+      "content_recall": 1.0,
+      "reading_order": 0.9641025641025641,
+      "table_cells": 1.0
+    }
+  },
+  "by_doc": {
+    "osric_2e": {
+      "pages": 10,
+      "content_recall": 0.975,
+      "reading_order": 1.0,
+      "table_cells": 0.95
+    },
+    "all": {
+      "pages": 54,
+      "content_recall": 0.9916666666666666,
+      "reading_order": 0.9777777777777779,
+      "table_cells": 0.9529761904761905
+    },
+    "cairn_1e": {
+      "pages": 5,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 0.9
+    },
+    "srd_5_1": {
+      "pages": 11,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 0.9027777777777778
+    },
+    "bfrpg_4e": {
+      "pages": 6,
+      "content_recall": 0.9666666666666667,
+      "reading_order": 0.85,
+      "table_cells": 1.0
+    },
+    "black_hack_1e": {
+      "pages": 7,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 0.9333333333333333
+    },
+    "srd_5_2_1": {
+      "pages": 10,
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 1.0
+    },
+    "yze_srd": {
+      "pages": 5,
+      "content_recall": 1.0,
+      "reading_order": 0.9166666666666667,
+      "table_cells": 1.0
+    }
+  },
+  "pages": [
+    {
+      "id": "g01",
+      "doc": "osric_2e",
+      "page": 135,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g02",
+      "doc": "osric_2e",
+      "page": 40,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g03",
+      "doc": "cairn_1e",
+      "page": 15,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g04",
+      "doc": "srd_5_1",
+      "page": 64,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 0.6666666666666666
+    },
+    {
+      "id": "g05",
+      "doc": "bfrpg_4e",
+      "page": 85,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g06",
+      "doc": "black_hack_1e",
+      "page": 4,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g07",
+      "doc": "black_hack_1e",
+      "page": 16,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 0.6666666666666666
+    },
+    {
+      "id": "g08",
+      "doc": "black_hack_1e",
+      "page": 6,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g09",
+      "doc": "srd_5_2_1",
+      "page": 91,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g10",
+      "doc": "srd_5_2_1",
+      "page": 92,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g11",
+      "doc": "srd_5_2_1",
+      "page": 131,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g12",
+      "doc": "srd_5_1",
+      "page": 66,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 0.75
+    },
+    {
+      "id": "g13",
+      "doc": "bfrpg_4e",
+      "page": 149,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g14",
+      "doc": "bfrpg_4e",
+      "page": 176,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g15",
+      "doc": "yze_srd",
+      "page": 20,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g16",
+      "doc": "yze_srd",
+      "page": 9,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g17",
+      "doc": "black_hack_1e",
+      "page": 3,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g18",
+      "doc": "srd_5_2_1",
+      "page": 290,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g27",
+      "doc": "srd_5_2_1",
+      "page": 290,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g29",
+      "doc": "srd_5_2_1",
+      "page": 146,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g28",
+      "doc": "srd_5_1",
+      "page": 315,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g19",
+      "doc": "srd_5_1",
+      "page": 144,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g20",
+      "doc": "srd_5_1",
+      "page": 358,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g21",
+      "doc": "bfrpg_4e",
+      "page": 20,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g30",
+      "doc": "bfrpg_4e",
+      "page": 170,
+      "kind": "table",
+      "content_recall": 0.8
+    },
+    {
+      "id": "g22",
+      "doc": "cairn_1e",
+      "page": 6,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g23",
+      "doc": "cairn_1e",
+      "page": 16,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g24",
+      "doc": "yze_srd",
+      "page": 21,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g26",
+      "doc": "osric_2e",
+      "page": 95,
+      "kind": "prose",
+      "content_recall": 1.0
+    },
+    {
+      "id": "g25",
+      "doc": "black_hack_1e",
+      "page": 9,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g31",
+      "doc": "srd_5_1",
+      "page": 290,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g32",
+      "doc": "srd_5_1",
+      "page": 299,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g33",
+      "doc": "srd_5_1",
+      "page": 103,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g34",
+      "doc": "osric_2e",
+      "page": 156,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g35",
+      "doc": "osric_2e",
+      "page": 163,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g36",
+      "doc": "osric_2e",
+      "page": 202,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g37",
+      "doc": "srd_5_2_1",
+      "page": 34,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g38",
+      "doc": "srd_5_2_1",
+      "page": 183,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "g39",
+      "doc": "cairn_1e",
+      "page": 10,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "g40",
+      "doc": "cairn_1e",
+      "page": 11,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 0.8
+    },
+    {
+      "id": "h01",
+      "doc": "osric_2e",
+      "page": 157,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "h02",
+      "doc": "osric_2e",
+      "page": 165,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "h03",
+      "doc": "osric_2e",
+      "page": 310,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h04",
+      "doc": "osric_2e",
+      "page": 368,
+      "kind": "table",
+      "content_recall": 0.75,
+      "table_cells": 0.8
+    },
+    {
+      "id": "h05",
+      "doc": "srd_5_1",
+      "page": 266,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h06",
+      "doc": "srd_5_1",
+      "page": 278,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h07",
+      "doc": "srd_5_1",
+      "page": 293,
+      "kind": "prose",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "h08",
+      "doc": "srd_5_2_1",
+      "page": 108,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h09",
+      "doc": "srd_5_2_1",
+      "page": 175,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0
+    },
+    {
+      "id": "h10",
+      "doc": "yze_srd",
+      "page": 4,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 0.8333333333333334,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h11",
+      "doc": "yze_srd",
+      "page": 19,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h12",
+      "doc": "black_hack_1e",
+      "page": 14,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h13",
+      "doc": "black_hack_1e",
+      "page": 15,
+      "kind": "table",
+      "content_recall": 1.0,
+      "table_cells": 1.0
+    },
+    {
+      "id": "h14",
+      "doc": "bfrpg_4e",
+      "page": 208,
+      "kind": "two_column",
+      "content_recall": 1.0,
+      "reading_order": 0.7
+    }
+  ]
+}

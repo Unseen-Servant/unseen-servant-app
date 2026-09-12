@@ -7,23 +7,23 @@ Unit: every chunk the chunker emits; flaw = property of its section_heading
 ```
 doc               chunks         markup_rate   split_letter_rate     mixed_case_rate furniture_root_rate     no_heading_rate
 ----------------------------------------------------------------------------------------------------------------------------
-bfrpg_4e            1194               0.000               0.000               0.000               0.003               0.001
+bfrpg_4e            1193               0.000               0.000               0.000               0.003               0.001
 black_hack_1e         87               0.000               0.000               0.000               0.000               0.011
 cairn_1e              92               0.000               0.000               0.000               0.000               0.011
-osric_2e            2674               0.000               0.010               0.000               0.009               0.000
-srd_5_1             3237               0.000               0.004               0.000               0.000               0.000
-srd_5_2_1           3445               0.000               0.002               0.000               0.000               0.000
+osric_2e            2671               0.000               0.010               0.000               0.009               0.000
+srd_5_1             3235               0.000               0.004               0.000               0.000               0.000
+srd_5_2_1           3444               0.000               0.002               0.000               0.000               0.000
 yze_srd              370               0.000               0.000               0.000               0.005               0.003
-all                11099               0.000               0.004               0.000               0.003               0.000
+all                11092               0.000               0.004               0.000               0.003               0.000
 ```
 
 ## Top roots per doc
-- **bfrpg_4e** (1194 chunks): `PART 6: MONSTERS` ×563; `PART 3: SPELLS` ×169; `PART 8: GAME MASTER INFORMATION` ×130; `PART 7: TREASURE` ×115; `PART 2: PLAYER CHARACTERS` ×66
+- **bfrpg_4e** (1193 chunks): `PART 6: MONSTERS` ×563; `PART 3: SPELLS` ×169; `PART 8: GAME MASTER INFORMATION` ×129; `PART 7: TREASURE` ×115; `PART 2: PLAYER CHARACTERS` ×66
 - **black_hack_1e** (87 chunks): `CONJURER` ×23; `EXAMPLE OF PLAY` ×10; `CONVERTING SAVES` ×6; `CLERIC` ×5; `ARMOR POINTS` ×3
 - **cairn_1e** (92 chunks): `Rules` ×30; `100 Spells` ×10; `Rules Summary` ×10; `Character Traits (d10)` ×7; `Bestiary` ×6
-- **srd_5_1** (3237 chunks): `Monsters` ×1001; `Spellcasting` ×650; `Paired Items` ×367; `Creatures` ×344; `Ability Scores and Modifiers` ×172
-- **srd_5_2_1** (3445 chunks): `Monsters A–Z` ×894; `Casting Spells` ×526; `Classes` ×477; `Magic Item Categories` ×438; `Animals` ×294
-- **osric_2e** (2674 chunks): `Monsters` ×822; `CHAPTER II: Spells` ×610; `CHAPTER VI: TREASURE` ×445; `CHAPTER III: How To Play THE FIRST TIME` ×261; `CHAPTER I: Creating a Character` ×201
+- **srd_5_1** (3235 chunks): `Monsters` ×1000; `Spellcasting` ×649; `Paired Items` ×367; `Creatures` ×344; `Ability Scores and Modifiers` ×172
+- **srd_5_2_1** (3444 chunks): `Monsters A–Z` ×894; `Casting Spells` ×525; `Classes` ×477; `Magic Item Categories` ×438; `Animals` ×294
+- **osric_2e** (2671 chunks): `Monsters` ×821; `CHAPTER II: Spells` ×609; `CHAPTER VI: TREASURE` ×445; `CHAPTER III: How To Play THE FIRST TIME` ×261; `CHAPTER I: Creating a Character` ×200
 - **yze_srd** (370 chunks): `COMBAT & DAMAGE` ×106; `LEARNING MAGIC` ×91; `OTHER SKILLS` ×75; `PLAYER CHARACTERS` ×34; `TRAVEL MAPS` ×33
 
 
