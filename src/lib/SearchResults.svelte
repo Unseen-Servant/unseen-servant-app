@@ -241,7 +241,9 @@
               {/each}
             </div>
           {/if}
-          <div class="snippet">{snippetPreview(result.text)}</div>
+          <!-- The row shows why it matched: `text` is the whole section
+               now, whose opening line is rarely the hit (roadmap 2.5). -->
+          <div class="snippet">{snippetPreview(result.matched_text || result.text)}</div>
           <div class="meta-row">
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
               <span class="hidden-badge micro-label" title="This file is hidden in the tree.">hidden</span>
@@ -250,6 +252,16 @@
               {result.filename}{result.game_system ? ` · ${displaySystem(result.game_system)}` : ''}{span ? ` · ${span}` : ''}
             </span>
           </div>
+          {#if result.also_in.length > 0}
+            <!-- Cross-edition twins folded into this row (roadmap 2.3);
+                 the inspector lists and opens them. -->
+            <div class="also-row">
+              <span class="also-chip" title={result.also_in.map((a) => a.filename).join(', ')}>
+                +{result.also_in.length}
+                {result.also_in.length === 1 ? 'edition' : 'editions'}
+              </span>
+            </div>
+          {/if}
         </div>
         <span
           class="gauge"
@@ -507,6 +519,23 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     font-style: italic;
+  }
+
+  .also-row {
+    margin-top: 0.2rem;
+  }
+
+  /* The SystemBadge tint recipe — identity fills are the one 20%
+     color-mix wash. Data, so parchment; no glow (not an active state). */
+  .also-chip {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--text-accent) 20%, transparent);
+    color: var(--text-accent);
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    white-space: nowrap;
   }
 
   .gauge {

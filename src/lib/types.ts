@@ -124,7 +124,20 @@ export interface CollectionMutationResult {
   file_count: number;
 }
 
+/** A cross-edition twin folded into another result (roadmap 2.3) — the
+ * same section printed in a different book. */
+export interface AlsoIn {
+  filename: string;
+  source: string;
+  page_start: number;
+  page_end: number;
+  page_label_start: string;
+  page_label_end: string;
+  section_id: string;
+}
+
 export interface SearchResultItem {
+  /** The whole assembled section the hit sits in (roadmap 2.5). */
   text: string;
   filename: string;
   source: string;
@@ -137,6 +150,23 @@ export interface SearchResultItem {
    * score scale; absent only for responses from an older sidecar. */
   tier?: 'strong' | 'good' | 'weak';
   reranked?: boolean;
+  // Required, not optional: every search response reaches the frontend
+  // through the Rust `search_index` command, whose struct defaults these
+  // and always serialises them — blank string, false, or [] — even when
+  // an older sidecar omits them.
+  /** The embed unit that actually matched, inside `text`. */
+  matched_text: string;
+  /** The chunk the unit belongs to — a middle ground between the two. */
+  chunk_text: string;
+  section_id: string;
+  section_path: string;
+  /** Page numbers printed on the paper. Blank means "cite the physical
+   * span" — a label would mislabel a wider returned section. */
+  page_label_start: string;
+  page_label_end: string;
+  /** True when a context budget cut this result back to its matched unit. */
+  truncated: boolean;
+  also_in: AlsoIn[];
 }
 
 export interface SearchResponse {

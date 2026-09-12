@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import Markdown from 'svelte-exmarkdown';
+  import { gfmPlugin } from 'svelte-exmarkdown/gfm';
   import type { SearchResultItem, KnownGameSystem } from './types';
-  import { pageHint } from './pdfUrl';
+  import { pageCitation, pageHint } from './pdfUrl';
+  import { findMatchedRange, splitAround, type MatchedParts } from './matchedSpan';
   import { isPathOrAncestorIn } from './selectionUtils';
   import { tierCells, tierLabel } from './searchTiers';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
@@ -18,7 +21,29 @@
   // Tag-editor menu shared with FileTree; left-aligned under the badge.
   let tagMenu: SystemTagMenu | undefined;
 
+  // Rulebook pages are half tables — without GFM they render as pipe soup.
+  const mdPlugins = [gfmPlugin()];
+
+  // The marked passage, for scrolling it into view.
+  let matchEl: HTMLElement | null = null;
+
   $: tags = (result && gameSystemMap.get(result.source)) || [];
+
+  // `text` is the whole assembled section now (roadmap 2.5), so the hit
+  // has to be marked inside it. Null when the unit can't be located —
+  // the section then renders undivided.
+  $: parts = result ? matchedParts(result) : null;
+
+  function matchedParts(r: SearchResultItem): MatchedParts | null {
+    const range = findMatchedRange(r.text, r.matched_text);
+    return range ? splitAround(r.text, range) : null;
+  }
+
+  // A section can run several screens; the hit is often below the fold.
+  // Same tick-then-scroll shape as the result list's row scrolling.
+  $: if (result) {
+    tick().then(() => matchEl?.scrollIntoView({ block: 'center' }));
+  }
 
   function toggleSystem(tag: string) {
     if (!result) return;
@@ -49,6 +74,12 @@
     {@const cells = tierCells(result.tier, result.relevance)}
     {@const label = tierLabel(result.tier, result.relevance)}
     {@const span = pageHint(result.page_start, result.page_end)}
+    {@const cite = pageCitation(
+      result.page_start,
+      result.page_end,
+      result.page_label_start,
+      result.page_label_end
+    )}
     {@const openLabel = result.page_start ? `Open PDF at ${span}` : 'Open PDF'}
     {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
 
@@ -68,7 +99,12 @@
               <SystemBadge tag={displaySystem(result.game_system)} />
             </button>
           {/if}
-          {#if span}<span class="dot">·</span><span>{span}</span>{/if}
+          {#if cite}
+            <span class="dot">·</span>
+            <!-- The printed page leads; the physical one stays in reach
+                 for PDF viewers, which count from the cover. -->
+            <span title={!span || cite === span ? undefined : `PDF ${span}`}>{cite}</span>
+          {/if}
           <span class="dot">·</span>
           <span class="gauge" role="img" aria-label={label} title={label}>
             {#each [0, 1, 2, 3, 4] as idx (idx)}
@@ -110,8 +146,46 @@
         </div>
       {/if}
 
+      {#if result.also_in.length > 0}
+        <!-- Cross-edition twins collapsed into this result (roadmap 2.3).
+             Each opens its own book at its own page. -->
+        <div class="also-in">
+          <span class="micro-label">also in</span>
+          {#each result.also_in as twin, idx (idx)}
+            {@const twinCite = pageCitation(
+              twin.page_start,
+              twin.page_end,
+              twin.page_label_start,
+              twin.page_label_end
+            )}
+            <button
+              type="button"
+              class="also-chip"
+              title={`Open ${twin.filename}${twinCite ? ` at ${twinCite}` : ''}`}
+              on:click={() => onOpenResult(twin.source, twin.filename, twin.page_start)}
+            >
+              {twin.filename}{twinCite ? ` · ${twinCite}` : ''}
+            </button>
+          {/each}
+        </div>
+      {/if}
+
       <div class="snippet">
-        <Markdown md={result.text} />
+        {#if parts}
+          <!-- Three documents, not one: the range is snapped to whole
+               Markdown blocks so a table straddling it stays renderable. -->
+          {#if parts.before}
+            <Markdown md={parts.before} plugins={mdPlugins} />
+          {/if}
+          <div class="matched" bind:this={matchEl}>
+            <Markdown md={parts.match} plugins={mdPlugins} />
+          </div>
+          {#if parts.after}
+            <Markdown md={parts.after} plugins={mdPlugins} />
+          {/if}
+        {:else}
+          <Markdown md={result.text} plugins={mdPlugins} />
+        {/if}
       </div>
     </div>
   {/if}
@@ -263,6 +337,52 @@
     -webkit-user-select: none;
     user-select: none;
   }
+
+  .also-in {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 0.6rem;
+  }
+
+  /* The SystemBadge tint recipe — the one 20% color-mix identity wash.
+     Hover brightens the border only; no glow, no new hue. */
+  .also-chip {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--text-accent) 20%, transparent);
+    color: var(--text-accent);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: border-color var(--transition-fast);
+  }
+
+  .also-chip:hover {
+    border-color: var(--text-accent);
+  }
+
+  .also-chip:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 2px;
+  }
+
+  /* The unit that actually matched, inside the section around it. */
+  .matched {
+    background: color-mix(in srgb, var(--text-accent) 14%, transparent);
+    border-left: 2px solid var(--text-accent);
+    padding-left: 0.5rem;
+  }
+
+  .matched :global(> *:first-child) { margin-top: 0; }
+  .matched :global(> *:last-child) { margin-bottom: 0; }
 
   .snippet {
     flex: 1;

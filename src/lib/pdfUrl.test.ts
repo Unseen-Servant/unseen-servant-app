@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pdfFileUrl, pageHint } from './pdfUrl';
+import { pdfFileUrl, pageHint, pageCitation } from './pdfUrl';
 
 describe('pdfFileUrl', () => {
   it('builds a plain file URL for a POSIX path with no page', () => {
@@ -55,5 +55,19 @@ describe('pageHint', () => {
   it('treats missing pageEnd as single-page', () => {
     expect(pageHint(12, null)).toBe('p.12');
     expect(pageHint(12, undefined)).toBe('p.12');
+  });
+});
+
+describe('pageCitation', () => {
+  it('leads with the printed label when it is known', () => {
+    expect(pageCitation(324, 331, '326', '333')).toBe('pp.326–333');
+    expect(pageCitation(24, 24, '12', '12')).toBe('p.12');
+    expect(pageCitation(24, 26, '12', '')).toBe('p.12');
+  });
+
+  it('falls back to the physical span when the labels are blank', () => {
+    expect(pageCitation(24, 26, '', '')).toBe('pp.24–26');
+    expect(pageCitation(24, 24)).toBe('p.24');
+    expect(pageCitation(0, 0, '', '')).toBe('');
   });
 });

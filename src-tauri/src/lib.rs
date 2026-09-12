@@ -370,6 +370,22 @@ struct DeleteIndexResult {
     removed_chunks: u64,
 }
 
+/// A cross-edition twin folded into another result (roadmap 2.3): the
+/// same section printed in a different book.
+#[derive(Serialize, Deserialize, Debug)]
+struct AlsoIn {
+    filename: String,
+    source: String,
+    page_start: u32,
+    page_end: u32,
+    #[serde(default)]
+    page_label_start: String,
+    #[serde(default)]
+    page_label_end: String,
+    #[serde(default)]
+    section_id: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct SearchResultItem {
     text: String,
@@ -384,6 +400,29 @@ struct SearchResultItem {
     tier: Option<String>,
     #[serde(default)]
     reranked: Option<bool>,
+    // `text` is now the whole assembled section, so the unit that
+    // actually matched has to be named separately (roadmap 2.5). All of
+    // these default so an older sidecar still deserializes; the frontend
+    // always sees them, blank or empty.
+    #[serde(default)]
+    matched_text: String,
+    #[serde(default)]
+    chunk_text: String,
+    #[serde(default)]
+    section_id: String,
+    #[serde(default)]
+    section_path: String,
+    /// The page numbers printed on the paper. Blank means "cite the
+    /// physical span" — the label would mislabel a wider section.
+    #[serde(default)]
+    page_label_start: String,
+    #[serde(default)]
+    page_label_end: String,
+    /// True when a context budget cut this result back to its matched unit.
+    #[serde(default)]
+    truncated: bool,
+    #[serde(default)]
+    also_in: Vec<AlsoIn>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1047,6 +1086,10 @@ async fn get_collections() -> Result<CollectionsResult, String> {
     Ok(result)
 }
 
+// The arguments are the IPC contract with the frontend — each one is a
+// named key in the `invoke` payload, so they can't be folded into a
+// struct without changing every caller.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn search_index(
     query: String,
@@ -1056,6 +1099,10 @@ async fn search_index(
     game_systems: Option<Vec<String>>,
     collection: Option<String>,
     source_paths: Option<Vec<String>>,
+    // Character budget for the sidecar's own section packing. The app
+    // passes nothing — the inspector wants whole sections — but agentic
+    // callers going through the same command can cap the payload.
+    max_context_chars: Option<u32>,
 ) -> Result<SearchResponse, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -1068,6 +1115,7 @@ async fn search_index(
             "game_systems": game_systems,
             "collection": collection,
             "source_paths": source_paths,
+            "max_context_chars": max_context_chars,
         }))
         .send()
         .await

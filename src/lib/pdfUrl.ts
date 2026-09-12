@@ -34,3 +34,25 @@ export function pageHint(pageStart?: number | null, pageEnd?: number | null): st
   if (!pageEnd || pageEnd === pageStart) return `p.${pageStart}`;
   return `pp.${pageStart}–${pageEnd}`;
 }
+
+/**
+ * Cite the page a reader can actually turn to.
+ *
+ * TTRPG PDFs carry covers, front matter and ads, so a book's printed page
+ * numbers commonly sit well short of the PDF's own index. When the printed
+ * label is known it leads; a blank label means "cite the physical span"
+ * (the sidecar blanks labels that would mislabel a wider section).
+ * Mirrors the MCP server's `_page_span` convention.
+ */
+export function pageCitation(
+  pageStart?: number | null,
+  pageEnd?: number | null,
+  labelStart?: string | null,
+  labelEnd?: string | null
+): string {
+  if (labelStart) {
+    if (!labelEnd || labelEnd === labelStart) return `p.${labelStart}`;
+    return `pp.${labelStart}–${labelEnd}`;
+  }
+  return pageHint(pageStart, pageEnd);
+}
