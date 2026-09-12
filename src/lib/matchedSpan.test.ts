@@ -1,16 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { findMatchedRange, splitAround } from './matchedSpan';
 
-const TABLE_SECTION = [
-  'Intro paragraph about the spell.',
-  '',
+const TABLE = [
   '| Level | Damage | Range |',
   '| --- | --- | --- |',
   '| 1 | 1d6 | 60 ft |',
   '| 2 | 2d6 | 90 ft |',
+].join('\n');
+
+const TABLE_SECTION = [
+  'Intro paragraph about the spell.',
+  '',
+  TABLE,
   '',
   'Closing paragraph after the table.',
 ].join('\n');
+
+// What the sidecar actually embeds for a table row: the row linearised
+// into a sentence, which is nowhere in the section's pipe markup.
+const LINEARISED_ROW = 'Level: 2; Damage: 2d6; Range: 90 ft';
 
 describe('findMatchedRange', () => {
   it('finds the matched unit as an exact substring', () => {
@@ -29,6 +37,33 @@ describe('findMatchedRange', () => {
     expect(range).not.toBeNull();
     expect(range![1] - range![0]).toBe(60);
     expect(section.slice(range![0], range![1])).toBe(matched.slice(0, 60));
+  });
+
+  it('falls back to the parent chunk when the unit was linearised out of the markup', () => {
+    // A table row's embed unit is a sentence; only the chunk it came
+    // from is still findable in the section's pipe markup.
+    expect(findMatchedRange(TABLE_SECTION, LINEARISED_ROW)).toBeNull();
+    const range = findMatchedRange(TABLE_SECTION, LINEARISED_ROW, TABLE);
+    expect(range).not.toBeNull();
+    expect(TABLE_SECTION.slice(range![0], range![1])).toBe(TABLE);
+    const { before, match, after } = splitAround(TABLE_SECTION, range!);
+    expect(match).toBe(TABLE);
+    expect(before).toBe('Intro paragraph about the spell.\n\n');
+    expect(after).toBe('\n\nClosing paragraph after the table.');
+  });
+
+  it('refuses a parent chunk that is most of the section', () => {
+    // Highlighting almost everything highlights nothing.
+    const chunk = 'A parent chunk that is very nearly the whole section here.';
+    const section = `Lead.\n\n${chunk}`;
+    expect(chunk.length).toBeGreaterThanOrEqual(0.8 * section.length);
+    expect(findMatchedRange(section, 'nowhere in the section', chunk)).toBeNull();
+  });
+
+  it('prefers the unit over the parent chunk when both are present', () => {
+    const section = 'Lead-in paragraph.\n\nThe matched unit sits here, inside a longer parent chunk.';
+    const range = findMatchedRange(section, 'The matched unit', section.slice(20));
+    expect(section.slice(range![0], range![1])).toBe('The matched unit');
   });
 
   it('returns null when the unit is nowhere in the section', () => {
@@ -57,11 +92,10 @@ describe('splitAround', () => {
     expect(after).toBe('\n\nLast block.');
   });
 
-  it('keeps a pipe table whole when the match is one of its rows', () => {
+  it('keeps a pipe table whole when the range lands inside it', () => {
     const row = '| 2 | 2d6 | 90 ft |';
-    const range = findMatchedRange(TABLE_SECTION, row);
-    expect(range).not.toBeNull();
-    const { before, match, after } = splitAround(TABLE_SECTION, range!);
+    const at = TABLE_SECTION.indexOf(row);
+    const { before, match, after } = splitAround(TABLE_SECTION, [at, at + row.length]);
     expect(before + match + after).toBe(TABLE_SECTION);
     expect(match).toContain('| Level | Damage | Range |');
     expect(match).toContain('| --- | --- | --- |');

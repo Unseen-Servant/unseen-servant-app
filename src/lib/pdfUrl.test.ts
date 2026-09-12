@@ -62,7 +62,14 @@ describe('pageCitation', () => {
   it('leads with the printed label when it is known', () => {
     expect(pageCitation(324, 331, '326', '333')).toBe('pp.326–333');
     expect(pageCitation(24, 24, '12', '12')).toBe('p.12');
-    expect(pageCitation(24, 26, '12', '')).toBe('p.12');
+    expect(pageCitation(24, 24, '12', '')).toBe('p.12');
+  });
+
+  it('falls back to the physical span when a multi-page span has no end label', () => {
+    // Labels are sparse — a labelled page running into unlabelled ones
+    // must not be cited as that one printed page.
+    expect(pageCitation(24, 26, '12', '')).toBe('pp.24–26');
+    expect(pageCitation(24, 26, '12')).toBe('pp.24–26');
   });
 
   it('falls back to the physical span when the labels are blank', () => {

@@ -50,9 +50,14 @@ export function pageCitation(
   labelStart?: string | null,
   labelEnd?: string | null
 ): string {
+  const physical = pageHint(pageStart, pageEnd);
   if (labelStart) {
-    if (!labelEnd || labelEnd === labelStart) return `p.${labelStart}`;
-    return `pp.${labelStart}–${labelEnd}`;
+    if (labelEnd && labelEnd !== labelStart) return `pp.${labelStart}–${labelEnd}`;
+    // Labels are sparse: a span that starts on a labelled page and runs
+    // into unlabelled ones has no end label, and citing the single
+    // printed page would understate it.
+    if (!labelEnd && physical.startsWith('pp.')) return physical;
+    return `p.${labelStart}`;
   }
-  return pageHint(pageStart, pageEnd);
+  return physical;
 }

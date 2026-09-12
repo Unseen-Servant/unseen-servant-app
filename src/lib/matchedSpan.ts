@@ -13,6 +13,10 @@
 /** How much of the unit has to line up for a non-exact hit to count. */
 const PREFIX_LENGTH = 60;
 
+/** A parent chunk bigger than this share of the section isn't a
+ * highlight — marking almost everything marks nothing. */
+const MAX_CHUNK_SHARE = 0.8;
+
 const BLOCK_SEP = '\n\n';
 
 export interface MatchedParts {
@@ -22,26 +26,43 @@ export interface MatchedParts {
 }
 
 /**
- * Character range of `matchedText` within `sectionText`: the exact
- * substring when it is there, otherwise the unit's first 60 characters,
- * otherwise null (the caller then renders the section undivided).
+ * Character range of the hit within `sectionText`, in three tiers: the
+ * exact `matchedText`, else its first 60 characters, else the exact
+ * parent `chunkText` when one is given and it isn't most of the section,
+ * else null (the caller then renders the section undivided).
+ *
+ * The chunk tier is what covers tables. A table row is linearised into a
+ * sentence on the way into the index ("Level: 2; Damage: 2d6; Range:
+ * 90 ft"), so the embed unit shares no run of characters with the
+ * section's pipe markup — but the chunk it came from is still verbatim
+ * section text.
  */
 export function findMatchedRange(
   sectionText: string,
-  matchedText: string
+  matchedText: string,
+  chunkText?: string
 ): [number, number] | null {
-  if (!sectionText || !matchedText) return null;
+  if (!sectionText) return null;
 
-  const exact = sectionText.indexOf(matchedText);
-  if (exact !== -1) return [exact, exact + matchedText.length];
+  if (matchedText) {
+    const exact = sectionText.indexOf(matchedText);
+    if (exact !== -1) return [exact, exact + matchedText.length];
 
-  const prefix = matchedText.slice(0, PREFIX_LENGTH);
-  // A unit shorter than the prefix window has already been searched for
-  // in full above, so only a real prefix can still hit.
-  if (prefix.length === matchedText.length) return null;
+    const prefix = matchedText.slice(0, PREFIX_LENGTH);
+    // A unit shorter than the prefix window has already been searched
+    // for in full above, so only a real prefix can still hit.
+    if (prefix.length < matchedText.length) {
+      const at = sectionText.indexOf(prefix);
+      if (at !== -1) return [at, at + prefix.length];
+    }
+  }
 
-  const at = sectionText.indexOf(prefix);
-  return at === -1 ? null : [at, at + prefix.length];
+  if (chunkText && chunkText.length < MAX_CHUNK_SHARE * sectionText.length) {
+    const at = sectionText.indexOf(chunkText);
+    if (at !== -1) return [at, at + chunkText.length];
+  }
+
+  return null;
 }
 
 /**
@@ -55,6 +76,10 @@ export function findMatchedRange(
  * table, which is the honest thing to show anyway.
  *
  * `before + match + after === text` always holds.
+ *
+ * Known limitation: blank lines are the only boundary, so a construct
+ * that legitimately contains one — a loose list, a fenced code block —
+ * can still be cut at the match.
  */
 export function splitAround(text: string, range: [number, number]): MatchedParts {
   const len = text.length;

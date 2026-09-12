@@ -35,7 +35,7 @@
   $: parts = result ? matchedParts(result) : null;
 
   function matchedParts(r: SearchResultItem): MatchedParts | null {
-    const range = findMatchedRange(r.text, r.matched_text);
+    const range = findMatchedRange(r.text, r.matched_text, r.chunk_text);
     return range ? splitAround(r.text, range) : null;
   }
 
@@ -177,9 +177,11 @@
           {#if parts.before}
             <Markdown md={parts.before} plugins={mdPlugins} />
           {/if}
-          <div class="matched" bind:this={matchEl}>
-            <Markdown md={parts.match} plugins={mdPlugins} />
-          </div>
+          {#if parts.match}
+            <div class="matched" bind:this={matchEl}>
+              <Markdown md={parts.match} plugins={mdPlugins} />
+            </div>
+          {/if}
           {#if parts.after}
             <Markdown md={parts.after} plugins={mdPlugins} />
           {/if}
