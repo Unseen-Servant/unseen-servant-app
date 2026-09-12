@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 from granularity import ParentDoc
@@ -72,6 +73,11 @@ def _connect(data_dir: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(data_dir / PARENTS_FILENAME))
     conn.executescript(_SCHEMA)
     _migrate(conn)
+    # section_path only exists once _migrate has run (a legacy store predates
+    # it), so this index is created here rather than inside _SCHEMA.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_parents_section ON parents(source, section_path)"
+    )
     return conn
 
 
@@ -265,6 +271,124 @@ def fetch_parents_extended(
     with _txn(data_dir) as conn:
         for pid in parent_ids:
             doc = _extend_one(conn, pid, max_extra_chars)
+            if doc is not None:
+                out[pid] = doc
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Section assembly by section_path prefix (roadmap 2.1)
+# ---------------------------------------------------------------------------
+
+# Max characters of an assembled section (root subtree, or a window grown
+# outward from the matched parent when the subtree is bigger than this).
+SECTION_CAP = 6000
+
+
+@dataclass(frozen=True)
+class SectionDoc:
+    root_path: str
+    section_id: str
+    section_heading: str | None
+    text: str
+    page_start: int
+    page_end: int
+    source_pdf: str
+    windowed: bool
+
+
+def _prefix_range(path: str) -> tuple[str, str]:
+    """Half-open key range selecting `path` and every descendant: ids are
+    fixed-width, '/' (0x2F) sorts just below '0' (0x30)."""
+    return path, path + "0"
+
+
+def _subtree_size(conn, source: str, path: str) -> int:
+    lo, hi = _prefix_range(path)
+    row = conn.execute(
+        "SELECT COALESCE(SUM(LENGTH(text)), 0), COUNT(*) FROM parents "
+        "WHERE source = ? AND section_path >= ? AND section_path < ?",
+        (source, lo, hi),
+    ).fetchone()
+    total, n = row
+    return total + 2 * max(0, n - 1)
+
+
+def section_root_for(conn, source: str, section_path: str, cap: int = SECTION_CAP) -> str:
+    """Shallowest ancestor (or the leaf) whose whole subtree fits in `cap`."""
+    ids = section_path.split("/")
+    for depth in range(1, len(ids) + 1):
+        candidate = "/".join(ids[:depth])
+        if _subtree_size(conn, source, candidate) <= cap:
+            return candidate
+    return section_path
+
+
+def _heading_at_depth(heading: str | None, depth: int) -> str | None:
+    if not heading:
+        return heading
+    return " > ".join(heading.split(" > ")[:depth])
+
+
+def assemble_section(conn, source: str, root_path: str, matched_parent_id: str,
+                     cap: int = SECTION_CAP) -> SectionDoc | None:
+    lo, hi = _prefix_range(root_path)
+    rows = conn.execute(
+        "SELECT rowid, parent_id, text, section_heading, page_start, page_end "
+        "FROM parents WHERE source = ? AND section_path >= ? AND section_path < ? "
+        "ORDER BY rowid",
+        (source, lo, hi),
+    ).fetchall()
+    if not rows:
+        return None
+    depth = root_path.count("/") + 1
+    heading = _heading_at_depth(rows[0][3], depth)
+    section_id = root_path.rsplit("/", 1)[-1]
+    total = sum(len(r[2]) for r in rows) + 2 * (len(rows) - 1)
+    if total <= cap:
+        chosen = rows
+        windowed = False
+    else:
+        idx = next((i for i, r in enumerate(rows) if r[1] == matched_parent_id), 0)
+        lo_i = hi_i = idx
+        size = len(rows[idx][2])
+        while True:
+            grew = False
+            if lo_i > 0 and size + len(rows[lo_i - 1][2]) + 2 <= cap:
+                lo_i -= 1; size += len(rows[lo_i][2]) + 2; grew = True
+            if hi_i < len(rows) - 1 and size + len(rows[hi_i + 1][2]) + 2 <= cap:
+                hi_i += 1; size += len(rows[hi_i][2]) + 2; grew = True
+            if not grew:
+                break
+        chosen = rows[lo_i:hi_i + 1]
+        windowed = True
+    return SectionDoc(
+        root_path=root_path, section_id=section_id, section_heading=heading,
+        text="\n\n".join(r[2] for r in chosen),
+        page_start=min(r[4] for r in chosen), page_end=max(r[5] for r in chosen),
+        source_pdf=source, windowed=windowed,
+    )
+
+
+def fetch_sections(data_dir: Path, hits: list[tuple[str, str | None, str | None]],
+                   cap: int = SECTION_CAP) -> dict[str, SectionDoc]:
+    """Assemble one section per hit `(parent_id, section_path, source)`; legacy
+    rows (no section_path) take the heading walk of `_extend_one`."""
+    if not data_dir or not hits:
+        return {}
+    out: dict[str, SectionDoc] = {}
+    with _txn(data_dir) as conn:
+        for pid, path, source in hits:
+            if not path or not source:
+                legacy = _extend_one(conn, pid, SECTION_EXPANSION_MAX_EXTRA_CHARS)
+                if legacy is not None:
+                    out[pid] = SectionDoc(root_path="", section_id=legacy.section_id or "",
+                                          section_heading=legacy.section_heading, text=legacy.text,
+                                          page_start=legacy.page_start, page_end=legacy.page_end,
+                                          source_pdf=legacy.source_pdf, windowed=False)
+                continue
+            root = section_root_for(conn, source, path, cap)
+            doc = assemble_section(conn, source, root, pid, cap)
             if doc is not None:
                 out[pid] = doc
     return out

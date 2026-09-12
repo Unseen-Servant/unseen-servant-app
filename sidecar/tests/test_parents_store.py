@@ -317,3 +317,77 @@ def test_update_units_fts_game_system_retags_one_source(tmp_path):
     assert update_units_fts_game_system(tmp_path, "/lib/a.pdf", "5E") == 1
     assert search_units_fts(tmp_path, '"owlbear"', 5, {"game_system": "5E"}) == ["a_0"]
     assert search_units_fts(tmp_path, '"owlbear"', 5, {"game_system": "OSR"}) == ["b_0"]
+
+
+# ---------------------------------------------------------------------------
+# Section assembly by section_path prefix (roadmap 2.1)
+# ---------------------------------------------------------------------------
+
+from parents_store import (SECTION_CAP, SectionDoc, _prefix_range, assemble_section,
+                           fetch_sections, section_root_for, _txn)
+
+# A monster chapter: Monsters (s_m) > Kraken (s_k) > {Actions (s_ka), Legendary (s_kl)}; Medusa (s_d) > Actions (s_da)
+def _monster_tree(tmp_path):
+    rows = [
+        _p("p_intro", "x.pdf", "Monsters intro " * 20, "Monsters", 1, 1, sid="s_m", path="s_m"),
+        _p("p_kra", "x.pdf", "Kraken AC 18 HP 472 " * 30, "Monsters > Kraken", 2, 2, sid="s_k", path="s_m/s_k"),
+        _p("p_kra_act", "x.pdf", "Tentacle attack " * 30, "Monsters > Kraken > Actions", 2, 3, sid="s_ka", path="s_m/s_k/s_ka"),
+        _p("p_kra_leg", "x.pdf", "Ink cloud legendary " * 30, "Monsters > Kraken > Legendary Actions", 3, 3, sid="s_kl", path="s_m/s_k/s_kl"),
+        _p("p_med", "x.pdf", "Medusa AC 15 " * 30, "Monsters > Medusa", 4, 4, sid="s_d", path="s_m/s_d"),
+        _p("p_med_act", "x.pdf", "Petrifying gaze " * 30, "Monsters > Medusa > Actions", 4, 4, sid="s_da", path="s_m/s_d/s_da"),
+    ]
+    upsert_parents(tmp_path, "x.pdf", rows)
+    return rows
+
+
+def test_prefix_range_covers_self_and_descendants_only():
+    lo, hi = _prefix_range("s_m/s_k")
+    assert lo == "s_m/s_k" and hi == "s_m/s_k0"
+    assert lo <= "s_m/s_k" < hi and lo <= "s_m/s_k/s_ka" < hi
+    assert not (lo <= "s_m/s_d" < hi) and not (lo <= "s_m/s_kz" < hi)   # 'z' > '0'
+
+
+def test_section_root_is_the_shallowest_ancestor_that_fits(tmp_path):
+    _monster_tree(tmp_path)
+    with _txn(tmp_path) as conn:
+        # Kraken subtree is 1 684 chars, fits; Monsters subtree is 2 860, also fits under 6 000 → Monsters is chosen …
+        assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka", cap=SECTION_CAP) == "s_m"
+        # … but with a 2 000-char cap the whole chapter (2 860) does not fit and Kraken (1 684) is the root.
+        assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka", cap=2000) == "s_m/s_k"
+        # A leaf larger than the cap (480 > 100) stays the leaf.
+        assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka", cap=100) == "s_m/s_k/s_ka"
+
+
+def test_assemble_section_returns_the_subtree_in_document_order(tmp_path):
+    _monster_tree(tmp_path)
+    with _txn(tmp_path) as conn:
+        doc = assemble_section(conn, "x.pdf", "s_m/s_k", "p_kra_act", cap=2000)
+    assert doc.text.startswith("Kraken AC 18") and "Ink cloud" in doc.text
+    assert doc.text.index("Tentacle") < doc.text.index("Ink cloud")
+    assert (doc.page_start, doc.page_end) == (2, 3)
+    assert doc.section_heading == "Monsters > Kraken"
+    assert doc.section_id == "s_k" and doc.windowed is False
+
+
+def test_assemble_section_windows_a_leaf_larger_than_the_cap(tmp_path):
+    rows = [_p(f"p{i}", "y.pdf", f"para{i} " * 40, "Long > Section", 1, 1, sid="s_l", path="s_x/s_l") for i in range(10)]
+    upsert_parents(tmp_path, "y.pdf", rows)
+    with _txn(tmp_path) as conn:
+        doc = assemble_section(conn, "y.pdf", "s_x/s_l", "p5", cap=900)
+    assert doc.windowed is True
+    assert "para5" in doc.text and len(doc.text) <= 900
+    assert "para4" in doc.text or "para6" in doc.text          # grows outward from the match
+    assert "para0" not in doc.text and "para9" not in doc.text
+
+
+def test_fetch_sections_falls_back_to_the_heading_walk_for_legacy_rows(tmp_path):
+    upsert_parents(tmp_path, "old.pdf", [_p("a", "old.pdf", "one", "H"), _p("b", "old.pdf", "two", "H")])
+    got = fetch_sections(tmp_path, [("a", None, "old.pdf")])
+    assert got["a"].text == "one\n\ntwo" and got["a"].root_path == ""
+
+
+def test_fetch_sections_batches_and_keys_by_parent_id(tmp_path):
+    _monster_tree(tmp_path)
+    got = fetch_sections(tmp_path, [("p_kra_act", "s_m/s_k/s_ka", "x.pdf"), ("p_med", "s_m/s_d", "x.pdf")])
+    assert set(got) == {"p_kra_act", "p_med"}
+    assert got["p_kra_act"].root_path == got["p_med"].root_path == "s_m"   # both fit under the chapter at 6 000
