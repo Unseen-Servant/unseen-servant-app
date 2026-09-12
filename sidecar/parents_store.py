@@ -332,6 +332,11 @@ def _heading_at_depth(heading: str | None, depth: int) -> str | None:
 
 def assemble_section(conn, source: str, root_path: str, matched_parent_id: str,
                      cap: int = SECTION_CAP) -> SectionDoc | None:
+    """Assemble the subtree rooted at `root_path`, in document order, or a
+    window grown outward from `matched_parent_id` when the subtree exceeds
+    `cap`. The matched parent is always included, so `text` can exceed
+    `cap` when that single parent is larger than the cap.
+    """
     lo, hi = _prefix_range(root_path)
     rows = conn.execute(
         "SELECT rowid, parent_id, text, section_heading, page_start, page_end "

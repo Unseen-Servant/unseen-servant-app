@@ -15,6 +15,13 @@ from parents_store import (
     rename_source,
     update_units_fts_game_system,
     where_to_sql,
+    SECTION_CAP,
+    _heading_at_depth,
+    _prefix_range,
+    _txn,
+    assemble_section,
+    fetch_sections,
+    section_root_for,
 )
 
 
@@ -323,9 +330,6 @@ def test_update_units_fts_game_system_retags_one_source(tmp_path):
 # Section assembly by section_path prefix (roadmap 2.1)
 # ---------------------------------------------------------------------------
 
-from parents_store import (SECTION_CAP, SectionDoc, _prefix_range, assemble_section,
-                           fetch_sections, section_root_for, _txn)
-
 # A monster chapter: Monsters (s_m) > Kraken (s_k) > {Actions (s_ka), Legendary (s_kl)}; Medusa (s_d) > Actions (s_da)
 def _monster_tree(tmp_path):
     rows = [
@@ -358,6 +362,12 @@ def test_section_root_is_the_shallowest_ancestor_that_fits(tmp_path):
         assert section_root_for(conn, "x.pdf", "s_m/s_k/s_ka", cap=100) == "s_m/s_k/s_ka"
 
 
+def test_heading_at_depth_cuts_the_breadcrumb():
+    assert _heading_at_depth("Monsters > Kraken > Actions", 2) == "Monsters > Kraken"
+    assert _heading_at_depth("Monsters", 3) == "Monsters"
+    assert _heading_at_depth(None, 2) is None
+
+
 def test_assemble_section_returns_the_subtree_in_document_order(tmp_path):
     _monster_tree(tmp_path)
     with _txn(tmp_path) as conn:
@@ -367,6 +377,17 @@ def test_assemble_section_returns_the_subtree_in_document_order(tmp_path):
     assert (doc.page_start, doc.page_end) == (2, 3)
     assert doc.section_heading == "Monsters > Kraken"
     assert doc.section_id == "s_k" and doc.windowed is False
+
+
+def test_assemble_section_heading_truncates_to_root_depth(tmp_path):
+    """The root is shallower than the first row's own breadcrumb: the
+    heading must be cut to the root's depth, not the row's full chain."""
+    upsert_parents(tmp_path, "z.pdf", [
+        _p("p_leaf", "z.pdf", "Leaf text", "Chapter > Sub > Leaf", 1, 1, sid="s_l", path="s_c/s_s/s_l"),
+    ])
+    with _txn(tmp_path) as conn:
+        doc = assemble_section(conn, "z.pdf", "s_c/s_s", "p_leaf", cap=SECTION_CAP)
+    assert doc.section_heading == "Chapter > Sub"
 
 
 def test_assemble_section_windows_a_leaf_larger_than_the_cap(tmp_path):
