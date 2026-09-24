@@ -58,7 +58,9 @@ from parents_store import (
     rename_source,
     update_units_fts_game_system,
 )
-from lexical import LEXICAL_RRF_WEIGHT, PersistedLexicalIndex, rrf_fuse
+from lexical import (
+    LEXICAL_RERANK_POOL, LEXICAL_RRF_WEIGHT, PersistedLexicalIndex, rrf_fuse,
+)
 from near_dup import collapse_near_dups
 from reranker import rerank_scores
 from spelling import SpellCorrector
@@ -312,14 +314,6 @@ def detect_game_system(
     return hits[0] if hits else "unknown"
 
 
-# Game-system soft-boost (hybrid_retrieval_spike V8: +0.042 cross-system
-# MRR@5). When the query names a system, matching-system candidates get
-# ×1.5 and the rest ×0.7 on the ordering score — a reweight, not a hard
-# filter, so a strong wrong-system hit can still surface.
-SYSTEM_BOOST_MATCH = 1.5
-SYSTEM_BOOST_NONMATCH = 0.7
-
-
 def detect_systems_in_query(
     query: str,
     known_systems: dict[str, list[str]] | None = None,
@@ -337,14 +331,14 @@ def detect_systems_in_query(
     }
 
 
-def _system_boost_factors(
+def _system_matches(
     metadatas: list[dict],
     target_systems: set[str],
     data_dir: Path | None,
     known_systems: dict[str, list[str]],
     manifest: "IndexManifest | None" = None,
-) -> list[float]:
-    """Per-candidate boost factor by system-match against the query.
+) -> list[bool]:
+    """Per-candidate: does its source belong to a system the query names?
 
     A candidate's systems are resolved query-side: the chunk's metadata
     tag, plus the manifest tags for its source (which carry user
@@ -359,8 +353,8 @@ def _system_boost_factors(
     if manifest is None:
         manifest = load_manifest(data_dir) if data_dir else IndexManifest()
     manifest_files = manifest.files
-    by_source: dict[str, float] = {}
-    factors: list[float] = []
+    by_source: dict[str, bool] = {}
+    flags: list[bool] = []
     for meta in metadatas:
         src = meta.get("source", "")
         if src not in by_source:
@@ -376,12 +370,14 @@ def _system_boost_factors(
                 )
             if not systems:
                 systems = set(detect_game_systems(Path(src), None, known_systems))
-            by_source[src] = (
-                SYSTEM_BOOST_MATCH if systems & target_systems
-                else SYSTEM_BOOST_NONMATCH
-            )
-        factors.append(by_source[src])
-    return factors
+            by_source[src] = bool(systems & target_systems)
+        flags.append(by_source[src])
+    return flags
+
+
+def _front_first(flags: list[bool]) -> list[int]:
+    """Indexes with flagged ones first, order kept within each group."""
+    return sorted(range(len(flags)), key=lambda i: not flags[i])
 
 
 _BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
@@ -615,6 +611,9 @@ class SearchRequest(BaseModel):
     # rankings weigh 1.0). Request-only eval knob, not a persisted
     # setting; None means LEXICAL_RRF_WEIGHT.
     lex_weight: float | None = Field(default=None, ge=0)
+    # lex_pool: BM25 top-M added to the dense top-N in the hybrid rerank
+    # pool. Request-only eval knob; None means LEXICAL_RERANK_POOL.
+    lex_pool: int | None = Field(default=None, ge=0)
     # spell_correction: rewrite out-of-vocabulary query tokens to the
     # closest library term before embedding (typo-tolerance design,
     # section A). Default on — the 2026-07-10 eval gate passed once
@@ -2153,7 +2152,12 @@ def _search_sync(
         # cosine distance — they get a sentinel 1.0 (relevance 0.0)
         # that the reranker replaces with a real cross-encoder score
         # when rerank is on.
-        ordering_scores: list[float] | None = None
+        # Hybrid rerank pool (union): the head of the candidate order
+        # plus the BM25 top-M, flagged here in `lex_top`. The fused
+        # order alone can't admit BM25 hits — weighted RRF at k=60 ranks
+        # a BM25-only #1 at w=0.3 like dense #143, so no BM25-only hit
+        # ever reached a top-50 pool.
+        lex_top: list[bool] | None = None
         if variant_queries or knobs.hybrid:
             rankings = list(results["ids"])
             dense_best: dict[str, tuple[dict, float, str]] = {}
@@ -2185,8 +2189,8 @@ def _search_sync(
                     [cid for cid in lex_ids if cid not in dense_best]
                 )
             fused_metadatas, fused_distances = [], []
-            fused_docs, fused_scores = [], []
-            for cid, score in rrf_fuse(rankings, weights):
+            fused_docs, fused_ids = [], []
+            for cid, _score in rrf_fuse(rankings, weights):
                 if cid in dense_best:
                     meta, dist, doc = dense_best[cid]
                     fused_metadatas.append(meta)
@@ -2200,20 +2204,28 @@ def _search_sync(
                 else:
                     # FTS row whose Chroma twin is gone mid-reindex.
                     continue
-                fused_scores.append(score)
+                fused_ids.append(cid)
             ordered_metadatas = fused_metadatas
             ordered_distances = fused_distances
             ordered_docs = fused_docs
-            ordering_scores = fused_scores
+            if knobs.hybrid:
+                lex_pool = (
+                    request.lex_pool if request.lex_pool is not None
+                    else LEXICAL_RERANK_POOL
+                )
+                top_ids = set(lex_ids[:lex_pool])
+                lex_top = [cid in top_ids for cid in fused_ids]
 
-        # Game-system soft-boost: when the query names a system and
-        # the request isn't already scoped to one (or to a single
-        # file), reorder the over-fetched candidate pool by
-        # boosted cosine similarity. Ordering only — distances (and
-        # therefore reported relevance/tier) stay on the raw scale.
-        # All distances are cosine at this point, so one sort key is
-        # safe; ties keep chroma's order (sorted() is stable).
-        boost_factors: list[float] | None = None
+        # Game-system boost (roadmap 3.3): when the query names a system
+        # and the request isn't already scoped to one (or to a single
+        # file), candidates from that system's sources move to the front
+        # as a stable partition — here, so the rerank pool fills with the
+        # named system, and again after rerank, so a wrong-system hit the
+        # cross-encoder loves can't outrank them. Never a filter: the
+        # rest follow in order. Distances (and so relevance/tier) are
+        # untouched. Replaces the ×1.5/×0.7 multipliers, which lost to a
+        # saturated cross-encoder score (0.92×0.7 > 0.39×1.5).
+        matched: list[bool] | None = None
         if not (
             request.game_system or request.game_systems
             or request.source_filter
@@ -2222,27 +2234,17 @@ def _search_sync(
                 query_text, merged["known"]
             )
             if target_systems:
-                boost_factors = _system_boost_factors(
+                matched = _system_matches(
                     ordered_metadatas, target_systems,
                     data_dir, merged["known"], manifest=ctx.manifest,
                 )
-                # Hybrid candidates are ordered by RRF score, not
-                # cosine — boost whichever scale ordered the pool.
-                order = sorted(
-                    range(len(boost_factors)),
-                    key=lambda i: (
-                        (ordering_scores[i] if ordering_scores is not None
-                         else max(0.0, 1.0 - ordered_distances[i]))
-                        * boost_factors[i]
-                    ),
-                    reverse=True,
-                )
+                order = _front_first(matched)
                 ordered_metadatas = [ordered_metadatas[i] for i in order]
                 ordered_distances = [ordered_distances[i] for i in order]
                 ordered_docs = [ordered_docs[i] for i in order]
-                boost_factors = [boost_factors[i] for i in order]
-                if ordering_scores is not None:
-                    ordering_scores = [ordering_scores[i] for i in order]
+                matched = [matched[i] for i in order]
+                if lex_top is not None:
+                    lex_top = [lex_top[i] for i in order]
 
         # Re-rank the top of the candidate pool with a cross-encoder.
         # Scoring (query, chunk-text) jointly is more accurate than raw
@@ -2260,6 +2262,17 @@ def _search_sync(
         pool = 0
         if knobs.rerank and _rerank_safe_for_query(query_text):
             pool = min(knobs.rerank_candidates, len(ordered_metadatas))
+            if lex_top is not None:
+                # Stable partition: the head plus the BM25 top-M move to
+                # the front in their current order — exactly the pool.
+                in_union = [i < pool or t for i, t in enumerate(lex_top)]
+                order = _front_first(in_union)
+                ordered_metadatas = [ordered_metadatas[i] for i in order]
+                ordered_distances = [ordered_distances[i] for i in order]
+                ordered_docs = [ordered_docs[i] for i in order]
+                if matched is not None:
+                    matched = [matched[i] for i in order]
+                pool = sum(in_union)
             pool_docs = ordered_docs[:pool]
             pool_meta = ordered_metadatas[:pool]
             rerank_inputs = [
@@ -2269,22 +2282,12 @@ def _search_sync(
             scores = rerank_scores(query_text, rerank_inputs)
             if scores is not None:
                 rerank_applied = True
-                # The soft-boost weighs the cross-encoder scores the
-                # same way it weighed cosine similarity; the stored
-                # distances stay raw either way.
-                if boost_factors is not None:
-                    order = sorted(
-                        range(pool),
-                        key=lambda i: scores[i] * boost_factors[i],
-                        reverse=True,
-                    )
-                    boost_factors = (
-                        [boost_factors[i] for i in order]
-                        + boost_factors[pool:]
-                    )
-                else:
-                    order = sorted(
-                        range(pool), key=lambda i: scores[i], reverse=True
+                order = sorted(
+                    range(pool), key=lambda i: scores[i], reverse=True
+                )
+                if matched is not None:
+                    matched = (
+                        [matched[i] for i in order] + matched[pool:]
                     )
                 head_metadatas = [ordered_metadatas[i] for i in order]
                 # Use 1 - rerank_score so 1 - distance = rerank score
@@ -2294,6 +2297,17 @@ def _search_sync(
                 ordered_metadatas = head_metadatas + ordered_metadatas[pool:]
                 ordered_distances = head_distances + ordered_distances[pool:]
                 ordered_docs = head_docs + ordered_docs[pool:]
+
+        # Which candidates the cross-encoder scored, carried through the
+        # post-rerank partition below.
+        reranked = [rerank_applied and i < pool for i in range(len(ordered_docs))]
+        if matched is not None:
+            order = _front_first(matched)
+            ordered_metadatas = [ordered_metadatas[i] for i in order]
+            ordered_distances = [ordered_distances[i] for i in order]
+            ordered_docs = [ordered_docs[i] for i in order]
+            reranked = [reranked[i] for i in order]
+            matched = [matched[i] for i in order]
 
         # Dedupe by assembled section, keeping the first hit per section
         # (the iteration order is the re-ranked-then-cosine order from
@@ -2336,10 +2350,8 @@ def _search_sync(
                     "metadata": metadata,
                     "distance": distance,
                     "doc": ordered_docs[i],
-                    "reranked": rerank_applied and i < pool,
-                    "boost": (
-                        boost_factors[i] if boost_factors is not None else 1.0
-                    ),
+                    "reranked": reranked[i],
+                    "matched": matched[i] if matched is not None else False,
                 })
                 if len(picked) >= request.n_results:
                     break
@@ -2375,11 +2387,12 @@ def _search_sync(
                         p["reranked"] = True
                     # All picked distances are now cross-encoder scale;
                     # stable sort keeps head order, interleaves the
-                    # rescored tail where it belongs — by the boosted
-                    # ordering score when the soft-boost is active.
+                    # rescored tail where it belongs — inside its
+                    # partition when the system boost is active.
                     picked.sort(
-                        key=lambda p: -(
-                            max(0.0, 1.0 - p["distance"]) * p["boost"]
+                        key=lambda p: (
+                            not p["matched"],
+                            -max(0.0, 1.0 - p["distance"]),
                         )
                     )
 

@@ -413,6 +413,8 @@ def main() -> int:
                     help="retrieval: search with the cross-encoder off (latency measurement)")
     ap.add_argument("--lex-weight", type=float, default=None,
                     help="retrieval: RRF lexical weight (dense=1.0); sweep the fusion balance")
+    ap.add_argument("--lex-pool", type=int, default=None,
+                    help="retrieval (v2): BM25 top-M added to the hybrid rerank pool")
     ap.add_argument("--rerank-weight", type=float, default=None,
                     help="retrieval: RRF rerank blend weight (retrieval=1.0); sweep the rerank pull")
     ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
@@ -502,6 +504,8 @@ def main() -> int:
                     extra["lex_weight"] = args.lex_weight
             if args.rerank_weight is not None:
                 extra["rerank_weight"] = args.rerank_weight
+            if args.lex_pool is not None:
+                extra["lex_pool"] = args.lex_pool
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
                                  rerank=not args.no_rerank,
                                  max_context_chars=args.max_context_chars, extra=extra)

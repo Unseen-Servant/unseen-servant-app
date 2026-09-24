@@ -1,10 +1,11 @@
 """Game-system soft-boost for /api/search (2026-07-01 roadmap quick-win).
 
 When the query text names a game system ("Fireball damage in 5E SRD"),
-results whose PDF belongs to that system are boosted (×1.5) and others
-demoted (×0.7) — per hybrid_retrieval_spike V8 (+0.042 cross-system
-MRR@5). Ordering only: reported relevance/tier stay on the honest model
-scale. The boost is a no-op when the query names no system, and is
+results whose PDF belongs to that system move to the front as a stable
+partition, before rerank (so they fill its pool) and after it (roadmap
+3.3; it replaced ×1.5/×0.7 multipliers a saturated cross-encoder score
+could beat). Never a filter, and ordering only: reported relevance/tier
+stay on the honest model scale. The boost is a no-op when the query names no system, and is
 skipped entirely when the request already filters by game system or
 source file.
 
@@ -92,7 +93,7 @@ def _meta(parent_id: str, filename: str, game_system: str) -> dict:
     }
 
 # Wrong-system chunk wins on raw cosine (distance 0.10 < 0.30); the
-# right-system chunk should win once boosted: 0.9×0.7=0.63 < 0.7×1.5=1.05.
+# right-system chunk should win once partitioned to the front.
 FAKE_RESULTS = {
     "documents": [["osr fireball text", "srd fireball text"]],
     "metadatas": [[
@@ -186,8 +187,8 @@ def test_relevance_and_tier_stay_on_raw_scale(fake_pool_client):
 
 
 def test_boost_applies_to_reranked_order(fake_pool_client, monkeypatch):
-    """With rerank on, the boost weighs the cross-encoder scores the
-    same way: 0.8×0.7=0.56 < 0.6×1.5=0.90 → the 5E chunk wins."""
+    """With rerank on, the partition holds over the cross-encoder
+    order: the 5E chunk wins though it scores lower."""
     import server
 
     monkeypatch.setattr(
@@ -198,3 +199,41 @@ def test_boost_applies_to_reranked_order(fake_pool_client, monkeypatch):
         "SRD_CC_v5.1.pdf", "Basic-Fantasy-RPG-Rules-r142.pdf"]
     assert results[0]["reranked"] is True
     assert results[0]["relevance"] == pytest.approx(0.6)   # raw sigmoid
+
+
+def test_boost_holds_against_a_saturated_wrong_system_score(
+        fake_pool_client, monkeypatch):
+    """The case the multipliers lost (q048, 2026-09-23): a wrong-system
+    exact match the cross-encoder scores 0.92 beat a named-system 0.39
+    (0.92×0.7 > 0.39×1.5). The partition keeps the named system first."""
+    import server
+
+    monkeypatch.setattr(
+        server, "rerank_scores",
+        lambda q, docs: [0.39 if "srd" in d else 0.92 for d in docs])
+    results = _search(fake_pool_client, rerank=True)
+    assert [r["filename"] for r in results] == [
+        "SRD_CC_v5.1.pdf", "Basic-Fantasy-RPG-Rules-r142.pdf"]
+
+
+def test_boost_fills_the_rerank_pool_with_the_named_system(
+        client, test_collection, monkeypatch):
+    """Before rerank the partition decides pool entry: a named-system
+    chunk ranked below the pool size is still scored."""
+    import server
+
+    fake = {
+        "documents": [["osr text", "srd text"]],
+        "metadatas": [[
+            _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),
+            _meta("p-srd", "SRD_CC_v5.1.pdf", "D&D 5E"),
+        ]],
+        "distances": [[0.10, 0.30]],
+    }
+    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    scored = []
+    monkeypatch.setattr(
+        server, "rerank_scores",
+        lambda q, docs: scored.extend(docs) or [0.5] * len(docs))
+    _search(client, rerank=True, rerank_candidates=1)
+    assert scored[0] == "srd text"

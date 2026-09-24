@@ -88,6 +88,12 @@ GAME_SYSTEMS: list[dict] = [
         "keywords": ["mork borg"],
         "color": "#2fa094",
     },
+    {
+        "tag": "YZE",
+        # "yze" alone is ≤3 chars (rule 1); the spelled-out name only.
+        "keywords": ["year zero"],
+        "color": "#2fa094",
+    },
     # --- Horror (Plum) ---
     {
         "tag": "CoC 7E",
@@ -187,7 +193,17 @@ GAME_SYSTEMS: list[dict] = [
         # to the same needle.
         "keywords": ["castles & crusades", "c&c"],
         "color": "#9f8b3e",
-    }
+    },
+    {
+        "tag": "Black Hack",
+        "keywords": ["black hack"],
+        "color": "#9f8b3e",
+    },
+    {
+        "tag": "Cairn",
+        "keywords": ["cairn"],
+        "color": "#9f8b3e",
+    },
 ]
 
 

@@ -239,6 +239,49 @@ def test_lex_weight_sets_the_bm25_share(hybrid_client):
     assert filenames == ["monsters.pdf", "rules.pdf"]
 
 
+@pytest.fixture
+def deep_dense_client(client, test_collection, tmp_path, monkeypatch):
+    """Twelve dense candidates — more than the minimum rerank pool of 10 —
+    plus the BM25-only stat block, which weighted RRF ranks last."""
+    _stage_hybrid_chunks(test_collection, tmp_path)
+    ids = [f"c-d{i}" for i in range(12)]
+    fake_dense = {
+        "ids": [ids],
+        "documents": [[f"combat prose {i}" for i in range(12)]],
+        "metadatas": [[_meta(f"p-d{i}", "rules.pdf") for i in range(12)]],
+        "distances": [[0.1 + i / 100 for i in range(12)]],
+    }
+    monkeypatch.setattr(
+        type(test_collection), "query", lambda self, **kw: fake_dense)
+    return client
+
+
+def _scored_docs(client, monkeypatch, **overrides):
+    import server
+
+    scored = []
+    monkeypatch.setattr(
+        server, "rerank_scores",
+        lambda q, docs: scored.extend(docs) or [0.5] * len(docs))
+    _search(client, hybrid=True, rerank=True, rerank_candidates=10,
+            spell_correction=False, **overrides)
+    return scored
+
+
+def test_hybrid_rerank_pool_adds_the_bm25_top_m(deep_dense_client, monkeypatch):
+    """The pool is the head of the order plus the BM25 top-M — not the
+    fused top-N, which a down-weighted BM25-only hit can never reach."""
+    scored = _scored_docs(deep_dense_client, monkeypatch, lex_pool=1)
+    assert len(scored) == 11
+    assert any("owlbear" in d for d in scored)
+
+
+def test_hybrid_lex_pool_zero_is_the_fused_head(deep_dense_client, monkeypatch):
+    scored = _scored_docs(deep_dense_client, monkeypatch, lex_pool=0)
+    assert len(scored) == 10
+    assert not any("owlbear" in d for d in scored)
+
+
 def test_hybrid_bm25_only_candidate_has_floor_relevance(hybrid_client):
     """No cosine distance exists for a BM25-only candidate: with rerank
     off it reports the sentinel 0.0 rather than a made-up score."""

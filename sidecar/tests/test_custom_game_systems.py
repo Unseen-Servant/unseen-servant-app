@@ -20,14 +20,14 @@ from server import CUSTOM_SYSTEMS_FILENAME
 def test_create_custom_system(client):
     """Creating a custom system should return the new entry."""
     response = client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn", "cairn 2e"],
+        "tag": "Mothership",
+        "keywords": ["mothership", "mothership 2e"],
     })
 
     assert response.status_code == 200
     data = response.json()
-    assert data["tag"] == "Cairn"
-    assert data["keywords"] == ["cairn", "cairn 2e"]
+    assert data["tag"] == "Mothership"
+    assert data["keywords"] == ["mothership", "mothership 2e"]
 
 
 def test_create_builtin_override(client):
@@ -88,17 +88,17 @@ def test_create_empty_tag_rejected(client):
 def test_custom_system_in_known_list(client):
     """Custom systems should appear in known-game-systems with is_builtin=False."""
     client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+        "tag": "Mothership",
+        "keywords": ["mothership"],
     })
 
     response = client.get("/api/known-game-systems")
     data = response.json()
 
-    cairn = next(s for s in data["systems"] if s["tag"] == "Cairn")
-    assert cairn["is_builtin"] is False
-    assert cairn["is_customized"] is False
-    assert "cairn" in cairn["keywords"]
+    mothership = next(s for s in data["systems"] if s["tag"] == "Mothership")
+    assert mothership["is_builtin"] is False
+    assert mothership["is_customized"] is False
+    assert "mothership" in mothership["keywords"]
 
 
 def test_builtins_have_is_builtin_true(client):
@@ -128,19 +128,19 @@ def test_known_systems_include_keywords(client):
 def test_update_custom_system(client):
     """Updating a custom system should change its fields."""
     client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+        "tag": "Mothership",
+        "keywords": ["mothership"],
     })
 
-    response = client.put("/api/custom-game-systems/Cairn", json={
-        "tag": "Cairn 2E",
-        "keywords": ["cairn", "cairn 2e", "cairn second edition"],
+    response = client.put("/api/custom-game-systems/Mothership", json={
+        "tag": "Mothership 2E",
+        "keywords": ["mothership", "mothership 2e", "mothership second edition"],
     })
 
     assert response.status_code == 200
     data = response.json()
-    assert data["tag"] == "Cairn 2E"
-    assert "cairn 2e" in data["keywords"]
+    assert data["tag"] == "Mothership 2E"
+    assert "mothership 2e" in data["keywords"]
 
 
 def test_edit_builtin_creates_override(client):
@@ -174,18 +174,18 @@ def test_update_nonexistent_system(client):
 def test_delete_custom_system(client):
     """Deleting a custom system should remove it from the known list."""
     client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+        "tag": "Mothership",
+        "keywords": ["mothership"],
     })
 
-    response = client.delete("/api/custom-game-systems/Cairn")
+    response = client.delete("/api/custom-game-systems/Mothership")
     assert response.status_code == 200
-    assert response.json()["deleted"] == "Cairn"
+    assert response.json()["deleted"] == "Mothership"
 
     # Verify it's gone from the known list
     known = client.get("/api/known-game-systems").json()
     tags = [s["tag"] for s in known["systems"]]
-    assert "Cairn" not in tags
+    assert "Mothership" not in tags
 
 
 def test_delete_builtin_override_resets_to_defaults(client):
@@ -256,7 +256,7 @@ def test_reenable_builtin(client):
 def test_toggle_nonbuiltin_rejected(client):
     """Toggling a non-built-in tag should return 400."""
     response = client.post("/api/custom-game-systems/toggle-builtin", json={
-        "tag": "Cairn",
+        "tag": "Mothership",
         "disabled": True,
     })
     assert response.status_code == 400
@@ -269,8 +269,8 @@ def test_toggle_nonbuiltin_rejected(client):
 def test_persist_to_disk(client, tmp_path):
     """Custom systems should be saved to disk as JSON."""
     client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+        "tag": "Mothership",
+        "keywords": ["mothership"],
     })
 
     config_path = tmp_path / CUSTOM_SYSTEMS_FILENAME
@@ -279,7 +279,7 @@ def test_persist_to_disk(client, tmp_path):
     raw = json.loads(config_path.read_text())
     assert raw["version"] == 1
     assert len(raw["systems"]) == 1
-    assert raw["systems"][0]["tag"] == "Cairn"
+    assert raw["systems"][0]["tag"] == "Mothership"
 
 
 def test_missing_file_loads_empty(client):
@@ -342,16 +342,16 @@ def test_known_systems_include_default_colors(client):
 def test_create_custom_with_color(client, tmp_path):
     """Custom system stores the chosen color and surfaces it via known-systems."""
     response = client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+        "tag": "Mothership",
+        "keywords": ["mothership"],
         "color": "#2fa094",
     })
     assert response.status_code == 200
     assert response.json()["color"] == "#2fa094"
 
     known = client.get("/api/known-game-systems").json()
-    cairn = next(s for s in known["systems"] if s["tag"] == "Cairn")
-    assert cairn["color"] == "#2fa094"
+    mothership = next(s for s in known["systems"] if s["tag"] == "Mothership")
+    assert mothership["color"] == "#2fa094"
 
 
 def test_create_custom_without_color_stays_unset(client):
@@ -370,13 +370,13 @@ def test_create_custom_without_color_stays_unset(client):
 def test_update_custom_changes_color(client):
     """Updating a custom system replaces the stored color."""
     client.post("/api/custom-game-systems", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+        "tag": "Mothership",
+        "keywords": ["mothership"],
         "color": "#2fa094",
     })
-    response = client.put("/api/custom-game-systems/Cairn", json={
-        "tag": "Cairn",
-        "keywords": ["cairn"],
+    response = client.put("/api/custom-game-systems/Mothership", json={
+        "tag": "Mothership",
+        "keywords": ["mothership"],
         "color": "#b5739f",
     })
     assert response.status_code == 200

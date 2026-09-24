@@ -30,6 +30,11 @@ RRF_K = 60  # standard reciprocal-rank-fusion constant
 # queries). `SearchRequest.lex_weight` overrides it for eval sweeps.
 LEXICAL_RRF_WEIGHT = 0.3
 
+# BM25 top-M that joins the dense top-N in the hybrid rerank pool
+# (union, not fused order: a down-weighted BM25-only hit can never
+# rank into a fused top-N). `SearchRequest.lex_pool` overrides it.
+LEXICAL_RERANK_POOL = 10
+
 # Unicode word characters minus "_" — matches what FTS5's unicode61
 # tokenizer treats as a token, so accented terms ("écran") stay whole.
 _TOKEN_RE = re.compile(r"[^\W_]+")
