@@ -169,6 +169,9 @@ uv run --project sidecar python -m evals.retrieval.report evals/baselines/<stem>
 # readable@5 + the anchors to fix).
 uv run --project sidecar python -m evals.blind.generate evals/baselines/<stem> --open
 uv run --project sidecar python -m evals.blind.score    evals/baselines/<stem>
+# Carry a scored round onto a later baseline whose results contain the labeled chunks
+# (sections ⊇ parents): prints human MRR@5 bounds, readable@5 and coverage.
+uv run --project sidecar python -m evals.blind.transfer evals/baselines/<scored-stem> evals/baselines/<target-stem>
 ```
 
 ## Engines
