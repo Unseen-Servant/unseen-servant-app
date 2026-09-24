@@ -18,7 +18,7 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   rerank: true,
   rerank_candidates: 50,
   spell_correction: true,
-  hybrid: false,
+  hybrid: true,
   variant_expansion: false,
 };
 

@@ -95,6 +95,7 @@ def _meta(parent_id: str, filename: str, game_system: str) -> dict:
 # Wrong-system chunk wins on raw cosine (distance 0.10 < 0.30); the
 # right-system chunk should win once partitioned to the front.
 FAKE_RESULTS = {
+    "ids": [["c-osr", "c-srd"]],
     "documents": [["osr fireball text", "srd fireball text"]],
     "metadatas": [[
         _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),
@@ -166,6 +167,7 @@ def test_unknown_tag_falls_back_to_source_path_detection(
     """Chunks indexed before the keyword existed carry 'unknown'; the
     boost re-detects from the source path at query time (no re-index)."""
     fake = {
+        "ids": [["c-osr", "c-bf"]],
         "documents": [["osr initiative text", "black flag initiative text"]],
         "metadatas": [[
             _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),
@@ -223,6 +225,7 @@ def test_boost_fills_the_rerank_pool_with_the_named_system(
     import server
 
     fake = {
+        "ids": [["c-osr", "c-srd"]],
         "documents": [["osr text", "srd text"]],
         "metadatas": [[
             _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),

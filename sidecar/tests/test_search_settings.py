@@ -7,6 +7,8 @@ override: resolution order is request field > persisted setting >
 built-in default (docs/retrieval/2026-07-11-search-settings-design.md).
 """
 
+import json
+
 import pytest
 
 import server
@@ -38,7 +40,7 @@ def test_get_settings_defaults(client):
         "rerank": True,
         "rerank_candidates": 50,
         "spell_correction": True,
-        "hybrid": False,
+        "hybrid": True,
         "variant_expansion": False,
     }
 
@@ -76,9 +78,27 @@ def test_put_invalid_type_rejected(client):
 
 
 def test_settings_survive_on_disk(client, tmp_path):
-    client.put("/api/search-settings", json={"hybrid": True})
+    client.put("/api/search-settings", json={"hybrid": False})
     assert (tmp_path / "search_settings.json").exists()
-    assert load_search_settings(tmp_path).hybrid is True
+    assert load_search_settings(tmp_path).hybrid is False
+
+
+def test_v1_file_hybrid_false_is_the_old_default(tmp_path):
+    """v1 files wrote every field, so `hybrid: false` there is the old
+    default rather than a choice: it gives way to the new default-on.
+    Other v1 values are kept."""
+    (tmp_path / "search_settings.json").write_text(
+        '{"rerank": false, "hybrid": false}')
+    loaded = load_search_settings(tmp_path)
+    assert loaded.hybrid is True
+    assert loaded.rerank is False
+
+
+def test_v2_file_keeps_an_explicit_hybrid_off(client, tmp_path):
+    client.put("/api/search-settings", json={"hybrid": False})
+    raw = json.loads((tmp_path / "search_settings.json").read_text())
+    assert raw["version"] == 2
+    assert load_search_settings(tmp_path).hybrid is False
 
 
 def test_corrupt_settings_file_falls_back(client, tmp_path):

@@ -27,11 +27,11 @@ describe('normalizeSearchSettings', () => {
     const result = normalizeSearchSettings({
       rerank: 'yes',
       rerank_candidates: 'many',
-      hybrid: true,
+      hybrid: false,
     });
     expect(result.rerank).toBe(true);
     expect(result.rerank_candidates).toBe(50);
-    expect(result.hybrid).toBe(true);
+    expect(result.hybrid).toBe(false);
   });
 
   it('clamps out-of-range pool sizes', () => {

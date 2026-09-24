@@ -149,26 +149,26 @@
         </select>
       </div>
 
+      <div class="setting-row">
+        <div class="setting-row-head">
+          <div class="setting-row-title">Hybrid keyword search</div>
+          <div class="setting-row-desc">
+            Adds exact-keyword (BM25) matches to semantic results. Helps
+            rare names and exact terms.
+          </div>
+        </div>
+        <select
+          class="setting-select"
+          value={settings.hybrid ? 'on' : 'off'}
+          on:change={setBool('hybrid')}
+        >
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+
       <fieldset class="experimental-group">
         <legend class="experimental-legend readout-label">Experimental</legend>
-
-        <div class="setting-row">
-          <div class="setting-row-head">
-            <div class="setting-row-title">Hybrid keyword search</div>
-            <div class="setting-row-desc">
-              Blends exact-keyword (BM25) matches into semantic results.
-              Helps rare exact terms.
-            </div>
-          </div>
-          <select
-            class="setting-select"
-            value={settings.hybrid ? 'on' : 'off'}
-            on:change={setBool('hybrid')}
-          >
-            <option value="on">On</option>
-            <option value="off">Off</option>
-          </select>
-        </div>
 
         <div class="setting-row">
           <div class="setting-row-head">
@@ -297,10 +297,6 @@
     flex-direction: column;
     gap: 0.1rem;
   }
-  .experimental-group .setting-row + .setting-row {
-    border-top: 1px solid var(--border-subtle);
-  }
-
   .experimental-legend {
     padding: 0 0.3rem;
   }

@@ -214,10 +214,13 @@ def _search(client, **overrides):
     return resp.json()["results"]
 
 
-def test_hybrid_off_by_default(hybrid_client):
-    """Without the flag the BM25-only chunk must not appear."""
-    filenames = [r["filename"] for r in _search(hybrid_client)]
-    assert filenames == ["rules.pdf"]
+def test_hybrid_on_by_default(hybrid_client):
+    """Default-on since 2026-09-23: without the flag the BM25-only chunk
+    appears; switched off, it doesn't."""
+    assert [r["filename"] for r in _search(hybrid_client)] == [
+        "rules.pdf", "monsters.pdf"]
+    assert [r["filename"] for r in _search(hybrid_client, hybrid=False)] == [
+        "rules.pdf"]
 
 
 def test_hybrid_pulls_in_bm25_only_candidate(hybrid_client):

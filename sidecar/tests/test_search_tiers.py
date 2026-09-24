@@ -126,8 +126,8 @@ def _upsert_parents(collection, n: int) -> None:
 
 def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatch):
     """With a rerank pool smaller than the picked page, results beyond the
-    pool must be rescored by a second rerank_scores call so the page is
-    single-scale. Pool size arrives via the request's rerank_candidates
+    pool must be scored by a second rerank_scores call so the page is
+    single-scale (scores only: the tail is not re-sorted into the head). Pool size arrives via the request's rerank_candidates
     knob (clamped to RERANK_POOL_MIN, so the fixture outnumbers it)."""
     import server
 
@@ -157,10 +157,6 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
 
     for r in results:
         assert r["reranked"] is True
-
-    # Single scale → the list must be sorted by relevance, descending.
-    relevances = [r["relevance"] for r in results]
-    assert relevances == sorted(relevances, reverse=True)
 
 
 def test_straggler_rescore_failure_keeps_honest_mixed_flags(client, test_collection, monkeypatch):

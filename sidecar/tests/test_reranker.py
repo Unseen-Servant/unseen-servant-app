@@ -30,11 +30,16 @@ def test_load_failure_returns_none(monkeypatch):
     """If the model load raises, fall back gracefully (caller reverts to cosine)."""
     monkeypatch.delenv("RERANK_DISABLED", raising=False)
 
-    def boom(model_name):
-        raise RuntimeError("simulated load failure")
+    class Boom:
+        @classmethod
+        def add_custom_model(cls, *a, **kw):
+            pass
+
+        def __init__(self, model_name, **kw):
+            raise RuntimeError("simulated load failure")
 
     class FakeModule:
-        TextCrossEncoder = boom
+        TextCrossEncoder = Boom
 
     import sys
     monkeypatch.setitem(sys.modules, "fastembed.rerank.cross_encoder", FakeModule)
@@ -46,7 +51,11 @@ def test_scoring_failure_returns_none(monkeypatch):
     monkeypatch.delenv("RERANK_DISABLED", raising=False)
 
     class FakeReranker:
-        def __init__(self, model_name):
+        @classmethod
+        def add_custom_model(cls, *a, **kw):
+            pass
+
+        def __init__(self, model_name, **kw):
             pass
 
         def rerank(self, query, docs):
@@ -65,7 +74,11 @@ def test_sigmoid_normalises_into_0_to_1(monkeypatch):
     monkeypatch.delenv("RERANK_DISABLED", raising=False)
 
     class FakeReranker:
-        def __init__(self, model_name):
+        @classmethod
+        def add_custom_model(cls, *a, **kw):
+            pass
+
+        def __init__(self, model_name, **kw):
             pass
 
         def rerank(self, query, docs):
@@ -90,12 +103,17 @@ def test_load_failure_is_cached(monkeypatch):
 
     calls = {"n": 0}
 
-    def counting_loader(model_name):
-        calls["n"] += 1
-        raise RuntimeError("nope")
+    class CountingLoader:
+        @classmethod
+        def add_custom_model(cls, *a, **kw):
+            pass
+
+        def __init__(self, model_name, **kw):
+            calls["n"] += 1
+            raise RuntimeError("nope")
 
     class FakeModule:
-        TextCrossEncoder = counting_loader
+        TextCrossEncoder = CountingLoader
 
     import sys
     monkeypatch.setitem(sys.modules, "fastembed.rerank.cross_encoder", FakeModule)
@@ -104,3 +122,36 @@ def test_load_failure_is_cached(monkeypatch):
     reranker.rerank_scores("q", ["b"])
     reranker.rerank_scores("q", ["c"])
     assert calls["n"] == 1
+
+
+def test_default_model_is_the_int8_l6_in_its_own_cache(monkeypatch, tmp_path):
+    """The default registers Xenova's quantized L-6 file and loads it from
+    a dedicated cache dir (a cached fp32 snapshot of the same repo would
+    otherwise make fastembed skip the quantized download)."""
+    monkeypatch.delenv("RERANK_DISABLED", raising=False)
+    monkeypatch.delenv("RERANK_MODEL", raising=False)
+    monkeypatch.setenv("FASTEMBED_CACHE_PATH", str(tmp_path))
+    seen = {}
+
+    class FakeReranker:
+        @classmethod
+        def add_custom_model(cls, model, sources, model_file, **kw):
+            seen["registered"] = (model, sources.hf, model_file)
+
+        def __init__(self, model_name, **kw):
+            seen["loaded"] = (model_name, kw.get("cache_dir"))
+
+        def rerank(self, query, docs):
+            return iter([0.0] * len(docs))
+
+    class FakeModule:
+        TextCrossEncoder = FakeReranker
+
+    import sys
+    monkeypatch.setitem(sys.modules, "fastembed.rerank.cross_encoder", FakeModule)
+    assert reranker.rerank_scores("q", ["d"]) == [0.5]
+    assert seen["registered"] == (
+        reranker.DEFAULT_MODEL, "Xenova/ms-marco-MiniLM-L-6-v2",
+        "onnx/model_quantized.onnx")
+    assert seen["loaded"] == (
+        reranker.DEFAULT_MODEL, str(tmp_path / "legend-lore-rerank-q8"))

@@ -11,12 +11,13 @@ existing bge-m3 embedding pipeline. No PyTorch dependency, no API
 calls; the model weights download once on first use and are then
 cached under ``~/.cache/huggingface/``.
 
-The default model is ``Xenova/ms-marco-MiniLM-L-12-v2`` rather than a
-BGE-family reranker for performance reasons: the smallest BGE
-reranker (``BAAI/bge-reranker-base``) takes ~6 seconds to score 50
-candidates on CPU, which is unusable for interactive search. The
-MS-MARCO L-12 model scores the same batch in ~100 ms. If quality
-becomes a problem, ``RERANK_MODEL`` can be overridden.
+The default is MS-MARCO MiniLM-L-6 with int8 weights (Xenova's
+``onnx/model_quantized.onnx``, registered below as a fastembed custom
+model): 222 ms for 60 real ~1000-char pairs on an M-series CPU vs 491 ms
+for L-6 fp32 and 981 ms for the previous default L-12 (2026-09-23,
+roadmap 3.2), with scores correlating 0.996 with fp32 L-6. BGE-family
+rerankers take seconds per 50 pairs on CPU — unusable interactively.
+``RERANK_MODEL`` overrides the default.
 
 The reranker is loaded lazily on first use and cached. If loading or
 scoring fails (model missing, network down, etc.) we return None so
@@ -26,10 +27,9 @@ must keep working even without the reranker available.
 Configuration via env vars:
 
 * ``RERANK_MODEL`` — fastembed model name. Default
-  ``Xenova/ms-marco-MiniLM-L-12-v2`` (120 MB, English, ~100 ms / 50
-  docs). Lighter still: ``Xenova/ms-marco-MiniLM-L-6-v2`` (80 MB,
-  ~50 ms). Heavier (1+ GB, slower): ``BAAI/bge-reranker-base``,
-  ``jinaai/jina-reranker-v2-base-multilingual``.
+  ``legend-lore/ms-marco-MiniLM-L-6-v2-q8`` (~23 MB). Previous default:
+  ``Xenova/ms-marco-MiniLM-L-12-v2`` (120 MB). Heavier (1+ GB, slower):
+  ``BAAI/bge-reranker-base``, ``jinaai/jina-reranker-v2-base-multilingual``.
 * ``RERANK_DISABLED`` — set to ``1`` to short-circuit and skip loading
   the model entirely. Useful in tests or for users who want to ship
   without the dependency.
@@ -39,12 +39,21 @@ from __future__ import annotations
 import logging
 import math
 import os
+import tempfile
 import threading
 
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "Xenova/ms-marco-MiniLM-L-12-v2"
+DEFAULT_MODEL = "legend-lore/ms-marco-MiniLM-L-6-v2-q8"
+
+# int8 variants of Xenova's MS-MARCO cross-encoders, registered as
+# fastembed custom models: name → (HF repo, size in GB).
+_QUANTIZED = {
+    DEFAULT_MODEL: ("Xenova/ms-marco-MiniLM-L-6-v2", 0.023),
+    "legend-lore/ms-marco-MiniLM-L-12-v2-q8": (
+        "Xenova/ms-marco-MiniLM-L-12-v2", 0.034),
+}
 
 _lock = threading.Lock()
 _reranker = None
@@ -75,7 +84,10 @@ def _get_reranker():
             from fastembed.rerank.cross_encoder import TextCrossEncoder
             model_name = os.getenv("RERANK_MODEL", DEFAULT_MODEL)
             logger.info("Loading re-ranker: %s", model_name)
-            _reranker = TextCrossEncoder(model_name=model_name)
+            if model_name in _QUANTIZED:
+                _reranker = _load_quantized(TextCrossEncoder, model_name)
+            else:
+                _reranker = TextCrossEncoder(model_name=model_name)
         except Exception as e:
             logger.warning(
                 "Re-ranker load failed (%s); falling back to vector order", e
@@ -83,6 +95,34 @@ def _get_reranker():
             _load_failed = True
             return None
     return _reranker
+
+
+def _load_quantized(TextCrossEncoder, model_name: str):
+    """An int8 MS-MARCO cross-encoder, registered as a fastembed custom
+    model (Xenova's ``onnx/model_quantized.onnx``).
+
+    Each gets its own cache directory: its HF repo is the same one as the
+    built-in fp32 model, and fastembed treats a cached snapshot of that
+    repo as complete, so it would never fetch the quantized file.
+    """
+    from fastembed.common.model_description import ModelSource
+
+    repo, size = _QUANTIZED[model_name]
+    try:
+        TextCrossEncoder.add_custom_model(
+            model_name,
+            sources=ModelSource(hf=repo),
+            model_file="onnx/model_quantized.onnx",
+            size_in_gb=size,
+        )
+    except ValueError:
+        pass  # already registered in this process
+    base = os.getenv("FASTEMBED_CACHE_PATH") or os.path.join(
+        tempfile.gettempdir(), "fastembed_cache")
+    return TextCrossEncoder(
+        model_name=model_name,
+        cache_dir=os.path.join(base, "legend-lore-rerank-q8"),
+    )
 
 
 def rerank_scores(query: str, docs: list[str]) -> list[float] | None:

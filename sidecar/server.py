@@ -602,10 +602,10 @@ class SearchRequest(BaseModel):
     # RERANK_POOL_MIN..RERANK_POOL_MAX). Built-in default is
     # RERANK_CANDIDATE_POOL (env RERANK_CANDIDATES, 50).
     rerank_candidates: int | None = None
-    # hybrid: experimental (BM25 re-test, 2026-07-01 roadmap REOPEN
-    # item): fuse a BM25 ranking over the same chunks into the dense
-    # candidate pool via reciprocal-rank fusion. Default off — does not
-    # change production search behavior.
+    # hybrid: BM25 over the same chunks joins the dense ranking — the
+    # BM25 top-M enters the rerank pool (roadmap 3.1). Default on since
+    # 2026-09-23 (`2026-09-23-v2-hybrid`: keyword MRR@5 0.882 → 0.912,
+    # cued 0.729 → 0.771, no query worse).
     hybrid: bool | None = None
     # lex_weight: RRF weight of the BM25 ranking under `hybrid` (dense
     # rankings weigh 1.0). Request-only eval knob, not a persisted
@@ -644,13 +644,17 @@ class SearchRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 SEARCH_SETTINGS_FILENAME = "search_settings.json"
+# v2 (2026-09-23): hybrid became default-on. v1 files wrote every field,
+# so their `hybrid: false` is the old default, not a choice — it is
+# dropped on load. Files without a version are v1.
+SEARCH_SETTINGS_VERSION = 2
 
 
 class SearchSettings(BaseModel):
     rerank: bool = True
     rerank_candidates: int = RERANK_CANDIDATE_POOL
     spell_correction: bool = True
-    hybrid: bool = False
+    hybrid: bool = True
     variant_expansion: bool = False
 
     @field_validator("rerank_candidates")
@@ -676,6 +680,8 @@ def load_search_settings(data_dir: Path) -> SearchSettings:
         return SearchSettings()
     try:
         raw = json.loads(path.read_text())
+        if raw.get("version", 1) < 2:
+            raw.pop("hybrid", None)
         known = {k: raw[k] for k in SearchSettings.model_fields if k in raw}
         return SearchSettings(**known)
     except Exception as e:
@@ -687,7 +693,10 @@ def save_search_settings(data_dir: Path, settings: SearchSettings) -> None:
     """Write search settings to disk atomically."""
     path = data_dir / SEARCH_SETTINGS_FILENAME
     tmp_path = path.with_suffix(".json.tmp")
-    tmp_path.write_text(settings.model_dump_json(indent=2))
+    tmp_path.write_text(json.dumps(
+        {**settings.model_dump(), "version": SEARCH_SETTINGS_VERSION},
+        indent=2,
+    ))
     os.replace(tmp_path, path)
 
 
@@ -2249,8 +2258,12 @@ def _search_sync(
         # Re-rank the top of the candidate pool with a cross-encoder.
         # Scoring (query, chunk-text) jointly is more accurate than raw
         # cosine, especially when several candidates are topically
-        # adjacent. Trailing candidates stay in cosine order so the
-        # dedupe loop never starves if a section has many slices.
+        # adjacent. It reorders the pool outright: a blend with the
+        # pool's retrieval order lost on every scope (2026-09-23, roadmap
+        # 3.2) — BM25-admitted candidates sit at the pool's tail, so the
+        # blend pinned down exactly what the union pool let in. Trailing
+        # candidates keep retrieval order so the dedupe loop never
+        # starves if a section has many slices.
         #
         # Section_heading is prepended to mirror what the embedder saw
         # (`_embed_text`). Without the breadcrumb the cross-encoder is
@@ -2351,7 +2364,6 @@ def _search_sync(
                     "distance": distance,
                     "doc": ordered_docs[i],
                     "reranked": reranked[i],
-                    "matched": matched[i] if matched is not None else False,
                 })
                 if len(picked) >= request.n_results:
                     break
@@ -2366,35 +2378,23 @@ def _search_sync(
         exhausted = len(picked) < request.n_results
 
         # Single-scale page (issue #306): when the reranker ran, picked
-        # results that came from the cosine tail are rescored with the
-        # cross-encoder in one small batch (≤ n_results pairs), so every
-        # returned relevance is on the same scale. On failure the tail
-        # keeps its cosine score and an honest reranked=False flag.
+        # results from beyond the pool are scored with the cross-encoder
+        # in one small batch (≤ n_results pairs), so every returned
+        # relevance and tier is on one scale. Scores only: re-sorting
+        # the tail into the head would undo the system-boost partition.
+        # On failure the tail keeps its cosine score and reranked=False.
         if rerank_applied:
             stragglers = [p for p in picked if not p["reranked"]]
             if stragglers:
-                straggler_inputs = [
+                straggler_scores = rerank_scores(query_text, [
                     f"{p['metadata']['section_heading']}\n\n{p['doc']}"
                     if p["metadata"].get("section_heading") else p["doc"]
                     for p in stragglers
-                ]
-                straggler_scores = rerank_scores(
-                    query_text, straggler_inputs
-                )
+                ])
                 if straggler_scores is not None:
-                    for p, s in zip(stragglers, straggler_scores):
-                        p["distance"] = 1.0 - s
+                    for p, sc in zip(stragglers, straggler_scores):
+                        p["distance"] = 1.0 - sc
                         p["reranked"] = True
-                    # All picked distances are now cross-encoder scale;
-                    # stable sort keeps head order, interleaves the
-                    # rescored tail where it belongs — inside its
-                    # partition when the system boost is active.
-                    picked.sort(
-                        key=lambda p: (
-                            not p["matched"],
-                            -max(0.0, 1.0 - p["distance"]),
-                        )
-                    )
 
         # The section each hit is answered with, plus the hit's own
         # parent (one batched IN query) for the narrower `chunk_text`.
