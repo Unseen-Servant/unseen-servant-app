@@ -19,6 +19,10 @@ Where the v2 retrieval roadmap stands and what is left. Written to pick the work
 
 **Update 2026-09-24 — 3.4 landed** (§8 row): rerank tiers strong ≥ 0.98 / weak < 0.5, fit on carried blind labels; real library (reindexed 2026-09-24) now 27 % strong. MCP weak divider opens the trailing weak run. Phase 3 is complete except the optional **3.5** spell tie-break; next is **Phase 4** (blind round on the final configuration, library tier queries in `evals/retrieval/library.yaml`, CHANGELOG, release tag) and the Phase 5 decision (roadmap §4). Quick exploratory runs: `--reuse-index --data-dir evals/.eval_data/v2-p3 --no-write --no-index` (current pipeline, deterministic, ~2 min); `evals/.eval_data/v2` is stale (no FTS rows — the harness's idempotent indexing ignores `pipeline_version`).
 
+**Update 2026-09-24 — 3.5 landed (59b0f1c); Phase 4 cut down to the release** (§8 rows). No new blind round (transferred labels on `2026-09-24-v2-rerank`: human single 0.906, readable@5 0.979, 70 % covered) and no library tier this release. What remains: licence gate (`scripts/check-third-party.py --release` fails — see below), `bump-version.sh 3.0.0`, date the CHANGELOG `[3.0.0]` entry, local `npm run tauri build` + `scripts/build-sidecar.sh`, tag `v3.0.0`. Then the Phase 5 decision.
+
+**Release blocker (2026-09-24):** `third_party/components.json` has 8 non-approved entries, and release mode fails closed. The shipped v2 sidecar's `pymupdf4llm` / `PyMuPDF` are `blocked` (AGPL); the rest are v3-era entries (pypdfium2, pdfplumber, pdfminer.six, PP-DocLayout-M) that v2 does not ship, plus the bge-m3 and MiniLM-L6 exports, which need their actual shipped forms (Ollama bge-m3; Xenova int8 L-6 via fastembed) recorded. The inventory also omits things the v2 sidecar does ship (chromadb, fastembed, symspellpy and its bigram list, Ollama as a prerequisite).
+
 | measure | phase0b | headings | sections | bar |
 |---|---|---|---|---|
 | auto all MRR@5 | 0.766 | 0.790 | 0.862 | ≥ 0.82 |

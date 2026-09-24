@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [3.0.0] - Unreleased
+
+Search is rebuilt from the index up. **Re-index your library after updating** — Library settings lists the files still indexed with the older pipeline. Until a file is re-indexed it keeps working, but without whole sections, keyword matching or printed page numbers.
+
+### Added
+
+- **Hybrid keyword search, on by default.** Exact-term matches now sit alongside meaning-based ones, so rare names, stat codes and a book's own jargon find their page even when the embedding misses them. The toggle has left the Experimental group; a settings file saved by an earlier version that only recorded the old default comes back on
+- **Results are whole sections.** A hit returns the section it belongs to rather than an isolated 1,000-character slice, so a stat block, a spell or a table arrives in one piece instead of split across three results, and one section never fills the list twice
+- **Editions collapse into one result.** When the same passage appears in several books — the SRD 5.1 and 5.2.1, say — you get one result with a `+1 edition` chip, and the inspector lists the other books under "also in"
+- **The inspector jumps to the match.** The passage that matched is highlighted and scrolled into view, and Markdown tables render as tables
+- **Citations use the printed page number.** TTRPG PDFs carry covers and front matter, so PDF page 312 is often printed as 276; results and Claude's citations now lead with the number on the paper, with the PDF page alongside
+- **Claude gets two new tools.** `get_section` fetches a whole section by id and `get_pages` reads a page range straight from a book, so Claude can drill in from a search hit instead of searching again
+- Year Zero Engine, The Black Hack and Cairn join the default game systems
+
+### Changed
+
+- **Search is about three times faster.** A quantised reranker cuts a typical query from over a second to about a third of one, on the same hardware. The new model (about 23 MB) downloads once, the first time the app starts
+- **Naming a game system puts its books first.** "grapple dnd 5e" leads with your D&D 5e books; the rest follow in their own order instead of being dropped
+- **Fewer results claim to be strong matches.** Relevance tiers are recalibrated on human-judged results, so "strong" now means the answer is very likely there — about a quarter of results earn it, down from over half
+- **Section titles are clean.** Headings no longer carry stray markup, letter-spaced small caps ("S P E L L S"), or a page footer masquerading as a chapter, which also sharpens what search matches on
+- **Spell correction reads the words around a typo.** It picks the correction that fits the neighbouring words in your own books ("thief skill", "chain mail") and in ordinary English questions ("how does"), cutting wrong corrections by a third to a half. Game-system names are never corrected — "dnd" no longer becomes "and"
+- **Claude's search answers are compact.** `search_library` returns 8 results with a short matched passage and a pointer to the full section, keeping answers small enough for local models; `full_text=True` restores whole sections under an 8,000-character budget
+- The first search after the app has sat idle no longer pays a slow warm-up, and each search reads settings once instead of on every step
+
+### Fixed
+
+- A dropped connection to the embedding model mid-index is retried instead of aborting the whole book — large books such as OSRIC hit it reliably
+- A search result's page range covers only the pages its text is on, not the whole run of pages around it
+
 ## [2.3.0] - 2026-08-14
 
 ### Changed
