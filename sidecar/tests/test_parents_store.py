@@ -310,6 +310,19 @@ def test_where_to_sql_rejects_unknown_operators():
         where_to_sql({"page_start": 3})
 
 
+def test_where_to_sql_degenerate_shapes():
+    """An unscoped sub-clause is TRUE; an empty $or matches nothing."""
+    assert where_to_sql({"$and": []}) == ("", [])
+    assert where_to_sql({"$and": [{}, {"filename": "a.pdf"}]}) == ("(filename = ?)", ["a.pdf"])
+    assert where_to_sql({"$or": [{}, {"filename": "a.pdf"}]}) == ("", [])
+    assert where_to_sql({"$or": []}) == ("0", [])
+
+
+def test_fts_search_with_an_empty_or_returns_nothing(tmp_path):
+    upsert_units_fts(tmp_path, "/lib/a.pdf", [("a_0", 0, "a.pdf", "OSR", "p1", "owlbear")])
+    assert search_units_fts(tmp_path, '"owlbear"', 5, {"$or": []}) == []
+
+
 def test_rename_source_rewrites_ids_from_ordinals(tmp_path):
     upsert_parents(tmp_path, "/old/a.pdf", [_parent("p1", "/old/a.pdf")])
     upsert_units_fts(tmp_path, "/old/a.pdf", [("h_a_0", 0, "a.pdf", "OSR", "p1", "text"), ("h_a_1", 1, "a.pdf", "OSR", "p1", "more")])

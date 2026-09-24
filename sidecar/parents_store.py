@@ -542,7 +542,9 @@ def where_to_sql(where: dict | None) -> tuple[str, list]:
 
     Supports exactly the shapes /api/search builds: field equality,
     ``{"$in": [...]}``, ``$and``, and ``$or``, over `_FTS_FIELDS`.
-    Returns (sql_fragment, params); ``("", [])`` when unscoped.
+    Returns (sql_fragment, params); ``("", [])`` when unscoped. An
+    unscoped sub-clause (``{}``) is TRUE: dropped from ``$and``, and it
+    makes an ``$or`` unscoped; an empty ``$or`` matches nothing.
     """
     if not where:
         return "", []
@@ -551,8 +553,14 @@ def where_to_sql(where: dict | None) -> tuple[str, list]:
         parts, params = [], []
         for w in where[op]:
             s, p = where_to_sql(w)
+            if not s:
+                if op == "$or":
+                    return "", []
+                continue
             parts.append(f"({s})")
             params += p
+        if not parts:
+            return ("0", []) if op == "$or" else ("", [])
         return (" AND " if op == "$and" else " OR ").join(parts), params
     ((field, cond),) = where.items()
     if field not in _FTS_FIELDS:

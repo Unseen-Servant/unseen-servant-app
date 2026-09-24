@@ -32,11 +32,25 @@ def test_fts_match_ors_quoted_tokens():
 def test_fts_match_quotes_away_fts5_syntax():
     """Punctuation is dropped and every token is quoted, so FTS5
     operators in user text are matched literally instead of parsed."""
-    assert fts_match("fire-breath NOT *") == '"fire" OR "breath" OR "NOT"'
+    assert fts_match("fire-breath NEAR *") == '"fire" OR "breath" OR "NEAR"'
 
 
 def test_fts_match_of_a_tokenless_query_is_empty():
     assert fts_match("???") == ""
+
+
+def test_fts_match_drops_stopwords():
+    assert fts_match("How does the owlbear attack?") == '"owlbear" OR "attack"'
+
+
+def test_fts_match_keeps_an_all_stopword_query():
+    """Dropping every term would leave nothing to match; keep them all."""
+    assert fts_match("Who are you") == '"Who" OR "are" OR "you"'
+
+
+def test_fts_match_keeps_accented_tokens_whole():
+    """unicode61 indexes "écran" as one token; the query must too."""
+    assert fts_match("écran du MJ") == '"écran" OR "du" OR "MJ"'
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +140,12 @@ def test_rrf_tie_keeps_first_ranking_order():
     assert [cid for cid, _ in fused] == ["a", "b"]
 
 
+def test_rrf_weights_scale_each_ranking():
+    fused = rrf_fuse([["a"], ["b"]], weights=[1.0, 2.0], k=60)
+    assert [cid for cid, _ in fused] == ["b", "a"]
+    assert dict(fused)["b"] == pytest.approx(2 / 61)
+
+
 # ---------------------------------------------------------------------------
 # /api/search hybrid flag (integration, deterministic fake dense pool)
 # ---------------------------------------------------------------------------
@@ -207,6 +227,16 @@ def test_hybrid_pulls_in_bm25_only_candidate(hybrid_client):
     keeps the dense candidate first."""
     filenames = [r["filename"] for r in _search(hybrid_client, hybrid=True)]
     assert filenames == ["rules.pdf", "monsters.pdf"]
+
+
+def test_lex_weight_sets_the_bm25_share(hybrid_client):
+    """At the default weight dense rank 1 outranks BM25 rank 1; a lexical
+    weight above 1.0 flips them."""
+    filenames = [
+        r["filename"]
+        for r in _search(hybrid_client, hybrid=True, lex_weight=2.0)
+    ]
+    assert filenames == ["monsters.pdf", "rules.pdf"]
 
 
 def test_hybrid_bm25_only_candidate_has_floor_relevance(hybrid_client):

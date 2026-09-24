@@ -496,7 +496,10 @@ def main() -> int:
             # which a dict of sets is not.
             extra: dict = {"system_map": _system_map(corpus)} if args.engine == "v3" else {}
             if args.lex_weight is not None:
-                extra["weights"] = [1.0, args.lex_weight]
+                if args.engine == "v3":
+                    extra["weights"] = [1.0, args.lex_weight]
+                else:
+                    extra["lex_weight"] = args.lex_weight
             if args.rerank_weight is not None:
                 extra["rerank_weight"] = args.rerank_weight
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,

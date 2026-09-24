@@ -58,7 +58,7 @@ from parents_store import (
     rename_source,
     update_units_fts_game_system,
 )
-from lexical import PersistedLexicalIndex, rrf_fuse
+from lexical import LEXICAL_RRF_WEIGHT, PersistedLexicalIndex, rrf_fuse
 from near_dup import collapse_near_dups
 from reranker import rerank_scores
 from spelling import SpellCorrector
@@ -611,6 +611,10 @@ class SearchRequest(BaseModel):
     # candidate pool via reciprocal-rank fusion. Default off — does not
     # change production search behavior.
     hybrid: bool | None = None
+    # lex_weight: RRF weight of the BM25 ranking under `hybrid` (dense
+    # rankings weigh 1.0). Request-only eval knob, not a persisted
+    # setting; None means LEXICAL_RRF_WEIGHT.
+    lex_weight: float | None = Field(default=None, ge=0)
     # spell_correction: rewrite out-of-vocabulary query tokens to the
     # closest library term before embedding (typo-tolerance design,
     # section A). Default on — the 2026-07-10 eval gate passed once
@@ -2163,6 +2167,7 @@ def _search_sync(
                         or dist < dense_best[cid][1]
                     ):
                         dense_best[cid] = (meta, dist, doc)
+            weights = [1.0] * len(rankings)
             lex_rows: dict[str, tuple[dict, str]] = {}
             if knobs.hybrid:
                 lex = get_lexical_index()
@@ -2172,12 +2177,16 @@ def _search_sync(
                     where=query_kwargs.get("where"),
                 )
                 rankings.append(lex_ids)
+                weights.append(
+                    request.lex_weight if request.lex_weight is not None
+                    else LEXICAL_RRF_WEIGHT
+                )
                 lex_rows = lex.lookup(
                     [cid for cid in lex_ids if cid not in dense_best]
                 )
             fused_metadatas, fused_distances = [], []
             fused_docs, fused_scores = [], []
-            for cid, score in rrf_fuse(rankings):
+            for cid, score in rrf_fuse(rankings, weights):
                 if cid in dense_best:
                     meta, dist, doc = dense_best[cid]
                     fused_metadatas.append(meta)

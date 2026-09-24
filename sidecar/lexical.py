@@ -25,7 +25,23 @@ logger = logging.getLogger(__name__)
 
 RRF_K = 60  # standard reciprocal-rank-fusion constant
 
-_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+# RRF weight of the BM25 ranking against 1.0 for each dense ranking
+# (roadmap 3.1; sidecar-v3 landed 0.3 — 1:1 cost natural-language
+# queries). `SearchRequest.lex_weight` overrides it for eval sweeps.
+LEXICAL_RRF_WEIGHT = 0.3
+
+# Unicode word characters minus "_" — matches what FTS5's unicode61
+# tokenizer treats as a token, so accented terms ("écran") stay whole.
+_TOKEN_RE = re.compile(r"[^\W_]+")
+
+# Question/function words carry no lexical signal and, OR'd in, let BM25
+# rank chunks on "what"/"the" matches (ported from sidecar-v3's
+# `_STOPWORDS`, roadmap 3.1).
+_STOPWORDS = frozenset(
+    "how what when where why who which whose whom does do did is are was were can "
+    "could should would will may might have has a an the of to in for on at by from "
+    "with as that this these those it its and or not you your they their he she his "
+    "her we our i me my but if then than into about over under out up down off no".split())
 
 # An index written before the rows existed has none: hybrid would then
 # quietly degrade to dense-only. Warn the first time it happens, not on
@@ -92,20 +108,30 @@ def fts_match(query: str) -> str:
 
     Query terms are OR'd: BM25's term weighting does the ranking, and
     requiring all terms would zero out any query with one word the chunk
-    lacks. Tokens are quoted so FTS5 operators in user text are literal.
+    lacks. Stopwords are dropped unless the query is nothing but
+    stopwords. Tokens are quoted so FTS5 operators in user text are
+    literal.
     """
     tokens = _TOKEN_RE.findall(query)
-    return " OR ".join(f'"{t}"' for t in tokens)
+    content = [t for t in tokens if t.lower() not in _STOPWORDS]
+    return " OR ".join(f'"{t}"' for t in content or tokens)
 
 
-def rrf_fuse(rankings: list[list[str]], k: int = RRF_K) -> list[tuple[str, float]]:
-    """Reciprocal-rank fusion: score(id) = Σ 1/(k + rank) over rankings.
+def rrf_fuse(
+    rankings: list[list[str]],
+    weights: list[float] | None = None,
+    k: int = RRF_K,
+) -> list[tuple[str, float]]:
+    """Weighted reciprocal-rank fusion: score(id) = Σ w/(k + rank).
 
-    Returns (id, score) pairs, best first. Ties keep the order ids were
-    first seen (earlier rankings win), so fusion is deterministic.
+    ``weights`` pairs with ``rankings`` (all 1.0 when omitted). Returns
+    (id, score) pairs, best first. Ties keep the order ids were first
+    seen (earlier rankings win), so fusion is deterministic.
     """
+    if weights is None:
+        weights = [1.0] * len(rankings)
     scores: dict[str, float] = {}
-    for ranking in rankings:
+    for ranking, w in zip(rankings, weights):
         for rank, cid in enumerate(ranking):
-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank + 1)
+            scores[cid] = scores.get(cid, 0.0) + w / (k + rank + 1)
     return sorted(scores.items(), key=lambda item: item[1], reverse=True)
