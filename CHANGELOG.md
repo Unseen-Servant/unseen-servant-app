@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-## [3.0.0] - Unreleased
+## [3.0.0] - 2026-09-24
 
 Search is rebuilt from the index up. **Re-index your library after updating** — Library settings lists the files still indexed with the older pipeline. Until a file is re-indexed it keeps working, but without whole sections, keyword matching or printed page numbers.
 
