@@ -13,6 +13,8 @@ Where the v2 retrieval roadmap stands and what is left. Written to pick the work
 
 **Reference baseline for Phase 3+: `evals/baselines/2026-09-12-v2-sections`** (gate against it, not headings).
 
+**Update 2026-09-23 — 3.1 and 3.3 landed** (roadmap §8 row). New baselines `2026-09-23-v2-boost` (production default) and `2026-09-23-v2-hybrid` (3.3 + `--hybrid`, all 0.879 / cued 0.771 / keyword 0.912, p50 1 265 ms). Gate 3.2 against **`2026-09-23-v2-hybrid`** with `--hybrid`: hybrid flips default-on once 3.2's p50 fits. Quick exploratory runs: `--reuse-index --data-dir evals/.eval_data/v2-p3 --no-write --no-index` (current pipeline, deterministic, ~2 min); `evals/.eval_data/v2` is stale (no FTS rows — the harness's idempotent indexing ignores `pipeline_version`).
+
 | measure | phase0b | headings | sections | bar |
 |---|---|---|---|---|
 | auto all MRR@5 | 0.766 | 0.790 | 0.862 | ≥ 0.82 |
