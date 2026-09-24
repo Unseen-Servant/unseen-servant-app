@@ -219,6 +219,23 @@ async def test_search_library_inserts_weak_divider(mock_sidecar):
 
 
 @pytest.mark.asyncio
+async def test_search_library_divider_opens_the_trailing_weak_run(mock_sidecar):
+    """A weak result followed by a strong one (system-boost partition,
+    straggler scoring) must not put the strong one below the line."""
+    mock_sidecar.set_post("/api/search", {
+        "results": [
+            _result("Named-system text.", "weak"),
+            _result("Strong other-system text.", "strong"),
+            _result("Marginal text.", "weak"),
+        ],
+    })
+    result = await search_library("grappling in osric")
+    divider = result.find("scored poorly")
+    assert result.find("Strong other-system text.") < divider < result.find("Marginal text.")
+    assert result.count("scored poorly") == 1
+
+
+@pytest.mark.asyncio
 async def test_search_library_all_weak_prefaces_warning(mock_sidecar):
     """When every result is weak, say so up front so the model doesn't
     synthesize a confident answer from noise."""

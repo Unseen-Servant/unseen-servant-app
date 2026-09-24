@@ -82,9 +82,14 @@ RERANK_POOL_MAX = 200
 # Relevance-tier thresholds (issues #306/#310). Neither score scale is a
 # calibrated probability, so results carry an ordinal tier instead of a
 # raw percentage. Thresholds are scale-specific:
-# - Rerank scale is the cross-encoder sigmoid: logit 0 → 0.5 is the
-#   model's own relevant/irrelevant midpoint; below ~0.1 the model is
-#   confident the pair is irrelevant.
+# - Rerank scale is the cross-encoder sigmoid, which saturates: fit
+#   2026-09-24 (roadmap 3.4, #366) on the int8 L-6 against the headings
+#   blind-round labels carried onto `2026-09-24-v2-rerank` (238 top-5
+#   results): human precision is 73% at ≥ 0.98, 32% in 0.5–0.98 and 12%
+#   below 0.5 (the old 0.5 strong line held 55%). On the real library
+#   (6 books, `sidecar/evals/library_probe.py`) that is 27% strong,
+#   29% good, 44% weak — was 56% strong. 0.99 was stricter (81%) but
+#   demoted correct top hits such as 5e Grappling to "good".
 # - Cosine scale is bge-m3 similarity; defaults calibrated against the
 #   hybrid_retrieval_spike ground truth (V0_h, 200 labeled results):
 #   below 0.50 only 12.5% of results are correct (1 correct result
@@ -93,8 +98,8 @@ RERANK_POOL_MAX = 200
 # The weak threshold is the "relevance floor": weak results are still
 # returned (recall preserved) but demoted in the UI and flagged to MCP
 # clients so out-of-scope queries stop looking confidently answered.
-RERANK_TIER_STRONG = float(os.getenv("RERANK_TIER_STRONG", "0.5"))
-RERANK_TIER_WEAK = float(os.getenv("RERANK_TIER_WEAK", "0.1"))
+RERANK_TIER_STRONG = float(os.getenv("RERANK_TIER_STRONG", "0.98"))
+RERANK_TIER_WEAK = float(os.getenv("RERANK_TIER_WEAK", "0.5"))
 COSINE_TIER_STRONG = float(os.getenv("COSINE_TIER_STRONG", "0.60"))
 COSINE_TIER_WEAK = float(os.getenv("COSINE_TIER_WEAK", "0.50"))
 

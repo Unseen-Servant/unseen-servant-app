@@ -42,6 +42,9 @@ DEFAULT_DATA_DIR = (
 # Ordinary mid-session lookups, not retrieval-shaped keyword queries. The
 # graded corpus deliberately uses locked phrasings; these are deliberately
 # the way a GM types.
+# #366 / roadmap 3.4: above this share "strong" stops discriminating.
+STRONG_SHARE_MAX = 0.35
+
 DEFAULT_QUERIES = [
     "falling damage",
     "how does grappling work",
@@ -134,6 +137,9 @@ def main():
         print(f"\n=== tiers over {len(DEFAULT_QUERIES)} queries, {total} results ===")
         for tier in ("strong", "good", "weak"):
             print(f"  {tier:<7} {tiers_total[tier]:>4}  {tiers_total[tier] / total:>5.0%}")
+        strong_share = tiers_total["strong"] / total
+        print(f"  target: strong ≤ {STRONG_SHARE_MAX:.0%} (#366) — "
+              + ("OK" if strong_share <= STRONG_SHARE_MAX else "OVER"))
         print("  A tier that covers most results carries no signal — and for an "
               "agent it is the only\n  per-result quality hint in the tool output.")
 

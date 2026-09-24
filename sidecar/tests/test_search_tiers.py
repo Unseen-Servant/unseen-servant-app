@@ -28,11 +28,11 @@ def indexed_client(client, sample_pdf_path):
 def test_tier_for_rerank_scale():
     import server
 
-    assert server._tier_for(0.9, reranked=True) == "strong"
-    assert server._tier_for(0.5, reranked=True) == "strong"   # boundary
-    assert server._tier_for(0.3, reranked=True) == "good"
-    assert server._tier_for(0.1, reranked=True) == "good"     # boundary
-    assert server._tier_for(0.05, reranked=True) == "weak"
+    assert server._tier_for(0.999, reranked=True) == "strong"
+    assert server._tier_for(0.98, reranked=True) == "strong"  # boundary
+    assert server._tier_for(0.9, reranked=True) == "good"
+    assert server._tier_for(0.5, reranked=True) == "good"     # boundary
+    assert server._tier_for(0.3, reranked=True) == "weak"
 
 
 def test_tier_for_cosine_scale():
@@ -67,7 +67,7 @@ def test_results_carry_tier_and_reranked_without_rerank(indexed_client):
 def test_results_reranked_true_when_reranker_runs(indexed_client, monkeypatch):
     import server
 
-    monkeypatch.setattr(server, "rerank_scores", lambda q, d: [0.9] * len(d))
+    monkeypatch.setattr(server, "rerank_scores", lambda q, d: [0.99] * len(d))
 
     response = indexed_client.post("/api/search", json={
         "query": "dragon", "n_results": 5, "rerank": True,
@@ -77,7 +77,7 @@ def test_results_reranked_true_when_reranker_runs(indexed_client, monkeypatch):
     assert results
     for r in results:
         assert r["reranked"] is True
-        assert r["tier"] == "strong"  # 0.9 >= RERANK_TIER_STRONG
+        assert r["tier"] == "strong"  # 0.99 >= RERANK_TIER_STRONG
 
 
 def test_non_ascii_query_gets_cosine_tiers(indexed_client, monkeypatch):

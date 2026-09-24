@@ -375,15 +375,19 @@ async def search_library(
             "Consider retrying without filters.\n"
         ))
 
-    weak_divider_emitted = False
+    # The divider opens the trailing run of weak results: the system-boost
+    # partition and the straggler scoring can leave a strong result after
+    # a weak one, and it must not sit below a "scored poorly" line.
+    weak_tail = len(results)
+    while weak_tail > 0 and results[weak_tail - 1].get("tier") == "weak":
+        weak_tail -= 1
     for i, r in enumerate(results, 1):
         tier = r.get("tier")
-        if tier == "weak" and not all_weak and not weak_divider_emitted:
+        if i == weak_tail + 1 and not all_weak:
             lines.append(
                 "--- Results below this line scored poorly (weak matches; "
                 "likely not relevant) ---\n"
             )
-            weak_divider_emitted = True
         match_tag = f" (match: {tier})" if tier else ""
         lines.append(f"--- Result {i}{match_tag} ---")
         system_tag = r.get('game_system', 'unknown')
