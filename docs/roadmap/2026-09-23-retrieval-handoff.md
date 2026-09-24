@@ -61,7 +61,7 @@ Planning note: write the plan with `superpowers:writing-plans` the same way as P
 
 - **Real library**: no reindex of the app's own library yet. Library settings shows the "N files indexed with an older pipeline" note; after reindexing run `sidecar/evals/library_probe.py` (breadcrumb: markup ≤ 2 %, furniture 0, split 0) and, once `evals/retrieval/library.yaml` has ≥ 20 queries (Phase 0 Task 6.10, still unauthored), `--suite library --data-dir <app data dir>`.
 - **Phase 4** (blind round on the final configuration, library tier, CHANGELOG, release tag) and **Phase 5** (Chroma → sqlite-vec, Ollama → ONNX; decided at the END of Phase 3 by the rule in roadmap §4).
-- Issues that can be closed with a pointer to the commits: #367, #328 (Phase 1), #375's v2 twin, #343, #341 (Phase 2). #366 is Phase 3.4.
+- Closed 2026-09-24 with pointers to the commits: #367, #328 (Phase 1), #375 (on v2), #343, #341 (Phase 2), #366 (3.4).
 
 ## How to run things
 
