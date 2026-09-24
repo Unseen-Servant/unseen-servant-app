@@ -530,3 +530,18 @@ def test_fetch_section_by_id_resolves_a_middle_segment(tmp_path):
 def test_fetch_section_by_id_unknown_id_is_none(tmp_path):
     _monster_tree(tmp_path)
     assert fetch_section_by_id(tmp_path, "s_nowhere") is None
+
+
+def test_count_phrases_counts_units_with_the_adjacent_pair(tmp_path):
+    from parents_store import count_phrases
+
+    upsert_units_fts(tmp_path, "/lib/a.pdf", [
+        ("a_0", 0, "a.pdf", "OSR", "p1", "Thief skills table"),
+        ("a_1", 1, "a.pdf", "OSR", "p1", "the thief skill of climbing"),
+        ("a_2", 2, "a.pdf", "OSR", "p1", "skill of this thief"),
+    ])
+    got = count_phrases(tmp_path, [("thief", "skill"), ("this", "skill"), ('bad"', "skill")])
+    assert got[("thief", "skill")] == 2      # porter stems "skills" → "skill"
+    assert got[("this", "skill")] == 0       # not adjacent in that order
+    assert got[('bad"', "skill")] == 0       # quotes stripped, no FTS syntax error
+    assert count_phrases(tmp_path, []) == {}

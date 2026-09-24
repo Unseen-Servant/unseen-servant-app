@@ -273,3 +273,49 @@ def test_split_preserves_casing_and_surroundings(expander):
 
 def test_non_ascii_query_has_no_variants(expander):
     assert expander.expand("dégâts chainmail") == []
+
+
+# ---------------------------------------------------------------------------
+# Context tie-break (roadmap 3.5)
+# ---------------------------------------------------------------------------
+
+# "thif" is one edit from both; raw frequency alone picks "this".
+TIE_VOCAB = {"this": 5000, "thief": 400, "skill": 300, "how": 900,
+             "does": 400, "dies": 800, "grappling": 50, "dnd": 0}
+
+
+def _counter(table):
+    return lambda phrases: {p: table.get(p, 0) for p in phrases}
+
+
+def test_frequency_decides_a_tie_without_context():
+    sc = SpellCorrector(TIE_VOCAB)
+    assert sc.correct("thif") == "this"
+
+
+def test_library_phrase_context_breaks_the_tie():
+    """The library prints "thief skill" far more than "this skill"."""
+    sc = SpellCorrector(
+        TIE_VOCAB, phrase_counts=_counter({("thief", "skill"): 95, ("this", "skill"): 6}))
+    assert sc.correct("thif skill") == "thief skill"
+
+
+def test_english_bigrams_settle_the_question_frame():
+    """Rulebooks never print "how does"; English bigrams know it beats
+    "how dies", which is more frequent in the library."""
+    sc = SpellCorrector(TIE_VOCAB, phrase_counts=_counter({}))
+    assert sc.correct("how dpes grappling") == "how does grappling"
+
+
+def test_protected_tokens_are_never_rewritten():
+    """System keywords ("dnd") are boost cues the library may never print."""
+    sc = SpellCorrector({"and": 5000, "grappling": 50})
+    assert sc.correct("dnd grappling") == "and grappling"
+    assert sc.correct("dnd grappling", protected={"dnd"}) is None
+
+
+def test_keyword_tokens_splits_multiword_keywords():
+    from spelling import keyword_tokens
+
+    assert keyword_tokens({"D&D 5E": ["dnd", "d&d"], "YZE": ["Year Zero"]}) >= {
+        "dnd", "d", "year", "zero"}

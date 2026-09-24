@@ -612,6 +612,28 @@ def search_units_fts(
         return [r[0] for r in conn.execute(sql, [match, *params, k]).fetchall()]
 
 
+def count_phrases(
+    data_dir: Path, phrases: list[tuple[str, ...]]
+) -> dict[tuple[str, ...], int]:
+    """Units containing each phrase (adjacent tokens, porter-stemmed).
+
+    Context for the spell corrector's tie-break: how often the library
+    prints "thief skill" vs "this skill". Tokens are quoted into one FTS5
+    phrase, so operators in them are literal. One connection for the
+    batch.
+    """
+    if not data_dir or not phrases:
+        return {}
+    with _txn(data_dir) as conn:
+        return {
+            p: conn.execute(
+                "SELECT count(*) FROM unit_fts WHERE unit_fts MATCH ?",
+                ['"' + " ".join(t.replace('"', "") for t in p) + '"'],
+            ).fetchone()[0]
+            for p in phrases
+        }
+
+
 def delete_units_fts_for_source(data_dir: Path, source: str) -> int:
     """Drop all FTS rows for a source path. Returns number deleted."""
     if not data_dir:

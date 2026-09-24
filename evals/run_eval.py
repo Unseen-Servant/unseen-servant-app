@@ -420,6 +420,11 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None, help="retrieval: run only the first N queries")
     ap.add_argument("--max-context-chars", type=int, default=None,
                     help="retrieval: cap total packed result chars (roadmap 2.2); default unlimited")
+    ap.add_argument("--typos", type=int, default=None, metavar="SEED",
+                    help="retrieval: one seeded typing error per query (evals/retrieval/typos.py); "
+                         "compare against the clean run to see how much of the gap correction closes")
+    ap.add_argument("--no-spell", action="store_true",
+                    help="retrieval: search with spell correction off (the uncorrected floor for --typos)")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
     ap.add_argument("--pages", type=Path, default=None,
                     help="corpus-qa: re-grade a prior run's .pages.json instead of re-extracting")
@@ -493,6 +498,13 @@ def main() -> int:
             queries = yaml.safe_load(QUERIES_PATH.read_text(encoding="utf-8"))
             if args.limit:
                 queries = queries[: args.limit]
+            if args.typos is not None:
+                import random
+
+                from evals.retrieval.typos import typo_query
+
+                rng = random.Random(args.typos)
+                queries = [{**q, "query": typo_query(q["query"], rng)[0]} for q in queries]
             # v3 takes the rung-6 keyword map in-process; v2 gets the same
             # information as tags (SYSTEM_TAGS) and its request body is JSON,
             # which a dict of sets is not.
@@ -507,7 +519,7 @@ def main() -> int:
             if args.lex_pool is not None:
                 extra["lex_pool"] = args.lex_pool
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
-                                 rerank=not args.no_rerank,
+                                 rerank=not args.no_rerank, spell_correction=not args.no_spell,
                                  max_context_chars=args.max_context_chars, extra=extra)
             result = run(engine, queries, corpus, opts, do_index=not args.no_index,
                          tags=SYSTEM_TAGS if args.engine == "v2" else None)

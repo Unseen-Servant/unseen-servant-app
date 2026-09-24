@@ -63,7 +63,7 @@ from lexical import (
 )
 from near_dup import collapse_near_dups
 from reranker import rerank_scores
-from spelling import SpellCorrector
+from spelling import SpellCorrector, keyword_tokens
 
 
 # Number of top ChromaDB candidates to feed into the cross-encoder. Set
@@ -1980,8 +1980,11 @@ def _search_sync(
 
         corrected_query: str | None = None
         if knobs.spell_correction:
+            # System keywords ("dnd", "osric") are cues for the boost,
+            # which reads the corrected text: never rewrite them.
             corrected_query = get_spell_corrector(ctx.manifest).correct(
-                request.query
+                request.query,
+                protected=keyword_tokens(merged["known"]),
             )
         query_text = (
             corrected_query if corrected_query is not None
