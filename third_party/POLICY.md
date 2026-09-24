@@ -22,9 +22,12 @@ components and model assets. Each entry records its version or revision,
 upstream source, SPDX identifier, distribution role, review status, and any
 replacement work.
 
-Run `python scripts/check-third-party.py` to validate the inventory. Release
-builds run `python scripts/check-third-party.py --release`; that mode refuses
-to build while any shipped component is blocked or awaiting license review.
+Run `python scripts/check-third-party.py` to validate the inventory.
+`python scripts/check-third-party.py --release` refuses while any shipped
+component is blocked or awaiting license review. Release builds do not run it
+since 2026-09-24: the app is for personal use only, with no distribution
+planned, so the AGPL PyMuPDF stack ships as-is. Restore the gate in
+`release.yml` before any public or commercial release.
 
 The inventory is intentionally conservative. A `review_required` entry is not
 an approval, even if its likely license appears compatible. Before a release,
