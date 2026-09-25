@@ -69,7 +69,8 @@ src-tauri/src/
   servant.rs
 sidecar/
   legend_lore/              chunker, lexical, reranker, spelling, parents_store, … (the
-                            whole retrieval stack) + router.py
+                            whole retrieval stack) + service.py (extraction, indexing,
+                            stores, search pipeline) + router.py (the routes)
   command/                  vault read/write, current-session state + router.py (§4 Q4)
   servant/                  the paused agent harness, when it resumes
   server.py                 one FastAPI app; `include_router` per package
@@ -220,6 +221,8 @@ Three slices, each its own commit, each verified by the full Linux suite plus `n
 | 1c | `src-tauri/src/lib.rs` → `legend_lore.rs` gets the sidecar-proxy commands (`check_sidecar_health` … `update_search_settings`); `lib.rs` keeps `run()`, sidecar lifecycle, tray, window handling | `cargo fmt --check`, clippy `-D warnings`, `cargo test` green |
 
 **1a done 2026-09-25.** Placement follows D2 as amended above; three files moved against the first sketch because of what they contain: `ContextMenu` is the file-tree menu (collections, systems, solo/mute) and `palette` is the collection pigments, so both are Legend Lore; the General and Library settings panes are Legend Lore panes hosted by the shell's `SettingsModal`. That hosting is the one shell → tool import left (`SettingsModal`, `help/GuidesPane` → `GettingStartedSteps`); it goes away when the D3 manifest carries each tool's settings panes.
+
+**1b done 2026-09-25.** `server.py` (285 lines) keeps CLI/port file, `create_app`, CORS, `/health` and the MCP heartbeat/status routes (workstation-level: the MCP server will aggregate every tool), the watchdog and `__main__`. The 34 Legend Lore routes are `legend_lore/router.py`'s `build_router(app, collection, data_dir, …)`, a factory whose closures are the old `create_app` body verbatim. The ~2 400 lines of module-level helpers the routes call became `legend_lore/service.py` — they could not stay in `server.py` without a circular import. The twelve retrieval modules moved into the package with relative imports. Tests patch where the call now happens (`service.rerank_scores`, `router.index_single_pdf`, …). Frozen binary serves the same 37 operations. Further splitting of `service.py` is left to Phase 5, which rewrites its embedder and store halves anyway.
 
 ### Step 2 — the shell assumes many windows (still one window)
 

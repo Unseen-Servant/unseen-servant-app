@@ -8,8 +8,8 @@ Tests for game system management endpoints.
 
 import json
 
-from parents_store import search_units_fts
-from server import MANIFEST_FILENAME
+from legend_lore.parents_store import search_units_fts
+from legend_lore.service import MANIFEST_FILENAME
 
 
 # ---------------------------------------------------------------------------
@@ -235,13 +235,13 @@ def test_set_game_systems_batches_the_chunk_update(
     call. Patching the batch size down to 1 exercises the multi-batch path
     without indexing a 5000-chunk PDF.
     """
-    import server
+    from legend_lore import router
 
     client.post("/api/index-files", json={"paths": [str(large_text_pdf_path)]})
     total = len(test_collection.get()["ids"])
     assert total > 1, "fixture must produce several chunks to exercise batching"
 
-    monkeypatch.setattr(server, "METADATA_UPDATE_BATCH_SIZE", 1)
+    monkeypatch.setattr(router, "METADATA_UPDATE_BATCH_SIZE", 1)
 
     # Record the size of every update call so the cap is verified directly,
     # not just inferred from the endpoint returning 200.
@@ -272,7 +272,12 @@ def test_set_game_systems_batches_the_chunk_update(
 
 def test_manifest_auto_populates_legacy(tmp_path):
     """A manifest written before multi-tag support backfills game_systems on load."""
-    from server import IndexManifest, ManifestEntry, load_manifest, save_manifest
+    from legend_lore.service import (
+        IndexManifest,
+        ManifestEntry,
+        load_manifest,
+        save_manifest,
+    )
 
     legacy_entry = ManifestEntry.model_construct(
         filename="legacy.pdf",

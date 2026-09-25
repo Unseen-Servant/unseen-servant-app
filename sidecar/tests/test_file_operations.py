@@ -12,8 +12,8 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from parents_store import PARENTS_FILENAME, count_units_fts
-from server import MANIFEST_FILENAME, chunk_id_prefix
+from legend_lore.parents_store import PARENTS_FILENAME, count_units_fts
+from legend_lore.service import MANIFEST_FILENAME, chunk_id_prefix
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ def test_file_rename_moves_the_lexical_rows(
 
 def test_file_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_path):
     """Rename should copy the old entry's pipeline_version, never recompute it."""
-    from server import load_manifest, save_manifest
+    from legend_lore.service import load_manifest, save_manifest
 
     index_pdfs(client, sample_pdf_path)
     manifest = load_manifest(tmp_path)

@@ -10,7 +10,7 @@ Tests for custom game system CRUD and merge logic.
 
 import json
 
-from server import CUSTOM_SYSTEMS_FILENAME
+from legend_lore.service import CUSTOM_SYSTEMS_FILENAME
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,8 @@ import json
 
 import pytest
 
-import server
-from server import (
+from legend_lore import service
+from legend_lore.service import (
     RERANK_POOL_MAX,
     RERANK_POOL_MIN,
     SearchRequest,
@@ -169,7 +169,7 @@ def test_persisted_rerank_off_skips_reranker(indexed_client, monkeypatch):
     def boom(query, docs):
         raise AssertionError("rerank_scores must not run: persisted rerank=off")
 
-    monkeypatch.setattr(server, "rerank_scores", boom)
+    monkeypatch.setattr(service, "rerank_scores", boom)
     indexed_client.put("/api/search-settings", json={"rerank": False})
 
     response = indexed_client.post("/api/search", json={
@@ -186,7 +186,7 @@ def test_request_rerank_overrides_persisted_off(indexed_client, monkeypatch):
         called["docs"] = docs
         return [0.5] * len(docs)
 
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(service, "rerank_scores", fake_scores)
     indexed_client.put("/api/search-settings", json={"rerank": False})
 
     response = indexed_client.post("/api/search", json={

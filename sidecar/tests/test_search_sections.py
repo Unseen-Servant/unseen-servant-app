@@ -13,8 +13,8 @@ their parents in the SQLite store, then pin the dense ranking with a fake
 
 import pytest
 
-from granularity import ParentDoc
-from parents_store import upsert_parents
+from legend_lore.granularity import ParentDoc
+from legend_lore.parents_store import upsert_parents
 
 SOURCE = "/corpus/monsters.pdf"
 
@@ -230,17 +230,17 @@ def test_the_roots_found_while_deduping_are_handed_to_fetch_sections(
 ):
     """The dedupe loop already paid for each candidate's root; assembling
     the sections must not compute them a second time."""
-    import server
+    from legend_lore import service
 
     seen: dict = {}
-    real = server.fetch_sections
+    real = service.fetch_sections
 
     def spy(data_dir, hits, **kwargs):
         seen["hits"] = hits
         seen.update(kwargs)
         return real(data_dir, hits, **kwargs)
 
-    monkeypatch.setattr(server, "fetch_sections", spy)
+    monkeypatch.setattr(service, "fetch_sections", spy)
     assert _search(section_client, query="kraken")["results"]
     assert all(pid in seen["roots"] for pid, _, _ in seen["hits"])
     assert seen["roots"]["p-ka"] == "s_m/s_k"

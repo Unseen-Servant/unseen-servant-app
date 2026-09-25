@@ -13,10 +13,10 @@ persisted FTS rows) key on the chunk count instead.
 
 import pytest
 
-import server
-import spelling
-from parents_store import upsert_units_fts
-from server import IndexManifest, ManifestEntry, save_manifest
+from legend_lore import router
+from legend_lore import spelling
+from legend_lore.parents_store import upsert_units_fts
+from legend_lore.service import IndexManifest, ManifestEntry, save_manifest
 
 
 def _meta(parent_id: str, filename: str) -> dict:
@@ -208,7 +208,7 @@ def test_spell_vocab_invalidates_on_manifest_digest_change(
     client, test_collection, tmp_path, monkeypatch
 ):
     """Cached across searches, rebuilt when a re-index moves the digest."""
-    import spelling
+    from legend_lore import spelling
 
     upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
         ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
@@ -248,13 +248,13 @@ def test_spell_mode_is_decided_once_per_manifest_digest(
         type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
 
     counted = []
-    real_count = server.count_units_fts
+    real_count = router.count_units_fts
 
     def counting(data_dir, source=None):
         counted.append(data_dir)
         return real_count(data_dir, source)
 
-    monkeypatch.setattr(server, "count_units_fts", counting)
+    monkeypatch.setattr(router, "count_units_fts", counting)
 
     assert _search(client)["corrected_query"] == "owlbear claws"
     assert _search(client)["corrected_query"] == "owlbear claws"

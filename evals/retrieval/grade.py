@@ -19,12 +19,12 @@ from pathlib import Path
 
 from evals.engines.base import SearchResponse, SearchResult
 
-# leaf_title lives in sidecar/near_dup.py (roadmap 2.3). APPEND (never
+# leaf_title lives in sidecar/legend_lore/near_dup.py (roadmap 2.3). APPEND (never
 # insert): both the repo root and sidecar/ contain a package named
 # `evals`, and the top-level one — this harness — must keep winning the
 # import race (same pattern as evals/engines/v2.py._import_sidecar).
 sys.path.append(str(Path(__file__).resolve().parents[2] / "sidecar"))
-from near_dup import leaf_title  # noqa: E402
+from legend_lore.near_dup import leaf_title  # noqa: E402
 
 
 def normalize(text: str) -> str:

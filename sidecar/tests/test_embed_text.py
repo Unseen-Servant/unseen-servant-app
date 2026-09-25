@@ -7,8 +7,8 @@ prepending the section_heading breadcrumb at embed time delivers
 unchanged.
 """
 
-from granularity import EmbedUnit
-from server import _embed_text
+from legend_lore.granularity import EmbedUnit
+from legend_lore.service import _embed_text
 
 
 def _eu(text: str, heading: str | None) -> EmbedUnit:

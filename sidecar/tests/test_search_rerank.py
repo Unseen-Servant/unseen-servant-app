@@ -17,12 +17,12 @@ def indexed_client(client, sample_pdf_path):
 
 def test_rerank_false_skips_reranker(indexed_client, monkeypatch):
     """When rerank=False, the reranker is never invoked."""
-    import server
+    from legend_lore import service
 
     def boom(query, docs):
         raise AssertionError("rerank_scores should not be called when rerank=False")
 
-    monkeypatch.setattr(server, "rerank_scores", boom)
+    monkeypatch.setattr(service, "rerank_scores", boom)
 
     response = indexed_client.post("/api/search", json={
         "query": "dragon", "n_results": 5, "rerank": False,
@@ -32,7 +32,7 @@ def test_rerank_false_skips_reranker(indexed_client, monkeypatch):
 
 def test_rerank_reorders_top_candidates(indexed_client, monkeypatch):
     """A reranker that prefers the *last* candidate should bubble it up."""
-    import server
+    from legend_lore import service
 
     captured = {}
 
@@ -41,7 +41,7 @@ def test_rerank_reorders_top_candidates(indexed_client, monkeypatch):
         # Score in reverse order: last doc gets the highest score.
         return [float(i) for i in range(len(docs))]
 
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
     response = indexed_client.post("/api/search", json={
         "query": "dragon", "n_results": 3, "rerank": True,
@@ -62,7 +62,7 @@ def test_rerank_input_prepends_section_heading(monkeypatch, client, test_collect
     Indexes a synthetic chunk with a known section_heading (the real
     test PDFs have none) and asserts the rerank input starts with it.
     """
-    import server
+    from legend_lore import service
 
     captured = {}
 
@@ -70,7 +70,7 @@ def test_rerank_input_prepends_section_heading(monkeypatch, client, test_collect
         captured["docs"] = list(docs)
         return [0.5] * len(docs)
 
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
     test_collection.upsert(
         ids=["synth_1"],
@@ -103,9 +103,9 @@ def test_rerank_input_prepends_section_heading(monkeypatch, client, test_collect
 
 def test_rerank_falls_back_when_scores_none(indexed_client, monkeypatch):
     """If rerank_scores returns None (model failed), keep cosine order."""
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(server, "rerank_scores", lambda q, d: None)
+    monkeypatch.setattr(service, "rerank_scores", lambda q, d: None)
 
     response = indexed_client.post("/api/search", json={
         "query": "dragon", "n_results": 3, "rerank": True,
@@ -118,10 +118,10 @@ def test_rerank_falls_back_when_scores_none(indexed_client, monkeypatch):
 
 def test_rerank_relevance_uses_score_when_reranked(indexed_client, monkeypatch):
     """Relevance should reflect the rerank score (sigmoid, [0,1]) post-rerank."""
-    import server
+    from legend_lore import service
 
     # Constant score 0.9 for everything → relevance ≈ 0.9 on every result.
-    monkeypatch.setattr(server, "rerank_scores", lambda q, d: [0.9] * len(d))
+    monkeypatch.setattr(service, "rerank_scores", lambda q, d: [0.9] * len(d))
 
     response = indexed_client.post("/api/search", json={
         "query": "dragon", "n_results": 3, "rerank": True,
@@ -140,21 +140,21 @@ def test_rerank_relevance_uses_score_when_reranked(indexed_client, monkeypatch):
 
 def test_rerank_safe_for_query_ascii_vs_accented():
     """All-ASCII queries are reranker-safe; accented ones are not."""
-    import server
+    from legend_lore import service
 
-    assert server._rerank_safe_for_query("falling damage") is True
-    assert server._rerank_safe_for_query("dégâts de chute") is False
+    assert service._rerank_safe_for_query("falling damage") is True
+    assert service._rerank_safe_for_query("dégâts de chute") is False
 
 
 def test_non_ascii_query_skips_reranker(indexed_client, monkeypatch):
     """An accented (non-English) query must bypass the English-only reranker,
     even with rerank=True, so bge-m3's multilingual order is preserved."""
-    import server
+    from legend_lore import service
 
     def boom(query, docs):
         raise AssertionError("reranker must not run on a non-ASCII query")
 
-    monkeypatch.setattr(server, "rerank_scores", boom)
+    monkeypatch.setattr(service, "rerank_scores", boom)
 
     response = indexed_client.post("/api/search", json={
         "query": "dégâts de chute", "n_results": 5, "rerank": True,
@@ -164,7 +164,7 @@ def test_non_ascii_query_skips_reranker(indexed_client, monkeypatch):
 
 def test_ascii_query_still_reranks(indexed_client, monkeypatch):
     """The #305 guard must not over-skip: an all-ASCII query still reranks."""
-    import server
+    from legend_lore import service
 
     captured = {}
 
@@ -172,7 +172,7 @@ def test_ascii_query_still_reranks(indexed_client, monkeypatch):
         captured["called"] = True
         return [0.5] * len(docs)
 
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
     response = indexed_client.post("/api/search", json={
         "query": "falling damage", "n_results": 5, "rerank": True,

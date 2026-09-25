@@ -72,8 +72,8 @@ def test_embed_unit_metadata_carries_section_identity():
     real headings, so the endpoint-level test above can't exercise a
     populated section_id/section_path)."""
     from pathlib import Path
-    from granularity import EmbedUnit
-    from server import _embed_unit_metadata
+    from legend_lore.granularity import EmbedUnit
+    from legend_lore.service import _embed_unit_metadata
 
     eu = EmbedUnit(
         chunk_id="c1", text="t", parent_id="p_1", chunk_type="prose",
@@ -88,8 +88,8 @@ def test_embed_unit_metadata_carries_section_identity():
 
 def test_embed_unit_metadata_section_identity_defaults_to_empty_string():
     from pathlib import Path
-    from granularity import EmbedUnit
-    from server import _embed_unit_metadata
+    from legend_lore.granularity import EmbedUnit
+    from legend_lore.service import _embed_unit_metadata
 
     eu = EmbedUnit(
         chunk_id="c1", text="t", parent_id="p_1", chunk_type="prose",

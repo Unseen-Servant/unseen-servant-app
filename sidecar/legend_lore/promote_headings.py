@@ -41,7 +41,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from heading_text import sanitize
+from .heading_text import sanitize
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _TOKEN_SPLIT_RE = re.compile(r"\W+", re.UNICODE)

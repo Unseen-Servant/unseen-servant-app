@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import re
 
-from parents_store import count_units_fts, search_units_fts
+from .parents_store import count_units_fts, search_units_fts
 
 logger = logging.getLogger(__name__)
 

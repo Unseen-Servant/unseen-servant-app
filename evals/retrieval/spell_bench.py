@@ -41,8 +41,8 @@ def load_corrector(data_dir: Path):
     """The production corrector, protecting the built-in system keywords
     the way ``/api/search`` does (custom systems aside)."""
     sys.path.insert(0, str(ROOT / "sidecar"))
-    from game_systems import KNOWN_SYSTEMS
-    from spelling import SpellCorrector, keyword_tokens
+    from legend_lore.game_systems import KNOWN_SYSTEMS
+    from legend_lore.spelling import SpellCorrector, keyword_tokens
 
     corrector = SpellCorrector.from_store(data_dir)
     protected = keyword_tokens(KNOWN_SYSTEMS)
@@ -53,8 +53,8 @@ def load_corrector(data_dir: Path):
 
 def bench(corrector, queries: list[str], samples: int, seed: int) -> dict:
     sys.path.insert(0, str(ROOT / "sidecar"))
-    from lexical import _STOPWORDS
-    from spelling import _english_words
+    from legend_lore.lexical import _STOPWORDS
+    from legend_lore.spelling import _english_words
 
     from evals.retrieval.typos import MIN_WORD_LEN, typo
 

@@ -14,7 +14,7 @@ BM25 ranking joins the same fusion.
 
 import pytest
 
-from parents_store import upsert_units_fts
+from legend_lore.parents_store import upsert_units_fts
 
 
 def _meta(parent_id: str, filename: str) -> dict:

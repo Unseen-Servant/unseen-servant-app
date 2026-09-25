@@ -5,7 +5,7 @@ cases (see FINDINGS.md in the experiments repo), most importantly the
 title-row heuristic that the spike found load-bearing on BFRPG tables.
 """
 
-from linearize import coverage_ratio, linearize_table
+from legend_lore.linearize import coverage_ratio, linearize_table
 
 
 STANDARD_TABLE = (

@@ -9,7 +9,7 @@ filename without re-embedding — saving the expensive Ollama call.
 import os
 import shutil
 
-from server import (
+from legend_lore.service import (
     MANIFEST_FILENAME,
     COLLECTIONS_FILENAME,
     IndexManifest,
@@ -331,7 +331,7 @@ def test_sync_rename_preserves_chunks(client, sample_pdf_path, tmp_path):
 
 def test_sync_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_path):
     """Rename should copy the old entry's pipeline_version, never recompute it."""
-    from server import load_manifest, save_manifest
+    from legend_lore.service import load_manifest, save_manifest
 
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]

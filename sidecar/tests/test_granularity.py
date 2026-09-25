@@ -10,8 +10,8 @@ repo). These tests pin the contract:
   - per-chunk page provenance preserved on parents (min/max)
 """
 
-from chunker import Chunk
-from granularity import (
+from legend_lore.chunker import Chunk
+from legend_lore.granularity import (
     EmbedUnit,
     ParentDoc,
     PARENT_HARD_CAP,

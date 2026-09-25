@@ -8,7 +8,7 @@ all indexed PDFs under that folder — transferring chunks without re-embedding
 
 import json
 
-from server import MANIFEST_FILENAME, COLLECTIONS_FILENAME
+from legend_lore.service import MANIFEST_FILENAME, COLLECTIONS_FILENAME
 
 
 # ---------------------------------------------------------------------------

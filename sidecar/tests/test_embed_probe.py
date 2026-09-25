@@ -2,7 +2,7 @@
 silently truncates long inputs (#327 — measured ~2048 on a dev machine
 vs bge-m3's native 8192)."""
 
-from server import probe_embed_truncation
+from legend_lore.service import probe_embed_truncation
 
 
 def test_probe_warns_when_tail_truncated(capsys):

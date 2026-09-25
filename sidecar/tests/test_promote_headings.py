@@ -5,7 +5,7 @@ contract that flat ``##`` headings get promoted to ``#``/``##``/``###``
 based on per-document font histograms and (optionally) TOC entries.
 """
 
-from promote_headings import (
+from legend_lore.promote_headings import (
     _rewrite_page_md,
     build_font_cluster_levels,
     build_toc_levels,

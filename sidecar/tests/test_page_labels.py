@@ -7,8 +7,8 @@ citation, so the printed label travels with the chunk.
 import pymupdf
 import pytest
 
-from server import _embed_unit_metadata, _page_labels
-from granularity import EmbedUnit
+from legend_lore.service import _embed_unit_metadata, _page_labels
+from legend_lore.granularity import EmbedUnit
 
 
 @pytest.fixture

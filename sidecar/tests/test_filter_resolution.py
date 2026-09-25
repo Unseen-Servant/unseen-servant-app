@@ -17,43 +17,43 @@ import pytest
 # ---------------------------------------------------------------------------
 
 def test_resolve_exact_match_wins():
-    import server
+    from legend_lore import service
 
-    resolved, matches = server._resolve_filter_value(
+    resolved, matches = service._resolve_filter_value(
         "D&D 5E", ["D&D 5E", "Dragonbane"])
     assert resolved == "D&D 5E"
 
 
 def test_resolve_case_and_accent_insensitive_equality():
-    import server
+    from legend_lore import service
 
-    resolved, _ = server._resolve_filter_value(
+    resolved, _ = service._resolve_filter_value(
         "dragon bane", ["Dragonbane", "D&D 5E"])
     assert resolved == "Dragonbane"
 
 
 def test_resolve_unique_substring():
-    import server
+    from legend_lore import service
 
     # 'dnd' is a normalized substring of 'dnd5e' only.
-    resolved, _ = server._resolve_filter_value(
+    resolved, _ = service._resolve_filter_value(
         "D&D", ["D&D 5E", "Dragonbane"])
     assert resolved == "D&D 5E"
 
 
 def test_resolve_ambiguous_returns_candidates():
-    import server
+    from legend_lore import service
 
-    resolved, matches = server._resolve_filter_value(
+    resolved, matches = service._resolve_filter_value(
         "Pathfinder", ["Pathfinder 1E", "Pathfinder 2E", "Dragonbane"])
     assert resolved is None
     assert set(matches) == {"Pathfinder 1E", "Pathfinder 2E"}
 
 
 def test_resolve_no_match():
-    import server
+    from legend_lore import service
 
-    resolved, matches = server._resolve_filter_value(
+    resolved, matches = service._resolve_filter_value(
         "Shadowrun", ["D&D 5E", "Dragonbane"])
     assert resolved is None
     assert matches == []

@@ -12,9 +12,9 @@ a ``RequestContext`` at the top of ``_search_sync``.
 
 import pytest
 
-import server
-from parents_store import upsert_units_fts
-from server import (
+from legend_lore import router, service
+from legend_lore.parents_store import upsert_units_fts
+from legend_lore.service import (
     Collection,
     CollectionsStore,
     IndexManifest,
@@ -105,8 +105,8 @@ MANIFEST = IndexManifest(files={
 def counting_loads(monkeypatch):
     """Count real loads of the manifest and the collections store."""
     counts = {"manifest": 0, "collections": 0}
-    real_manifest = server.load_manifest
-    real_collections = server.load_collections
+    real_manifest = service.load_manifest
+    real_collections = service.load_collections
 
     def count_manifest(data_dir):
         counts["manifest"] += 1
@@ -116,8 +116,11 @@ def counting_loads(monkeypatch):
         counts["collections"] += 1
         return real_collections(data_dir)
 
-    monkeypatch.setattr(server, "load_manifest", count_manifest)
-    monkeypatch.setattr(server, "load_collections", count_collections)
+    # Loads happen on both sides of the route seam: the search pipeline
+    # (service) and the spell-corrector cache in the route factory (router).
+    for module in (service, router):
+        monkeypatch.setattr(module, "load_manifest", count_manifest)
+        monkeypatch.setattr(module, "load_collections", count_collections)
     return counts
 
 

@@ -9,7 +9,7 @@ unseen-legend-lore-experiments). These tests pin the contract so future
 changes can't silently break it.
 """
 
-from cleanup import (
+from legend_lore.cleanup import (
     CleanupReport,
     RunningElement,
     RunningHeading,
@@ -495,7 +495,7 @@ def test_flatten_br_works_on_r2_rejoined_output():
     on \\n) must still correctly expand <br>-packed table rows in the
     rejoined output. Locks in the whitespace-agnostic contract.
     """
-    from server import _flatten_br_packed_cells
+    from legend_lore.service import _flatten_br_packed_cells
 
     pages = [_page(
         "Some prose.",

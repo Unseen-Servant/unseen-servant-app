@@ -10,8 +10,8 @@ in submission order.
 import time
 from pathlib import Path
 
-from granularity import EmbedUnit
-from server import _embed_and_upsert_units
+from legend_lore.granularity import EmbedUnit
+from legend_lore.service import _embed_and_upsert_units
 
 
 class _FakeCollection:

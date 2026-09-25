@@ -13,7 +13,7 @@ multiple logical rows. When <br> counts match across cells, we expand to
 one row per pair. When they don't, we leave the row alone.
 """
 
-from server import _flatten_br_packed_cells
+from legend_lore.service import _flatten_br_packed_cells
 
 
 def test_empty_input():

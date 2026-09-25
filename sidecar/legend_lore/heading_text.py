@@ -4,7 +4,7 @@ pymupdf4llm's heading lines keep inline markup and, on small-caps display
 fonts, pull descender glyphs (g, p, y, q, j) out of their words and append
 them: ``S eed p`` for ``Speed``, ``Halfling Halflin Traits g`` for the two
 headings ``Halfling`` / ``Halfling Traits``. The page's raw spans
-(``server._extract_spans``) still carry the intact text, so they are the
+(``service._extract_spans``) still carry the intact text, so they are the
 oracle: a run of consecutive spans whose letters are exactly the heading's
 letters, in fragment order, replaces the heading.
 

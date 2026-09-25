@@ -2,7 +2,7 @@
 Tests for GET /api/sources and DELETE /api/source/{filename}.
 """
 
-from parents_store import count_units_fts
+from legend_lore.parents_store import count_units_fts
 
 
 def test_sources_empty(client):

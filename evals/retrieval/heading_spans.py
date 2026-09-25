@@ -43,8 +43,7 @@ def leaf_spans(pages: list) -> list[tuple[str, int, bool]]:
 
 
 def main() -> int:
-    import server  # noqa: F401  (sidecar import path set above)
-    from server import _extract_pdf_pages
+    from legend_lore.service import _extract_pdf_pages
 
     corpus = require_corpus()
     rows = []

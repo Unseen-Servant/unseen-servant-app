@@ -25,16 +25,16 @@ import pytest
 # ---------------------------------------------------------------------------
 
 def test_black_flag_detects_as_5e():
-    import server
+    from legend_lore import service
 
-    assert server.detect_game_system(
+    assert service.detect_game_system(
         Path("/corpus/Black-Flag-Roleplaying.pdf")) == "D&D 5E"
 
 
 def test_srd_cc_detects_as_5e():
-    import server
+    from legend_lore import service
 
-    assert server.detect_game_system(
+    assert service.detect_game_system(
         Path("/corpus/SRD_CC_v5.1.pdf")) == "D&D 5E"
 
 
@@ -43,37 +43,37 @@ def test_srd_cc_detects_as_5e():
 # ---------------------------------------------------------------------------
 
 def test_query_naming_5e_srd_detects_5e():
-    import server
+    from legend_lore import service
 
-    assert server.detect_systems_in_query(
+    assert service.detect_systems_in_query(
         "Fireball damage in 5E SRD") == {"D&D 5E"}
 
 
 def test_query_naming_black_flag_detects_5e():
-    import server
+    from legend_lore import service
 
-    assert server.detect_systems_in_query(
+    assert service.detect_systems_in_query(
         "Initiative roll in Black Flag") == {"D&D 5E"}
 
 
 def test_query_naming_basic_fantasy_detects_osr():
-    import server
+    from legend_lore import service
 
-    assert server.detect_systems_in_query(
+    assert service.detect_systems_in_query(
         "Cloud Dragon stats in Basic Fantasy") == {"OSR"}
 
 
 def test_query_without_system_mention_detects_nothing():
-    import server
+    from legend_lore import service
 
-    assert server.detect_systems_in_query(
+    assert service.detect_systems_in_query(
         "how does grappling work") == set()
 
 
 def test_query_naming_two_systems_detects_both():
-    import server
+    from legend_lore import service
 
-    assert server.detect_systems_in_query(
+    assert service.detect_systems_in_query(
         "convert a dnd 5e monster to pathfinder 2e") == {"D&D 5E", "PF2E"}
 
 
@@ -191,10 +191,9 @@ def test_relevance_and_tier_stay_on_raw_scale(fake_pool_client):
 def test_boost_applies_to_reranked_order(fake_pool_client, monkeypatch):
     """With rerank on, the partition holds over the cross-encoder
     order: the 5E chunk wins though it scores lower."""
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(
-        server, "rerank_scores",
+    monkeypatch.setattr(service, "rerank_scores",
         lambda q, docs: [0.6 if "srd" in d else 0.8 for d in docs])
     results = _search(fake_pool_client, rerank=True)
     assert [r["filename"] for r in results] == [
@@ -208,10 +207,9 @@ def test_boost_holds_against_a_saturated_wrong_system_score(
     """The case the multipliers lost (q048, 2026-09-23): a wrong-system
     exact match the cross-encoder scores 0.92 beat a named-system 0.39
     (0.92×0.7 > 0.39×1.5). The partition keeps the named system first."""
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(
-        server, "rerank_scores",
+    monkeypatch.setattr(service, "rerank_scores",
         lambda q, docs: [0.39 if "srd" in d else 0.92 for d in docs])
     results = _search(fake_pool_client, rerank=True)
     assert [r["filename"] for r in results] == [
@@ -222,7 +220,7 @@ def test_boost_fills_the_rerank_pool_with_the_named_system(
         client, test_collection, monkeypatch):
     """Before rerank the partition decides pool entry: a named-system
     chunk ranked below the pool size is still scored."""
-    import server
+    from legend_lore import service
 
     fake = {
         "ids": [["c-osr", "c-srd"]],
@@ -235,8 +233,7 @@ def test_boost_fills_the_rerank_pool_with_the_named_system(
     }
     monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
     scored = []
-    monkeypatch.setattr(
-        server, "rerank_scores",
+    monkeypatch.setattr(service, "rerank_scores",
         lambda q, docs: scored.extend(docs) or [0.5] * len(docs))
     _search(client, rerank=True, rerank_candidates=1)
     assert scored[0] == "srd text"

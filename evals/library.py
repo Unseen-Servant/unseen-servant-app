@@ -17,7 +17,7 @@ from pathlib import Path
 import yaml
 
 LIBRARY_PATH = Path(__file__).resolve().parent / "retrieval" / "library.yaml"
-MANIFEST_FILENAME = "index_manifest.json"   # sidecar/server.py MANIFEST_FILENAME
+MANIFEST_FILENAME = "index_manifest.json"   # sidecar/legend_lore/service.py MANIFEST_FILENAME
 
 
 @dataclass(frozen=True)

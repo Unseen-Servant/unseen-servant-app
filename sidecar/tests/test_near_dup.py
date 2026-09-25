@@ -1,5 +1,5 @@
 """Cross-edition near-dup collapse (roadmap 2.3)."""
-from near_dup import collapse_near_dups, leaf_title
+from legend_lore.near_dup import collapse_near_dups, leaf_title
 
 
 def test_leaf_title_normalises():

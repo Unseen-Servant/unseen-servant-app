@@ -1,4 +1,4 @@
-from heading_text import normalize_small_caps, repair_from_spans, sanitize, strip_markup
+from legend_lore.heading_text import normalize_small_caps, repair_from_spans, sanitize, strip_markup
 
 
 def _sp(text, size, bold=True):

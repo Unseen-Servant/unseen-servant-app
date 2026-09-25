@@ -48,7 +48,8 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 - `src/lib/legend-lore/FileTree.svelte` — Recursive file tree component
 - `src/lib/legend-lore/types.ts` — Legend Lore TypeScript types
 - `src-tauri/src/lib.rs` — Rust backend commands + sidecar lifecycle
-- `sidecar/server.py` — FastAPI indexing and search server
+- `sidecar/server.py` — FastAPI app construction, lifecycle, health; mounts each tool's router
+- `sidecar/legend_lore/` — Legend Lore routes (`router.py`), indexing + search (`service.py`), retrieval modules
 - `sidecar/mcp_server.py` — MCP tool definitions for Claude Desktop
 - `sidecar/tests/` — Pytest suite (chunking, indexing, search, MCP tools)
 

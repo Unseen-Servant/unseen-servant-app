@@ -5,7 +5,7 @@ Measured by hand on the 08-15 v2 results: 84 % of returned chunks carried
 Markdown markup in the breadcrumb, 27 % were rooted at OSRIC's running
 footer, 11 % at the split word "S eed p" (= Speed). ``section_heading`` is
 prepended to the embedded text (``chunker._embed_text``) and to the
-cross-encoder input (``server._search_sync``), so damage here is a retrieval
+cross-encoder input (``service._search_sync``), so damage here is a retrieval
 defect. This axis grades every chunk the chunker produces — no embedding,
 seconds per corpus — and is the gate Phase 1's heading work must clear.
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import difflib
 import re
 
-from heading_text import strip_markup
+from .heading_text import strip_markup
 
 NEAR_DUP_RATIO = 0.9
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")

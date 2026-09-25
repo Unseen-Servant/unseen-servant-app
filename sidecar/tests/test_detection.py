@@ -10,8 +10,8 @@ folder paths and PDF content, using a three-tier approach:
 
 from pathlib import Path
 
-from game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
-from server import detect_game_system, detect_game_systems
+from legend_lore.game_systems import GAME_SYSTEMS, KNOWN_SYSTEMS
+from legend_lore.service import detect_game_system, detect_game_systems
 
 
 def test_game_systems_structure():

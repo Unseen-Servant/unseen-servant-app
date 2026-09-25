@@ -31,12 +31,12 @@ EVALS_DIR = Path(__file__).parent
 sys.path.insert(0, str(EVALS_DIR.parent))  # so `python -m evals.run_eval` sees server.py
 
 from evals import scorer
-from server import (
+from legend_lore.service import (
     COLLECTION_METADATA,
     build_ollama_embedding_function,
-    create_app,
     load_manifest,
 )
+from server import create_app
 
 QUERIES_PATH = EVALS_DIR / "queries.yaml"
 DEFAULT_DATA_DIR = EVALS_DIR / ".eval_data"

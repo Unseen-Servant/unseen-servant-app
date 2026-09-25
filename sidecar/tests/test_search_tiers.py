@@ -26,25 +26,25 @@ def indexed_client(client, sample_pdf_path):
 # ---------------------------------------------------------------------------
 
 def test_tier_for_rerank_scale():
-    import server
+    from legend_lore import service
 
-    assert server._tier_for(0.999, reranked=True) == "strong"
-    assert server._tier_for(0.98, reranked=True) == "strong"  # boundary
-    assert server._tier_for(0.9, reranked=True) == "good"
-    assert server._tier_for(0.5, reranked=True) == "good"     # boundary
-    assert server._tier_for(0.3, reranked=True) == "weak"
+    assert service._tier_for(0.999, reranked=True) == "strong"
+    assert service._tier_for(0.98, reranked=True) == "strong"  # boundary
+    assert service._tier_for(0.9, reranked=True) == "good"
+    assert service._tier_for(0.5, reranked=True) == "good"     # boundary
+    assert service._tier_for(0.3, reranked=True) == "weak"
 
 
 def test_tier_for_cosine_scale():
-    import server
+    from legend_lore import service
 
-    strong = server.COSINE_TIER_STRONG
-    weak = server.COSINE_TIER_WEAK
-    assert server._tier_for(strong + 0.05, reranked=False) == "strong"
-    assert server._tier_for(strong, reranked=False) == "strong"    # boundary
-    assert server._tier_for((strong + weak) / 2, reranked=False) == "good"
-    assert server._tier_for(weak, reranked=False) == "good"        # boundary
-    assert server._tier_for(weak - 0.05, reranked=False) == "weak"
+    strong = service.COSINE_TIER_STRONG
+    weak = service.COSINE_TIER_WEAK
+    assert service._tier_for(strong + 0.05, reranked=False) == "strong"
+    assert service._tier_for(strong, reranked=False) == "strong"    # boundary
+    assert service._tier_for((strong + weak) / 2, reranked=False) == "good"
+    assert service._tier_for(weak, reranked=False) == "good"        # boundary
+    assert service._tier_for(weak - 0.05, reranked=False) == "weak"
 
 
 # ---------------------------------------------------------------------------
@@ -65,9 +65,9 @@ def test_results_carry_tier_and_reranked_without_rerank(indexed_client):
 
 
 def test_results_reranked_true_when_reranker_runs(indexed_client, monkeypatch):
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(server, "rerank_scores", lambda q, d: [0.99] * len(d))
+    monkeypatch.setattr(service, "rerank_scores", lambda q, d: [0.99] * len(d))
 
     response = indexed_client.post("/api/search", json={
         "query": "dragon", "n_results": 5, "rerank": True,
@@ -82,12 +82,12 @@ def test_results_reranked_true_when_reranker_runs(indexed_client, monkeypatch):
 
 def test_non_ascii_query_gets_cosine_tiers(indexed_client, monkeypatch):
     """#305 guard composes: French query → cosine scale end to end."""
-    import server
+    from legend_lore import service
 
     def boom(query, docs):
         raise AssertionError("reranker must not run on a non-ASCII query")
 
-    monkeypatch.setattr(server, "rerank_scores", boom)
+    monkeypatch.setattr(service, "rerank_scores", boom)
 
     response = indexed_client.post("/api/search", json={
         "query": "dégâts de chute", "n_results": 5, "rerank": True,
@@ -129,9 +129,9 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
     pool must be scored by a second rerank_scores call so the page is
     single-scale (scores only: the tail is not re-sorted into the head). Pool size arrives via the request's rerank_candidates
     knob (clamped to RERANK_POOL_MIN, so the fixture outnumbers it)."""
-    import server
+    from legend_lore import service
 
-    n_parents = server.RERANK_POOL_MIN + 2
+    n_parents = service.RERANK_POOL_MIN + 2
     _upsert_parents(test_collection, n_parents)
     calls = []
 
@@ -139,21 +139,21 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
         calls.append(list(docs))
         return [0.8] * len(docs)
 
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
     response = client.post("/api/search", json={
         "query": "dragon", "n_results": n_parents, "rerank": True,
-        "rerank_candidates": server.RERANK_POOL_MIN,
+        "rerank_candidates": service.RERANK_POOL_MIN,
     })
     assert response.status_code == 200
     results = response.json()["results"]
-    assert len(results) > server.RERANK_POOL_MIN, \
+    assert len(results) > service.RERANK_POOL_MIN, \
         "need picks beyond the pool for a meaningful straggler test"
 
     # One head batch (pool-sized) + one straggler batch for the picked tail.
     assert len(calls) == 2
-    assert len(calls[0]) == server.RERANK_POOL_MIN
-    assert len(calls[1]) == len(results) - server.RERANK_POOL_MIN
+    assert len(calls[0]) == service.RERANK_POOL_MIN
+    assert len(calls[1]) == len(results) - service.RERANK_POOL_MIN
 
     for r in results:
         assert r["reranked"] is True
@@ -161,9 +161,9 @@ def test_picked_tail_stragglers_are_rescored(client, test_collection, monkeypatc
 
 def test_straggler_rescore_failure_keeps_honest_mixed_flags(client, test_collection, monkeypatch):
     """If the straggler batch fails (None), tail results stay cosine-flagged."""
-    import server
+    from legend_lore import service
 
-    n_parents = server.RERANK_POOL_MIN + 2
+    n_parents = service.RERANK_POOL_MIN + 2
     _upsert_parents(test_collection, n_parents)
     calls = []
 
@@ -171,16 +171,16 @@ def test_straggler_rescore_failure_keeps_honest_mixed_flags(client, test_collect
         calls.append(list(docs))
         return [0.8] * len(docs) if len(calls) == 1 else None
 
-    monkeypatch.setattr(server, "rerank_scores", fake_scores)
+    monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
     response = client.post("/api/search", json={
         "query": "dragon", "n_results": n_parents, "rerank": True,
-        "rerank_candidates": server.RERANK_POOL_MIN,
+        "rerank_candidates": service.RERANK_POOL_MIN,
     })
     assert response.status_code == 200
     results = response.json()["results"]
-    assert len(results) > server.RERANK_POOL_MIN
-    head = results[:server.RERANK_POOL_MIN]
-    tail = results[server.RERANK_POOL_MIN:]
+    assert len(results) > service.RERANK_POOL_MIN
+    head = results[:service.RERANK_POOL_MIN]
+    tail = results[service.RERANK_POOL_MIN:]
     assert all(r["reranked"] is True for r in head)
     assert all(r["reranked"] is False for r in tail)

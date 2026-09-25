@@ -16,9 +16,9 @@ import logging
 
 import pytest
 
-import lexical
-from lexical import PersistedLexicalIndex, fts_match, rrf_fuse
-from parents_store import upsert_units_fts
+from legend_lore import lexical
+from legend_lore.lexical import PersistedLexicalIndex, fts_match, rrf_fuse
+from legend_lore.parents_store import upsert_units_fts
 
 
 # ---------------------------------------------------------------------------
@@ -260,11 +260,10 @@ def deep_dense_client(client, test_collection, tmp_path, monkeypatch):
 
 
 def _scored_docs(client, monkeypatch, **overrides):
-    import server
+    from legend_lore import service
 
     scored = []
-    monkeypatch.setattr(
-        server, "rerank_scores",
+    monkeypatch.setattr(service, "rerank_scores",
         lambda q, docs: scored.extend(docs) or [0.5] * len(docs))
     _search(client, hybrid=True, rerank=True, rerank_candidates=10,
             spell_correction=False, **overrides)
@@ -304,10 +303,9 @@ def test_hybrid_respects_source_scope(hybrid_client):
 def test_hybrid_reranker_rescores_bm25_only_candidate(hybrid_client, monkeypatch):
     """With rerank on, the cross-encoder gives the BM25-only candidate a
     real score on the same scale as everything else."""
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(
-        server, "rerank_scores",
+    monkeypatch.setattr(service, "rerank_scores",
         lambda q, docs: [0.9 if "owlbear" in d else 0.1 for d in docs])
     results = _search(hybrid_client, hybrid=True, rerank=True)
     assert [r["filename"] for r in results] == ["monsters.pdf", "rules.pdf"]

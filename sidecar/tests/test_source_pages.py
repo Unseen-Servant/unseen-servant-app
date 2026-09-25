@@ -16,8 +16,8 @@ real file on disk (it opens the PDF with pymupdf), so it uses the
 
 import pytest
 
-from granularity import ParentDoc
-from parents_store import upsert_parents
+from legend_lore.granularity import ParentDoc
+from legend_lore.parents_store import upsert_parents
 
 SOURCE = "/corpus/monsters.pdf"
 

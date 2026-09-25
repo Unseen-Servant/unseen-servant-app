@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-import reranker
+from legend_lore import reranker
 
 
 @pytest.fixture(autouse=True)

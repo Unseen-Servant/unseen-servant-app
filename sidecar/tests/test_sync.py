@@ -10,8 +10,13 @@ import json
 import os
 import time
 
-from parents_store import count_units_fts
-from server import MANIFEST_FILENAME, PIPELINE_VERSION, IndexManifest, ManifestEntry
+from legend_lore.parents_store import count_units_fts
+from legend_lore.service import (
+    MANIFEST_FILENAME,
+    PIPELINE_VERSION,
+    IndexManifest,
+    ManifestEntry,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +110,7 @@ def test_index_status_up_to_date(client, sample_pdf_path, tmp_path):
 
 def test_index_status_counts_files_indexed_by_an_older_pipeline(client, sample_pdf_path, tmp_path):
     """Files whose manifest entry predates PIPELINE_VERSION should be reported outdated."""
-    from server import load_manifest, save_manifest
+    from legend_lore.service import load_manifest, save_manifest
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
     m = load_manifest(tmp_path)
     m.files[str(sample_pdf_path)].pipeline_version = "structure_aware-v2/bge-m3"
@@ -287,8 +292,8 @@ def test_index_files_writes_manifest(client, sample_pdf_path, tmp_path):
 
 def test_index_files_records_pipeline_version(client, sample_pdf_path, tmp_path):
     """Successful indexing should stamp the manifest entry with PIPELINE_VERSION."""
-    from chunker import PIPELINE_VERSION
-    from server import load_manifest
+    from legend_lore.chunker import PIPELINE_VERSION
+    from legend_lore.service import load_manifest
     r = client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
     assert r.status_code == 200
     entry = load_manifest(tmp_path).files[str(sample_pdf_path)]
@@ -406,14 +411,14 @@ def test_manifest_backward_compat_missing_game_system(tmp_path):
     }
     (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(old_manifest))
 
-    from server import load_manifest
+    from legend_lore.service import load_manifest
     manifest = load_manifest(tmp_path)
     assert manifest.files["/old/book.pdf"].game_system == "unknown"
 
 
 def test_manifest_backward_compat_missing_pipeline_version(tmp_path):
     """Old manifests without pipeline_version should load with an empty default."""
-    from server import IndexManifest, ManifestEntry
+    from legend_lore.service import IndexManifest, ManifestEntry
     raw = {"version": 1, "files": {"/a.pdf": {"filename": "a.pdf", "mtime": 1.0, "chunk_count": 1,
                                                  "indexed_at": "2026-01-01T00:00:00+00:00"}}}
     m = IndexManifest(**raw)

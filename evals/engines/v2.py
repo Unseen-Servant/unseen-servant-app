@@ -45,22 +45,22 @@ def _import_sidecar():
     APPEND (never insert) sidecar to sys.path: both the repo root and
     sidecar/ contain a package named ``evals``, and the top-level one —
     this harness — must keep winning the import race. Nothing in
-    sidecar's server module imports ``evals``, so append order is safe.
+    the sidecar's modules imports ``evals``, so append order is safe.
     """
     if str(SIDECAR_DIR) not in sys.path:
         sys.path.append(str(SIDECAR_DIR))
     try:
         import chromadb
         from fastapi.testclient import TestClient
-        from server import (
+        from legend_lore.service import (
             COLLECTION_METADATA,
             PIPELINE_VERSION,
             _extract_and_chunk,
             _extract_pdf_pages,
             build_ollama_embedding_function,
-            create_app,
             load_manifest,
         )
+        from server import create_app
     except ImportError as exc:  # pragma: no cover - environment guard
         raise SystemExit(
             f"v2 engine needs the sidecar environment (missing: {exc}).\n"

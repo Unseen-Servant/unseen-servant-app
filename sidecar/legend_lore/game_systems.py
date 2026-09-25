@@ -207,7 +207,7 @@ GAME_SYSTEMS: list[dict] = [
 ]
 
 
-# Derived lookup: tag → keywords (used by detect_game_system in server.py)
+# Derived lookup: tag → keywords (used by detect_game_system in service.py)
 KNOWN_SYSTEMS: dict[str, list[str]] = {
     entry["tag"]: entry["keywords"] for entry in GAME_SYSTEMS
 }

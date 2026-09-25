@@ -8,7 +8,7 @@ keeps its full section text. `None` means unlimited — every result
 passes through unmodified except for the added `truncated: False` flag.
 """
 
-from server import pack_results
+from legend_lore.service import pack_results
 from tests.test_search_sections import _search, section_client  # noqa: F401
 
 

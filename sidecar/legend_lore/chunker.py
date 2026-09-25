@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-from heading_text import strip_markup
+from .heading_text import strip_markup
 
 
 CHUNKER_VERSION = "structure_aware-v3"

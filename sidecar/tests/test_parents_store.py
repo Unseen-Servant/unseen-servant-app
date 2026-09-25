@@ -1,7 +1,7 @@
 """Unit tests for parents_store — SQLite-backed parent KV store."""
 
-from granularity import ParentDoc
-from parents_store import (
+from legend_lore.granularity import ParentDoc
+from legend_lore.parents_store import (
     upsert_parents,
     fetch_parents,
     fetch_parents_extended,
@@ -533,7 +533,7 @@ def test_fetch_section_by_id_unknown_id_is_none(tmp_path):
 
 
 def test_count_phrases_counts_units_with_the_adjacent_pair(tmp_path):
-    from parents_store import count_phrases
+    from legend_lore.parents_store import count_phrases
 
     upsert_units_fts(tmp_path, "/lib/a.pdf", [
         ("a_0", 0, "a.pdf", "OSR", "p1", "Thief skills table"),

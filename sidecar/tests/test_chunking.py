@@ -2,10 +2,10 @@
 
 Pure function over `list[PageMarkdown]` — no PDF, no Chroma, no Ollama.
 Mirrors the boundary rules validated by the chunker spike (see
-sidecar/chunker.py docstring for the FINDINGS link).
+sidecar/legend_lore/chunker.py docstring for the FINDINGS link).
 """
 
-from chunker import (
+from legend_lore.chunker import (
     CHUNKER_VERSION,
     HARD_CAP,
     Chunk,
@@ -13,7 +13,7 @@ from chunker import (
     _enforce_hard_cap,
     structure_aware,
 )
-from promote_headings import promote_markdown
+from legend_lore.promote_headings import promote_markdown
 
 
 def _page(n: int, md: str) -> PageMarkdown:
@@ -221,8 +221,8 @@ def test_composed_pipeline_produces_real_section_metadata():
     using real distinct sections (not hand-built stand-ins) to check the
     fields actually survive composition, not just each module in isolation."""
     from pathlib import Path
-    from granularity import build
-    from server import _embed_unit_metadata
+    from legend_lore.granularity import build
+    from legend_lore.service import _embed_unit_metadata
 
     pages = [_page(1, "# Monsters\n\n## Kraken\n\nbody\n\n### Actions\n\nbite\n\n## Medusa\n\ngaze\n\n### Actions\n\nglare")]
     chunks = structure_aware(pages, source_pdf="x.pdf")
@@ -244,7 +244,7 @@ def test_section_ids_are_stable_across_runs():
 
 
 def test_pipeline_version_names_chunker_and_embedder():
-    from chunker import CHUNKER_VERSION, EMBEDDING_MODEL, PIPELINE_VERSION
+    from legend_lore.chunker import CHUNKER_VERSION, EMBEDDING_MODEL, PIPELINE_VERSION
     assert CHUNKER_VERSION == "structure_aware-v3"
     assert PIPELINE_VERSION == f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
 

@@ -35,8 +35,8 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from chunker import Chunk
-from linearize import coverage_ratio, linearize_table
+from .chunker import Chunk
+from .linearize import coverage_ratio, linearize_table
 
 
 SMALL_TARGET = 400

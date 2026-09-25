@@ -257,11 +257,14 @@ Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe`
 unseen-servant-app/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
-│   │   ├── +page.svelte        # Main UI: folder picker, file tree, indexing
+│   │   ├── legend-lore/
+│   │   │   └── +page.svelte    # Legend Lore UI: folder picker, file tree, search
+│   │   ├── +page.ts            # Root route redirects to /legend-lore
 │   │   └── +layout.ts          # Disables SSR (SPA mode for Tauri)
 │   └── lib/
-│       ├── FileTree.svelte     # Recursive file tree component
-│       └── types.ts            # Shared TypeScript types (FileItem)
+│       ├── shell/              # Workstation chrome: header, status bar, settings, dialogs
+│       ├── ui/                 # Shared primitives: buttons, confirm dialog, icons
+│       └── legend-lore/        # Legend Lore components (file tree, search, collections)
 │
 ├── src-tauri/                  # Backend (Rust)
 │   ├── src/
@@ -273,10 +276,13 @@ unseen-servant-app/
 │   └── Cargo.toml              # Rust dependencies
 │
 ├── sidecar/                    # Python indexing sidecar
-│   ├── server.py               # FastAPI server (indexing, search, tiers, boost)
+│   ├── server.py               # FastAPI app construction, lifecycle, health
 │   ├── mcp_server.py           # MCP tool definitions for Claude Desktop
-│   ├── reranker.py             # Cross-encoder reranking (fastembed/ONNX)
-│   ├── linearize.py            # Table row-linearization for embed units
+│   ├── legend_lore/            # Legend Lore: routes, indexing, search, retrieval modules
+│   │   ├── router.py           # HTTP routes (APIRouter mounted by server.py)
+│   │   ├── service.py          # Extraction, indexing, stores, search pipeline
+│   │   ├── reranker.py         # Cross-encoder reranking (fastembed/ONNX)
+│   │   └── linearize.py        # Table row-linearization for embed units
 │   ├── evals/                  # Retrieval eval harness (queries, scorer, baselines)
 │   ├── pyproject.toml          # Dependencies (runtime + dev/build groups)
 │   ├── uv.lock                 # Locked dependency versions

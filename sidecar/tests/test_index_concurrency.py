@@ -19,6 +19,7 @@ import pytest
 from httpx import ASGITransport
 
 import server
+from legend_lore import router
 
 
 SLOW_S = 1.5
@@ -35,7 +36,7 @@ def slow_app(
         time.sleep(SLOW_S)
         return 1, None, "unknown", []
 
-    monkeypatch.setattr(server, "index_single_pdf", slow_index)
+    monkeypatch.setattr(router, "index_single_pdf", slow_index)
 
     app = server.create_app(
         collection=test_collection,

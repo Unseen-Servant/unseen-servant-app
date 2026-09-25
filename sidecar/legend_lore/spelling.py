@@ -26,7 +26,7 @@ from typing import Callable
 
 from symspellpy import SymSpell, Verbosity
 
-from parents_store import count_phrases, open_store
+from .parents_store import count_phrases, open_store
 
 # A term is in-vocab (protected, and a valid correction target) only at
 # this frequency or above. Start 3 per the design; tune during eval.
@@ -95,7 +95,7 @@ def _english_bigrams() -> dict[str, int]:
     """
     global _english_bigrams_cache
     if _english_bigrams_cache is None:
-        from lexical import _STOPWORDS
+        from .lexical import _STOPWORDS
 
         text = files("symspellpy").joinpath(
             "frequency_bigramdictionary_en_243_342.txt"

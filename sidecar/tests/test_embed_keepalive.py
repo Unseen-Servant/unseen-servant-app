@@ -8,8 +8,8 @@ embedder, and failures that never escape.
 
 import threading
 
-import server
-from server import (
+from legend_lore import service
+from legend_lore.service import (
     EMBED_KEEPALIVE_INTERVAL_SECONDS,
     keep_embedder_warm,
     warm_search_stack,
@@ -90,8 +90,7 @@ def test_keepalive_default_interval_is_120s():
 def test_warm_search_stack_loads_reranker_and_vocabulary(monkeypatch):
     monkeypatch.delenv("RERANK_DISABLED", raising=False)
     reranked = []
-    monkeypatch.setattr(
-        server, "rerank_scores",
+    monkeypatch.setattr(service, "rerank_scores",
         lambda query, docs: reranked.append((query, docs)) or [0.0])
     built = []
 
@@ -106,8 +105,7 @@ def test_warm_search_stack_skips_the_reranker_when_disabled(monkeypatch):
     only burn a thread on a load that is going to be refused."""
     monkeypatch.setenv("RERANK_DISABLED", "1")
     reranked = []
-    monkeypatch.setattr(
-        server, "rerank_scores", lambda query, docs: reranked.append(1))
+    monkeypatch.setattr(service, "rerank_scores", lambda query, docs: reranked.append(1))
     built = []
 
     warm_search_stack(lambda: built.append(1))
@@ -124,7 +122,7 @@ def test_warm_search_stack_survives_a_failing_reranker(monkeypatch):
     def boom(query, docs):
         raise RuntimeError("no model")
 
-    monkeypatch.setattr(server, "rerank_scores", boom)
+    monkeypatch.setattr(service, "rerank_scores", boom)
     built = []
 
     warm_search_stack(lambda: built.append(1))  # must not raise

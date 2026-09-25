@@ -9,7 +9,7 @@ reconstruction, and section B split/join variant generation.
 
 import pytest
 
-from spelling import MIN_VOCAB_FREQ, SpellCorrector, build_vocabulary
+from legend_lore.spelling import MIN_VOCAB_FREQ, SpellCorrector, build_vocabulary
 
 
 class FakeCollection:
@@ -315,7 +315,7 @@ def test_protected_tokens_are_never_rewritten():
 
 
 def test_keyword_tokens_splits_multiword_keywords():
-    from spelling import keyword_tokens
+    from legend_lore.spelling import keyword_tokens
 
     assert keyword_tokens({"D&D 5E": ["dnd", "d&d"], "YZE": ["Year Zero"]}) >= {
         "dnd", "d", "year", "zero"}

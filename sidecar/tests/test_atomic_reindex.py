@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from server import (
+from legend_lore.service import (
     EmbedBatchError,
     MANIFEST_FILENAME,
     _embed_and_upsert_units,
@@ -19,8 +19,8 @@ from server import (
     chunk_id_prefix,
     load_manifest,
 )
-from granularity import EmbedUnit, ParentDoc
-from parents_store import count_units_fts
+from legend_lore.granularity import EmbedUnit, ParentDoc
+from legend_lore.parents_store import count_units_fts
 
 
 # ---------------------------------------------------------------------------
@@ -120,9 +120,9 @@ def test_embed_batch_error_chains_original_cause():
 def test_embed_batch_retries_transient_reset(monkeypatch):
     """A transient runner reset ("connection reset by peer") is retried and
     recovers, so one dropped connection doesn't abort the file."""
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(server.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(service.time, "sleep", lambda *_: None)
     calls = {"n": 0}
 
     class _FlakyCollection(_RecordingCollection):
@@ -134,16 +134,16 @@ def test_embed_batch_retries_transient_reset(monkeypatch):
                 )
             return [[float(i)] * 4 for i, _ in enumerate(texts)]
 
-    out = server._embed_batch(_FlakyCollection(), _make_units(2))
+    out = service._embed_batch(_FlakyCollection(), _make_units(2))
     assert calls["n"] == 2  # failed once, recovered on retry
     assert len(out) == 2
 
 
 def test_embed_batch_does_not_retry_deterministic_error(monkeypatch):
     """A real error (bad input) fails fast — no retry, no backoff sleep."""
-    import server
+    from legend_lore import service
 
-    monkeypatch.setattr(server.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(service.time, "sleep", lambda *_: None)
     calls = {"n": 0}
 
     class _BoomCollection(_RecordingCollection):
@@ -152,7 +152,7 @@ def test_embed_batch_does_not_retry_deterministic_error(monkeypatch):
             raise ValueError("bad input")
 
     with pytest.raises(ValueError):
-        server._embed_batch(_BoomCollection(), _make_units(2))
+        service._embed_batch(_BoomCollection(), _make_units(2))
     assert calls["n"] == 1  # not retried
 
 
@@ -256,9 +256,8 @@ def test_reindex_file_failure_preserves_indexed_data(
     )["ids"])
     assert initial_ids
 
-    import server
-    monkeypatch.setattr(
-        server, "_embed_batch",
+    from legend_lore import service
+    monkeypatch.setattr(service, "_embed_batch",
         lambda collection, batch: (_ for _ in ()).throw(RuntimeError("ollama down"))
     )
 
@@ -281,9 +280,8 @@ def test_reindex_file_failure_records_last_error(
     """Failure records last_error/last_error_at on the manifest entry."""
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
 
-    import server
-    monkeypatch.setattr(
-        server, "_embed_batch",
+    from legend_lore import service
+    monkeypatch.setattr(service, "_embed_batch",
         lambda collection, batch: (_ for _ in ()).throw(RuntimeError("ollama down"))
     )
 
@@ -304,9 +302,8 @@ def test_reindex_file_success_clears_last_error(
     """A successful re-index clears any prior last_error marker."""
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
 
-    import server
-    monkeypatch.setattr(
-        server, "_embed_batch",
+    from legend_lore import service
+    monkeypatch.setattr(service, "_embed_batch",
         lambda collection, batch: (_ for _ in ()).throw(RuntimeError("first failure"))
     )
     client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
@@ -356,8 +353,8 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
     _modify_pdf(sample_pdf_path)
     _modify_pdf(large_text_pdf_path)
 
-    import server
-    real_embed = server._embed_batch
+    from legend_lore import service
+    real_embed = service._embed_batch
 
     def selective_boom(collection, batch):
         # The metadata source is set later in _upsert_batch, so inspect the
@@ -366,7 +363,7 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
             raise RuntimeError("ollama choked on dragons")
         return real_embed(collection, batch)
 
-    monkeypatch.setattr(server, "_embed_batch", selective_boom)
+    monkeypatch.setattr(service, "_embed_batch", selective_boom)
 
     resp = client.post("/api/sync-index", json={"selected_paths": paths})
     assert resp.status_code == 200
@@ -396,7 +393,7 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
 def test_build_ollama_embedding_function_default_timeout(monkeypatch):
     """Default timeout is 120s — long enough for a slow embed batch but
     short enough that a wedged Ollama can't hang sync forever."""
-    from server import build_ollama_embedding_function
+    from legend_lore.service import build_ollama_embedding_function
 
     monkeypatch.delenv("OLLAMA_EMBED_TIMEOUT_SECONDS", raising=False)
     ef = build_ollama_embedding_function()
@@ -405,7 +402,7 @@ def test_build_ollama_embedding_function_default_timeout(monkeypatch):
 
 def test_build_ollama_embedding_function_env_override(monkeypatch):
     """OLLAMA_EMBED_TIMEOUT_SECONDS overrides the default."""
-    from server import build_ollama_embedding_function
+    from legend_lore.service import build_ollama_embedding_function
 
     monkeypatch.setenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "30")
     ef = build_ollama_embedding_function()
@@ -419,9 +416,8 @@ def test_sync_stream_phase3_failure_releases_lock(
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
     _modify_pdf(sample_pdf_path)
 
-    import server
-    monkeypatch.setattr(
-        server, "_embed_batch",
+    from legend_lore import service
+    monkeypatch.setattr(service, "_embed_batch",
         lambda collection, batch: (_ for _ in ()).throw(RuntimeError("everything fails"))
     )
 

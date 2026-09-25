@@ -10,9 +10,9 @@ from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from fastapi.testclient import TestClient
 import pytest
 
-from granularity import ParentDoc
-from parents_store import upsert_parents, clear_all_parents
-from server import (
+from legend_lore.granularity import ParentDoc
+from legend_lore.parents_store import upsert_parents, clear_all_parents
+from legend_lore.service import (
     _UUID_DIR_RE,
     _compute_reclaimable_bytes,
     _live_segment_ids,
@@ -21,9 +21,9 @@ from server import (
     _sqlite_freelist_bytes,
     _remove_segment_dir,
     compact_sqlite,
-    create_app,
     gc_orphan_segments,
 )
+from server import create_app
 
 
 FAKE_UUID = "deadbeef-1234-5678-90ab-cdef12345678"
