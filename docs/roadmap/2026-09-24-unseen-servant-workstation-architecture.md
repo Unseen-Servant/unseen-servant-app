@@ -1,7 +1,7 @@
 # Unseen Servant workstation — codebase architecture
 
 **Date:** 2026-09-24
-**Status:** decisions D1–D7 agreed 2026-09-24. D1 shipped the same day: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Next steps in §6; nothing in steps 1–5 started.
+**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Next steps in §6; nothing in steps 1–5 started.
 **Objective:** grow this repository from one tool (Legend Lore) into the GM workstation — one app, **Unseen Servant**, hosting three tools: Legend Lore (RAG over the PDF library), Command (session manager), and the Servant (assistant) — without a rewrite, a plugin system, or a second repository.
 
 ---
@@ -66,6 +66,7 @@ src-tauri/src/
 sidecar/
   legend_lore/              chunker, lexical, reranker, spelling, parents_store, … (the
                             whole retrieval stack) + router.py
+  command/                  vault read/write, current-session state + router.py (§4 Q4)
   servant/                  the paused agent harness, when it resumes
   server.py                 one FastAPI app; `include_router` per package
   mcp_server.py             one MCP server; registers each package's tools
@@ -75,7 +76,7 @@ Rules:
 
 - **Tools never import each other's UI.** `src/lib/command/` may not import from `src/lib/legend-lore/`. Shared components go to `ui/`; shared workstation state goes to `shell/`.
 - **Tool → tool inside the sidecar is a plain Python import**, one process. Tool → tool across the Rust/JS boundary is a Tauri command or an event, never a shared Svelte store (§4).
-- **Command probably has no Python.** The sidecar exists for the ML stack. A session manager is CRUD over Markdown — Rust + Svelte covers it. Only the Servant (inference orchestration, where the paused Phase 1 harness already lives in Python) joins Legend Lore in the sidecar. Put Command in the sidecar only if it grows a need that is actually Python-shaped.
+- **Command's state and vault I/O live in the sidecar** (`sidecar/command/`, decided §4 Q4). Not because CRUD over Markdown needs Python, but because the MCP server is an HTTP adapter over the sidecar (D5): putting Command there gives its MCP tools away for free, keeps one seam, and lets Legend Lore index the vault with an import. Rust stays the shell — window registry, sidecar lifecycle, tray, proxy commands — and Svelte calls Command through Tauri commands exactly as it calls Legend Lore.
 
 ### D3 — One window per tool, Rust owns the registry
 
@@ -155,13 +156,13 @@ A move-only refactor — no behaviour change, tests green before and after.
 
 ---
 
-## 4. Open questions
+## 4. Open questions — all resolved 2026-09-24
 
-1. **plugin-store cross-window reactivity** — does `store.onChange` fire in window B when window A writes? Decides whether settings need any new code at all (D4).
-2. **macOS `Reopen` target** — last-focused window, or every window that was visible before the app lost all of them? Decide when D3 lands; either is a few lines.
-3. **Servant window shape** — floating always-on-top palette vs. ordinary window. Defer to the Servant's own design pass; the registry does not care.
-4. **Where "current session" lives** — Rust state fed from the vault, or the sidecar? `mcp_server.py` is a pure `httpx` adapter over the FastAPI routes, so a tool gets MCP exposure only through an HTTP surface: Command state in Rust needs a small local endpoint, or Command's state lives in the sidecar after all. Decide with the Command design doc.
-5. **A `games.unseenservant.command` app-data directory already exists on the dev machine.** If a Command prototype lives somewhere as its own app, it is a fourth codebase this doc should account for before step 4 — port or retire, not run alongside.
+1. **plugin-store cross-window reactivity — yes, it broadcasts.** Verified in `tauri-plugin-store` 2.4.4 source: `Store::set` calls `app.emit("store://change", …)` (global, every window), and a second window loading the same path gets the same resource id, which is what the JS `onChange`/`onKeyChange` filter keys on. Settings need no new bus: the funnel (step 2a) subscribes with `onKeyChange` and every window follows.
+2. **macOS `Reopen` when no window is visible → the last-focused window only.** Deliberate closes stay closed; when some window is visible, `has_visible_windows` is true and macOS just brings the app forward.
+3. **Servant window shape → an ordinary window**, same class as the tools. Always-on-top can be added later if live play asks for it.
+4. **Command's state lives in the sidecar, `sidecar/command/`.** `mcp_server.py` is a pure `httpx` adapter over the FastAPI routes, so MCP exposure needs an HTTP surface; the sidecar already is one. Rejected: Rust state plus a second local HTTP server (two servers, new dependency), and moving the MCP server into Rust (rewrites a working server before Command exists). D2 amended accordingly.
+5. **The `games.unseenservant.command` data dir is from a throwaway spike.** Nothing to port; Command is greenfield. The directory is orphaned and can be deleted.
 6. **MCP is kept for the user's own harness**, not for Claude Desktop (config removed 2026-09-24). D5 stands: the Servant consumes the same tool surface; the Claude Desktop installer in Getting Started is just one client of it.
 
 ---
@@ -200,21 +201,21 @@ Three slices, each its own commit, each verified by the full Linux suite plus `n
 
 | | Slice | Verify |
 |---|---|---|
-| 2a | Settings funnel: one `shell/settings.ts` owns every `tauri-plugin-store` read/write (today `+page.svelte` and `storeParsers.ts` call it directly); answer §4 Q1 while there | vitest; a setting changed in Settings is read back through the funnel only |
+| 2a | Settings funnel: one `shell/settings.ts` owns every `tauri-plugin-store` read/write (today `+page.svelte` and `storeParsers.ts` call it directly) and subscribes with `onKeyChange`, which the plugin already broadcasts to every window (§4 Q1) | vitest; a setting changed in Settings is read back through the funnel only |
 | 2b | Window label `main` → `legend-lore`: `tauri.conf.json`, capability file, `Reopen`, `save_window_size`. Resets saved geometry once | relaunch restores geometry after the second launch |
 | 2c | Rust window registry: `open_tool(id)` (focus-or-create), `tools.ts` manifest, **Window** menu + tray entries, remembered set of open windows; per-window capability files | `npm run tauri build` locally (with the exec-bit fix); tray Quit saves every window; relaunch reopens the same set |
 
 ### Step 3 — cross-window state
 
-Lift Ollama status, sidecar health and sync/reindex progress to Rust source of truth with `emit` to all windows; settings too unless 2a showed plugin-store already broadcasts. **Verify:** dev-only, open two windows on the same route, change a setting / start a sync — both reflect it. Do this **before** Command exists so the second tool lands on a shell that already assumes multiple windows.
+Lift Ollama status, sidecar health and sync/reindex progress to Rust source of truth with `emit` to all windows (settings are already covered — §4 Q1). **Verify:** dev-only, open two windows on the same route, start a sync — both status bars reflect it. Do this **before** Command exists so the second tool lands on a shell that already assumes multiple windows.
 
 ### Step 4 — Command
 
-Second window, Rust + Svelte, Markdown vault (D6), its MCP tools registered in `mcp_server.py` (resolve §4 Q4 and Q5 first). **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
+Greenfield (§4 Q5). Second window; Svelte UI over Tauri proxy commands; state and vault I/O in `sidecar/command/` (§4 Q4, D6); its MCP tools registered in `mcp_server.py`. Needs its own design doc before code. **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
 
 ### Step 5 — Servant
 
-A window, MCP client over both tools (D5). **Verify:** a scripted tool-call transcript reproduces a session-prep task end to end.
+An ordinary window (§4 Q3), MCP client over both tools (D5). **Verify:** a scripted tool-call transcript reproduces a session-prep task end to end.
 
 ### Outside this repository
 
