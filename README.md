@@ -7,7 +7,7 @@
 
 ## Installation (End Users)
 
-1. Download the latest installer from [GitHub Releases](https://github.com/Unseen-Servant/unseen-servant/releases):
+1. Download the latest installer from [GitHub Releases](https://github.com/Unseen-Servant/unseen-servant-app/releases):
    - **macOS (Apple Silicon):** `.dmg`
    - **Windows:** `.msi` or `.exe`
 2. Install the app:
@@ -196,8 +196,8 @@ See the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/) for 
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Unseen-Servant/unseen-servant.git
-cd unseen-servant
+git clone https://github.com/Unseen-Servant/unseen-servant-app.git
+cd unseen-servant-app
 
 # 2. Install frontend dependencies
 npm install
@@ -254,7 +254,7 @@ Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe`
 ## Project Structure
 
 ```text
-unseen-servant/
+unseen-servant-app/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
 │   │   ├── +page.svelte        # Main UI: folder picker, file tree, indexing
