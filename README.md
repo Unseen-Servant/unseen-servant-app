@@ -268,7 +268,8 @@ unseen-servant-app/
 │
 ├── src-tauri/                  # Backend (Rust)
 │   ├── src/
-│   │   ├── lib.rs              # Tauri commands + sidecar lifecycle
+│   │   ├── lib.rs              # run(), sidecar lifecycle, tray, windows, health checks
+│   │   ├── legend_lore.rs      # Legend Lore commands (proxy to the sidecar)
 │   │   └── main.rs             # App entry point
 │   ├── capabilities/
 │   │   └── default.json        # Tauri permissions (dialog, store, etc.)

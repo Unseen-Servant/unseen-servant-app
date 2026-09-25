@@ -1,7 +1,7 @@
 # Unseen Servant workstation — codebase architecture
 
 **Date:** 2026-09-24
-**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Next steps in §6; nothing in steps 1–5 started.
+**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25; next is Phase 5 runtime (§6 order table).
 **Objective:** grow this repository from one tool (Legend Lore) into the GM workstation — one app, **Unseen Servant**, hosting three tools: Legend Lore (RAG over the PDF library), Command (session manager), and the Servant (assistant) — without a rewrite, a plugin system, or a second repository.
 
 ---
@@ -223,6 +223,8 @@ Three slices, each its own commit, each verified by the full Linux suite plus `n
 **1a done 2026-09-25.** Placement follows D2 as amended above; three files moved against the first sketch because of what they contain: `ContextMenu` is the file-tree menu (collections, systems, solo/mute) and `palette` is the collection pigments, so both are Legend Lore; the General and Library settings panes are Legend Lore panes hosted by the shell's `SettingsModal`. That hosting is the one shell → tool import left (`SettingsModal`, `help/GuidesPane` → `GettingStartedSteps`); it goes away when the D3 manifest carries each tool's settings panes.
 
 **1b done 2026-09-25.** `server.py` (285 lines) keeps CLI/port file, `create_app`, CORS, `/health` and the MCP heartbeat/status routes (workstation-level: the MCP server will aggregate every tool), the watchdog and `__main__`. The 34 Legend Lore routes are `legend_lore/router.py`'s `build_router(app, collection, data_dir, …)`, a factory whose closures are the old `create_app` body verbatim. The ~2 400 lines of module-level helpers the routes call became `legend_lore/service.py` — they could not stay in `server.py` without a circular import. The twelve retrieval modules moved into the package with relative imports. Tests patch where the call now happens (`service.rerank_scores`, `router.index_single_pdf`, …). Frozen binary serves the same 37 operations. Further splitting of `service.py` is left to Phase 5, which rewrites its embedder and store halves anyway.
+
+**1c done 2026-09-25.** `legend_lore.rs` holds the 30 Legend Lore commands (library file system, index/sync, stats, game systems, collections, search, search settings), their response types and the rename-validation tests. Commands and the types in their signatures became `pub`, which Tauri needs for commands in a submodule. `lib.rs` keeps `run()`, sidecar lifecycle, port and `sidecar_url()`, the sidecar/Ollama/MCP health checks (shell state, lifted to Rust in step 3, so they stay beside it rather than following the doc's `check_sidecar_health …` range), `get_data_dir`, `get_mcp_config`, tray and window handling.
 
 ### Step 2 — the shell assumes many windows (still one window)
 
