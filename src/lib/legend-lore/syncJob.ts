@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { jobNotification } from './notificationStore';
+import { jobNotification } from '../shell/notificationStore';
 
 export interface SyncProgressPayload {
   files_done: number;

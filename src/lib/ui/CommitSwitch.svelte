@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { chord, commitKeyShortcut } from './keybindings';
+  import { chord, commitKeyShortcut } from '../shell/keybindings';
   import { commitKeyId } from './confirmKeys';
 
   export let label: string;

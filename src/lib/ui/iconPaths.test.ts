@@ -33,7 +33,7 @@ describe('vendored sources', () => {
 describe('shared glyphs', () => {
   // Re-inlining a shared path is how the eight dice-d6 copies happened.
   it('are not re-inlined in components', () => {
-    const src = fileURLToPath(new URL('..', import.meta.url));
+    const src = fileURLToPath(new URL('../..', import.meta.url));
     const shared: Record<string, string> = {
       DICE_D6,
       BOOK,

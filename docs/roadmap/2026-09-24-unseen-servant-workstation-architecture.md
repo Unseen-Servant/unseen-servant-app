@@ -45,11 +45,15 @@ Repository renamed `unseen-legend-lore` → `unseen-servant-app`, paired with `u
 
 ```
 src/lib/
-  shell/          Header, StatusBar, Settings*, Modal, dialogStack, confirmStore,
-                  keybindings, palette, paneFocus, menuSlot, notificationStore, OllamaStatus
-  ui/             ActionButton, ConfirmDialog, ContextMenu, CommitSwitch, icons, iconPaths
-  legend-lore/    FileTree, SearchResults, SearchScopeBar, collections*, searchScope*,
-                  searchTiers, syncJob, GameSystems*, SystemsView, DocumentStatsModal, …
+  shell/          Header, StatusBar, SettingsModal, help/, Modal, dialogStack, confirmStore,
+                  keybindings, KeyboardHelpOverlay, LaunchSplash, paneFocus, menuSlot,
+                  notificationStore, OllamaStatus, storeParsers, tauriInvoke
+  ui/             ActionButton, ConfirmDialog, CommitSwitch, confirmKeys, inputModality,
+                  holdLatch, menuGeometry, icons, iconPaths
+  legend-lore/    FileTree, SearchResults, SearchScopeBar, ContextMenu, collections*,
+                  searchScope*, searchTiers, syncJob, GameSystems*, SystemsView,
+                  DocumentStatsModal, palette (collection pigments), General/Library
+                  settings panes, GettingStarted*, types, …
   command/
   servant/
   tools.ts        the tool manifest (§2 D3)
@@ -214,6 +218,8 @@ Three slices, each its own commit, each verified by the full Linux suite plus `n
 | 1a | `src/lib/` → `shell/`, `ui/`, `legend-lore/` per D2; tests move with their modules; `+page.svelte` → `routes/legend-lore/+page.svelte` with the root route redirecting there | vitest 462 green, svelte-check 0 errors, stylelint green |
 | 1b | `sidecar/server.py` → `sidecar/legend_lore/router.py` (`APIRouter`, the 37 routes) + the retrieval modules; `server.py` keeps app construction, lifespan, health, `include_router`; `tests/` imports and both PyInstaller `.spec` files follow | pytest green; `bash scripts/build-sidecar.sh` produces working binaries |
 | 1c | `src-tauri/src/lib.rs` → `legend_lore.rs` gets the sidecar-proxy commands (`check_sidecar_health` … `update_search_settings`); `lib.rs` keeps `run()`, sidecar lifecycle, tray, window handling | `cargo fmt --check`, clippy `-D warnings`, `cargo test` green |
+
+**1a done 2026-09-25.** Placement follows D2 as amended above; three files moved against the first sketch because of what they contain: `ContextMenu` is the file-tree menu (collections, systems, solo/mute) and `palette` is the collection pigments, so both are Legend Lore; the General and Library settings panes are Legend Lore panes hosted by the shell's `SettingsModal`. That hosting is the one shell → tool import left (`SettingsModal`, `help/GuidesPane` → `GettingStartedSteps`); it goes away when the D3 manifest carries each tool's settings panes.
 
 ### Step 2 — the shell assumes many windows (still one window)
 

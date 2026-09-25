@@ -8,12 +8,12 @@
   // furniture, not a popover.
   import { afterUpdate } from 'svelte';
   import { computeFilterRows, stepFilterRow } from './filterRows';
-  import { materializeKey } from './paneFocus';
-  import { holdLatch } from './holdLatch';
-  import { menuSlotHeld } from './menuSlot';
+  import { materializeKey } from '../shell/paneFocus';
+  import { holdLatch } from '../ui/holdLatch';
+  import { menuSlotHeld } from '../shell/menuSlot';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
-  import { DICE_D6, DIE_OUTLINE, RIBBON_OUTLINE } from './iconPaths';
+  import { DICE_D6, DIE_OUTLINE, RIBBON_OUTLINE } from '../ui/iconPaths';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.

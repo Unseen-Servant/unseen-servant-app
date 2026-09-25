@@ -6,9 +6,9 @@
   // single narrowing without touching the others.
 
   import { displaySystem } from './searchScope';
-  import { chordHint } from './keybindings';
+  import { chordHint } from '../shell/keybindings';
   import type { CurationKey } from './searchScope';
-  import { DICE_D6, RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
+  import { DICE_D6, RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
 
   // Chip glyph = axis (pigment bookmark = collection, outline bookmark =
   // curation bucket, monochrome die = system); chip frame = operation

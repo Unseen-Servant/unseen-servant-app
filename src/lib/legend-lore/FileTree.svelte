@@ -9,7 +9,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { memberStateFor, type ArmState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, RIBBON_FILLED } from './iconPaths';
+  import { BOOK, RIBBON_FILLED } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 

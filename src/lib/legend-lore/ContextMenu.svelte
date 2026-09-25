@@ -2,10 +2,10 @@
   import { afterUpdate, onMount } from 'svelte';
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
   import { menuMemberState, type MemberState } from './collectionMembership';
-  import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from './keybindings';
-  import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
-  import { clampToViewport } from './menuGeometry';
-  import { RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
+  import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from '../shell/keybindings';
+  import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
+  import { clampToViewport } from '../ui/menuGeometry';
+  import { RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemTagRows from './SystemTagRows.svelte';
 
   export let x: number;

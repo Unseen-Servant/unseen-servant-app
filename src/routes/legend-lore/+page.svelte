@@ -4,34 +4,34 @@
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { pdfFileUrl } from '../lib/pdfUrl';
+  import { pdfFileUrl } from '../../lib/legend-lore/pdfUrl';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../lib/types';
-  import { DEFAULT_SYNC_PREFERENCES } from '../lib/types';
-  import FileTree from '../lib/FileTree.svelte';
-  import ContextMenu from '../lib/ContextMenu.svelte';
-  import Header from '../lib/Header.svelte';
-  import SearchResults from '../lib/SearchResults.svelte';
-  import SearchInspector from '../lib/SearchInspector.svelte';
-  import SearchScopeBar from '../lib/SearchScopeBar.svelte';
-  import StatusBar from '../lib/StatusBar.svelte';
-  import GettingStartedPage from '../lib/GettingStartedPage.svelte';
-  import SettingsModal from '../lib/SettingsModal.svelte';
-  import KeyboardHelpOverlay from '../lib/KeyboardHelpOverlay.svelte';
-  import LaunchSplash from '../lib/LaunchSplash.svelte';
-  import DocumentStatsModal from '../lib/DocumentStatsModal.svelte';
-  import ConfirmDialog from '../lib/ConfirmDialog.svelte';
-  import { confirmPrompt } from '../lib/confirmStore';
-  import { holdLatch } from '../lib/holdLatch';
-  import CollectionsPanel from '../lib/CollectionsPanel.svelte';
-  import FilterPanel from '../lib/FilterPanel.svelte';
-  import SystemsView from '../lib/SystemsView.svelte';
-  import { jobNotification, pendingNotification } from '../lib/notificationStore';
-  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../lib/selectionUtils';
-  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, type VisibleRow } from '../lib/treeNav';
-  import { materializeKey } from '../lib/paneFocus';
-  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../lib/searchScope';
-  import { runSyncJob } from '../lib/syncJob';
+  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../../lib/legend-lore/types';
+  import { DEFAULT_SYNC_PREFERENCES } from '../../lib/legend-lore/types';
+  import FileTree from '../../lib/legend-lore/FileTree.svelte';
+  import ContextMenu from '../../lib/legend-lore/ContextMenu.svelte';
+  import Header from '../../lib/shell/Header.svelte';
+  import SearchResults from '../../lib/legend-lore/SearchResults.svelte';
+  import SearchInspector from '../../lib/legend-lore/SearchInspector.svelte';
+  import SearchScopeBar from '../../lib/legend-lore/SearchScopeBar.svelte';
+  import StatusBar from '../../lib/shell/StatusBar.svelte';
+  import GettingStartedPage from '../../lib/legend-lore/GettingStartedPage.svelte';
+  import SettingsModal from '../../lib/shell/SettingsModal.svelte';
+  import KeyboardHelpOverlay from '../../lib/shell/KeyboardHelpOverlay.svelte';
+  import LaunchSplash from '../../lib/shell/LaunchSplash.svelte';
+  import DocumentStatsModal from '../../lib/legend-lore/DocumentStatsModal.svelte';
+  import ConfirmDialog from '../../lib/ui/ConfirmDialog.svelte';
+  import { confirmPrompt } from '../../lib/shell/confirmStore';
+  import { holdLatch } from '../../lib/ui/holdLatch';
+  import CollectionsPanel from '../../lib/legend-lore/CollectionsPanel.svelte';
+  import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
+  import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
+  import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
+  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../../lib/legend-lore/selectionUtils';
+  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, type VisibleRow } from '../../lib/legend-lore/treeNav';
+  import { materializeKey } from '../../lib/shell/paneFocus';
+  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
+  import { runSyncJob } from '../../lib/legend-lore/syncJob';
   import {
     indexedPathsUnder,
     collectionsContaining,
@@ -41,20 +41,20 @@
     memberStateFor,
     addMembers,
     removeMembers,
-  } from '../lib/collectionMembership';
-  import { buildRibbonIndex, firstColorByPath } from '../lib/collectionRibbons';
-  import { createCommitScheduler, mergeArmedCollection } from '../lib/collectionCommit';
-  import { setTreePathsPayload, type TreePathsPayload } from '../lib/dragPayload';
-  import { chord, isDeleteChord } from '../lib/keybindings';
-  import { menuSlotHeld } from '../lib/menuSlot';
+  } from '../../lib/legend-lore/collectionMembership';
+  import { buildRibbonIndex, firstColorByPath } from '../../lib/legend-lore/collectionRibbons';
+  import { createCommitScheduler, mergeArmedCollection } from '../../lib/legend-lore/collectionCommit';
+  import { setTreePathsPayload, type TreePathsPayload } from '../../lib/legend-lore/dragPayload';
+  import { chord, isDeleteChord } from '../../lib/shell/keybindings';
+  import { menuSlotHeld } from '../../lib/shell/menuSlot';
   import {
     parseString,
     parseBoolean,
     parseStringArray,
     parseEnum,
-  } from '../lib/storeParsers';
-  import { parseScopeConsoleState } from '../lib/scopeConsole';
-  import type { ScopeConsoleState } from '../lib/scopeConsole';
+  } from '../../lib/shell/storeParsers';
+  import { parseScopeConsoleState } from '../../lib/legend-lore/scopeConsole';
+  import type { ScopeConsoleState } from '../../lib/legend-lore/scopeConsole';
 
   let selectedFolder = '';
   let files: FileItem[] = [];

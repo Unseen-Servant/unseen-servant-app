@@ -1,8 +1,8 @@
 <script lang="ts">
   import { afterUpdate, onDestroy } from 'svelte';
   import type { KnownGameSystem } from './types';
-  import { claimMenuSlot, releaseMenuSlot } from './menuSlot';
-  import { clampToViewport } from './menuGeometry';
+  import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
+  import { clampToViewport } from '../ui/menuGeometry';
   import SystemTagRows from './SystemTagRows.svelte';
 
   export let knownSystems: KnownGameSystem[] = [];

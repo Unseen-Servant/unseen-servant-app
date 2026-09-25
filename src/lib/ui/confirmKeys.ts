@@ -13,7 +13,7 @@
 //
 // See docs/frontend/2026-08-12-modal-rack-units-design.md#the-keyboard.
 
-import { isDeleteChord, type ChordEvent } from './keybindings';
+import { isDeleteChord, type ChordEvent } from '../shell/keybindings';
 
 /** The binding id for this prompt's commit switch. */
 export function commitKeyId(danger: boolean): 'confirm.commit' | 'confirm.commitSafe' {

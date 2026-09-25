@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DICE_D6 } from './iconPaths';
+  import { DICE_D6 } from '../ui/iconPaths';
 
   export let tag: string;
 </script>

@@ -22,7 +22,7 @@ Two pitfalls when adding keywords:
    English phrases ("5th edition") match content but rarely paths.
 """
 
-# Colors come from the manuscript-pigment palette; src/lib/palette.ts is
+# Colors come from the manuscript-pigment palette; src/lib/legend-lore/palette.ts is
 # the source of truth (keep hexes in sync by hand — no shared codegen):
 #   #c2736d Madder  #bb7b4e Ember      #9f8b3e Gilt  #6b9b60 Moss
 #   #2fa094 Verdigris  #5b90c7 Woad    #b5739f Plum

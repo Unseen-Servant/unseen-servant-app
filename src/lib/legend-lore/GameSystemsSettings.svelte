@@ -1,11 +1,11 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import type { KnownGameSystem } from './types';
-  import { DICE_D6 } from './iconPaths';
-  import Modal from './Modal.svelte';
-  import ActionButton from './ActionButton.svelte';
-  import CommitSwitch from './CommitSwitch.svelte';
-  import { confirmPrompt } from './confirmStore';
+  import { DICE_D6 } from '../ui/iconPaths';
+  import Modal from '../shell/Modal.svelte';
+  import ActionButton from '../ui/ActionButton.svelte';
+  import CommitSwitch from '../ui/CommitSwitch.svelte';
+  import { confirmPrompt } from '../shell/confirmStore';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};

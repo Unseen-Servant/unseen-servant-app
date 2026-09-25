@@ -5,14 +5,14 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { isIndexedRowOutOfScope } from './treeNav';
   import { UNTAGGED_KEY } from './searchScope';
-  import { materializeKey } from './paneFocus';
-  import { holdLatch } from './holdLatch';
-  import { menuSlotHeld } from './menuSlot';
-  import { systemsRowScopeKey } from './keybindings';
+  import { materializeKey } from '../shell/paneFocus';
+  import { holdLatch } from '../ui/holdLatch';
+  import { menuSlotHeld } from '../shell/menuSlot';
+  import { systemsRowScopeKey } from '../shell/keybindings';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, DICE_D6, DIE_OUTLINE, RIBBON_FILLED } from './iconPaths';
+  import { BOOK, DICE_D6, DIE_OUTLINE, RIBBON_FILLED } from '../ui/iconPaths';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();

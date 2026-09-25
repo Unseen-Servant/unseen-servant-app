@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import Modal from './Modal.svelte';
+  import Modal from '../shell/Modal.svelte';
   import { displaySystem } from './searchScope';
 
   export let path: string;

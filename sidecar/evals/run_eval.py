@@ -52,7 +52,7 @@ EXPECTED_PDFS = [
 TOP_K = 10  # nDCG@10 needs 10 results
 
 # Default n_results per request. Mirrors PAGE_SIZE_INITIAL in
-# src/routes/+page.svelte (pinned by tests/test_eval_config.py): the
+# src/routes/legend-lore/+page.svelte (pinned by tests/test_eval_config.py): the
 # rerank pool can scale with n_results, so quality must be gated at the
 # page size the app actually sends — requesting TOP_K let the #340
 # restructure pass a gate the UI then failed. Metrics stay graded @TOP_K.

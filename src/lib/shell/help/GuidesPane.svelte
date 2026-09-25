@@ -1,5 +1,5 @@
 <script lang="ts">
-  import GettingStartedSteps from '../GettingStartedSteps.svelte';
+  import GettingStartedSteps from '../../legend-lore/GettingStartedSteps.svelte';
 
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;

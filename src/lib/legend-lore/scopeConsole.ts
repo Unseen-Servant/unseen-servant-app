@@ -6,7 +6,7 @@
 // names and paths are kept as-is: resolution intersects them away, and
 // their chips stay visible and removable rather than silently ignored.
 
-import { parseStringArray, parseRecord } from './storeParsers';
+import { parseStringArray, parseRecord } from '../shell/storeParsers';
 import type { CurationKey, ScopeRef } from './searchScope';
 
 export interface ScopeConsoleState {

@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { BackgroundCheckInterval, BucketPolicy, SyncPreferences } from './types';
   import { BACKGROUND_CHECK_OPTIONS, DEFAULT_SYNC_PREFERENCES } from './types';
-  import { FOLDER_OPEN, FOLDER_OPEN_VIEWBOX } from './iconPaths';
-  import ActionButton from './ActionButton.svelte';
-  import { confirmPrompt } from './confirmStore';
+  import { FOLDER_OPEN, FOLDER_OPEN_VIEWBOX } from '../ui/iconPaths';
+  import ActionButton from '../ui/ActionButton.svelte';
+  import { confirmPrompt } from '../shell/confirmStore';
 
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;

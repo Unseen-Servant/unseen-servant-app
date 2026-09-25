@@ -43,9 +43,10 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 
 ### Key files
 
-- `src/routes/+page.svelte` — Main UI page
-- `src/lib/FileTree.svelte` — Recursive file tree component
-- `src/lib/types.ts` — Shared TypeScript types
+- `src/routes/legend-lore/+page.svelte` — Legend Lore main UI page
+- `src/lib/{shell,ui,legend-lore}/` — workstation chrome, shared primitives, Legend Lore components
+- `src/lib/legend-lore/FileTree.svelte` — Recursive file tree component
+- `src/lib/legend-lore/types.ts` — Legend Lore TypeScript types
 - `src-tauri/src/lib.rs` — Rust backend commands + sidecar lifecycle
 - `sidecar/server.py` — FastAPI indexing and search server
 - `sidecar/mcp_server.py` — MCP tool definitions for Claude Desktop

@@ -1,16 +1,16 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
+  import { RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
-  import { chord, chordHint, isBareKeyChord, isDeleteChord } from './keybindings';
-  import { materializeKey } from './paneFocus';
-  import { holdLatch } from './holdLatch';
+  import { chord, chordHint, isBareKeyChord, isDeleteChord } from '../shell/keybindings';
+  import { materializeKey } from '../shell/paneFocus';
+  import { holdLatch } from '../ui/holdLatch';
   import { childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
-  import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from './menuSlot';
+  import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
-  import { clampToViewport } from './menuGeometry';
+  import { clampToViewport } from '../ui/menuGeometry';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against

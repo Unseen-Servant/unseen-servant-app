@@ -1,5 +1,5 @@
 <script lang="ts">
-  import OllamaStatus from './OllamaStatus.svelte';
+  import OllamaStatus from '../shell/OllamaStatus.svelte';
 
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;

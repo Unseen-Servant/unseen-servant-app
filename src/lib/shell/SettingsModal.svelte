@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { KnownGameSystem, SyncPreferences } from './types';
-  import { DEFAULT_SYNC_PREFERENCES } from './types';
+  import type { KnownGameSystem, SyncPreferences } from '../legend-lore/types';
+  import { DEFAULT_SYNC_PREFERENCES } from '../legend-lore/types';
   import Modal from './Modal.svelte';
-  import GameSystemsSettings from './GameSystemsSettings.svelte';
-  import GeneralSettings from './GeneralSettings.svelte';
-  import LibrarySettings from './LibrarySettings.svelte';
+  import GameSystemsSettings from '../legend-lore/GameSystemsSettings.svelte';
+  import GeneralSettings from '../legend-lore/GeneralSettings.svelte';
+  import LibrarySettings from '../legend-lore/LibrarySettings.svelte';
   import GuidesPane from './help/GuidesPane.svelte';
   import ReferencePane from './help/ReferencePane.svelte';
   import AboutPane from './help/AboutPane.svelte';

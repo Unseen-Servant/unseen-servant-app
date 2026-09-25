@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { commitKeyId, isCommitChord } from './confirmKeys';
-import { KEYBINDINGS, chord, isDeleteChord, type ChordEvent } from './keybindings';
+import { KEYBINDINGS, chord, isDeleteChord, type ChordEvent } from '../shell/keybindings';
 
 const ev = (over: Partial<ChordEvent> = {}): ChordEvent => ({
   key: 'a', code: 'KeyA', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...over,

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Modal from './Modal.svelte';
+  import Modal from '../shell/Modal.svelte';
   import CommitSwitch from './CommitSwitch.svelte';
-  import { confirmPrompt } from './confirmStore';
+  import { confirmPrompt } from '../shell/confirmStore';
   import { isCommitChord } from './confirmKeys';
   import { trackInputModality, type InputModality } from './inputModality';
 

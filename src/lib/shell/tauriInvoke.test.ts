@@ -192,7 +192,7 @@ describe('checkInvokeCalls', () => {
 // The guard itself, against the real tree.
 // ---------------------------------------------------------------------------
 
-const root = fileURLToPath(new URL('../..', import.meta.url));
+const root = fileURLToPath(new URL('../../..', import.meta.url));
 
 function walk(dir: string, match: (name: string) => boolean): string[] {
   const out: string[] = [];

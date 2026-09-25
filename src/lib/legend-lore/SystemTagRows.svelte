@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { KnownGameSystem } from './types';
-  import { DICE_D6 } from './iconPaths';
+  import { DICE_D6 } from '../ui/iconPaths';
 
   // The rows behind both game-system pickers: the tree row's context-menu
   // submenu and the standalone SystemTagMenu. Rendered straight into the
