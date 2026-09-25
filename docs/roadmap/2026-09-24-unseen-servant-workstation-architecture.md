@@ -182,6 +182,24 @@ A move-only refactor — no behaviour change, tests green before and after.
 
 Each step is independently shippable; the tree is releasable after every one. Steps 1–3 are Legend-Lore-only work and ship as v3.x; nothing in them is user-visible except 2c. Steps 4–5 are the new tools.
 
+### Order across workstreams (decided 2026-09-24: Phase 5 before Command)
+
+The retrieval roadmap's Phase 5 (`2026-09-02-v2-retrieval-improvement-roadmap.md` §4, decision in §8) was ruled GO for both swaps on the v3.0.0 numbers. It interleaves with the steps below like this:
+
+| # | Work | Track | Why here |
+|---|---|---|---|
+| 1 | Step 1 — move-only split (1a/1b/1c) | shell | Days, zero behaviour change. Precedes Phase 5 so the store/embedder rewrite lands inside `sidecar/legend_lore/` instead of a 4 300-line file that then moves a second time. |
+| 2 | Phase 5 runtime — Ollama → in-process bge-m3 ONNX | retrieval | Biggest user-visible win left (no prerequisite, no `OLLAMA_CONTEXT_LENGTH` foot-gun, no cold cliffs) and a prerequisite for both new tools, which embed vault notes and prompts on the fly. Drops "Ollama status" from step 3's list. Ships as **v3.1.0**. |
+| 3 | #330 — filename-addressed mutations hit twins | retrieval | Small correctness bug in the routes 1b just moved; fix while that code is fresh. |
+| 4 | Command design doc | shell | No code; written alongside 2–3. Decides what the vault looks like, which is what steps 2–3's shell has to serve — building the shell first is scaffolding for a guess. |
+| 5 | Phase 5 store — Chroma → sqlite-vec | retrieval | One-shot vector migration, no reindex. Closes #170, retires Compact and the orphan GC, gives Command's vault index a transactional home in the same SQLite. Ships as **v3.2.0**. |
+| 6 | Steps 2–3 — settings funnel, window label, registry, cross-window state | shell | Invisible; done right before the thing that needs it. |
+| 7 | Step 4 — Command | shell | **v4.0.0**, the second tool. |
+| 8 | Step 5 — Servant | shell | Needs 2 (local embedding) and 7 (something to command). |
+| — | #329 — two-column reading order | retrieval | Parked explicitly: PDFium was a NO-GO and no cheap fix is known. Pick up when a book used at the table is wrong. |
+
+Harness growth (#368, #369) and the Phase 2 residuals are pulled in only when a retrieval change needs them as a gate.
+
 ### Done (2026-09-24)
 
 - D1: product name, bundle identifier + data-dir migration (v3.0.0, published); repository → `unseen-servant-app`.
