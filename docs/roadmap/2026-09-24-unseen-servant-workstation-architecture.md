@@ -1,7 +1,7 @@
 # Unseen Servant workstation — codebase architecture
 
 **Date:** 2026-09-24
-**Status:** proposed. Decisions D1–D7 agreed in discussion; sequencing (§7) not started.
+**Status:** decisions D1–D7 agreed 2026-09-24. D1 shipped the same day: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Next steps in §6; nothing in steps 1–5 started.
 **Objective:** grow this repository from one tool (Legend Lore) into the GM workstation — one app, **Unseen Servant**, hosting three tools: Legend Lore (RAG over the PDF library), Command (session manager), and the Servant (assistant) — without a rewrite, a plugin system, or a second repository.
 
 ---
@@ -37,7 +37,7 @@
 
 ### D1 — One repository, renamed
 
-Rename `unseen-legend-lore` → `unseen-servant` (GitHub redirects the old URL; update the local remote). `productName` → "Unseen Servant", identifier → `games.unseenservant.app` — both shipped in v3.0.0, with `migrate_legacy_data_dir` moving the old app-data directory once. One version number for the whole app (`scripts/bump-version.sh` already touches the three files). Legend Lore becomes the name of a tool, not of the app. The MCP server key in the generated Claude Desktop config stays `"Legend Lore"` until the MCP server aggregates more than one tool; renaming it needs a config migration so users don't keep a dead entry.
+Repository renamed `unseen-legend-lore` → `unseen-servant-app`, paired with `unseen-servant-site` (GitHub redirects the old URLs; historical issue links in docs keep the old name). `productName` → "Unseen Servant", identifier → `games.unseenservant.app` — both shipped in v3.0.0, with `migrate_legacy_data_dir` moving the old app-data directory once. One version number for the whole app (`scripts/bump-version.sh` already touches the three files). Legend Lore becomes the name of a tool, not of the app. The MCP server key in the generated Claude Desktop config stays `"Legend Lore"` until the MCP server aggregates more than one tool; renaming it needs a config migration so users don't keep a dead entry.
 
 **Rejected:** a repo per tool (three CI configs, cross-repo changes for every shell tweak, version coordination — for nothing, since no tool has an independent release cadence or an external consumer); workspaces (same reason, at the package level); a plugin/extension system (no third party will ever load a plugin).
 
@@ -160,7 +160,9 @@ A move-only refactor — no behaviour change, tests green before and after.
 1. **plugin-store cross-window reactivity** — does `store.onChange` fire in window B when window A writes? Decides whether settings need any new code at all (D4).
 2. **macOS `Reopen` target** — last-focused window, or every window that was visible before the app lost all of them? Decide when D3 lands; either is a few lines.
 3. **Servant window shape** — floating always-on-top palette vs. ordinary window. Defer to the Servant's own design pass; the registry does not care.
-4. **Where "current session" lives** — Rust state fed from the vault, or the sidecar? Affects whether Command's MCP tools are served by the Python MCP server or need a Rust-side bridge. Decide with the Command design doc.
+4. **Where "current session" lives** — Rust state fed from the vault, or the sidecar? `mcp_server.py` is a pure `httpx` adapter over the FastAPI routes, so a tool gets MCP exposure only through an HTTP surface: Command state in Rust needs a small local endpoint, or Command's state lives in the sidecar after all. Decide with the Command design doc.
+5. **A `games.unseenservant.command` app-data directory already exists on the dev machine.** If a Command prototype lives somewhere as its own app, it is a fourth codebase this doc should account for before step 4 — port or retire, not run alongside.
+6. **MCP is kept for the user's own harness**, not for Claude Desktop (config removed 2026-09-24). D5 stands: the Servant consumes the same tool surface; the Claude Desktop installer in Getting Started is just one client of it.
 
 ---
 
@@ -175,19 +177,48 @@ A move-only refactor — no behaviour change, tests green before and after.
 
 ---
 
-## 6. Sequencing
+## 6. Next steps
 
-Each step is independently shippable; the tree is releasable after every one.
+Each step is independently shippable; the tree is releasable after every one. Steps 1–3 are Legend-Lore-only work and ship as v3.x; nothing in them is user-visible except 2c. Steps 4–5 are the new tools.
 
-| # | Step | Verify |
+### Done (2026-09-24)
+
+- D1: product name, bundle identifier + data-dir migration (v3.0.0, published); repository → `unseen-servant-app`.
+- `scripts/build-sidecar.sh` forces `+x` on the staged sidecar binaries — the local validation build silently shipped non-executable sidecars before.
+
+### Step 1 — move-only split (no behaviour change)
+
+Three slices, each its own commit, each verified by the full Linux suite plus `npm run tauri dev` behaving identically:
+
+| | Slice | Verify |
 |---|---|---|
-| 1 | Move-only split of `src/lib/`, `server.py`, `lib.rs` into tool folders (§3) | vitest, pytest, svelte-check, clippy green; `npm run tauri dev` behaves identically |
-| 2 | Rename the GitHub repo (product + identifier already done in v3.0.0); Rust window registry (`open_tool`), per-window capabilities, layout restore, with Legend Lore as the sole window at label `legend-lore` | `npm run tauri build` locally; relaunch restores geometry; tray Quit saves it |
-| 3 | Lift Ollama status, sidecar health, sync progress (and settings if §4 Q1 says so) to Rust source of truth + events | dev-only: open two windows on the same route, change a setting / start a sync, both windows reflect it |
-| 4 | Command as second window — Rust + Svelte, Markdown vault, its MCP tools registered in `mcp_server.py` | Claude Desktop lists Command tools alongside Legend Lore's; Send-to-Command action round-trips a search hit |
-| 5 | Servant as a window, MCP client over both | a scripted tool-call transcript reproduces a session-prep task end to end |
+| 1a | `src/lib/` → `shell/`, `ui/`, `legend-lore/` per D2; tests move with their modules; `+page.svelte` → `routes/legend-lore/+page.svelte` with the root route redirecting there | vitest 462 green, svelte-check 0 errors, stylelint green |
+| 1b | `sidecar/server.py` → `sidecar/legend_lore/router.py` (`APIRouter`, the 37 routes) + the retrieval modules; `server.py` keeps app construction, lifespan, health, `include_router`; `tests/` imports and both PyInstaller `.spec` files follow | pytest green; `bash scripts/build-sidecar.sh` produces working binaries |
+| 1c | `src-tauri/src/lib.rs` → `legend_lore.rs` gets the sidecar-proxy commands (`check_sidecar_health` … `update_search_settings`); `lib.rs` keeps `run()`, sidecar lifecycle, tray, window handling | `cargo fmt --check`, clippy `-D warnings`, `cargo test` green |
 
-Step 3 is the one that is easy to skip and expensive to retrofit: do it **before** Command exists so the second tool lands on a shell that already assumes multiple windows.
+### Step 2 — the shell assumes many windows (still one window)
+
+| | Slice | Verify |
+|---|---|---|
+| 2a | Settings funnel: one `shell/settings.ts` owns every `tauri-plugin-store` read/write (today `+page.svelte` and `storeParsers.ts` call it directly); answer §4 Q1 while there | vitest; a setting changed in Settings is read back through the funnel only |
+| 2b | Window label `main` → `legend-lore`: `tauri.conf.json`, capability file, `Reopen`, `save_window_size`. Resets saved geometry once | relaunch restores geometry after the second launch |
+| 2c | Rust window registry: `open_tool(id)` (focus-or-create), `tools.ts` manifest, **Window** menu + tray entries, remembered set of open windows; per-window capability files | `npm run tauri build` locally (with the exec-bit fix); tray Quit saves every window; relaunch reopens the same set |
+
+### Step 3 — cross-window state
+
+Lift Ollama status, sidecar health and sync/reindex progress to Rust source of truth with `emit` to all windows; settings too unless 2a showed plugin-store already broadcasts. **Verify:** dev-only, open two windows on the same route, change a setting / start a sync — both reflect it. Do this **before** Command exists so the second tool lands on a shell that already assumes multiple windows.
+
+### Step 4 — Command
+
+Second window, Rust + Svelte, Markdown vault (D6), its MCP tools registered in `mcp_server.py` (resolve §4 Q4 and Q5 first). **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
+
+### Step 5 — Servant
+
+A window, MCP client over both tools (D5). **Verify:** a scripted tool-call transcript reproduces a session-prep task end to end.
+
+### Outside this repository
+
+- `unseen-servant-site`: product copy and download links → `Unseen-Servant_<ver>_aarch64.dmg` / `Unseen-Servant_<ver>_x64-setup.exe`.
 
 ---
 
