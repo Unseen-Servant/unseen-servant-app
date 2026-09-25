@@ -27,7 +27,7 @@
 | `src-tauri/src/lib.rs` | 2 100 lines: sidecar lifecycle, ~30 commands proxying the sidecar, tray, window hide-on-close, per-label `save_window_size` | sidecar is already app-owned (stopped on `RunEvent::Exit`, not on window close); tray already keeps the app alive with no visible window — the multi-window model extends this rather than replacing it |
 | `sidecar/server.py` | 4 300 lines, 37 routes, one FastAPI app | needs `include_router` per tool package |
 | `sidecar/mcp_server.py` | 570 lines, Legend Lore tools only | becomes the aggregator |
-| `tauri.conf.json` | `productName` "Legend Lore", identifier `games.unseenservant.legendlore`, one implicit `main` window | rename (§2) |
+| `tauri.conf.json` | `productName` "Unseen Servant", identifier `games.unseenservant.app` (renamed in v3.0.0 with a one-time data-dir migration in `lib.rs`), one implicit `main` window | window label + capabilities still to do (§2 D3) |
 | capabilities | one file, `windows: ["main"]` | one file per tool window |
 | settings | `tauri-plugin-store` (Rust-side JSON), no `localStorage` use in the app | store is shared across windows by construction; live cross-window reactivity to verify (§4) |
 
@@ -37,7 +37,7 @@
 
 ### D1 — One repository, renamed
 
-Rename `unseen-legend-lore` → `unseen-servant` (GitHub redirects the old URL; update the local remote). `productName` → "Unseen Servant", identifier → `games.unseenservant.app`, one version number for the whole app (`scripts/bump-version.sh` already touches the three files). Legend Lore becomes the name of a tool, not of the app.
+Rename `unseen-legend-lore` → `unseen-servant` (GitHub redirects the old URL; update the local remote). `productName` → "Unseen Servant", identifier → `games.unseenservant.app` — both shipped in v3.0.0, with `migrate_legacy_data_dir` moving the old app-data directory once. One version number for the whole app (`scripts/bump-version.sh` already touches the three files). Legend Lore becomes the name of a tool, not of the app. The MCP server key in the generated Claude Desktop config stays `"Legend Lore"` until the MCP server aggregates more than one tool; renaming it needs a config migration so users don't keep a dead entry.
 
 **Rejected:** a repo per tool (three CI configs, cross-repo changes for every shell tweak, version coordination — for nothing, since no tool has an independent release cadence or an external consumer); workspaces (same reason, at the package level); a plugin/extension system (no third party will ever load a plugin).
 
@@ -182,7 +182,7 @@ Each step is independently shippable; the tree is releasable after every one.
 | # | Step | Verify |
 |---|---|---|
 | 1 | Move-only split of `src/lib/`, `server.py`, `lib.rs` into tool folders (§3) | vitest, pytest, svelte-check, clippy green; `npm run tauri dev` behaves identically |
-| 2 | Rename repo + product + identifier; Rust window registry (`open_tool`), per-window capabilities, layout restore, with Legend Lore as the sole window at label `legend-lore` | `npm run tauri build` locally; relaunch restores geometry; tray Quit saves it |
+| 2 | Rename the GitHub repo (product + identifier already done in v3.0.0); Rust window registry (`open_tool`), per-window capabilities, layout restore, with Legend Lore as the sole window at label `legend-lore` | `npm run tauri build` locally; relaunch restores geometry; tray Quit saves it |
 | 3 | Lift Ollama status, sidecar health, sync progress (and settings if §4 Q1 says so) to Rust source of truth + events | dev-only: open two windows on the same route, change a setting / start a sync, both windows reflect it |
 | 4 | Command as second window — Rust + Svelte, Markdown vault, its MCP tools registered in `mcp_server.py` | Claude Desktop lists Command tools alongside Legend Lore's; Send-to-Command action round-trips a search hit |
 | 5 | Servant as a window, MCP client over both | a scripted tool-call transcript reproduces a session-prep task end to end |

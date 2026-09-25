@@ -1,7 +1,7 @@
-# Legend Lore
+# Unseen Servant
 
-> A desktop app for TTRPG Game Masters to browse, index, and search their local PDF collection
-> when prepping or running a game.
+> A desktop workstation for TTRPG Game Masters. Its first tool, Legend Lore, browses, indexes,
+> and searches your local PDF collection when prepping or running a game.
 
 ---
 
@@ -11,7 +11,7 @@
    - **macOS (Apple Silicon):** `.dmg`
    - **Windows:** `.msi` or `.exe`
 2. Install the app:
-   - **macOS:** Drag **Legend Lore** to your Applications folder
+   - **macOS:** Drag **Unseen Servant** to your Applications folder
    - **Windows:** Run the installer and follow the prompts
 3. Install [Ollama](https://ollama.com), pull the embedding model, and start
    Ollama with the 8K context window the embedder needs:
@@ -25,7 +25,7 @@
    embeddings at 2048 tokens. The app probes for this at startup and warns in
    the sidecar logs if truncation is detected.
 
-4. Launch Legend Lore
+4. Launch Unseen Servant
    - The app runs in the menu bar / system tray — click the tray icon to show the window
 
 > **Note:** Ollama must be running for indexing and search to work. The app will still launch and
@@ -315,4 +315,4 @@ PDF files on disk
 
 ## License
 
-Legend Lore is proprietary software. See [LICENSE](LICENSE) for details.
+Unseen Servant is proprietary software. See [LICENSE](LICENSE) for details.

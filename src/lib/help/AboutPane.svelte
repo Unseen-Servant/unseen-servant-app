@@ -28,7 +28,7 @@
 <div class="pane">
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title section-title">About Legend Lore</h3>
+      <h3 class="block-title section-title">About Unseen Servant</h3>
       <p class="block-desc">
         Local-first, AI-augmented toolkit for tabletop RPG Gamemasters.
         Distributed by Unseen Servant Games.

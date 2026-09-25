@@ -6,7 +6,7 @@
 #
 # Get a book's sha256 from your indexed library:
 #   python3 -c "import json,sys;m=json.load(open(sys.argv[1]));[print(e['content_hash'],e['filename']) for e in m['files'].values()]" \
-#     "$HOME/Library/Application Support/games.unseenservant.legendlore/chroma_db/index_manifest.json"
+#     "$HOME/Library/Application Support/games.unseenservant.app/chroma_db/index_manifest.json"
 #
 # Query fields are identical to queries.yaml (id, pair, style, scope, category,
 # query, doc, anchors, pages). Use ids L001… so they never collide. Author in

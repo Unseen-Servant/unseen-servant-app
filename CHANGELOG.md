@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [3.0.0] - 2026-09-24
 
+**The app is now Unseen Servant.** Legend Lore is its PDF search tool; the window keeps that name, the app in your dock, tray and Applications folder is Unseen Servant. Your index and settings move to the new data directory on first launch. Re-run the MCP setup in Getting Started so Claude Desktop points at the renamed app.
+
 Search is rebuilt from the index up. **Re-index your library after updating** — Library settings lists the files still indexed with the older pipeline. Until a file is re-indexed it keeps working, but without whole sections, keyword matching or printed page numbers.
 
 ### Added

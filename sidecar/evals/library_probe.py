@@ -36,7 +36,7 @@ import httpx
 SIDECAR_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_DIR = (
     Path.home()
-    / "Library/Application Support/games.unseenservant.legendlore/chroma_db"
+    / "Library/Application Support/games.unseenservant.app/chroma_db"
 )
 
 # Ordinary mid-session lookups, not retrieval-shaped keyword queries. The

@@ -1750,6 +1750,28 @@ fn stop_sidecar(state: &SidecarState) {
 // ---------------------------------------------------------------------------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// v3.0.0 renamed the bundle identifier from `games.unseenservant.legendlore`
+/// to `games.unseenservant.app`, which moves the app-data directory. Move the
+/// old one across once so the index, settings and window geometry survive.
+fn migrate_legacy_data_dir(app_data_dir: &Path) {
+    if app_data_dir.exists() {
+        return;
+    }
+    let Some(parent) = app_data_dir.parent() else {
+        return;
+    };
+    let legacy = parent.join("games.unseenservant.legendlore");
+    if legacy.is_dir() {
+        if let Err(e) = std::fs::rename(&legacy, app_data_dir) {
+            eprintln!(
+                "Failed to migrate data dir from {}: {}",
+                legacy.display(),
+                e
+            );
+        }
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -1800,6 +1822,7 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("Failed to resolve app data directory");
+            migrate_legacy_data_dir(&app_data_dir);
             std::fs::create_dir_all(&app_data_dir).ok();
 
             // Before the sidecar startup below, which blocks.
@@ -1868,7 +1891,7 @@ pub fn run() {
             TrayIconBuilder::new()
                 .icon(tauri::include_image!("icons/tray-icon.png"))
                 .icon_as_template(true)
-                .tooltip("Legend Lore")
+                .tooltip("Unseen Servant")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {

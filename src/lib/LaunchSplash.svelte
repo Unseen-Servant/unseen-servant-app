@@ -18,8 +18,8 @@
   >
     <div class="stack">
       <img class="icon" src="/logo.svg" alt="" draggable="false" />
-      <h1 class="title font-heading">Legend Lore</h1>
-      <span class="byline">Unseen Servant</span>
+      <h1 class="title font-heading">Unseen Servant</h1>
+      <span class="byline">Legend Lore</span>
     </div>
   </div>
 {/if}

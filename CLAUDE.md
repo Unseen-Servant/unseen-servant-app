@@ -1,8 +1,8 @@
-# Legend Lore Development Guide
+# Unseen Servant Development Guide
 
 ## Product Vision
 
-Legend Lore is a local-first, AI-augmented toolkit for tabletop RPG Gamemasters. It helps GMs browse, index, and semantically search their PDF rulebook collections, and integrates with Claude AI via MCP for mid-session lookups and homebrew creation.
+Unseen Servant is a local-first, AI-augmented workstation for tabletop RPG Gamemasters. Its first tool, Legend Lore, helps GMs browse, index, and semantically search their PDF rulebook collections, and integrates with Claude AI via MCP for mid-session lookups and homebrew creation.
 
 ### Target User
 

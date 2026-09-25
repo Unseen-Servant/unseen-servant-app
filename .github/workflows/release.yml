@@ -132,7 +132,7 @@ jobs:
         run: |
           mkdir -p release-artifacts
           for f in src-tauri/target/release/bundle/dmg/*.dmg; do
-            name=$(basename "$f" | sed 's/Legend Lore/Unseen-Servant-Legend-Lore/')
+            name=$(basename "$f" | sed 's/Unseen Servant/Unseen-Servant/')
             cp "$f" "release-artifacts/$name"
           done
 
@@ -236,7 +236,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release-artifacts
           Get-ChildItem src-tauri\target\release\bundle\nsis\*.exe | ForEach-Object {
-            $name = $_.Name -replace 'Legend Lore', 'Unseen-Servant-Legend-Lore'
+            $name = $_.Name -replace 'Unseen Servant', 'Unseen-Servant'
             Copy-Item $_.FullName "release-artifacts\$name"
           }
 
