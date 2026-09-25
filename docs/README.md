@@ -23,6 +23,7 @@ is the source of truth; this index is just a map and may lag new files.
 - [Spell-correction eval](roadmap/2026-07-10-spell-correction-eval.md)
 - [Pipeline rebuild plan](roadmap/2026-08-13-pipeline-rebuild-plan.md) — the v3 program
 - [Agent-harness retrieval findings](roadmap/2026-08-14-agent-harness-retrieval-findings.md)
+- [Unseen Servant workstation architecture](roadmap/2026-09-24-unseen-servant-workstation-architecture.md) — one repo, one window per tool, MCP as the seam
 
 ## retrieval/
 
