@@ -64,6 +64,9 @@ echo "==> Placing binaries in src-tauri/binaries/..."
 mkdir -p "$BINARIES_DIR"
 cp "$SIDECAR_DIR/dist/legend-lore-sidecar" "$BINARIES_DIR/legend-lore-sidecar-$TARGET_TRIPLE"
 cp "$SIDECAR_DIR/dist/legend-lore-mcp" "$BINARIES_DIR/legend-lore-mcp-$TARGET_TRIPLE"
+# cp onto an existing file keeps the destination's mode. Without the exec bit
+# Tauri bundles non-executable sidecars and the app starts with no indexer.
+chmod +x "$BINARIES_DIR"/legend-lore-*
 
 echo "==> Done! Binaries placed at:"
 ls -lh "$BINARIES_DIR/"
