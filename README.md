@@ -7,7 +7,7 @@
 
 ## Installation (End Users)
 
-1. Download the latest installer from [GitHub Releases](https://github.com/Unseen-Servant/unseen-legend-lore/releases):
+1. Download the latest installer from [GitHub Releases](https://github.com/Unseen-Servant/unseen-servant/releases):
    - **macOS (Apple Silicon):** `.dmg`
    - **Windows:** `.msi` or `.exe`
 2. Install the app:
@@ -196,8 +196,8 @@ See the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/) for 
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Unseen-Servant/unseen-legend-lore.git
-cd unseen-legend-lore
+git clone https://github.com/Unseen-Servant/unseen-servant.git
+cd unseen-servant
 
 # 2. Install frontend dependencies
 npm install
@@ -254,7 +254,7 @@ Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe`
 ## Project Structure
 
 ```text
-unseen-legend-lore/
+unseen-servant/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
 │   │   ├── +page.svelte        # Main UI: folder picker, file tree, indexing
