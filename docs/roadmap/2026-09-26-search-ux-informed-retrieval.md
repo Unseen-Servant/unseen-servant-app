@@ -1,7 +1,7 @@
 # Retrieval informed by how Legend Lore is searched
 
 **Date:** 2026-09-26
-**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6).
+**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7).
 **Context:** after the library store swap (`../retrieval/2026-09-26-library-store-design.md`) and the first library tier (`evals/baselines/2026-09-26-v2-library`). The goal is broad improvements, not tuning to a document: every item below is a *class* of behaviour, judged across both eval suites.
 
 ---
@@ -53,7 +53,7 @@ Measured on the eval index, spell correction rewrites half-typed words into wron
 | # | Item | Measured by | Notes |
 |---|---|---|---|
 | 1 | **Typing vs committing** (done, §6). A `partial` search request: the trailing word is completed from the vocabulary instead of spell-corrected, and prefix-matched in BM25 (FTS5 `term*`). The UI sends it for debounced searches whose raw text does not end in whitespace; Enter commits. | A prefix variant of both suites (each query's last word cut to a fixed share of its length), current vs partial mode; committed queries must be byte-identical to today. | Broad, cheap, and fixes a visible defect. Skipping the reranker while typing is a follow-up only if latency needs it: a debounced search is often the final one (many searches never see Enter). |
-| 2 | **Ordering within a book under scope.** Candidates: section-level evidence (best + second-best unit), heading trust. | Collection-scoped library queries (2–3 books), authored and committed *before* any fix is tried. | The regime the app is used in. |
+| 2 | **Ordering within a book under scope** (measured, little headroom — §7). Candidates: section-level evidence (best + second-best unit), heading trust. | Collection-scoped library queries (2–3 books), authored and committed *before* any fix is tried. | The regime the app is used in. |
 | 3 | **Heading quality.** Measure mis-heading across the real library (`breadcrumb_qa`-style checks), then fix in extraction. | Per-book flaw counts, then both suites. | Worth more than its eval impact alone: headings are shown to the user. |
 | 4 | **Cue stripping + reranker choice.** Remove a detected system cue from the text embedded and reranked; compare MiniLM L-6 with `bge-reranker-v2-m3`. | MCP-shaped (NL, system named, unscoped) queries in both suites; latency budget. | Folded into the runtime-swap benchmark (`2026-09-26-ml-runtime-consolidation.md`), where the reranker runtime is decided anyway. |
 
@@ -82,4 +82,12 @@ Also open, not scheduled: load-more stability (item-sized check: top 25 at `n_re
 | library, all | 0.578 | — | **0.740** | 0.695 |
 
 Closes about 65 % of the corpus typing gap. 9 corpus queries better, 3 worse, all explained: q019 returns to its committed-query loss (the mis-headed gnoll chunk), q042 is a near-tie among ancient dragons once "breath wea" completes to "breath weapon" (today's "breath sea" was accidentally narrower), q050 completes correctly but stays below the top 5 (the reranker's pull to intro sections, item 4). Committed queries (partial off) reproduce `2026-09-26-v2-library-store` exactly.
+
+## 7. Item 2 result — ordering within a book under scope (2026-09-26)
+
+Nine keyword/NL pairs scoped to the three Dragonbane books (the collection Jerome arms together), sent as `source_paths` the way the console does, pre-registered in `0e2a9cb` before any fix: sections drawn with `random.Random(20260926)` from all 832 Dragonbane sections of ≥ 300 chars, three per book, questions written from the drawn text.
+
+**Baseline `2026-09-26-v2-library-scoped` (the whole library tier, 34 queries, hybrid):** collection MRR@5 **0.972** (17 of 18 at #1), cued 0.635, uncued 0.875, all 0.842; p50 285 ms. The one miss (L113, "pit of skeletons fear roll") ranks another adventure's Sacrificial Pit first — a fair ambiguity; its NL twin is #1.
+
+**Conclusion:** under the console's scope, within-book ordering has almost no headroom. The "right book, wrong section" misses of §1 come from unscoped searches, which the console normally prevents, so item 2 is not worth a fix now. Caveat: questions written from the drawn text share its vocabulary; the NL versions finding the answer at #1 suggests that is not the whole story. The remaining losses sit in unscoped search — mostly the MCP regime and unscoped app searches — which points at items 3 (headings) and 4 (cue stripping, reranker).
 
