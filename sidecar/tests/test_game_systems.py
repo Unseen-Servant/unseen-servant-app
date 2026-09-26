@@ -2,7 +2,7 @@
 Tests for game system management endpoints.
 
 - GET /api/game-systems — list distinct game systems in the index
-- POST /api/set-game-system — override a file's game system tag
+- POST /api/set-game-systems — override a file's game system tags
 - GET /api/sources — verify game_system appears in source listings
 """
 
@@ -52,7 +52,7 @@ def test_game_systems_sorted(client, dnd5e_pdf_path, dragonbane_pdf_path):
 
 
 # ---------------------------------------------------------------------------
-# POST /api/set-game-system
+# POST /api/set-game-systems — single tag
 # ---------------------------------------------------------------------------
 
 def test_set_game_system_updates_metadata(
@@ -63,9 +63,9 @@ def test_set_game_system_updates_metadata(
         "paths": [str(untagged_pdf_path)]
     })
 
-    response = client.post("/api/set-game-system", json={
+    response = client.post("/api/set-game-systems", json={
         "filename": "random_supplement.pdf",
-        "game_system": "Savage Worlds",
+        "game_systems": ["Savage Worlds"],
     })
 
     assert response.status_code == 200
@@ -97,9 +97,9 @@ def test_set_game_system_updates_manifest(
         "paths": [str(untagged_pdf_path)]
     })
 
-    client.post("/api/set-game-system", json={
+    client.post("/api/set-game-systems", json={
         "filename": "random_supplement.pdf",
-        "game_system": "GURPS",
+        "game_systems": ["GURPS"],
     })
 
     manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
@@ -109,9 +109,9 @@ def test_set_game_system_updates_manifest(
 
 def test_set_game_system_nonexistent_source(client):
     """Setting game system on a non-indexed file should return 404."""
-    response = client.post("/api/set-game-system", json={
+    response = client.post("/api/set-game-systems", json={
         "filename": "ghost_book.pdf",
-        "game_system": "D&D 5E",
+        "game_systems": ["D&D 5E"],
     })
 
     assert response.status_code == 404
@@ -125,9 +125,9 @@ def test_set_game_system_reflected_in_search(
         "paths": [str(untagged_pdf_path)]
     })
 
-    client.post("/api/set-game-system", json={
+    client.post("/api/set-game-systems", json={
         "filename": "random_supplement.pdf",
-        "game_system": "Blades in the Dark",
+        "game_systems": ["Blades in the Dark"],
     })
 
     response = client.post("/api/search", json={

@@ -639,36 +639,6 @@ pub async fn delete_index() -> Result<DeleteIndexResult, String> {
 }
 
 #[tauri::command]
-pub async fn set_game_system(
-    filename: String,
-    game_system: String,
-) -> Result<SetGameSystemResult, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{}/api/set-game-system", sidecar_url()))
-        .json(&serde_json::json!({
-            "filename": filename,
-            "game_system": game_system,
-        }))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Sidecar error ({}): {}", status, body));
-    }
-
-    let result: SetGameSystemResult = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
-
-    Ok(result)
-}
-
-#[tauri::command]
 pub async fn set_game_systems(
     path: String,
     game_systems: Vec<String>,

@@ -71,7 +71,6 @@ from .service import (
     SearchSettings,
     SearchSettingsUpdate,
     _segment_ids_for_collection,
-    SetGameSystemRequest,
     SetGameSystemsRequest,
     SyncIndexRequest,
     ToggleBuiltinRequest,
@@ -1183,20 +1182,6 @@ def build_router(
             "game_systems": list(game_systems),
             "chunks_updated": len(results["ids"]),
         }
-
-    @router.post("/api/set-game-system")
-    async def set_game_system(request: SetGameSystemRequest):
-        """Update the game system tag for all chunks of a file.
-
-        Changes metadata in ChromaDB and the manifest without re-indexing.
-        Back-compat alias for the multi-tag endpoint.
-        """
-        try:
-            return _apply_game_systems(request.filename, [request.game_system])
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
 
     @router.post("/api/set-game-systems")
     async def set_game_systems(request: SetGameSystemsRequest):

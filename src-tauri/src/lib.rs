@@ -569,7 +569,6 @@ pub fn run() {
             legend_lore::delete_index,
             get_data_dir,
             legend_lore::get_known_game_systems,
-            legend_lore::set_game_system,
             legend_lore::set_game_systems,
             legend_lore::create_custom_game_system,
             legend_lore::update_custom_game_system,

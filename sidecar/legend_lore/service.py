@@ -679,10 +679,6 @@ def resolve_search_knobs(
     return SearchSettings(**{**base.model_dump(), **overrides})
 
 
-class SetGameSystemRequest(BaseModel):
-    filename: str
-    game_system: str
-
 class SetGameSystemsRequest(BaseModel):
     # ``path`` addresses one file; ``filename`` is the legacy form and is
     # refused when two indexed files share it (#330).
