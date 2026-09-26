@@ -1,7 +1,7 @@
 # Unseen Servant workstation — codebase architecture
 
 **Date:** 2026-09-24
-**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25; next is Phase 5 runtime (§6 order table).
+**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25. 2026-09-26: Phase 5 store swap done ahead of the runtime swap, which waits on its reopened target and a real-library eval tier (§6 order table).
 **Objective:** grow this repository from one tool (Legend Lore) into the GM workstation — one app, **Unseen Servant**, hosting three tools: Legend Lore (RAG over the PDF library), Command (session manager), and the Servant (assistant) — without a rewrite, a plugin system, or a second repository.
 
 ---
@@ -194,10 +194,10 @@ The retrieval roadmap's Phase 5 (`2026-09-02-v2-retrieval-improvement-roadmap.md
 | # | Work | Track | Why here |
 |---|---|---|---|
 | 1 | Step 1 — move-only split (1a/1b/1c) | shell | Days, zero behaviour change. Precedes Phase 5 so the store/embedder rewrite lands inside `sidecar/legend_lore/` instead of a 4 300-line file that then moves a second time. |
-| 2 | Phase 5 runtime — Ollama → in-process bge-m3 ONNX | retrieval | Biggest user-visible win left (no prerequisite, no `OLLAMA_CONTEXT_LENGTH` foot-gun, no cold cliffs) and a prerequisite for both new tools, which embed vault notes and prompts on the fly. Drops "Ollama status" from step 3's list. Ships as **v3.1.0**. *2026-09-26: the target (ONNX vs llama.cpp) is reopened because the Servant needs a chat model too — see `2026-09-26-ml-runtime-consolidation.md`; the sidecar prep on that branch already moved runtime knowledge out of Rust.* |
+| 2 | Phase 5 runtime — Ollama → in-process bge-m3 ONNX | retrieval | Biggest user-visible win left (no prerequisite, no `OLLAMA_CONTEXT_LENGTH` foot-gun, no cold cliffs) and a prerequisite for both new tools, which embed vault notes and prompts on the fly. Drops "Ollama status" from step 3's list. Ships as **v3.1.0**. *2026-09-26: the target (ONNX vs llama.cpp) is reopened because the Servant needs a chat model too — see `2026-09-26-ml-runtime-consolidation.md`; the sidecar prep on that branch already moved runtime knowledge out of Rust. Moved behind row 5, which landed first, and gated on the library tier: the runtime swap changes the vectors, and the 3-book corpus misses the many-near-duplicates regime of a real library.* |
 | 3 | #330 — filename-addressed mutations hit twins | retrieval | Small correctness bug in the routes 1b just moved; fix while that code is fresh. |
 | 4 | Command design doc | shell | No code; written alongside 2–3. Decides what the vault looks like, which is what steps 2–3's shell has to serve — building the shell first is scaffolding for a guess. |
-| 5 | Phase 5 store — Chroma → sqlite-vec | retrieval | One-shot vector migration, no reindex. Closes #170, retires Compact and the orphan GC, gives Command's vault index a transactional home in the same SQLite. Ships as **v3.2.0**. |
+| 5 | Phase 5 store — Chroma → sqlite-vec | retrieval | One-shot vector migration, no reindex. Closes #170, retires Compact and the orphan GC, gives Command's vault index a transactional home in the same SQLite. Ships as **v3.2.0**. *Done 2026-09-26, ahead of row 2 (`../retrieval/2026-09-26-library-store-design.md`): a rebuild rather than a migration (the library was 5–6 books and not yet complete), so it ships in whichever release comes next.* |
 | 6 | Steps 2–3 — settings funnel, window label, registry, cross-window state | shell | Invisible; done right before the thing that needs it. |
 | 7 | Step 4 — Command | shell | **v4.0.0**, the second tool. |
 | 8 | Step 5 — Servant | shell | Needs 2 (local embedding) and 7 (something to command). |

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+**Re-index your library after updating.** The index moves to a new store, and the old one is removed the first time the app starts, so search returns nothing until you re-index. Library settings lists every file as needing it. Your PDFs, collections and game-system settings are untouched.
+
+### Changed
+
+- **The whole index is one file.** Books, sections, text, embeddings and the keyword index live together in a single SQLite file in the app's data directory, and every change to a book (indexing, renaming, retagging, removing) is saved in one step, so an interrupted operation can no longer leave parts of the index disagreeing
+- **Removing a book gives the disk space back straight away.** The Compact button and its "reclaimable" readout are gone because there is nothing left to compact
+- **Searching inside a collection or game system is faster, and stays fast as the library grows.** A scoped search reads only the selected books instead of the whole library
+- Renaming or moving a file or folder, and changing a book's game-system tags, are instant regardless of book size
+- The app is smaller: the sidecar no longer ships ChromaDB
+
 ## [3.0.0] - 2026-09-24
 
 **The app is now Unseen Servant.** Legend Lore is its PDF search tool; the window keeps that name, the app in your dock, tray and Applications folder is Unseen Servant. Your index and settings move to the new data directory on first launch. Re-run the MCP setup in Getting Started so Claude Desktop points at the renamed app.
