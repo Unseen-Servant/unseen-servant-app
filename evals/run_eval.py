@@ -156,9 +156,13 @@ def _apply_prefix(queries: list[dict], frac: float | None) -> list[dict]:
     return out
 
 
-def _partial_extra(args) -> dict:
-    """``partial`` rides in the request body like the other v2 knobs."""
-    return {"partial": True} if args.partial else {}
+def _request_extra(args) -> dict:
+    """``partial`` and ``strip_cues`` ride in the request body like the
+    other v2 knobs."""
+    extra: dict = {"partial": True} if args.partial else {}
+    if args.keep_cues:
+        extra["strip_cues"] = False
+    return extra
 
 
 def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool,
@@ -452,6 +456,9 @@ def main() -> int:
                          "the search box holds it mid-typing (evals/retrieval/prefixes.py)")
     ap.add_argument("--partial", action="store_true",
                     help="retrieval/library: send partial=true (the app's typing mode)")
+    ap.add_argument("--keep-cues", action="store_true",
+                    help="retrieval/library: leave a named system in the searched text "
+                         "(strip_cues=false; the pre-2026-09-26 behaviour)")
     ap.add_argument("--no-spell", action="store_true",
                     help="retrieval: search with spell correction off (the uncorrected floor for --typos)")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
@@ -521,7 +528,7 @@ def main() -> int:
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
                                  rerank=not args.no_rerank,
                                  max_context_chars=args.max_context_chars,
-                                 extra={"system_map": {}, **_partial_extra(args)})
+                                 extra={"system_map": {}, **_request_extra(args)})
             result = run(engine, queries, corpus, opts, do_index=False)
             result["skipped_queries"], result["missing_docs"] = skipped, missing
         else:
@@ -540,7 +547,7 @@ def main() -> int:
             # information as tags (SYSTEM_TAGS) and its request body is JSON,
             # which a dict of sets is not.
             extra: dict = {"system_map": _system_map(corpus)} if args.engine == "v3" else {}
-            extra.update(_partial_extra(args))
+            extra.update(_request_extra(args))
             if args.lex_weight is not None:
                 if args.engine == "v3":
                     extra["weights"] = [1.0, args.lex_weight]

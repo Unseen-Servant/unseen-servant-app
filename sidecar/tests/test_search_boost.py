@@ -80,6 +80,42 @@ def test_query_naming_two_systems_detects_both():
 
 
 # ---------------------------------------------------------------------------
+# strip_system_cues (unit)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("query, expected", [
+    ("dragonbane fireball spell damage", "fireball spell damage"),
+    ("how much damage does fireball do in dragonbane?",
+     "how much damage does fireball do in"),
+    ("Fireball damage in 5E SRD", "Fireball damage in"),
+    ("Cloud Dragon stats in Basic Fantasy", "Cloud Dragon stats in"),
+    ("D&D 5e grappling", "grappling"),
+    ("convert a dnd 5e monster to pathfinder 2e", "convert a monster to"),
+    ("castles & crusades siege engine", "siege engine"),
+    # Spaced the way the Dragonbane rulebook itself prints it.
+    ("dragon bane poison", "poison"),
+    ("osric's paladin", "paladin"),
+])
+def test_named_system_is_stripped(query, expected):
+    from legend_lore import service
+
+    assert service.strip_system_cues(query) == expected
+
+
+@pytest.mark.parametrize("query", [
+    "how does grappling work",
+    # Detection matches substrings; only whole words are stripped.
+    "dragonbanes poison",
+    # Nothing but the cue: searching for nothing is worse than the name.
+    "dragonbane",
+])
+def test_query_is_kept_whole(query):
+    from legend_lore import service
+
+    assert service.strip_system_cues(query) == query
+
+
+# ---------------------------------------------------------------------------
 # /api/search ordering (integration, deterministic fake candidate pool)
 # ---------------------------------------------------------------------------
 
@@ -236,3 +272,27 @@ def test_boost_fills_the_rerank_pool_with_the_named_system(
         lambda q, docs: scored.extend(docs) or [0.5] * len(docs))
     _search(client, rerank=True, rerank_candidates=1)
     assert scored[0] == "srd text"
+
+
+def test_reranker_scores_the_query_without_its_system_cue(
+        fake_pool_client, monkeypatch):
+    """The named system boosts its books but is not part of what the
+    cross-encoder scores against; the boost still reads the full query."""
+    from legend_lore import service
+
+    queries = []
+    monkeypatch.setattr(service, "rerank_scores",
+        lambda q, docs: queries.append(q) or [0.5] * len(docs))
+    results = _search(fake_pool_client, rerank=True)
+    assert set(queries) == {"Fireball damage in"}
+    assert results[0]["filename"] == "SRD_CC_v5.1.pdf"
+
+
+def test_strip_cues_off_scores_the_full_query(fake_pool_client, monkeypatch):
+    from legend_lore import service
+
+    queries = []
+    monkeypatch.setattr(service, "rerank_scores",
+        lambda q, docs: queries.append(q) or [0.5] * len(docs))
+    _search(fake_pool_client, rerank=True, strip_cues=False)
+    assert set(queries) == {"Fireball damage in 5E SRD"}

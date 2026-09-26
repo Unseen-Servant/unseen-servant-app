@@ -1,7 +1,7 @@
 # Retrieval informed by how Legend Lore is searched
 
 **Date:** 2026-09-26
-**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7).
+**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7); item 4's cue stripping landed the same day (§8), its reranker choice is still open.
 **Context:** after the library store swap (`../retrieval/2026-09-26-library-store-design.md`) and the first library tier (`evals/baselines/2026-09-26-v2-library`). The goal is broad improvements, not tuning to a document: every item below is a *class* of behaviour, judged across both eval suites.
 
 ---
@@ -55,7 +55,7 @@ Measured on the eval index, spell correction rewrites half-typed words into wron
 | 1 | **Typing vs committing** (done, §6). A `partial` search request: the trailing word is completed from the vocabulary instead of spell-corrected, and prefix-matched in BM25 (FTS5 `term*`). The UI sends it for debounced searches whose raw text does not end in whitespace; Enter commits. | A prefix variant of both suites (each query's last word cut to a fixed share of its length), current vs partial mode; committed queries must be byte-identical to today. | Broad, cheap, and fixes a visible defect. Skipping the reranker while typing is a follow-up only if latency needs it: a debounced search is often the final one (many searches never see Enter). |
 | 2 | **Ordering within a book under scope** (measured, little headroom — §7). Candidates: section-level evidence (best + second-best unit), heading trust. | Collection-scoped library queries (2–3 books), authored and committed *before* any fix is tried. | The regime the app is used in. |
 | 3 | **Heading quality.** Measure mis-heading across the real library (`breadcrumb_qa`-style checks), then fix in extraction. | Per-book flaw counts, then both suites. | Worth more than its eval impact alone: headings are shown to the user. |
-| 4 | **Cue stripping + reranker choice.** Remove a detected system cue from the text embedded and reranked; compare MiniLM L-6 with `bge-reranker-v2-m3`. | MCP-shaped (NL, system named, unscoped) queries in both suites; latency budget. | Folded into the runtime-swap benchmark (`2026-09-26-ml-runtime-consolidation.md`), where the reranker runtime is decided anyway. |
+| 4 | **Cue stripping + reranker choice.** Remove a detected system cue from the text embedded and reranked; compare MiniLM L-6 with `bge-reranker-v2-m3`. | MCP-shaped (NL, system named, unscoped) queries in both suites; latency budget. | Cue stripping done (§8). Reranker choice folded into the runtime-swap benchmark (`2026-09-26-ml-runtime-consolidation.md`), where the reranker runtime is decided anyway. |
 
 Also open, not scheduled: load-more stability (item-sized check: top 25 at `n_results` 25 vs 50); "N strong hits outside your scope" as an answer to the bypass question (a feature, not a fix).
 
@@ -91,3 +91,22 @@ Nine keyword/NL pairs scoped to the three Dragonbane books (the collection Jerom
 
 **Conclusion:** under the console's scope, within-book ordering has almost no headroom. The "right book, wrong section" misses of §1 come from unscoped searches, which the console normally prevents, so item 2 is not worth a fix now. Caveat: questions written from the drawn text share its vocabulary; the NL versions finding the answer at #1 suggests that is not the whole story. The remaining losses sit in unscoped search — mostly the MCP regime and unscoped app searches — which points at items 3 (headings) and 4 (cue stripping, reranker).
 
+## 8. Item 4 result — cue stripping (2026-09-26)
+
+**Shipped:** a system named in the query is left out of the text that is embedded, BM25-matched and reranked; system detection and the boost still read the whole query (`strip_system_cues`, next to `detect_systems_in_query`). Only whole words that normalize to a system keyword are removed ("dnd 5e", "D&D", "dragon bane", "osric's"). A cue that detection finds only as a substring straddling words still boosts but stays in the text, and a query that is nothing but a cue is searched as typed. `SearchRequest.strip_cues` is request-only and on by default; `run_eval --keep-cues` restores the old behaviour.
+
+**Pre-registered** in `31dc506`, before the fix: three cued pairs (L017–L022) drawn with `random.Random(20260926)` from OSRIC, the Dragonbane Rulebook and SRD 5.1, each a topic another book of the library also covers. All six were already #1 with the cue kept and stay #1, so they show the fix costs nothing on unseen queries but not that it helps them.
+
+| MRR@5 | cue kept | cue stripped |
+|---|---|---|
+| library, cued (18) | 0.756 | **0.972** |
+| corpus, cued (24) | 0.750 | **0.806** |
+| library, all (40) | 0.865 | **0.963** |
+| corpus, all (68) | 0.876 | **0.896** |
+
+Every other scope is identical in both runs: no cue, no change. Latency is unchanged. Baselines: `2026-09-26-v2-library-cue-strip`, `2026-09-26-v2-cue-strip`.
+
+- **Library:** 7 better, none worse. All six original Dragonbane queries reach #1: "dragonbane fireball" no longer ranks the DRAGON monster first, and "how many items can a character carry in dragonbane?" goes from #5 to #1. "osric morale check" goes from #3 to #1.
+- **Corpus:** 6 better, 2 worse. Better: "year zero engine initiative" (q049 #9 → #1, q050 #25 → #2), and q018–q020 from #2 to #1. Worse: q045/q046, Basic Fantasy magic missile, #1 → #6/#3. **The cause is item 3's class:** Magic Missile has no heading of its own in the extraction. It sits inside a 5,079-char section titled "Hallucinatory Terrain > BASIC FANTASY RPG", where the page footer was promoted to a heading. The query's "basic fantasy" matching that bogus heading is what put it first. It was right for the wrong reason, and a heading fix is what should bring it back.
+
+Still open in item 4: the reranker choice (MiniLM L-6 vs `bge-reranker-v2-m3`), in the runtime-swap benchmark.

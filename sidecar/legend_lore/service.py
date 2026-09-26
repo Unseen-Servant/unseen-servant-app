@@ -267,6 +267,50 @@ def detect_systems_in_query(
     }
 
 
+def strip_system_cues(
+    query: str,
+    known_systems: dict[str, list[str]] | None = None,
+) -> str:
+    """The query without the game systems it names, for the text that is
+    embedded, BM25-matched and reranked ("dragonbane fireball damage" →
+    "fireball damage").
+
+    A named system is a scope cue — the boost acts on it — not part of
+    what is asked; left in, its words pull toward their meaning
+    ("dragonbane" ranks the DRAGON monster first). Only whole words that
+    normalize to a keyword are removed: ``detect_systems_in_query``
+    matches substrings, which can straddle words, and such a cue still
+    boosts but stays in the text. Returns the query unchanged when no cue
+    is found or nothing else would be left.
+    """
+    systems = known_systems if known_systems is not None else KNOWN_SYSTEMS
+    needles = {
+        n for keywords in systems.values() for k in keywords
+        if (n := _normalize_for_match(k))
+    }
+    if not needles:
+        return query
+    longest = max(map(len, needles))
+    words = query.split()
+    norms = [
+        _normalize_for_match(w.removesuffix("'s").removesuffix("’s"))
+        for w in words
+    ]
+    drop: set[int] = set()
+    for i in range(len(words)):
+        joined = ""
+        for j in range(i, len(words)):
+            joined += norms[j]
+            if len(joined) > longest:
+                break
+            if joined in needles:
+                drop.update(range(i, j + 1))
+    kept = [w for i, w in enumerate(words) if i not in drop]
+    if not drop or not any(norms[i] for i in range(len(words)) if i not in drop):
+        return query
+    return " ".join(kept)
+
+
 def _system_matches(
     metadatas: list[dict],
     target_systems: set[str],
@@ -572,6 +616,10 @@ class SearchRequest(BaseModel):
     # corrected ("grapp" would become "grasp") and BM25 matches it as a
     # prefix. Request-only, not a setting.
     partial: bool = False
+    # strip_cues: a game system named in the query boosts that system's
+    # books but is left out of the text that is embedded, BM25-matched and
+    # reranked (roadmap 2026-09-26 item 4). Request-only eval knob.
+    strip_cues: bool = True
     # max_context_chars: cap the total `len(text) + len(section_heading)`
     # across returned results (roadmap 2.2). None (default) is unlimited;
     # otherwise results are packed in rank order and the first one that
@@ -1589,14 +1637,20 @@ def _search_sync(
                     corrected_query or request.query
                 )
         query_text = completed_query or corrected_query or request.query
+        # What is searched for: the query minus any system it names. The
+        # system boost below still reads `query_text`.
+        search_text = (
+            strip_system_cues(query_text, merged["known"])
+            if request.strip_cues else query_text
+        )
         variant_queries: list[str] = []
         if knobs.variant_expansion:
             variant_queries = get_spell_corrector(ctx.manifest).expand(
-                query_text
+                search_text
             )
 
         # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
-        query_texts = [query_text, *variant_queries]
+        query_texts = [search_text, *variant_queries]
         n_candidates = request.n_results * 10
 
         # Scope, ANDed: which paths, which filename, which game systems.
@@ -1789,7 +1843,7 @@ def _search_sync(
             if knobs.hybrid:
                 lex = get_lexical_index()
                 lex_ids = lex.search(
-                    query_text, k=n_candidates, doc_ids=doc_ids,
+                    search_text, k=n_candidates, doc_ids=doc_ids,
                     prefix_last=request.partial,
                 )
                 rankings.append(lex_ids)
@@ -1876,7 +1930,7 @@ def _search_sync(
         # keyword-dense action text.
         rerank_applied = False
         pool = 0
-        if knobs.rerank and _rerank_safe_for_query(query_text):
+        if knobs.rerank and _rerank_safe_for_query(search_text):
             pool = min(knobs.rerank_candidates, len(ordered_metadatas))
             if lex_top is not None:
                 # Stable partition: the head plus the BM25 top-M move to
@@ -1895,7 +1949,7 @@ def _search_sync(
                 f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
                 for m, d in zip(pool_meta, pool_docs)
             ]
-            scores = rerank_scores(query_text, rerank_inputs)
+            scores = rerank_scores(search_text, rerank_inputs)
             if scores is not None:
                 rerank_applied = True
                 order = sorted(
@@ -1989,7 +2043,7 @@ def _search_sync(
         if rerank_applied:
             stragglers = [p for p in picked if not p["reranked"]]
             if stragglers:
-                straggler_scores = rerank_scores(query_text, [
+                straggler_scores = rerank_scores(search_text, [
                     f"{p['metadata']['section_heading']}\n\n{p['doc']}"
                     if p["metadata"].get("section_heading") else p["doc"]
                     for p in stragglers
