@@ -189,8 +189,8 @@ Either one is internal to `knn()`.
 Each commit leaves `pytest` green:
 
 1. `LibraryStore` plus its unit tests, unused by the app. Add the `sqlite-vec` dependency.
-2. `embedder.embed()` replaces Chroma's embedding function (no store change yet).
-3. Switch the write paths, read paths and the fixture to `LibraryStore`. Legacy files are removed at boot, `PIPELINE_VERSION` is bumped, and the `chromadb`/`ollama` dependencies are dropped.
+2. `embedder.embed()`, a direct call to Ollama's `/api/embed` (the request the `ollama` client sends, so vectors are unchanged). The truncation probe and keep-warm ticker use it. Indexing and query embedding stay on the collection until step 3, because their tests mock the collection's hooks.
+3. Switch the write paths, read paths, indexing and query embedding, the fixture and the eval engine (`evals/engines/v2.py` still imports the pre-prep `build_ollama_embedding_function`) to `LibraryStore` and `embed()`. Legacy files are removed at boot, `PIPELINE_VERSION` is bumped, and the `chromadb`/`ollama` dependencies are dropped.
 4. Remove Compact from the Tauri command, the UI and the stats response.
 5. Packaging and copy: build script, spec, `release.yml`, Getting Started text.
 6. Eval run, CHANGELOG, and the roadmap §8 plus workstation §6 order rows.
