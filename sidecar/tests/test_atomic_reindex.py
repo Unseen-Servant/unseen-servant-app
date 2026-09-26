@@ -390,22 +390,22 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
 # ---------------------------------------------------------------------------
 
 
-def test_build_ollama_embedding_function_default_timeout(monkeypatch):
+def test_build_embedding_function_default_timeout(monkeypatch):
     """Default timeout is 120s — long enough for a slow embed batch but
     short enough that a wedged Ollama can't hang sync forever."""
-    from legend_lore.service import build_ollama_embedding_function
+    from legend_lore.embedder import build_embedding_function
 
     monkeypatch.delenv("OLLAMA_EMBED_TIMEOUT_SECONDS", raising=False)
-    ef = build_ollama_embedding_function()
+    ef = build_embedding_function()
     assert ef.timeout == 120
 
 
-def test_build_ollama_embedding_function_env_override(monkeypatch):
+def test_build_embedding_function_env_override(monkeypatch):
     """OLLAMA_EMBED_TIMEOUT_SECONDS overrides the default."""
-    from legend_lore.service import build_ollama_embedding_function
+    from legend_lore.embedder import build_embedding_function
 
     monkeypatch.setenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "30")
-    ef = build_ollama_embedding_function()
+    ef = build_embedding_function()
     assert ef.timeout == 30
 
 

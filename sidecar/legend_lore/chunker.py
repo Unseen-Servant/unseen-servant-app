@@ -15,11 +15,11 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from .embedder import EMBEDDING_MODEL
 from .heading_text import strip_markup
 
 
 CHUNKER_VERSION = "structure_aware-v3"
-EMBEDDING_MODEL = "bge-m3"
 PIPELINE_VERSION = f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
 SOFT_CAP = 1000
 HARD_CAP = 20000

@@ -25,7 +25,7 @@ import uvicorn
 from legend_lore.router import build_router
 from legend_lore.service import (
     COLLECTION_METADATA,
-    build_ollama_embedding_function,
+    build_embedding_function,
     gc_orphan_segments,
     keep_embedder_warm,
     probe_embed_truncation,
@@ -112,7 +112,7 @@ def create_app(
         reclaimed = gc_orphan_segments(data_dir)
         if reclaimed > 0:
             print(f"[gc] removed orphan segment dirs: {reclaimed:,} bytes reclaimed")
-        embedding_function = build_ollama_embedding_function()
+        embedding_function = build_embedding_function()
         collection = chroma_client.get_or_create_collection(
             name="ttrpg_docs",
             embedding_function=embedding_function,

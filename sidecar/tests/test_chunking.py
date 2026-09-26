@@ -244,7 +244,8 @@ def test_section_ids_are_stable_across_runs():
 
 
 def test_pipeline_version_names_chunker_and_embedder():
-    from legend_lore.chunker import CHUNKER_VERSION, EMBEDDING_MODEL, PIPELINE_VERSION
+    from legend_lore.chunker import CHUNKER_VERSION, PIPELINE_VERSION
+    from legend_lore.embedder import EMBEDDING_MODEL
     assert CHUNKER_VERSION == "structure_aware-v3"
     assert PIPELINE_VERSION == f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
 

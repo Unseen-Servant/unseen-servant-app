@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from chromadb.utils import embedding_functions
 import pymupdf
 import pymupdf4llm
 from fastapi import HTTPException
@@ -29,13 +28,13 @@ from pydantic import BaseModel, Field, field_validator
 
 from .chunker import (
     CHUNKER_VERSION,
-    EMBEDDING_MODEL,
     PIPELINE_VERSION,
     Chunk,
     PageMarkdown,
     structure_aware,
 )
 from .cleanup import clean_pages
+from .embedder import EMBEDDING_MODEL, build_embedding_function
 from .promote_headings import promote_markdown
 from .granularity import EmbedUnit, ParentDoc, build as build_granularity
 from .parents_store import (
@@ -977,25 +976,6 @@ def resolve_collection_paths(
 # ---------------------------------------------------------------------------
 
 
-def build_ollama_embedding_function():
-    """Construct the Ollama embedding function with an explicit timeout.
-
-    chromadb defaults to 60s, which is too tight for a 256-input bge-m3
-    batch on slower hardware. Without an effective timeout, a wedged
-    Ollama (process suspended, network down) blocks the worker thread
-    indefinitely, which blocks ``fut.result()`` in
-    ``_embed_and_upsert_units``, which holds the sync lock forever.
-
-    Override at runtime with ``OLLAMA_EMBED_TIMEOUT_SECONDS``.
-    """
-    timeout = int(os.getenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "120"))
-    return embedding_functions.OllamaEmbeddingFunction(
-        url="http://localhost:11434/api/embeddings",
-        model_name="bge-m3",
-        timeout=timeout,
-    )
-
-
 def probe_embed_truncation(embed_fn=None) -> None:
     """Warn when the effective Ollama embed context silently truncates.
 
@@ -1008,7 +988,7 @@ def probe_embed_truncation(embed_fn=None) -> None:
     """
     try:
         if embed_fn is None:
-            embed_fn = build_ollama_embedding_function()
+            embed_fn = build_embedding_function()
         base = "word " * 8000  # ~8k bge-m3 tokens, inside the native window
         tail = "zanzibar quetzal umbra"
         vec_a = list(embed_fn([base])[0])
@@ -1053,7 +1033,7 @@ def keep_embedder_warm(
     stop = stop or threading.Event()
     if embed_fn is None:
         try:
-            embed_fn = build_ollama_embedding_function()
+            embed_fn = build_embedding_function()
         except Exception:
             return
     while not stop.wait(interval):

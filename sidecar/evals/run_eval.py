@@ -33,7 +33,7 @@ sys.path.insert(0, str(EVALS_DIR.parent))  # so `python -m evals.run_eval` sees 
 from evals import scorer
 from legend_lore.service import (
     COLLECTION_METADATA,
-    build_ollama_embedding_function,
+    build_embedding_function,
     load_manifest,
 )
 from server import create_app
@@ -64,7 +64,7 @@ def build_client(data_dir: Path):
 
     data_dir.mkdir(parents=True, exist_ok=True)
     chroma_client = chromadb.PersistentClient(path=str(data_dir))
-    embedding_function = build_ollama_embedding_function()
+    embedding_function = build_embedding_function()
     collection = chroma_client.get_or_create_collection(
         name="ttrpg_docs",
         embedding_function=embedding_function,
