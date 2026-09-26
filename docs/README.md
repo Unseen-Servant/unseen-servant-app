@@ -24,6 +24,7 @@ is the source of truth; this index is just a map and may lag new files.
 - [Pipeline rebuild plan](roadmap/2026-08-13-pipeline-rebuild-plan.md) — the v3 program
 - [Agent-harness retrieval findings](roadmap/2026-08-14-agent-harness-retrieval-findings.md)
 - [Unseen Servant workstation architecture](roadmap/2026-09-24-unseen-servant-workstation-architecture.md) — one repo, one window per tool, MCP as the seam
+- [ML runtime consolidation](roadmap/2026-09-26-ml-runtime-consolidation.md) — one provider for embed, rerank and chat; Phase 5 runtime target reopened, sidecar prep landed
 
 ## retrieval/
 
