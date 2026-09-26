@@ -1,7 +1,7 @@
 """``/api/models/status`` — model readiness for the desktop UI.
 
-The Ollama probe is stubbed at ``httpx.get`` so no test needs a live
-runtime; the three states the UI distinguishes (down, up without the
+The ``/v1/models`` probe is stubbed at ``httpx.get`` so no test needs a
+live runtime; the three states the UI distinguishes (down, up without the
 model, ready) are each covered.
 """
 import httpx
@@ -34,14 +34,14 @@ def test_status_when_runtime_down(monkeypatch):
 
 
 def test_status_when_model_missing(monkeypatch):
-    _stub_get(monkeypatch, _Resp(200, {"models": [{"name": "llama3:latest"}]}))
+    _stub_get(monkeypatch, _Resp(200, {"data": [{"id": "llama3:latest"}]}))
     status = embedder.embedder_status()
     assert status["runtime_up"] is True
     assert status["ready"] is False
 
 
 def test_status_when_ready(monkeypatch):
-    _stub_get(monkeypatch, _Resp(200, {"models": [{"name": "bge-m3:latest"}]}))
+    _stub_get(monkeypatch, _Resp(200, {"data": [{"id": "bge-m3:latest"}]}))
     status = embedder.embedder_status()
     assert status == {
         "role": "embed",

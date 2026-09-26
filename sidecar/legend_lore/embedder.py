@@ -22,6 +22,13 @@ import threading
 # before this module existed still match. Extend the string when the
 # backend changes, e.g. ``bge-m3/llamacpp-q8``.
 EMBEDDING_MODEL = "bge-m3"
+EMBED_BASE_URL = "http://localhost:11434"
+
+# NOTE for the runtime swap: Chroma persists the embedding function's
+# ``name()`` ("ollama") in the collection config and refuses to open the
+# collection if a differently named function is supplied. A new backend
+# therefore needs a boot-time drop-and-recreate of the collection when
+# the persisted name differs, not just the fingerprint bump.
 
 
 def build_embedding_function():
@@ -40,7 +47,7 @@ def build_embedding_function():
 
     timeout = int(os.getenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "120"))
     return embedding_functions.OllamaEmbeddingFunction(
-        url="http://localhost:11434/api/embeddings",
+        url=EMBED_BASE_URL,
         model_name=EMBEDDING_MODEL,
         timeout=timeout,
     )
@@ -56,14 +63,17 @@ def embedder_status() -> dict:
     """
     import httpx
 
+    # OpenAI-dialect ``/v1/models`` rather than Ollama's ``/api/tags``:
+    # llama-server, LM Studio and vLLM answer the same shape, so a runtime
+    # swap changes the base URL, not the probe.
     runtime_up = ready = False
     try:
-        resp = httpx.get("http://localhost:11434/api/tags", timeout=3.0)
+        resp = httpx.get(f"{EMBED_BASE_URL}/v1/models", timeout=3.0)
         if resp.status_code == 200:
             runtime_up = True
-            models = resp.json().get("models", [])
+            models = resp.json().get("data", [])
             ready = any(
-                m.get("name", "").startswith(EMBEDDING_MODEL) for m in models
+                m.get("id", "").startswith(EMBEDDING_MODEL) for m in models
             )
     except Exception:
         pass
