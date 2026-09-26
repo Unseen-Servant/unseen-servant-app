@@ -31,25 +31,58 @@ EMBED_BASE_URL = "http://localhost:11434"
 # the persisted name differs, not just the fingerprint bump.
 
 
-def build_embedding_function():
-    """Construct the embedding function for the configured backend.
+def _embed_timeout() -> float:
+    """Seconds to wait for one embed request.
 
-    Currently Ollama serving bge-m3 on its default port, with an explicit
-    timeout: chromadb defaults to 60s, which is too tight for a 256-input
-    bge-m3 batch on slower hardware. Without an effective timeout, a
-    wedged Ollama (process suspended, network down) blocks the worker
-    thread indefinitely, which blocks ``fut.result()`` in
+    120s by default: chromadb's 60s was too tight for a 256-input bge-m3
+    batch on slower hardware. Without an effective timeout, a wedged
+    Ollama (process suspended, network down) blocks the worker thread
+    indefinitely, which blocks ``fut.result()`` in
     ``_embed_and_upsert_units``, which holds the sync lock forever.
 
     Override at runtime with ``OLLAMA_EMBED_TIMEOUT_SECONDS``.
     """
+    return float(os.getenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "120"))
+
+
+def embed(texts: list[str]) -> list[list[float]]:
+    """Embed ``texts`` with bge-m3 — one request, vectors in input order.
+
+    Ollama's native ``/api/embed`` with only ``model`` and ``input``: the
+    exact request the ``ollama`` client (and so chromadb's
+    ``OllamaEmbeddingFunction``) sends, so vectors match every index
+    built before this function existed. Raises on a non-200 answer with
+    Ollama's own error message.
+    """
+    import httpx
+
+    resp = httpx.post(
+        f"{EMBED_BASE_URL}/api/embed",
+        json={"model": EMBEDDING_MODEL, "input": list(texts)},
+        timeout=_embed_timeout(),
+    )
+    if resp.status_code != 200:
+        try:
+            detail = resp.json().get("error", resp.text)
+        except ValueError:
+            detail = resp.text
+        raise RuntimeError(f"embed failed ({resp.status_code}): {detail}")
+    return resp.json()["embeddings"]
+
+
+def build_embedding_function():
+    """Chroma's embedding function for the collection, until the store swap.
+
+    Same endpoint and timeout as ``embed``; indexing and query embedding
+    still go through the collection (``docs/retrieval/2026-09-26-library-
+    store-design.md`` step 3 moves them to ``embed``).
+    """
     from chromadb.utils import embedding_functions
 
-    timeout = int(os.getenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "120"))
     return embedding_functions.OllamaEmbeddingFunction(
         url=EMBED_BASE_URL,
         model_name=EMBEDDING_MODEL,
-        timeout=timeout,
+        timeout=int(_embed_timeout()),
     )
 
 
@@ -98,7 +131,7 @@ def probe_embed_truncation(embed_fn=None) -> None:
     """
     try:
         if embed_fn is None:
-            embed_fn = build_embedding_function()
+            embed_fn = embed
         base = "word " * 8000  # ~8k bge-m3 tokens, inside the native window
         tail = "zanzibar quetzal umbra"
         vec_a = list(embed_fn([base])[0])
@@ -142,10 +175,7 @@ def keep_embedder_warm(
         return
     stop = stop or threading.Event()
     if embed_fn is None:
-        try:
-            embed_fn = build_embedding_function()
-        except Exception:
-            return
+        embed_fn = embed
     while not stop.wait(interval):
         try:
             embed_fn(["ping"])
