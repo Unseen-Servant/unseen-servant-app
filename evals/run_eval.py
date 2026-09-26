@@ -207,6 +207,9 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
         #   uncued — unfiltered; the query omits the system; grade anchors, any
         #            file (a correct answer from any system counts). `doc` is
         #            kept as the representative for anchor verification only.
+        #   collection — filtered to `scope_docs`, sent as `source_paths` the
+        #            way the app's scope console does (library tier); grade
+        #            anchors, any file in scope. `doc` is the representative.
         scope = q.get("scope", "cued")
         docs = query_docs(q)
         if scope == "single":
@@ -215,6 +218,10 @@ def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool
             q_opts, grade_doc = replace(opts, source_filter=doc_file[docs[0]]), None
         elif scope == "uncued":
             q_opts, grade_doc = opts, None
+        elif scope == "collection":
+            paths = [str(doc_pdf[d]) for d in q["scope_docs"]]
+            q_opts = replace(opts, extra={**opts.extra, "source_paths": paths})
+            grade_doc = None
         else:  # cued: the right file must win; a list means any listed file is right
             q_opts, grade_doc = opts, {doc_file[d] for d in docs} or None
         resp = engine.search(q["query"], q_opts)

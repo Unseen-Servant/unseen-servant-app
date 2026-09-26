@@ -80,7 +80,7 @@ def select_queries(queries: list[dict], present: set[str]) -> tuple[list[dict], 
     skipped: list[str] = []
     for q in queries:
         doc = q["doc"]
-        needed = list(doc) if isinstance(doc, list) else [doc]
+        needed = (list(doc) if isinstance(doc, list) else [doc]) + list(q.get("scope_docs", []))
         if all(d in present for d in needed):
             kept.append(q)
         else:

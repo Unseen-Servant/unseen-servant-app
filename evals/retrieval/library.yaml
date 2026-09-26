@@ -81,3 +81,82 @@ queries:
   - {id: L016, pair: troll_regeneration, style: nl, scope: uncued, category: exact_name,
      query: "how do trolls regenerate?", doc: srd_5_1,
      anchors: ["troll", ["regeneration", "regenerate"]], pages: "351"}
+
+  # ── collection: scoped to the three Dragonbane books, as the console sends
+  # it (source_paths). Pre-registered 2026-09-26 for roadmap item 2 (within-
+  # book ordering under scope), BEFORE any fix was tried. Sections were drawn
+  # with random.Random(20260926) from every Dragonbane section of ≥ 300 chars
+  # (832), first three per book in draw order; questions written from the
+  # drawn text. Graded on anchors, any book in scope.
+  - {id: L101, pair: db_satyr_revels, style: keyword, scope: collection, category: prose_rule,
+     query: "satyr feasts wine dancing", doc: db_bestiary,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["satyr", "wines"], pages: "40"}
+  - {id: L102, pair: db_satyr_revels, style: nl, scope: collection, category: prose_rule,
+     query: "how do satyrs celebrate?", doc: db_bestiary,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["satyr", "wines"], pages: "40"}
+  - {id: L103, pair: db_frog_seed, style: keyword, scope: collection, category: prose_rule,
+     query: "frog people adventure hook swamp", doc: db_bestiary,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["quaark", "giant amoeba"], pages: "27"}
+  - {id: L104, pair: db_frog_seed, style: nl, scope: collection, category: prose_rule,
+     query: "is there an adventure idea involving the frog people?", doc: db_bestiary,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["quaark", "giant amoeba"], pages: "27"}
+  - {id: L105, pair: db_hobgoblin_seed, style: keyword, scope: collection, category: prose_rule,
+     query: "hobgoblin clan adventure hook", doc: db_bestiary,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["hobgoblin", ["phubarra", "bog ore"]], pages: "13"}
+  - {id: L106, pair: db_hobgoblin_seed, style: nl, scope: collection, category: prose_rule,
+     query: "give me an adventure idea with hobgoblins", doc: db_bestiary,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["hobgoblin", ["phubarra", "bog ore"]], pages: "13"}
+  - {id: L107, pair: db_encumbrance_scoped, style: keyword, scope: collection, category: prose_rule,
+     query: "encumbrance carrying capacity", doc: db_rulebook,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["encumbrance", "inventory", "rounded up"], pages: "32"}
+  - {id: L108, pair: db_encumbrance_scoped, style: nl, scope: collection, category: prose_rule,
+     query: "how many items can I carry?", doc: db_rulebook,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["encumbrance", "inventory", "rounded up"], pages: "32"}
+  - {id: L109, pair: db_twin_shot, style: keyword, scope: collection, category: exact_name,
+     query: "twin shot heroic ability", doc: db_rulebook,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["two arrows", "bane"], pages: "43"}
+  - {id: L110, pair: db_twin_shot, style: nl, scope: collection, category: exact_name,
+     query: "can my archer shoot two arrows at once?", doc: db_rulebook,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["two arrows", "bane"], pages: "43"}
+  - {id: L111, pair: db_long_journeys, style: keyword, scope: collection, category: prose_rule,
+     query: "travel distance per shift on foot", doc: db_rulebook,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["15 kilometers", "shift"], pages: "105"}
+  - {id: L112, pair: db_long_journeys, style: nl, scope: collection, category: prose_rule,
+     query: "how far can the characters travel in a day on foot?", doc: db_rulebook,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["15 kilometers", "shift"], pages: "105"}
+  - {id: L113, pair: db_skeletal_guard, style: keyword, scope: collection, category: prose_rule,
+     query: "pit of skeletons fear roll", doc: db_adventures,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["skeletons", "sneaking"], pages: "113"}
+  - {id: L114, pair: db_skeletal_guard, style: nl, scope: collection, category: prose_rule,
+     query: "what happens when the party enters the room with the pit of skeletons?", doc: db_adventures,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["skeletons", "sneaking"], pages: "113"}
+  - {id: L115, pair: db_purple_flame, style: keyword, scope: collection, category: exact_name,
+     query: "temple of the purple flame", doc: db_adventures,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["purple flame", "cultists"], pages: "49"}
+  - {id: L116, pair: db_purple_flame, style: nl, scope: collection, category: exact_name,
+     query: "what is going on at the temple of the purple flame?", doc: db_adventures,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["purple flame", "cultists"], pages: "49"}
+  - {id: L117, pair: db_akrae_attacks, style: keyword, scope: collection, category: table_lookup,
+     query: "tower of sacrifice demon attacks", doc: db_adventures,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["claw grab", "salt spew"], pages: "107"}
+  - {id: L118, pair: db_akrae_attacks, style: nl, scope: collection, category: table_lookup,
+     query: "what attacks does the demon in the tower of sacrifice have?", doc: db_adventures,
+     scope_docs: [db_rulebook, db_bestiary, db_adventures],
+     anchors: ["claw grab", "salt spew"], pages: "107"}
