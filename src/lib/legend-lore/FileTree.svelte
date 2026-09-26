@@ -21,7 +21,7 @@
   export let knownSystems: KnownGameSystem[] = [];
   export let indexedPaths: Set<string> = new Set();
   export let onToggle: (path: string, isDir: boolean, item: FileItem, shiftKey: boolean) => void;
-  export let onSetGameSystems: (path: string, filename: string, tags: string[]) => void = () => {};
+  export let onSetGameSystems: (path: string, tags: string[]) => void = () => {};
 
   // Focus & context menu props
   export let focusedFilePath: string | null = null;
@@ -208,11 +208,11 @@
     const next = tags.includes(tag)
       ? tags.filter((t) => t !== tag)
       : [...tags, tag];
-    onSetGameSystems(item.path, item.name, next);
+    onSetGameSystems(item.path, next);
   }
 
   function clearSystem() {
-    onSetGameSystems(item.path, item.name, []);
+    onSetGameSystems(item.path, []);
   }
 
   function handleDragStart(event: DragEvent) {

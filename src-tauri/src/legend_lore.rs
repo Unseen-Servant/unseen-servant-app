@@ -670,14 +670,14 @@ pub async fn set_game_system(
 
 #[tauri::command]
 pub async fn set_game_systems(
-    filename: String,
+    path: String,
     game_systems: Vec<String>,
 ) -> Result<SetGameSystemResult, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/api/set-game-systems", sidecar_url()))
         .json(&serde_json::json!({
-            "filename": filename,
+            "path": path,
             "game_systems": game_systems,
         }))
         .send()

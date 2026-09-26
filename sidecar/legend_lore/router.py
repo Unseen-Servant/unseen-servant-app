@@ -1104,7 +1104,30 @@ def build_router(
         )
         return {"systems": systems}
 
-    def _apply_game_systems(filename: str, game_systems: list[str]) -> dict:
+    def _resolve_source(manifest, filename: str | None, path: str | None) -> str:
+        """Return the manifest path a mutation targets.
+
+        ``path`` is exact. A bare ``filename`` is accepted only while it
+        names one indexed file: same-named twins in different folders are
+        refused with 409 rather than guessed at (#330).
+        """
+        if path is not None:
+            if path not in manifest.files:
+                raise HTTPException(status_code=404, detail=f"Source not found: {path}")
+            return path
+        matches = [p for p, e in manifest.files.items() if e.filename == filename]
+        if not matches:
+            raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
+        if len(matches) > 1:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{len(matches)} indexed files are named {filename}; address one by path",
+            )
+        return matches[0]
+
+    def _apply_game_systems(
+        filename: str | None, game_systems: list[str], path: str | None = None
+    ) -> dict:
         """Update Chroma chunk metadata + manifest entry for a file's tags.
 
         ``game_systems[0]`` becomes the primary scalar in chunk metadata
@@ -1114,19 +1137,14 @@ def build_router(
         """
         primary = game_systems[0] if game_systems else "unknown"
 
-        manifest = load_manifest(data_dir) if data_dir else None
-        source_path = None
-        if manifest:
-            for path_str, entry in manifest.files.items():
-                if entry.filename == filename:
-                    source_path = path_str
-                    break
-
-        if not source_path:
+        if not data_dir:
             raise HTTPException(
                 status_code=404,
-                detail=f"Source not found: {filename}",
+                detail=f"Source not found: {path or filename}",
             )
+        manifest = load_manifest(data_dir)
+        source_path = _resolve_source(manifest, filename, path)
+        entry = manifest.files[source_path]
 
         results = collection.get(
             where={"source": source_path},
@@ -1136,7 +1154,7 @@ def build_router(
         if not results["ids"]:
             raise HTTPException(
                 status_code=404,
-                detail=f"Source not found: {filename}",
+                detail=f"Source not found: {source_path}",
             )
 
         updated_metadatas = [
@@ -1155,15 +1173,12 @@ def build_router(
 
         update_units_fts_game_system(data_dir, source_path, primary)
 
-        if manifest:
-            for entry in manifest.files.values():
-                if entry.filename == filename:
-                    entry.game_system = primary
-                    entry.game_systems = list(game_systems)
-            save_manifest(data_dir, manifest)
+        entry.game_system = primary
+        entry.game_systems = list(game_systems)
+        save_manifest(data_dir, manifest)
 
         return {
-            "filename": filename,
+            "filename": entry.filename,
             "game_system": primary,
             "game_systems": list(game_systems),
             "chunks_updated": len(results["ids"]),
@@ -1192,7 +1207,11 @@ def build_router(
         tags back to ``"unknown"``.
         """
         try:
-            return _apply_game_systems(request.filename, request.game_systems)
+            if request.path is None and request.filename is None:
+                raise HTTPException(status_code=422, detail="path or filename is required")
+            return _apply_game_systems(
+                request.filename, request.game_systems, path=request.path
+            )
         except HTTPException:
             raise
         except Exception as e:
@@ -1321,14 +1340,7 @@ def build_router(
         try:
             # Look up the full path from the manifest so we can filter by source
             manifest = load_manifest(data_dir)
-            source_path = None
-            for path_str, entry in manifest.files.items():
-                if entry.filename == filename:
-                    source_path = path_str
-                    break
-
-            if not source_path:
-                raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
+            source_path = _resolve_source(manifest, filename, None)
 
             deleted = delete_source_chunks(source_path, collection, data_dir=data_dir)
 

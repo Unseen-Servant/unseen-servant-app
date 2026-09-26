@@ -16,7 +16,7 @@
   export let knownSystems: KnownGameSystem[] = [];
   export let gameSystemMap: Map<string, string[]> = new Map();
   export let onOpenResult: (source: string, filename: string, page?: number | null) => void = () => {};
-  export let onSetGameSystems: (path: string, filename: string, tags: string[]) => void = () => {};
+  export let onSetGameSystems: (path: string, tags: string[]) => void = () => {};
 
   // Tag-editor menu shared with FileTree; left-aligned under the badge.
   let tagMenu: SystemTagMenu | undefined;
@@ -50,12 +50,12 @@
     const next = tags.includes(tag)
       ? tags.filter((t) => t !== tag)
       : [...tags, tag];
-    onSetGameSystems(result.source, result.filename, next);
+    onSetGameSystems(result.source, next);
   }
 
   function clearSystem() {
     if (!result) return;
-    onSetGameSystems(result.source, result.filename, []);
+    onSetGameSystems(result.source, []);
   }
 
   function stripBold(s: string): string {

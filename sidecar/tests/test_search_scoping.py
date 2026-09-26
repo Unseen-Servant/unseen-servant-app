@@ -90,14 +90,12 @@ def test_secondary_game_system_scope_excludes_same_named_file(
     """The secondary-tag fold-in must not pull in an untagged file that
     merely shares a filename with the tagged one."""
     a, b = twin_pdfs
-    # Index and tag ONLY the first twin (set_game_systems is
-    # filename-keyed, so tag before the same-named sibling exists).
-    client.post("/api/index-files", json={"paths": [str(a)]})
+    # Tag ONLY the first twin.
+    client.post("/api/index-files", json={"paths": [str(a), str(b)]})
     resp = client.post("/api/set-game-systems", json={
-        "filename": a.name, "game_systems": ["Dragonbane", "D&D 5E"],
+        "path": str(a), "game_systems": ["Dragonbane", "D&D 5E"],
     })
     assert resp.status_code == 200, resp.text
-    client.post("/api/index-files", json={"paths": [str(b)]})
 
     # "D&D 5E" is a's SECONDARY tag → served by the manifest fold-in
     # clause, not the primary chunk-metadata clause.

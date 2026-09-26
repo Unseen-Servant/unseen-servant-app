@@ -1798,11 +1798,11 @@
     }
   }
 
-  async function handleSetGameSystems(path: string, filename: string, tags: string[]) {
+  async function handleSetGameSystems(path: string, tags: string[]) {
     pendingTagOverrides.set(path, tags);
     pendingTagOverrides = pendingTagOverrides;
     try {
-      await invoke('set_game_systems', { filename, gameSystems: tags });
+      await invoke('set_game_systems', { path, gameSystems: tags });
     } catch (e) {
       // Only the write failing justifies dropping the optimistic value —
       // otherwise the menu would keep claiming a tag that was never stored.
@@ -3900,7 +3900,7 @@
       containingCollections={collectionsContaining(contextMenu.item.path, contextMenu.item.is_dir, collections, indexedPaths)}
       knownSystems={knownSystems}
       currentTags={effectiveGameSystemMap.get(contextMenu.item.path) ?? []}
-      onSetGameSystems={(tags) => handleSetGameSystems(contextMenu!.item.path, contextMenu!.item.name, tags)}
+      onSetGameSystems={(tags) => handleSetGameSystems(contextMenu!.item.path, tags)}
       fullyContainingCollections={collectionsFullyContaining(contextMenu.item.path, contextMenu.item.is_dir, collections, indexedPaths)}
       initialSubmenu={contextMenu.initialSubmenu}
       onOpen={handleContextOpen}

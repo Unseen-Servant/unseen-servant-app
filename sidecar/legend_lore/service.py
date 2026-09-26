@@ -684,7 +684,10 @@ class SetGameSystemRequest(BaseModel):
     game_system: str
 
 class SetGameSystemsRequest(BaseModel):
-    filename: str
+    # ``path`` addresses one file; ``filename`` is the legacy form and is
+    # refused when two indexed files share it (#330).
+    filename: str | None = None
+    path: str | None = None
     game_systems: list[str]
 
 class CustomGameSystemRequest(BaseModel):
