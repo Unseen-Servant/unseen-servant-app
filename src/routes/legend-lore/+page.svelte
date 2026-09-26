@@ -1226,9 +1226,12 @@
 
   async function checkOllamaHealth() {
     try {
-      const status = await invoke<{ running: boolean; has_model: boolean }>('check_ollama_health');
-      ollamaRunning = status.running;
-      ollamaModelReady = status.has_model;
+      const status = await invoke<{
+        models: { role: string; runtime_up: boolean; ready: boolean }[];
+      }>('check_models_status');
+      const embed = status.models.find((m) => m.role === 'embed');
+      ollamaRunning = embed?.runtime_up ?? false;
+      ollamaModelReady = embed?.ready ?? false;
     } catch {
       ollamaRunning = false;
       ollamaModelReady = false;

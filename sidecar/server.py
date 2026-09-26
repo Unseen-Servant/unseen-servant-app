@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+from legend_lore.embedder import embedder_status
 from legend_lore.router import build_router
 from legend_lore.service import (
     COLLECTION_METADATA,
@@ -150,6 +151,16 @@ def create_app(
     async def health():
         """Health check for startup detection."""
         return {"status": "ok"}
+
+    @app.get("/api/models/status")
+    def models_status():
+        """Readiness of every ML model role the sidecar depends on.
+
+        One row per role so the UI renders roles, not runtimes: a future
+        reranker or chat-model row slots in without a frontend change.
+        Sync ``def`` so the blocking probe runs in the threadpool.
+        """
+        return {"models": [embedder_status()]}
 
     @app.post("/api/mcp-heartbeat")
     async def mcp_heartbeat():

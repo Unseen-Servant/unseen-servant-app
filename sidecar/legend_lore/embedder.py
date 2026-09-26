@@ -43,3 +43,33 @@ def build_embedding_function():
         model_name=EMBEDDING_MODEL,
         timeout=timeout,
     )
+
+
+def embedder_status() -> dict:
+    """Readiness of the embedding backend, for the desktop UI.
+
+    ``runtime_up`` is whether the serving process answers at all;
+    ``ready`` is whether it also has the model. Two flags rather than one
+    because the UI's remedy differs: install/launch the runtime vs. pull
+    the model. Never raises — a down runtime is a status, not an error.
+    """
+    import httpx
+
+    runtime_up = ready = False
+    try:
+        resp = httpx.get("http://localhost:11434/api/tags", timeout=3.0)
+        if resp.status_code == 200:
+            runtime_up = True
+            models = resp.json().get("models", [])
+            ready = any(
+                m.get("name", "").startswith(EMBEDDING_MODEL) for m in models
+            )
+    except Exception:
+        pass
+    return {
+        "role": "embed",
+        "runtime": "ollama",
+        "model": EMBEDDING_MODEL,
+        "runtime_up": runtime_up,
+        "ready": ready,
+    }

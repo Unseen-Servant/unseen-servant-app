@@ -149,7 +149,7 @@ fn save_window_size(app: &tauri::AppHandle, label: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// Sidecar port and health checks (sidecar, Ollama, MCP). legend_lore.rs
+// Sidecar port and health checks (sidecar, models, MCP). legend_lore.rs
 // reaches the sidecar through sidecar_url() as well.
 // ---------------------------------------------------------------------------
 
@@ -163,48 +163,37 @@ fn sidecar_url() -> String {
     format!("http://127.0.0.1:{}", SIDECAR_PORT.load(Ordering::Relaxed))
 }
 
-const OLLAMA_URL: &str = "http://localhost:11434";
-
-#[derive(Serialize, Deserialize, Debug)]
-struct OllamaStatus {
-    running: bool,
-    has_model: bool,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ModelStatus {
+    role: String,
+    runtime: String,
+    model: String,
+    runtime_up: bool,
+    ready: bool,
 }
 
-#[derive(Deserialize, Debug)]
-struct OllamaModel {
-    name: String,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ModelsStatus {
+    models: Vec<ModelStatus>,
 }
 
-#[derive(Deserialize, Debug)]
-struct OllamaTagsResponse {
-    models: Vec<OllamaModel>,
-}
-
+/// Readiness of the ML models the sidecar depends on, one row per role.
+/// The sidecar owns the probe (it knows which runtime serves which
+/// model); this is a plain proxy, like `check_mcp_status`.
 #[tauri::command]
-async fn check_ollama_health() -> Result<OllamaStatus, String> {
+async fn check_models_status() -> Result<ModelsStatus, String> {
     let client = reqwest::Client::new();
     match client
-        .get(format!("{}/api/tags", OLLAMA_URL))
-        .timeout(std::time::Duration::from_secs(3))
+        .get(format!("{}/api/models/status", sidecar_url()))
+        .timeout(std::time::Duration::from_secs(5))
         .send()
         .await
     {
-        Ok(resp) if resp.status().is_success() => {
-            let tags: OllamaTagsResponse = resp
-                .json()
-                .await
-                .unwrap_or(OllamaTagsResponse { models: vec![] });
-            let has_model = tags.models.iter().any(|m| m.name.starts_with("bge-m3"));
-            Ok(OllamaStatus {
-                running: true,
-                has_model,
-            })
-        }
-        _ => Ok(OllamaStatus {
-            running: false,
-            has_model: false,
-        }),
+        Ok(resp) if resp.status().is_success() => resp
+            .json::<ModelsStatus>()
+            .await
+            .map_err(|e| format!("Failed to parse models status: {}", e)),
+        _ => Ok(ModelsStatus { models: vec![] }),
     }
 }
 
@@ -567,7 +556,7 @@ pub fn run() {
             legend_lore::delete_file,
             legend_lore::rename_folder,
             legend_lore::delete_folder,
-            check_ollama_health,
+            check_models_status,
             check_sidecar_health,
             check_mcp_status,
             legend_lore::get_index_status,
