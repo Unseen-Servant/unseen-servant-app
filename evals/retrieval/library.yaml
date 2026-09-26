@@ -68,6 +68,30 @@ queries:
   - {id: L012, pair: db_fireball, style: nl, scope: cued, category: exact_name,
      query: "how much damage does fireball do in dragonbane?", doc: db_rulebook,
      anchors: ["fireball", "2d6"], pages: "70"}
+  # Pre-registered 2026-09-26 for roadmap item 4 (cue stripping), BEFORE any
+  # fix was tried. Sections drawn with random.Random(20260926) from every
+  # section of >= 300 chars in the three books a system cue names on its own
+  # (OSRIC, Dragonbane Rulebook, SRD 5.1; 2793), first per book in draw
+  # order; questions written from the drawn text. Each topic also exists in
+  # another book of the library.
+  - {id: L017, pair: srd_black_dragon, style: keyword, scope: cued, category: exact_name,
+     query: "dnd 5e adult black dragon attacks", doc: srd_5_1,
+     anchors: ["frightful presence", "2d10 + 6"], pages: "281"}
+  - {id: L018, pair: srd_black_dragon, style: nl, scope: cued, category: exact_name,
+     query: "what attacks does an adult black dragon have in dnd 5e?", doc: srd_5_1,
+     anchors: ["frightful presence", "2d10 + 6"], pages: "281"}
+  - {id: L019, pair: osric_giant_crab, style: keyword, scope: cued, category: exact_name,
+     query: "osric giant crab surprise", doc: osric_2e,
+     anchors: ["giant crab", "1-4 of 1d6"], pages: "269"}
+  - {id: L020, pair: osric_giant_crab, style: nl, scope: cued, category: exact_name,
+     query: "how often does a giant crab surprise its prey in osric?", doc: osric_2e,
+     anchors: ["giant crab", "1-4 of 1d6"], pages: "269"}
+  - {id: L021, pair: db_time_units, style: keyword, scope: cued, category: table_lookup,
+     query: "dragonbane units of time round stretch shift", doc: db_rulebook,
+     anchors: ["stretch", "15 minutes", "6 hours"], pages: "11"}
+  - {id: L022, pair: db_time_units, style: nl, scope: cued, category: table_lookup,
+     query: "how is time measured in dragonbane?", doc: db_rulebook,
+     anchors: ["stretch", "15 minutes", "6 hours"], pages: "11"}
   # ── uncued: any book that answers counts; doc is the representative ──
   - {id: L013, pair: ghoul_paralysis, style: keyword, scope: uncued, category: exact_name,
      query: "ghoul paralysis", doc: srd_5_1,
