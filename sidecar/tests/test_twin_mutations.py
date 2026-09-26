@@ -1,11 +1,11 @@
 """Mutations on same-named files in different folders (issue #330).
 
-``/api/set-game-systems`` and ``DELETE /api/source/{filename}`` resolved
-their target by bare filename, so with ``/5e/Monster Manual.pdf`` and
-``/pf2e/Monster Manual.pdf`` indexed, a mutation meant for one twin
-landed on whichever the manifest listed first, and tagging wrote the
-tags into *both* manifest entries. Tagging is now path-addressed; a
-filename that names more than one file is refused rather than guessed.
+``/api/set-game-systems`` resolved its target by bare filename, so with
+``/5e/Monster Manual.pdf`` and ``/pf2e/Monster Manual.pdf`` indexed, a
+retag meant for one twin landed on whichever the manifest listed first,
+and wrote the tags into *both* manifest entries. Tagging is now
+path-addressed; a filename that names more than one file is refused
+rather than guessed.
 """
 
 from legend_lore.service import load_manifest
@@ -67,11 +67,3 @@ def test_set_game_systems_ambiguous_filename_is_refused(
         assert "OSRIC" not in _chunk_systems(test_collection, p)
         assert load_manifest(tmp_path).files[str(p)].game_systems != ["OSRIC"]
 
-
-def test_delete_ambiguous_filename_is_refused(client, twin_pdfs, test_collection):
-    a, b = _index_twins(client, twin_pdfs)
-    count = test_collection.count()
-
-    resp = client.delete(f"/api/source/{a.name}")
-    assert resp.status_code == 409, resp.text
-    assert test_collection.count() == count

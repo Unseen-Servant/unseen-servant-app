@@ -1,8 +1,6 @@
 """
-Tests for GET /api/sources and DELETE /api/source/{filename}.
+Tests for GET /api/sources.
 """
-
-from legend_lore.parents_store import count_units_fts
 
 
 def test_sources_empty(client):
@@ -36,55 +34,6 @@ def test_sources_sorted_alphabetically(client, sample_pdf_path, large_text_pdf_p
     response = client.get("/api/sources")
     filenames = [s["filename"] for s in response.json()["sources"]]
     assert filenames == sorted(filenames)
-
-
-def test_delete_source(client, sample_pdf_path, test_collection, tmp_path):
-    """Deleting a source should remove all its chunks."""
-    client.post("/api/index-files", json={
-        "paths": [str(sample_pdf_path)]
-    })
-
-    # Verify it exists
-    assert test_collection.count() > 0
-    assert count_units_fts(tmp_path) > 0
-
-    # Delete it
-    response = client.delete("/api/source/dragonbane_monsters.pdf")
-    assert response.status_code == 200
-    assert "Deleted" in response.json()["message"]
-
-    # Verify it's gone
-    assert test_collection.count() == 0
-    assert count_units_fts(tmp_path) == 0
-
-
-def test_delete_nonexistent_source(client):
-    """Deleting a source that doesn't exist should return 404."""
-    response = client.delete("/api/source/nonexistent.pdf")
-    assert response.status_code == 404
-
-
-def test_delete_one_preserves_others(
-    client, sample_pdf_path, large_text_pdf_path, test_collection
-):
-    """Deleting one source should not affect other sources."""
-    client.post("/api/index-files", json={
-        "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
-    })
-
-    count_before = test_collection.count()
-
-    client.delete("/api/source/dragonbane_monsters.pdf")
-
-    count_after = test_collection.count()
-    assert count_after > 0
-    assert count_after < count_before
-
-    # The other source should still be listed
-    response = client.get("/api/sources")
-    filenames = [s["filename"] for s in response.json()["sources"]]
-    assert "core_rules.pdf" in filenames
-    assert "dragonbane_monsters.pdf" not in filenames
 
 
 def test_sources_includes_per_file_stats(client, sample_pdf_path):

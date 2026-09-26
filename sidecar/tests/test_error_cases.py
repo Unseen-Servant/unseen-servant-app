@@ -39,19 +39,6 @@ def test_index_special_characters_filename(client, special_chars_pdf_path):
     assert data["errors"] == []
 
 
-def test_delete_special_characters_filename(client, special_chars_pdf_path):
-    """DELETE endpoint must handle special characters in filenames."""
-    # First index it
-    client.post("/api/index-files", json={
-        "paths": [str(special_chars_pdf_path)]
-    })
-
-    # Then delete by filename (which has special chars)
-    filename = "D&D 5E - Player's Guide (2024).pdf"
-    response = client.delete(f"/api/source/{filename}")
-    assert response.status_code == 200
-
-
 def test_duplicate_indexing(client, sample_pdf_path, test_collection):
     """Indexing the same PDF twice should not create duplicate chunks.
 

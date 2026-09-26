@@ -1319,27 +1319,6 @@ def build_router(
 
         return {"tag": request.tag, "disabled": request.disabled}
 
-    @router.delete("/api/source/{filename}")
-    async def delete_source(filename: str):
-        """Delete a source and all its chunks."""
-        try:
-            # Look up the full path from the manifest so we can filter by source
-            manifest = load_manifest(data_dir)
-            source_path = _resolve_source(manifest, filename, None)
-
-            deleted = delete_source_chunks(source_path, collection, data_dir=data_dir)
-
-            if not deleted:
-                raise HTTPException(status_code=404, detail=f"Source not found: {filename}")
-
-            compact_sqlite(data_dir)
-
-            return {"message": f"Deleted {deleted} chunks from {filename}"}
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
     @router.get("/api/source/{filename}/content")
     async def get_source_content(filename: str):
         """Retrieve the full text content of an indexed PDF.

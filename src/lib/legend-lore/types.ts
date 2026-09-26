@@ -19,13 +19,6 @@ export interface GameSystemsResult {
   count: number;
 }
 
-export interface SetGameSystemResult {
-  filename: string;
-  game_system: string;
-  game_systems?: string[];
-  chunks_updated: number;
-}
-
 export interface KnownGameSystem {
   tag: string;
   keywords?: string[];
