@@ -5,10 +5,10 @@ Tests for POST /api/reindex-file (single-file force rebuild).
 import time
 
 
-def test_reindex_file_rebuilds_chunks(client, sample_pdf_path, test_collection):
+def test_reindex_file_rebuilds_chunks(client, sample_pdf_path, test_store):
     """Re-indexing a file should keep chunk count > 0 and not duplicate."""
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
-    chunks_before = test_collection.count()
+    chunks_before = test_store.count_units()
     assert chunks_before > 0
 
     response = client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
@@ -17,8 +17,8 @@ def test_reindex_file_rebuilds_chunks(client, sample_pdf_path, test_collection):
     assert data["error"] is None
     assert data["chunks"] > 0
 
-    # Same chunk count after — delete + re-add, no duplication.
-    assert test_collection.count() == chunks_before
+    # Same chunk count after — the book's rows are replaced, not duplicated.
+    assert test_store.count_units() == chunks_before
 
 
 def test_reindex_file_advances_indexed_at(client, sample_pdf_path):
@@ -45,17 +45,17 @@ def test_reindex_file_missing_path(client, tmp_path):
 
 
 def test_reindex_file_preserves_other_sources(
-    client, sample_pdf_path, large_text_pdf_path, test_collection
+    client, sample_pdf_path, large_text_pdf_path, test_store
 ):
     """Re-indexing one file leaves other indexed files alone."""
     client.post("/api/index-files", json={
         "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
     })
-    total_before = test_collection.count()
+    total_before = test_store.count_units()
 
     client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
 
-    assert test_collection.count() == total_before
+    assert test_store.count_units() == total_before
     filenames = {
         s["filename"] for s in client.get("/api/sources").json()["sources"]
     }

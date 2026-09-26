@@ -1,14 +1,12 @@
 """
 Legend Lore — indexing and search engine behind the sidecar routes.
 
-PDF extraction, chunking and embedding into ChromaDB, the manifest and
-collection stores, sync diffing, storage maintenance, and the search
-pipeline. The HTTP surface over it is ``router.py``; app construction
+PDF extraction, chunking and embedding into the library store, the
+manifest and collection stores, sync diffing, and the search pipeline. The HTTP surface over it is ``router.py``; app construction
 and process lifecycle stay in ``sidecar/server.py``.
 """
 
 import hashlib
-import secrets
 import json
 import os
 import re
@@ -16,7 +14,6 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,23 +24,16 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from .chunker import (
-    CHUNKER_VERSION,
     PIPELINE_VERSION,
     Chunk,
     PageMarkdown,
     structure_aware,
 )
 from .cleanup import clean_pages
-from .embedder import EMBEDDING_MODEL, build_embedding_function
 from .promote_headings import promote_markdown
 from .granularity import EmbedUnit, ParentDoc, build as build_granularity
-from .parents_store import (
-    upsert_parents, fetch_parents, fetch_sections,
-    open_store, section_root_for,
-    delete_parents_for_source,
-    upsert_units_fts,
-    delete_units_fts_for_source,
-)
+from .library_store import LibraryStore
+from .parents_store import fetch_parents, fetch_sections, section_root_for
 from .lexical import (
     LEXICAL_RERANK_POOL, LEXICAL_RRF_WEIGHT, rrf_fuse,
 )
@@ -52,7 +42,7 @@ from .reranker import rerank_scores
 from .spelling import keyword_tokens
 
 
-# Number of top ChromaDB candidates to feed into the cross-encoder. Set
+# Number of top dense candidates to feed into the cross-encoder. Set
 # to balance re-rank latency against the size of the candidate pool the
 # parent-dedupe loop sees in re-ranked order. Trailing candidates beyond
 # this still appear (in cosine order) so dedupe never starves.
@@ -89,13 +79,6 @@ RERANK_TIER_WEAK = float(os.getenv("RERANK_TIER_WEAK", "0.5"))
 COSINE_TIER_STRONG = float(os.getenv("COSINE_TIER_STRONG", "0.60"))
 COSINE_TIER_WEAK = float(os.getenv("COSINE_TIER_WEAK", "0.50"))
 
-
-# Pinning HNSW space at collection creation makes `relevance = 1 - distance`
-# bounded in [0, 1] for the normalised embeddings bge-m3 produces. Chroma's
-# default is l2, where distances can exceed 1.0 and yield negative relevance.
-# The space is locked at creation; existing l2 collections flip to cosine
-# only when the user re-indexes (delete-index drops and recreates).
-COLLECTION_METADATA = {"hnsw:space": "cosine"}
 
 # ---------------------------------------------------------------------------
 # Pure helpers (no dependencies — safe to import in tests)
@@ -961,11 +944,10 @@ def resolve_collection_paths(
     """Resolve a collection's file_paths to the indexed subset.
 
     Filters out paths no longer indexed (graceful degradation). Returns
-    exact source paths — chunk metadata stores the full path, and
-    filtering by bare filename would leak same-named PDFs from other
-    folders into the collection scope (issue #308; the '/5e/Monster
-    Manual.pdf' vs '/pf2e/Monster Manual.pdf' case chunk_id_prefix
-    already guards against).
+    exact source paths — books are keyed by full path, and filtering by
+    bare filename would leak same-named PDFs from other folders into the
+    collection scope (issue #308; the '/5e/Monster Manual.pdf' vs
+    '/pf2e/Monster Manual.pdf' case).
     """
     return [p for p in coll.file_paths if p in manifest.files]
 
@@ -998,44 +980,6 @@ def warm_search_stack(get_spell_corrector) -> None:
         pass
 
 
-def chunk_id_prefix(pdf_path: Path, nonce: str | None = None) -> str:
-    """Return a stable, collision-free prefix for chunk IDs.
-
-    Uses an 8-char hex digest of the full path so that two PDFs with the same
-    stem (e.g. ``/5e/Monster Manual.pdf`` and ``/pf2e/Monster Manual.pdf``)
-    never collide. When ``nonce`` is provided, it is folded into the prefix
-    so a re-index can stage new chunks under a distinct prefix and atomically
-    swap them in once embedding succeeds.
-    """
-    path_hash = hashlib.sha256(str(pdf_path).encode()).hexdigest()[:8]
-    if nonce:
-        return f"{path_hash}_{nonce}_{pdf_path.stem}"
-    return f"{path_hash}_{pdf_path.stem}"
-
-
-def _embed_unit_metadata(pdf_path: Path, eu: EmbedUnit, game_system: str,
-                         page_labels: dict[int, str] | None = None) -> dict:
-    labels = page_labels or {}
-    return {
-        "source": str(pdf_path),
-        "filename": pdf_path.name,
-        "chunk": eu.ordinal,
-        "game_system": game_system,
-        "chunk_type": eu.chunk_type,
-        "section_heading": eu.section_heading or "",
-        "page_start": eu.page_start,
-        "page_end": eu.page_end,
-        # Printed labels, "" when the PDF numbers its pages the obvious way.
-        "page_label_start": labels.get(eu.page_start, ""),
-        "page_label_end": labels.get(eu.page_end, ""),
-        "parent_id": eu.parent_id,
-        "section_id": eu.section_id or "",
-        "section_path": eu.section_path or "",
-        "chunker_version": CHUNKER_VERSION,
-        "embedding_model": EMBEDDING_MODEL,
-    }
-
-
 def _embed_text(eu: EmbedUnit) -> str:
     """Heading-prepended text for embedding (storage of eu.text unchanged).
 
@@ -1052,18 +996,10 @@ def _embed_text(eu: EmbedUnit) -> str:
 # 256 was chosen over the previous 100 to amortize Ollama per-call overhead;
 # bge-m3 embeds each input independently so the 8192 ctx applies per input,
 # not per batch (mean embed-text size ~400 chars / ~100 tokens). Concurrency=3
-# fires up to N embed batches at Ollama in parallel; upserts to Chroma stay
-# serial because its SQLite is not concurrent-write friendly.
+# fires up to N embed batches at Ollama in parallel; the book is written to
+# the store once, after every batch has embedded.
 EMBED_BATCH_SIZE = 256
 EMBED_CONCURRENCY = 3
-
-# Chroma refuses any single write carrying more records than its max batch
-# size — 5461 for a local client. Indexing never hits this because it upserts
-# in EMBED_BATCH_SIZE slices, but a metadata rewrite touches every chunk of a
-# file at once, and a big rulebook chunks well past the cap (13k+ is ordinary).
-# Kept below 5461 with headroom rather than read from the client, since the
-# limit is a property of the local Chroma build and not worth a runtime probe.
-METADATA_UPDATE_BATCH_SIZE = 5000
 
 
 # A model runner can drop an in-flight embed ("connection reset by peer")
@@ -1090,7 +1026,7 @@ def _is_transient_embed_error(exc: Exception) -> bool:
     return any(m in msg for m in _TRANSIENT_EMBED_MARKERS)
 
 
-def _embed_batch(collection, batch: list[EmbedUnit]) -> list[list[float]]:
+def _embed_batch(embed_fn, batch: list[EmbedUnit]) -> list[list[float]]:
     """Heading-prepended embeddings for a batch (no DB writes).
 
     Retries transient Ollama runner resets so a single dropped connection
@@ -1100,7 +1036,7 @@ def _embed_batch(collection, batch: list[EmbedUnit]) -> list[list[float]]:
     texts = [_embed_text(eu) for eu in batch]
     for attempt in range(1, EMBED_MAX_ATTEMPTS + 1):
         try:
-            return collection._embedding_function(texts)
+            return embed_fn(texts)
         except Exception as e:
             if attempt == EMBED_MAX_ATTEMPTS or not _is_transient_embed_error(e):
                 raise
@@ -1109,27 +1045,8 @@ def _embed_batch(collection, batch: list[EmbedUnit]) -> list[list[float]]:
             time.sleep(1.0 * attempt)
 
 
-def _upsert_batch(
-    collection,
-    batch: list[EmbedUnit],
-    embeddings: list[list[float]],
-    pdf_path: Path,
-    game_system: str,
-    prefix: str,
-    page_labels: dict[int, str] | None = None,
-) -> None:
-    """Upsert a pre-embedded batch with stored text and metadata."""
-    collection.upsert(
-        embeddings=embeddings,
-        documents=[eu.text for eu in batch],
-        metadatas=[_embed_unit_metadata(pdf_path, eu, game_system, page_labels)
-                   for eu in batch],
-        ids=[f"{prefix}_{eu.ordinal}" for eu in batch],
-    )
-
-
 class EmbedBatchError(Exception):
-    """Raised when embedding or upsert fails for a single source.
+    """Raised when embedding fails for a single source.
 
     Carries the source path so callers can record which file failed and
     preserve any prior successful index for it. The original cause is
@@ -1141,25 +1058,23 @@ class EmbedBatchError(Exception):
         self.source_path = source_path
 
 
-def _embed_and_upsert_units(
-    collection,
+def _embed_units(
+    embed_fn,
     embed_units: list[EmbedUnit],
     pdf_path: Path,
-    game_system: str,
-    prefix: str,
+    vectors: list[list[float]],
     batch_size: int = EMBED_BATCH_SIZE,
     concurrency: int = EMBED_CONCURRENCY,
-    page_labels: dict[int, str] | None = None,
 ):
-    """Embed batches concurrently, upsert serially in submission order.
+    """Embed batches concurrently, collecting vectors in submission order.
 
-    Generator that yields each batch's unit count after it's been written to
-    Chroma. Callers that don't need progress can `sum(...)` to get the total.
-    Submission-order draining keeps chunk ordinals deterministic in the DB
-    and progress events monotonic for streaming callers.
+    Generator that appends each batch's vectors to ``vectors`` and yields
+    its unit count, so streaming callers can report progress while the
+    book is still embedding. Submission-order draining keeps ``vectors``
+    aligned with ``embed_units``.
 
-    Raises ``EmbedBatchError`` if any embed or upsert fails. Pending futures
-    are cancelled before the exception propagates so the executor exits
+    Raises ``EmbedBatchError`` if any batch fails. Pending futures are
+    cancelled before the exception propagates so the executor exits
     promptly.
     """
     if not embed_units:
@@ -1169,116 +1084,72 @@ def _embed_and_upsert_units(
         for i in range(0, len(embed_units), batch_size)
     ]
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
-        futures = [ex.submit(_embed_batch, collection, b) for b in batches]
+        futures = [ex.submit(_embed_batch, embed_fn, b) for b in batches]
         try:
             for batch, fut in zip(batches, futures):
-                embeddings = fut.result()
-                _upsert_batch(collection, batch, embeddings, pdf_path, game_system,
-                              prefix, page_labels)
+                vectors.extend(fut.result())
                 yield len(batch)
-        except EmbedBatchError:
-            raise
         except Exception as e:
             for f in futures:
                 f.cancel()
             raise EmbedBatchError(pdf_path, str(e)) from e
 
 
-def _split_chunk_ids_by_prefix(
-    collection, source_path: str, prefix: str
-) -> tuple[list[str], list[str]]:
-    """Return (matching_prefix, not_matching_prefix) chunk IDs for a source.
-
-    Used by the atomic re-index path to separate freshly inserted chunks
-    (under a per-write nonce prefix) from any pre-existing chunks for the
-    same source.
-    """
-    results = collection.get(where={"source": source_path}, include=[])
-    pattern = f"{prefix}_"
-    matching, not_matching = [], []
-    for cid in results["ids"]:
-        if cid.startswith(pattern):
-            matching.append(cid)
-        else:
-            not_matching.append(cid)
-    return matching, not_matching
-
-
 def _atomic_index_pdf(
     pdf_path: Path,
     game_system: str,
+    game_systems: list[str],
     embed_units: list[EmbedUnit],
     parents: list,
-    collection,
-    data_dir: Path | None,
+    store: LibraryStore,
+    embed_fn,
     batch_size: int = EMBED_BATCH_SIZE,
     page_labels: dict[int, str] | None = None,
 ):
-    """Generator: stage new chunks under a fresh prefix, then swap atomically.
+    """Generator: embed a book, then swap it into the store in one transaction.
 
-    Yields each batch's unit count as it lands in Chroma so callers can
-    surface progress. On full iteration: deletes any pre-existing chunks
-    for this source that don't share the new prefix, then writes the new
-    parents. On ``EmbedBatchError``: rolls back the partial new chunks and
-    re-raises — pre-existing chunks and parents are untouched.
-
-    The per-write nonce ensures even a same-content force re-index gets a
-    distinct prefix, so leftovers from a prior larger chunking can never
-    survive the swap.
+    Yields each batch's unit count as it embeds so callers can surface
+    progress. Nothing is written until every batch has embedded; then
+    ``replace_document`` replaces the book's units, vectors, FTS rows and
+    parents together. On ``EmbedBatchError`` the store is untouched, so a
+    previous index of the book keeps serving searches.
     """
-    nonce = secrets.token_hex(4)
-    new_prefix = chunk_id_prefix(pdf_path, nonce)
-    try:
-        for n in _embed_and_upsert_units(
-            collection, embed_units, pdf_path, game_system, new_prefix,
-            batch_size=batch_size, page_labels=page_labels,
-        ):
-            yield n
-    except EmbedBatchError:
-        partial, _ = _split_chunk_ids_by_prefix(collection, str(pdf_path), new_prefix)
-        if partial:
-            collection.delete(ids=partial)
-        raise
-    _, stale = _split_chunk_ids_by_prefix(collection, str(pdf_path), new_prefix)
-    if stale:
-        collection.delete(ids=stale)
-    if data_dir:
-        upsert_parents(data_dir, str(pdf_path), parents)
-        upsert_units_fts(data_dir, str(pdf_path), [
-            (f"{new_prefix}_{eu.ordinal}", eu.ordinal, pdf_path.name, game_system,
-             eu.parent_id, _embed_text(eu))
-            for eu in embed_units
-        ])
+    vectors: list[list[float]] = []
+    yield from _embed_units(
+        embed_fn, embed_units, pdf_path, vectors, batch_size=batch_size,
+    )
+    store.replace_document(
+        str(pdf_path), game_system, game_systems, embed_units,
+        embed_texts=[_embed_text(eu) for eu in embed_units],
+        vectors=vectors, parents=parents, page_labels=page_labels,
+    )
 
 
 def _index_chunks(
     chunks: list[Chunk],
     pdf_path: Path,
     game_system: str,
-    collection,
-    data_dir: Path | None,
+    game_systems: list[str],
+    store: LibraryStore,
+    embed_fn,
     batch_size: int = EMBED_BATCH_SIZE,
 ) -> int:
     """Run the granularity step and persist embed units + parents.
 
     Splits chunks into ~400-char embed units (tables linearized into row
     units, atomic fallback) and contiguous same-breadcrumb parents (capped
-    at 6,000 chars). Embed units go to ChromaDB with parent_id in metadata;
-    parents go to the SQLite store.
+    at 6,000 chars), embeds the units and writes the book in one store
+    transaction. Raises ``EmbedBatchError`` if embedding fails — the
+    book's previous index stays intact in that case.
 
-    Uses the atomic re-index pattern: stages new chunks under a per-write
-    prefix, then swaps in the new parents only after embed succeeds. Raises
-    ``EmbedBatchError`` if embedding fails — old chunks and parents stay
-    intact in that case.
-
-    Returns the number of embed units upserted.
+    Returns the number of embed units written.
     """
     if not chunks:
         return 0
     embed_units, parents = build_granularity(chunks)
     return sum(_atomic_index_pdf(
-        pdf_path, game_system, embed_units, parents, collection, data_dir,
-        batch_size=batch_size, page_labels=_page_labels(pdf_path),
+        pdf_path, game_system, game_systems, embed_units, parents, store,
+        embed_fn, batch_size=batch_size, page_labels=_page_labels(pdf_path),
     ))
 
 
@@ -1323,11 +1194,11 @@ def _extract_and_chunk(
 
 
 def index_single_pdf(
-    pdf_path: Path, collection, game_system: str | None = None,
+    pdf_path: Path, store: LibraryStore, embed_fn,
+    game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
-    data_dir: Path | None = None,
 ) -> tuple[int, str | None, str, list[str]]:
-    """Extract, chunk, and upsert a single PDF into ChromaDB + parents store.
+    """Extract, chunk, embed and write a single PDF to the library store.
 
     Returns (embed_unit_count, error_message, game_system, game_systems).
     error_message is None on success. Embedding failures are converted to
@@ -1340,7 +1211,9 @@ def index_single_pdf(
     if error:
         return 0, error, resolved_system, resolved_systems
     try:
-        count = _index_chunks(chunks, pdf_path, resolved_system, collection, data_dir)
+        count = _index_chunks(
+            chunks, pdf_path, resolved_system, resolved_systems, store, embed_fn
+        )
     except EmbedBatchError as e:
         return 0, str(e), resolved_system, resolved_systems
     return count, None, resolved_system, resolved_systems
@@ -1358,188 +1231,37 @@ def prepare_pdf(
     return _extract_and_chunk(pdf_path, game_system, known_systems)
 
 
-def compact_sqlite(data_dir: Path) -> int:
-    """VACUUM the ChromaDB and parents SQLite databases.
-
-    Both stores accumulate tombstoned pages on every delete-index or
-    re-index cycle; SQLite doesn't reclaim that space without VACUUM.
-
-    Returns total bytes reclaimed across both files (0 if neither exists).
-    """
-    if not data_dir:
-        return 0
-    import sqlite3
-    reclaimed = 0
-    for name in ("chroma.sqlite3", "parents.sqlite3"):
-        path = data_dir / name
-        if not path.exists():
-            continue
-        size_before = os.path.getsize(path)
-        conn = sqlite3.connect(str(path))
-        try:
-            conn.execute("VACUUM")
-        finally:
-            conn.close()
-        reclaimed += size_before - os.path.getsize(path)
-    return reclaimed
-
-
 # UUID-named segment directories created by Chroma's HNSW persistence.
 _UUID_DIR_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
 
+# What the pre-library-store index left in the data dir.
+_LEGACY_STORE_FILES = ("chroma.sqlite3", "parents.sqlite3")
 
-def _live_segment_ids(data_dir: Path) -> set[str]:
-    """Read live segment UUIDs from chroma.sqlite3.
 
-    Returns an empty set if the database doesn't exist (fresh install).
+def remove_legacy_chroma(data_dir: Path) -> int:
+    """Delete the ChromaDB store and the old parents file. Returns bytes freed.
+
+    The library store replaced both (docs/retrieval/2026-09-26-library-
+    store-design.md); the library is rebuilt rather than migrated, and the
+    ``PIPELINE_VERSION`` bump flags every manifest entry for reindex. The
+    UUID pattern guards against removing unrelated directories. Safe to
+    call on every boot: a data dir without legacy files costs a listing.
     """
-    sqlite_path = data_dir / "chroma.sqlite3"
-    if not sqlite_path.exists():
-        return set()
-    import sqlite3
-    conn = sqlite3.connect(str(sqlite_path))
-    try:
-        rows = conn.execute("SELECT id FROM segments").fetchall()
-    finally:
-        conn.close()
-    return {r[0] for r in rows}
-
-
-def _segment_ids_for_collection(data_dir: Path, collection_name: str) -> list[str]:
-    """Return segment UUIDs belonging to a named Chroma collection."""
-    sqlite_path = data_dir / "chroma.sqlite3"
-    if not sqlite_path.exists():
-        return []
-    import sqlite3
-    conn = sqlite3.connect(str(sqlite_path))
-    try:
-        rows = conn.execute(
-            "SELECT s.id FROM segments s "
-            "JOIN collections c ON s.collection = c.id "
-            "WHERE c.name = ?",
-            (collection_name,),
-        ).fetchall()
-    finally:
-        conn.close()
-    return [r[0] for r in rows]
-
-
-def _remove_segment_dir(data_dir: Path, segment_id: str) -> int:
-    """Remove a single segment directory if it exists. Returns bytes freed.
-
-    UUID-pattern check guards against rmtree on unrelated paths if Chroma's
-    segment id format ever drifts.
-    """
-    if not _UUID_DIR_RE.match(segment_id):
-        return 0
-    seg_dir = data_dir / segment_id
-    if not seg_dir.is_dir():
-        return 0
     import shutil
-    size = sum(p.stat().st_size for p in seg_dir.rglob("*") if p.is_file())
-    shutil.rmtree(seg_dir, ignore_errors=True)
-    return size
 
-
-def _sqlite_freelist_bytes(sqlite_path: Path) -> int:
-    """Return bytes that ``VACUUM`` would reclaim from a SQLite database."""
-    if not sqlite_path.exists():
-        return 0
-    import sqlite3
-    conn = sqlite3.connect(str(sqlite_path))
-    try:
-        page_size = conn.execute("PRAGMA page_size").fetchone()[0]
-        freelist = conn.execute("PRAGMA freelist_count").fetchone()[0]
-    finally:
-        conn.close()
-    return page_size * freelist
-
-
-def _orphan_segment_bytes(data_dir: Path) -> int:
-    """Return total bytes in UUID-named segment dirs not referenced by any
-    live segment. Read-only counterpart of ``gc_orphan_segments``.
-    """
-    if not data_dir or not data_dir.is_dir():
-        return 0
-    live = _live_segment_ids(data_dir)
-    total = 0
+    freed = 0
+    for name in _LEGACY_STORE_FILES:
+        for path in data_dir.glob(name + "*"):  # -wal / -shm / -journal too
+            freed += path.stat().st_size
+            path.unlink()
     for entry in data_dir.iterdir():
-        if not entry.is_dir() or not _UUID_DIR_RE.match(entry.name):
-            continue
-        if entry.name in live:
-            continue
-        total += sum(p.stat().st_size for p in entry.rglob("*") if p.is_file())
-    return total
-
-
-def _compute_reclaimable_bytes(data_dir: Path | None) -> int:
-    """Bytes that ``/api/compact`` would reclaim if invoked right now.
-
-    Sum of: chroma.sqlite3 freelist + parents.sqlite3 freelist + orphan
-    segment dir bytes. Powers the UI's gating on whether to surface the
-    Compact button.
-    """
-    if not data_dir:
-        return 0
-    return (
-        _sqlite_freelist_bytes(data_dir / "chroma.sqlite3")
-        + _sqlite_freelist_bytes(data_dir / "parents.sqlite3")
-        + _orphan_segment_bytes(data_dir)
-    )
-
-
-def gc_orphan_segments(data_dir: Path) -> int:
-    """Remove UUID-named segment directories not referenced by any live segment.
-
-    Chroma's ``delete_collection`` only removes metadata rows from
-    ``chroma.sqlite3``; the on-disk segment directories are left behind.
-    Each call to ``/api/delete-index`` therefore leaks ~250 MB on a typical
-    library. This helper walks ``data_dir`` for UUID-named directories and
-    removes any whose UUID is not in ``segments.id``.
-
-    Returns bytes reclaimed.
-    """
-    if not data_dir or not data_dir.is_dir():
-        return 0
-    live = _live_segment_ids(data_dir)
-    reclaimed = 0
-    for entry in data_dir.iterdir():
-        if not entry.is_dir():
-            continue
-        if not _UUID_DIR_RE.match(entry.name):
-            continue
-        if entry.name in live:
-            continue
-        reclaimed += _remove_segment_dir(data_dir, entry.name)
-    return reclaimed
-
-
-def delete_source_chunks(
-    source_path: str, collection, data_dir: Path | None = None
-) -> int:
-    """Delete all chunks for a given source path from ChromaDB.
-
-    Uses the full ``source`` metadata field to avoid collisions when two PDFs
-    share the same filename in different directories. Also drops the source's
-    parent and lexical (FTS) rows from the parents store so re-indexes don't
-    accumulate orphans.
-
-    Returns the number of deleted chunks, or 0 if not found.
-    """
-    results = collection.get(where={"source": source_path}, include=[])
-    ids_to_delete = results["ids"]
-
-    if ids_to_delete:
-        collection.delete(ids=ids_to_delete)
-
-    if data_dir:
-        delete_parents_for_source(data_dir, source_path)
-        delete_units_fts_for_source(data_dir, source_path)
-
-    return len(ids_to_delete)
+        if entry.is_dir() and _UUID_DIR_RE.match(entry.name):
+            freed += sum(p.stat().st_size for p in entry.rglob("*") if p.is_file())
+            shutil.rmtree(entry, ignore_errors=True)
+    return freed
 
 
 def compute_diff(
@@ -1800,7 +1522,8 @@ def _build_request_context(
 def _search_sync(
     request: "SearchRequest",
     *,
-    collection,
+    store: LibraryStore,
+    embed_fn,
     data_dir: Path | None,
     merged: dict,
     get_spell_corrector,
@@ -1808,9 +1531,9 @@ def _search_sync(
 ) -> dict:
     """Parent-document semantic search. Synchronous by nature.
 
-    Every expensive step here blocks: Chroma's query embeds the text via a
-    blocking HTTP call to Ollama, the cross-encoder is CPU-bound ONNX, and
-    the manifest/parents reads hit SQLite. It therefore must not run on the
+    Every expensive step here blocks: the query embeds via a blocking HTTP
+    call to Ollama, the cross-encoder is CPU-bound ONNX, and the
+    manifest/store reads hit disk. It therefore must not run on the
     event loop — ``/api/search`` calls it through ``run_in_threadpool`` so
     one 5-7s search can't stall health polls, MCP heartbeats, or a streaming
     chat turn (issue #344).
@@ -1829,7 +1552,7 @@ def _search_sync(
         # form. A clean query is a strict no-op (corrected is None).
         # Variant expansion (section B, default-off flag) then derives
         # spacing variants ("chainmail" ↔ "chain mail") of the
-        # corrected query; they ride the same Chroma call and fuse
+        # corrected query; they embed in the same call and fuse
         # below via RRF. Without them this is the single-query path —
         # zero overhead for the common case.
         # Effective pipeline knobs for this request: explicit request
@@ -1858,12 +1581,14 @@ def _search_sync(
             )
 
         # Over-fetch by 10x so dedupe-by-parent still yields top-K parents.
-        query_kwargs = {
-            "query_texts": [query_text, *variant_queries],
-            "n_results": request.n_results * 10,
-        }
+        query_texts = [query_text, *variant_queries]
+        n_candidates = request.n_results * 10
 
-        where_clauses = []
+        # Scope, ANDed: which paths, which filename, which game systems.
+        # `None` leaves that dimension open.
+        scope_paths: set[str] | None = None
+        scope_filename: str | None = None
+        scope_systems: list[str] | None = None
         effective_collection = request.collection
 
         if effective_collection:
@@ -1871,14 +1596,14 @@ def _search_sync(
                 raise HTTPException(
                     status_code=500, detail="No data directory configured"
                 )
-            store = ctx.collections
-            if effective_collection not in store.collections:
+            coll_store = ctx.collections
+            if effective_collection not in coll_store.collections:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Collection not found: {effective_collection}",
                 )
             coll_paths = resolve_collection_paths(
-                store.collections[effective_collection], ctx.manifest
+                coll_store.collections[effective_collection], ctx.manifest
             )
             if not coll_paths:
                 return {
@@ -1887,9 +1612,12 @@ def _search_sync(
                     "effective_collection": effective_collection,
                     "exhausted": True,
                 }
-            where_clauses.append({"source": {"$in": coll_paths}})
+            scope_paths = set(coll_paths)
         if request.source_paths:
-            where_clauses.append({"source": {"$in": request.source_paths}})
+            scope_paths = (
+                set(request.source_paths) if scope_paths is None
+                else scope_paths & set(request.source_paths)
+            )
 
         # source_filter / game_system arrive as guesses over user
         # vernacular ("dnd 5e", "Players Handbook.pdf") — mostly from
@@ -1963,48 +1691,39 @@ def _search_sync(
                         }
 
         if request.source_filter:
-            where_clauses.append({"filename": request.source_filter})
+            scope_filename = request.source_filter
         if request.game_system or request.game_systems:
+            # A book matches on its primary tag or any secondary tag.
             requested = set(request.game_systems or [])
             if request.game_system:
                 requested.add(request.game_system)
+            scope_systems = sorted(requested)
 
-            # Resolve secondary-tag matches via the manifest: any file
-            # whose `game_systems` includes a requested tag but whose
-            # primary `game_system` (the one stored in chunk metadata)
-            # does not. Chroma metadata is scalar-only, so secondary
-            # matches must be folded in as a source-path `$in` clause —
-            # exact paths, not filenames, so an untagged same-named
-            # file in another folder can't ride along (issue #308).
-            secondary_paths: list[str] = []
-            if data_dir:
-                for path, entry in ctx.manifest.files.items():
-                    if entry.game_system in requested:
-                        continue
-                    if any(t in requested for t in entry.game_systems):
-                        secondary_paths.append(path)
+        doc_ids = store.scope_document_ids(
+            paths=sorted(scope_paths) if scope_paths is not None else None,
+            filename=scope_filename,
+            systems=scope_systems,
+        )
 
-            if request.game_system:
-                primary_clause: dict = {"game_system": request.game_system}
-            else:
-                primary_clause = {"game_system": {"$in": list(requested)}}
-
-            if secondary_paths:
-                where_clauses.append({
-                    "$or": [
-                        primary_clause,
-                        {"source": {"$in": secondary_paths}},
-                    ]
-                })
-            else:
-                where_clauses.append(primary_clause)
-
-        if len(where_clauses) == 1:
-            query_kwargs["where"] = where_clauses[0]
-        elif len(where_clauses) > 1:
-            query_kwargs["where"] = {"$and": where_clauses}
-
-        results = collection.query(**query_kwargs)
+        # One dense ranking per query text (the query plus its spacing
+        # variants), in the shape the fusion below reads: per-ranking
+        # lists of ids, metadatas, distances and texts.
+        results: dict[str, list[list]] = {
+            "ids": [], "metadatas": [], "distances": [], "documents": [],
+        }
+        rankings_raw = [
+            store.knn(vec, n_candidates, doc_ids)
+            for vec in embed_fn(query_texts)
+        ]
+        units = store.hydrate(
+            list({uid for ranking in rankings_raw for uid, _ in ranking})
+        )
+        for ranking in rankings_raw:
+            hits = [(uid, dist) for uid, dist in ranking if uid in units]
+            results["ids"].append([uid for uid, _ in hits])
+            results["metadatas"].append([units[uid].metadata for uid, _ in hits])
+            results["distances"].append([dist for _, dist in hits])
+            results["documents"].append([units[uid].text for uid, _ in hits])
 
         if not any(results["documents"]):
             return {
@@ -2024,7 +1743,7 @@ def _search_sync(
         # a BM25 ranking over the same chunks join the dense primary
         # via reciprocal-rank fusion, then the fused pool feeds the
         # boost/rerank/dedupe pipeline unchanged. The BM25 side
-        # mirrors the dense query's scope via its `where` clause.
+        # searches the same `doc_ids` scope as the dense side.
         # A candidate seen by several dense rankings reports its
         # minimum cosine distance; BM25-only candidates carry no
         # cosine distance — they get a sentinel 1.0 (relevance 0.0)
@@ -2038,7 +1757,7 @@ def _search_sync(
         lex_top: list[bool] | None = None
         if variant_queries or knobs.hybrid:
             rankings = list(results["ids"])
-            dense_best: dict[str, tuple[dict, float, str]] = {}
+            dense_best: dict[int, tuple[dict, float, str]] = {}
             for ids, metas, dists, docs in zip(
                 results["ids"], results["metadatas"],
                 results["distances"], results["documents"],
@@ -2050,13 +1769,11 @@ def _search_sync(
                     ):
                         dense_best[cid] = (meta, dist, doc)
             weights = [1.0] * len(rankings)
-            lex_rows: dict[str, tuple[dict, str]] = {}
+            lex_rows: dict[int, tuple[dict, str]] = {}
             if knobs.hybrid:
                 lex = get_lexical_index()
                 lex_ids = lex.search(
-                    query_text,
-                    k=request.n_results * 10,
-                    where=query_kwargs.get("where"),
+                    query_text, k=n_candidates, doc_ids=doc_ids,
                 )
                 rankings.append(lex_ids)
                 weights.append(
@@ -2080,7 +1797,7 @@ def _search_sync(
                     fused_distances.append(1.0)
                     fused_docs.append(doc)
                 else:
-                    # FTS row whose Chroma twin is gone mid-reindex.
+                    # A unit whose book was removed mid-search.
                     continue
                 fused_ids.append(cid)
             ordered_metadatas = fused_metadatas
@@ -2208,34 +1925,34 @@ def _search_sync(
         root_by_pid: dict[str, str] = {}
         seen: set[str] = set()
         picked: list[dict] = []
-        with open_store(data_dir) if data_dir else nullcontext(None) as conn:
-            for i, (metadata, distance) in enumerate(
-                zip(ordered_metadatas, ordered_distances)
-            ):
-                pid = metadata.get("parent_id")
-                if not pid:
-                    continue
-                path = metadata.get("section_path") or None
-                source = metadata.get("source") or None
-                root = None
-                if conn is not None and path and source:
-                    root = section_root_for(
-                        conn, source, path, cache=size_cache
-                    )
-                if root is not None:
-                    root_by_pid[pid] = root
-                key = root or pid
-                if key in seen:
-                    continue
-                seen.add(key)
-                picked.append({
-                    "metadata": metadata,
-                    "distance": distance,
-                    "doc": ordered_docs[i],
-                    "reranked": reranked[i],
-                })
-                if len(picked) >= request.n_results:
-                    break
+        conn = store.conn()
+        for i, (metadata, distance) in enumerate(
+            zip(ordered_metadatas, ordered_distances)
+        ):
+            pid = metadata.get("parent_id")
+            if not pid:
+                continue
+            path = metadata.get("section_path") or None
+            source = metadata.get("source") or None
+            root = None
+            if path and source:
+                root = section_root_for(
+                    conn, source, path, cache=size_cache
+                )
+            if root is not None:
+                root_by_pid[pid] = root
+            key = root or pid
+            if key in seen:
+                continue
+            seen.add(key)
+            picked.append({
+                "metadata": metadata,
+                "distance": distance,
+                "doc": ordered_docs[i],
+                "reranked": reranked[i],
+            })
+            if len(picked) >= request.n_results:
+                break
 
         # Whether a larger request could find more (roadmap 2.x): the
         # overfetch pool ran out before n_results distinct sections were
@@ -2268,7 +1985,7 @@ def _search_sync(
         # The section each hit is answered with, plus the hit's own
         # parent (one batched IN query) for the narrower `chunk_text`.
         sections = fetch_sections(
-            data_dir,
+            store,
             [
                 (
                     p["metadata"]["parent_id"],
@@ -2279,10 +1996,10 @@ def _search_sync(
             ],
             roots=root_by_pid,
             cache=size_cache,
-        ) if data_dir else {}
+        )
         parents = fetch_parents(
-            data_dir, [p["metadata"]["parent_id"] for p in picked]
-        ) if data_dir else {}
+            store, [p["metadata"]["parent_id"] for p in picked]
+        )
 
         formatted = []
         for p in picked:

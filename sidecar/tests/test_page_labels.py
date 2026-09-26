@@ -7,8 +7,9 @@ citation, so the printed label travels with the chunk.
 import pymupdf
 import pytest
 
-from legend_lore.service import _embed_unit_metadata, _page_labels
+from legend_lore.service import _page_labels
 from legend_lore.granularity import EmbedUnit
+from legend_lore.library_store import LibraryStore
 
 
 @pytest.fixture
@@ -54,14 +55,26 @@ def _unit(page_start: int, page_end: int) -> EmbedUnit:
                      page_start=page_start, page_end=page_end, ordinal=0)
 
 
+def _stored_metadata(tmp_path, unit: EmbedUnit, page_labels: dict) -> dict:
+    """Round-trip one unit through the library store; its metadata as search
+    reads it back."""
+    store = LibraryStore.open(tmp_path / "library.sqlite3", "m", 2)
+    store.replace_document(str(tmp_path / "x.pdf"), "osric", (), [unit], ["t"],
+                           [[1.0, 0.0]], [], page_labels=page_labels)
+    (uid, _), = store.knn([1.0, 0.0], k=1)
+    meta = store.hydrate([uid])[uid].metadata
+    store.close()
+    return meta
+
+
 def test_metadata_carries_the_printed_label_for_the_chunk_span(tmp_path):
-    meta = _embed_unit_metadata(tmp_path / "x.pdf", _unit(3, 4), "osric",
-                                {1: "i", 2: "ii", 3: "1", 4: "2"})
+    meta = _stored_metadata(tmp_path, _unit(3, 4),
+                            {1: "i", 2: "ii", 3: "1", 4: "2"})
     assert meta["page_label_start"] == "1"
     assert meta["page_label_end"] == "2"
 
 
 def test_metadata_leaves_labels_empty_when_the_pdf_has_none(tmp_path):
-    meta = _embed_unit_metadata(tmp_path / "x.pdf", _unit(3, 4), "osric", {})
+    meta = _stored_metadata(tmp_path, _unit(3, 4), {})
     assert meta["page_label_start"] == ""
     assert meta["page_label_end"] == ""

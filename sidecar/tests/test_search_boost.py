@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+from legend_lore.library_store import StoredUnit
+
 
 # ---------------------------------------------------------------------------
 # KNOWN_SYSTEMS keyword gap (the roadmap blocker)
@@ -81,34 +83,41 @@ def test_query_naming_two_systems_detects_both():
 # /api/search ordering (integration, deterministic fake candidate pool)
 # ---------------------------------------------------------------------------
 
-def _meta(parent_id: str, filename: str, game_system: str) -> dict:
-    return {
-        "parent_id": parent_id,
-        "filename": filename,
-        "source": f"/corpus/{filename}",
-        "game_system": game_system,
-        "section_heading": "",
-        "page_start": 1,
-        "page_end": 1,
-    }
+def _unit(uid: int, text: str, parent_id: str, filename: str,
+          game_system: str) -> StoredUnit:
+    return StoredUnit(
+        id=uid, text=text, source=f"/corpus/{filename}", filename=filename,
+        game_system=game_system, ordinal=uid, parent_id=parent_id,
+        chunk_type="prose", section_heading=None, page_start=1, page_end=1,
+        page_label_start="", page_label_end="", section_id=None,
+        section_path=None,
+    )
+
+
+def _fake_pool(store, monkeypatch, pool):
+    """Serve ``pool`` — ``(StoredUnit, cosine distance)`` pairs, nearest
+    first — as the dense ranking, whatever the query or scope."""
+    units = {u.id: u for u, _ in pool}
+    monkeypatch.setattr(
+        store, "knn",
+        lambda vector, k, doc_ids=None: [(u.id, d) for u, d in pool][:k])
+    monkeypatch.setattr(
+        store, "hydrate",
+        lambda ids: {i: units[i] for i in ids if i in units})
+
 
 # Wrong-system chunk wins on raw cosine (distance 0.10 < 0.30); the
 # right-system chunk should win once partitioned to the front.
-FAKE_RESULTS = {
-    "ids": [["c-osr", "c-srd"]],
-    "documents": [["osr fireball text", "srd fireball text"]],
-    "metadatas": [[
-        _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),
-        _meta("p-srd", "SRD_CC_v5.1.pdf", "D&D 5E"),
-    ]],
-    "distances": [[0.10, 0.30]],
-}
+FAKE_POOL = [
+    (_unit(1, "osr fireball text", "p-osr",
+           "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"), 0.10),
+    (_unit(2, "srd fireball text", "p-srd", "SRD_CC_v5.1.pdf", "D&D 5E"), 0.30),
+]
 
 
 @pytest.fixture
-def fake_pool_client(client, test_collection, monkeypatch):
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: FAKE_RESULTS)
+def fake_pool_client(client, test_store, monkeypatch):
+    _fake_pool(test_store, monkeypatch, FAKE_POOL)
     return client
 
 
@@ -151,31 +160,26 @@ def test_game_system_filter_skips_boost(fake_pool_client):
         "Basic-Fantasy-RPG-Rules-r142.pdf", "SRD_CC_v5.1.pdf"]
 
 
-def test_source_filter_skips_boost(client, test_collection, sample_pdf_path,
+def test_source_filter_skips_boost(client, test_store, sample_pdf_path,
                                    monkeypatch):
     """A single-file scope can't contain a cross-system mix; skip."""
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: FAKE_RESULTS)
+    _fake_pool(test_store, monkeypatch, FAKE_POOL)
     results = _search(client, source_filter=sample_pdf_path.name)
     assert [r["filename"] for r in results] == [
         "Basic-Fantasy-RPG-Rules-r142.pdf", "SRD_CC_v5.1.pdf"]
 
 
 def test_unknown_tag_falls_back_to_source_path_detection(
-        client, test_collection, monkeypatch):
+        client, test_store, monkeypatch):
     """Chunks indexed before the keyword existed carry 'unknown'; the
     boost re-detects from the source path at query time (no re-index)."""
-    fake = {
-        "ids": [["c-osr", "c-bf"]],
-        "documents": [["osr initiative text", "black flag initiative text"]],
-        "metadatas": [[
-            _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),
-            _meta("p-bf", "Black-Flag-Roleplaying.pdf", "unknown"),
-        ]],
-        "distances": [[0.10, 0.30]],
-    }
-    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    _fake_pool(test_store, monkeypatch, [
+        (_unit(1, "osr initiative text", "p-osr",
+               "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"), 0.10),
+        (_unit(2, "black flag initiative text", "p-bf",
+               "Black-Flag-Roleplaying.pdf", "unknown"), 0.30),
+    ])
     results = _search(client, query="Initiative roll in Black Flag")
     assert [r["filename"] for r in results] == [
         "Black-Flag-Roleplaying.pdf", "Basic-Fantasy-RPG-Rules-r142.pdf"]
@@ -217,21 +221,16 @@ def test_boost_holds_against_a_saturated_wrong_system_score(
 
 
 def test_boost_fills_the_rerank_pool_with_the_named_system(
-        client, test_collection, monkeypatch):
+        client, test_store, monkeypatch):
     """Before rerank the partition decides pool entry: a named-system
     chunk ranked below the pool size is still scored."""
     from legend_lore import service
 
-    fake = {
-        "ids": [["c-osr", "c-srd"]],
-        "documents": [["osr text", "srd text"]],
-        "metadatas": [[
-            _meta("p-osr", "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"),
-            _meta("p-srd", "SRD_CC_v5.1.pdf", "D&D 5E"),
-        ]],
-        "distances": [[0.10, 0.30]],
-    }
-    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    _fake_pool(test_store, monkeypatch, [
+        (_unit(1, "osr text", "p-osr",
+               "Basic-Fantasy-RPG-Rules-r142.pdf", "OSR"), 0.10),
+        (_unit(2, "srd text", "p-srd", "SRD_CC_v5.1.pdf", "D&D 5E"), 0.30),
+    ])
     scored = []
     monkeypatch.setattr(service, "rerank_scores",
         lambda q, docs: scored.extend(docs) or [0.5] * len(docs))

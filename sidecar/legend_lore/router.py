@@ -20,29 +20,18 @@ from .chunker import PIPELINE_VERSION
 from .game_systems import GAME_SYSTEMS
 from .granularity import build as build_granularity
 from .lexical import PersistedLexicalIndex
-from .parents_store import (
-    clear_all_parents,
-    count_units_fts,
-    fetch_section_by_id,
-    rename_source,
-    update_units_fts_game_system,
-)
+from .library_store import LibraryStore
+from .parents_store import fetch_section_by_id
 from .service import (
     _atomic_index_pdf,
-    chunk_id_prefix,
     Collection,
-    COLLECTION_METADATA,
-    compact_sqlite,
     compute_diff,
-    _compute_reclaimable_bytes,
     CreateCollectionRequest,
     CustomGameSystemEntry,
     CustomGameSystemRequest,
     CustomGameSystemsStore,
-    delete_source_chunks,
     EmbedBatchError,
     file_content_hash,
-    gc_orphan_segments,
     get_merged_systems,
     index_single_pdf,
     IndexFilesRequest,
@@ -55,12 +44,10 @@ from .service import (
     manifest_digest,
     ManifestEntry,
     _mark_manifest_error,
-    METADATA_UPDATE_BATCH_SIZE,
     _now_iso,
     _page_labels,
     prepare_pdf,
     ReindexFileRequest,
-    _remove_segment_dir,
     RenameCollectionRequest,
     save_collections,
     save_custom_systems,
@@ -70,7 +57,6 @@ from .service import (
     SearchRequest,
     SearchSettings,
     SearchSettingsUpdate,
-    _segment_ids_for_collection,
     SetGameSystemsRequest,
     SyncIndexRequest,
     ToggleBuiltinRequest,
@@ -81,12 +67,11 @@ from .spelling import SpellCorrector
 
 def build_router(
     app,
-    collection,
+    library: LibraryStore,
+    embed_fn,
     data_dir: Path | None,
-    chroma_client=None,
-    embedding_function=None,
 ) -> APIRouter:
-    """Build the Legend Lore routes over ``collection`` and ``data_dir``.
+    """Build the Legend Lore routes over ``library``, ``embed_fn`` and ``data_dir``.
 
     The routes close over the factory arguments exactly as they did when
     they lived inside ``create_app``; ``app`` is passed for its ``state``
@@ -133,7 +118,7 @@ def build_router(
         _merged["list"] = merged_list
         _merged["known"] = merged_known
 
-    # Endpoints (close over `collection` from the factory)
+    # Endpoints (close over `library` and `embed_fn` from the factory)
     # ------------------------------------------------------------------
 
     @router.post("/api/index-files")
@@ -142,7 +127,7 @@ def build_router(
 
         Declared as plain ``def`` (not ``async def``) so FastAPI runs the
         body in a worker thread. Indexing does heavy synchronous work
-        (PyMuPDF + Ollama + Chroma); putting it on the event loop would
+        (PyMuPDF + Ollama + SQLite); putting it on the event loop would
         block ``/health`` polls and other concurrent requests.
         """
         total = len(request.paths)
@@ -153,8 +138,8 @@ def build_router(
         for pdf_path_str in request.paths:
             pdf_path = Path(pdf_path_str)
             chunk_count, error, detected_system, detected_systems = index_single_pdf(
-                pdf_path, collection, game_system=request.game_system,
-                known_systems=_merged["known"], data_dir=data_dir,
+                pdf_path, library, embed_fn, game_system=request.game_system,
+                known_systems=_merged["known"],
             )
 
             if error:
@@ -201,12 +186,12 @@ def build_router(
                     status_code=404, detail=f"File not found: {request.path}"
                 )
 
-            # Atomic: index_single_pdf stages new chunks under a fresh prefix
-            # and only swaps in once embedding succeeds. Old chunks/parents
-            # remain on failure so search keeps working.
+            # Atomic: index_single_pdf writes the book in one transaction
+            # after embedding succeeds. The old index remains on failure so
+            # search keeps working.
             chunk_count, error, detected_system, detected_systems = index_single_pdf(
-                pdf_path, collection, game_system=request.game_system,
-                known_systems=_merged["known"], data_dir=data_dir,
+                pdf_path, library, embed_fn, game_system=request.game_system,
+                known_systems=_merged["known"],
             )
 
             if error:
@@ -300,7 +285,7 @@ def build_router(
 
         # Phase 1: Remove deselected files
         for entry in diff["to_remove"]:
-            deleted = delete_source_chunks(entry["path"], collection, data_dir=data_dir)
+            deleted = library.delete_document(entry["path"])
             del manifest.files[entry["path"]]
             save_manifest(data_dir, manifest)
             removed += 1
@@ -310,7 +295,7 @@ def build_router(
 
         # Phase 1a: Auto-remove files deleted from disk
         for entry in diff["to_auto_remove"]:
-            deleted = delete_source_chunks(entry["path"], collection, data_dir=data_dir)
+            deleted = library.delete_document(entry["path"])
             del manifest.files[entry["path"]]
             save_manifest(data_dir, manifest)
             auto_removed += 1
@@ -323,33 +308,10 @@ def build_router(
             old_path_str = entry["old_path"]
             new_path = Path(entry["new_path"])
 
-            results = collection.get(
-                where={"source": old_path_str},
-                include=["embeddings", "documents", "metadatas"],
+            transferred = (
+                entry["chunk_count"]
+                if library.rename_document(old_path_str, str(new_path)) else 0
             )
-
-            transferred = 0
-            if results["ids"]:
-                collection.delete(ids=results["ids"])
-                prefix = chunk_id_prefix(new_path)
-                # Ids rebuild from the stored ordinal, not the list
-                # position, so they match what rename_source writes to
-                # the FTS rows.
-                new_ids = [f"{prefix}_{m['chunk']}" for m in results["metadatas"]]
-                new_metadatas = [
-                    {**m, "source": str(new_path), "filename": new_path.name}
-                    for m in results["metadatas"]
-                ]
-                collection.add(
-                    ids=new_ids,
-                    documents=results["documents"],
-                    embeddings=results["embeddings"],
-                    metadatas=new_metadatas,
-                )
-                rename_source(
-                    data_dir, old_path_str, str(new_path), new_path.name, prefix
-                )
-                transferred = len(results["ids"])
 
             old_entry = manifest.files[old_path_str]
             del manifest.files[old_path_str]
@@ -390,15 +352,15 @@ def build_router(
             embed_units, parents = build_granularity(chunks)
             try:
                 for n in _atomic_index_pdf(
-                    pdf_path, detected_system, embed_units, parents,
-                    collection, data_dir, page_labels=_page_labels(pdf_path),
+                    pdf_path, detected_system, detected_systems, embed_units,
+                    parents, library, embed_fn, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
             except EmbedBatchError as e:
-                # Partial new chunks already rolled back by _atomic_index_pdf.
-                # No prior manifest entry exists for an add; just record the
-                # error so the user sees it. Next sync will retry.
+                # Nothing was written for this book. No prior manifest entry
+                # exists for an add; just record the error so the user sees
+                # it. Next sync will retry.
                 err_msg = str(e)
                 errors.append(err_msg)
                 files_done += 1
@@ -422,9 +384,9 @@ def build_router(
             save_manifest(data_dir, manifest)
             yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
 
-        # Phase 3: Re-index modified files. Atomic — old chunks are only
-        # removed once the new ones land. On failure, the previous
-        # successful manifest entry is preserved with last_error set.
+        # Phase 3: Re-index modified files. Atomic — the book's rows are
+        # replaced in one transaction after embedding. On failure, the
+        # previous successful manifest entry is preserved with last_error set.
         for entry in diff["to_update"]:
             pdf_path = Path(entry["path"])
             override = (
@@ -446,8 +408,8 @@ def build_router(
             embed_units, parents = build_granularity(chunks)
             try:
                 for n in _atomic_index_pdf(
-                    pdf_path, detected_system, embed_units, parents,
-                    collection, data_dir, page_labels=_page_labels(pdf_path),
+                    pdf_path, detected_system, detected_systems, embed_units,
+                    parents, library, embed_fn, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
                     yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
@@ -603,22 +565,13 @@ def build_router(
 
     @router.post("/api/delete-index")
     async def delete_index():
-        """Purge every chunk from ChromaDB and clear the manifest.
-
-        Drops and recreates the underlying Chroma collection rather than
-        only deleting rows. Chroma locks a collection's vector dim to the
-        first inserted embedding; deleting rows preserves that lock, so
-        an embedding-model change (e.g. nomic 768 → bge-m3 1024) leaves
-        the collection unable to accept new vectors. Recreating resets
-        the dim binding so the next re-index works against the current
-        embedding function.
+        """Purge every book from the store and clear the manifest.
 
         Preserves the selected folder, game systems, and user-curated
         collections in full (collections store file paths, not chunk
         IDs — those paths are still valid on disk and will resolve
         again after the next sync re-creates their chunks).
         """
-        nonlocal collection
         with sync_lock_or_409():
             if not data_dir:
                 raise HTTPException(
@@ -627,34 +580,8 @@ def build_router(
 
             manifest = load_manifest(data_dir)
             removed_files = len(manifest.files)
-
-            removed_chunks = len(collection.get(include=[])["ids"])
-
-            if chroma_client is not None:
-                collection_name = collection.name
-                # Capture segment dir UUIDs before delete_collection wipes them
-                # from sqlite — Chroma only removes metadata rows, not the
-                # on-disk dirs, so we have to rmtree them ourselves.
-                old_segment_ids = (
-                    _segment_ids_for_collection(data_dir, collection_name)
-                    if data_dir else []
-                )
-                chroma_client.delete_collection(name=collection_name)
-                collection = chroma_client.get_or_create_collection(
-                    name=collection_name,
-                    embedding_function=embedding_function,
-                    metadata=COLLECTION_METADATA,
-                )
-                if data_dir:
-                    for sid in old_segment_ids:
-                        _remove_segment_dir(data_dir, sid)
-            elif removed_chunks:
-                # Test path without an injected chroma_client — the dim is
-                # fixed by the fixture and never changes, so row-delete is
-                # sufficient.
-                collection.delete(ids=collection.get(include=[])["ids"])
-
-            clear_all_parents(data_dir)
+            removed_chunks = library.count_units()
+            library.clear()
             save_manifest(data_dir, IndexManifest())
 
             return {"removed_files": removed_files, "removed_chunks": removed_chunks}
@@ -671,7 +598,7 @@ def build_router(
     async def file_rename(request: FileRenameRequest):
         """Rename a single file's index entry without re-embedding.
 
-        Transfers ChromaDB chunks to the new path, updates the manifest
+        Moves the book to the new path in the store, updates the manifest
         and collections.
         """
         with sync_lock_or_409():
@@ -688,29 +615,7 @@ def build_router(
             if old_path_str not in manifest.files:
                 return {"renamed": False, "reason": "not_indexed"}
 
-            # Transfer chunks: get → delete → re-add with new IDs/metadata
-            results = collection.get(
-                where={"source": old_path_str},
-                include=["embeddings", "documents", "metadatas"],
-            )
-            if results["ids"]:
-                collection.delete(ids=results["ids"])
-                prefix = chunk_id_prefix(new_path)
-                # Ordinal-derived ids: see the sync rename phase.
-                new_ids = [f"{prefix}_{m['chunk']}" for m in results["metadatas"]]
-                new_metadatas = [
-                    {**m, "source": new_path_str, "filename": new_path.name}
-                    for m in results["metadatas"]
-                ]
-                collection.add(
-                    ids=new_ids,
-                    documents=results["documents"],
-                    embeddings=results["embeddings"],
-                    metadatas=new_metadatas,
-                )
-                rename_source(
-                    data_dir, old_path_str, new_path_str, new_path.name, prefix
-                )
+            library.rename_document(old_path_str, new_path_str)
 
             # Update manifest
             old_entry = manifest.files.pop(old_path_str)
@@ -750,7 +655,7 @@ def build_router(
     async def file_delete(request: FileDeleteRequest):
         """Remove a single file's index entry immediately.
 
-        Deletes chunks from ChromaDB and cleans up the manifest and
+        Deletes the book from the store and cleans up the manifest and
         collections.
         """
         with sync_lock_or_409():
@@ -765,7 +670,7 @@ def build_router(
             if path_str not in manifest.files:
                 return {"deleted": False, "reason": "not_indexed"}
 
-            delete_source_chunks(path_str, collection, data_dir=data_dir)
+            library.delete_document(path_str)
             del manifest.files[path_str]
             save_manifest(data_dir, manifest)
 
@@ -797,7 +702,7 @@ def build_router(
     async def folder_rename(request: FolderRenameRequest):
         """Batch-rename all indexed files under a folder prefix.
 
-        Transfers ChromaDB chunks without re-embedding, updates the
+        Re-roots the books in the store without re-embedding, updates the
         manifest and collections.
         """
         with sync_lock_or_409():
@@ -816,37 +721,12 @@ def build_router(
                 if p.startswith(child_prefix)
             ]
 
+            library.rename_folder(child_prefix, new_prefix + "/")
+
             renamed_files = 0
             for old_path_str in matched_paths:
                 new_path_str = new_prefix + old_path_str[len(old_prefix):]
                 new_path = Path(new_path_str)
-
-                # Transfer chunks: get → delete → re-add with new IDs/metadata
-                results = collection.get(
-                    where={"source": old_path_str},
-                    include=["embeddings", "documents", "metadatas"],
-                )
-                if results["ids"]:
-                    collection.delete(ids=results["ids"])
-                    prefix = chunk_id_prefix(new_path)
-                    # Ordinal-derived ids: see the sync rename phase.
-                    new_ids = [
-                        f"{prefix}_{m['chunk']}" for m in results["metadatas"]
-                    ]
-                    new_metadatas = [
-                        {**m, "source": new_path_str, "filename": new_path.name}
-                        for m in results["metadatas"]
-                    ]
-                    collection.add(
-                        ids=new_ids,
-                        documents=results["documents"],
-                        embeddings=results["embeddings"],
-                        metadatas=new_metadatas,
-                    )
-                    rename_source(
-                        data_dir, old_path_str, new_path_str,
-                        new_path.name, prefix,
-                    )
 
                 # Update manifest
                 old_entry = manifest.files.pop(old_path_str)
@@ -889,7 +769,7 @@ def build_router(
     async def folder_delete(request: FolderDeleteRequest):
         """Batch-delete all indexed files under a folder prefix.
 
-        Removes chunks from ChromaDB and cleans up the manifest and
+        Removes the books from the store and cleans up the manifest and
         collections.
         """
         with sync_lock_or_409():
@@ -909,7 +789,7 @@ def build_router(
 
             deleted_files = 0
             for path_str in matched_paths:
-                delete_source_chunks(path_str, collection, data_dir=data_dir)
+                library.delete_document(path_str)
                 del manifest.files[path_str]
                 deleted_files += 1
 
@@ -936,62 +816,19 @@ def build_router(
     async def get_stats():
         """Database statistics."""
         try:
-            count = collection.count()
-            results = collection.get(include=["metadatas"])
-            unique_sources = (
-                len(set(m.get("filename") for m in results["metadatas"]))
-                if results["metadatas"] else 0
-            )
             storage_bytes = 0
             if data_dir and data_dir.exists():
                 for dirpath, _dirnames, filenames in os.walk(data_dir):
                     for f in filenames:
                         storage_bytes += os.path.getsize(os.path.join(dirpath, f))
 
-            # Calculate reclaimable space: SQLite freelist pages across both
-            # stores + bytes locked up in orphan segment dirs. Mirrors what
-            # `/api/compact` actually reclaims, so the UI's "Compact" button
-            # only appears when there's something to recover.
-            reclaimable_bytes = _compute_reclaimable_bytes(data_dir)
-
             return {
-                "total_chunks": count,
-                "total_documents": unique_sources,
-                "collection_name": collection.name,
+                "total_chunks": library.count_units(),
+                "total_documents": len({d.filename for d in library.documents()}),
                 "storage_bytes": storage_bytes,
-                "reclaimable_bytes": reclaimable_bytes,
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-
-    @router.post("/api/compact")
-    async def compact_database():
-        """Compact the ChromaDB database to reclaim disk space.
-
-        VACUUMs ``chroma.sqlite3`` and removes any orphan segment dirs left
-        behind by previous ``delete_collection`` calls (Chroma's behavior:
-        metadata rows are removed but on-disk dirs are not).
-        """
-        if not data_dir:
-            raise HTTPException(
-                status_code=500, detail="No data directory configured"
-            )
-
-        sqlite_path = data_dir / "chroma.sqlite3"
-        if not sqlite_path.exists():
-            raise HTTPException(
-                status_code=404, detail="Database file not found"
-            )
-
-        size_before = os.path.getsize(sqlite_path)
-        sqlite_reclaimed = compact_sqlite(data_dir)
-        orphan_reclaimed = gc_orphan_segments(data_dir)
-
-        return {
-            "size_before": size_before,
-            "size_after": os.path.getsize(sqlite_path),
-            "reclaimed": sqlite_reclaimed + orphan_reclaimed,
-        }
 
     @router.get("/api/search-settings")
     async def get_search_settings():
@@ -1025,45 +862,30 @@ def build_router(
     async def get_sources():
         """List all indexed PDFs with per-source stats."""
         try:
-            results = collection.get(include=["metadatas"])
-            if not results["metadatas"]:
-                return {"sources": [], "count": 0}
-
             manifest = load_manifest(data_dir) if data_dir else IndexManifest()
 
-            sources_info = {}
-            for metadata in results["metadatas"]:
-                filename = metadata["filename"]
-                source_path = metadata.get("source", "")
-                # Key by source path, not filename: same-named PDFs in
-                # different folders are distinct sources and would
-                # otherwise merge into one entry (issue #308 family).
-                key = source_path or filename
-                if key not in sources_info:
-                    entry = manifest.files.get(source_path)
-                    primary = metadata.get("game_system", "unknown")
-                    if entry and entry.game_systems:
-                        systems = list(entry.game_systems)
-                    elif primary != "unknown":
-                        systems = [primary]
-                    else:
-                        systems = []
-                    sources_info[key] = {
-                        "filename": filename,
-                        "source": source_path,
-                        "chunks": 0,
-                        "game_system": primary,
-                        "game_systems": systems,
-                        "pages": 0,
-                        "indexed_at": entry.indexed_at if entry else None,
-                        "file_size_bytes": entry.file_size if entry else None,
-                    }
-                sources_info[key]["chunks"] += 1
-                page_end = metadata.get("page_end")
-                if isinstance(page_end, int) and page_end > sources_info[key]["pages"]:
-                    sources_info[key]["pages"] = page_end
-
-            sources_list = sorted(sources_info.values(), key=lambda x: x["filename"])
+            # One entry per path: same-named PDFs in different folders are
+            # distinct sources (issue #308 family).
+            sources_list = []
+            for doc in library.documents():
+                entry = manifest.files.get(doc.path)
+                if entry and entry.game_systems:
+                    systems = list(entry.game_systems)
+                elif doc.game_system != "unknown":
+                    systems = [doc.game_system]
+                else:
+                    systems = []
+                sources_list.append({
+                    "filename": doc.filename,
+                    "source": doc.path,
+                    "chunks": doc.units,
+                    "game_system": doc.game_system,
+                    "game_systems": systems,
+                    "pages": doc.pages,
+                    "indexed_at": entry.indexed_at if entry else None,
+                    "file_size_bytes": entry.file_size if entry else None,
+                })
+            sources_list.sort(key=lambda x: x["filename"])
             return {"sources": sources_list, "count": len(sources_list)}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -1072,15 +894,7 @@ def build_router(
     async def get_game_systems():
         """List all distinct game systems found in the index."""
         try:
-            results = collection.get(include=["metadatas"])
-            if not results["metadatas"]:
-                return {"game_systems": [], "count": 0}
-
-            systems = set()
-            for metadata in results["metadatas"]:
-                systems.add(metadata.get("game_system", "unknown"))
-
-            sorted_systems = sorted(systems)
+            sorted_systems = sorted({d.game_system for d in library.documents()})
             return {"game_systems": sorted_systems, "count": len(sorted_systems)}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -1127,12 +941,11 @@ def build_router(
     def _apply_game_systems(
         filename: str | None, game_systems: list[str], path: str | None = None
     ) -> dict:
-        """Update Chroma chunk metadata + manifest entry for a file's tags.
+        """Update a file's tags in the store and its manifest entry.
 
-        ``game_systems[0]`` becomes the primary scalar in chunk metadata
-        (and the manifest's ``game_system`` field). The full list is
-        written to the manifest's ``game_systems`` field. An empty list
-        clears both back to ``"unknown"`` / ``[]``.
+        ``game_systems[0]`` becomes the primary tag (the manifest's
+        ``game_system`` field); the full list is its ``game_systems``
+        field. An empty list clears both back to ``"unknown"`` / ``[]``.
         """
         primary = game_systems[0] if game_systems else "unknown"
 
@@ -1145,32 +958,11 @@ def build_router(
         source_path = _resolve_source(manifest, filename, path)
         entry = manifest.files[source_path]
 
-        results = collection.get(
-            where={"source": source_path},
-            include=["metadatas"],
-        )
-
-        if not results["ids"]:
+        if not library.set_systems(source_path, primary, game_systems):
             raise HTTPException(
                 status_code=404,
                 detail=f"Source not found: {source_path}",
             )
-
-        updated_metadatas = [
-            {**metadata, "game_system": primary}
-            for metadata in results["metadatas"]
-        ]
-
-        # One call per slice: a file's chunk count routinely exceeds Chroma's
-        # per-write cap, and going over it fails the whole update.
-        for start in range(0, len(results["ids"]), METADATA_UPDATE_BATCH_SIZE):
-            end = start + METADATA_UPDATE_BATCH_SIZE
-            collection.update(
-                ids=results["ids"][start:end],
-                metadatas=updated_metadatas[start:end],
-            )
-
-        update_units_fts_game_system(data_dir, source_path, primary)
 
         entry.game_system = primary
         entry.game_systems = list(game_systems)
@@ -1180,16 +972,16 @@ def build_router(
             "filename": entry.filename,
             "game_system": primary,
             "game_systems": list(game_systems),
-            "chunks_updated": len(results["ids"]),
+            "chunks_updated": entry.chunk_count,
         }
 
     @router.post("/api/set-game-systems")
     async def set_game_systems(request: SetGameSystemsRequest):
-        """Update multiple game system tags for all chunks of a file.
+        """Update the game system tags of a file.
 
-        The first tag becomes the primary stored in ChromaDB metadata; the
-        full list is persisted to the manifest. An empty list clears all
-        tags back to ``"unknown"``.
+        The first tag becomes the primary; the full list is stored with
+        the book and in the manifest. An empty list clears all tags back
+        to ``"unknown"``.
         """
         try:
             if request.path is None and request.filename is None:
@@ -1323,32 +1115,22 @@ def build_router(
     async def get_source_content(filename: str):
         """Retrieve the full text content of an indexed PDF.
 
-        Fetches all chunks for the given filename from ChromaDB,
-        sorts them by chunk index, and concatenates them into
-        one continuous text.
+        Concatenates the book's units in reading order. Same-named books
+        in different folders resolve to the first by path.
         """
         try:
-            results = collection.get(
-                where={"filename": filename},
-                include=["documents", "metadatas"],
+            doc = next(
+                (d for d in library.documents() if d.filename == filename), None
             )
-
-            if not results["ids"]:
+            if doc is None:
                 raise HTTPException(
                     status_code=404, detail=f"Source not found: {filename}"
                 )
 
-            # Sort chunks by their index so the text reads in order
-            paired = sorted(
-                zip(results["documents"], results["metadatas"]),
-                key=lambda pair: pair[1].get("chunk", 0),
-            )
-            content = "\n".join(doc for doc, _ in paired)
-
             return {
                 "filename": filename,
-                "chunks": len(paired),
-                "content": content,
+                "chunks": doc.units,
+                "content": library.document_text(doc.path),
             }
         except HTTPException:
             raise
@@ -1363,7 +1145,7 @@ def build_router(
         returns by default: the model pulls the full section text only
         when it needs it, instead of paying its cost on every result.
         """
-        sec = fetch_section_by_id(data_dir, section_id) if data_dir else None
+        sec = fetch_section_by_id(library, section_id)
         if sec is None:
             raise HTTPException(
                 status_code=404, detail=f"Section not found: {section_id}"
@@ -1569,14 +1351,11 @@ def build_router(
         save_collections(data_dir, store)
         return {"name": new_name, "file_count": len(coll.file_paths)}
 
-    # Experimental BM25 hybrid (default-off `hybrid` search flag): the
-    # lexical rows are written at index time into the parents SQLite, so
-    # there is nothing to build, cache or invalidate here. Constructed per
-    # call — it is two attributes, and `collection` is rebound when
-    # /api/delete-index recreates the collection, so a handle captured
-    # once would go stale.
+    # BM25 hybrid (`hybrid` search flag): the lexical rows are written at
+    # index time into the library store, so there is nothing to build,
+    # cache or invalidate here.
     def _get_lexical_index() -> PersistedLexicalIndex:
-        return PersistedLexicalIndex(data_dir, collection)
+        return PersistedLexicalIndex(library)
 
     # Spell-correction vocabulary: built lazily on first use (and at boot
     # by ``warm_search_stack``), rebuilt when the index changes. On an
@@ -1584,22 +1363,10 @@ def build_router(
     # happens to leave the chunk count unchanged still invalidates it;
     # with nothing indexed the chunk count is all there is (issue #343).
     #
-    # Where the vocabulary is read from is decided once per key, on a
-    # cache miss, by coverage: the persisted FTS rows only when they
-    # cover every indexed chunk, otherwise the full Chroma scan.
-    # All-or-nothing because a part-migrated library's FTS rows are a
-    # subset of the library — building from them would leave the
-    # un-migrated books' proper nouns out of the vocabulary, and
-    # ``correct()`` would rewrite them as typos. That is a change in
-    # search results, which this path must not make. Coverage is also
-    # the reason the check is per-key: ``count_units_fts`` is an O(rows)
-    # scan (~37 ms at 100k rows), and a per-search check would pay it
-    # once per query — twice under variant expansion.
-    #
     # The cache is guarded by a lock: since #344 the search body runs in
     # a worker thread, so two concurrent searches can race here on a
     # cold cache and each pay the full build cost.
-    spell_cache: dict = {"key": None, "corrector": None, "mode": None}
+    spell_cache: dict = {"key": None, "corrector": None}
     spell_lock = threading.Lock()
 
     def _get_spell_corrector(
@@ -1616,22 +1383,12 @@ def build_router(
             )
         key = (
             manifest_digest(manifest) if expected_units
-            else collection.count()
+            else library.count_units()
         )
         with spell_lock:
             if spell_cache["corrector"] is None or spell_cache["key"] != key:
-                mode = (
-                    "store"
-                    if expected_units
-                    and count_units_fts(data_dir) >= expected_units
-                    else "chroma"
-                )
-                spell_cache["corrector"] = (
-                    SpellCorrector.from_store(data_dir) if mode == "store"
-                    else SpellCorrector.from_collection(collection)
-                )
+                spell_cache["corrector"] = SpellCorrector.from_store(library)
                 spell_cache["key"] = key
-                spell_cache["mode"] = mode
             return spell_cache["corrector"]
 
     # Exposed for the boot warm-up thread in __main__.
@@ -1652,7 +1409,8 @@ def build_router(
             return await run_in_threadpool(
                 _search_sync,
                 request,
-                collection=collection,
+                store=library,
+                embed_fn=embed_fn,
                 data_dir=data_dir,
                 merged=_merged,
                 get_spell_corrector=_get_spell_corrector,

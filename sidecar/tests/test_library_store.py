@@ -240,14 +240,14 @@ def test_delete_document_removes_every_row_and_reclaims_space(store):
     conn = store._conn()
     pages_before = conn.execute("PRAGMA page_count").fetchone()[0]
 
-    assert store.delete_document("/lib/big.pdf")
+    assert store.delete_document("/lib/big.pdf") == 2000
 
     assert [d.path for d in store.documents()] == ["/lib/keep.pdf"]
     for table in ("units", "unit_vec", "unit_fts", "parents"):
         assert _rows(store, table) == 1, table
     assert conn.execute("PRAGMA freelist_count").fetchone()[0] == 0
     assert conn.execute("PRAGMA page_count").fetchone()[0] < pages_before
-    assert not store.delete_document("/lib/big.pdf")
+    assert store.delete_document("/lib/big.pdf") == 0
 
 
 def test_clear_empties_the_library(store):
@@ -268,9 +268,10 @@ def test_documents_lists_books_with_unit_counts(store):
     _index(store, "/lib/b.pdf", ["z"], [_axis(2)])
 
     stats = store.documents()
-    assert [(d.filename, d.game_system, d.systems, d.units) for d in stats] == [
-        ("a.pdf", "dnd5e", ("dnd5e",), 2),
-        ("b.pdf", "unknown", (), 1),
+    assert [(d.filename, d.game_system, d.systems, d.units, d.pages)
+            for d in stats] == [
+        ("a.pdf", "dnd5e", ("dnd5e",), 2, 1),
+        ("b.pdf", "unknown", (), 1, 1),
     ]
     assert store.count_units() == 3
 

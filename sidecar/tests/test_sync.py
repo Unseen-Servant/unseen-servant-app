@@ -10,7 +10,6 @@ import json
 import os
 import time
 
-from legend_lore.parents_store import count_units_fts
 from legend_lore.service import (
     MANIFEST_FILENAME,
     PIPELINE_VERSION,
@@ -154,7 +153,7 @@ def test_index_status_empty_selection(client):
 # ---------------------------------------------------------------------------
 
 def test_sync_adds_new_files(
-    client, sample_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, test_store, tmp_path
 ):
     """Sync should index new files and write them to the manifest."""
     response = client.post("/api/sync-index", json={
@@ -169,7 +168,7 @@ def test_sync_adds_new_files(
     assert data["total_indexed"] == 1
 
     # Verify chunks in ChromaDB
-    assert test_collection.count() > 0
+    assert test_store.count_units() > 0
 
     # Verify manifest was written
     manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
@@ -177,14 +176,14 @@ def test_sync_adds_new_files(
 
 
 def test_sync_removes_files(
-    client, sample_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, test_store, tmp_path
 ):
     """Sync should delete chunks for files no longer selected."""
     # First, index a file
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]
     })
-    assert test_collection.count() > 0
+    assert test_store.count_units() > 0
 
     # Now sync with empty selection — should remove it
     response = client.post("/api/sync-index", json={
@@ -196,7 +195,7 @@ def test_sync_removes_files(
     assert data["total_indexed"] == 0
 
     # Verify chunks deleted from ChromaDB
-    assert test_collection.count() == 0
+    assert test_store.count_units() == 0
 
     # Verify manifest entry removed
     manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
@@ -204,14 +203,14 @@ def test_sync_removes_files(
 
 
 def test_sync_updates_modified_files(
-    client, sample_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, test_store, tmp_path
 ):
     """Sync should re-index files whose mtime has changed."""
     # Index the file first
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]
     })
-    count_before = test_collection.count()
+    count_before = test_store.count_units()
 
     # Simulate modification by changing the manifest mtime
     manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
@@ -229,11 +228,11 @@ def test_sync_updates_modified_files(
     assert data["added"] == 0
 
     # Chunk count should be the same (same content, upsert overwrites)
-    assert test_collection.count() == count_before
+    assert test_store.count_units() == count_before
 
 
 def test_sync_mixed_operations(
-    client, sample_pdf_path, large_text_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, large_text_pdf_path, test_store, tmp_path
 ):
     """Sync with a mix of adds and removes in one call."""
     # Index sample_pdf first
@@ -334,7 +333,7 @@ def test_sync_with_game_system_override(
 
 
 def test_sync_update_with_fewer_chunks_removes_orphans(
-    client, test_collection, tmp_path
+    client, test_store, tmp_path
 ):
     """Re-indexing a file that now produces fewer chunks should not leave orphans."""
     from reportlab.lib.pagesizes import letter
@@ -369,7 +368,7 @@ def test_sync_update_with_fewer_chunks_removes_orphans(
     client.post("/api/sync-index", json={
         "selected_paths": [str(pdf_path)]
     })
-    count_before = test_collection.count()
+    count_before = test_store.count_units()
     assert count_before > 2  # Should have multiple chunks
 
     # Rewrite the PDF with much less text (fewer chunks)
@@ -389,9 +388,9 @@ def test_sync_update_with_fewer_chunks_removes_orphans(
     data = response.json()
     assert data["updated"] == 1
 
-    # The key assertion: collection count should match the new (smaller) chunk count,
+    # The key assertion: stored unit count should match the new (smaller) chunk count,
     # not retain orphaned chunks from the old version
-    count_after = test_collection.count()
+    count_after = test_store.count_units()
     assert count_after < count_before
     assert count_after == 1  # "Short book now." = 1 chunk
 
@@ -430,14 +429,14 @@ def test_manifest_backward_compat_missing_pipeline_version(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_reindex_all_stream_reprocesses_up_to_date_files(
-    client, sample_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, test_store, tmp_path
 ):
     """POST /api/reindex-all-stream should force-update every manifest file."""
     # Prime the index so the manifest has one up-to-date entry.
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]
     })
-    count_before = test_collection.count()
+    count_before = test_store.count_units()
     assert count_before > 0
 
     # A plain sync with the same selection should be a no-op (nothing changed).
@@ -464,7 +463,7 @@ def test_reindex_all_stream_reprocesses_up_to_date_files(
     assert complete["total_indexed"] == 1
 
     # Chunk count is stable (same content, upsert overwrites).
-    assert test_collection.count() == count_before
+    assert test_store.count_units() == count_before
 
 
 # ---------------------------------------------------------------------------
@@ -472,22 +471,15 @@ def test_reindex_all_stream_reprocesses_up_to_date_files(
 # ---------------------------------------------------------------------------
 
 def test_delete_index_clears_manifest_and_chunks(
-    client, sample_pdf_path, test_collection, test_chroma_client, tmp_path
+    client, sample_pdf_path, test_store, tmp_path
 ):
-    """POST /api/delete-index should purge chunks and empty the manifest.
-
-    Note: delete-index drops and recreates the underlying collection (so
-    the dim binding resets after an embedding-model swap), which means the
-    original ``test_collection`` reference is dead after the call. Refetch
-    via the client.
-    """
+    """POST /api/delete-index should purge chunks and empty the manifest."""
     client.post("/api/sync-index", json={
         "selected_paths": [str(sample_pdf_path)]
     })
-    collection_name = test_collection.name
-    chunks_before = test_collection.count()
+    chunks_before = test_store.count_units()
     assert chunks_before > 0
-    assert count_units_fts(tmp_path) > 0
+    assert list(test_store.fts_texts())
 
     manifest_path = tmp_path / MANIFEST_FILENAME
     assert json.loads(manifest_path.read_text())["files"]
@@ -498,15 +490,15 @@ def test_delete_index_clears_manifest_and_chunks(
     assert data["removed_files"] == 1
     assert data["removed_chunks"] == chunks_before
 
-    fresh_collection = test_chroma_client.get_collection(name=collection_name)
-    assert fresh_collection.count() == 0
-    assert count_units_fts(tmp_path) == 0
+    assert test_store.count_units() == 0
+    assert list(test_store.fts_texts()) == []
+    assert test_store.documents() == []
     assert json.loads(manifest_path.read_text())["files"] == {}
 
 
-def test_delete_index_empty_manifest(client, test_collection):
+def test_delete_index_empty_manifest(client, test_store):
     """Deleting when nothing is indexed should succeed with zero counts."""
-    assert test_collection.count() == 0
+    assert test_store.count_units() == 0
 
     response = client.post("/api/delete-index")
     assert response.status_code == 200
@@ -515,46 +507,8 @@ def test_delete_index_empty_manifest(client, test_collection):
     assert data["removed_chunks"] == 0
 
 
-def test_delete_index_resets_collection_dim_binding(
-    client, sample_pdf_path, test_collection, test_chroma_client
-):
-    """After delete-index, the recreated collection should accept embeddings
-    of a different dim than the original.
-
-    Chroma locks a collection's vector dim to the first inserted embedding;
-    a row-only delete preserves that lock, which is exactly the failure mode
-    that broke search after the bge-m3 swap. This test would fail under the
-    old "delete rows only" implementation.
-    """
-    import chromadb
-
-    collection_name = test_collection.name
-    client.post("/api/sync-index", json={
-        "selected_paths": [str(sample_pdf_path)]
-    })
-    assert test_collection.count() > 0
-
-    client.post("/api/delete-index")
-
-    # The original handle is dead; the recreated collection must accept
-    # vectors of a different dim. Add a manual embedding with a dim the
-    # original ONNX model does NOT produce — this would raise on the
-    # original collection.
-    fresh = test_chroma_client.get_collection(
-        name=collection_name,
-        embedding_function=chromadb.utils.embedding_functions.DefaultEmbeddingFunction(),
-    )
-    assert fresh.count() == 0
-    fresh.add(
-        ids=["dim-probe-0"],
-        documents=["any document"],
-        embeddings=[[0.0] * 4242],  # arbitrary dim, would be rejected if dim was locked
-    )
-    assert fresh.count() == 1
-
-
 def test_delete_index_preserves_collections(
-    client, sample_pdf_path, test_collection, tmp_path
+    client, sample_pdf_path, test_store, tmp_path
 ):
     """Delete keeps collections fully intact — names AND file paths.
 

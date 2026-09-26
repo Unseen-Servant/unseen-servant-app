@@ -171,13 +171,13 @@ def test_multiple_collections(client):
     assert "Campaign B" in data["collections"]
 
 
-def test_collections_persist_across_restart(test_collection, tmp_path):
+def test_collections_persist_across_restart(test_store, test_embed_fn, tmp_path):
     """Collections created in one server session are available after restart."""
     from server import create_app
     from fastapi.testclient import TestClient
 
     # Session 1: create a collection
-    app1 = create_app(collection=test_collection, data_dir=tmp_path)
+    app1 = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     client1 = TestClient(app1)
 
     client1.post("/api/collections", json={
@@ -187,7 +187,7 @@ def test_collections_persist_across_restart(test_collection, tmp_path):
     })
 
     # Session 2: fresh app, same data_dir
-    app2 = create_app(collection=test_collection, data_dir=tmp_path)
+    app2 = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     client2 = TestClient(app2)
 
     data = client2.get("/api/collections").json()
@@ -200,7 +200,7 @@ def test_collections_persist_across_restart(test_collection, tmp_path):
     assert "created_at" in col
 
 
-def test_collections_loaded_from_preexisting_json(test_collection, tmp_path):
+def test_collections_loaded_from_preexisting_json(test_store, test_embed_fn, tmp_path):
     """A hand-written collections.json is loaded correctly by a fresh server."""
     import json
     from server import create_app
@@ -219,7 +219,7 @@ def test_collections_loaded_from_preexisting_json(test_collection, tmp_path):
     }
     (tmp_path / "collections.json").write_text(json.dumps(collections_data, indent=2))
 
-    app = create_app(collection=test_collection, data_dir=tmp_path)
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     client = TestClient(app)
 
     data = client.get("/api/collections").json()
@@ -323,7 +323,7 @@ def test_update_without_file_paths_keeps_existing(client):
     assert col["description"] == "metadata only"
 
 
-def test_v1_collections_migrate_on_load(test_collection, tmp_path):
+def test_v1_collections_migrate_on_load(test_store, test_embed_fn, tmp_path):
     """Legacy v1 records gain v2 fields with sensible defaults."""
     import json
     from server import create_app
@@ -342,7 +342,7 @@ def test_v1_collections_migrate_on_load(test_collection, tmp_path):
     }
     (tmp_path / "collections.json").write_text(json.dumps(legacy))
 
-    app = create_app(collection=test_collection, data_dir=tmp_path)
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     client = TestClient(app)
 
     col = client.get("/api/collections").json()["collections"]["Old"]
@@ -423,17 +423,17 @@ def test_rename_collection_empty_name_returns_400(client):
     assert resp.status_code == 400
 
 
-def test_rename_collection_persists_to_disk(test_collection, tmp_path):
+def test_rename_collection_persists_to_disk(test_store, test_embed_fn, tmp_path):
     """Renamed collections survive a server restart."""
     from server import create_app
     from fastapi.testclient import TestClient
 
-    app1 = create_app(collection=test_collection, data_dir=tmp_path)
+    app1 = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     c1 = TestClient(app1)
     c1.post("/api/collections", json={"name": "First", "file_paths": ["/a.pdf"]})
     c1.post("/api/collections/First/rename", json={"new_name": "Second"})
 
-    app2 = create_app(collection=test_collection, data_dir=tmp_path)
+    app2 = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     c2 = TestClient(app2)
     cols = c2.get("/api/collections").json()["collections"]
     assert "First" not in cols
@@ -441,7 +441,7 @@ def test_rename_collection_persists_to_disk(test_collection, tmp_path):
     assert cols["Second"]["file_paths"] == ["/a.pdf"]
 
 
-def test_v1_disk_migrates_to_v2_on_save(test_collection, tmp_path):
+def test_v1_disk_migrates_to_v2_on_save(test_store, test_embed_fn, tmp_path):
     """After a write, the on-disk file is in v2 shape."""
     import json
     from server import create_app
@@ -460,7 +460,7 @@ def test_v1_disk_migrates_to_v2_on_save(test_collection, tmp_path):
     }
     (tmp_path / "collections.json").write_text(json.dumps(legacy))
 
-    app = create_app(collection=test_collection, data_dir=tmp_path)
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     client = TestClient(app)
     client.post("/api/collections", json={"name": "New", "file_paths": []})
 
@@ -474,7 +474,7 @@ def test_v1_disk_migrates_to_v2_on_save(test_collection, tmp_path):
     assert new["id"] != old["id"]
 
 
-def test_legacy_active_context_key_is_shed(test_collection, tmp_path):
+def test_legacy_active_context_key_is_shed(test_store, test_embed_fn, tmp_path):
     """Stores written before the play/stop transport still load; the retired
     active_context key is dropped on the next write."""
     import json
@@ -495,7 +495,7 @@ def test_legacy_active_context_key_is_shed(test_collection, tmp_path):
     }
     (tmp_path / "collections.json").write_text(json.dumps(legacy))
 
-    app = create_app(collection=test_collection, data_dir=tmp_path)
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     client = TestClient(app)
     data = client.get("/api/collections").json()
     assert "active_context" not in data

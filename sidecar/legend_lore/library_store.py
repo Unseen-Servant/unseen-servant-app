@@ -131,6 +131,7 @@ class DocumentStats:
     game_system: str
     systems: tuple[str, ...]
     units: int
+    pages: int  # highest page any unit reaches
 
 
 class LibraryStore:
@@ -160,6 +161,11 @@ class LibraryStore:
         return store
 
     # -- connections -------------------------------------------------------
+
+    def conn(self) -> sqlite3.Connection:
+        """This thread's connection, for read-only helpers outside the class
+        (section assembly in ``parents_store``). Writes go through methods."""
+        return self._conn()
 
     def _conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
@@ -347,17 +353,20 @@ class LibraryStore:
             self._write_systems(conn, row[0], primary, systems)
         return True
 
-    def delete_document(self, path: str) -> bool:
-        """Remove a book and reclaim its space. False when it isn't indexed."""
+    def delete_document(self, path: str) -> int:
+        """Remove a book and reclaim its space. Returns the units removed,
+        0 when the book isn't indexed."""
         with self._write() as conn:
             row = conn.execute(
-                "SELECT id FROM documents WHERE path = ?", (path,)
+                "SELECT d.id, (SELECT count(*) FROM units u "
+                "WHERE u.document_id = d.id) FROM documents d WHERE d.path = ?",
+                (path,),
             ).fetchone()
             if row is None:
-                return False
+                return 0
             self._delete_document_rows(conn, row[0], keep_document=False)
         self._reclaim()
-        return True
+        return row[1]
 
     def clear(self) -> None:
         """Empty the library and shrink the file."""
@@ -488,11 +497,12 @@ class LibraryStore:
             systems.setdefault(doc_id, []).append(system)
         return [
             DocumentStats(path, filename, game_system,
-                          tuple(systems.get(doc_id, ())), units)
-            for doc_id, path, filename, game_system, units in conn.execute(
+                          tuple(systems.get(doc_id, ())), units, pages)
+            for doc_id, path, filename, game_system, units, pages in conn.execute(
                 "SELECT d.id, d.path, d.filename, d.game_system, "
-                "(SELECT count(*) FROM units u WHERE u.document_id = d.id) "
-                "FROM documents d ORDER BY d.path"
+                "count(u.id), coalesce(max(u.page_end), 0) "
+                "FROM documents d LEFT JOIN units u ON u.document_id = d.id "
+                "GROUP BY d.id ORDER BY d.path"
             )
         ]
 

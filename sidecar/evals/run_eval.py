@@ -5,7 +5,7 @@ One command, from sidecar/:
     uv run python -m evals.run_eval
 
 Indexes the eval corpus (once — reruns reuse the persisted index) with the
-production indexing pipeline into a dedicated ChromaDB under
+production indexing pipeline into a dedicated library store under
 ``evals/.eval_data``, runs every query in ``evals/queries.yaml`` through
 the production ``/api/search`` endpoint (rerank on, production defaults),
 judges each result against the answer-chunk ground truth, and prints
@@ -24,19 +24,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import chromadb
 import yaml
 
 EVALS_DIR = Path(__file__).parent
 sys.path.insert(0, str(EVALS_DIR.parent))  # so `python -m evals.run_eval` sees server.py
 
 from evals import scorer
-from legend_lore.service import (
-    COLLECTION_METADATA,
-    build_embedding_function,
-    load_manifest,
-)
-from server import create_app
+from legend_lore.service import load_manifest
+from server import create_app, open_library_store
 
 QUERIES_PATH = EVALS_DIR / "queries.yaml"
 DEFAULT_DATA_DIR = EVALS_DIR / ".eval_data"
@@ -63,19 +58,7 @@ def build_client(data_dir: Path):
     from fastapi.testclient import TestClient
 
     data_dir.mkdir(parents=True, exist_ok=True)
-    chroma_client = chromadb.PersistentClient(path=str(data_dir))
-    embedding_function = build_embedding_function()
-    collection = chroma_client.get_or_create_collection(
-        name="ttrpg_docs",
-        embedding_function=embedding_function,
-        metadata=COLLECTION_METADATA,
-    )
-    app = create_app(
-        collection=collection,
-        data_dir=data_dir,
-        chroma_client=chroma_client,
-        embedding_function=embedding_function,
-    )
+    app = create_app(store=open_library_store(data_dir), data_dir=data_dir)
     return TestClient(app)
 
 

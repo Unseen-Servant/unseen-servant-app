@@ -19,14 +19,16 @@ def _index_twins(client, twin_pdfs):
     return a, b
 
 
-def _chunk_systems(collection, path) -> set[str]:
-    got = collection.get(where={"source": str(path)}, include=["metadatas"])
-    assert got["ids"], f"no chunks for {path}"
-    return {m["game_system"] for m in got["metadatas"]}
+def _chunk_systems(store, path) -> set[str]:
+    """The primary tag every unit of ``path`` reports (units read it from
+    their book's documents row)."""
+    docs = [d for d in store.documents() if d.path == str(path)]
+    assert docs and docs[0].units, f"no chunks for {path}"
+    return {docs[0].game_system}
 
 
 def test_set_game_systems_by_path_leaves_twin_untouched(
-    client, twin_pdfs, test_collection, tmp_path
+    client, twin_pdfs, test_store, tmp_path
 ):
     a, b = _index_twins(client, twin_pdfs)
 
@@ -36,8 +38,8 @@ def test_set_game_systems_by_path_leaves_twin_untouched(
     assert resp.status_code == 200, resp.text
     assert resp.json()["filename"] == b.name
 
-    assert _chunk_systems(test_collection, b) == {"Pathfinder 2E"}
-    assert _chunk_systems(test_collection, a) != {"Pathfinder 2E"}
+    assert _chunk_systems(test_store, b) == {"Pathfinder 2E"}
+    assert _chunk_systems(test_store, a) != {"Pathfinder 2E"}
 
     files = load_manifest(tmp_path).files
     assert files[str(b)].game_systems == ["Pathfinder 2E", "D&D 5E"]
@@ -55,7 +57,7 @@ def test_set_game_systems_unknown_path_is_404(client, twin_pdfs, tmp_path):
 
 
 def test_set_game_systems_ambiguous_filename_is_refused(
-    client, twin_pdfs, test_collection, tmp_path
+    client, twin_pdfs, test_store, tmp_path
 ):
     a, b = _index_twins(client, twin_pdfs)
     resp = client.post("/api/set-game-systems", json={
@@ -64,6 +66,6 @@ def test_set_game_systems_ambiguous_filename_is_refused(
     assert resp.status_code == 409, resp.text
 
     for p in (a, b):
-        assert "OSRIC" not in _chunk_systems(test_collection, p)
+        assert "OSRIC" not in _chunk_systems(test_store, p)
         assert load_manifest(tmp_path).files[str(p)].game_systems != ["OSRIC"]
 

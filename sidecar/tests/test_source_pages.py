@@ -5,8 +5,8 @@ These back the MCP drill-in tools (`get_section`, `get_pages`): compact
 search hands the model a `section_id` or a page range instead of the full
 section text, and these endpoints let it pull the full text on demand.
 
-`/api/section/{id}` is exercised against a parents row staged directly
-(the same technique test_search_sections.py uses) rather than a PDF run
+`/api/section/{id}` is exercised against a parents row staged directly in
+the library store (the same technique test_search_sections.py uses) rather than a PDF run
 through the real heading-detection pipeline — the plain-text fixture PDFs
 in conftest.py produce no headings at all (`n_headings=0`), so a real
 index of them never carries a resolvable `section_id`. `/pages` needs a
@@ -17,7 +17,6 @@ real file on disk (it opens the PDF with pymupdf), so it uses the
 import pytest
 
 from legend_lore.granularity import ParentDoc
-from legend_lore.parents_store import upsert_parents
 
 SOURCE = "/corpus/monsters.pdf"
 
@@ -37,9 +36,9 @@ def _parent(pid, heading, section_id, section_path, text, pages=(10, 10)):
 
 
 @pytest.fixture
-def section_client(client, tmp_path):
-    """One staged section (`s_k`) in the parents store `client` reads from."""
-    upsert_parents(tmp_path, SOURCE, [
+def section_client(client, test_store):
+    """One staged section (`s_k`) in the library store `client` reads from."""
+    test_store.replace_document(SOURCE, "unknown", (), [], [], [], parents=[
         _parent("p-k", "Monsters > Kraken", "s_k", "s_m/s_k",
                 "Kraken. AC 18, HP 472. A gargantuan monstrosity."),
     ])

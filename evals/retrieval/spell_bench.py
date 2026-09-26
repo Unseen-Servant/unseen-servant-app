@@ -41,10 +41,15 @@ def load_corrector(data_dir: Path):
     """The production corrector, protecting the built-in system keywords
     the way ``/api/search`` does (custom systems aside)."""
     sys.path.insert(0, str(ROOT / "sidecar"))
+    from legend_lore.embedder import EMBEDDING_DIM, EMBEDDING_MODEL
     from legend_lore.game_systems import KNOWN_SYSTEMS
+    from legend_lore.library_store import LIBRARY_FILENAME, LibraryStore
     from legend_lore.spelling import SpellCorrector, keyword_tokens
 
-    corrector = SpellCorrector.from_store(data_dir)
+    store = LibraryStore.open(
+        data_dir / LIBRARY_FILENAME, EMBEDDING_MODEL, EMBEDDING_DIM
+    )
+    corrector = SpellCorrector.from_store(store)
     protected = keyword_tokens(KNOWN_SYSTEMS)
     plain = corrector.correct
     corrector.correct = lambda q: plain(q, protected=protected)

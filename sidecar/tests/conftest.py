@@ -17,54 +17,61 @@ import os
 os.environ.setdefault("RERANK_DISABLED", "1")
 
 import pytest
-import chromadb
-from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from fastapi.testclient import TestClient
 
 # We can import these safely now — no side effects at import time.
+from legend_lore.library_store import LIBRARY_FILENAME, LibraryStore
+from legend_lore.service import _embed_text
 from server import create_app
 
 
 # ---------------------------------------------------------------------------
-# ChromaDB fixtures
+# Library store fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def test_chroma_client():
-    """Fresh in-RAM ChromaDB client for each test.
+# all-MiniLM-L6-v2 embeds to 384 dimensions.
+TEST_EMBED_MODEL = "test-minilm"
+TEST_EMBED_DIM = 384
 
-    Split out from ``test_collection`` so tests can exercise endpoints
-    that recreate the collection (e.g. delete-index).
+
+@pytest.fixture(scope="session")
+def test_embed_fn():
+    """Real embeddings, no Ollama: fastembed's all-MiniLM-L6-v2.
+
+    The same model ChromaDB's default embedding function used before the
+    library store, so the search tests keep their semantics. Loaded once
+    per session (~90 MB download on a cold cache).
     """
-    return chromadb.EphemeralClient()
+    from fastembed import TextEmbedding
+
+    model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2")
+
+    def embed(texts):
+        return [v.tolist() for v in model.embed(list(texts))]
+
+    return embed
 
 
 @pytest.fixture
-def test_embedding_function():
-    """ChromaDB's built-in ONNX (MiniLM) embedding function.
+def test_store(tmp_path):
+    """Fresh library store in the test's temp dir."""
+    store = LibraryStore.open(
+        tmp_path / LIBRARY_FILENAME, TEST_EMBED_MODEL, TEST_EMBED_DIM
+    )
+    yield store
+    store.close()
 
-    Real embeddings, no Ollama needed. Used for both the test collection
-    and any collection recreated by the endpoints under test.
-    """
-    return DefaultEmbeddingFunction()
 
-
-@pytest.fixture
-def test_collection(test_chroma_client, test_embedding_function):
-    """Fresh in-memory ChromaDB collection for each test.
-
-    EphemeralClient instances share state within a process, so delete
-    the collection first to ensure each test starts clean.
-    """
-    try:
-        test_chroma_client.delete_collection("ttrpg_docs_test")
-    except Exception:
-        pass
-
-    return test_chroma_client.get_or_create_collection(
-        name="ttrpg_docs_test",
-        embedding_function=test_embedding_function,
-        metadata={"hnsw:space": "cosine"},
+def seed_book(store, embed_fn, path, units, parents=(), game_system="unknown",
+              systems=(), page_labels=None):
+    """Write one book's EmbedUnits (and parents) straight into the store,
+    embedding them the way indexing does. For tests that need exact units
+    rather than a PDF run through the chunker."""
+    texts = [_embed_text(u) for u in units]
+    return store.replace_document(
+        str(path), game_system, systems, units, embed_texts=texts,
+        vectors=embed_fn(texts) if units else [], parents=list(parents),
+        page_labels=page_labels,
     )
 
 
@@ -73,23 +80,16 @@ def test_collection(test_chroma_client, test_embedding_function):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def client(test_collection, test_chroma_client, test_embedding_function, tmp_path):
-    """HTTP test client wired to an in-memory ChromaDB.
+def client(test_store, test_embed_fn, tmp_path):
+    """HTTP test client wired to a temp-dir library store.
 
     FastAPI's TestClient lets us make HTTP requests without
     starting a real server. It handles the async event loop
     internally, so our test code stays synchronous and simple.
 
-    tmp_path is used as data_dir for manifest storage during tests.
-    The chroma_client and embedding_function are passed through so
-    delete-index exercises the full production drop+recreate path.
+    tmp_path is the data_dir for the store, manifest and settings.
     """
-    app = create_app(
-        collection=test_collection,
-        data_dir=tmp_path,
-        chroma_client=test_chroma_client,
-        embedding_function=test_embedding_function,
-    )
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     return TestClient(app)
 
 

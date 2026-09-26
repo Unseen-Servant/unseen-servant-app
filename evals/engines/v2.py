@@ -1,7 +1,7 @@
 """V2 engine — the production ``sidecar/`` pipeline, driven in-process.
 
 Ports the approach of ``sidecar/evals/run_eval.py``: build the real
-ChromaDB + Ollama embedding function against a dedicated data dir, call
+library store + Ollama embedder against a dedicated data dir, call
 the production ``create_app()``, and drive it through FastAPI's
 ``TestClient`` — the production ``/api/search`` path with zero HTTP
 transport, so measured latency is the pipeline's own.
@@ -35,7 +35,7 @@ SIDECAR_DIR = REPO_ROOT / "sidecar"
 
 # Default lives under evals/ (gitignored alongside the corpus). Separate
 # from sidecar/evals/.eval_data so the legacy harness and this one never
-# fight over a Chroma dir.
+# fight over a data dir.
 DEFAULT_DATA_DIR = REPO_ROOT / "evals" / ".eval_data" / "v2"
 
 
@@ -50,17 +50,14 @@ def _import_sidecar():
     if str(SIDECAR_DIR) not in sys.path:
         sys.path.append(str(SIDECAR_DIR))
     try:
-        import chromadb
         from fastapi.testclient import TestClient
         from legend_lore.service import (
-            COLLECTION_METADATA,
             PIPELINE_VERSION,
             _extract_and_chunk,
             _extract_pdf_pages,
-            build_ollama_embedding_function,
             load_manifest,
         )
-        from server import create_app
+        from server import create_app, open_library_store
     except ImportError as exc:  # pragma: no cover - environment guard
         raise SystemExit(
             f"v2 engine needs the sidecar environment (missing: {exc}).\n"
@@ -68,14 +65,12 @@ def _import_sidecar():
             "    uv run --project sidecar python -m evals.engines.v2 ..."
         ) from exc
     return {
-        "chromadb": chromadb,
         "TestClient": TestClient,
-        "COLLECTION_METADATA": COLLECTION_METADATA,
         "PIPELINE_VERSION": PIPELINE_VERSION,
         "_extract_and_chunk": _extract_and_chunk,
         "_extract_pdf_pages": _extract_pdf_pages,
-        "build_ollama_embedding_function": build_ollama_embedding_function,
         "create_app": create_app,
+        "open_library_store": open_library_store,
         "load_manifest": load_manifest,
     }
 
@@ -97,18 +92,9 @@ class V2Engine:
             return self._client
         mods = self._mods = _import_sidecar()
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        chroma_client = mods["chromadb"].PersistentClient(path=str(self.data_dir))
-        embedding_function = mods["build_ollama_embedding_function"]()
-        collection = chroma_client.get_or_create_collection(
-            name="ttrpg_docs",
-            embedding_function=embedding_function,
-            metadata=mods["COLLECTION_METADATA"],
-        )
         app = mods["create_app"](
-            collection=collection,
+            store=mods["open_library_store"](self.data_dir),
             data_dir=self.data_dir,
-            chroma_client=chroma_client,
-            embedding_function=embedding_function,
         )
         self._client = mods["TestClient"](app)
         return self._client
@@ -169,7 +155,7 @@ class V2Engine:
 
     def extract(self, pdf_path: Path | str) -> list[Page]:
         """v2's real page extraction (pymupdf4llm + heading promotion +
-        furniture stripping) — no Chroma/Ollama needed, just the sidecar env."""
+        furniture stripping) — no store/Ollama needed, just the sidecar env."""
         if self._mods is None:
             self._mods = _import_sidecar()
         path = Path(pdf_path).expanduser().resolve()
@@ -180,7 +166,7 @@ class V2Engine:
 
     def chunks(self, pdf_path: Path | str) -> list[dict]:
         """v2's real chunker output for one PDF (pymupdf4llm → promotion →
-        cleanup → structure_aware), no Chroma/Ollama. What breadcrumb-qa
+        cleanup → structure_aware), no store/Ollama. What breadcrumb-qa
         grades: the heading each chunk would carry into the embedding."""
         if self._mods is None:
             self._mods = _import_sidecar()

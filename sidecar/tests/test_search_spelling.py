@@ -7,55 +7,76 @@ The corrected query must drive every downstream consumer of the query
 text — the dense embed, the BM25 side when `hybrid` is on — and surface
 in the response as `corrected_query` plus a note in the `message`
 channel. `spell_correction: false` bypasses everything; the vocabulary
-rebuilds when the manifest content digest changes; legacy stores (no
-persisted FTS rows) key on the chunk count instead.
+rebuilds when the manifest content digest changes (or, with nothing in
+the manifest, when the store's unit count does).
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
-from legend_lore import router
 from legend_lore import spelling
-from legend_lore.parents_store import upsert_units_fts
+from legend_lore.granularity import EmbedUnit
 from legend_lore.service import IndexManifest, ManifestEntry, save_manifest
-
-
-def _meta(parent_id: str, filename: str) -> dict:
-    return {
-        "parent_id": parent_id,
-        "filename": filename,
-        "source": f"/corpus/{filename}",
-        "game_system": "OSR",
-        "section_heading": "",
-        "page_start": 1,
-        "page_end": 1,
-    }
+from server import create_app
+from tests.conftest import TEST_EMBED_DIM, seed_book
 
 
 STAT_DOC = "the owlbear has claws and the owlbear grapples the owlbear"
 
 
+def _flat(texts):
+    """Placeholder vectors for tests whose dense ranking is scripted."""
+    return [[1.0] + [0.0] * (TEST_EMBED_DIM - 1) for _ in texts]
+
+
+def _book(store, filename, *texts, heading=None, embed_fn=_flat):
+    """Index `texts` as one book at /corpus/<filename>; unit ids in order."""
+    path = f"/corpus/{filename}"
+    units = [
+        EmbedUnit(
+            chunk_id=f"c{i}", text=t, parent_id=f"p-{filename}-{i}",
+            chunk_type="prose", section_heading=heading, source_pdf=path,
+            page_start=1, page_end=1, ordinal=i,
+        )
+        for i, t in enumerate(texts)
+    ]
+    seed_book(store, embed_fn, path, units, game_system="OSR")
+    return [
+        uid for (uid,) in store.conn().execute(
+            "SELECT u.id FROM units u JOIN documents d ON d.id = u.document_id "
+            "WHERE d.path = ? ORDER BY u.ordinal", (path,)
+        )
+    ]
+
+
 @pytest.fixture
-def capture_client(client, test_collection, monkeypatch):
-    """One chunk giving 'owlbear' vocab frequency 3; dense query calls
-    are captured so tests can assert which text was embedded."""
-    test_collection.add(
-        ids=["c-stat"],
-        documents=[STAT_DOC],
-        metadatas=[_meta("p-stat", "monsters.pdf")],
+def dense(test_store, tmp_path, monkeypatch):
+    """App whose dense side is scripted: each embed call's query texts are
+    recorded in ``state["query_texts"]``, and every knn returns
+    ``state["pool"]`` — (unit_id, distance) pairs."""
+    state: dict = {"query_texts": None, "pool": []}
+
+    def embed(texts):
+        state["query_texts"] = list(texts)
+        return _flat(texts)
+
+    monkeypatch.setattr(
+        test_store, "knn", lambda vec, k, doc_ids=None: list(state["pool"])
     )
-    captured: dict = {}
+    client = TestClient(
+        create_app(store=test_store, data_dir=tmp_path, embed_fn=embed)
+    )
+    return client, state
 
-    def fake_query(self, **kwargs):
-        captured.update(kwargs)
-        return {
-            "ids": [["c-stat"]],
-            "documents": [[STAT_DOC]],
-            "metadatas": [[_meta("p-stat", "monsters.pdf")]],
-            "distances": [[0.2]],
-        }
 
-    monkeypatch.setattr(type(test_collection), "query", fake_query)
-    return client, captured
+@pytest.fixture
+def capture_client(dense, test_store):
+    """One chunk giving 'owlbear' vocab frequency 3; the embedded query
+    text is captured so tests can assert which text was embedded."""
+    client, state = dense
+    (stat,) = _book(test_store, "monsters.pdf", STAT_DOC)
+    state["pool"] = [(stat, 0.2)]
+    return client, state
 
 
 def _search(client, **overrides):
@@ -97,28 +118,17 @@ def test_spell_correction_false_bypasses_everything(capture_client):
     assert "message" not in body
 
 
-def test_composes_with_hybrid(client, test_collection, tmp_path, monkeypatch):
+def test_composes_with_hybrid(dense, test_store):
     """The BM25 side must search the corrected text: 'owlber' matches
-    nothing lexically, so the stat block (missed by the fake dense pool)
-    only surfaces when the corrected 'owlbear' reaches FTS5."""
-    prose_doc = "combat happens in rounds and each round has phases"
-    test_collection.add(
-        ids=["c-prose", "c-stat"],
-        documents=[prose_doc, STAT_DOC],
-        metadatas=[_meta("p-prose", "rules.pdf"), _meta("p-stat", "monsters.pdf")],
+    nothing lexically, so the stat block (missed by the scripted dense
+    pool) only surfaces when the corrected 'owlbear' reaches FTS5."""
+    client, state = dense
+    (prose,) = _book(
+        test_store, "rules.pdf",
+        "combat happens in rounds and each round has phases",
     )
-    upsert_units_fts(tmp_path, "/corpus/rules.pdf", [
-        ("c-prose", 0, "rules.pdf", "OSR", "p-prose", prose_doc)])
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
-    fake_dense = {
-        "ids": [["c-prose"]],
-        "documents": [[prose_doc]],
-        "metadatas": [[_meta("p-prose", "rules.pdf")]],
-        "distances": [[0.2]],
-    }
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: fake_dense)
+    _book(test_store, "monsters.pdf", STAT_DOC)
+    state["pool"] = [(prose, 0.2)]
 
     corrected = _search(client, query="owlber", hybrid=True)
     assert corrected["corrected_query"] == "owlbear"
@@ -131,21 +141,19 @@ def test_composes_with_hybrid(client, test_collection, tmp_path, monkeypatch):
     assert [r["filename"] for r in bypassed["results"]] == ["rules.pdf"]
 
 
-def test_vocabulary_rebuilds_when_chunk_count_changes(client, test_collection):
+def test_vocabulary_rebuilds_when_chunk_count_changes(
+    client, test_store, test_embed_fn
+):
     """A term indexed after the first search becomes a correction target
     on the next one."""
-    test_collection.add(
-        ids=["c1"],
-        documents=[STAT_DOC],
-        metadatas=[_meta("p1", "monsters.pdf")],
-    )
+    _book(test_store, "monsters.pdf", STAT_DOC, embed_fn=test_embed_fn)
     before = _search(client, query="grimlok lair")
     assert before["corrected_query"] is None  # 'grimlock' not indexed yet
 
-    test_collection.add(
-        ids=["c2"],
-        documents=["the grimlock hears all; grimlock packs hunt; grimlock"],
-        metadatas=[_meta("p2", "monsters.pdf")],
+    _book(
+        test_store, "grimlocks.pdf",
+        "the grimlock hears all; grimlock packs hunt; grimlock",
+        embed_fn=test_embed_fn,
     )
     after = _search(client, query="grimlok lair")
     assert after["corrected_query"] == "grimlock lair"
@@ -154,15 +162,6 @@ def test_vocabulary_rebuilds_when_chunk_count_changes(client, test_collection):
 # ---------------------------------------------------------------------------
 # Vocabulary source and invalidation (#343)
 # ---------------------------------------------------------------------------
-
-def _fake_stat_pool():
-    return {
-        "ids": [["c-stat"]],
-        "documents": [[STAT_DOC]],
-        "metadatas": [[_meta("p-stat", "monsters.pdf")]],
-        "distances": [[0.2]],
-    }
-
 
 def _manifest(
     tmp_path, content_hash: str = "h1", sources: dict[str, int] | None = None
@@ -183,45 +182,35 @@ def _manifest(
     }))
 
 
-def test_spell_vocab_comes_from_unit_fts(
-    client, test_collection, tmp_path, monkeypatch
-):
-    """The vocabulary is read from the persisted FTS rows — whose text is
-    exactly the heading-prepended embed text — not by paging the whole
-    Chroma collection back over the wire."""
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
-    _manifest(tmp_path, "h1")
+def test_spell_vocab_counts_the_heading_prepended_text(dense, test_store, tmp_path):
+    """The vocabulary is the text the embedder saw — section heading
+    prepended — so a monster name that only appears as the heading above
+    its stat block is still a correction target."""
+    client, state = dense
+    ids = _book(
+        test_store, "monsters.pdf",
+        "claws rend flesh", "a grapple follows", "it hunts at night",
+        heading="Owlbear",
+    )
+    state["pool"] = [(ids[0], 0.2)]
+    _manifest(tmp_path, sources={"/corpus/monsters.pdf": 3})
 
-    def no_scan(*args, **kwargs):
-        raise AssertionError("Chroma scanned to build the spell vocabulary")
-
-    monkeypatch.setattr(type(test_collection), "get", no_scan)
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
-
-    body = _search(client)
-    assert body["corrected_query"] == "owlbear claws"
+    assert _search(client)["corrected_query"] == "owlbear claws"
 
 
 def test_spell_vocab_invalidates_on_manifest_digest_change(
-    client, test_collection, tmp_path, monkeypatch
+    capture_client, tmp_path, monkeypatch
 ):
     """Cached across searches, rebuilt when a re-index moves the digest."""
-    from legend_lore import spelling
-
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
+    client, _ = capture_client
     _manifest(tmp_path, "h1")
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
 
     builds = []
     real_build = spelling.build_vocabulary_from_store
 
-    def counting(data_dir):
-        builds.append(data_dir)
-        return real_build(data_dir)
+    def counting(store):
+        builds.append(store)
+        return real_build(store)
 
     monkeypatch.setattr(spelling, "build_vocabulary_from_store", counting)
 
@@ -235,90 +224,27 @@ def test_spell_vocab_invalidates_on_manifest_digest_change(
     assert len(builds) == 2
 
 
-def test_spell_mode_is_decided_once_per_manifest_digest(
-    client, test_collection, tmp_path, monkeypatch
+def test_spell_vocab_survives_a_unit_count_change_with_the_same_digest(
+    capture_client, test_store, tmp_path, monkeypatch
 ):
-    """Coverage is a cache-miss question, not a per-search one:
-    `count_units_fts` is an O(rows) scan (~37 ms at 100k rows), and
-    variant expansion would pay it twice per search."""
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
+    """The negative of the invalidation test: with an indexed manifest the
+    key is the digest, so units appearing in the store without a manifest
+    change must not throw the vocabulary away."""
+    client, _ = capture_client
     _manifest(tmp_path)
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
-
-    counted = []
-    real_count = router.count_units_fts
-
-    def counting(data_dir, source=None):
-        counted.append(data_dir)
-        return real_count(data_dir, source)
-
-    monkeypatch.setattr(router, "count_units_fts", counting)
-
-    assert _search(client)["corrected_query"] == "owlbear claws"
-    assert _search(client)["corrected_query"] == "owlbear claws"
-    assert len(counted) == 1
-
-
-def test_partial_fts_coverage_falls_back_to_the_chroma_scan(
-    client, test_collection, tmp_path, monkeypatch
-):
-    """A part-migrated library (FTS rows for some books only) must not
-    build the vocabulary from the migrated subset: the missing books'
-    proper nouns would read as OOV and get rewritten — a change in search
-    results, on a perf-only change. Full coverage or nothing."""
-    test_collection.add(
-        ids=["c-stat"],
-        documents=[STAT_DOC],
-        metadatas=[_meta("p-stat", "monsters.pdf")],
-    )
-    # rules.pdf has its FTS rows; monsters.pdf (which holds 'owlbear')
-    # has not been re-indexed yet.
-    upsert_units_fts(tmp_path, "/corpus/rules.pdf", [
-        ("c-prose", 0, "rules.pdf", "OSR", "p-prose", "combat in rounds"),
-        ("c-prose2", 1, "rules.pdf", "OSR", "p-prose", "each round has phases"),
-    ])
-    _manifest(tmp_path, sources={"/corpus/rules.pdf": 2, "/corpus/monsters.pdf": 2})
-
-    def no_store(*args, **kwargs):
-        raise AssertionError("built the vocabulary from partial FTS coverage")
-
-    monkeypatch.setattr(spelling, "build_vocabulary_from_store", no_store)
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
-
-    assert _search(client)["corrected_query"] == "owlbear claws"
-
-
-def test_spell_vocab_survives_a_chunk_count_change_with_the_same_digest(
-    client, test_collection, tmp_path, monkeypatch
-):
-    """The negative of the invalidation test: on a migrated index the key
-    is the digest, so rows appearing in Chroma without a re-index must
-    not throw the vocabulary away."""
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", STAT_DOC)])
-    _manifest(tmp_path)
-    monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: _fake_stat_pool())
 
     builds = []
     real_build = spelling.build_vocabulary_from_store
 
-    def counting(data_dir):
-        builds.append(data_dir)
-        return real_build(data_dir)
+    def counting(store):
+        builds.append(store)
+        return real_build(store)
 
     monkeypatch.setattr(spelling, "build_vocabulary_from_store", counting)
 
     assert _search(client)["corrected_query"] == "owlbear claws"
     assert len(builds) == 1
 
-    test_collection.add(
-        ids=["c-extra"],
-        documents=["a later section about torches and rations"],
-        metadatas=[_meta("p-extra", "monsters.pdf")],
-    )
+    _book(test_store, "extra.pdf", "a later section about torches and rations")
     assert _search(client)["corrected_query"] == "owlbear claws"
     assert len(builds) == 1

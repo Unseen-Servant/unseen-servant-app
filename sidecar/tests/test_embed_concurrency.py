@@ -1,35 +1,29 @@
 """
-Tests for the concurrent embed -> serial upsert helper (issue #158).
+Tests for the concurrent embed helper (issue #158).
 
-The thread-pool fans out embeds, but upserts must commit in submission
-order so chunk ordinals stay monotonic in Chroma. These tests force
-out-of-order embed completion and assert the upsert sequence is still
-in submission order.
+The thread-pool fans out embeds, but vectors must be collected in
+submission order so they stay aligned with the embed units the store
+writes them against. These tests force out-of-order embed completion and
+assert the collected vectors are still in submission order.
 """
 
 import time
 from pathlib import Path
 
 from legend_lore.granularity import EmbedUnit
-from legend_lore.service import _embed_and_upsert_units
+from legend_lore.service import _embed_units
 
 
-class _FakeCollection:
-    """Minimal stand-in: sync embedding function + upsert recorder."""
+def _delayed_embed(embed_delay):
+    """Embedder whose latency depends on the batch's first ordinal; each
+    vector carries its own unit's ordinal so order can be checked."""
 
-    def __init__(self, embed_delay):
-        self._embedding_function = self._embed
-        self._embed_delay = embed_delay
-        self.upsert_calls = []  # list of id lists, in commit order
-
-    def _embed(self, texts):
+    def embed(texts):
         # Each text is "text <ordinal>"; first ordinal pins the batch index.
-        first_ordinal = int(texts[0].split()[1])
-        time.sleep(self._embed_delay(first_ordinal))
-        return [[float(first_ordinal)] * 4 for _ in texts]
+        time.sleep(embed_delay(int(texts[0].split()[1])))
+        return [[float(t.split()[1])] * 4 for t in texts]
 
-    def upsert(self, *, embeddings, documents, metadatas, ids):
-        self.upsert_calls.append(list(ids))
+    return embed
 
 
 def _make_units(n: int) -> list[EmbedUnit]:
@@ -49,47 +43,47 @@ def _make_units(n: int) -> list[EmbedUnit]:
     ]
 
 
-def test_upsert_order_is_deterministic_under_out_of_order_embed_completion():
-    """Earlier batches that embed slowly must still be upserted first.
+def test_vector_order_is_deterministic_under_out_of_order_embed_completion():
+    """Earlier batches that embed slowly must still be collected first.
 
     Inverts the natural latency: later batches return faster than earlier
-    ones, so a naive `as_completed` drain would commit them out of order
-    and corrupt the on-disk chunk sequence.
+    ones, so a naive `as_completed` drain would collect them out of order
+    and pair vectors with the wrong units.
     """
     units = _make_units(30)  # 10 batches at batch_size=3
 
     # First batch (ordinal 0) sleeps the longest; last batch (ordinal 27)
     # returns almost instantly. Forces out-of-order completion.
-    coll = _FakeCollection(embed_delay=lambda o: max(0, (30 - o) * 0.005))
+    embed = _delayed_embed(lambda o: max(0, (30 - o) * 0.005))
 
-    list(_embed_and_upsert_units(
-        coll, units, Path("test.pdf"), "unknown", "stem",
-        batch_size=3, concurrency=4,
+    vectors: list[list[float]] = []
+    list(_embed_units(
+        embed, units, Path("test.pdf"), vectors, batch_size=3, concurrency=4,
     ))
 
-    flat = [int(cid.rsplit("_", 1)[1]) for ids in coll.upsert_calls for cid in ids]
+    flat = [int(v[0]) for v in vectors]
     assert flat == list(range(30)), (
-        f"Expected upsert ordinals to be monotonic 0..29, got: {flat}"
+        f"Expected vector ordinals to be monotonic 0..29, got: {flat}"
     )
 
 
 def test_yields_per_batch_unit_counts_in_order():
     """The generator should yield one int per batch, summing to total units."""
     units = _make_units(7)  # batch_size=3 -> [3, 3, 1]
-    coll = _FakeCollection(embed_delay=lambda _o: 0.0)
+    vectors: list[list[float]] = []
 
-    yields = list(_embed_and_upsert_units(
-        coll, units, Path("test.pdf"), "unknown", "stem",
+    yields = list(_embed_units(
+        _delayed_embed(lambda _o: 0.0), units, Path("test.pdf"), vectors,
         batch_size=3, concurrency=2,
     ))
 
     assert yields == [3, 3, 1]
-    assert sum(yields) == len(units)
+    assert sum(yields) == len(units) == len(vectors)
 
 
 def test_empty_input_yields_nothing():
-    coll = _FakeCollection(embed_delay=lambda _o: 0.0)
-    assert list(_embed_and_upsert_units(
-        coll, [], Path("test.pdf"), "unknown", "stem",
+    vectors: list[list[float]] = []
+    assert list(_embed_units(
+        _delayed_embed(lambda _o: 0.0), [], Path("test.pdf"), vectors,
     )) == []
-    assert coll.upsert_calls == []
+    assert vectors == []

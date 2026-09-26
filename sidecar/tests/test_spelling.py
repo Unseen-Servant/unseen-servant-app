@@ -9,52 +9,46 @@ reconstruction, and section B split/join variant generation.
 
 import pytest
 
-from legend_lore.spelling import MIN_VOCAB_FREQ, SpellCorrector, build_vocabulary
+from legend_lore.granularity import EmbedUnit
+from legend_lore.spelling import (
+    MIN_VOCAB_FREQ, SpellCorrector, build_vocabulary_from_store,
+)
+from tests.conftest import TEST_EMBED_DIM, seed_book
 
 
-class FakeCollection:
-    """Minimal stand-in for a ChromaDB collection's batched get()."""
-
-    def __init__(self, rows):
-        self._rows = rows  # list of (id, document, metadata)
-
-    def get(self, include=None, limit=None, offset=0):
-        batch = self._rows[offset:offset + limit]
-        return {
-            "ids": [r[0] for r in batch],
-            "documents": [r[1] for r in batch],
-            "metadatas": [r[2] for r in batch],
-        }
+def _index(store, *rows):
+    """Index (text, section_heading) rows as one book."""
+    units = [
+        EmbedUnit(
+            chunk_id=f"c{i}", text=text, parent_id=f"p{i}", chunk_type="prose",
+            section_heading=heading, source_pdf="/lib/x.pdf",
+            page_start=1, page_end=1, ordinal=i,
+        )
+        for i, (text, heading) in enumerate(rows)
+    ]
+    seed_book(
+        store, lambda texts: [[1.0] + [0.0] * (TEST_EMBED_DIM - 1)] * len(texts),
+        "/lib/x.pdf", units,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Vocabulary build
 # ---------------------------------------------------------------------------
 
-def test_build_vocabulary_counts_lowercased_frequencies():
-    collection = FakeCollection([
-        ("c1", "Chain mail armor", {}),
-        ("c2", "chain MAIL", {}),
-    ])
-    vocab = build_vocabulary(collection)
+def test_build_vocabulary_counts_lowercased_frequencies(test_store):
+    _index(test_store, ("Chain mail armor", None), ("chain MAIL", None))
+    vocab = build_vocabulary_from_store(test_store)
     assert vocab["chain"] == 2
     assert vocab["mail"] == 2
     assert vocab["armor"] == 1
 
 
-def test_build_vocabulary_includes_section_heading_terms():
-    collection = FakeCollection([
-        ("c1", "AC 22, HD 11", {"section_heading": "Cloud Dragon"}),
-    ])
-    vocab = build_vocabulary(collection)
+def test_build_vocabulary_includes_section_heading_terms(test_store):
+    _index(test_store, ("AC 22, HD 11", "Cloud Dragon"))
+    vocab = build_vocabulary_from_store(test_store)
     assert vocab["cloud"] == 1
     assert vocab["dragon"] == 1
-
-
-def test_build_vocabulary_batches_past_first_page():
-    rows = [(f"c{i}", "goblin", {}) for i in range(7)]
-    vocab = build_vocabulary(FakeCollection(rows), batch_size=3)
-    assert vocab["goblin"] == 7
 
 
 # ---------------------------------------------------------------------------

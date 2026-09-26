@@ -52,7 +52,9 @@ def test_rerank_reorders_top_candidates(indexed_client, monkeypatch):
     assert "docs" in captured  # rerank_scores actually called
 
 
-def test_rerank_input_prepends_section_heading(monkeypatch, client, test_collection):
+def test_rerank_input_prepends_section_heading(
+    monkeypatch, client, test_store, test_embed_fn
+):
     """Rerank input should mirror the embedder by prepending section_heading.
 
     Without this, the cross-encoder loses the breadcrumb context (e.g.
@@ -72,23 +74,15 @@ def test_rerank_input_prepends_section_heading(monkeypatch, client, test_collect
 
     monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
-    test_collection.upsert(
-        ids=["synth_1"],
-        documents=["body text about grappling and grapples"],
-        metadatas=[{
-            "source": "/lib/x.pdf",
-            "filename": "x.pdf",
-            "chunk": 0,
-            "game_system": "5e",
-            "chunk_type": "prose",
-            "section_heading": "Combat > Grappling",
-            "page_start": 1,
-            "page_end": 1,
-            "parent_id": "p_synth",
-            "chunker_version": "test",
-            "embedding_model": "test",
-        }],
-    )
+    from legend_lore.granularity import EmbedUnit
+    from tests.conftest import seed_book
+
+    seed_book(test_store, test_embed_fn, "/lib/x.pdf", [EmbedUnit(
+        chunk_id="synth_1", text="body text about grappling and grapples",
+        parent_id="p_synth", chunk_type="prose",
+        section_heading="Combat > Grappling", source_pdf="/lib/x.pdf",
+        page_start=1, page_end=1, ordinal=0,
+    )], game_system="5e")
 
     response = client.post("/api/search", json={
         "query": "grappling", "n_results": 3, "rerank": True,

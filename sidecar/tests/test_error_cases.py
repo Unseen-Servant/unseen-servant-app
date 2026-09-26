@@ -39,18 +39,17 @@ def test_index_special_characters_filename(client, special_chars_pdf_path):
     assert data["errors"] == []
 
 
-def test_duplicate_indexing(client, sample_pdf_path, test_collection):
+def test_duplicate_indexing(client, sample_pdf_path, test_store):
     """Indexing the same PDF twice should not create duplicate chunks.
 
-    This validates the .add() -> .upsert() fix. With .add(), the second
-    call would crash on duplicate IDs. With .upsert(), it silently
-    overwrites — same count, no errors.
+    A reindex replaces the book's rows in one transaction — same count,
+    no errors.
     """
     # Index once
     client.post("/api/index-files", json={
         "paths": [str(sample_pdf_path)]
     })
-    count_after_first = test_collection.count()
+    count_after_first = test_store.count_units()
 
     # Index again
     response = client.post("/api/index-files", json={
@@ -62,8 +61,8 @@ def test_duplicate_indexing(client, sample_pdf_path, test_collection):
     assert data["indexed"] == 1
     assert data["errors"] == []
 
-    # Count should stay the same (upsert, not duplicate)
-    count_after_second = test_collection.count()
+    # Count should stay the same (replaced, not duplicated)
+    count_after_second = test_store.count_units()
     assert count_after_second == count_after_first
 
 
@@ -82,8 +81,8 @@ def test_search_missing_query(client):
 def test_search_negative_n_results(client, sample_pdf_path):
     """Negative n_results: should either error or return empty.
 
-    This is a boundary condition. ChromaDB may handle it differently
-    than expected. The test documents the actual behavior.
+    This is a boundary condition. The vector store may handle it
+    differently than expected. The test documents the actual behavior.
     """
     client.post("/api/index-files", json={
         "paths": [str(sample_pdf_path)]

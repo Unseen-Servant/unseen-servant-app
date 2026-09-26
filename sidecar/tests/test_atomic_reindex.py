@@ -1,5 +1,5 @@
 """
-Tests for atomic re-index — embed/upsert failures must not destroy the
+Tests for atomic re-index — embed failures must not destroy the
 previously-indexed chunks, parents, or manifest entry for a source.
 
 The whole point: if Ollama dies mid-sync, the user's last good index is
@@ -14,13 +14,12 @@ import pytest
 from legend_lore.service import (
     EmbedBatchError,
     MANIFEST_FILENAME,
-    _embed_and_upsert_units,
+    _embed_units,
     _atomic_index_pdf,
-    chunk_id_prefix,
     load_manifest,
 )
 from legend_lore.granularity import EmbedUnit, ParentDoc
-from legend_lore.parents_store import count_units_fts
+from legend_lore.library_store import LibraryStore
 
 
 # ---------------------------------------------------------------------------
@@ -47,33 +46,32 @@ def _make_units(n: int) -> list[EmbedUnit]:
     ]
 
 
-class _RecordingCollection:
-    """Stand-in collection: tracks upserts/deletes and serves get(where=)."""
+def _embed(texts):
+    """4-dim stand-in embedder (non-zero, so cosine is defined)."""
+    return [[float(i) + 1.0] * 4 for i, _ in enumerate(texts)]
 
-    def __init__(self):
-        self._embedding_function = self._embed
-        self.records: dict[str, dict] = {}  # id -> {"source": ..., "doc": ...}
 
-    def _embed(self, texts):
-        return [[float(i)] * 4 for i, _ in enumerate(texts)]
+def _boom(message, exc=RuntimeError):
+    def embed(texts):
+        raise exc(message)
+    return embed
 
-    def upsert(self, *, embeddings, documents, metadatas, ids):
-        for i, cid in enumerate(ids):
-            self.records[cid] = {
-                "source": metadatas[i].get("source"),
-                "doc": documents[i],
-            }
 
-    def delete(self, ids):
-        for cid in ids:
-            self.records.pop(cid, None)
+@pytest.fixture
+def store(tmp_path):
+    s = LibraryStore.open(tmp_path / "library.sqlite3", "test", 4)
+    yield s
+    s.close()
 
-    def get(self, *, where=None, include=None):
-        if where is None:
-            return {"ids": list(self.records.keys())}
-        source = where.get("source")
-        ids = [cid for cid, meta in self.records.items() if meta["source"] == source]
-        return {"ids": ids}
+
+def _unit_ids(store, source: str) -> set[int]:
+    """Unit ids currently stored for one book."""
+    return {
+        uid for (uid,) in store.conn().execute(
+            "SELECT u.id FROM units u JOIN documents d ON d.id = u.document_id "
+            "WHERE d.path = ?", (source,),
+        )
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -85,14 +83,9 @@ def test_embed_failure_raises_embed_batch_error():
     """An exception inside the embed function is wrapped with the source path."""
     units = _make_units(6)
 
-    class _BoomCollection(_RecordingCollection):
-        def _embed(self, texts):
-            raise RuntimeError("ollama is wedged")
-
-    coll = _BoomCollection()
     with pytest.raises(EmbedBatchError) as exc_info:
-        list(_embed_and_upsert_units(
-            coll, units, Path("/lib/test.pdf"), "unknown", "stem",
+        list(_embed_units(
+            _boom("ollama is wedged"), units, Path("/lib/test.pdf"), [],
             batch_size=3, concurrency=2,
         ))
     err = exc_info.value
@@ -105,14 +98,10 @@ def test_embed_batch_error_chains_original_cause():
     """The original exception is available via __cause__ for diagnostics."""
     units = _make_units(3)
 
-    class _BoomCollection(_RecordingCollection):
-        def _embed(self, texts):
-            raise ValueError("bad input")
-
-    coll = _BoomCollection()
     with pytest.raises(EmbedBatchError) as exc_info:
-        list(_embed_and_upsert_units(
-            coll, units, Path("test.pdf"), "unknown", "stem", batch_size=3,
+        list(_embed_units(
+            _boom("bad input", ValueError), units, Path("test.pdf"), [],
+            batch_size=3,
         ))
     assert isinstance(exc_info.value.__cause__, ValueError)
 
@@ -125,16 +114,15 @@ def test_embed_batch_retries_transient_reset(monkeypatch):
     monkeypatch.setattr(service.time, "sleep", lambda *_: None)
     calls = {"n": 0}
 
-    class _FlakyCollection(_RecordingCollection):
-        def _embed(self, texts):
-            calls["n"] += 1
-            if calls["n"] == 1:
-                raise RuntimeError(
-                    'Post ".../tokenize": read: connection reset by peer (status code: 400)'
-                )
-            return [[float(i)] * 4 for i, _ in enumerate(texts)]
+    def flaky_embed(texts):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError(
+                'Post ".../tokenize": read: connection reset by peer (status code: 400)'
+            )
+        return _embed(texts)
 
-    out = service._embed_batch(_FlakyCollection(), _make_units(2))
+    out = service._embed_batch(flaky_embed, _make_units(2))
     assert calls["n"] == 2  # failed once, recovered on retry
     assert len(out) == 2
 
@@ -146,99 +134,85 @@ def test_embed_batch_does_not_retry_deterministic_error(monkeypatch):
     monkeypatch.setattr(service.time, "sleep", lambda *_: None)
     calls = {"n": 0}
 
-    class _BoomCollection(_RecordingCollection):
-        def _embed(self, texts):
-            calls["n"] += 1
-            raise ValueError("bad input")
+    def boom(texts):
+        calls["n"] += 1
+        raise ValueError("bad input")
 
     with pytest.raises(ValueError):
-        service._embed_batch(_BoomCollection(), _make_units(2))
+        service._embed_batch(boom, _make_units(2))
     assert calls["n"] == 1  # not retried
 
 
 # ---------------------------------------------------------------------------
-# Atomic helper: rollback on failure
+# Atomic helper: nothing is written until the whole book has embedded
 # ---------------------------------------------------------------------------
 
 
-def test_atomic_index_pdf_rolls_back_partial_inserts(tmp_path):
-    """If embed fails on batch 2 of 3, the first batch's chunks are removed."""
+def test_atomic_index_pdf_writes_nothing_when_embed_fails(store):
+    """If embed fails on batch 2 of 3, no chunk of the book reaches the store."""
     pdf_path = Path("/lib/test.pdf")
     units = _make_units(9)  # batch_size=3 -> 3 batches
     parents: list[ParentDoc] = []
 
-    coll = _RecordingCollection()
     fail_after = {"calls": 0}
-    real_embed = coll._embedding_function
 
     def flaky_embed(texts):
         fail_after["calls"] += 1
         if fail_after["calls"] >= 2:
             raise RuntimeError("network glitch")
-        return real_embed(texts)
-
-    coll._embedding_function = flaky_embed
+        return _embed(texts)
 
     with pytest.raises(EmbedBatchError):
         list(_atomic_index_pdf(
-            pdf_path, "unknown", units, parents, coll, tmp_path,
+            pdf_path, "unknown", [], units, parents, store, flaky_embed,
             batch_size=3,
         ))
 
-    # No chunks survive for this source — the partial insert was cleaned up
-    assert coll.get(where={"source": str(pdf_path)})["ids"] == []
+    assert _unit_ids(store, str(pdf_path)) == set()
+    assert store.documents() == []
 
 
-def test_atomic_index_pdf_preserves_old_chunks_on_failure(tmp_path):
+def test_atomic_index_pdf_preserves_old_chunks_on_failure(store):
     """A re-index that fails leaves the previous chunks for the source intact."""
     pdf_path = Path("/lib/test.pdf")
-    coll = _RecordingCollection()
 
     # First successful index
-    units_v1 = _make_units(6)
     list(_atomic_index_pdf(
-        pdf_path, "unknown", units_v1, [], coll, tmp_path, batch_size=3,
+        pdf_path, "unknown", [], _make_units(6), [], store, _embed, batch_size=3,
     ))
-    v1_ids = set(coll.get(where={"source": str(pdf_path)})["ids"])
-    assert v1_ids
+    v1_ids = _unit_ids(store, str(pdf_path))
     assert len(v1_ids) == 6
 
     # Second attempt: embed fails on the very first batch of the new attempt
-    coll._embedding_function = lambda texts: (_ for _ in ()).throw(RuntimeError("oom"))
-    units_v2 = _make_units(6)
-
     with pytest.raises(EmbedBatchError):
         list(_atomic_index_pdf(
-            pdf_path, "unknown", units_v2, [], coll, tmp_path, batch_size=3,
+            pdf_path, "unknown", [], _make_units(6), [], store, _boom("oom"),
+            batch_size=3,
         ))
 
     # Old chunks still there, with their original IDs
-    after_ids = set(coll.get(where={"source": str(pdf_path)})["ids"])
-    assert after_ids == v1_ids
+    assert _unit_ids(store, str(pdf_path)) == v1_ids
 
 
-def test_atomic_index_pdf_swaps_in_new_chunks_on_success(tmp_path):
-    """A successful re-index replaces old chunks even when content_hash unchanged."""
+def test_atomic_index_pdf_replaces_book_on_success(store):
+    """A successful re-index replaces the old chunks, leaving none of a prior
+    larger chunking behind."""
     pdf_path = Path("/lib/test.pdf")
-    coll = _RecordingCollection()
 
     list(_atomic_index_pdf(
-        pdf_path, "unknown", _make_units(8), [], coll, tmp_path, batch_size=3,
+        pdf_path, "unknown", [], _make_units(8), [], store, _embed, batch_size=3,
     ))
-    v1_ids = set(coll.get(where={"source": str(pdf_path)})["ids"])
+    assert len(_unit_ids(store, str(pdf_path))) == 8
 
-    # Re-index with fewer units: nonce makes the new prefix distinct, so the
-    # cleanup wipes leftover chunks from the prior larger chunking.
+    # Re-index with fewer units.
     list(_atomic_index_pdf(
-        pdf_path, "unknown", _make_units(4), [], coll, tmp_path, batch_size=3,
+        pdf_path, "unknown", [], _make_units(4), [], store, _embed, batch_size=3,
     ))
-    v2_ids = set(coll.get(where={"source": str(pdf_path)})["ids"])
 
-    assert len(v2_ids) == 4
-    assert v2_ids.isdisjoint(v1_ids)
-    # The FTS rows swap with the chunks — one row per surviving unit,
-    # under the same ids.
-    assert count_units_fts(tmp_path, str(pdf_path)) == 4
+    assert len(_unit_ids(store, str(pdf_path))) == 4
+    assert store.document_text(str(pdf_path)) == "text 0\ntext 1\ntext 2\ntext 3"
+    # The FTS rows swap with the chunks — one row per surviving unit.
+    assert len(store.fts("text", k=100)) == 4
 
 
 # ---------------------------------------------------------------------------
@@ -247,18 +221,16 @@ def test_atomic_index_pdf_swaps_in_new_chunks_on_success(tmp_path):
 
 
 def test_reindex_file_failure_preserves_indexed_data(
-    client, sample_pdf_path, test_collection, tmp_path, monkeypatch
+    client, sample_pdf_path, test_store, tmp_path, monkeypatch
 ):
     """Embed failure during /api/reindex-file must not destroy old chunks."""
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
-    initial_ids = set(test_collection.get(
-        where={"source": str(sample_pdf_path)}, include=[]
-    )["ids"])
+    initial_ids = _unit_ids(test_store, str(sample_pdf_path))
     assert initial_ids
 
     from legend_lore import service
     monkeypatch.setattr(service, "_embed_batch",
-        lambda collection, batch: (_ for _ in ()).throw(RuntimeError("ollama down"))
+        lambda embed_fn, batch: (_ for _ in ()).throw(RuntimeError("ollama down"))
     )
 
     resp = client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
@@ -268,10 +240,7 @@ def test_reindex_file_failure_preserves_indexed_data(
     assert data["error"] is not None
     assert "ollama" in data["error"].lower() or "down" in data["error"].lower()
 
-    after_ids = set(test_collection.get(
-        where={"source": str(sample_pdf_path)}, include=[]
-    )["ids"])
-    assert after_ids == initial_ids
+    assert _unit_ids(test_store, str(sample_pdf_path)) == initial_ids
 
 
 def test_reindex_file_failure_records_last_error(
@@ -282,7 +251,7 @@ def test_reindex_file_failure_records_last_error(
 
     from legend_lore import service
     monkeypatch.setattr(service, "_embed_batch",
-        lambda collection, batch: (_ for _ in ()).throw(RuntimeError("ollama down"))
+        lambda embed_fn, batch: (_ for _ in ()).throw(RuntimeError("ollama down"))
     )
 
     client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
@@ -304,7 +273,7 @@ def test_reindex_file_success_clears_last_error(
 
     from legend_lore import service
     monkeypatch.setattr(service, "_embed_batch",
-        lambda collection, batch: (_ for _ in ()).throw(RuntimeError("first failure"))
+        lambda embed_fn, batch: (_ for _ in ()).throw(RuntimeError("first failure"))
     )
     client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
     assert load_manifest(tmp_path).files[str(sample_pdf_path)].last_error is not None
@@ -333,7 +302,7 @@ def _modify_pdf(pdf_path: Path) -> None:
 
 
 def test_sync_stream_phase3_failure_preserves_old_chunks(
-    client, sample_pdf_path, large_text_pdf_path, test_collection, tmp_path,
+    client, sample_pdf_path, large_text_pdf_path, test_store, tmp_path,
     monkeypatch,
 ):
     """A Phase 3 (update) embed failure preserves the previous chunks.
@@ -344,9 +313,7 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
     """
     paths = [str(sample_pdf_path), str(large_text_pdf_path)]
     client.post("/api/index-files", json={"paths": paths})
-    sample_initial_ids = set(test_collection.get(
-        where={"source": str(sample_pdf_path)}, include=[]
-    )["ids"])
+    sample_initial_ids = _unit_ids(test_store, str(sample_pdf_path))
     assert sample_initial_ids
 
     # Modify both so both end up in to_update; only the sample one will fail.
@@ -356,12 +323,11 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
     from legend_lore import service
     real_embed = service._embed_batch
 
-    def selective_boom(collection, batch):
-        # The metadata source is set later in _upsert_batch, so inspect the
-        # text contents — sample PDF is dragonbane themed.
+    def selective_boom(embed_fn, batch):
+        # Inspect the text contents — sample PDF is dragonbane themed.
         if any("Fire Drake" in eu.text or "dragon" in eu.text.lower() for eu in batch):
             raise RuntimeError("ollama choked on dragons")
-        return real_embed(collection, batch)
+        return real_embed(embed_fn, batch)
 
     monkeypatch.setattr(service, "_embed_batch", selective_boom)
 
@@ -370,11 +336,8 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
     body = resp.json()
     assert body["errors"], "expected at least one error in the sync result"
 
-    # Sample's old chunks are still there — atomic rollback preserved them
-    after_ids = set(test_collection.get(
-        where={"source": str(sample_pdf_path)}, include=[]
-    )["ids"])
-    assert after_ids == sample_initial_ids
+    # Sample's old chunks are still there — the failed book was never written
+    assert _unit_ids(test_store, str(sample_pdf_path)) == sample_initial_ids
 
     # large_text_pdf got re-indexed successfully; its manifest entry has no error
     manifest = load_manifest(tmp_path)
@@ -383,30 +346,6 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
     assert sample_entry.last_error is not None
     assert sample_entry.chunk_count > 0  # previous count preserved
     assert large_entry.last_error is None
-
-
-# ---------------------------------------------------------------------------
-# Ollama embed timeout — defends against wedged Ollama hanging the sync
-# ---------------------------------------------------------------------------
-
-
-def test_build_embedding_function_default_timeout(monkeypatch):
-    """Default timeout is 120s — long enough for a slow embed batch but
-    short enough that a wedged Ollama can't hang sync forever."""
-    from legend_lore.embedder import build_embedding_function
-
-    monkeypatch.delenv("OLLAMA_EMBED_TIMEOUT_SECONDS", raising=False)
-    ef = build_embedding_function()
-    assert ef.timeout == 120
-
-
-def test_build_embedding_function_env_override(monkeypatch):
-    """OLLAMA_EMBED_TIMEOUT_SECONDS overrides the default."""
-    from legend_lore.embedder import build_embedding_function
-
-    monkeypatch.setenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "30")
-    ef = build_embedding_function()
-    assert ef.timeout == 30
 
 
 def test_sync_stream_phase3_failure_releases_lock(
@@ -418,7 +357,7 @@ def test_sync_stream_phase3_failure_releases_lock(
 
     from legend_lore import service
     monkeypatch.setattr(service, "_embed_batch",
-        lambda collection, batch: (_ for _ in ()).throw(RuntimeError("everything fails"))
+        lambda embed_fn, batch: (_ for _ in ()).throw(RuntimeError("everything fails"))
     )
 
     # First sync — fails on the embed, but should return 200 with errors,

@@ -54,7 +54,7 @@ def test_folder_rename_updates_manifest(client, sample_pdf_path, large_text_pdf_
         assert not path.startswith(old_prefix + "/")
 
 
-def test_folder_rename_updates_chromadb_metadata(client, sample_pdf_path, tmp_path):
+def test_folder_rename_updates_search_metadata(client, sample_pdf_path, tmp_path):
     """After folder rename, search results should reference the new path."""
     index_pdfs(client, sample_pdf_path)
 

@@ -8,10 +8,10 @@ the embedder (``_embed_text``) and the reranker score — so the lexical
 side gets the breadcrumb signal too (the prior spike fused a plain-BM25
 index and never tested the heading-prepended one it built).
 
-The rows live in ``parents_store.unit_fts``, written per document inside
-the same swap as the Chroma upsert (roadmap 1.6, S5). Nothing is built
-at search time: the predecessor rebuilt an in-memory FTS5 table from a
-full Chroma scan on the first hybrid search and again whenever the chunk
+The rows live in the library store's ``unit_fts``, written in the same
+transaction as the rest of a book (roadmap 1.6, S5). Nothing is built at
+search time: the predecessor rebuilt an in-memory FTS5 table from a full
+Chroma scan on the first hybrid search and again whenever the chunk
 count changed, holding every document and metadata dict in RAM.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import re
 
-from .parents_store import count_units_fts, search_units_fts
+from .library_store import LibraryStore
 
 logger = logging.getLogger(__name__)
 
@@ -55,18 +55,18 @@ _EMPTY_STORE_WARNED = False
 
 
 class PersistedLexicalIndex:
-    """FTS5 rows live in the parents SQLite (parents_store.unit_fts),
-    written at index time; nothing is rebuilt at search time."""
+    """FTS5 rows live in the library store (``unit_fts``), written at
+    index time; nothing is rebuilt at search time."""
 
-    def __init__(self, data_dir, collection) -> None:
-        self._data_dir = data_dir
-        self._collection = collection
+    def __init__(self, store: LibraryStore) -> None:
+        self._store = store
 
-    def search(self, query: str, k: int, where: dict | None = None) -> list[str]:
-        """Top-k chunk ids by BM25, best first.
+    def search(
+        self, query: str, k: int, doc_ids: list[int] | None = None
+    ) -> list[int]:
+        """Top-k unit ids by BM25, best first.
 
-        ``where`` mirrors the dense query's scope and applies as SQL over
-        the FTS table's metadata columns.
+        ``doc_ids`` is the dense query's scope (``None`` = whole library).
 
         An index written before the FTS rows existed has none, and hybrid
         would silently be dense-only — warn once per process. The count is
@@ -76,35 +76,27 @@ class PersistedLexicalIndex:
         match = fts_match(query)
         if not match:
             return []
-        ids = search_units_fts(self._data_dir, match, k, where)
+        ids = self._store.fts(match, k, doc_ids)
         if not ids:
             self._warn_if_store_is_empty()
         return ids
 
     def _warn_if_store_is_empty(self) -> None:
         global _EMPTY_STORE_WARNED
-        if _EMPTY_STORE_WARNED or not self._data_dir:
+        if _EMPTY_STORE_WARNED:
             return
-        if count_units_fts(self._data_dir) == 0:
+        if self._store.count_units() == 0:
             _EMPTY_STORE_WARNED = True
             logger.warning(
                 "unit_fts is empty — reindex to enable lexical search"
             )
 
-    def lookup(self, ids: list[str]) -> dict[str, tuple[dict, str]]:
-        """Fetch (metadata, document) from Chroma for BM25-only hits.
-
-        One ``get`` by id — ids whose Chroma twin vanished mid-reindex are
-        simply absent from the result.
-        """
-        if not ids:
-            return {}
-        got = self._collection.get(ids=ids, include=["metadatas", "documents"])
+    def lookup(self, ids: list[int]) -> dict[int, tuple[dict, str]]:
+        """(metadata, text) for BM25-only hits; ids whose book was removed
+        mid-search are simply absent."""
         return {
-            cid: (meta, doc)
-            for cid, meta, doc in zip(
-                got["ids"], got["metadatas"], got["documents"]
-            )
+            uid: (unit.metadata, unit.text)
+            for uid, unit in self._store.hydrate(ids).items()
         }
 
 

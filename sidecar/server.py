@@ -17,17 +17,23 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import chromadb
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from legend_lore.embedder import embedder_status, start_background_tasks
+from legend_lore.embedder import (
+    EMBEDDING_DIM,
+    EMBEDDING_MODEL,
+    embed,
+    embedder_status,
+    start_background_tasks,
+)
+from legend_lore.library_store import LIBRARY_FILENAME, LibraryStore
 from legend_lore.router import build_router
 from legend_lore.service import (
-    COLLECTION_METADATA,
-    build_embedding_function,
-    gc_orphan_segments,
+    load_manifest,
+    remove_legacy_chroma,
+    save_manifest,
     warm_search_stack,
 )
 
@@ -44,7 +50,7 @@ def parse_args():
     parser.add_argument("--port", type=int, default=8420,
                         help="HTTP port; pass 0 to bind an ephemeral port")
     parser.add_argument("--data-dir", type=str, default=None,
-                        help="Directory for ChromaDB storage (default: ./chroma_db)")
+                        help="Directory for the library store (default: ./chroma_db)")
     return parser.parse_args()
 
 
@@ -73,50 +79,53 @@ def remove_port_file(data_dir: Path) -> None:
 # App factory
 # ---------------------------------------------------------------------------
 
+def open_library_store(data_dir: Path) -> LibraryStore:
+    """Open the production store, clearing what an older build left behind.
+
+    Legacy Chroma files are deleted (the library is rebuilt, not migrated).
+    A store opened under a different embedding model or dimension clears
+    itself; every manifest entry is then marked outdated so sync reindexes
+    it rather than trusting chunks that are no longer there.
+    """
+    freed = remove_legacy_chroma(data_dir)
+    if freed:
+        print(f"[store] removed legacy Chroma files: {freed:,} bytes")
+    store = LibraryStore.open(
+        data_dir / LIBRARY_FILENAME, EMBEDDING_MODEL, EMBEDDING_DIM
+    )
+    if store.was_reset:
+        manifest = load_manifest(data_dir)
+        for entry in manifest.files.values():
+            entry.pipeline_version = ""
+        save_manifest(data_dir, manifest)
+    return store
+
+
 def create_app(
-    collection=None,
+    store: LibraryStore | None = None,
     data_dir: Path | None = None,
-    chroma_client=None,
-    embedding_function=None,
+    embed_fn=None,
 ):
-    """Create the FastAPI app, optionally with a pre-configured collection.
+    """Create the FastAPI app, optionally with a pre-configured store.
 
-    In production: called with no arguments — sets up Ollama + PersistentClient.
-    In tests: called with a test collection (EphemeralClient + ONNX embeddings).
-
-    Tests that need to exercise endpoints that recreate the collection
-    (e.g. delete-index, which drops the collection to reset its vector-dim
-    binding after an embedding-model change) can pass `chroma_client` and
-    `embedding_function` so the recreate path has the dependencies it needs.
+    In production: called with no arguments — opens the library store in
+    the ``--data-dir`` and embeds with Ollama.
+    In tests: called with a store in a temp dir and a local embedder.
 
     Args:
-        collection: ChromaDB collection (None = production auto-setup).
-        data_dir: Directory for ChromaDB and manifest storage.
+        store: The library store (None = production auto-setup).
+        data_dir: Directory for the store, manifest and settings.
                   In production, resolved from --data-dir CLI arg.
                   In tests, pass tmp_path.
-        chroma_client: ChromaDB client owning ``collection``. Required for
-                  the delete-index recreate path; ``None`` falls back to
-                  row-by-row delete (sufficient when dim never changes).
-        embedding_function: Embedding function for collection recreate.
-                  Paired with ``chroma_client``.
+        embed_fn: ``texts -> vectors``; defaults to ``embedder.embed``.
     """
-    if collection is None:
-        # Production path: same setup as before, but now only runs
-        # when the server is actually started (not at import time).
+    if store is None:
         args = parse_args()
         data_dir = Path(args.data_dir) if args.data_dir else Path(__file__).parent / "chroma_db"
         data_dir.mkdir(parents=True, exist_ok=True)
-
-        chroma_client = chromadb.PersistentClient(path=str(data_dir))
-        reclaimed = gc_orphan_segments(data_dir)
-        if reclaimed > 0:
-            print(f"[gc] removed orphan segment dirs: {reclaimed:,} bytes reclaimed")
-        embedding_function = build_embedding_function()
-        collection = chroma_client.get_or_create_collection(
-            name="ttrpg_docs",
-            embedding_function=embedding_function,
-            metadata=COLLECTION_METADATA,
-        )
+        store = open_library_store(data_dir)
+    if embed_fn is None:
+        embed_fn = embed
 
     app = FastAPI(title="Legend Lore Sidecar")
 
@@ -187,7 +196,7 @@ def create_app(
 
     # Legend Lore
     app.include_router(
-        build_router(app, collection, data_dir, chroma_client, embedding_function)
+        build_router(app, store, embed_fn, data_dir)
     )
 
     return app

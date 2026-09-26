@@ -20,7 +20,11 @@ from .heading_text import strip_markup
 
 
 CHUNKER_VERSION = "structure_aware-v3"
-PIPELINE_VERSION = f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
+# The trailing store marker flags every file indexed into ChromaDB as
+# outdated: the library store starts empty and is rebuilt by reindexing
+# (docs/retrieval/2026-09-26-library-store-design.md).
+STORE_VERSION = "library-store-v1"
+PIPELINE_VERSION = f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}/{STORE_VERSION}"
 SOFT_CAP = 1000
 HARD_CAP = 20000
 

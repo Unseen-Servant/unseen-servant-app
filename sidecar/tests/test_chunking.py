@@ -216,24 +216,28 @@ def test_chunks_carry_section_id_and_path():
     assert kraken_actions.section_id != medusa_actions.section_id   # same title, different section
 
 
-def test_composed_pipeline_produces_real_section_metadata():
-    """Full pipeline: chunker -> granularity -> Chroma metadata mapping,
+def test_composed_pipeline_produces_real_section_metadata(tmp_path):
+    """Full pipeline: chunker -> granularity -> library store round trip,
     using real distinct sections (not hand-built stand-ins) to check the
     fields actually survive composition, not just each module in isolation."""
-    from pathlib import Path
     from legend_lore.granularity import build
-    from legend_lore.service import _embed_unit_metadata
+    from legend_lore.library_store import LibraryStore
 
     pages = [_page(1, "# Monsters\n\n## Kraken\n\nbody\n\n### Actions\n\nbite\n\n## Medusa\n\ngaze\n\n### Actions\n\nglare")]
     chunks = structure_aware(pages, source_pdf="x.pdf")
-    units, _parents = build(chunks)
+    units, parents = build(chunks)
 
-    meta0 = _embed_unit_metadata(Path("x.pdf"), units[0], "unknown")
-    assert meta0["section_id"].startswith("s_")
+    store = LibraryStore.open(tmp_path / "library.sqlite3", "m", 2)
+    store.replace_document("x.pdf", "unknown", (), units, [u.text for u in units],
+                           [[1.0, 0.0]] * len(units), parents)
+    stored = store.hydrate([uid for uid, _ in store.knn([1.0, 0.0], k=len(units))])
+    by_ordinal = {u.ordinal: u.metadata for u in stored.values()}
+
+    assert by_ordinal[units[0].ordinal]["section_id"].startswith("s_")
 
     actions_unit = next(u for u in units if u.section_heading and u.section_heading.endswith("Actions"))
-    meta_actions = _embed_unit_metadata(Path("x.pdf"), actions_unit, "unknown")
-    assert "/" in meta_actions["section_path"]
+    assert "/" in by_ordinal[actions_unit.ordinal]["section_path"]
+    store.close()
 
 
 def test_section_ids_are_stable_across_runs():
@@ -243,11 +247,12 @@ def test_section_ids_are_stable_across_runs():
     assert [c.section_id for c in a] == [c.section_id for c in b]
 
 
-def test_pipeline_version_names_chunker_and_embedder():
+def test_pipeline_version_names_chunker_embedder_and_store():
     from legend_lore.chunker import CHUNKER_VERSION, PIPELINE_VERSION
     from legend_lore.embedder import EMBEDDING_MODEL
     assert CHUNKER_VERSION == "structure_aware-v3"
-    assert PIPELINE_VERSION == f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}"
+    from legend_lore.chunker import STORE_VERSION
+    assert PIPELINE_VERSION == f"{CHUNKER_VERSION}/{EMBEDDING_MODEL}/{STORE_VERSION}"
 
 
 # ─────────────────────── hard-cap enforcement ───────────────────────

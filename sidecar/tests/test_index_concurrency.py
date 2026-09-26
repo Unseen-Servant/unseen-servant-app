@@ -2,7 +2,7 @@
 Regression tests for /api/index-files and /api/reindex-file event-loop blocking.
 
 If these endpoints are declared as ``async def`` while their bodies do heavy
-synchronous work (PyMuPDF + Ollama + Chroma), the FastAPI event loop is blocked
+synchronous work (PyMuPDF + Ollama + SQLite), the FastAPI event loop is blocked
 for the entire indexing duration. Real-world consequence: the frontend's
 ``/health`` poll times out, the sidecar appears disconnected, and the user-
 facing "Add to index" / "Re-index" right-click actions look broken.
@@ -27,22 +27,17 @@ HEALTH_DELAY_S = 0.2
 
 
 @pytest.fixture
-def slow_app(
-    monkeypatch, test_collection, test_chroma_client, test_embedding_function, tmp_path
-):
+def slow_app(monkeypatch, test_store, test_embed_fn, tmp_path):
     """App where index_single_pdf sleeps for SLOW_S to simulate a real PDF."""
 
-    def slow_index(pdf_path, collection, **kwargs):
+    def slow_index(pdf_path, store, embed_fn, **kwargs):
         time.sleep(SLOW_S)
         return 1, None, "unknown", []
 
     monkeypatch.setattr(router, "index_single_pdf", slow_index)
 
     app = server.create_app(
-        collection=test_collection,
-        data_dir=tmp_path,
-        chroma_client=test_chroma_client,
-        embedding_function=test_embedding_function,
+        store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn,
     )
     return app
 

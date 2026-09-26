@@ -9,11 +9,8 @@ next auto-sync poll to discover the change.
 
 import json
 import shutil
-import sqlite3
-from pathlib import Path
 
-from legend_lore.parents_store import PARENTS_FILENAME, count_units_fts
-from legend_lore.service import MANIFEST_FILENAME, chunk_id_prefix
+from legend_lore.service import MANIFEST_FILENAME
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +52,7 @@ def test_file_rename_updates_manifest(client, sample_pdf_path, tmp_path):
     assert new_path in manifest["files"]
 
 
-def test_file_rename_updates_chromadb_metadata(client, sample_pdf_path, tmp_path):
+def test_file_rename_updates_search_metadata(client, sample_pdf_path, tmp_path):
     """Search results should reference the new path after rename."""
     index_pdfs(client, sample_pdf_path)
 
@@ -122,51 +119,33 @@ def test_file_rename_preserves_chunk_count(client, sample_pdf_path, tmp_path):
 
 
 def test_file_rename_moves_the_lexical_rows(
-    client, large_text_pdf_path, test_collection, tmp_path, monkeypatch
+    client, large_text_pdf_path, test_store, tmp_path
 ):
-    """The persisted FTS rows follow the file and keep the ids Chroma has.
+    """The persisted FTS rows follow the file and keep their unit ids.
 
-    Both sides rebuild the id from the chunk's stored ordinal, so they
-    agree even though ChromaDB promises no ordering for ``get`` — the
-    reversed ``get`` here stands in for any order but insertion order.
+    A rename is one update of the book's documents row, so the lexical
+    side finds the same units under the new path and none under the old.
     """
     index_pdfs(client, large_text_pdf_path)
     old_path = str(large_text_pdf_path)
-    units = count_units_fts(tmp_path, old_path)
-    assert units > 1  # a single-chunk file could not detect a reordering
+    before = test_store.fts(
+        '"combat"', 50, test_store.scope_document_ids(paths=[old_path])
+    )
+    assert len(before) > 1  # a single-chunk file could not detect a mix-up
 
-    orig_get = type(test_collection).get
-
-    def reversed_get(self, **kwargs):
-        got = orig_get(self, **kwargs)
-        for key in ("ids", "documents", "metadatas", "embeddings"):
-            if got.get(key) is not None:
-                got[key] = list(reversed(got[key]))
-        return got
-
-    monkeypatch.setattr(type(test_collection), "get", reversed_get)
     new_path = str(tmp_path / "renamed_lexical.pdf")
     resp = client.post("/api/file-rename", json={
         "old_path": old_path,
         "new_path": new_path,
     })
     assert resp.json()["renamed"] is True
-    monkeypatch.undo()
 
-    assert count_units_fts(tmp_path, old_path) == 0
-    assert count_units_fts(tmp_path, new_path) == units
-
-    conn = sqlite3.connect(tmp_path / PARENTS_FILENAME)
-    fts_ids = {
-        r[0] for r in conn.execute(
-            "SELECT chunk_id FROM unit_fts WHERE source = ?", (new_path,)
-        )
-    }
-    conn.close()
-    got = test_collection.get(where={"source": new_path}, include=["metadatas"])
-    prefix = chunk_id_prefix(Path(new_path))
-    assert fts_ids == set(got["ids"])
-    assert got["ids"] == [f"{prefix}_{m['chunk']}" for m in got["metadatas"]]
+    assert test_store.scope_document_ids(paths=[old_path]) == []
+    after = test_store.fts(
+        '"combat"', 50, test_store.scope_document_ids(paths=[new_path])
+    )
+    assert after == before
+    assert {u.source for u in test_store.hydrate(after).values()} == {new_path}
 
 
 def test_file_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_path):
@@ -207,7 +186,7 @@ def test_file_delete_removes_from_manifest(client, sample_pdf_path, tmp_path):
 
 
 def test_file_delete_removes_chunks(client, sample_pdf_path, tmp_path):
-    """ChromaDB should have no chunks for the file after delete."""
+    """The store should have no chunks for the file after delete."""
     index_pdfs(client, sample_pdf_path)
 
     search_resp = client.post("/api/search", json={"query": "dragon"})

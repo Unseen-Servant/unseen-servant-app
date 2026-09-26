@@ -1,9 +1,9 @@
 """Tests for search not monopolising the event loop (issue #344).
 
 ``/api/search`` is declared ``async def`` but its body is entirely
-synchronous — Chroma's query (which embeds via a *blocking* HTTP call to
-Ollama), the cross-encoder rerank, and several manifest reads all run
-inline. Every millisecond of that runs on the uvicorn event loop, so one
+synchronous — the query embed (a *blocking* HTTP call to Ollama), the
+store's vector search, the cross-encoder rerank, and several manifest
+reads all run inline. Every millisecond of that runs on the uvicorn event loop, so one
 5-7s search stalls every other request: health polls, MCP heartbeats, and
 (once it exists) the Unseen Servant's token stream.
 
@@ -19,7 +19,9 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 import pytest
 
+from legend_lore.granularity import EmbedUnit
 from server import create_app
+from tests.conftest import seed_book
 
 # How long the fake query holds the gate if the test fails to release it.
 # Bounds the damage when the event loop *is* blocked: the test fails by
@@ -28,16 +30,19 @@ GATE_TIMEOUT = 3.0
 
 
 @pytest.fixture
-def app(test_collection, test_chroma_client, test_embedding_function, tmp_path):
-    return create_app(
-        collection=test_collection,
-        data_dir=tmp_path,
-        chroma_client=test_chroma_client,
-        embedding_function=test_embedding_function,
+def app(test_store, test_embed_fn, tmp_path):
+    return create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
+
+
+def _unit(ordinal: int, text: str, heading: str | None = None) -> EmbedUnit:
+    return EmbedUnit(
+        chunk_id=f"c{ordinal}", text=text, parent_id=f"p{ordinal}",
+        chunk_type="prose", section_heading=heading, source_pdf="",
+        page_start=1, page_end=1, ordinal=ordinal,
     )
 
 
-async def test_search_does_not_block_the_event_loop(app, test_collection, monkeypatch):
+async def test_search_does_not_block_the_event_loop(app, test_store, monkeypatch):
     """While a search is mid-flight, /health must still answer.
 
     The property has to be encoded as *ordering*, not as a timeout: a
@@ -61,9 +66,9 @@ async def test_search_does_not_block_the_event_loop(app, test_collection, monkey
     def blocking_query(*args, **kwargs):
         entered_query.set()
         served_health.wait(timeout=GATE_TIMEOUT)
-        return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+        return []
 
-    monkeypatch.setattr(test_collection, "query", blocking_query)
+    monkeypatch.setattr(test_store, "knn", blocking_query)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -89,27 +94,17 @@ async def test_search_does_not_block_the_event_loop(app, test_collection, monkey
     )
 
 
-async def test_concurrent_searches_both_succeed(app, test_collection):
+async def test_concurrent_searches_both_succeed(app, test_store, test_embed_fn):
     """Two searches in flight at once must both return correct results.
 
-    Guards the premise the threadpool move rests on: Chroma collection
-    reads are safe from multiple threads.
+    Guards the premise the threadpool move rests on: store reads are safe
+    from multiple threads (each worker thread gets its own connection).
     """
-    test_collection.add(
-        ids=["a", "b"],
-        documents=[
-            "The fire drake breathes gouts of flame and hoards gold.",
-            "Rope, hempen, 50 feet. Costs 1 gp and weighs 10 pounds.",
-        ],
-        metadatas=[
-            {"filename": "bestiary.pdf", "source": "/lib/bestiary.pdf",
-             "parent_id": "p1", "section_heading": "Fire Drake",
-             "page_start": 1, "page_end": 1, "game_system": "unknown"},
-            {"filename": "gear.pdf", "source": "/lib/gear.pdf",
-             "parent_id": "p2", "section_heading": "Rope",
-             "page_start": 2, "page_end": 2, "game_system": "unknown"},
-        ],
-    )
+    seed_book(test_store, test_embed_fn, "/lib/bestiary.pdf", [_unit(
+        0, "The fire drake breathes gouts of flame and hoards gold.",
+        "Fire Drake")])
+    seed_book(test_store, test_embed_fn, "/lib/gear.pdf", [_unit(
+        0, "Rope, hempen, 50 feet. Costs 1 gp and weighs 10 pounds.", "Rope")])
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -123,24 +118,25 @@ async def test_concurrent_searches_both_succeed(app, test_collection):
     assert rope.json()["results"][0]["filename"] == "gear.pdf"
 
 
-def test_collection_query_is_thread_safe(test_collection):
-    """Direct-to-Chroma concurrency check, independent of FastAPI.
+def test_store_knn_is_thread_safe(test_store, test_embed_fn):
+    """Direct-to-store concurrency check, independent of FastAPI.
 
     If this fails, the threadpool approach is unsound and the fix has to
     serialise instead — so it's worth pinning separately from the routes.
     """
-    test_collection.add(
-        ids=[f"c{i}" for i in range(20)],
-        documents=[f"Chunk number {i} about dragons and dungeons." for i in range(20)],
-        metadatas=[{"parent_id": f"p{i}"} for i in range(20)],
-    )
+    seed_book(test_store, test_embed_fn, "/lib/dragons.pdf", [
+        _unit(i, f"Chunk number {i} about dragons and dungeons.")
+        for i in range(20)
+    ])
+    vectors = test_embed_fn([f"dragons {n}" for n in range(16)])
 
-    def query(n):
-        return test_collection.query(query_texts=[f"dragons {n}"], n_results=5)
+    def query(vec):
+        hits = test_store.knn(vec, 5)
+        return test_store.hydrate([uid for uid, _ in hits])
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(query, range(16)))
+        results = list(pool.map(query, vectors))
 
     assert len(results) == 16
     for r in results:
-        assert len(r["documents"][0]) == 5
+        assert len(r) == 5

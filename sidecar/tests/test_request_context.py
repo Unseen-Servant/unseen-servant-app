@@ -13,7 +13,7 @@ a ``RequestContext`` at the top of ``_search_sync``.
 import pytest
 
 from legend_lore import router, service
-from legend_lore.parents_store import upsert_units_fts
+from legend_lore.granularity import EmbedUnit
 from legend_lore.service import (
     Collection,
     CollectionsStore,
@@ -23,6 +23,7 @@ from legend_lore.service import (
     save_collections,
     save_manifest,
 )
+from tests.conftest import TEST_EMBED_DIM, seed_book
 
 
 def _entry(filename: str, game_system: str = "OSR", content_hash: str = "h1",
@@ -73,28 +74,6 @@ def test_manifest_digest_changes_on_add_remove_and_pipeline_version():
 # /api/search — one load per file per request
 # ---------------------------------------------------------------------------
 
-def _meta(parent_id: str, filename: str, game_system: str) -> dict:
-    return {
-        "parent_id": parent_id,
-        "filename": filename,
-        "source": f"/corpus/{filename}",
-        "game_system": game_system,
-        "section_heading": "",
-        "page_start": 1,
-        "page_end": 1,
-    }
-
-
-FAKE_RESULTS = {
-    "ids": [["c-osr", "c-srd"]],
-    "documents": [["osr fireball text", "srd fireball text"]],
-    "metadatas": [[
-        _meta("p-osr", "monsters.pdf", "OSR"),
-        _meta("p-srd", "SRD_CC_v5.1.pdf", "D&D 5E"),
-    ]],
-    "distances": [[0.10, 0.30]],
-}
-
 MANIFEST = IndexManifest(files={
     "/corpus/monsters.pdf": _entry("monsters.pdf", "OSR"),
     "/corpus/SRD_CC_v5.1.pdf": _entry("SRD_CC_v5.1.pdf", "D&D 5E"),
@@ -124,19 +103,36 @@ def counting_loads(monkeypatch):
     return counts
 
 
+def _book(store, filename: str, game_system: str, text: str) -> int:
+    """Index one unit at /corpus/<filename>; returns its unit id."""
+    path = f"/corpus/{filename}"
+    unit = EmbedUnit(
+        chunk_id="c0", text=text, parent_id=f"p-{filename}", chunk_type="prose",
+        section_heading=None, source_pdf=path, page_start=1, page_end=1,
+        ordinal=0,
+    )
+    seed_book(
+        store, lambda texts: [[1.0] + [0.0] * (TEST_EMBED_DIM - 1)] * len(texts),
+        path, [unit], game_system=game_system,
+    )
+    return store.conn().execute(
+        "SELECT u.id FROM units u JOIN documents d ON d.id = u.document_id "
+        "WHERE d.path = ?", (path,)
+    ).fetchone()[0]
+
+
 @pytest.fixture
-def fake_pool_client(client, test_collection, tmp_path, monkeypatch):
+def fake_pool_client(client, test_store, tmp_path, monkeypatch):
+    """Both books indexed (so the spell corrector reads the store under the
+    manifest-digest key and must reuse the request's manifest rather than
+    reading its own); the dense pool is fixed."""
+    osr = _book(test_store, "monsters.pdf", "OSR", "osr fireball text")
+    srd = _book(test_store, "SRD_CC_v5.1.pdf", "D&D 5E", "srd fireball text")
     monkeypatch.setattr(
-        type(test_collection), "query", lambda self, **kw: FAKE_RESULTS)
+        test_store, "knn",
+        lambda vec, k, doc_ids=None: [(osr, 0.10), (srd, 0.30)],
+    )
     save_manifest(tmp_path, MANIFEST)
-    # FTS rows covering every indexed chunk, as in any index built since
-    # roadmap 1.6 — so the spell corrector takes its manifest-digest,
-    # store-backed path and must reuse the request's manifest rather than
-    # reading its own.
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-osr", 0, "monsters.pdf", "OSR", "p-osr", "osr fireball text")])
-    upsert_units_fts(tmp_path, "/corpus/SRD_CC_v5.1.pdf", [
-        ("c-srd", 0, "SRD_CC_v5.1.pdf", "D&D 5E", "p-srd", "srd fireball text")])
     return client
 
 

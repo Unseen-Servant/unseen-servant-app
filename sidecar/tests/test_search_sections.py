@@ -5,16 +5,15 @@ the root chosen by `parents_store.section_root_for` — deduped by that
 root rather than by parent_id, with the unit that actually matched
 (`matched_text`) and its own parent (`chunk_text`) kept alongside.
 
-The fixtures stage units directly in Chroma with hand-built metadata and
-their parents in the SQLite store, then pin the dense ranking with a fake
-`collection.query` — the same deterministic setup as
-`test_search_hybrid.py`.
+The fixtures stage units and their parents directly in the library store,
+then pin the dense ranking with a fake `store.knn` — the same
+deterministic setup as `test_search_hybrid.py`.
 """
 
 import pytest
 
-from legend_lore.granularity import ParentDoc
-from legend_lore.parents_store import upsert_parents
+from legend_lore.granularity import EmbedUnit, ParentDoc
+from tests.conftest import seed_book
 
 SOURCE = "/corpus/monsters.pdf"
 
@@ -24,32 +23,26 @@ SOURCE = "/corpus/monsters.pdf"
 DRAGON_TEXT = "Dragon lore. " * 500
 
 
-def _meta(parent_id: str, section_id: str, section_path: str, heading: str) -> dict:
-    return {
-        "parent_id": parent_id,
-        "section_id": section_id,
-        "section_path": section_path,
-        "filename": "monsters.pdf",
-        "source": SOURCE,
-        "game_system": "OSR",
-        "section_heading": heading,
-        "page_start": 10,
-        "page_end": 10,
-        # Front matter puts the printed number well ahead of the physical
-        # one, as in a real book.
-        "page_label_start": "326",
-        "page_label_end": "326",
-    }
+def _unit(ordinal: int, text: str, parent_id: str, section_id: str | None,
+          section_path: str | None, heading: str, source: str = SOURCE) -> EmbedUnit:
+    return EmbedUnit(
+        chunk_id=f"c{ordinal}", text=text, parent_id=parent_id,
+        chunk_type="prose", section_heading=heading, source_pdf=source,
+        page_start=10, page_end=10, ordinal=ordinal,
+        section_id=section_id, section_path=section_path,
+    )
 
+
+# Front matter puts the printed number well ahead of the physical one, as
+# in a real book.
+PAGE_LABELS = {10: "326"}
 
 UNITS = [
-    ("u-k", "Kraken overview text",
-     _meta("p-k", "s_k", "s_m/s_k", "Monsters > Kraken")),
-    ("u-ka", "Tentacle attack text",
-     _meta("p-ka", "s_ka", "s_m/s_k/s_ka", "Monsters > Kraken > Actions")),
-    ("u-kl", "Ink cloud text",
-     _meta("p-kl", "s_kl", "s_m/s_k/s_kl",
-           "Monsters > Kraken > Legendary Actions")),
+    _unit(0, "Kraken overview text", "p-k", "s_k", "s_m/s_k", "Monsters > Kraken"),
+    _unit(1, "Tentacle attack text", "p-ka", "s_ka", "s_m/s_k/s_ka",
+          "Monsters > Kraken > Actions"),
+    _unit(2, "Ink cloud text", "p-kl", "s_kl", "s_m/s_k/s_kl",
+          "Monsters > Kraken > Legendary Actions"),
 ]
 
 PARENT_TEXTS = {
@@ -75,116 +68,92 @@ def _parent(pid: str, heading: str, section_id: str | None,
     )
 
 
-def _stage_units(collection):
-    collection.add(
-        ids=[u[0] for u in UNITS],
-        documents=[u[1] for u in UNITS],
-        metadatas=[u[2] for u in UNITS],
-    )
+def _unit_ids(store, path: str = SOURCE) -> list[int]:
+    """The store's unit ids for a book, in ordinal order."""
+    return [r[0] for r in store.conn().execute(
+        "SELECT u.id FROM units u JOIN documents d ON d.id = u.document_id "
+        "WHERE d.path = ? ORDER BY u.ordinal", (path,))]
 
 
-def _fake_dense(monkeypatch, collection, unit_ids):
-    """Pin the dense ranking to `unit_ids`, in that order."""
-    by_id = {u[0]: u for u in UNITS}
-    picked = [by_id[i] for i in unit_ids]
-    fake = {
-        "ids": [[u[0] for u in picked]],
-        "documents": [[u[1] for u in picked]],
-        "metadatas": [[u[2] for u in picked]],
-        "distances": [[0.2 + 0.1 * i for i in range(len(picked))]],
-    }
-    monkeypatch.setattr(type(collection), "query", lambda self, **kw: fake)
+def _fake_dense(monkeypatch, store, pinned):
+    """Pin the dense ranking to `pinned` — (path, ordinal) pairs, in that
+    order — with increasing distances. Resolved on each call so the ids
+    track whatever is in the store."""
+    def knn(vector, k, doc_ids=None):
+        return [
+            (_unit_ids(store, path)[ordinal], 0.2 + 0.1 * i)
+            for i, (path, ordinal) in enumerate(pinned)
+        ]
+    monkeypatch.setattr(store, "knn", knn)
+
+
+def _seed(store, embed_fn, units, parents=()):
+    seed_book(store, embed_fn, SOURCE, units, parents=parents,
+              game_system="OSR", page_labels=PAGE_LABELS)
 
 
 @pytest.fixture
-def section_client(client, test_collection, tmp_path, monkeypatch):
+def section_client(client, test_store, test_embed_fn, monkeypatch):
     """Three Kraken units under one section tree, plus a bulky Dragon
     sibling so the section root is the Kraken and not all of Monsters.
 
-    `tmp_path` is the client's data dir, so the parents land where the
-    app reads them. Dense returns Actions first, Legendary Actions
-    second — two hits inside the same section."""
-    _stage_units(test_collection)
-    upsert_parents(tmp_path, SOURCE, [
+    Dense returns Actions first, Legendary Actions second — two hits
+    inside the same section."""
+    _seed(test_store, test_embed_fn, UNITS, [
         _parent("p-d", "Monsters > Dragon", "s_d", "s_m/s_d", DRAGON_TEXT),
         _parent("p-k", "Monsters > Kraken", "s_k", "s_m/s_k"),
         _parent("p-ka", "Monsters > Kraken > Actions", "s_ka", "s_m/s_k/s_ka"),
         _parent("p-kl", "Monsters > Kraken > Legendary Actions",
                 "s_kl", "s_m/s_k/s_kl"),
     ])
-    _fake_dense(monkeypatch, test_collection, ["u-ka", "u-kl"])
+    _fake_dense(monkeypatch, test_store, [(SOURCE, 1), (SOURCE, 2)])
     return client
 
 
 @pytest.fixture
-def section_client_legacy(client, test_collection, tmp_path, monkeypatch):
+def section_client_legacy(client, test_store, test_embed_fn, monkeypatch):
     """An index predating the section columns: parents carry no
-    section_id/section_path and the units' metadata has section_path "".
+    section_id/section_path and neither do the units.
 
     Each parent covers exactly its unit's page, so nothing widens the span
     — the hit keeps its printed page labels."""
     legacy_units = [
-        (uid, doc, {**meta, "section_id": "", "section_path": ""})
-        for uid, doc, meta in UNITS
+        _unit(u.ordinal, u.text, u.parent_id, None, None, u.section_heading)
+        for u in UNITS
     ]
-    test_collection.add(
-        ids=[u[0] for u in legacy_units],
-        documents=[u[1] for u in legacy_units],
-        metadatas=[u[2] for u in legacy_units],
-    )
-    upsert_parents(tmp_path, SOURCE, [
+    _seed(test_store, test_embed_fn, legacy_units, [
         _parent("p-k", "Monsters > Kraken", None, None, pages=(10, 10)),
         _parent("p-ka", "Monsters > Kraken > Actions", None, None, pages=(10, 10)),
         _parent("p-kl", "Monsters > Kraken > Legendary Actions", None, None,
                 pages=(10, 10)),
     ])
-    picked = [legacy_units[1], legacy_units[2]]
-    fake = {
-        "ids": [[u[0] for u in picked]],
-        "documents": [[u[1] for u in picked]],
-        "metadatas": [[u[2] for u in picked]],
-        "distances": [[0.2, 0.3]],
-    }
-    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    _fake_dense(monkeypatch, test_store, [(SOURCE, 1), (SOURCE, 2)])
     return client
 
 
 @pytest.fixture
-def section_client_no_parents(client, test_collection, tmp_path, monkeypatch):
-    """Units in Chroma whose parents rows are gone (cleared store, or a
-    half-finished reindex): every subtree measures 0 chars, so nothing may
-    be allowed to "fit" at depth 1."""
-    _stage_units(test_collection)
-    _fake_dense(monkeypatch, test_collection, ["u-ka", "u-kl"])
+def section_client_no_parents(client, test_store, test_embed_fn, monkeypatch):
+    """Units whose book has no parents rows: every subtree measures 0
+    chars, so nothing may be allowed to "fit" at depth 1."""
+    _seed(test_store, test_embed_fn, UNITS)
+    _fake_dense(monkeypatch, test_store, [(SOURCE, 1), (SOURCE, 2)])
     return client
 
 
 @pytest.fixture
-def section_client_three_sections(client, test_collection, tmp_path, monkeypatch):
+def section_client_three_sections(client, test_store, test_embed_fn, monkeypatch):
     """The same three units, but each in a section of its own — a pool the
     dedupe loop can either satisfy or drain, which is what `exhausted`
     reports."""
     units = [
-        (uid, doc, {**meta, "section_id": sid, "section_path": sid})
-        for (uid, doc, meta), sid in zip(UNITS, ["s_a", "s_b", "s_c"])
+        _unit(u.ordinal, u.text, u.parent_id, sid, sid, u.section_heading)
+        for u, sid in zip(UNITS, ["s_a", "s_b", "s_c"])
     ]
-    test_collection.add(
-        ids=[u[0] for u in units],
-        documents=[u[1] for u in units],
-        metadatas=[u[2] for u in units],
-    )
-    upsert_parents(tmp_path, SOURCE, [
-        _parent(m["parent_id"], m["section_heading"], m["section_id"],
-                m["section_path"])
-        for _, _, m in units
+    _seed(test_store, test_embed_fn, units, [
+        _parent(u.parent_id, u.section_heading, u.section_id, u.section_path)
+        for u in units
     ])
-    fake = {
-        "ids": [[u[0] for u in units]],
-        "documents": [[u[1] for u in units]],
-        "metadatas": [[u[2] for u in units]],
-        "distances": [[0.2, 0.3, 0.4]],
-    }
-    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    _fake_dense(monkeypatch, test_store, [(SOURCE, 0), (SOURCE, 1), (SOURCE, 2)])
     return client
 
 
@@ -235,10 +204,10 @@ def test_the_roots_found_while_deduping_are_handed_to_fetch_sections(
     seen: dict = {}
     real = service.fetch_sections
 
-    def spy(data_dir, hits, **kwargs):
+    def spy(store, hits, **kwargs):
         seen["hits"] = hits
         seen.update(kwargs)
-        return real(data_dir, hits, **kwargs)
+        return real(store, hits, **kwargs)
 
     monkeypatch.setattr(service, "fetch_sections", spy)
     assert _search(section_client, query="kraken")["results"]
@@ -277,37 +246,24 @@ def test_a_hit_whose_span_did_not_widen_keeps_its_page_labels(
     assert r[0]["page_label_start"] == "326" and r[0]["page_label_end"] == "326"
 
 
-def test_cross_edition_twin_collapses_into_also_in(client, test_collection, monkeypatch):
+def test_cross_edition_twin_collapses_into_also_in(
+    client, test_store, test_embed_fn, monkeypatch
+):
     """Two editions of the same rule (identical matched_text, same leaf
     title, different files) are one result with the twin in `also_in`
     (roadmap 2.3) — no parents/sections needed, same as the no-parents
     fixture above."""
-    twins = [
-        ("u-51", "You create three glowing darts of magical force.",
-         {"parent_id": "p-51", "section_id": "s_51", "section_path": "",
-          "filename": "SRD_5.1.pdf", "source": "/l/SRD_5.1.pdf",
-          "game_system": "5e", "section_heading": "Spells > Magic Missile",
-          "page_start": 1, "page_end": 1,
-          "page_label_start": "", "page_label_end": ""}),
-        ("u-521", "You create three glowing darts of magical force.",
-         {"parent_id": "p-521", "section_id": "s_521", "section_path": "",
-          "filename": "SRD_5.2.1.pdf", "source": "/l/SRD_5.2.1.pdf",
-          "game_system": "5e", "section_heading": "Spells > Magic Missile",
-          "page_start": 1, "page_end": 1,
-          "page_label_start": "", "page_label_end": ""}),
-    ]
-    test_collection.add(
-        ids=[u[0] for u in twins],
-        documents=[u[1] for u in twins],
-        metadatas=[u[2] for u in twins],
-    )
-    fake = {
-        "ids": [[u[0] for u in twins]],
-        "documents": [[u[1] for u in twins]],
-        "metadatas": [[u[2] for u in twins]],
-        "distances": [[0.1, 0.2]],
-    }
-    monkeypatch.setattr(type(test_collection), "query", lambda self, **kw: fake)
+    twins = [("/l/SRD_5.1.pdf", "p-51", "s_51"),
+             ("/l/SRD_5.2.1.pdf", "p-521", "s_521")]
+    for path, pid, sid in twins:
+        unit = EmbedUnit(
+            chunk_id="c0", text="You create three glowing darts of magical force.",
+            parent_id=pid, chunk_type="prose",
+            section_heading="Spells > Magic Missile", source_pdf=path,
+            page_start=1, page_end=1, ordinal=0, section_id=sid, section_path=None,
+        )
+        seed_book(test_store, test_embed_fn, path, [unit], game_system="5e")
+    _fake_dense(monkeypatch, test_store, [(p, 0) for p, _, _ in twins])
 
     r = _search(client, query="magic missile", rerank=False)["results"]
     assert len(r) == 1

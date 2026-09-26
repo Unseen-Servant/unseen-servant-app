@@ -1,7 +1,7 @@
 """/api/search variant expansion (typo-tolerance design, section B).
 
-Spacing variants of the (corrected) query are searched alongside it in
-one multi-query Chroma call and fused with RRF: a query that joins what
+Spacing variants of the (corrected) query are embedded alongside it in
+one call, each gets its own dense ranking, and they fuse with RRF: a query that joins what
 the corpus splits — or splits what it joins — converges on the same
 results. Default OFF — the 2026-07-10 eval gate failed (spacing
 variants gained nothing, clean queries regressed; findings in the
@@ -13,20 +13,11 @@ BM25 ranking joins the same fusion.
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
-from legend_lore.parents_store import upsert_units_fts
-
-
-def _meta(parent_id: str, filename: str) -> dict:
-    return {
-        "parent_id": parent_id,
-        "filename": filename,
-        "source": f"/corpus/{filename}",
-        "game_system": "OSR",
-        "section_heading": "",
-        "page_start": 1,
-        "page_end": 1,
-    }
+from legend_lore.granularity import EmbedUnit
+from server import create_app
+from tests.conftest import TEST_EMBED_DIM, seed_book
 
 
 # Gives the vocabulary owlbear=3 and bear=3 (owl stays at 0 — protected
@@ -35,36 +26,64 @@ JOIN_DOC = "a bear and an owlbear; the bear meets the owlbear; bear owlbear"
 PROSE_DOC = "combat happens in rounds and each round has phases"
 
 
-@pytest.fixture
-def capture_client(client, test_collection, monkeypatch):
-    """Dense query calls are captured; each query text gets its own
-    fixed ranking so tests can see fusion across the variants."""
-    test_collection.add(
-        ids=["c-stat"],
-        documents=[JOIN_DOC],
-        metadatas=[_meta("p-stat", "monsters.pdf")],
+def _flat(texts):
+    """Placeholder vectors: every dense ranking here is scripted."""
+    return [[1.0] + [0.0] * (TEST_EMBED_DIM - 1) for _ in texts]
+
+
+def _book(store, filename, text):
+    """Index one unit at /corpus/<filename>; returns its unit id."""
+    path = f"/corpus/{filename}"
+    unit = EmbedUnit(
+        chunk_id="c0", text=text, parent_id=f"p-{filename}",
+        chunk_type="prose", section_heading=None, source_pdf=path,
+        page_start=1, page_end=1, ordinal=0,
     )
-    captured: dict = {}
-    rankings = {
-        "owl bear": ("c-prose", PROSE_DOC, _meta("p-prose", "rules.pdf"), 0.4),
-        "owlbear": ("c-stat", JOIN_DOC, _meta("p-stat", "monsters.pdf"), 0.2),
-    }
+    seed_book(store, _flat, path, [unit], game_system="OSR")
+    return store.conn().execute(
+        "SELECT u.id FROM units u JOIN documents d ON d.id = u.document_id "
+        "WHERE d.path = ?", (path,)
+    ).fetchone()[0]
 
-    def fake_query(self, **kwargs):
-        captured.update(kwargs)
-        out = {"ids": [], "documents": [], "metadatas": [], "distances": []}
-        for q in kwargs["query_texts"]:
-            cid, doc, meta, dist = rankings.get(
-                q, ("c-stat", JOIN_DOC, _meta("p-stat", "monsters.pdf"), 0.3)
-            )
-            out["ids"].append([cid])
-            out["documents"].append([doc])
-            out["metadatas"].append([meta])
-            out["distances"].append([dist])
-        return out
 
-    monkeypatch.setattr(type(test_collection), "query", fake_query)
-    return client, captured
+@pytest.fixture
+def dense(test_store, tmp_path, monkeypatch):
+    """App whose dense side is scripted per query text.
+
+    Records the texts of each embed call in ``state["query_texts"]``; the
+    knn calls that follow (one per text, in order) return
+    ``state["rankings"][text]`` — (unit_id, distance) pairs — or
+    ``state["default"]`` for a text with no scripted ranking.
+    """
+    state: dict = {"query_texts": None, "rankings": {}, "default": []}
+    pending: list[str] = []
+
+    def embed(texts):
+        state["query_texts"] = list(texts)
+        pending[:] = list(texts)
+        return _flat(texts)
+
+    def knn(vec, k, doc_ids=None):
+        text = pending.pop(0)
+        return list(state["rankings"].get(text, state["default"]))
+
+    monkeypatch.setattr(test_store, "knn", knn)
+    client = TestClient(
+        create_app(store=test_store, data_dir=tmp_path, embed_fn=embed)
+    )
+    return client, state
+
+
+@pytest.fixture
+def capture_client(dense, test_store):
+    """Each query text gets its own fixed ranking so tests can see fusion
+    across the variants."""
+    client, state = dense
+    stat = _book(test_store, "monsters.pdf", JOIN_DOC)
+    prose = _book(test_store, "rules.pdf", PROSE_DOC)
+    state["rankings"] = {"owl bear": [(prose, 0.4)], "owlbear": [(stat, 0.2)]}
+    state["default"] = [(stat, 0.3)]
+    return client, state
 
 
 def _search(client, **overrides):
@@ -83,7 +102,7 @@ def _search(client, **overrides):
 def test_spacing_query_searches_variant_and_fuses(capture_client):
     client, captured = capture_client
     body = _search(client)
-    # The joined variant rode along in one multi-query call...
+    # The joined variant rode along in the same embed call...
     assert captured["query_texts"] == ["owl bear", "owlbear"]
     # ...and the fused pool contains parents from both rankings.
     assert {r["filename"] for r in body["results"]} == {
@@ -108,9 +127,10 @@ def test_query_without_variants_stays_single(capture_client):
 
 def test_expansion_defaults_off(capture_client):
     client, captured = capture_client
+    # hybrid off: BM25 would add the stat unit ("bear") on its own.
     payload = {
         "query": "owl bear", "n_results": 5,
-        "rerank": False,
+        "rerank": False, "hybrid": False,
     }
     resp = client.post("/api/search", json=payload)
     assert resp.status_code == 200, resp.text
@@ -127,69 +147,32 @@ def test_expansion_runs_without_correction(capture_client):
     assert body["corrected_query"] is None
 
 
-def test_fused_distance_is_minimum_across_rankings(
-    client, test_collection, monkeypatch
-):
+def test_fused_distance_is_minimum_across_rankings(dense, test_store):
     """The same candidate found by primary and variant reports the
     better (smaller) of its cosine distances."""
-    test_collection.add(
-        ids=["c-stat"],
-        documents=[JOIN_DOC],
-        metadatas=[_meta("p-stat", "monsters.pdf")],
-    )
-    distances = {"owl bear": 0.5, "owlbear": 0.1}
+    client, state = dense
+    stat = _book(test_store, "monsters.pdf", JOIN_DOC)
+    state["rankings"] = {"owl bear": [(stat, 0.5)], "owlbear": [(stat, 0.1)]}
 
-    def fake_query(self, **kwargs):
-        return {
-            "ids": [["c-stat"] for _ in kwargs["query_texts"]],
-            "documents": [[JOIN_DOC] for _ in kwargs["query_texts"]],
-            "metadatas": [
-                [_meta("p-stat", "monsters.pdf")]
-                for _ in kwargs["query_texts"]
-            ],
-            "distances": [[distances[q]] for q in kwargs["query_texts"]],
-        }
-
-    monkeypatch.setattr(type(test_collection), "query", fake_query)
     body = _search(client)
     assert [r["relevance"] for r in body["results"]] == [0.9]
 
 
-def test_composes_with_hybrid(client, test_collection, tmp_path, monkeypatch):
+def test_composes_with_hybrid(dense, test_store):
     """BM25 joins the same fusion. The stat doc says only "owlbear", so
     FTS5 can't reach it from the query "owl bear" — it surfaces solely
     through the dense variant ranking, next to the BM25-only chunk."""
-    stat_doc = "the owlbear hunts; an owlbear sleeps; the owlbear tracks prey"
-    lex_doc = "the owl and the bear live in a cave"
-    test_collection.add(
-        ids=["c-stat", "c-lex"],
-        documents=[stat_doc, lex_doc],
-        metadatas=[_meta("p-stat", "monsters.pdf"), _meta("p-lex", "lex.pdf")],
+    client, state = dense
+    stat = _book(
+        test_store, "monsters.pdf",
+        "the owlbear hunts; an owlbear sleeps; the owlbear tracks prey",
     )
-    upsert_units_fts(tmp_path, "/corpus/monsters.pdf", [
-        ("c-stat", 0, "monsters.pdf", "OSR", "p-stat", stat_doc)])
-    upsert_units_fts(tmp_path, "/corpus/lex.pdf", [
-        ("c-lex", 0, "lex.pdf", "OSR", "p-lex", lex_doc)])
-    rankings = {
-        "owl bear": ("c-prose", PROSE_DOC, _meta("p-prose", "rules.pdf"), 0.4),
-        "owlbear": ("c-stat", stat_doc, _meta("p-stat", "monsters.pdf"), 0.2),
-    }
-    captured: dict = {}
+    _book(test_store, "lex.pdf", "the owl and the bear live in a cave")
+    prose = _book(test_store, "rules.pdf", PROSE_DOC)
+    state["rankings"] = {"owl bear": [(prose, 0.4)], "owlbear": [(stat, 0.2)]}
 
-    def fake_query(self, **kwargs):
-        captured.update(kwargs)
-        out = {"ids": [], "documents": [], "metadatas": [], "distances": []}
-        for q in kwargs["query_texts"]:
-            cid, doc, meta, dist = rankings[q]
-            out["ids"].append([cid])
-            out["documents"].append([doc])
-            out["metadatas"].append([meta])
-            out["distances"].append([dist])
-        return out
-
-    monkeypatch.setattr(type(test_collection), "query", fake_query)
     body = _search(client, hybrid=True)
-    assert captured["query_texts"] == ["owl bear", "owlbear"]
+    assert state["query_texts"] == ["owl bear", "owlbear"]
     assert {r["filename"] for r in body["results"]} == {
         "rules.pdf", "monsters.pdf", "lex.pdf"
     }

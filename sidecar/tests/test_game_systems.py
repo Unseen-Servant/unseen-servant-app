@@ -8,7 +8,6 @@ Tests for game system management endpoints.
 
 import json
 
-from legend_lore.parents_store import search_units_fts
 from legend_lore.service import MANIFEST_FILENAME
 
 
@@ -56,9 +55,9 @@ def test_game_systems_sorted(client, dnd5e_pdf_path, dragonbane_pdf_path):
 # ---------------------------------------------------------------------------
 
 def test_set_game_system_updates_metadata(
-    client, untagged_pdf_path, test_collection, tmp_path
+    client, untagged_pdf_path, test_store, tmp_path
 ):
-    """Setting game system should update all chunk metadata."""
+    """Setting game system should update the tag every chunk reports."""
     client.post("/api/index-files", json={
         "paths": [str(untagged_pdf_path)]
     })
@@ -73,19 +72,21 @@ def test_set_game_system_updates_metadata(
     assert data["game_system"] == "Savage Worlds"
     assert data["chunks_updated"] > 0
 
-    # Verify metadata in ChromaDB
-    results = test_collection.get(include=["metadatas"])
-    for metadata in results["metadatas"]:
-        assert metadata["game_system"] == "Savage Worlds"
+    # Every unit reads its tag from the book's documents row.
+    (doc,) = test_store.documents()
+    assert doc.game_system == "Savage Worlds"
+    unit_ids = test_store.fts('"tables"', 10)
+    assert unit_ids
+    assert {u.metadata["game_system"]
+            for u in test_store.hydrate(unit_ids).values()} == {"Savage Worlds"}
 
-    # The persisted FTS rows carry the same scope columns, so the retag
-    # has to reach them too or a game_system-scoped hybrid search would
-    # still see the old tag.
-    assert search_units_fts(
-        tmp_path, '"tables"', 10, {"game_system": "Savage Worlds"}
+    # A game_system-scoped lexical search follows the retag: it scopes
+    # through the same documents row, not a copy of the tag.
+    assert test_store.fts(
+        '"tables"', 10, test_store.scope_document_ids(systems=["Savage Worlds"])
     )
-    assert search_units_fts(
-        tmp_path, '"tables"', 10, {"game_system": "unknown"}
+    assert test_store.fts(
+        '"tables"', 10, test_store.scope_document_ids(systems=["unknown"])
     ) == []
 
 
@@ -174,9 +175,10 @@ def test_sources_unknown_game_system(client, untagged_pdf_path):
 # ---------------------------------------------------------------------------
 
 def test_set_game_systems_multi(
-    client, untagged_pdf_path, test_collection, tmp_path
+    client, untagged_pdf_path, test_store, tmp_path
 ):
-    """Setting multiple tags writes the primary to Chroma and full list to manifest."""
+    """Setting multiple tags stores the primary and full list with the book
+    and in the manifest."""
     client.post("/api/index-files", json={"paths": [str(untagged_pdf_path)]})
 
     response = client.post("/api/set-game-systems", json={
@@ -190,10 +192,11 @@ def test_set_game_systems_multi(
     assert data["game_systems"] == ["D&D 5E", "PF2E"]
     assert data["chunks_updated"] > 0
 
-    # Chroma chunks store only the primary scalar.
-    results = test_collection.get(include=["metadatas"])
-    for metadata in results["metadatas"]:
-        assert metadata["game_system"] == "D&D 5E"
+    # Units report the primary; the book carries every tag for scoping.
+    (doc,) = test_store.documents()
+    assert doc.game_system == "D&D 5E"
+    assert doc.systems == ("D&D 5E", "PF2E")
+    assert test_store.scope_document_ids(systems=["PF2E"]) != []
 
     # Manifest carries the full list.
     manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())
@@ -222,52 +225,6 @@ def test_set_game_systems_clear(client, untagged_pdf_path, tmp_path):
     entry = manifest_raw["files"][str(untagged_pdf_path)]
     assert entry["game_system"] == "unknown"
     assert entry["game_systems"] == []
-
-
-def test_set_game_systems_batches_the_chunk_update(
-    client, large_text_pdf_path, test_collection, monkeypatch
-):
-    """Tagging a file with more chunks than Chroma's cap still succeeds.
-
-    ChromaDB rejects any single update carrying more records than its max
-    batch size (5461 for a local client), so a rulebook that chunks into
-    six or thirteen thousand pieces cannot have its tags rewritten in one
-    call. Patching the batch size down to 1 exercises the multi-batch path
-    without indexing a 5000-chunk PDF.
-    """
-    from legend_lore import router
-
-    client.post("/api/index-files", json={"paths": [str(large_text_pdf_path)]})
-    total = len(test_collection.get()["ids"])
-    assert total > 1, "fixture must produce several chunks to exercise batching"
-
-    monkeypatch.setattr(router, "METADATA_UPDATE_BATCH_SIZE", 1)
-
-    # Record the size of every update call so the cap is verified directly,
-    # not just inferred from the endpoint returning 200.
-    batch_sizes = []
-    original_update = test_collection.update
-
-    def spy_update(ids, **kwargs):
-        batch_sizes.append(len(ids))
-        return original_update(ids=ids, **kwargs)
-
-    monkeypatch.setattr(test_collection, "update", spy_update)
-
-    response = client.post("/api/set-game-systems", json={
-        "filename": "core_rules.pdf",
-        "game_systems": ["OSR"],
-    })
-
-    assert response.status_code == 200, response.text
-    assert response.json()["chunks_updated"] == total
-
-    assert batch_sizes, "expected at least one update call"
-    assert max(batch_sizes) <= 1, f"a batch exceeded the cap: {batch_sizes}"
-    assert sum(batch_sizes) == total, "every chunk should be covered exactly once"
-
-    results = test_collection.get(include=["metadatas"])
-    assert all(m["game_system"] == "OSR" for m in results["metadatas"])
 
 
 def test_manifest_auto_populates_legacy(tmp_path):

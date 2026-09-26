@@ -22,13 +22,11 @@ import threading
 # before this module existed still match. Extend the string when the
 # backend changes, e.g. ``bge-m3/llamacpp-q8``.
 EMBEDDING_MODEL = "bge-m3"
+# The library store fixes its vector table to this width and records it
+# with EMBEDDING_MODEL; a store opened under different values clears
+# itself, which is how a runtime swap triggers the reindex.
+EMBEDDING_DIM = 1024
 EMBED_BASE_URL = "http://localhost:11434"
-
-# NOTE for the runtime swap: Chroma persists the embedding function's
-# ``name()`` ("ollama") in the collection config and refuses to open the
-# collection if a differently named function is supplied. A new backend
-# therefore needs a boot-time drop-and-recreate of the collection when
-# the persisted name differs, not just the fingerprint bump.
 
 
 def _embed_timeout() -> float:
@@ -68,22 +66,6 @@ def embed(texts: list[str]) -> list[list[float]]:
             detail = resp.text
         raise RuntimeError(f"embed failed ({resp.status_code}): {detail}")
     return resp.json()["embeddings"]
-
-
-def build_embedding_function():
-    """Chroma's embedding function for the collection, until the store swap.
-
-    Same endpoint and timeout as ``embed``; indexing and query embedding
-    still go through the collection (``docs/retrieval/2026-09-26-library-
-    store-design.md`` step 3 moves them to ``embed``).
-    """
-    from chromadb.utils import embedding_functions
-
-    return embedding_functions.OllamaEmbeddingFunction(
-        url=EMBED_BASE_URL,
-        model_name=EMBEDDING_MODEL,
-        timeout=int(_embed_timeout()),
-    )
 
 
 def embedder_status() -> dict:

@@ -21,12 +21,11 @@ from __future__ import annotations
 import math
 import re
 from importlib.resources import files
-from pathlib import Path
 from typing import Callable
 
 from symspellpy import SymSpell, Verbosity
 
-from .parents_store import count_phrases, open_store
+from .library_store import LibraryStore
 
 # A term is in-vocab (protected, and a valid correction target) only at
 # this frequency or above. Start 3 per the design; tune during eval.
@@ -120,47 +119,18 @@ def keyword_tokens(known_systems: dict[str, list[str]]) -> set[str]:
     }
 
 
-def build_vocabulary(collection, batch_size: int = 1000) -> dict[str, int]:
-    """Term → frequency over every chunk in a ChromaDB collection.
+def build_vocabulary_from_store(store: LibraryStore) -> dict[str, int]:
+    """Term → frequency over every indexed unit.
 
-    Counts the heading-prepended view of each chunk — the same text the
-    embedder, reranker, and lexical index see — so section-heading terms
-    (monster names above stat blocks) are correction targets too.
+    Counts the heading-prepended view of each unit (``unit_fts`` holds
+    ``_embed_text(eu)``) — the same text the embedder, reranker, and
+    lexical index see — so section-heading terms (monster names above
+    stat blocks) are correction targets too.
     """
     vocab: dict[str, int] = {}
-    offset = 0
-    while True:
-        batch = collection.get(
-            include=["documents", "metadatas"],
-            limit=batch_size,
-            offset=offset,
-        )
-        if not batch["ids"]:
-            break
-        for doc, meta in zip(batch["documents"], batch["metadatas"]):
-            heading = (meta or {}).get("section_heading") or ""
-            text = f"{heading}\n\n{doc}" if heading else doc
-            for token in _TOKEN_RE.findall(text.lower()):
-                vocab[token] = vocab.get(token, 0) + 1
-        offset += len(batch["ids"])
-    return vocab
-
-
-def build_vocabulary_from_store(data_dir: Path) -> dict[str, int]:
-    """Term → frequency over the persisted embed units (``unit_fts``).
-
-    Same counting as ``build_vocabulary``, one SQLite read instead of a
-    full Chroma scan: ``unit_fts.text`` is written as ``_embed_text(eu)``,
-    i.e. exactly the heading-prepended text ``build_vocabulary``
-    reassembles from documents + metadata. Used whenever the store has
-    rows; a legacy index predating ``unit_fts`` still needs the Chroma
-    path.
-    """
-    vocab: dict[str, int] = {}
-    with open_store(data_dir) as conn:
-        for (text,) in conn.execute("SELECT text FROM unit_fts"):
-            for token in _TOKEN_RE.findall(text.lower()):
-                vocab[token] = vocab.get(token, 0) + 1
+    for text in store.fts_texts():
+        for token in _TOKEN_RE.findall(text.lower()):
+            vocab[token] = vocab.get(token, 0) + 1
     return vocab
 
 
@@ -182,15 +152,11 @@ class SpellCorrector:
                 self._symspell.create_dictionary_entry(term, freq)
 
     @classmethod
-    def from_collection(cls, collection) -> "SpellCorrector":
-        return cls(build_vocabulary(collection))
-
-    @classmethod
-    def from_store(cls, data_dir: Path) -> "SpellCorrector":
+    def from_store(cls, store: LibraryStore) -> "SpellCorrector":
         """Vocabulary and neighbour-pair context both from ``unit_fts``."""
         return cls(
-            build_vocabulary_from_store(data_dir),
-            phrase_counts=lambda phrases: count_phrases(data_dir, phrases),
+            build_vocabulary_from_store(store),
+            phrase_counts=store.count_phrases,
         )
 
     def correct(
