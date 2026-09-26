@@ -9,11 +9,11 @@ embedder, and failures that never escape.
 import threading
 
 from legend_lore import service
-from legend_lore.service import (
+from legend_lore.embedder import (
     EMBED_KEEPALIVE_INTERVAL_SECONDS,
     keep_embedder_warm,
-    warm_search_stack,
 )
+from legend_lore.service import warm_search_stack
 
 
 def test_ticker_embeds_on_each_interval():

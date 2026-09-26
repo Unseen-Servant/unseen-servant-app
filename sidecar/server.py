@@ -22,14 +22,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from legend_lore.embedder import embedder_status
+from legend_lore.embedder import embedder_status, start_background_tasks
 from legend_lore.router import build_router
 from legend_lore.service import (
     COLLECTION_METADATA,
     build_embedding_function,
     gc_orphan_segments,
-    keep_embedder_warm,
-    probe_embed_truncation,
     warm_search_stack,
 )
 
@@ -254,13 +252,8 @@ if __name__ == "__main__":
     watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
     watchdog.start()
 
-    # Truncation probe (daemon thread — diagnostics only, must not block
-    # startup and must not fail it if Ollama isn't up yet)
-    threading.Thread(target=probe_embed_truncation, daemon=True).start()
-
-    # Keep bge-m3 resident so the first search after an idle spell doesn't
-    # pay a cold model load (issue #341). Daemon thread, same contract.
-    threading.Thread(target=keep_embedder_warm, daemon=True).start()
+    # Backend-specific boot helpers (truncation probe, keep-warm ticker).
+    start_background_tasks()
 
     application = create_app()
 
