@@ -18,10 +18,11 @@ loaded into the dictionary as correction targets.
 """
 from __future__ import annotations
 
+import bisect
 import math
 import re
 from importlib.resources import files
-from typing import Callable
+from typing import Callable, NamedTuple
 
 from symspellpy import SymSpell, Verbosity
 
@@ -58,6 +59,10 @@ CONTEXT_WEIGHT = 2.0
 ENGLISH_CONTEXT_WEIGHT = 1.0
 ENGLISH_BIGRAM_SCALE = 1e6
 MAX_CONTEXT_CANDIDATES = 10
+
+# A still-being-typed last word is completed only from this length: two
+# letters prefix too much of the vocabulary to guess from.
+MIN_COMPLETION_PREFIX = 3
 
 PhraseCounter = Callable[[list[tuple[str, ...]]], dict[tuple[str, ...], int]]
 
@@ -110,6 +115,15 @@ def _english_bigrams() -> dict[str, int]:
     return _english_bigrams_cache
 
 
+def trailing_token(query: str) -> str:
+    """The last token of ``query``, lowercase; "" when there is none.
+
+    What a partial (still-being-typed) search protects from correction.
+    """
+    tokens = _TOKEN_RE.findall(query)
+    return tokens[-1].lower() if tokens else ""
+
+
 def keyword_tokens(known_systems: dict[str, list[str]]) -> set[str]:
     """Lowercase tokens of every game-system keyword ("dnd", "osric",
     "year", "zero") — the words ``SpellCorrector.correct`` must protect."""
@@ -134,6 +148,13 @@ def build_vocabulary_from_store(store: LibraryStore) -> dict[str, int]:
     return vocab
 
 
+class _Candidate(NamedTuple):
+    """A completion candidate, shaped like symspell's suggestions for
+    ``SpellCorrector._best``."""
+    term: str
+    count: int
+
+
 class SpellCorrector:
     """Rewrites OOV query tokens to the closest in-vocabulary term."""
 
@@ -145,6 +166,7 @@ class SpellCorrector:
     ) -> None:
         self._vocab = vocabulary
         self._min_freq = min_freq
+        self._sorted_vocab: list[str] | None = None  # built on first complete()
         self._phrase_counts = phrase_counts
         self._symspell = SymSpell(max_dictionary_edit_distance=2)
         for term, freq in vocabulary.items():
@@ -213,6 +235,54 @@ class SpellCorrector:
             prev = end
         out.append(query[prev:])
         return "".join(out)
+
+    def complete(self, query: str) -> str | None:
+        """``query`` with its last word completed, or ``None``.
+
+        For a search sent while the GM is still typing: the last word is
+        an unfinished prefix, not a typo, so it is completed from the
+        library's vocabulary instead of edit-corrected (which turns "wea"
+        into "sea"). Candidates are the most frequent in-vocab words
+        starting with the prefix, the prefix itself included when it is
+        a word; the left neighbour's context score picks among them, as
+        in ``correct`` ("against poi" → "poison", not "points"). Prefixes
+        shorter than ``MIN_COMPLETION_PREFIX`` or holding digits are left
+        alone.
+        """
+        if not query.isascii():
+            return None
+        matches = list(_TOKEN_RE.finditer(query))
+        if not matches:
+            return None
+        last = matches[-1]
+        token = last.group()
+        if len(token) < MIN_COMPLETION_PREFIX or any(c.isdigit() for c in token):
+            return None
+        candidates = self._completions(token.lower())
+        if not candidates:
+            return None
+        left = matches[-2].group().lower() if len(matches) > 1 else None
+        best = self._best(candidates, left, None)
+        if best == token.lower():
+            return None
+        if token[0].isupper():
+            best = best.capitalize()
+        return query[:last.start()] + best + query[last.end():]
+
+    def _completions(self, prefix: str) -> list[_Candidate]:
+        """In-vocab words starting with ``prefix``, most frequent first."""
+        if self._sorted_vocab is None:
+            self._sorted_vocab = sorted(
+                t for t, f in self._vocab.items() if f >= self._min_freq
+            )
+        words = self._sorted_vocab
+        found = []
+        for i in range(bisect.bisect_left(words, prefix), len(words)):
+            if not words[i].startswith(prefix):
+                break
+            found.append(_Candidate(words[i], self._vocab[words[i]]))
+        found.sort(key=lambda c: c.count, reverse=True)
+        return found[:MAX_CONTEXT_CANDIDATES]
 
     def _best(self, suggestions, left: str | None, right: str | None) -> str:
         """The candidate to use among those at the closest distance.

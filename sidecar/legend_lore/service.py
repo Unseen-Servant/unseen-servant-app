@@ -39,7 +39,7 @@ from .lexical import (
 )
 from .near_dup import collapse_near_dups
 from .reranker import rerank_scores
-from .spelling import keyword_tokens
+from .spelling import keyword_tokens, trailing_token
 
 
 # Number of top dense candidates to feed into the cross-encoder. Set
@@ -565,6 +565,13 @@ class SearchRequest(BaseModel):
     # already absorb spacing) and clean queries regressed
     # (evals/baselines/2026-07-10-variant-expansion.md).
     variant_expansion: bool | None = None
+    # partial: the query's last word may still be being typed. The app
+    # searches as the GM types (300 ms debounce) and sends this for a
+    # debounced search whose text does not end in whitespace; Enter
+    # commits with it off. The trailing word is then never spell-
+    # corrected ("grapp" would become "grasp") and BM25 matches it as a
+    # prefix. Request-only, not a setting.
+    partial: bool = False
     # max_context_chars: cap the total `len(text) + len(section_heading)`
     # across returned results (roadmap 2.2). None (default) is unlimited;
     # otherwise results are packed in rank order and the first one that
@@ -1563,17 +1570,25 @@ def _search_sync(
         knobs = resolve_search_knobs(request, data_dir, settings=ctx.settings)
 
         corrected_query: str | None = None
+        completed_query: str | None = None
         if knobs.spell_correction:
             # System keywords ("dnd", "osric") are cues for the boost,
             # which reads the corrected text: never rewrite them.
-            corrected_query = get_spell_corrector(ctx.manifest).correct(
-                request.query,
-                protected=keyword_tokens(merged["known"]),
+            protected = keyword_tokens(merged["known"])
+            if request.partial:
+                # A word still being typed is not a typo.
+                protected |= {trailing_token(request.query)} - {""}
+            corrector = get_spell_corrector(ctx.manifest)
+            corrected_query = corrector.correct(
+                request.query, protected=protected,
             )
-        query_text = (
-            corrected_query if corrected_query is not None
-            else request.query
-        )
+            if request.partial:
+                # Silent: the GM is still typing, so the box keeps what
+                # they typed and only the search uses the completion.
+                completed_query = corrector.complete(
+                    corrected_query or request.query
+                )
+        query_text = completed_query or corrected_query or request.query
         variant_queries: list[str] = []
         if knobs.variant_expansion:
             variant_queries = get_spell_corrector(ctx.manifest).expand(
@@ -1730,6 +1745,7 @@ def _search_sync(
                 "results": [],
                 "message": " ".join([*filter_notes, "No results found."]),
                 "corrected_query": corrected_query,
+                "completed_query": completed_query,
                 "effective_collection": effective_collection,
                 "exhausted": True,
             }
@@ -1774,6 +1790,7 @@ def _search_sync(
                 lex = get_lexical_index()
                 lex_ids = lex.search(
                     query_text, k=n_candidates, doc_ids=doc_ids,
+                    prefix_last=request.partial,
                 )
                 rankings.append(lex_ids)
                 weights.append(
@@ -2073,6 +2090,7 @@ def _search_sync(
         response: dict = {
             "results": formatted,
             "corrected_query": corrected_query,
+            "completed_query": completed_query,
             "effective_collection": effective_collection,
             "exhausted": exhausted,
         }

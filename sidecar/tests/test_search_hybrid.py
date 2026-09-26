@@ -45,6 +45,26 @@ def test_fts_match_drops_stopwords():
     assert fts_match("How does the owlbear attack?") == '"owlbear" OR "attack"'
 
 
+def test_fts_match_prefix_last_makes_the_last_word_a_prefix_term():
+    assert fts_match("goblin armor cla", prefix_last=True) == (
+        '"goblin" OR "armor" OR "cla"*'
+    )
+    # Committed queries are unchanged.
+    assert fts_match("goblin armor cla") == '"goblin" OR "armor" OR "cla"'
+
+
+def test_fts_match_prefix_last_drops_a_too_short_last_word():
+    assert fts_match("goblin armor cl", prefix_last=True) == '"goblin" OR "armor"'
+    assert fts_match("gr", prefix_last=True) == ""
+
+
+def test_fts_match_prefix_last_keeps_a_stopword_looking_prefix():
+    # "the" may be the start of "thief": a prefix is not a stopword yet.
+    assert fts_match("rogue skills the", prefix_last=True) == (
+        '"rogue" OR "skills" OR "the"*'
+    )
+
+
 def test_fts_match_keeps_an_all_stopword_query():
     """Dropping every term would leave nothing to match; keep them all."""
     assert fts_match("Who are you") == '"Who" OR "are" OR "you"'
@@ -322,7 +342,7 @@ def test_hybrid_drops_a_bm25_id_the_store_no_longer_has(
     real = PersistedLexicalIndex.search
     monkeypatch.setattr(
         PersistedLexicalIndex, "search",
-        lambda self, q, k, doc_ids=None: [10_000, *real(self, q, k, doc_ids)],
+        lambda self, q, k, doc_ids=None, **kw: [10_000, *real(self, q, k, doc_ids, **kw)],
     )
     filenames = [r["filename"] for r in _search(hybrid_client, hybrid=True)]
     assert filenames == ["rules.pdf", "monsters.pdf"]

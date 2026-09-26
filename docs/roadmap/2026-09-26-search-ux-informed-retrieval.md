@@ -1,7 +1,7 @@
 # Retrieval informed by how Legend Lore is searched
 
 **Date:** 2026-09-26
-**Status:** agreed 2026-09-26; item 1 (typing vs committing) in progress.
+**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6).
 **Context:** after the library store swap (`../retrieval/2026-09-26-library-store-design.md`) and the first library tier (`evals/baselines/2026-09-26-v2-library`). The goal is broad improvements, not tuning to a document: every item below is a *class* of behaviour, judged across both eval suites.
 
 ---
@@ -52,7 +52,7 @@ Measured on the eval index, spell correction rewrites half-typed words into wron
 
 | # | Item | Measured by | Notes |
 |---|---|---|---|
-| 1 | **Typing vs committing.** A `partial` search request: the trailing word is not spell-corrected and is prefix-matched in BM25 (FTS5 `term*`). The UI sends it for debounced searches whose raw text does not end in whitespace; Enter commits. | A prefix variant of both suites (each query's last word cut to a fixed share of its length), current vs partial mode; committed queries must be byte-identical to today. | Broad, cheap, and fixes a visible defect. Skipping the reranker while typing is a follow-up only if latency needs it: a debounced search is often the final one (many searches never see Enter). |
+| 1 | **Typing vs committing** (done, §6). A `partial` search request: the trailing word is completed from the vocabulary instead of spell-corrected, and prefix-matched in BM25 (FTS5 `term*`). The UI sends it for debounced searches whose raw text does not end in whitespace; Enter commits. | A prefix variant of both suites (each query's last word cut to a fixed share of its length), current vs partial mode; committed queries must be byte-identical to today. | Broad, cheap, and fixes a visible defect. Skipping the reranker while typing is a follow-up only if latency needs it: a debounced search is often the final one (many searches never see Enter). |
 | 2 | **Ordering within a book under scope.** Candidates: section-level evidence (best + second-best unit), heading trust. | Collection-scoped library queries (2–3 books), authored and committed *before* any fix is tried. | The regime the app is used in. |
 | 3 | **Heading quality.** Measure mis-heading across the real library (`breadcrumb_qa`-style checks), then fix in extraction. | Per-book flaw counts, then both suites. | Worth more than its eval impact alone: headings are shown to the user. |
 | 4 | **Cue stripping + reranker choice.** Remove a detected system cue from the text embedded and reranked; compare MiniLM L-6 with `bge-reranker-v2-m3`. | MCP-shaped (NL, system named, unscoped) queries in both suites; latency budget. | Folded into the runtime-swap benchmark (`2026-09-26-ml-runtime-consolidation.md`), where the reranker runtime is decided anyway. |
@@ -64,3 +64,22 @@ Also open, not scheduled: load-more stability (item-sized check: top 25 at `n_re
 - **Judge by class, not by query.** A change is kept when its class improves across both suites with no unexplained per-query loss, not when one query flips.
 - **Pre-register queries.** Before trying a fix for a class, author 2–3 new queries for that class and commit them first, so the fix is measured on queries it was not designed around.
 - **Usage over guesses.** A local, opt-in search log (a plain `search_log.jsonl` in the data dir: query, scope, source app/MCP, top results; then reformulations, load-more, MCP drill-ins) would rank these classes by how often they occur in real sessions and supply library-tier queries from real failures. Proposed, not built: stage 1 is sidecar-only with no UI instrumentation; stage 2 (result opens, PDF jumps, a one-key "this answered it" mark) only if stage 1 proves useful.
+
+## 6. Item 1 result — typing vs committing (2026-09-26)
+
+**Harness:** `run_eval --prefix FRAC` cuts each query's last word to FRAC of its length (≥ 3 letters, words of 5+ letters only, trailing punctuation dropped — `evals/retrieval/prefixes.py`); `--partial` sends the new request field. At 0.5, 49 of 68 corpus and 14 of 16 library queries end mid-word.
+
+**Finding that changed the design.** At a half-typed word, today's edit-distance correction is never right: of the 49 cut words it produced the intended word 0 times and a wrong one 18 times ("wea" → "sea", "cai" → "can", "fant" → "ant", "rou" → "you"). Only protecting the word from correction left ranking flat (all MRR@5 0.797 → 0.797). Completing it from the library's vocabulary gave the intended word 35 of 49 times, most misses being inflections ("walls" → "wall"); scoring candidates with the existing neighbour context fixes the rest seen ("against poi" → "poison", "year zero eng" → "engine", "determined in com" → "combat").
+
+**Shipped:** `SearchRequest.partial`. The trailing word is protected from correction, completed by `SpellCorrector.complete` (most frequent in-vocab words with the prefix, the left neighbour's context score decides), and matched as an FTS5 prefix term; completion is silent (no `message`) and reported as `completed_query`. The app sends `partial` for a debounced search whose raw text doesn't end in whitespace; Enter commits without it; scope toggles and load-more re-send the last search's flag.
+
+| MRR@5 on half-typed queries | today | protect only | complete + prefix | finished queries |
+|---|---|---|---|---|
+| corpus, all | 0.797 | 0.797 | **0.848** | 0.876 |
+| corpus, cued | 0.597 | 0.597 | **0.694** | 0.750 |
+| corpus, uncued | 0.854 | 0.879 | **0.938** | 0.942 |
+| corpus, single | 0.948 | 0.927 | 0.927 | 0.948 |
+| library, all | 0.578 | — | **0.740** | 0.695 |
+
+Closes about 65 % of the corpus typing gap. 9 corpus queries better, 3 worse, all explained: q019 returns to its committed-query loss (the mis-headed gnoll chunk), q042 is a near-tie among ancient dragons once "breath wea" completes to "breath weapon" (today's "breath sea" was accidentally narrower), q050 completes correctly but stays below the top 5 (the reranker's pull to intro sections, item 4). Committed queries (partial off) reproduce `2026-09-26-v2-library-store` exactly.
+

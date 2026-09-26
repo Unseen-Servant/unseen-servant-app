@@ -248,3 +248,40 @@ def test_spell_vocab_survives_a_unit_count_change_with_the_same_digest(
     _book(test_store, "extra.pdf", "a later section about torches and rations")
     assert _search(client)["corrected_query"] == "owlbear claws"
     assert len(builds) == 1
+
+
+# --- partial searches: the GM is still typing the last word ---------------
+
+
+def test_partial_completes_the_last_word_silently(capture_client):
+    client, captured = capture_client
+    body = _search(client, query="claws owlb", partial=True)
+    assert captured["query_texts"] == ["claws owlbear"]
+    assert body["completed_query"] == "claws owlbear"
+    assert body["corrected_query"] is None
+    assert "message" not in body          # nothing to tell a typing GM
+
+
+def test_partial_never_edit_corrects_the_last_word(capture_client):
+    # Committed, "owlber" is a typo for "owlbear"; mid-typing it is a
+    # prefix, and no vocabulary word starts with it.
+    client, captured = capture_client
+    body = _search(client, query="claws owlber", partial=True)
+    assert captured["query_texts"] == ["claws owlber"]
+    assert body["corrected_query"] is None
+    assert body["completed_query"] is None
+
+
+def test_partial_still_corrects_the_words_before_the_last(capture_client):
+    client, captured = capture_client
+    body = _search(client, query="owlber cl", partial=True)
+    assert captured["query_texts"] == ["owlbear cl"]
+    assert body["corrected_query"] == "owlbear cl"
+
+
+def test_committed_search_reports_no_completion(capture_client):
+    client, captured = capture_client
+    body = _search(client, query="claws owlb")
+    assert captured["query_texts"] == ["claws owlb"]
+    assert body["completed_query"] is None
+

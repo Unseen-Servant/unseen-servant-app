@@ -815,6 +815,10 @@ pub async fn search_index(
     // passes nothing — the inspector wants whole sections — but agentic
     // callers going through the same command can cap the payload.
     max_context_chars: Option<u32>,
+    // The query's last word may still be being typed (a debounced search
+    // whose text doesn't end in whitespace): the sidecar completes it
+    // instead of spell-correcting it and prefix-matches it in BM25.
+    partial: Option<bool>,
 ) -> Result<SearchResponse, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -828,6 +832,7 @@ pub async fn search_index(
             "collection": collection,
             "source_paths": source_paths,
             "max_context_chars": max_context_chars,
+            "partial": partial.unwrap_or(false),
         }))
         .send()
         .await

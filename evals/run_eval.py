@@ -144,6 +144,23 @@ def format_retrieval_regressions(regressions: list[dict]) -> str:
     )
 
 
+def _apply_prefix(queries: list[dict], frac: float | None) -> list[dict]:
+    """Cut each query's last word to ``frac`` of its length (``--prefix``)."""
+    if frac is None:
+        return queries
+    from evals.retrieval.prefixes import prefix_query
+
+    out = [{**q, "query": prefix_query(q["query"], frac)[0]} for q in queries]
+    cut = sum(prefix_query(q["query"], frac)[1] for q in queries)
+    print(f"prefix {frac}: {cut}/{len(queries)} queries end mid-word", flush=True)
+    return out
+
+
+def _partial_extra(args) -> dict:
+    """``partial`` rides in the request body like the other v2 knobs."""
+    return {"partial": True} if args.partial else {}
+
+
 def run(engine, queries: list[dict], corpus, opts: SearchOptions, do_index: bool,
         tags: dict[str, tuple[str, list[str]]] | None = None) -> dict:
     doc_file = {d.id: d.pdf_path.name for d in corpus.documents}
@@ -423,6 +440,11 @@ def main() -> int:
     ap.add_argument("--typos", type=int, default=None, metavar="SEED",
                     help="retrieval: one seeded typing error per query (evals/retrieval/typos.py); "
                          "compare against the clean run to see how much of the gap correction closes")
+    ap.add_argument("--prefix", type=float, default=None, metavar="FRAC",
+                    help="retrieval/library: cut each query's last word to FRAC of its length, as "
+                         "the search box holds it mid-typing (evals/retrieval/prefixes.py)")
+    ap.add_argument("--partial", action="store_true",
+                    help="retrieval/library: send partial=true (the app's typing mode)")
     ap.add_argument("--no-spell", action="store_true",
                     help="retrieval: search with spell correction off (the uncorrected floor for --typos)")
     ap.add_argument("--no-write", action="store_true", help="print but do not write a baseline")
@@ -488,10 +510,11 @@ def main() -> int:
                 raise SystemExit("no runnable library queries — author some in evals/retrieval/library.yaml")
             if args.limit:
                 queries = queries[: args.limit]
+            queries = _apply_prefix(queries, args.prefix)
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
                                  rerank=not args.no_rerank,
                                  max_context_chars=args.max_context_chars,
-                                 extra={"system_map": {}})
+                                 extra={"system_map": {}, **_partial_extra(args)})
             result = run(engine, queries, corpus, opts, do_index=False)
             result["skipped_queries"], result["missing_docs"] = skipped, missing
         else:
@@ -505,10 +528,12 @@ def main() -> int:
 
                 rng = random.Random(args.typos)
                 queries = [{**q, "query": typo_query(q["query"], rng)[0]} for q in queries]
+            queries = _apply_prefix(queries, args.prefix)
             # v3 takes the rung-6 keyword map in-process; v2 gets the same
             # information as tags (SYSTEM_TAGS) and its request body is JSON,
             # which a dict of sets is not.
             extra: dict = {"system_map": _system_map(corpus)} if args.engine == "v3" else {}
+            extra.update(_partial_extra(args))
             if args.lex_weight is not None:
                 if args.engine == "v3":
                     extra["weights"] = [1.0, args.lex_weight]

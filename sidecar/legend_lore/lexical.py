@@ -48,6 +48,10 @@ _STOPWORDS = frozenset(
     "with as that this these those it its and or not you your they their he she his "
     "her we our i me my but if then than into about over under out up down off no".split())
 
+# A still-being-typed last word is matched as a prefix only from this
+# length: "gr*" matches too much of any book to rank anything.
+MIN_PREFIX_LEN = 3
+
 # An index written before the rows existed has none: hybrid would then
 # quietly degrade to dense-only. Warn the first time it happens, not on
 # every query.
@@ -62,18 +66,21 @@ class PersistedLexicalIndex:
         self._store = store
 
     def search(
-        self, query: str, k: int, doc_ids: list[int] | None = None
+        self, query: str, k: int, doc_ids: list[int] | None = None,
+        prefix_last: bool = False,
     ) -> list[int]:
         """Top-k unit ids by BM25, best first.
 
         ``doc_ids`` is the dense query's scope (``None`` = whole library).
+        ``prefix_last`` matches the last word as a prefix (a partial search).
+
 
         An index written before the FTS rows existed has none, and hybrid
         would silently be dense-only — warn once per process. The count is
         only paid when a real query found nothing, since any hit already
         proves the table is populated.
         """
-        match = fts_match(query)
+        match = fts_match(query, prefix_last=prefix_last)
         if not match:
             return []
         ids = self._store.fts(match, k, doc_ids)
@@ -100,7 +107,7 @@ class PersistedLexicalIndex:
         }
 
 
-def fts_match(query: str) -> str:
+def fts_match(query: str, prefix_last: bool = False) -> str:
     """Build an FTS5 MATCH expression from a free-text query.
 
     Query terms are OR'd: BM25's term weighting does the ranking, and
@@ -108,10 +115,18 @@ def fts_match(query: str) -> str:
     lacks. Stopwords are dropped unless the query is nothing but
     stopwords. Tokens are quoted so FTS5 operators in user text are
     literal.
+
+    ``prefix_last`` marks the query's last word as unfinished: it becomes
+    an FTS5 prefix term (``"cla"*``), or is dropped when shorter than
+    ``MIN_PREFIX_LEN``.
     """
     tokens = _TOKEN_RE.findall(query)
+    last = tokens.pop() if prefix_last and tokens else None
     content = [t for t in tokens if t.lower() not in _STOPWORDS]
-    return " OR ".join(f'"{t}"' for t in content or tokens)
+    terms = [f'"{t}"' for t in content or tokens]
+    if last is not None and len(last) >= MIN_PREFIX_LEN:
+        terms.append(f'"{last}"*')
+    return " OR ".join(terms)
 
 
 def rrf_fuse(

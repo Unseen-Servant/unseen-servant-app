@@ -295,6 +295,10 @@
   // In-app search state
   let searchQuery = '';
   let committedQuery = '';
+  // Whether committedQuery came from search-as-you-type with its last word
+  // possibly unfinished. Scope toggles and load-more re-run the same query,
+  // so they re-send the same flag; Enter clears it.
+  let committedPartial = false;
   // The search view is stateful, not derived: entered by focusing the
   // search bar, left only explicitly (view switch, Cmd+J/T, or the
   // Escape ladder). Never persisted — the app launches into the browse
@@ -536,6 +540,7 @@
         nResults: requestedPageSize,
         sourcePaths,
         gameSystems,
+        partial: committedPartial,
       });
       if (seq !== searchSeq) return;
       const next = response.results ?? [];
@@ -571,6 +576,9 @@
     const trimmed = q.trim();
     if (trimmed !== committedQuery) resetPageSize();
     committedQuery = trimmed;
+    // Search-as-you-type: without a trailing space the last word may
+    // be unfinished, so the sidecar completes rather than corrects it.
+    committedPartial = !/\s$/.test(q);
     runSearch(q);
   }
 
@@ -582,6 +590,7 @@
     const trimmed = q.trim();
     if (trimmed !== committedQuery) resetPageSize();
     committedQuery = trimmed;
+    committedPartial = false; // Enter commits the query as typed
     runSearch(q);
   }
 

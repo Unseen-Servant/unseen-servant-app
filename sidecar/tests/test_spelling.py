@@ -12,6 +12,7 @@ import pytest
 from legend_lore.granularity import EmbedUnit
 from legend_lore.spelling import (
     MIN_VOCAB_FREQ, SpellCorrector, build_vocabulary_from_store,
+    trailing_token,
 )
 from tests.conftest import TEST_EMBED_DIM, seed_book
 
@@ -313,3 +314,51 @@ def test_keyword_tokens_splits_multiword_keywords():
 
     assert keyword_tokens({"D&D 5E": ["dnd", "d&d"], "YZE": ["Year Zero"]}) >= {
         "dnd", "d", "year", "zero"}
+
+
+# ---------------------------------------------------------------------------
+# Completion of a still-being-typed last word (partial searches)
+# ---------------------------------------------------------------------------
+
+
+def test_trailing_token_is_the_last_word_lowercased():
+    assert trailing_token("Goblin Armor CLA") == "cla"
+    assert trailing_token("chain mail?") == "mail"
+    assert trailing_token("???") == ""
+
+
+def test_complete_finishes_the_last_word_with_the_most_frequent_match(corrector):
+    assert corrector.complete("chain mail armor cla") == "chain mail armor class"
+    assert corrector.complete("fire dam") == "fire damage"
+
+
+def test_complete_only_touches_the_last_word(corrector):
+    # "dam" mid-query is left alone; only the word being typed completes.
+    assert corrector.complete("dam of dra") == "dam of dragon"
+
+
+def test_complete_never_offers_junk_under_the_vocabulary_threshold(corrector):
+    # "dragonx" (freq 2) is below MIN_VOCAB_FREQ, so "dragon" wins even
+    # though "dragonx" also starts with the prefix.
+    assert corrector.complete("the dragon") is None
+    assert corrector.complete("the drag") == "the dragon"
+
+
+def test_complete_leaves_short_digit_and_unknown_prefixes(corrector):
+    assert corrector.complete("armor cl") is None      # under 3 letters
+    assert corrector.complete("level 5e") is None      # digits
+    assert corrector.complete("owlbe") is None         # no vocabulary match
+    assert corrector.complete("") is None
+
+
+def test_complete_keeps_the_capital_of_the_typed_word(corrector):
+    assert corrector.complete("Chain Mai") == "Chain Mail"
+
+
+def test_complete_uses_the_left_neighbour_as_context():
+    vocab = {"points": 90, "poison": 40, "against": 50, "hit": 50}
+    counts = _counter({("against", "poison"): 30, ("hit", "points"): 40})
+    sc = SpellCorrector(vocab, phrase_counts=counts)
+    assert sc.complete("save against poi") == "save against poison"
+    assert sc.complete("hit poi") == "hit points"
+
