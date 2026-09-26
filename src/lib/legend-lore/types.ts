@@ -107,9 +107,7 @@ export interface CollectionsResult {
 export interface StatsResult {
   total_chunks: number;
   total_documents: number;
-  collection_name: string;
   storage_bytes: number;
-  reclaimable_bytes: number;
 }
 
 export interface CollectionMutationResult {

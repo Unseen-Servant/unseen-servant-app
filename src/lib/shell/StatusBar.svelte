@@ -13,7 +13,6 @@
   export let topGameSystem: string = '';
   export let totalChunks: number = 0;
   export let storageBytes: number;
-  export let reclaimableBytes: number = 0;
   export let isSyncing: boolean = false;
   // Master bypass is lit, not persisted — the lamp is the only thing
   // telling you the console you can see isn't currently doing anything.
@@ -35,10 +34,6 @@
   $: syncTooltip = (lastSyncTime
     ? `Last synced ${lastSyncTime.toLocaleTimeString()}`
     : 'Sync index') + chordHint('sync.run');
-
-  $: storageTooltip = reclaimableBytes > 0
-    ? `${formatSize(reclaimableBytes)} reclaimable — compact from Settings → Library`
-    : 'No reclaimable space';
 
   function formatSize(bytes: number): string {
     if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
@@ -90,7 +85,7 @@
         {/if}
         {#if storageBytes > 0}
           <span class="separator">&middot;</span>
-          <span title={storageTooltip}>{formatSize(storageBytes)}</span>
+          <span>{formatSize(storageBytes)}</span>
         {/if}
       {:else}
         <span>{selectedCount} selected</span>

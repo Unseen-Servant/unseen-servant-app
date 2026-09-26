@@ -266,7 +266,6 @@
   // Sidecar stats
   let storageBytes = 0;
   let totalChunks = 0;
-  let reclaimableBytes = 0;
 
   // Sidecar health
   let sidecarConnected = false;
@@ -1252,8 +1251,8 @@
       }
 
       invoke<StatsResult>('get_stats')
-        .then(r => { storageBytes = r.storage_bytes; totalChunks = r.total_chunks; reclaimableBytes = r.reclaimable_bytes; })
-        .catch(() => { storageBytes = 0; totalChunks = 0; reclaimableBytes = 0; });
+        .then(r => { storageBytes = r.storage_bytes; totalChunks = r.total_chunks; })
+        .catch(() => { storageBytes = 0; totalChunks = 0; });
 
       lastSyncTime = new Date();
       return status;
@@ -3438,27 +3437,6 @@
     }
   }
 
-  // Compact the database to reclaim unused space
-  async function handleCompact() {
-    try {
-      const result = await invoke<{ reclaimed: number }>('compact_database');
-      const msg = result.reclaimed > 0
-        ? `Reclaimed ${formatSize(result.reclaimed)}`
-        : 'Nothing to reclaim';
-      jobNotification.show({ type: 'success', message: msg, duration: 4000 });
-      await refreshIndexStatus(); // refresh stats to update reclaimable_bytes
-    } catch (e) {
-      jobNotification.show({ type: 'error', message: `Compact failed: ${String(e)}`, duration: 5000 });
-    }
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
-    if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB';
-    if (bytes >= 1_024) return (bytes / 1_024).toFixed(0) + ' KB';
-    return bytes + ' B';
-  }
-
   async function refreshIndexAndCollections() {
     await refreshIndexStatus();
     // Get armed writes on the wire before the fetch, so loadCollections
@@ -3943,7 +3921,6 @@
     {topGameSystem}
     {totalChunks}
     {storageBytes}
-    {reclaimableBytes}
     {isSyncing}
     {scopeBypassed}
     {lastSyncTime}
@@ -3967,7 +3944,6 @@
   {totalFilesFound}
   {totalChunks}
   {storageBytes}
-  {reclaimableBytes}
   {gameSystemCount}
   {isSyncing}
   {syncPreferences}
@@ -3980,7 +3956,6 @@
   {mcpConnected}
   onSelectFolder={handleSelectFolder}
   onDeselectFolder={handleDeselectFolder}
-  onCompact={handleCompact}
   onReindexAll={handleReindexAll}
   onDeleteIndex={handleDeleteIndex}
   onSyncPreferencesChange={handleSyncPreferencesChange}

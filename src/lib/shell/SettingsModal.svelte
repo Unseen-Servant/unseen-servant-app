@@ -19,7 +19,6 @@
   export let totalFilesFound: number = 0;
   export let totalChunks: number = 0;
   export let storageBytes: number = 0;
-  export let reclaimableBytes: number = 0;
   export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
   export let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
@@ -27,7 +26,6 @@
   export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
   export let onDeselectFolder: () => void = () => {};
-  export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
   export let onSyncPreferencesChange: (partial: Partial<SyncPreferences>) => void = () => {};
@@ -94,7 +92,6 @@
         {totalFilesFound}
         {totalChunks}
         {storageBytes}
-        {reclaimableBytes}
         {gameSystemCount}
         {isSyncing}
         {syncPreferences}
@@ -102,7 +99,6 @@
         {lastSyncTime}
         {onSelectFolder}
         {onDeselectFolder}
-        {onCompact}
         {onReindexAll}
         {onDeleteIndex}
         {onSyncPreferencesChange}

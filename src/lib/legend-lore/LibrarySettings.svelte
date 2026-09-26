@@ -11,7 +11,6 @@
   export let totalFilesFound: number = 0;
   export let totalChunks: number = 0;
   export let storageBytes: number = 0;
-  export let reclaimableBytes: number = 0;
   export let gameSystemCount: number = 0;
   export let isSyncing: boolean = false;
   export let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
@@ -19,7 +18,6 @@
   export let lastSyncTime: Date | null = null;
   export let onSelectFolder: () => void = () => {};
   export let onDeselectFolder: () => void = () => {};
-  export let onCompact: () => void = () => {};
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
   export let onSyncPreferencesChange: (partial: Partial<SyncPreferences>) => void = () => {};
@@ -291,8 +289,7 @@
     <div class="field-head">
       <h3 class="field-title section-title">Database</h3>
       <p class="field-desc">
-        Where the index is stored on disk, and maintenance to reclaim space
-        from removed or re-indexed chunks.
+        Where the index is stored on disk, and how much space it takes.
       </p>
     </div>
 
@@ -323,21 +320,7 @@
       <span class="meta-label readout-label">Storage</span>
       <span class="meta-value">
         {storageBytes > 0 ? formatSize(storageBytes) : '—'}
-        {#if reclaimableBytes > 0}
-          <span class="meta-muted"> · {formatSize(reclaimableBytes)} reclaimable</span>
-        {/if}
       </span>
-      {#if reclaimableBytes > 0}
-        <button
-          type="button"
-          class="btn-link"
-          on:click={onCompact}
-          disabled={isSyncing}
-          title="Reclaim {formatSize(reclaimableBytes)}"
-        >
-          Compact
-        </button>
-      {/if}
     </div>
   </section>
 
@@ -503,12 +486,8 @@
     min-width: 0;
   }
 
-  .meta-muted {
-    color: var(--text-secondary);
-  }
-
   /*
-   * Compact action — Option B: bracketed terminal-style affordance.
+   * Link action — Option B: bracketed terminal-style affordance.
    * Brackets in muted color, label in accent. Hover brightens the
    * brackets so the whole token feels reactive.
    */

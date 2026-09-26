@@ -192,9 +192,7 @@ pub struct CollectionDeleteResult {
 pub struct StatsResult {
     total_chunks: u32,
     total_documents: u32,
-    collection_name: String,
     storage_bytes: u64,
-    reclaimable_bytes: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -221,13 +219,6 @@ pub struct DocumentStats {
 struct SourcesResult {
     sources: Vec<DocumentStats>,
     count: u32,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CompactResult {
-    size_before: u64,
-    size_after: u64,
-    reclaimed: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -591,23 +582,6 @@ pub async fn get_stats() -> Result<StatsResult, String> {
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
     let result: StatsResult = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response from indexer: {}", e))?;
-
-    Ok(result)
-}
-
-#[tauri::command]
-pub async fn compact_database() -> Result<CompactResult, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{}/api/compact", sidecar_url()))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
-
-    let result: CompactResult = response
         .json()
         .await
         .map_err(|e| format!("Invalid response from indexer: {}", e))?;

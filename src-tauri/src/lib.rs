@@ -565,7 +565,6 @@ pub fn run() {
             legend_lore::reindex_file,
             legend_lore::get_document_stats,
             legend_lore::get_stats,
-            legend_lore::compact_database,
             legend_lore::delete_index,
             get_data_dir,
             legend_lore::get_known_game_systems,
