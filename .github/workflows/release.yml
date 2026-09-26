@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: sidecar/dist
-          key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', '.github/workflows/release.yml') }}
+          key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', 'sidecar/legend_lore/**/*.py', '.github/workflows/release.yml') }}
 
       - name: Install Python dependencies and PyInstaller
         if: steps.sidecar-dist.outputs.cache-hit != 'true'
@@ -186,7 +186,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: sidecar/dist
-          key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', '.github/workflows/release.yml') }}
+          key: sidecar-dist-${{ runner.os }}-${{ hashFiles('sidecar/uv.lock', 'sidecar/*.py', 'sidecar/legend_lore/**/*.py', '.github/workflows/release.yml') }}
 
       - name: Install Python dependencies and PyInstaller
         if: steps.sidecar-dist.outputs.cache-hit != 'true'
