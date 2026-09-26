@@ -25,6 +25,7 @@ is the source of truth; this index is just a map and may lag new files.
 - [Agent-harness retrieval findings](roadmap/2026-08-14-agent-harness-retrieval-findings.md)
 - [Unseen Servant workstation architecture](roadmap/2026-09-24-unseen-servant-workstation-architecture.md) — one repo, one window per tool, MCP as the seam
 - [ML runtime consolidation](roadmap/2026-09-26-ml-runtime-consolidation.md) — one provider for embed, rerank and chat; Phase 5 runtime target reopened, sidecar prep landed
+- [Retrieval informed by how Legend Lore is searched](roadmap/2026-09-26-search-ux-informed-retrieval.md) — failure classes across both suites, typing vs committing, scoped-search evals, investigation order
 
 ## retrieval/
 
