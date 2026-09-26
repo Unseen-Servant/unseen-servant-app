@@ -175,7 +175,7 @@ Scoped search costs about 7 ms per selected book, independent of library size: s
 
 Either one is internal to `knn()`.
 
-**Follow-up (library tier), agreed 2026-09-26:** after Jerome rebuilds the real library, author 15–20 confusable-regime queries in `evals/retrieval/library.yaml`, verify their anchors, and commit the library baseline and probe numbers. The runtime swap is gated on that tier as well as on the corpus suite, because it changes the vectors.
+**Follow-up (library tier), agreed and done 2026-09-26 (`2026-09-26-v2-library`, roadmap §8):** after Jerome rebuilds the real library, author 15–20 confusable-regime queries in `evals/retrieval/library.yaml`, verify their anchors, and commit the library baseline and probe numbers. The runtime swap is gated on that tier as well as on the corpus suite, because it changes the vectors.
 
 **Follow-up (option 3):** fold the manifest into `documents` (mtime, hash, size, `pipeline_version`, `last_error`, `indexed_at`) so tags and sync state have a single source of truth.
 

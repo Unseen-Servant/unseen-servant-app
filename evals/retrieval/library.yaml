@@ -17,5 +17,67 @@
 #
 # Verify anchors against the PDFs before committing:
 #   uv run --project sidecar python -m evals.retrieval.verify_anchors --library "<data dir>"
-docs: []
-queries: []
+docs:
+  - {id: osric_2e,      sha256: 4b2532028fecb8891d4ba9b068b5c709fc9441c9ee4c3100c28e84dac3cc1724, system: OSR}
+  - {id: db_rulebook,   sha256: 381a52d6b679df33b490cd35b8cd233a63e5f7b1274b6b8c2faff654c63a4e33, system: Dragonbane}
+  - {id: db_adventures, sha256: e7287b933664159e074ff7a874869d1450b61449994750378fb2ff8cfea86c88, system: Dragonbane}
+  - {id: db_bestiary,   sha256: b232acf66b0be6911aa941f146ad48f009223472dd5d24b9a4f5871d22297c2c, system: Dragonbane}
+  - {id: srd_5_1,       sha256: 2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0, system: D&D 5E}
+  - {id: wight_box,     sha256: e3a12ce9ec9d936aba4f0e63cc4c33dc60f9329cf17034f3047cde6be7991228, system: OSR}
+
+# Confusable regime of this library (2026-09-26): OSRIC, Wight-Box and the
+# 5e SRD define the same rules differently; trolls, skeletons and ghouls
+# appear in 3–4 books; Dragonbane is three books. Cued queries name a system
+# whose answer lives in exactly one file (OSRIC; a Dragonbane *rule*, which
+# only the Rulebook states), so file-match is system-match.
+queries:
+  # ── cued: the named system must beat the same topic in other systems ──
+  - {id: L001, pair: osric_turn_undead, style: keyword, scope: cued, category: table_lookup,
+     query: "osric turning undead cleric table", doc: osric_2e,
+     anchors: ["undead", ["3d4 rounds", "type of undead"]], pages: "141"}
+  - {id: L002, pair: osric_turn_undead, style: nl, scope: cued, category: table_lookup,
+     query: "how does a cleric turn undead in osric?", doc: osric_2e,
+     anchors: ["undead", ["3d4 rounds", "type of undead"]], pages: "141"}
+  - {id: L003, pair: osric_morale, style: keyword, scope: cued, category: prose_rule,
+     query: "osric morale check", doc: osric_2e,
+     anchors: ["morale check", "fanatical"], pages: "142"}
+  - {id: L004, pair: osric_morale, style: nl, scope: cued, category: prose_rule,
+     query: "when should monsters check morale in osric?", doc: osric_2e,
+     anchors: ["morale check", "fanatical"], pages: "142"}
+  - {id: L005, pair: osric_troll, style: keyword, scope: cued, category: exact_name,
+     query: "osric troll regeneration", doc: osric_2e,
+     anchors: ["troll", "3 hit points per round"], pages: "221"}
+  - {id: L006, pair: osric_troll, style: nl, scope: cued, category: exact_name,
+     query: "how many hit points does a troll regenerate each round in osric?", doc: osric_2e,
+     anchors: ["troll", "3 hit points per round"], pages: "221"}
+  - {id: L007, pair: db_surprise, style: keyword, scope: cued, category: prose_rule,
+     query: "dragonbane surprise attack initiative card", doc: db_rulebook,
+     anchors: ["surprise attack", "initiative card"], pages: "45"}
+  - {id: L008, pair: db_surprise, style: nl, scope: cued, category: prose_rule,
+     query: "what happens when you surprise your enemies in dragonbane?", doc: db_rulebook,
+     anchors: ["surprise attack", "initiative card"], pages: "45"}
+  - {id: L009, pair: db_encumbrance, style: keyword, scope: cued, category: prose_rule,
+     query: "dragonbane encumbrance items carried strength", doc: db_rulebook,
+     anchors: ["encumbrance", "inventory", "rounded up"], pages: "32"}
+  - {id: L010, pair: db_encumbrance, style: nl, scope: cued, category: prose_rule,
+     query: "how many items can a character carry in dragonbane?", doc: db_rulebook,
+     anchors: ["encumbrance", "inventory", "rounded up"], pages: "32"}
+  - {id: L011, pair: db_fireball, style: keyword, scope: cued, category: exact_name,
+     query: "dragonbane fireball spell damage", doc: db_rulebook,
+     anchors: ["fireball", "2d6"], pages: "70"}
+  - {id: L012, pair: db_fireball, style: nl, scope: cued, category: exact_name,
+     query: "how much damage does fireball do in dragonbane?", doc: db_rulebook,
+     anchors: ["fireball", "2d6"], pages: "70"}
+  # ── uncued: any book that answers counts; doc is the representative ──
+  - {id: L013, pair: ghoul_paralysis, style: keyword, scope: uncued, category: exact_name,
+     query: "ghoul paralysis", doc: srd_5_1,
+     anchors: ["ghoul", ["paralyzed", "paralysed"]], pages: "312"}
+  - {id: L014, pair: ghoul_paralysis, style: nl, scope: uncued, category: exact_name,
+     query: "does a ghoul's attack paralyze you?", doc: srd_5_1,
+     anchors: ["ghoul", ["paralyzed", "paralysed"]], pages: "312"}
+  - {id: L015, pair: troll_regeneration, style: keyword, scope: uncued, category: exact_name,
+     query: "troll regeneration", doc: srd_5_1,
+     anchors: ["troll", ["regeneration", "regenerate"]], pages: "351"}
+  - {id: L016, pair: troll_regeneration, style: nl, scope: uncued, category: exact_name,
+     query: "how do trolls regenerate?", doc: srd_5_1,
+     anchors: ["troll", ["regeneration", "regenerate"]], pages: "351"}
