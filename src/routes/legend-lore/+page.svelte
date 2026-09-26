@@ -588,7 +588,7 @@
   // Scroll-to-bottom in the result list bumps the page size and re-runs
   // the same query with a larger n_results. Re-querying (vs. true offset
   // pagination) is fine on a local sidecar — the embedding is cached and
-  // ChromaDB's nearest-neighbor cost is sub-linear in N at this scale.
+  // the store's nearest-neighbour scan costs the same at any page size.
   function loadMoreResults() {
     if (isSearching || reachedEnd || pageSize >= PAGE_SIZE_MAX || !committedQuery) return;
     pageSize = Math.min(PAGE_SIZE_MAX, pageSize + PAGE_SIZE_STEP);

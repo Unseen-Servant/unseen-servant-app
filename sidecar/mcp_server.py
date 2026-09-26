@@ -6,7 +6,7 @@ launches it via stdio, and it calls the sidecar's HTTP API to fulfill
 requests.
 
 Architecture:
-    Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP) ←→ ChromaDB
+    Claude Desktop ←→ mcp_server.py (stdio) ←→ FastAPI sidecar (HTTP) ←→ library store (SQLite)
 
 Usage:
     python mcp_server.py --data-dir /path/to/app/data

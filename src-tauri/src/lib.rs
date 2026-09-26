@@ -585,7 +585,7 @@ pub fn run() {
             legend_lore::update_search_settings
         ])
         .setup(|app| {
-            // Determine where ChromaDB should store data
+            // Determine where the sidecar keeps its data (library store, manifest)
             let app_data_dir = app
                 .path()
                 .app_data_dir()

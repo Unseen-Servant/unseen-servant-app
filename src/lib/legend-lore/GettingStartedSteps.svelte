@@ -73,7 +73,7 @@
       <p class="field-desc detail">
         Your PDFs stay in the folder you pick. Legend Lore stores only
         the index — extracted text, chunk boundaries, and embeddings —
-        in a local ChromaDB instance under the app's data directory
+        in a single SQLite file under the app's data directory
         (visible from <em>Settings → Library → Database</em>). Delete
         the index anytime; the PDFs are untouched.
       </p>
@@ -92,7 +92,7 @@
       <p class="field-desc">
         Indexing reads each PDF, splits it at heading boundaries into
         ~1,000-character chunks, and embeds each one via Ollama. The
-        result lives locally in ChromaDB. First-time indexing takes
+        result lives locally in that SQLite file. First-time indexing takes
         roughly a minute per book; afterwards only changed PDFs are
         re-embedded.
       </p>
@@ -176,8 +176,8 @@
         spawns <code class="inline-code">mcp_server.py</code> as a
         subprocess and talks to it over stdio. The MCP server then
         calls back to the local sidecar at
-        <code class="inline-code">localhost:8420</code>, which queries
-        ChromaDB and returns results. The agent sees only the search
+        <code class="inline-code">localhost:8420</code>, which searches
+        the local index and returns results. The agent sees only the search
         results — never your PDF files, never the embeddings, never
         anything outside what you asked it to look for.
       </p>
