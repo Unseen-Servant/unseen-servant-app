@@ -879,7 +879,7 @@
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">{f.base}</span>
               {#if f.tag}
-                <SystemBadge tag={f.tag} />
+                <SystemBadge tag={f.tag} inline />
               {/if}
               <!-- This list is the only place a collection's contents are
                    enumerated, so it's where dropping one belongs. Keyed by
@@ -1385,6 +1385,8 @@
     flex-shrink: 0;
   }
   .child-name {
+    /* Takes the free width, pushing the capped system tag to the row's
+       right edge beside the remove mark. */
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -1392,17 +1394,22 @@
     white-space: nowrap;
   }
   /* Hover-revealed, same recipe as the row transport — but a bare stroked
-     mark, not a boxed control: child rows carry no hardware, and the ▸ and
-     ⠿ they sit under are bare glyphs too. Danger is the hue the mark is
-     drawn in (a swap, not a shape), and it's safe at rest because row
-     hover is what reveals it in the first place. */
+     mark, not a boxed control: child rows carry no hardware. It sits in the
+     count column (an 18px slot at the row's end, the collection row's count
+     box above it), so every row in the panel ends on one edge. Tertiary
+     when revealed, danger only under the pointer: color on intent, like a
+     scope chip's ×, rather than a new hue arriving with a row hover. */
   .child-remove {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
     flex-shrink: 0;
+    margin-left: auto;
     padding: 0;
     background: none;
     border: none;
-    color: var(--text-danger);
+    color: var(--text-tertiary);
     cursor: pointer;
     opacity: 0;
     transition: all var(--transition-fast);
@@ -1416,7 +1423,7 @@
     opacity: 1;
   }
   .child-remove:hover {
-    filter: brightness(1.2);
+    color: var(--text-danger);
   }
   .child-remove:active {
     transform: scale(0.97);
