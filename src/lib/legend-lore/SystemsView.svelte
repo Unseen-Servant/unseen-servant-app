@@ -578,6 +578,7 @@
         <div
           class="group-head-row"
           class:untagged={group.tag === 'Untagged'}
+          class:muted={group.muted && !soloedSystems.has(group.tag)}
           class:hovered={hoveredGroup === group.tag}
           on:pointerenter={() => (hoveredGroup = group.tag)}
           on:pointerleave={() => { if (hoveredGroup === group.tag) hoveredGroup = null; }}
@@ -904,6 +905,15 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  /* A muted channel's header goes grey the way its row does in the filter
+     panel: the same out-of-scope level on the head's content (arrow,
+     shield, name) and its count, never on the S/M cluster, and no hover
+     restore — the filter row has none. Solo overrides mute, as there. */
+  .group-head-row.muted .group-head,
+  .group-head-row.muted .group-count {
+    opacity: var(--opacity-out-of-scope);
   }
 
   /* Muted groups (and non-soloed groups while a solo is active) dim but
