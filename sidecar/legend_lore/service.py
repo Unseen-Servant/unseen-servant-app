@@ -443,8 +443,9 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
 
     Pipeline (issue #157 — heading-hierarchy promotion adoption):
       pymupdf4llm.to_markdown  +  font-span side-channel  +  TOC
-        → promote_headings (outline: the PDF outline when it passes the
-          trust gate, else toc_then_font with the TOC capped at depth 1)
+        → promote_headings (toc_then_font; TOC capped at depth 1. The
+          `outline` strategy exists but is not the default: it failed its
+          validation — docs/retrieval/2026-09-27-outline-headings-design.md)
         → R1 (rejoin CR fragments)
         → R3 (strip image-placeholder chrome)
         → R4 (strip running-heading chrome — cross-page detection)
@@ -481,7 +482,7 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
         return []
     pages_dict = [{"page_number": pn, "markdown": md} for pn, md in raw_pages]
     promoted, promo_report = promote_markdown(
-        pages_dict, spans_pages, toc, strategy="outline"
+        pages_dict, spans_pages, toc, strategy="toc_then_font"
     )
     print(
         f"[promote] {pdf_path.name}: "
