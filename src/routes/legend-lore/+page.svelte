@@ -4016,7 +4016,9 @@
     display: flex;
     flex-direction: column;
     background: var(--bg-app);
-    border-right: 1px solid var(--border-subtle);
+    /* 4px: the seam between the dock's plates and the scope plate, which
+       share a grey and sit side by side, needs more than a hairline. */
+    border-right: 4px solid var(--border-subtle);
   }
   .left-dock > :global(.panel) {
     flex: 1 1 auto;
@@ -4052,6 +4054,13 @@
   /* Search mode replaces the scrollable single column with a fixed scope
      bar on top and a split (list / inspector) below. The .file-tree-area
      itself stops scrolling — child panes manage their own overflow. */
+  /* The scope bar is a nameplate, and a plate runs edge to edge like the
+     dock's; out of search mode the area's side padding would inset it, so
+     it bleeds back over that padding. Search mode has none to undo. */
+  .file-tree-area:not(.search-mode) > :global(.scope-bar) {
+    margin-inline: -0.75rem;
+  }
+
   .file-tree-area.search-mode {
     display: flex;
     flex-direction: column;

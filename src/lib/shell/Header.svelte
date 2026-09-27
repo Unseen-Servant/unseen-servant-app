@@ -189,8 +189,8 @@
     height: var(--header-height);
     padding: 0 0.5rem;
     background: var(--bg-header);
-    /* No bottom rule: the dock's panel plates share this grey and hang
-       straight off the bar. */
+    /* No bottom rule: the plates beneath it (the dock's mastheads and the
+       scope bar) sit a step darker, and that step is the edge. */
     flex-shrink: 0;
   }
 

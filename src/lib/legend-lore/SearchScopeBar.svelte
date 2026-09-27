@@ -83,7 +83,7 @@
     curationSoloList.length > 0 ? [] : CURATION_ORDER.filter((k) => curationMutes.has(k));
 </script>
 
-<div class="scope-bar">
+<div class="scope-bar nameplate">
   <div class="left" class:bypassed={scopeBypassed}>
     <!-- The master section: a nameplate and the bypass switch, both
          permanent. The bar used to render empty until something narrowed,
@@ -92,7 +92,7 @@
          The switch is the same 18px hardware square the S and M buttons
          use, labelled with its own chord: the letter on the switch is the
          key that throws it. -->
-    <span class="nameplate ledger-label">Scope</span>
+    <span class="scope-name panel-title">Scope</span>
     <button
       type="button"
       class="sm-btn"
@@ -368,9 +368,10 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    /* A nameplate like the dock's panel mastheads (.nameplate supplies the
+       plate). No bottom rule: the plate's grey parts it from the rows
+       scrolling beneath. */
     padding: 0.3rem 0.75rem;
-    background: var(--bg-app);
-    border-bottom: 1px solid var(--border-subtle);
     font-family: var(--font-body);
     font-size: 0.75rem;
     color: var(--text-secondary);
@@ -454,7 +455,7 @@
 
   /* Names the region whether or not anything is in it. Same voice the
      other row-group headings wear. */
-  .nameplate {
+  .scope-name {
     flex-shrink: 0;
   }
 

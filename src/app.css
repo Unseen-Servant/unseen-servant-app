@@ -108,11 +108,8 @@
   --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
   /* Panel nameplates (.nameplate). The letters are cut in: dark above,
-     lit below, the light warm like the greys. The rivet is a dull brass —
-     parchment sunk into the plate's grey, so it can't pass for the amber
-     lamp. */
+     lit below, the light warm like the greys. */
   --text-shadow-engraved: 0 -1px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 240, 210, 0.07);
-  --metal-rivet: color-mix(in srgb, var(--text-accent) 55%, var(--bg-header));
   /* Roving keyboard focus on list rows. Same parchment as the global
      :focus-visible outline below, drawn inset because a dense list has
      no room for that rule's 2px offset. A ring rather than a fill so it
@@ -706,31 +703,22 @@ dialog[open]::backdrop {
 
 /* --- Panel nameplates --- */
 
-/* A panel's masthead is an iron plate riveted to the chassis: a flat field
-   (no sheen, no bevel — the rivets and the cut lettering carry the metal)
-   with a brass rivet at each end. The plate spans the whole masthead so its
-   controls sit on the metal with the name, rather than a small plate
-   floating in the dock. Layout (padding clear of the rivets, where the
-   control sits) stays in the component. The header bar's grey, so the
-   plates and the app's menu bar read as one chassis. */
+/* A panel's masthead is a plate: a flat field (no sheen, no bevel, no
+   hardware — the cut lettering carries it) spanning the whole masthead, so
+   the controls sit on it with the name rather than a small plate floating
+   in the dock. --bg-container, the step halfway between the dock and the
+   header bar: it reads apart from both, and the secondary text a plate can
+   carry (the scope bar's) still clears 4.5:1 on it. Layout (padding, where
+   the control sits) stays in the component. */
 .nameplate {
-  position: relative;
-  background: var(--bg-header);
+  /* One height for every plate, so the scope bar's lines up with the
+     Collections plate across the dock seam. Their content (a title row, or
+     the scope bar's chip row) fits inside it; a floor, not a cap, so a
+     scope bar whose chips wrap still grows. */
+  min-height: 1.875rem;
+  background: var(--bg-container);
 }
-/* Both rivets on one pseudo-element, painted as gradients, so the plate's
-   own text keeps its baseline. Each is a flat brass disc with no outline or
-   shading, like a DAW rack screw drawn as a graphic, not a render; only its
-   edge is softened by half a pixel so it doesn't alias. */
-.nameplate::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 0.45rem 50%, var(--metal-rivet) 2px, transparent 2.7px),
-    radial-gradient(circle at calc(100% - 0.45rem) 50%, var(--metal-rivet) 2px, transparent 2.7px);
-}
-.nameplate > .panel-title {
+.nameplate .panel-title {
   text-shadow: var(--text-shadow-engraved);
 }
 

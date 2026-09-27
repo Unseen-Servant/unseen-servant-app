@@ -510,10 +510,13 @@
   }
   .panel-head {
     display: flex;
-    align-items: baseline;
+    /* Centred, not baseline-aligned, and padded like the scope bar: the
+       plate's min-height sets the box, and the title sits in its middle
+       the same way SCOPE does, instead of riding the mono control's
+       taller line box off-centre. */
+    align-items: center;
     gap: 0.5rem;
-    /* Symmetric now that it's a plate; 1rem sides clear the rivets. */
-    padding: 0.45rem 1rem;
+    padding: 0.3rem 0.75rem;
     margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
