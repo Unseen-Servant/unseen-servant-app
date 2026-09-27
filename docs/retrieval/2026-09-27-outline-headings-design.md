@@ -1,6 +1,6 @@
 # Headings from the PDF outline
 
-**Date:** 2026-09-27 · **Status:** draft for approval, amended 2026-09-27 after a survey of Jerome's 3,293-PDF collection (§2.1: size-relative gate, collection-wide validation); supported by the heading ablation (roadmap `2026-09-26-search-ux-informed-retrieval.md` §10: headings are a strong ranking signal, and entity names and correct ancestors are what matter)
+**Date:** 2026-09-27 · **Status:** built 2026-09-27 (junk filter bb0922f, outline a27b898) — **outline strategy NO-GO as the default** (5cf8b5c), results in §8; the junk filter stays
 **Context:** roadmap `../roadmap/2026-09-26-search-ux-informed-retrieval.md` item 3, measured in its §9: 122 of 240 sampled units (51 %; ≈ 33 % of the library by volume) carry a wrong or misleading heading path. The path is shown as the result's title and prepended to the text that is embedded and reranked, so a wrong path misleads twice.
 
 ---
@@ -140,3 +140,27 @@ After the change and Jerome's reindex:
 2. Junk filter (§3.4) with tests — useful alone, affects books without an outline too.
 3. Outline placement, levels and the gate (§3.1–3.3, 3.5) with tests on synthetic outlines; `CHUNKER_VERSION` bump.
 4. Corpus suite and tripwires on a fresh eval index; then, after Jerome's reindex, the heading judging and the library tier; roadmap §9 and CHANGELOG.
+
+## 8. Result (2026-09-27)
+
+**Junk filter (§3.4) — kept.** Precision checked against every distinct heading segment in the real library and the eval corpus (5,528): the narrowed rules reject only non-titles. It touches 32 % of the Dragonbane Bestiary's units and 37 % of Wight-Box's, under 1 % elsewhere; `breadcrumb_qa` passed. Corpus suite with the junk filter alone (5cf8b5c, fresh index) reproduces `2026-09-26-v2-cue-strip` exactly — all MRR@5 0.896, no query better or worse — as expected: the corpus books have almost no promoted attributions or stat lines. Its effect is in the Dragonbane Bestiary and Wight-Box, measured by the library tier after the reindex.
+
+**Outline strategy (§3.1–3.3) — NO-GO as the default**; the code stays, selectable as `strategy="outline"`. All three checks set in §6 failed:
+
+| check | result |
+|---|---|
+| collection sample (40 books drawn in advance, 233 passages, old and new headings judged blind) | mis-headed 40.3 % → 39.5 %; 10 fixed, 8 broken; small/flat-outline band unchanged. Criterion was a drop in both outline bands with no book worse. |
+| corpus suite vs `2026-09-26-v2-cue-strip` | all MRR@5 0.896 → 0.893; cued 0.806 → 0.896, single-book 0.948 → 0.844 (goblin warrior #1 → not found); gate failed |
+| `breadcrumb_qa` | split-letter flaws up in SRD 5.2.1 (7 → 13) and OSRIC (28 → 35) |
+
+What the pipeline actually trusts: 8 of 10 deep-outline and 7 of 10 small-outline books; the survey's placement measure (§2.1) was optimistic — it accepted any raw line holding half a title's tokens, which short common words satisfy by coincidence (Wight-Box's "88 %" is 17 % in the pipeline: its headings are vector outlines, absent from the text layer). Coverage by the real gate is roughly 55–60 % of the collection's pages, not 74 %.
+
+**Why it did not generalise.**
+
+1. **Ancestry still comes from reading order.** Outline levels fed a stack built in text order, so an outline-listed sidebar that sits between keyed rooms ("Random Happenings", a Pathfinder "Synopsis") becomes the parent of the rooms after it — five of the eight breaks are one adventure. The outline's own tree knows those rooms belong to "Area Descriptions".
+2. **Box detection by label is too narrow.** Only "NPC:"/"Table:"-style prefixes and "table" in the title mark a leaf; most sidebars carry neither.
+3. **Most mis-headings have other causes.** About 40 % of passages are mis-headed in *both* versions: headings shifted by one entry, a neighbouring table header or item named instead of the text's own entry, siblings nested by font level, table-of-contents lines and credits as headings. The outline does not touch these.
+4. **Stat lines as sub-headings** ("Skills Stealth +6") still split stat blocks; the single-book loss is likely section assembly around them (not confirmed).
+
+**If retried:** take each placed entry's ancestors from the outline tree (not the stack), treat any outline entry whose page range sits inside a sibling's as a leaf, and extend the junk filter to single stat lines — then validate on a *fresh* seeded sample; the 20260929 books have shaped this analysis and are now a development set. The cheaper alternative from the heading ablation (roadmap §10) — prepend the nearest *named* segment — does not depend on the path being right and may be the better next lever.
+
