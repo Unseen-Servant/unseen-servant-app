@@ -1,7 +1,7 @@
 <script lang="ts">
   import { jobNotification, pendingNotification } from './notificationStore';
   import { chordHint } from './keybindings';
-  import { FOLDER_OPEN, FOLDER_OPEN_VIEWBOX } from '../ui/iconPaths';
+  import { FOLDER_BACK, FOLDER_FLAP } from '../ui/iconPaths';
 
   export let selectedFolder: string;
   export let sidecarConnected: boolean;
@@ -91,10 +91,10 @@
         <span>{selectedCount} selected</span>
       {/if}
       <span class="separator">&middot;</span>
-      <button class="sync-btn" on:click={onOpenFolder} title={`Reveal library folder${chordHint('library.reveal')}`}>
-        <!-- Wide glyph — it renders wider and shorter than the other icons. -->
-        <svg class="sync-icon" viewBox={FOLDER_OPEN_VIEWBOX} fill="currentColor">
-          <path d={FOLDER_OPEN}/>
+      <button class="sync-btn folder-btn" on:click={onOpenFolder} title={`Reveal library folder${chordHint('library.reveal')}`}>
+        <svg class="sync-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d={FOLDER_BACK}/>
+          <path class="folder-flap" d={FOLDER_FLAP}/>
         </svg>
       </button>
       {#if onSync}
@@ -307,6 +307,9 @@
   .sync-icon {
     width: 12px;
     height: 12px;
+  }
+  .folder-btn {
+    --folder-seam: var(--bg-header);
   }
   .sync-btn.spinning .sync-icon {
     animation: spin 1s linear infinite;

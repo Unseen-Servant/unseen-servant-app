@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { BOOK, FOLDER_OPEN, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from './iconPaths';
+import { BOOK, FOLDER_BACK, FOLDER_FLAP, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from './iconPaths';
 
 function vendoredPath(file: string): string {
   const svg = readFileSync(new URL(`./icons/${file}`, import.meta.url), 'utf8');
@@ -32,7 +32,8 @@ describe('shared glyphs', () => {
     const src = fileURLToPath(new URL('../..', import.meta.url));
     const shared: Record<string, string> = {
       BOOK,
-      FOLDER_OPEN,
+      FOLDER_BACK,
+      FOLDER_FLAP,
       RIBBON_OUTLINE,
       SHIELD,
       SHIELD_FESS,
