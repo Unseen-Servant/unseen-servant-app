@@ -323,7 +323,7 @@ def _rewrite_page_md(
         if not parts or not parts[0][0]:
             lines[r["line_idx"]] = ""
             continue
-        first_level = max(1, min(6, int(level_by_loc.get(loc, r["original_level"]))))
+        first_level = max(1, min(MAX_LEVEL, int(level_by_loc.get(loc, r["original_level"]))))
         out = []
         first_heading_done = False
         for i, (text, sig) in enumerate(parts):
@@ -335,10 +335,145 @@ def _rewrite_page_md(
                 level = first_level
                 first_heading_done = True
             else:
-                level = level_by_sig.get(sig, min(6, first_level + 1))
-            out.append(("#" * max(1, min(6, int(level)))) + " " + text)
+                level = level_by_sig.get(sig, min(MAX_LEVEL, first_level + 1))
+            out.append(("#" * max(1, min(MAX_LEVEL, int(level)))) + " " + text)
         lines[r["line_idx"]] = "\n".join(out)
     return "\n".join(lines)
+
+
+# ─────────────── outline strategy ───────────────
+# docs/retrieval/2026-09-27-outline-headings-design.md: the publisher's PDF
+# outline supplies the heading structure when the book has a trustworthy
+# one; font-detected headings only add detail inside an outline entry.
+
+# Deepest heading level written to the page Markdown: outline depth plus
+# the font clusters shifted below it (the chunker and cleanup read up to
+# this many '#').
+MAX_LEVEL = 12
+# Trust gate (§3.1), measured on a 3,293-PDF collection (§2.1).
+OUTLINE_MIN_ENTRIES = 5
+OUTLINE_MIN_PLACED = 0.70
+OUTLINE_MIN_SPAN = 0.50
+# Placement (§3.2): share of the title's tokens a line must hold, and the
+# longest body line that may be promoted (a title, not a sentence using it).
+PLACE_MIN_OVERLAP = 0.5
+PROMOTE_MAX_WORDS = 12
+# Editorial label outlines put before box titles ("NPC: Master Ulvar",
+# "Table: Rumors"); the page does not print it.
+_BOX_PREFIX_RE = re.compile(r"^\s*[A-Za-z]+(?:\s[A-Za-z]+)?\s*:\s*(?=\S)")
+_TABLE_WORD_RE = re.compile(r"\btable\b", re.IGNORECASE)
+_BODY_MARKUP_RE = re.compile(r"^[\s>*_\-•·]+|[*_]+")
+
+
+def outline_entries(toc_entries: list[list]) -> list[dict]:
+    """Outline entries relative to the book's effective top depth (the
+    same rule as ``build_toc_levels``: a lone book-title entry above the
+    real top level is skipped). Each: level, title (label prefix
+    stripped), page, box (a leaf that must never parent what follows)."""
+    entries = [e for e in toc_entries if len(e) >= 3]
+    if not entries:
+        return []
+    depths = Counter(int(e[0]) for e in entries)
+    top = next((d for d in sorted(depths) if depths[d] >= 2), min(depths))
+    out = []
+    for depth, title, page in ((int(e[0]), str(e[1]), int(e[2])) for e in entries):
+        level = depth - top + 1
+        if level < 1:
+            continue
+        stripped = _BOX_PREFIX_RE.sub("", title).strip()
+        box = stripped != title.strip() or bool(_TABLE_WORD_RE.search(title))
+        out.append({"level": level, "title": stripped, "page": page, "box": box})
+    return out
+
+
+def _overlap(want: set[str], have: set[str]) -> float:
+    return len(want & have) / len(want) if want else 0.0
+
+
+def place_outline(rows: list[dict], pages: list[dict], entries: list[dict]) -> dict:
+    """Place each outline entry on its page, the next, or the previous.
+
+    On each page, in that order: a detected heading row holding at least
+    ``PLACE_MIN_OVERLAP`` of the title's tokens is claimed (best overlap
+    wins); else a short body line is (an entry font detection missed —
+    a heading is inserted above it); else the next page is tried. An
+    entry found nowhere is left unplaced rather than put anywhere.
+    """
+    rows_by_page: dict[int, list[dict]] = {}
+    for r in rows:
+        rows_by_page.setdefault(r["page_number"], []).append(r)
+    md_by_page = {p["page_number"]: p["markdown"] for p in pages}
+    claimed: set[tuple[int, int]] = set()
+    row_entry: dict[tuple[int, int], dict] = {}
+    inserts: dict[tuple[int, int], dict] = {}
+    body_cache: dict[int, list[tuple[int, set[str], int]]] = {}
+
+    def body_lines(page: int) -> list[tuple[int, set[str], int]]:
+        if page not in body_cache:
+            out = []
+            for i, line in enumerate(md_by_page.get(page, "").split("\n")):
+                if not line.strip() or HEADING_RE.match(line) or line.lstrip().startswith("|"):
+                    continue
+                text = _BODY_MARKUP_RE.sub("", line).strip()
+                out.append((i, _tokenize(text), len(text.split())))
+            body_cache[page] = out
+        return body_cache[page]
+
+    existing = promoted = 0
+    for e in entries:
+        want = _tokenize(e["title"])
+        if not want:
+            continue
+        for page in (e["page"], e["page"] + 1, e["page"] - 1):
+            best = None
+            for r in rows_by_page.get(page, []):
+                loc = (r["page_number"], r["line_idx"])
+                if loc in claimed:
+                    continue
+                ov = _overlap(want, _tokenize(_strip_md_emphasis(r["text"])))
+                if ov >= PLACE_MIN_OVERLAP and (best is None or ov > best[0]):
+                    best = (ov, loc)
+            if best is not None:
+                claimed.add(best[1])
+                row_entry[best[1]] = e
+                existing += 1
+                break
+            best_line = None
+            for i, toks, words in body_lines(page):
+                loc = (page, i)
+                if loc in claimed or words > PROMOTE_MAX_WORDS:
+                    continue
+                ov = _overlap(want, toks)
+                if ov >= PLACE_MIN_OVERLAP and (
+                    best_line is None or (ov, -words) > (best_line[0], -best_line[1])
+                ):
+                    best_line = (ov, words, loc)
+            if best_line is not None:
+                claimed.add(best_line[2])
+                inserts[best_line[2]] = e
+                promoted += 1
+                break
+    considered = [e for e in entries if _tokenize(e["title"])]
+    return {
+        "row_entry": row_entry,
+        "inserts": inserts,
+        "considered": len(considered),
+        "existing": existing,
+        "promoted": promoted,
+        "unplaced": len(considered) - existing - promoted,
+        "boxes": sum(1 for e in considered if e["box"]),
+        "pages": [e["page"] for e in considered],
+    }
+
+
+def outline_trusted(placement: dict, page_count: int) -> tuple[bool, float, float]:
+    """The trust gate: (trusted, placed rate, span as a share of the book)."""
+    n = placement["considered"]
+    placed = (placement["existing"] + placement["promoted"]) / n if n else 0.0
+    pages = placement["pages"]
+    span = (max(pages) - min(pages) + 1) / page_count if pages and page_count else 0.0
+    trusted = n >= OUTLINE_MIN_ENTRIES and placed >= OUTLINE_MIN_PLACED and span >= OUTLINE_MIN_SPAN
+    return trusted, placed, span
 
 
 def _junk_part_count(r: dict) -> int:
@@ -364,15 +499,37 @@ def promote_markdown(
 ) -> tuple[list[dict], dict]:
     """Apply heading-promotion to a document. Returns (new_pages, report).
 
-    ``strategy`` ∈ {"font_cluster", "toc", "toc_then_font"}.
+    ``strategy`` ∈ {"font_cluster", "toc", "toc_then_font", "outline"}.
+    ``outline`` uses the PDF outline when it passes the trust gate and
+    falls back to ``toc_then_font`` otherwise (the report says which).
     """
-    if strategy not in {"font_cluster", "toc", "toc_then_font"}:
+    if strategy not in {"font_cluster", "toc", "toc_then_font", "outline"}:
         raise ValueError(f"unknown strategy: {strategy}")
 
     rows = collect_heading_signatures(pages, spans_pages)
 
     for r in rows:
         r["junk"] = is_junk_heading(r["text"])
+
+    outline_report: dict = {}
+    if strategy == "outline":
+        entries = outline_entries(toc.get("entries", []) or [])
+        placement = place_outline(rows, pages, entries)
+        page_count = max((p["page_number"] for p in pages), default=0)
+        trusted, placed_rate, span = outline_trusted(placement, page_count)
+        outline_report = {
+            "outline_trusted": trusted,
+            "outline_entries": placement["considered"],
+            "outline_placed": round(placed_rate, 3),
+            "outline_span": round(span, 3),
+            "outline_existing": placement["existing"],
+            "outline_promoted": placement["promoted"],
+            "outline_unplaced": placement["unplaced"],
+            "outline_boxes": placement["boxes"],
+        }
+        if trusted:
+            return _promote_by_outline(pages, rows, placement, outline_report)
+        strategy = "toc_then_font"
 
     font_info = build_font_cluster_levels([r for r in rows if not r["junk"]])
     toc_info = build_toc_levels(rows, toc.get("entries", []) or [])
@@ -433,5 +590,80 @@ def promote_markdown(
         "font_histogram": font_info["histogram"],
         "modal_sig": font_info.get("modal_sig"),
         "toc_effective_depth": toc_info["effective_depth"],
+        **outline_report,
+    }
+    return new_pages, report
+
+
+def _promote_by_outline(
+    pages: list[dict], rows: list[dict], placement: dict, outline_report: dict,
+) -> tuple[list[dict], dict]:
+    """Levels under a trusted outline (§3.3).
+
+    An outline entry at relative depth *d* is level *d*; a box entry is
+    the deepest level in use, so any following heading closes it.
+    Detected headings the outline does not list keep their font-cluster
+    order shifted below the outline, so the next outline entry always
+    closes them. An outline-placed line is never demoted as junk.
+    """
+    row_entry, inserts = placement["row_entry"], placement["inserts"]
+    placed = list(row_entry.values()) + list(inserts.values())
+    depth = max((e["level"] for e in placed if not e["box"]), default=1)
+    box_level = min(MAX_LEVEL, depth + 6)
+
+    def entry_level(e: dict) -> int:
+        return box_level if e["box"] else min(MAX_LEVEL, e["level"])
+
+    font_info = build_font_cluster_levels(
+        [r for r in rows if not r["junk"] and (r["page_number"], r["line_idx"]) not in row_entry]
+    )
+    shifted_by_sig = {
+        sig: min(MAX_LEVEL, depth + lvl) for sig, lvl in font_info["level_by_sig"].items()
+    }
+    level_by_loc: dict[tuple[int, int], int] = {}
+    for r in rows:
+        loc = (r["page_number"], r["line_idx"])
+        if loc in row_entry:
+            r["junk"] = False
+            level_by_loc[loc] = entry_level(row_entry[loc])
+        elif r["sig"] is not None and r["sig"] in shifted_by_sig:
+            level_by_loc[loc] = shifted_by_sig[r["sig"]]
+        else:
+            level_by_loc[loc] = min(MAX_LEVEL, depth + max(2, r["original_level"]))
+
+    rows_by_page: dict[int, list[dict]] = {}
+    for r in rows:
+        rows_by_page.setdefault(r["page_number"], []).append(r)
+    inserts_by_page: dict[int, list[tuple[int, dict]]] = {}
+    for (page, idx), e in inserts.items():
+        inserts_by_page.setdefault(page, []).append((idx, e))
+
+    new_pages: list[dict] = []
+    for page in pages:
+        md = _rewrite_page_md(
+            page["markdown"], rows_by_page.get(page["page_number"], []),
+            level_by_loc, shifted_by_sig,
+        )
+        if page["page_number"] in inserts_by_page:
+            lines = md.split("\n")
+            for idx, e in inserts_by_page[page["page_number"]]:
+                lines[idx] = "#" * entry_level(e) + " " + e["title"] + "\n" + lines[idx]
+            md = "\n".join(lines)
+        new_pages.append({**page, "markdown": md})
+
+    levels = list(level_by_loc.values()) + [entry_level(e) for e in inserts.values()]
+    report = {
+        "strategy": "outline",
+        "n_headings": len(rows) + len(inserts),
+        "n_unmatched_signature": sum(1 for r in rows if r["sig"] is None),
+        "toc_used": len(row_entry) + len(inserts),
+        "font_used": sum(1 for r in rows if (r["page_number"], r["line_idx"]) not in row_entry),
+        "fallback_count": 0,
+        "junk_demoted": sum(_junk_part_count(r) for r in rows),
+        "promoted_level_distribution": dict(Counter(levels)),
+        "font_histogram": font_info["histogram"],
+        "modal_sig": font_info.get("modal_sig"),
+        "toc_effective_depth": depth,
+        **outline_report,
     }
     return new_pages, report

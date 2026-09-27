@@ -387,3 +387,117 @@ def test_merged_line_junk_decided_per_part_first_real_second_junk():
     lines = out.split("\n")
     assert lines[0] == "## Kraken"
     assert lines[1] == "**Armor Class 12 Hit Points 7**"
+
+
+# ─────────────── outline strategy (outline-headings design) ───────────────
+
+def _outline_pages():
+    """Six pages: two chapters, each with entries; font detection finds the
+    chapter headings and one entry, and misses 'Fire Blast' (a bold body
+    line) — the outline names every entry."""
+    md = {
+        1: "## Magic\n\nIntro to magic.\n\n## Gust of Wind\n\nWind text.",
+        2: "**Fire Blast**\n\nYou throw fire.",
+        3: "## Stat Block Heading\n\nMore magic.",
+        4: "## Gear\n\nGear intro.",
+        5: "## Weapons\n\nSwords and axes.",
+        6: "Rumors text here.\n\n| a | b |\n|---|---|",
+    }
+    pages = [{"page_number": n, "markdown": m} for n, m in md.items()]
+    spans = [{"page_number": n, "spans": _spans([
+        ("Magic", 18.0, True), ("Gear", 18.0, True), ("Gust of Wind", 12.0, True),
+        ("Weapons", 12.0, True), ("Stat Block Heading", 10.0, True),
+    ])} for n in md]
+    toc = {"entries": [
+        [1, "Magic", 1], [2, "Gust of Wind", 1], [2, "Fire Blast", 2],
+        [1, "Gear", 4], [2, "Weapons", 5], [2, "Table: Rumors", 6],
+    ]}
+    return pages, spans, toc
+
+
+def _headings(pages):
+    out = []
+    for p in pages:
+        for line in p["markdown"].split("\n"):
+            if line.startswith("#"):
+                hashes, text = line.split(" ", 1)
+                out.append((len(hashes), text))
+    return out
+
+
+def test_outline_levels_come_from_the_outline_and_missed_entries_are_inserted():
+    pages, spans, toc = _outline_pages()
+    promoted, report = promote_markdown(pages, spans, toc, strategy="outline")
+    assert report["strategy"] == "outline" and report["outline_trusted"]
+    heads = _headings(promoted)
+    assert (1, "Magic") in heads and (1, "Gear") in heads
+    assert (2, "Gust of Wind") in heads and (2, "Weapons") in heads
+    # Font detection missed Fire Blast; the outline entry is inserted above
+    # the body line, which stays.
+    assert (2, "Fire Blast") in heads
+    assert "**Fire Blast**" in promoted[1]["markdown"]
+    assert report["outline_promoted"] >= 1
+
+
+def test_detected_headings_sit_below_the_outline():
+    """A heading the outline does not list is shifted below the deepest
+    outline level, so the next outline entry closes it."""
+    pages, spans, toc = _outline_pages()
+    promoted, _ = promote_markdown(pages, spans, toc, strategy="outline")
+    (level,) = [lvl for lvl, text in _headings(promoted) if text == "Stat Block Heading"]
+    assert level > 2
+
+
+def test_box_entries_are_leaves_with_their_label_stripped():
+    pages, spans, toc = _outline_pages()
+    promoted, report = promote_markdown(pages, spans, toc, strategy="outline")
+    (level,) = [lvl for lvl, text in _headings(promoted) if text == "Rumors"]
+    assert level == max(lvl for lvl, _ in _headings(promoted))
+    assert report["outline_boxes"] == 1
+
+
+def test_outline_placed_line_is_never_demoted_as_junk():
+    pages = [{"page_number": n, "markdown": f"## Entry {n}\n\nText."} for n in range(1, 6)]
+    pages[2]["markdown"] = "## What happens next?\n\nText."  # a real title...
+    pages[3]["markdown"] = "## treasure: none.\n\nText."      # ...and a junk shape
+    spans = [{"page_number": n, "spans": _spans([(f"Entry {n}", 12.0, True)])} for n in range(1, 6)]
+    toc = {"entries": [[1, f"Entry {n}", n] for n in (1, 2, 5)]
+           + [[1, "What happens next?", 3], [1, "treasure: none.", 4]]}
+    toc["entries"].sort(key=lambda e: e[2])
+    promoted, report = promote_markdown(pages, spans, toc, strategy="outline")
+    assert report["outline_trusted"]
+    assert any(text == "treasure: none." for _, text in _headings(promoted))
+
+
+def test_small_outline_falls_back():
+    pages, spans, _ = _outline_pages()
+    toc = {"entries": [[1, "Magic", 1], [1, "Gear", 4]]}
+    _, report = promote_markdown(pages, spans, toc, strategy="outline")
+    assert report["outline_trusted"] is False
+    assert report["strategy"] == "toc_then_font"
+
+
+def test_front_matter_only_outline_falls_back():
+    """Entries spanning under half the book would leave the last one open
+    over the rest."""
+    pages = [{"page_number": n, "markdown": f"## Part {n}\n\nText."} for n in range(1, 21)]
+    spans = [{"page_number": n, "spans": _spans([(f"Part {n}", 12.0, True)])} for n in range(1, 21)]
+    toc = {"entries": [[1, f"Part {n}", n] for n in range(1, 7)]}
+    _, report = promote_markdown(pages, spans, toc, strategy="outline")
+    assert report["outline_placed"] == 1.0 and report["outline_span"] < 0.5
+    assert report["outline_trusted"] is False
+
+
+def test_unplaceable_outline_falls_back():
+    pages, spans, _ = _outline_pages()
+    toc = {"entries": [[1, f"Nowhere {i}", 1 + i % 6] for i in range(8)]}
+    _, report = promote_markdown(pages, spans, toc, strategy="outline")
+    assert report["outline_placed"] == 0.0 and report["outline_trusted"] is False
+
+
+def test_outline_entry_found_nowhere_is_not_invented():
+    pages, spans, toc = _outline_pages()
+    toc["entries"].append([2, "Completely Absent Entry", 5])
+    promoted, report = promote_markdown(pages, spans, toc, strategy="outline")
+    assert report["outline_unplaced"] == 1
+    assert all(text != "Completely Absent Entry" for _, text in _headings(promoted))

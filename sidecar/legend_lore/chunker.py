@@ -19,7 +19,7 @@ from .embedder import EMBEDDING_MODEL
 from .heading_text import strip_markup
 
 
-CHUNKER_VERSION = "structure_aware-v3"
+CHUNKER_VERSION = "structure_aware-v4"
 # The trailing store marker flags every file indexed into ChromaDB as
 # outdated: the library store starts empty and is rebuilt by reindexing
 # (docs/retrieval/2026-09-26-library-store-design.md).
@@ -30,7 +30,7 @@ HARD_CAP = 20000
 
 ChunkType = Literal["prose", "table", "heading", "list", "mixed"]
 
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+_HEADING_RE = re.compile(r"^(#{1,12})\s+(.+?)\s*$")
 _TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
 _PAGE_MARKER_RE = re.compile(r"^<!--\s*page\s+(\d+)\s*-->\s*$")
 

@@ -220,7 +220,7 @@ def strip_running_elements(
 
 # ─────────────────────────── R4 ───────────────────────────
 
-_HEADING_LINE_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+_HEADING_LINE_RE = re.compile(r"^#{1,12}\s+(.+?)\s*$")
 _HEAD_LINES_ZONE = 5
 _TAIL_LINES_ZONE = 5
 

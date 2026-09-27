@@ -443,7 +443,8 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
 
     Pipeline (issue #157 — heading-hierarchy promotion adoption):
       pymupdf4llm.to_markdown  +  font-span side-channel  +  TOC
-        → promote_headings (toc_then_font; TOC capped at depth 1)
+        → promote_headings (outline: the PDF outline when it passes the
+          trust gate, else toc_then_font with the TOC capped at depth 1)
         → R1 (rejoin CR fragments)
         → R3 (strip image-placeholder chrome)
         → R4 (strip running-heading chrome — cross-page detection)
@@ -480,7 +481,7 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
         return []
     pages_dict = [{"page_number": pn, "markdown": md} for pn, md in raw_pages]
     promoted, promo_report = promote_markdown(
-        pages_dict, spans_pages, toc, strategy="toc_then_font"
+        pages_dict, spans_pages, toc, strategy="outline"
     )
     print(
         f"[promote] {pdf_path.name}: "
@@ -492,6 +493,17 @@ def _extract_pdf_pages(pdf_path: Path) -> list[PageMarkdown]:
         f"distribution={promo_report['promoted_level_distribution']} "
         f"junk={promo_report.get('junk_demoted', 0)} "
         f"toc_depth={promo_report.get('toc_effective_depth', 1)}"
+        + (
+            f" outline={'trusted' if promo_report['outline_trusted'] else 'fallback'}"
+            f" entries={promo_report['outline_entries']}"
+            f" placed={promo_report['outline_placed']}"
+            f" (existing={promo_report['outline_existing']}"
+            f" promoted={promo_report['outline_promoted']}"
+            f" unplaced={promo_report['outline_unplaced']})"
+            f" boxes={promo_report['outline_boxes']}"
+            f" span={promo_report['outline_span']}"
+            if "outline_trusted" in promo_report else ""
+        )
     )
     cleaned, report = clean_pages([p["markdown"] for p in promoted])
     print(f"[cleanup] {pdf_path.name}: {report.summary()}")
