@@ -200,7 +200,17 @@
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
       {@const collColor = collectionColorByPath.get(result.source) ?? null}
       {#if i === dividerAt}
-        <div class="weak-divider" role="separator">weak matches</div>
+        <!-- ⁂ drawn, not typed: none of the bundled fonts carry U+2042,
+             and the system fallbacks differ between macOS and Windows. -->
+        <div class="weak-divider" role="separator">
+          <svg class="asterism" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 1.5v4M4.27 2.5l3.46 2M4.27 4.5l3.46-2M3 7.5v4M1.27 8.5l3.46 2M1.27 10.5l3.46-2M9 7.5v4M7.27 8.5l3.46 2M7.27 10.5l3.46-2"/>
+          </svg>
+          weak matches
+          <svg class="asterism" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 1.5v4M4.27 2.5l3.46 2M4.27 4.5l3.46-2M3 7.5v4M1.27 8.5l3.46 2M1.27 10.5l3.46-2M9 7.5v4M7.27 8.5l3.46 2M7.27 10.5l3.46-2"/>
+          </svg>
+        </div>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <div
@@ -236,7 +246,7 @@
           {#if segments.length > 0}
             <div class="breadcrumb">
               {#each segments as segment, idx (idx)}
-                {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
+                {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
                 <span class="bc-segment">{segment}</span>
               {/each}
             </div>
@@ -418,11 +428,24 @@
     gap: 0.5rem;
   }
 
+  /* The rules fade in toward the ornament rather than running edge to
+     edge, so the asterisms read as the centre of the divider. */
   .weak-divider::before,
   .weak-divider::after {
     content: '';
     flex: 1;
-    border-top: 1px solid var(--border-subtle);
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border-subtle));
+  }
+
+  .weak-divider::after {
+    background: linear-gradient(to left, transparent, var(--border-subtle));
+  }
+
+  .asterism {
+    width: 0.75rem;
+    height: 0.8rem;
+    flex-shrink: 0;
   }
 
   .weak-callout {
@@ -443,11 +466,16 @@
     align-items: center;
     justify-content: center;
     border-radius: 2px;
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    font-variant-numeric: tabular-nums;
-    background: color-mix(in srgb, var(--collection-color, var(--text-tertiary)) 20%, transparent);
-    color: var(--collection-color, var(--text-tertiary));
+    /* Gilt folio numerals: Almendra, and parchment rather than grey when
+       no collection claims the file. A collection's pigment still wins, so
+       the colour↔collection mapping the panel teaches survives. Almendra's
+       figures are proportional; the fixed cell width keeps the column
+       aligned all the same. */
+    font-family: var(--font-heading);
+    font-size: 0.8rem;
+    line-height: 1;
+    background: color-mix(in srgb, var(--collection-color, var(--text-accent)) 15%, transparent);
+    color: var(--collection-color, var(--text-accent));
     -webkit-user-select: none;
     user-select: none;
     margin-top: 0.05rem;
@@ -477,11 +505,14 @@
     color: var(--text-primary);
   }
 
+  /* A fleuron (❧, carried by Crimson Text) instead of a chevron. Tertiary
+     rather than the old border grey: the chevron's straight strokes read
+     at that level, the fleuron's hairlines vanish into the row. */
   .bc-sep {
-    color: var(--border-subtle);
+    color: var(--text-tertiary);
     -webkit-user-select: none;
     user-select: none;
-    margin: 0 0.25rem;
+    margin: 0 0.3rem;
   }
 
   .snippet {

@@ -518,6 +518,10 @@
     padding: 0.6rem 0.75rem 0.4rem;
     flex-shrink: 0;
   }
+  /* Let the nameplate's rule run to the reset control. */
+  .panel-title {
+    flex: 1;
+  }
   .panel-body {
     flex: 1;
     min-height: 0;

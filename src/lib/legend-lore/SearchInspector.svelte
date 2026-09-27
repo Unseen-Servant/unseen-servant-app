@@ -140,7 +140,7 @@
       {#if segments.length > 0}
         <div class="breadcrumb" aria-label="Section path">
           {#each segments as segment, idx (idx)}
-            {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
+            {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
             <span class="bc-segment">{segment}</span>
           {/each}
         </div>
@@ -334,8 +334,9 @@
     color: var(--text-primary);
   }
 
+  /* Fleuron separator — see SearchResults.svelte .bc-sep */
   .bc-sep {
-    color: var(--border-subtle);
+    color: var(--text-tertiary);
     -webkit-user-select: none;
     user-select: none;
   }
