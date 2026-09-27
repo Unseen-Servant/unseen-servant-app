@@ -4,7 +4,7 @@
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
-  import { chord, chordHint, isBareKeyChord, isDeleteChord } from '../shell/keybindings';
+  import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
@@ -461,6 +461,13 @@
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
 
+    const edge = jumpEdge(event);
+    if (edge && navEntries.length > 0) {
+      event.preventDefault();
+      onFocusCollection(navEntries[edge === 'first' ? 0 : navEntries.length - 1].key);
+      return;
+    }
+
     // Active with no caret (the pane was claimed by a chrome click): the
     // first arrow places the caret rather than stepping, so it lands *on*
     // the restored row instead of one past it.
@@ -481,16 +488,6 @@
       event.preventDefault();
       const prev = stepNavKey(navEntries, focusedName, -1);
       if (prev) onFocusCollection(prev);
-      return;
-    }
-    if (event.key === 'Home' && !meta && navEntries[0]) {
-      event.preventDefault();
-      onFocusCollection(navEntries[0].key);
-      return;
-    }
-    if (event.key === 'End' && !meta && navEntries.length > 0) {
-      event.preventDefault();
-      onFocusCollection(navEntries[navEntries.length - 1].key);
       return;
     }
 

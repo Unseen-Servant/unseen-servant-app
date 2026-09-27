@@ -84,8 +84,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // File tree (when a row is focused)
   { id: 'tree.next',             keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'fileTree' },
   { id: 'tree.prev',             keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'fileTree' },
-  { id: 'tree.home',             keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'fileTree' },
-  { id: 'tree.end',              keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
+  { id: 'tree.home',             keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first row',            scope: 'fileTree' },
+  { id: 'tree.end',              keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last row',             scope: 'fileTree' },
   { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
   { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: "Tick the row's checkbox — indexing, or the collection while armed", scope: 'fileTree', switch: true },
@@ -114,8 +114,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Collections panel (when a row is focused)
   { id: 'collections.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'collections' },
   { id: 'collections.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'collections' },
-  { id: 'collections.home',      keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'collections' },
-  { id: 'collections.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
+  { id: 'collections.home',      keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first row',            scope: 'collections' },
+  { id: 'collections.end',       keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
   { id: 'collections.expand',    keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand collection / first file', scope: 'collections' },
   { id: 'collections.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse collection / parent row', scope: 'collections' },
   { id: 'collections.toggle',    keys: { mac: '↵',    other: 'Enter' },         label: 'Expand / collapse collection', scope: 'collections' },
@@ -133,8 +133,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Filters panel (while the pane holds focus)
   { id: 'filterPanel.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'filterPanel' },
   { id: 'filterPanel.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterPanel' },
-  { id: 'filterPanel.home',      keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first row',            scope: 'filterPanel' },
-  { id: 'filterPanel.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'filterPanel' },
+  { id: 'filterPanel.home',      keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first row',            scope: 'filterPanel' },
+  { id: 'filterPanel.end',       keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last row',             scope: 'filterPanel' },
   // Channel rows (curation, system) answer with their M; view rows have no M,
   // so this hits their single switch instead. One key, "do this row's thing".
   { id: 'filterPanel.toggle',    keys: { mac: 'X',    other: 'X' },             label: "Tick the focused view row's checkbox", scope: 'filterPanel', switch: true },
@@ -152,8 +152,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Search results list
   { id: 'results.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Next result',                  scope: 'searchResults' },
   { id: 'results.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Previous result (or back to input)', scope: 'searchResults' },
-  { id: 'results.home',          keys: { mac: 'Home', other: 'Home' },          label: 'Jump to first result',         scope: 'searchResults' },
-  { id: 'results.end',           keys: { mac: 'End',  other: 'End' },           label: 'Jump to last result',          scope: 'searchResults' },
+  { id: 'results.home',          keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first result',         scope: 'searchResults' },
+  { id: 'results.end',           keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last result',          scope: 'searchResults' },
   { id: 'results.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused result',       scope: 'searchResults' },
   { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
   // No switch flag: the search rows draw no S/M squares — the lit state
@@ -236,6 +236,23 @@ export function isDeleteChord(event: ChordEvent, mac = isMac): boolean {
   if (event.shiftKey || event.altKey) return false;
   if (mac) return (event.metaKey || event.ctrlKey) && event.key === 'Backspace';
   return !event.metaKey && !event.ctrlKey && event.key === 'Delete';
+}
+
+// First/last row of a list. Home/End everywhere; on mac ⌥↑/⌥↓ too — laptop
+// keyboards there have no Home/End keys, and ⌥↑/⌥↓ is the list-view
+// convention. Not elsewhere: on Windows Alt+↑ is Explorer's "up one level".
+// Cmd/Ctrl combinations are someone else's chord (⌘⌥↑/↓ walks the dock).
+// Callers must test this ahead of their plain ↑/↓ step, which would
+// otherwise swallow the ⌥ arrows.
+export function jumpEdge(event: ChordEvent, mac = isMac): 'first' | 'last' | null {
+  if (event.metaKey || event.ctrlKey) return null;
+  if (event.key === 'Home') return 'first';
+  if (event.key === 'End') return 'last';
+  if (mac && event.altKey && !event.shiftKey) {
+    if (event.key === 'ArrowUp') return 'first';
+    if (event.key === 'ArrowDown') return 'last';
+  }
+  return null;
 }
 
 // aria-keyshortcuts for a destructive commit. keyShortcut() derives from

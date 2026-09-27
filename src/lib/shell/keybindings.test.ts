@@ -5,6 +5,7 @@ import {
   eventMatchKey,
   isBareKeyChord,
   isDeleteChord,
+  jumpEdge,
   keyShortcut,
   matchKey,
   systemsRowScopeKey,
@@ -85,6 +86,40 @@ describe('isDeleteChord', () => {
     expect(eventMatchKey(ev({ key: 'Backspace', metaKey: true }))).toBeNull();
     expect(KEYBINDINGS.find((k) => k.id === 'tree.delete')!.match).toBeUndefined();
     expect(KEYBINDINGS.find((k) => k.id === 'collections.delete')!.match).toBeUndefined();
+  });
+});
+
+describe('jumpEdge', () => {
+  test('Home and End jump on both platforms', () => {
+    for (const mac of [true, false]) {
+      expect(jumpEdge(ev({ key: 'Home' }), mac)).toBe('first');
+      expect(jumpEdge(ev({ key: 'End' }), mac)).toBe('last');
+    }
+  });
+
+  test('mac also takes ⌥↑/⌥↓ — its laptops have no Home/End', () => {
+    expect(jumpEdge(ev({ key: 'ArrowUp', altKey: true }), true)).toBe('first');
+    expect(jumpEdge(ev({ key: 'ArrowDown', altKey: true }), true)).toBe('last');
+  });
+
+  test('elsewhere Alt+↑ stays free — it is Explorer\'s "up one level"', () => {
+    expect(jumpEdge(ev({ key: 'ArrowUp', altKey: true }), false)).toBeNull();
+    expect(jumpEdge(ev({ key: 'ArrowDown', altKey: true }), false)).toBeNull();
+  });
+
+  test('plain arrows step, they do not jump', () => {
+    expect(jumpEdge(ev({ key: 'ArrowUp' }), true)).toBeNull();
+    expect(jumpEdge(ev({ key: 'ArrowDown' }), true)).toBeNull();
+  });
+
+  test('Cmd/Ctrl chords belong to someone else — ⌘⌥↑/↓ walks the dock', () => {
+    expect(jumpEdge(ev({ key: 'ArrowUp', altKey: true, metaKey: true }), true)).toBeNull();
+    expect(jumpEdge(ev({ key: 'Home', metaKey: true }), true)).toBeNull();
+    expect(jumpEdge(ev({ key: 'End', ctrlKey: true }), false)).toBeNull();
+  });
+
+  test('shift+⌥ arrows are not a jump', () => {
+    expect(jumpEdge(ev({ key: 'ArrowDown', altKey: true, shiftKey: true }), true)).toBeNull();
   });
 });
 

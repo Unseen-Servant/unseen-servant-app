@@ -11,6 +11,7 @@
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { menuSlotHeld } from '../shell/menuSlot';
+  import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
   import { DICE_D6, DIE_OUTLINE, RIBBON_OUTLINE } from '../ui/iconPaths';
@@ -187,6 +188,12 @@
       onFocusRow(null);
       return;
     }
+    const edge = jumpEdge(event);
+    if (edge && rows.length > 0) {
+      event.preventDefault();
+      onFocusRow(rows[edge === 'first' ? 0 : rows.length - 1].key);
+      return;
+    }
     // Active with no caret (the pane was claimed by a click on its chrome):
     // the first arrow places the caret rather than stepping, so it lands *on*
     // the restored row instead of one past it.
@@ -203,16 +210,6 @@
     if (isUp) {
       event.preventDefault();
       onFocusRow(stepFilterRow(rows, focusedRow, -1));
-      return;
-    }
-    if (event.key === 'Home' && !meta && rows.length > 0) {
-      event.preventDefault();
-      onFocusRow(rows[0].key);
-      return;
-    }
-    if (event.key === 'End' && !meta && rows.length > 0) {
-      event.preventDefault();
-      onFocusRow(rows[rows.length - 1].key);
       return;
     }
 

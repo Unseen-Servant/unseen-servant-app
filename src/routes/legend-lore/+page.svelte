@@ -45,7 +45,7 @@
   import { buildRibbonIndex, firstColorByPath } from '../../lib/legend-lore/collectionRibbons';
   import { createCommitScheduler, mergeArmedCollection } from '../../lib/legend-lore/collectionCommit';
   import { setTreePathsPayload, type TreePathsPayload } from '../../lib/legend-lore/dragPayload';
-  import { chord, isDeleteChord } from '../../lib/shell/keybindings';
+  import { chord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
   import { menuSlotHeld } from '../../lib/shell/menuSlot';
   import {
     parseString,
@@ -1981,19 +1981,17 @@
     const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
     const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
 
+    const edge = jumpEdge(event);
+    if (edge) {
+      event.preventDefault();
+      if (visibleTreeRows.length > 0) {
+        focusTreeRow(visibleTreeRows[edge === 'first' ? 0 : visibleTreeRows.length - 1].path);
+      }
+      return true;
+    }
+
     if (isDown) { event.preventDefault(); moveTreeFocus(1);  return true; }
     if (isUp)   { event.preventDefault(); moveTreeFocus(-1); return true; }
-
-    if (event.key === 'Home' && !meta) {
-      event.preventDefault();
-      if (visibleTreeRows.length > 0) focusTreeRow(visibleTreeRows[0].path);
-      return true;
-    }
-    if (event.key === 'End' && !meta) {
-      event.preventDefault();
-      if (visibleTreeRows.length > 0) focusTreeRow(visibleTreeRows[visibleTreeRows.length - 1].path);
-      return true;
-    }
 
     const idx = indexOfPath(visibleTreeRows, focusedFilePath);
     if (idx < 0) return false;
@@ -2527,7 +2525,12 @@
     // input. Enter or ⌘O opens; Escape is handled by the ladder above.
     const isDown = event.key === 'ArrowDown' || (bareLetter && inList && lk === 'j');
     const isUp = event.key === 'ArrowUp' || (bareLetter && inList && lk === 'k');
-    if (isDown) {
+    const edge = inList ? jumpEdge(event) : null;
+    if (edge) {
+      event.preventDefault();
+      selectedResultIndex = edge === 'first' ? 0 : searchResults.length - 1;
+      searchResultsComponent?.focusRow(selectedResultIndex);
+    } else if (isDown) {
       if (inInput) {
         event.preventDefault();
         searchResultsComponent?.focusRow(selectedResultIndex);
@@ -2544,14 +2547,6 @@
       } else {
         headerComponent?.focus();
       }
-    } else if (event.key === 'Home' && !meta && inList) {
-      event.preventDefault();
-      selectedResultIndex = 0;
-      searchResultsComponent?.focusRow(0);
-    } else if (event.key === 'End' && !meta && inList) {
-      event.preventDefault();
-      selectedResultIndex = searchResults.length - 1;
-      searchResultsComponent?.focusRow(selectedResultIndex);
     } else if (event.key === 'Enter' && inList) {
       event.preventDefault();
       const sel = searchResults[selectedResultIndex];

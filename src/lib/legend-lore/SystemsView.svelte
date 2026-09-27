@@ -8,7 +8,7 @@
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { menuSlotHeld } from '../shell/menuSlot';
-  import { systemsRowScopeKey } from '../shell/keybindings';
+  import { jumpEdge, systemsRowScopeKey } from '../shell/keybindings';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
@@ -424,19 +424,15 @@
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
 
+    const edge = jumpEdge(event);
+    if (edge && visibleEntries.length > 0) {
+      event.preventDefault();
+      setFocusedIdx(edge === 'first' ? 0 : visibleEntries.length - 1);
+      return;
+    }
+
     if (isDown) { event.preventDefault(); moveFocus(1);  return; }
     if (isUp)   { event.preventDefault(); moveFocus(-1); return; }
-
-    if (event.key === 'Home' && !meta && visibleEntries[0]) {
-      event.preventDefault();
-      setFocusedIdx(0);
-      return;
-    }
-    if (event.key === 'End' && !meta && visibleEntries.length > 0) {
-      event.preventDefault();
-      setFocusedIdx(visibleEntries.length - 1);
-      return;
-    }
 
     // Esc clears focus when a systems entry is focused. Skip otherwise so
     // we don't fight the page's Esc ladder (search, modals, etc.).
