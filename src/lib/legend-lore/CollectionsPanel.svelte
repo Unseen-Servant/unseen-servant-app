@@ -424,6 +424,13 @@
     el?.scrollIntoView({ block: 'nearest' });
   }
 
+  // Enter as a row verb — unmodified, and not on a focused button, which
+  // keeps its own activation (the row's P/M/E squares).
+  function isPlainEnter(event: KeyboardEvent): boolean {
+    if (event.key !== 'Enter' || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    return !(event.target as HTMLElement | null)?.closest('button, a[href], [role="button"]');
+  }
+
   function handleWindowKey(event: KeyboardEvent) {
     // The context menu claims Esc before anything else.
     if (ctxMenu && event.key === 'Escape') {
@@ -512,7 +519,7 @@
         removeChildRow(parsed.name, parsed.path);
         return;
       }
-      if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
+      if ((meta && !event.shiftKey && !event.altKey && lk === 'o') || isPlainEnter(event)) {
         event.preventDefault();
         onOpenFile(parsed.path);
         return;
@@ -536,6 +543,12 @@
       return;
     }
 
+    // Enter folds the head row either way, as it does a tree folder.
+    if (isPlainEnter(event)) {
+      event.preventDefault();
+      toggleExpand(col.name);
+      return;
+    }
     if (bareLetter && (event.key === 'ArrowRight' || lk === 'l')) {
       event.preventDefault();
       if (!expandedNames.has(col.name)) {

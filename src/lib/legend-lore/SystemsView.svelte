@@ -477,12 +477,13 @@
 
     // X ticks the row's checkbox — the tree spends the same key on its
     // indexing checkbox, so "X toggles the box you can see" holds in both
-    // views. Left unhandled when there's no box to tick. Space and Enter
-    // are unbound here; ⌘O opens the focused file and R renames it.
-    if (bareLetter && lk === 'x' && curating) {
+    // views. ⇧X extends within the group, as shift-click does. Left
+    // unhandled when there's no box to tick. Space is unbound here; Enter
+    // and ⌘O open the focused file (the page's handler) and R renames it.
+    if (!meta && !event.altKey && lk === 'x' && curating) {
       event.preventDefault();
       handleCheckboxClick(
-        { shiftKey: false, stopPropagation: () => {} } as MouseEvent,
+        { shiftKey: event.shiftKey, stopPropagation: () => {} } as MouseEvent,
         focused.entry,
         focused.tag,
         groups.find((g) => g.tag === focused.tag)?.entries ?? []

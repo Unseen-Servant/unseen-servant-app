@@ -247,10 +247,12 @@ describe('switch bindings', () => {
   });
 
   // Shift is the one modifier that can still land on a square: ⇧S/⇧M throw
-  // the systems view's group squares from a file row. That is a fact about
-  // these two entries, not about shift, so it is pinned by id rather than
-  // waved through.
-  const SHIFT_SWITCHES = new Set(['systems.soloGroup', 'systems.muteGroup']);
+  // the systems view's group squares from a file row, and ⇧X ticks a run of
+  // the same checkboxes X does. That is a fact about these entries, not
+  // about shift, so it is pinned by id rather than waved through.
+  const SHIFT_SWITCHES = new Set([
+    'systems.soloGroup', 'systems.muteGroup', 'tree.tickRange', 'systems.tickRange',
+  ]);
 
   test('never marks a meta or alt chord, and shift only where a square really is', () => {
     for (const k of KEYBINDINGS.filter(e => e.switch)) {

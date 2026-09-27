@@ -300,8 +300,8 @@
   // so they re-send the same flag; Enter clears it.
   let committedPartial = false;
   // The search view is stateful, not derived: entered by focusing the
-  // search bar, left only explicitly (view switch, Cmd+J/T, or the
-  // Escape ladder). Never persisted — the app launches into the browse
+  // search bar, left only explicitly (view switch or the Escape
+  // ladder). Never persisted — the app launches into the browse
   // view. searchActive (committed query) keeps meaning "has a query".
   let searchViewOpen = false;
   let searchResults: SearchResultItem[] = [];
@@ -940,8 +940,8 @@
 
   async function setViewMode(mode: 'tree' | 'systems') {
     // Selecting a view is also the exit from the search view. Blur the
-    // bar if it holds focus — Cmd+J/T can fire from inside it, and a
-    // focused input would keep feeding a view no longer on screen.
+    // bar if it holds focus — a focused input would keep feeding a view
+    // no longer on screen.
     searchViewOpen = false;
     const ae = document.activeElement as HTMLElement | null;
     if (ae?.classList.contains('search-input')) ae.blur();
@@ -1973,7 +1973,7 @@
     const lk = event.key.toLowerCase();
 
     // Vim-style aliases: hjkl mirror the arrow keys. Only when no modifier
-    // is held so chords like Cmd+J keep their meaning. h/l free up because
+    // is held so chords like Cmd+K keep their meaning. h/l free up because
     // the hide action moved to '.', matching the Cmd+Shift+. show-hidden chord.
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
     const isDown  = event.key === 'ArrowDown'  || (bareLetter && lk === 'j');
@@ -2032,12 +2032,13 @@
     }
 
     // X ticks the row's checkbox, whichever meaning it currently carries:
-    // indexing normally, collection membership while armed. Space and Enter
-    // are unbound here — →/← walk folders, ⌘O opens, R renames.
-    if (bareLetter && lk === 'x') {
+    // indexing normally, collection membership while armed. ⇧X extends from
+    // the last tick, the keyboard half of shift-click. Space stays unbound —
+    // →/← walk folders, Enter and ⌘O open, R renames.
+    if (!meta && !event.altKey && lk === 'x') {
       event.preventDefault();
-      if (armState) toggleMembership(row.item);
-      else toogleSelection(row.path, row.item.is_dir, row.item, false);
+      if (armState) toggleMembership(row.item, event.shiftKey);
+      else toogleSelection(row.path, row.item.is_dir, row.item, event.shiftKey);
       return true;
     }
 
@@ -2085,6 +2086,17 @@
     if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
       event.preventDefault();
       if (!focused.item.is_dir) openPath(focused.path);
+      return true;
+    }
+
+    // Enter opens a file or folds a folder — the results list's Enter, and
+    // the treeview default. Stands down on a focused button so the button
+    // keeps its own activation.
+    if (event.key === 'Enter' && !meta && !event.shiftKey && !event.altKey
+        && !(event.target as HTMLElement | null)?.closest('button, a[href], [role="button"]')) {
+      event.preventDefault();
+      if (focused.item.is_dir) handleToggleExpand(focused.path);
+      else openPath(focused.path);
       return true;
     }
 
@@ -2202,7 +2214,7 @@
     // the rest of the page (clicks, focus, screen-readers all skip), but
     // window-level keydown listeners still fire because keydown bubbles
     // through the focused dialog. Bail here so app-wide chords (Cmd+B,
-    // Cmd+J, Cmd+Alt+←/→, Esc ladder, tree-nav letters, etc.) don't run
+    // Cmd+Alt+←/→, Esc ladder, tree-nav letters, etc.) don't run
     // behind the modal. The dialog has its own handlers for what it
     // needs (Esc → cancel, Enter → submit, Tab cycles inside).
     if (document.querySelector('dialog[open]')) return;
@@ -2259,6 +2271,15 @@
     // that's the browser/OS find-in-page chord, and here it opens the Filters
     // panel instead (below). ⌘K is the command-bar convention.
     if (meta && !event.shiftKey && lk === 'k') {
+      event.preventDefault();
+      headerComponent?.focus();
+      return;
+    }
+
+    // `/`: the web's search key (Gmail, GitHub, Slack) and Vim's — a bare
+    // alias for ⌘K. Matched on event.key like `?`, and gated out of inputs
+    // so a literal slash still types.
+    if (event.key === '/' && !meta && !event.altKey && !inAnyInput) {
       event.preventDefault();
       headerComponent?.focus();
       return;
@@ -2403,7 +2424,7 @@
 
     // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
     // explorer (same handler the status-bar folder button calls). Skipped
-    // when an input has focus to match Cmd+Z's behavior.
+    // when an input has focus.
     if (meta && event.shiftKey && lk === 'o' && selectedFolder && !inAnyInput) {
       event.preventDefault();
       revealItemInDir(selectedFolder);
@@ -2421,17 +2442,20 @@
       return;
     }
 
-    // Cmd/Ctrl+Enter: save the in-progress collection (draft or files
-    // edit). Works from anywhere, including inside the rename input —
-    // it commits the rename via that input's own handler first, then
-    // this branch fires because metaKey + Enter wasn't preventDefault'd
-    // by the input's logic. Guard on having pending state so the chord
-    // is a clear no-op when nothing's being edited.
     // `?` — show keyboard shortcuts overlay. Match on event.key (the
     // produced character) rather than Shift+/ so any layout that emits
     // `?` from a different physical key still triggers. Bare chord, gated
     // out of inputs so typing a literal `?` works as expected.
     if (event.key === '?' && !meta && !event.altKey && !inAnyInput) {
+      event.preventDefault();
+      showHelpOverlay = true;
+      return;
+    }
+
+    // Cmd/Ctrl+/: the same sheet (Docs, Slack, Linear). Live inside inputs
+    // too — the one way to reach the sheet from the search bar, where a
+    // bare `?` has to type.
+    if (meta && event.key === '/' && !event.altKey) {
       event.preventDefault();
       showHelpOverlay = true;
       return;

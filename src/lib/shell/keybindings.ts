@@ -2,7 +2,7 @@
 //
 // The global handler in +page.svelte hardcodes the chord checks for speed
 // and clarity, but every binding is also registered here so tooltips and
-// (eventually) the `?` help overlay can stay in sync. When you add a chord
+// the `?` help overlay can stay in sync. When you add a chord
 // to the handler, add (or update) its entry here and reuse `chordHint(id)`
 // in the corresponding button's `title` attribute.
 
@@ -65,7 +65,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global', match: 'meta+i' },
-  { id: 'search.focus',          keys: { mac: '⌘K',   other: 'Ctrl+K' },        label: 'Focus search input',          scope: 'global' },
+  { id: 'search.focus',          keys: { mac: '⌘K / /', other: 'Ctrl+K / /' },  label: 'Focus search input',          scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
@@ -73,7 +73,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Not a chord of its own — one line teaching the idiom every transport
   // key shares, so the sheet doesn't have to repeat it on eight labels.
   { id: 'scope.peek',            keys: { mac: 'hold S / M / P / B', other: 'hold S / M / P / B' }, label: 'Hold rather than tap to engage only while held', scope: 'global' },
-  { id: 'help.overlay',          keys: { mac: '?',    other: '?' },             label: 'Show keyboard shortcuts',     scope: 'global' },
+  { id: 'help.overlay',          keys: { mac: '? / ⌘/', other: '? / Ctrl+/' },  label: 'Show keyboard shortcuts',     scope: 'global' },
   { id: 'app.escape',            keys: { mac: 'Esc',  other: 'Esc' },           label: 'Cancel / close / step back', scope: 'global' },
 
   // Search input
@@ -89,6 +89,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.expand',           keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand folder / first child',  scope: 'fileTree' },
   { id: 'tree.collapse',         keys: { mac: '← / H', other: '← / H' },        label: 'Collapse folder / parent',     scope: 'fileTree' },
   { id: 'tree.toggleSelect',     keys: { mac: 'X',    other: 'X' },             label: "Tick the row's checkbox — indexing, or the collection while armed", scope: 'fileTree', switch: true },
+  { id: 'tree.tickRange',        keys: { mac: '⇧X',   other: 'Shift+X' },       label: 'Tick every row from the last tick to here', scope: 'fileTree', switch: true },
+  { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: 'Open file / expand or collapse folder', scope: 'fileTree' },
   { id: 'tree.open',             keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.openExternal',     keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal row in OS file explorer', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: 'Open context menu',         scope: 'fileTree' },
@@ -100,9 +102,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete focused row (to Trash)', scope: 'fileTree' },
 
   // Systems view (when a row is focused)
-  { id: 'systems.open',          keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'systemsView' },
+  { id: 'systems.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused file',       scope: 'systemsView' },
   { id: 'systems.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'systemsView' },
   { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView', switch: true },
+  { id: 'systems.tickRange',     keys: { mac: '⇧X',   other: 'Shift+X' },       label: 'Tick every row in the system from the last tick to here', scope: 'systemsView', switch: true },
   { id: 'systems.solo',          keys: { mac: 'S',    other: 'S' },             label: 'Solo focused row (narrow search to it)', scope: 'systemsView', switch: true },
   { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'systemsView', switch: true },
   { id: 'systems.soloGroup',     keys: { mac: '⇧S',   other: 'Shift+S' },       label: "Solo the row's system",        scope: 'systemsView', switch: true },
@@ -115,7 +118,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'collections.end',       keys: { mac: 'End',  other: 'End' },           label: 'Jump to last row',             scope: 'collections' },
   { id: 'collections.expand',    keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand collection / first file', scope: 'collections' },
   { id: 'collections.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse collection / parent row', scope: 'collections' },
-  { id: 'collections.openFile',  keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open focused file',            scope: 'collections' },
+  { id: 'collections.toggle',    keys: { mac: '↵',    other: 'Enter' },         label: 'Expand / collapse collection', scope: 'collections' },
+  { id: 'collections.openFile',  keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused file',       scope: 'collections' },
   { id: 'collections.removeFile', keys: { mac: '⌘⌫',  other: 'Del' },           label: 'Remove focused file from the collection', scope: 'collections' },
   { id: 'collections.play',      keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Play / stop focused collection', scope: 'collections', switch: true },
   { id: 'collections.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused collection', scope: 'collections', switch: true },
