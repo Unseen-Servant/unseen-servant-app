@@ -50,6 +50,30 @@ _CAPTION_RE = re.compile(r"^(table|figure|fig\.|chart|map|illustration)\s+[\dA-Z
 _URL_RE = re.compile(r"www\.|https?://|\.(com|net|org)\b", re.IGNORECASE)
 _SINGLE_LETTER_RE = re.compile(r"\W*[A-Za-z]\W*")
 _JUNK_MAX_LEN = 80
+# Promoted lines that are not section titles (heading audit, roadmap
+# 2026-09-26 §9): a quote attribution ("– Loretta Wineroot, tavern maid"),
+# a stat line of Label: value pairs ("Ferocity: 2 Size: Small"), and
+# sentences. Question and exclamation headings are real titles ("What Is a
+# Spell?", "START PLAYING!"), so only these sentence shapes count: a
+# quoted utterance, a lowercase fragment or dialogue ("wights.", "eric:
+# These guys have shields?"), a single "Label: value." ("Treasure: None."),
+# and prose of four or more words ending in a period.
+_ATTRIBUTION_RE = re.compile(r"^[-–—]\s*\S.*,")
+_LABEL_VALUE_RE = re.compile(r"[A-Za-z][A-Za-z']*:\s*[^\s:]+")
+_SENTENCE_END_RE = re.compile(r"[.!?][\"”’']?$")
+_QUOTED_UTTERANCE_RE = re.compile(r"^[\"“].*[.!?][\"”]$")
+_LABEL_SENTENCE_RE = re.compile(r"^[A-Za-z][\w ]*:\s+\S")
+_PROSE_MIN_WORDS = 4
+
+
+def _is_sentence(t: str) -> bool:
+    if not _SENTENCE_END_RE.search(t):
+        return False
+    if _QUOTED_UTTERANCE_RE.match(t) or t[:1].islower():
+        return True
+    if t.endswith("."):
+        return bool(_LABEL_SENTENCE_RE.match(t)) or len(t.split()) >= _PROSE_MIN_WORDS
+    return False
 
 
 def is_junk_heading(text: str) -> bool:
@@ -71,6 +95,10 @@ def is_junk_heading(text: str) -> bool:
     if len(_NUM_RE.findall(t)) >= 2:
         return True
     if _CAPTION_RE.match(t) or _URL_RE.search(t) or t.endswith(":"):
+        return True
+    if _ATTRIBUTION_RE.match(t) or len(_LABEL_VALUE_RE.findall(t)) >= 2:
+        return True
+    if _is_sentence(t.strip("*_ ")):
         return True
     return False
 

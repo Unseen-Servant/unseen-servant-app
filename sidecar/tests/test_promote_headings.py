@@ -275,6 +275,23 @@ def test_junk_shapes():
     assert is_junk_heading("For free updates, errata and other OSRIC support, visit:")  # lead-in
     assert is_junk_heading("www.knights-n-knaves.com/osric")
     assert not is_junk_heading("Chapter 3")
+    # Heading audit (roadmap 2026-09-26 §9): promoted lines that are not titles.
+    assert is_junk_heading("– Loretta Wineroot, tavern maid")          # attribution
+    assert is_junk_heading("— Kaspert Woodshot, gamekeeper")
+    assert is_junk_heading("Ferocity: 2 Size: Small")                   # label–value pairs
+    assert is_junk_heading("Casting Time: 4 segments Saving Throw: None")
+    assert is_junk_heading("wights.")                                   # lowercase fragment
+    assert is_junk_heading("eric: These guys have shields?")            # dialogue
+    assert is_junk_heading('"Is the dungeon to the north of here?"')    # quoted utterance
+    assert is_junk_heading("Treasure: None.")                           # Label: value.
+    assert is_junk_heading("The passageway ends at a rockfall.")        # prose sentence
+    assert not is_junk_heading("What Is a Spell?")                      # real question titles
+    assert not is_junk_heading("LEAVING THE TOWER?")
+    assert not is_junk_heading("START PLAYING!")
+    assert not is_junk_heading("Heavy Armor.")                          # short run-in title
+    assert not is_junk_heading("“The Next Dawn”")                       # quoted title
+    assert not is_junk_heading("– Interlude")                           # dash, no comma
+    assert not is_junk_heading("Chapter 1: Heroes")                     # one label pair
     assert not is_junk_heading("Level 1 Spells")
     assert not is_junk_heading("THAC0")
     assert not is_junk_heading("Combat")
