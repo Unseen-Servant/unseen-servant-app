@@ -110,3 +110,29 @@ Every other scope is identical in both runs: no cue, no change. Latency is uncha
 - **Corpus:** 6 better, 2 worse. Better: "year zero engine initiative" (q049 #9 → #1, q050 #25 → #2), and q018–q020 from #2 to #1. Worse: q045/q046, Basic Fantasy magic missile, #1 → #6/#3. **The cause is item 3's class:** Magic Missile has no heading of its own in the extraction. It sits inside a 5,079-char section titled "Hallucinatory Terrain > BASIC FANTASY RPG", where the page footer was promoted to a heading. The query's "basic fantasy" matching that bogus heading is what put it first. It was right for the wrong reason, and a heading fix is what should bring it back.
 
 Still open in item 4: the reranker choice (MiniLM L-6 vs `bge-reranker-v2-m3`), in the runtime-swap benchmark.
+
+## 9. Item 3 measurement — how often headings are wrong (2026-09-27)
+
+**Method.** 40 units per book drawn with `random.Random(20260927)` from Jerome's library store (240 units, weighted by units, i.e. by text volume), each labelled against a fixed rubric by one of three agents (two books each): ok, wrong_entry (the text belongs to another entry), wrong_parent (a wrong ancestor), attribution (a quote/speaker/stat line promoted to a heading), lost_context (the path cannot say what the text belongs to), garbled, furniture, no_heading. A random dozen spot-checked by hand agreed. Sample and labels are local (`evals/.eval_data/heading_audit/`, gitignored — they contain book text) so the same texts can be re-judged after a fix.
+
+| book | mis-headed | wrong_parent | wrong_entry | attribution | lost_context | other |
+|---|---|---|---|---|---|---|
+| Dragonbane Bestiary | 23/40 | 12 | 6 | 8 | 0 | 0 |
+| Dragonbane Adventures | 14/40 | 6 | 6 | 1 | 8 | 0 |
+| Dragonbane Rulebook | 22/40 | 13 | 15 | 1 | 1 | 2 |
+| OSRIC 2E | 7/40 | 5 | 3 | 0 | 0 | 0 |
+| SRD 5.1 | 16/40 | 14 | 2 | 0 | 2 | 0 |
+| Wight-Box | 40/40 | 2 | 34 | 13 | 2 | 11 |
+| **all** | **122/240 (51 %)** | 52 | 66 | 23 | 13 | 12 |
+
+Weighted by book size, about **33 %** of the library's units carry a misleading heading. The existing `breadcrumb_qa` checks (markup, split letters, mixed case, furniture root, no heading) flag 0.3–7.2 % per book: they measure typographic damage, which the Phase-1 heading work fixed, not attribution.
+
+**Mechanisms** (from `promote_headings.py` and the chunker's heading stack). Headings are what pymupdf4llm marks by font; levels come from font-signature clusters, with the PDF outline used only for depth-1 chapters; the chunker's stack closes a parent only when a heading of the same or higher level appears. Hence:
+
+1. **A missed chapter heading leaves the previous parent open indefinitely** — "MENTALISM" over the Rulebook's whole Gear chapter (pp. 77–84), "Level 5 Cleric Spells" over Wight-Box pp. 45–150, "Ability Scores and Modifiers" over SRD travel and combat rules, "Paired Items" over every SRD magic item. Most wrong_parent.
+2. **A missed entry heading merges its text into the previous entry** — a thunderstroke spell under "RESURRECTION", Fire Blast under "GUST OF WIND", Bandits under a spell list. Most wrong_entry.
+3. **Bold lines promoted to headings** — quote attributions ("– Kaspert Woodshot, gamekeeper"), stat lines ("Ferocity: 2 Size: Small", "Armor Class 11"), read-aloud sentences, sentence fragments ("wights."). All attribution.
+4. **Sidebars treated as parents** — the Bestiary's Random Encounter / Adventure Seed sidebars become ancestors of the monster's attacks and traits.
+
+**The general remedy available:** five of the six books ship a detailed PDF outline (OSRIC 1,228 entries to depth 6; Dragonbane Rulebook 659, Adventures 444, Bestiary 360 with an entry per monster; Wight-Box 192). The Dragonbane outlines even label sidebars ("Sidebar: …", "Table: …"). Only SRD 5.1 has none (two file-level entries). An outline is the publisher's own structure with page positions, so ancestors taken from the outline entries covering a text's position cannot stay open past the next chapter, and each entry it lists cannot be missed.
+
