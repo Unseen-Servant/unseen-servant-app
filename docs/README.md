@@ -34,6 +34,7 @@ is the source of truth; this index is just a map and may lag new files.
 - Search settings — [design](retrieval/2026-07-11-search-settings-design.md)
 - v3 scaffold — [spec](retrieval/2026-08-14-v3-scaffold.md) (implements roadmap §7)
 - Library store (Chroma → one normalized SQLite file) — [design](retrieval/2026-09-26-library-store-design.md)
+- Headings from the PDF outline — [design](retrieval/2026-09-27-outline-headings-design.md)
 
 ## frontend/
 
