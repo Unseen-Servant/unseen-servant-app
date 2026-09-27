@@ -1,7 +1,7 @@
 # Retrieval informed by how Legend Lore is searched
 
 **Date:** 2026-09-26
-**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7); item 4's cue stripping landed the same day (§8), its reranker choice is still open.
+**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7); item 4's cue stripping landed the same day (§8), its reranker choice is still open; item 3 (heading quality) started 2026-09-27.
 **Context:** after the library store swap (`../retrieval/2026-09-26-library-store-design.md`) and the first library tier (`evals/baselines/2026-09-26-v2-library`). The goal is broad improvements, not tuning to a document: every item below is a *class* of behaviour, judged across both eval suites.
 
 ---
@@ -54,7 +54,7 @@ Measured on the eval index, spell correction rewrites half-typed words into wron
 |---|---|---|---|
 | 1 | **Typing vs committing** (done, §6). A `partial` search request: the trailing word is completed from the vocabulary instead of spell-corrected, and prefix-matched in BM25 (FTS5 `term*`). The UI sends it for debounced searches whose raw text does not end in whitespace; Enter commits. | A prefix variant of both suites (each query's last word cut to a fixed share of its length), current vs partial mode; committed queries must be byte-identical to today. | Broad, cheap, and fixes a visible defect. Skipping the reranker while typing is a follow-up only if latency needs it: a debounced search is often the final one (many searches never see Enter). |
 | 2 | **Ordering within a book under scope** (measured, little headroom — §7). Candidates: section-level evidence (best + second-best unit), heading trust. | Collection-scoped library queries (2–3 books), authored and committed *before* any fix is tried. | The regime the app is used in. |
-| 3 | **Heading quality.** Measure mis-heading across the real library (`breadcrumb_qa`-style checks), then fix in extraction. | Per-book flaw counts, then both suites. | Worth more than its eval impact alone: headings are shown to the user. |
+| 3 | **Heading quality** (in progress). Measure mis-heading across the real library (`breadcrumb_qa`-style checks), then fix in extraction. | Per-book flaw counts, then both suites. | Worth more than its eval impact alone: headings are shown to the user. |
 | 4 | **Cue stripping + reranker choice.** Remove a detected system cue from the text embedded and reranked; compare MiniLM L-6 with `bge-reranker-v2-m3`. | MCP-shaped (NL, system named, unscoped) queries in both suites; latency budget. | Cue stripping done (§8). Reranker choice folded into the runtime-swap benchmark (`2026-09-26-ml-runtime-consolidation.md`), where the reranker runtime is decided anyway. |
 
 Also open, not scheduled: load-more stability (item-sized check: top 25 at `n_results` 25 vs 50); "N strong hits outside your scope" as an answer to the bypass question (a feature, not a fix).

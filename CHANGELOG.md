@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Searching inside a collection or game system is faster, and stays fast as the library grows.** A scoped search reads only the selected books instead of the whole library
 - Renaming or moving a file or folder, and changing a book's game-system tags, are instant regardless of book size
 - The app is smaller: the sidecar no longer ships ChromaDB
+- **Naming a game system in a search no longer skews it.** "dragonbane fireball" used to rank Dragonbane's Dragon monster first, because the system's name was searched as if it were part of the question. A named system now only puts that system's books first, so questions that name a system find the right section far more often
 - **Search while you type understands an unfinished word.** Results as you type used to "correct" the word you were still typing into a different one ("grapp" became "grasp", "wea" became "sea"); the last word is now completed from your own books instead ("grapp" → "grapple", "against poi" → "poison"), so the list shows what you're heading for. Pressing Enter searches exactly what you typed
 
 ## [3.0.0] - 2026-09-24
