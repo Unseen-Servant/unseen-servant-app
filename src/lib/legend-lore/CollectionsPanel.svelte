@@ -580,9 +580,8 @@
         return;
       }
       // P or Space toggle the transport — Space is the DAW play/stop
-      // convention, shared with file rows (where it opens). A shelved
-      // track has no transport, so both are inert until unarchived
-      // (Space still swallowed so the list doesn't scroll).
+      // convention. A shelved track has no transport, so both are inert
+      // until unarchived (Space still swallowed so the list doesn't scroll).
       if (lk === 'p' || lk === ' ') {
         event.preventDefault();
         if (event.repeat) return;
