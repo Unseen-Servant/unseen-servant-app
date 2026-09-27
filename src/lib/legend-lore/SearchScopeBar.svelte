@@ -459,12 +459,28 @@
     flex-shrink: 0;
   }
 
+  /* On the plate's --bg-container the switch's --border-subtle frame all
+     but vanished, and the shared 0.35 disabled veil finished the job — yet
+     staying visible is the whole point of a bypass that shows before it
+     can act (it is how the control is found). So on the plate the frame
+     and the rule step up to --bg-category, and unavailable is a lighter
+     veil. Hover and the lit bypass keep the shared recipe's inks. */
+  .left > .sm-btn:not(.bypass-on) {
+    border-color: var(--bg-category);
+  }
+  .left > .sm-btn:not(.bypass-on):hover:not(:disabled) {
+    border-color: var(--text-secondary);
+  }
+  .left > .sm-btn:disabled {
+    opacity: 0.6;
+  }
+
   /* Divides master from channels — the switch above the strip, not the
      first chip in it. */
   .master-rule {
     width: 1px;
     height: 12px;
-    background: var(--border-subtle);
+    background: var(--bg-category);
     flex-shrink: 0;
   }
 
