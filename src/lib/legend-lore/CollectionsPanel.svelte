@@ -4,7 +4,7 @@
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
-  import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
+  import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut } from '../shell/keybindings';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
@@ -25,10 +25,10 @@
   // held, so pointing at the panel doesn't throw away the user's position.
   export let lastFocusedName: string | null = null;
   export let onFocusCollection: (name: string | null) => void = () => {};
-  // Non-null while a new collection is being named. The "+ New collection"
-  // box becomes the name field; nothing exists until it's committed, so
-  // backing out leaves nothing behind. Carries the suggested name — a
-  // folder's, when the creation was seeded from one.
+  // Non-null while a new collection is being named. The ghost track at the
+  // list's end turns into the name field; nothing exists until it's
+  // committed, so backing out leaves nothing behind. Carries the suggested
+  // name — a folder's, when the creation was seeded from one.
   export let creating: { name: string } | null = null;
   export let onCommitCreate: (name: string) => void = () => {};
   export let onCancelCreate: () => void = () => {};
@@ -302,9 +302,12 @@
   // drops sit on the wrapping <li>, which also makes the expanded child
   // list a target at no extra cost.
   // ------------------------------------------------------------------
-  // Which target is lit: a collection name, or the new-collection button.
+  // Which target is lit: a collection name, or the ghost track.
   let dropIntoName: string | null = null;
   let dropIntoNew = false;
+  // What a drop on the ghost track would make, read from the drag's payload
+  // (set at dragstart, so it is readable mid-drag where getData() is not).
+  let newDropPreview: { label: string; count: number } | null = null;
 
   function acceptPathDrag(e: DragEvent): boolean {
     if (!isTreePathsDrag(e.dataTransfer?.types)) return false;
@@ -323,6 +326,8 @@
     if (!acceptPathDrag(e)) return;
     dropIntoNew = true;
     dropIntoName = null;
+    const payload = getTreePathsPayload();
+    newDropPreview = payload ? { label: payload.label, count: payload.paths.length } : null;
   }
 
   // dragover fires continuously over descendants, so only clear when the
@@ -722,11 +727,9 @@
     </div>
   </header>
 
-  {#if hasNone && creating === null}
-    <div class="empty">
-      <span class="ledger-label">No collections yet</span>
-    </div>
-  {:else if rows.length === 0 && creating === null}
+  <!-- No collections at all needs no message of its own: the ghost track
+       below is the invitation. -->
+  {#if !hasNone && rows.length === 0 && creating === null}
     <div class="empty">
       <span class="ledger-label">All archived</span>
     </div>
@@ -768,7 +771,14 @@
           on:dragover={(e) => handleDragOver(e, i)}
           on:drop={handleDrop}
           on:dragend={handleDragEnd}
-          on:click={() => { if (!isRenamingRow) onFocusCollection(col.name); }}
+          on:click={(e) => {
+            if (isRenamingRow) return;
+            onFocusCollection(col.name);
+            // The row is the disclosure: a click opens or closes its books.
+            // Only the first click of a double-click toggles, so the second
+            // doesn't undo it on the way into rename.
+            if (e.detail <= 1) toggleExpand(col.name);
+          }}
           on:dblclick={() => { if (!isRenamingRow) startRename(col.name); }}
           on:contextmenu={(e) => openContextMenu(e, col.name)}
         >
@@ -780,12 +790,6 @@
             title={sortKey === 'custom' ? 'Drag to reorder' : undefined}
             aria-hidden="true"
           >{sortKey === 'custom' ? '⠿' : ''}</span>
-          <button
-            class="arrow"
-            on:click|stopPropagation={() => toggleExpand(col.name)}
-            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-            aria-expanded={isExpanded}
-          >{isExpanded ? '▾' : '▸'}</button>
           {#if col.color}
             <!-- Pigment bookmark — this is where the color↔collection
                  mapping is taught; the same ribbon reappears in scope
@@ -905,12 +909,19 @@
       </li>
     {/each}
   </ul>
-  <!-- Outside the scroll container: trails the last row while the list is
-       short, stays visible once the list overflows. -->
+  <!-- The ghost track: the next collection, waiting — a row's exact
+       geometry drawn in outline, the way a DAW leaves an empty lane below
+       its last track. Outside the scroll container, so it trails the last
+       row while the list is short and stays in view once it overflows.
+       Click, ⌘N, a drop or a folder's "New collection" all turn it into the
+       row it will become, in place; nothing exists until that's committed,
+       so Esc costs nothing. -->
   {#if creating !== null}
-    <!-- The box does the naming. Committing promotes it to a row above;
-         nothing exists until then, so Esc costs nothing. -->
-    <div class="add-coll creating">
+    <div class="row-container ghost naming">
+      <span class="grip" aria-hidden="true"></span>
+      <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+        <path d={RIBBON_OUTLINE}/>
+      </svg>
       <input
         class="new-coll-input"
         bind:value={newValue}
@@ -920,19 +931,42 @@
         on:blur={commitCreate}
         use:autofocusInput
       />
+      <!-- A new collection lands armed: say so before it exists. Not a
+           control — the real arm button arrives with the row. -->
+      <span class="tr-btn arm-btn armed ghost-arm" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+      </span>
+    </div>
+    <div class="ghost-keys micro-label" aria-hidden="true">
+      <span><kbd>↵</kbd> create</span><span><kbd>esc</kbd> back</span>
     </div>
   {:else}
     <button
-      class="add-coll"
+      class="row-container ghost"
       class:drop-into={dropIntoNew}
       on:click={onCreate}
       on:dragover={handleNewDragOver}
       on:dragleave={handlePathDragLeave}
       on:drop={handleNewDrop}
+      title={`New collection${chordHint('collections.new')} — or drop books here`}
+      aria-keyshortcuts={keyShortcut('collections.new') || undefined}
     >
-      <span>+ New collection</span>
-      <span class="new-chord" aria-hidden="true">{chord('collections.new')}</span>
+      <span class="grip" aria-hidden="true"></span>
+      <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+        <path d={RIBBON_OUTLINE}/>
+      </svg>
+      {#if dropIntoNew && newDropPreview}
+        <!-- Under a drag, say what the drop will make. -->
+        <span class="ghost-label">New collection from <em>{newDropPreview.label}</em></span>
+        <span class="row-count">{newDropPreview.count}</span>
+      {:else}
+        <span class="ghost-label">New collection</span>
+        <span class="new-chord" aria-hidden="true">{chord('collections.new')}</span>
+      {/if}
     </button>
+    {#if hasNone}
+      <div class="empty"><span class="ledger-label">or drag books here from the tree</span></div>
+    {/if}
   {/if}
 </aside>
 
@@ -1124,7 +1158,7 @@
     padding: 0;
     overflow-y: auto;
     /* Content-sized, shrinkable: the list only scrolls once it runs out
-       of room, and the "+ New collection" row below it never leaves view. */
+       of room, and the ghost track below it never leaves view. */
     flex: 0 1 auto;
     min-height: 0;
   }
@@ -1138,10 +1172,11 @@
     align-items: center;
     gap: 0.3rem;
     /* Right gutter matches the filter panel's rows so the two panels'
-       count readouts share a column down the dock. The left inset is
-       tighter than the panel's 0.75rem chrome: the caret already sits
-       behind the grip's reserved width, which reads as dead space. */
-    padding: 0.22rem 0.75rem 0.22rem 0.5rem;
+       count readouts share a column down the dock. On the left, 0.25rem +
+       the grip (0.55rem) + the gap (0.3rem) is the filter row's 1.1rem
+       inset, so the ribbon lands in the same column as the filter panel's
+       shields, with the grip in front of it. */
+    padding: 0.22rem 0.75rem 0.22rem 0.25rem;
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
     border-left: 3px solid transparent;
     cursor: pointer;
@@ -1213,20 +1248,10 @@
     opacity: 1;
   }
 
-  .arrow {
-    width: 0.8rem;
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--text-secondary);
-    font-size: 0.7rem;
-    cursor: pointer;
-    text-align: center;
-  }
+  /* The filter panel's shield size, so the two icon columns match. */
   .bkm {
-    width: 12px;
-    height: 12px;
+    width: 0.8rem;
+    height: 0.8rem;
     flex-shrink: 0;
   }
 
@@ -1397,29 +1422,91 @@
     transform: scale(0.97);
   }
 
-  /* Dashed create affordance — same family as the tree's "+ tag". */
-  .add-coll {
+  /* The ghost track — the next collection, waiting. It wears .row-container,
+     so it is a row's exact geometry, drawn in outline: a plain tertiary
+     ribbon in the icon column (not dashed — dashes are Loose's, "in no
+     collection", in the filter panel), an italic tertiary name, the ⌘N cap
+     at its end. Hover is the rows' own grey step. */
+  .ghost {
+    width: 100%;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin: 0.35rem 0.75rem;
-    padding: 0.18rem 0.55rem;
-    width: calc(100% - 1.5rem);
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px dashed var(--text-tertiary);
-    border-radius: var(--radius-sm);
+    background: none;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
     font-family: var(--font-body);
-    font-size: 0.8rem;
-    letter-spacing: 0.02em;
-    cursor: pointer;
-    transition: all var(--transition-fast);
+    text-align: left;
+    color: var(--text-tertiary);
   }
-  /* Naming in place: the same box, now solid and holding a field, so the
-     affordance you clicked is the one you're typing into. */
+  .ghost:hover {
+    background: var(--bg-container);
+    color: var(--text-secondary);
+  }
+  .ghost-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Under a drag it says what the drop will make, framed in the app's
+     dashed-parchment "prospective" outline. */
+  .ghost.drop-into {
+    outline: var(--outline-drop);
+    outline-offset: -3px;
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    color: var(--text-accent);
+  }
+  .ghost.drop-into .ghost-label {
+    font-style: normal;
+  }
+  /* Naming in place: the slot already dresses as the row it will become —
+     the armed wash and purple rule, and the caret's ring on the field. */
+  .ghost.naming {
+    cursor: default;
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
+    box-shadow: var(--ring-focus);
+  }
+  .new-coll-input {
+    flex: 1;
+    min-width: 0;
+    -webkit-user-select: text;
+    user-select: text;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    padding: 0;
+    outline: none;
+  }
+  .new-coll-input::placeholder {
+    color: var(--text-tertiary);
+  }
+  /* The arm the row will land with — purple ink, but no glow: a glow
+     reports a state you switched on, and this one is only a promise until
+     the name is committed (the rack-unit commit switch's rule). */
+  .ghost-arm {
+    cursor: default;
+    filter: none;
+  }
+  /* Key hints under the naming row, starting in the name's column. */
+  .ghost-keys {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.2rem 0.75rem 0.35rem calc(3px + 1.1rem + 0.8rem + 0.3rem);
+  }
+  .ghost-keys kbd {
+    font-family: var(--font-mono);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-secondary);
+  }
   /* The same key cap as the search bar's ⌘K (Header.svelte .search-chord):
-     a shortcut on a standing button reads as a cap, one in a menu row as
+     a shortcut on a standing control reads as a cap, one in a menu row as
      plain text. */
   .new-chord {
     display: inline-flex;
@@ -1436,42 +1523,12 @@
     font-family: var(--font-body);
     font-size: 0.62rem;
     font-weight: 700;
+    font-style: normal;
     color: var(--text-tertiary);
     flex-shrink: 0;
     white-space: nowrap;
     -webkit-user-select: none;
     user-select: none;
-  }
-  .add-coll.creating {
-    cursor: default;
-    border-style: solid;
-    border-color: var(--text-accent);
-    padding: 0.1rem 0.3rem;
-  }
-  .new-coll-input {
-    flex: 1;
-    min-width: 0;
-    -webkit-user-select: text;
-    user-select: text;
-    background: transparent;
-    border: none;
-    color: var(--text-primary);
-    font-family: var(--font-body);
-    font-size: 0.85rem;
-    letter-spacing: 0.02em;
-    padding: 0.05rem 0.25rem;
-    outline: none;
-  }
-  .new-coll-input::placeholder {
-    color: var(--text-tertiary);
-  }
-
-  .add-coll:hover,
-  .add-coll.drop-into {
-    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
-    color: var(--text-accent);
-    border-color: var(--text-accent);
-    border-style: solid;
   }
 
   /* Drop target under a path drag. Dashed parchment reads as "this could

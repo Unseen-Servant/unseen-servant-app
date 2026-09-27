@@ -278,9 +278,9 @@
           <!-- Outline bookmark — same ribbon as the chip bookmarks, unfilled:
                the channel is the curation bucket, not a specific collection.
                Loose dashes that same ribbon rather than taking a shape of its
-               own — one rung further down the ladder the systems section
-               already walks (filled cube for a tagged system, outline for
-               Untagged), so the two rows read as ends of one axis. A strike or
+               own — the systems section walks the same ladder (a shield for
+               a tagged system, that shield dashed for Untagged), so dashed
+               means "in none" on both axes. A strike or
                slash would have been the obvious alternative and is wrong here:
                in this panel that reads as muted, which is a live state on this
                very row. -->

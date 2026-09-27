@@ -136,7 +136,7 @@
       </p>
     </div>
     <p class="field-desc">
-      Click <em>+ New collection</em> at the foot of the panel
+      Click the <em>New collection</em> row at the foot of the panel
       (<strong>&#8984;N</strong>), type a name, and press Return &mdash;
       it becomes a row in the list, already <em>armed</em>. While a
       collection is armed, clicking a book in the tree files or unfiles it
