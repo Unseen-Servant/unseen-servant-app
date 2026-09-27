@@ -1035,6 +1035,24 @@ def warm_search_stack(get_spell_corrector) -> None:
         pass
 
 
+# How much of the heading path each ranking input carries: "path" (the
+# whole breadcrumb, production), "leaf" (its last segment) or "none".
+# Eval-only switches for the heading ablation (roadmap 2026-09-26 item 3):
+# embeddings and BM25 are fixed at index time, so an index built under one
+# setting must be searched under the same one.
+HEADING_EMBED = os.getenv("HEADING_EMBED", "path")
+HEADING_FTS = os.getenv("HEADING_FTS", "path")
+HEADING_RERANK = os.getenv("HEADING_RERANK", "path")
+
+
+def _with_heading(heading: str | None, text: str, mode: str) -> str:
+    if not heading or mode == "none":
+        return text
+    if mode == "leaf":
+        heading = heading.rsplit(" > ", 1)[-1]
+    return f"{heading}\n\n{text}"
+
+
 def _embed_text(eu: EmbedUnit) -> str:
     """Heading-prepended text for embedding (storage of eu.text unchanged).
 
@@ -1042,9 +1060,12 @@ def _embed_text(eu: EmbedUnit) -> str:
     one change: embedding sees the section_heading breadcrumb as topical
     context for the embed unit body.
     """
-    if eu.section_heading:
-        return f"{eu.section_heading}\n\n{eu.text}"
-    return eu.text
+    return _with_heading(eu.section_heading, eu.text, HEADING_EMBED)
+
+
+def _fts_text(eu: EmbedUnit) -> str:
+    """The unit's BM25 text — also the spell vocabulary's source."""
+    return _with_heading(eu.section_heading, eu.text, HEADING_FTS)
 
 
 # Embed batching tunables (issue #158).
@@ -1175,7 +1196,7 @@ def _atomic_index_pdf(
     )
     store.replace_document(
         str(pdf_path), game_system, game_systems, embed_units,
-        embed_texts=[_embed_text(eu) for eu in embed_units],
+        embed_texts=[_fts_text(eu) for eu in embed_units],
         vectors=vectors, parents=parents, page_labels=page_labels,
     )
 
@@ -1946,7 +1967,7 @@ def _search_sync(
             pool_docs = ordered_docs[:pool]
             pool_meta = ordered_metadatas[:pool]
             rerank_inputs = [
-                f"{m['section_heading']}\n\n{d}" if m.get("section_heading") else d
+                _with_heading(m.get("section_heading"), d, HEADING_RERANK)
                 for m, d in zip(pool_meta, pool_docs)
             ]
             scores = rerank_scores(search_text, rerank_inputs)
@@ -2044,8 +2065,10 @@ def _search_sync(
             stragglers = [p for p in picked if not p["reranked"]]
             if stragglers:
                 straggler_scores = rerank_scores(search_text, [
-                    f"{p['metadata']['section_heading']}\n\n{p['doc']}"
-                    if p["metadata"].get("section_heading") else p["doc"]
+                    _with_heading(
+                        p["metadata"].get("section_heading"), p["doc"],
+                        HEADING_RERANK,
+                    )
                     for p in stragglers
                 ])
                 if straggler_scores is not None:

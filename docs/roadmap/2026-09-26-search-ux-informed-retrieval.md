@@ -136,3 +136,25 @@ Weighted by book size, about **33 %** of the library's units carry a misleading 
 
 **The general remedy available:** five of the six books ship a detailed PDF outline (OSRIC 1,228 entries to depth 6; Dragonbane Rulebook 659, Adventures 444, Bestiary 360 with an entry per monster; Wight-Box 192). The Dragonbane outlines even label sidebars ("Sidebar: …", "Table: …"). Only SRD 5.1 has none (two file-level entries). An outline is the publisher's own structure with page positions, so ancestors taken from the outline entries covering a text's position cannot stay open past the next chapter, and each entry it lists cannot be missed.
 
+## 10. Are headings worth it in ranking? — ablation (2026-09-27)
+
+**Question** (Jerome): with a third of the library mis-headed, is putting headings into ranking worth the complexity, or could hybrid BM25 cover for leaving them out of the embeddings and the reranker?
+
+**Method.** Eval-only switches in `service.py` (`HEADING_EMBED`, `HEADING_FTS`, `HEADING_RERANK`: `path` = production, `leaf`, `none`; embeddings and BM25 fixed at index time, the reranker per query). A fresh index per variant for the corpus suite and for a copy of Jerome's six books built from the PDFs on disk (the app's index untouched), with his custom game systems and tags copied so the boost and scope match the app. Hybrid on, cue stripping on, everything else as shipped. Variant A is the existing references.
+
+| MRR@5 | A: full path (today) | B: none in vectors/reranker, full path in BM25 | C: none anywhere | D: leaf only |
+|---|---|---|---|---|
+| corpus (68) | **0.896** | 0.775 | 0.776 | 0.853 |
+| corpus, single-book | **0.948** | 0.733 | 0.736 | 0.826 |
+| library (40) | 0.963 | 0.810 | 0.815 | **0.975** |
+| library, collection-scoped | 0.972 | 0.796 | 0.796 | 0.972 |
+
+**Findings.**
+
+- **Headings are one of the strongest ranking signals, even this broken.** Taking them out of the vectors and the reranker costs about 0.12 on the corpus and 0.15 on the library. B loses 12 corpus and 9 library queries and wins 3 and 0.
+- **Titles in BM25 alone do not compensate** (B ≈ C). BM25 can bring a stat-table row into the pool, but the reranker then judges it without the name.
+- **What the heading carries that the body does not is the entity's name.** Every loss names one: "goblin warrior hit points" (#1 → not found), "twin shot heroic ability" (#1 → not found), "adult black dragon attacks" (#1 → #13), "ancient gold dragon armor class" (#1 → #22), fireball, magic missile, the Tower of Sacrifice demon. A stat block's or spell's body never repeats its name.
+- **Ancestors help when right and cost a little when wrong.** Leaf-only trails the full path on the corpus (decent headings; 7 worse, 3 better, mostly #1 → #2 where the leaf is a generic "Actions" and the name sits in the ancestor) and edges it on the library (bad headings; 0 worse, 1 better). The queries leaf-only wins are the misleading-ancestor cases ("osric falling damage", both Year Zero initiative queries).
+
+**Conclusion.** Keep headings in ranking; the item-3 direction is to make them *correct*, not to use less of them. That supports the outline design (`../retrieval/2026-09-27-outline-headings-design.md`): its main effects — no stale ancestors, no missed entry names — are exactly the two things this ablation shows matter. Not adopted: switching production to leaf-only (a corpus loss for a one-query library gain). A cheap follow-up worth one run after the outline work: prepend the nearest *named* segment rather than the raw leaf ("Ancient Gold Dragon", not "Actions"). The switches stay in the code so the same ablation can be re-run on corrected headings.
+

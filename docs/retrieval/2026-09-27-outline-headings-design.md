@@ -1,6 +1,6 @@
 # Headings from the PDF outline
 
-**Date:** 2026-09-27 · **Status:** draft for approval
+**Date:** 2026-09-27 · **Status:** draft for approval; supported by the heading ablation (roadmap `2026-09-26-search-ux-informed-retrieval.md` §10: headings are a strong ranking signal, and entity names and correct ancestors are what matter)
 **Context:** roadmap `../roadmap/2026-09-26-search-ux-informed-retrieval.md` item 3, measured in its §9: 122 of 240 sampled units (51 %; ≈ 33 % of the library by volume) carry a wrong or misleading heading path. The path is shown as the result's title and prepended to the text that is embedded and reranked, so a wrong path misleads twice.
 
 ---
