@@ -8,10 +8,10 @@
   import { displaySystem } from './searchScope';
   import { chordHint } from '../shell/keybindings';
   import type { CurationKey } from './searchScope';
-  import { DICE_D6, RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { RIBBON_FILLED, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
 
   // Chip glyph = axis (pigment bookmark = collection, outline bookmark =
-  // curation bucket, monochrome die = system); chip frame = operation
+  // curation bucket, monochrome shield = system); chip frame = operation
   // (purple play/solo / danger-edged mute).
   export let collectionPlays: { key: string; label: string; color: string | null }[] = [];
   export let collectionSolos: { key: string; label: string; color: string | null }[] = [];
@@ -216,9 +216,10 @@
         aria-label="Stop soloing {displaySystem(system)}"
       >
         <span class="chip-prefix micro-label">solo</span>
-        <!-- Font Awesome "dice-d6" — monochrome; it marks the axis, the frame marks the operation -->
-        <svg class="chip-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-          <path d={DICE_D6}/>
+        <!-- Active shield (with its fess) — monochrome; it marks the axis, the frame marks the operation -->
+        <svg class="chip-die" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+          <path d={SHIELD}/>
+          <path d={SHIELD_FESS}/>
         </svg>
         <span class="chip-label">{displaySystem(system)}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
@@ -278,9 +279,9 @@
         aria-label="Unmute {displaySystem(system)}"
       >
         <span class="chip-prefix micro-label">mute</span>
-        <!-- Font Awesome "dice-d6" — monochrome; dims with the chip ("removed, still recognizable") -->
-        <svg class="chip-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-          <path d={DICE_D6}/>
+        <!-- Shield — monochrome; dims with the chip ("removed, still recognizable") -->
+        <svg class="chip-die" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+          <path d={SHIELD}/>
         </svg>
         <span class="chip-label">{displaySystem(system)}</span>
         <span class="chip-clear" aria-hidden="true">×</span>

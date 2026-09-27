@@ -561,7 +561,7 @@
   .type-icon svg {
     display: block;
   }
-  /* Parchment = content identity, same as the systems view's die icon. */
+  /* Parchment = content identity, same as the systems view's shield icon. */
   .folder-glyph {
     color: var(--text-accent);
   }
@@ -623,7 +623,7 @@
     height: 10px;
   }
   /* Base pill styles live in SystemBadge.svelte; the +N overflow pills have
-     no die and stay grey, so they keep their own copy here. One recipe for
+     no shield and stay grey, so they keep their own copy here. One recipe for
      both clusters so tags and collections read as the same family. */
   .game-system-badge.overflow,
   .ribbon-overflow {

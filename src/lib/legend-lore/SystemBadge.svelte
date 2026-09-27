@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { DICE_D6 } from '../ui/iconPaths';
+  import { SHIELD } from '../ui/iconPaths';
 
   export let tag: string;
 </script>
 
 <span class="game-system-badge" title={tag}>
-  <!-- Font Awesome "dice-d6" -->
-  <svg class="badge-die" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-    <path d={DICE_D6}/>
+  <!-- Shield — a game system -->
+  <svg class="badge-die" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+    <path d={SHIELD}/>
   </svg>
   {tag}
 </span>
 
 <style>
-  /* Monochrome parchment — systems carry a die, not a color. The 20%
+  /* Monochrome parchment — systems carry a shield, not a color. The 20%
      color-mix is the one tint recipe for identity fills. */
   .game-system-badge {
     display: inline-block;

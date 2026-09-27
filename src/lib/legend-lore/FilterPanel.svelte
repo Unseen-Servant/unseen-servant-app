@@ -14,7 +14,7 @@
   import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
-  import { DICE_D6, DIE_OUTLINE, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.
@@ -345,9 +345,11 @@
             on:pointerenter={() => enterRow(`system:${name}`)}
             on:pointerleave={() => leaveRow(`system:${name}`)}
           >
-            <!-- Font Awesome "dice-d6" — monochrome; systems don't carry color -->
-            <svg class="row-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-              <path d={DICE_D6}/>
+            <!-- Shield — monochrome; systems don't carry color. Soloed, it
+                 takes up its fess (the active shield). -->
+            <svg class="row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+              <path d={SHIELD}/>
+              {#if soloed}<path d={SHIELD_FESS}/>{/if}
             </svg>
             <span class="row-name">{name}</span>
             <span class="sm" class:engaged={soloed || muted}>
@@ -389,11 +391,9 @@
             on:pointerenter={() => enterRow(`system:${UNTAGGED_KEY}`)}
             on:pointerleave={() => leaveRow(`system:${UNTAGGED_KEY}`)}
           >
-            <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
-            <svg class="row-icon" viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
-              {#each DIE_OUTLINE as stroke}
-                <path d={stroke}/>
-              {/each}
+            <!-- Dashed shield: the untagged bucket is a placeholder, not an identity -->
+            <svg class="row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="3.2 2.4" aria-hidden="true">
+              <path d={SHIELD}/>
             </svg>
             <span class="row-name">Untagged</span>
             <span class="sm" class:engaged={muted}>
@@ -578,6 +578,11 @@
   .row.soloed {
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
     border-left-color: var(--text-active);
+  }
+  /* The active shield comes up in parchment, the systems view's ink for a
+     system; at rest it sits back in secondary with the other row icons. */
+  .row.soloed .row-icon {
+    color: var(--text-accent);
   }
 
   .row-icon {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { KnownGameSystem } from './types';
-  import { DICE_D6 } from '../ui/iconPaths';
+  import { SHIELD } from '../ui/iconPaths';
 
   // The rows behind both game-system pickers: the tree row's context-menu
   // submenu and the standalone SystemTagMenu. Rendered straight into the
@@ -23,9 +23,9 @@
     on:click={() => onToggle(sys.tag)}
   >
     <span class="menu-pip" class:on={tags.includes(sys.tag)} aria-hidden="true"></span>
-    <!-- Font Awesome "dice-d6" — one fill for every system -->
-    <svg class="sys-die" viewBox="0 0 640 640" fill="var(--text-secondary)" aria-hidden="true">
-      <path d={DICE_D6}/>
+    <!-- Shield — one ink for every system -->
+    <svg class="sys-die" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+      <path d={SHIELD}/>
     </svg>
     <span class="sys-tag" title={sys.tag}>{sys.tag}</span>
   </button>
@@ -50,7 +50,7 @@
   }
   /* Tags are user-written and uncapped — ellipsize against --menu-max-width
      rather than stretching the menu or scrolling it sideways. The label stays
-     primary ink: identity rides on the die, the same way a collection row
+     primary ink: identity rides on the shield, the same way a collection row
      carries its pigment in the ribbon and not the name. */
   .sys-tag {
     min-width: 0;

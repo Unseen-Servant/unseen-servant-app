@@ -1,5 +1,5 @@
 // Manuscript-pigment palette for user-assigned collection colors.
-// Collections only — game systems are monochrome (die + parchment ink).
+// Collections only — game systems are monochrome (shield + parchment ink).
 // All hues share oklch L 0.64, C 0.10 so no color shouts over another on
 // the dark shell. Hue gaps ≥35° keep neighbors distinguishable. Reserved
 // UI hues are deliberately excluded so user colors can't impersonate

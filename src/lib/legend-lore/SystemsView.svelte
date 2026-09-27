@@ -12,7 +12,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, DICE_D6, DIE_OUTLINE, RIBBON_FILLED } from '../ui/iconPaths';
+  import { BOOK, RIBBON_FILLED, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -598,18 +598,17 @@
             <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
             {#if group.tag !== 'Untagged'}
               <span class="group-icon" aria-hidden="true">
-                <!-- Font Awesome "dice-d6" -->
-                <svg viewBox="0 0 640 640" fill="currentColor">
-                  <path d={DICE_D6}/>
+                <!-- Shield — a game system; soloed, it takes up its fess -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round">
+                  <path d={SHIELD}/>
+                  {#if soloedSystems.has(group.tag)}<path d={SHIELD_FESS}/>{/if}
                 </svg>
               </span>
             {:else}
               <span class="group-icon" aria-hidden="true">
-                <!-- Outline die: the untagged bucket is a placeholder, not an identity -->
-                <svg viewBox="0 0 640 640" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round">
-                  {#each DIE_OUTLINE as stroke}
-                    <path d={stroke}/>
-                  {/each}
+                <!-- Dashed shield: the untagged bucket is a placeholder, not an identity -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="3.2 2.4">
+                  <path d={SHIELD}/>
                 </svg>
               </span>
             {/if}
@@ -776,7 +775,7 @@
     flex-direction: column;
   }
 
-  /* Headers are monochrome — parchment name + die sigil; color belongs
+  /* Headers are monochrome — parchment name + shield sigil; color belongs
      to collections. */
   .group-head-row {
     --group-color: var(--text-accent);

@@ -26,7 +26,7 @@
   export let libraryEmpty: boolean = false;
   export let hiddenPaths: Set<string> = new Set();
   // File path → collection pigment, resolved by the parent. Color is
-  // reserved for collections — systems are monochrome (die + parchment).
+  // reserved for collections — systems are monochrome (shield + parchment).
   export let collectionColorByPath: Map<string, string> = new Map();
   export let selectedIndex: number = 0;
   export let canLoadMore: boolean = false;

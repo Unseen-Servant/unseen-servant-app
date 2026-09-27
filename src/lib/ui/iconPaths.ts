@@ -11,10 +11,6 @@
  * against these constants by iconPaths.test.ts. CC BY 4.0, Fonticons, Inc.
  */
 
-/** Font Awesome "dice-d6". viewBox="0 0 640 640". Source: ./icons/dice-d6-solid-full.svg */
-export const DICE_D6 =
-  'M288.4 72.3C308 61.2 332 61.2 351.6 72.3L527.6 172C547.6 183.4 560 204.6 560 227.7L560 425.1C560 448.1 547.6 469.4 527.6 480.8L351.6 580.5C332 591.6 308 591.6 288.5 580.5L112.5 480.8C92.4 469.5 80 448.2 80 425.2L80 227.8C80 204.8 92.4 183.5 112.4 172.1L288.4 72.4zM166.6 219.6C157.8 216.5 147.8 219.9 142.8 228.2C137.8 236.5 139.6 246.9 146.4 253.2L149.6 255.6L299.8 345.8L299.8 494.5C299.8 505.5 308.8 514.5 319.8 514.5C330.8 514.5 339.8 505.5 339.8 494.5L339.8 345.8L490.1 255.6C499.6 249.9 502.7 237.6 497 228.2C491.3 218.8 479 215.7 469.6 221.3L319.9 311.1L170.2 221.3L166.5 219.6z';
-
 /** Font Awesome "book". viewBox="0 0 640 640". Source: ./icons/book-solid-full.svg */
 export const BOOK =
   'M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z';
@@ -37,11 +33,16 @@ export const RIBBON_FILLED = 'M5 2h14v20l-7-5.2L5 22z';
 export const RIBBON_OUTLINE = 'M6 3h12v18l-6-4.4L6 21z';
 
 /**
- * Outline die — the Untagged bucket is a placeholder, not an identity.
- * Three strokes, drawn at viewBox="0 0 640 640" with stroke-width="40".
+ * Heater shield — a game system. Always stroked, never filled: systems are
+ * monochrome and carry no colour of their own. The Untagged bucket draws the
+ * same shield dashed (a placeholder, not an identity), as Loose does with the
+ * collection ribbon. viewBox="0 0 24 24", stroke-width="2.2".
  */
-export const DIE_OUTLINE = [
-  'M320 76 L548 206 L548 434 L320 564 L92 434 L92 206 Z',
-  'M92 206 L320 336 L548 206',
-  'M320 336 L320 564',
-] as const;
+export const SHIELD = 'M12 3l7 2.5V11c0 5-3.3 8.2-7 10-3.7-1.8-7-5-7-10V5.5z';
+
+/**
+ * The fess — a band across the shield, wall to wall where its sides stop
+ * running straight. Drawn in the same <svg> as SHIELD when the system is
+ * soloed: the shield taking up its charge is the active state.
+ */
+export const SHIELD_FESS = 'M5 11h14';

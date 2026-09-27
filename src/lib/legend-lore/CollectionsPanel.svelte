@@ -794,7 +794,7 @@
               <path d={RIBBON_FILLED}/>
             </svg>
           {:else}
-            <!-- Outline ribbon — uncolored, same grammar as the untagged die -->
+            <!-- Outline ribbon — uncolored, same grammar as the untagged shield -->
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
               <path d={RIBBON_OUTLINE}/>
             </svg>

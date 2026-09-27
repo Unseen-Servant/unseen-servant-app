@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { BOOK, DICE_D6, DIE_OUTLINE, FOLDER_OPEN, RIBBON_FILLED, RIBBON_OUTLINE } from './iconPaths';
+import { BOOK, FOLDER_OPEN, RIBBON_FILLED, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from './iconPaths';
 
 function vendoredPath(file: string): string {
   const svg = readFileSync(new URL(`./icons/${file}`, import.meta.url), 'utf8');
@@ -21,26 +21,22 @@ function svelteFiles(dir: string): string[] {
 describe('vendored sources', () => {
   // A Font Awesome bump should fail here rather than silently leaving the
   // shipped glyph a version behind its source file.
-  it('dice-d6 matches its vendored file', () => {
-    expect(DICE_D6).toBe(vendoredPath('dice-d6-solid-full.svg'));
-  });
-
   it('book matches its vendored file', () => {
     expect(BOOK).toBe(vendoredPath('book-solid-full.svg'));
   });
 });
 
 describe('shared glyphs', () => {
-  // Re-inlining a shared path is how the eight dice-d6 copies happened.
+  // Re-inlining a shared path is how the eight copies of the old die glyph happened.
   it('are not re-inlined in components', () => {
     const src = fileURLToPath(new URL('../..', import.meta.url));
     const shared: Record<string, string> = {
-      DICE_D6,
       BOOK,
       FOLDER_OPEN,
       RIBBON_FILLED,
       RIBBON_OUTLINE,
-      ...Object.fromEntries(DIE_OUTLINE.map((d, i) => [`DIE_OUTLINE[${i}]`, d])),
+      SHIELD,
+      SHIELD_FESS,
     };
     const offenders = svelteFiles(src).flatMap((file) => {
       const text = readFileSync(file, 'utf8');

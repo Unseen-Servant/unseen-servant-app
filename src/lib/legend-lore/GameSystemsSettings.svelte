@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import type { KnownGameSystem } from './types';
-  import { DICE_D6 } from '../ui/iconPaths';
+  import { SHIELD } from '../ui/iconPaths';
   import Modal from '../shell/Modal.svelte';
   import ActionButton from '../ui/ActionButton.svelte';
   import CommitSwitch from '../ui/CommitSwitch.svelte';
@@ -188,9 +188,9 @@
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
       <div class="system-row" on:click={() => openEditModal(sys)}>
         <span class="system-icon" aria-hidden="true">
-          <!-- Font Awesome "dice-d6" -->
-          <svg viewBox="0 0 640 640" fill="currentColor">
-            <path d={DICE_D6}/>
+          <!-- Shield — a game system -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round">
+            <path d={SHIELD}/>
           </svg>
         </span>
         <span class="system-tag">{sys.tag}</span>
