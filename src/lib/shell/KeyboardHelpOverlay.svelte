@@ -1,6 +1,6 @@
 <script lang="ts">
   import Modal from './Modal.svelte';
-  import { KEYBINDINGS, chord, isBareKeyChord, type KeyScope } from './keybindings';
+  import { KEYBINDINGS, chord, type KeyScope } from './keybindings';
 
   export let visible = false;
   export let onClose: () => void;
@@ -38,6 +38,14 @@
       entries: KEYBINDINGS.filter(k => k.scope === scope),
     }))
     .filter(g => g.entries.length > 0);
+
+  // One cap per alternative (`↓ / J` is two keys, not one), with the peek
+  // line's leading "hold" kept as a word rather than capped.
+  function caps(id: string): { prefix: string; keys: string[] } {
+    const c = chord(id);
+    const prefix = c.startsWith('hold ') ? 'hold' : '';
+    return { prefix, keys: (prefix ? c.slice(5) : c).split(' / ') };
+  }
 </script>
 
 <Modal
@@ -56,12 +64,13 @@
           <h3 class="ledger-label">{group.label}</h3>
           <dl class="bindings">
             {#each group.entries as entry (entry.id)}
+              {@const c = caps(entry.id)}
               <dt class="keys">
-                {#if isBareKeyChord(entry.id)}
-                  <span class="keycap" class:switch-key={entry.switch}>{chord(entry.id)}</span>
-                {:else}
-                  <span class="mono">{chord(entry.id)}</span>
-                {/if}
+                {#if c.prefix}<span class="word">{c.prefix}</span>{/if}
+                {#each c.keys as key, i}
+                  {#if i > 0}<span class="word">/</span>{/if}
+                  <span class="keycap" class:switch-key={entry.switch}>{key}</span>
+                {/each}
               </dt>
               <dd class="desc">{entry.label}</dd>
             {/each}
@@ -127,10 +136,9 @@
     gap: 3px;
     align-items: center;
   }
-  .mono {
-    font-family: var(--font-mono);
+  .word {
     font-size: 0.76rem;
-    color: var(--text-primary);
+    color: var(--text-tertiary);
     white-space: nowrap;
   }
   .desc {
@@ -140,14 +148,18 @@
     line-height: 1.3;
   }
 
-  /* A cap means "there is a square in the window for this key". The purple
-     edge marks the ones that light purple when engaged. */
+  /* Every key reads as a cap; a single letter stays square, a chord grows
+     wider. The purple edge marks keys that throw a switch in the window —
+     the ones that light purple when engaged. */
   .keycap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 17px;
+    min-width: 17px;
     height: 17px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    white-space: nowrap;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     background: var(--bg-app);

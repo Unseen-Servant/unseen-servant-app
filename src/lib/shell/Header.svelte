@@ -334,11 +334,25 @@
   /* The hint is supplementary — the placeholder already says what the field
      is for — so it sits one step below the icon and placeholder voice on
      --bg-app rather than matching them. */
+  /* Drawn as a key cap, like the shortcut sheet's, but kept in the tertiary
+     ink: it is an idle hint, not content. */
   .search-chord {
-    padding-left: 0.5rem;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    margin-left: 0.5rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-app);
+    font-family: var(--font-body);
+    font-size: 0.62rem;
+    font-weight: 700;
     color: var(--text-tertiary);
+    flex-shrink: 0;
     white-space: nowrap;
     -webkit-user-select: none;
     user-select: none;
