@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { PENNANT_FILLED, PENNANT_OUTLINE } from '../ui/iconPaths';
+  import { RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
@@ -797,16 +797,16 @@
             aria-expanded={isExpanded}
           >{isExpanded ? '▾' : '▸'}</button>
           {#if col.color}
-            <!-- Pigment pennant — this is where the color↔collection
-                 mapping is taught; the same pennant reappears in scope
+            <!-- Pigment bookmark — this is where the color↔collection
+                 mapping is taught; the same ribbon reappears in scope
                  chips and search-result index cells. -->
             <svg class="bkm" style={`color: ${col.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d={PENNANT_FILLED}/>
+              <path d={RIBBON_FILLED}/>
             </svg>
           {:else}
-            <!-- Outline pennant — uncolored, same grammar as the untagged die -->
+            <!-- Outline ribbon — uncolored, same grammar as the untagged die -->
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={PENNANT_OUTLINE}/>
+              <path d={RIBBON_OUTLINE}/>
             </svg>
           {/if}
           {#if isRenamingRow}
@@ -1002,7 +1002,7 @@
             >
               <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
               <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d={PENNANT_FILLED}/>
+                <path d={RIBBON_FILLED}/>
               </svg>
               <span>{pig.name}</span>
             </button>
@@ -1016,7 +1016,7 @@
           >
             <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={PENNANT_OUTLINE}/>
+              <path d={RIBBON_OUTLINE}/>
             </svg>
             <span>None</span>
           </button>
@@ -1057,10 +1057,8 @@
     padding: 0.6rem 0.75rem 0.4rem;
     flex-shrink: 0;
   }
-  /* The plate hugs its name (as in the filter panel); the space it used
-     to stretch across now just pushes the sort button right. */
   .panel-title {
-    margin-right: auto;
+    flex: 1;
   }
 
   .sort-wrapper {
