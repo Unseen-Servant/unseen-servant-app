@@ -66,10 +66,14 @@
             {#each group.entries as entry (entry.id)}
               {@const c = caps(entry.id)}
               <dt class="keys">
-                {#if c.prefix}<span class="word">{c.prefix}</span>{/if}
+                <!-- Each cap carries its trailing slash (and the first, the
+                     "hold"), so a wrapped chord breaks after a slash. -->
                 {#each c.keys as key, i}
-                  {#if i > 0}<span class="word">/</span>{/if}
-                  <span class="keycap" class:switch-key={entry.switch}>{key}</span>
+                  <span class="alt">
+                    {#if i === 0 && c.prefix}<span class="word">{c.prefix}</span>{/if}
+                    <span class="keycap" class:switch-key={entry.switch}>{key}</span>
+                    {#if i < c.keys.length - 1}<span class="word">/</span>{/if}
+                  </span>
                 {/each}
               </dt>
               <dd class="desc">{entry.label}</dd>
@@ -115,16 +119,15 @@
 
   /* The <dl> *is* the grid: a shortcut sheet is the one screen whose whole job
      is conveying term/definition pairs, so the pairing stays programmatic and
-     the two-column layout costs no wrapper. `auto` rather than the old fixed
-     9rem, right-aligned against a shared gap: a fixed column sized itself for
-     the longest chord in the whole sheet and floated every short one away from
-     its label — and anything longer than it (`hold S / M / P / B`,
-     `Shift+F10 / Menu`) spilled out of its cell. `auto` is per-group, so it
-     cannot overflow and only the group holding a long chord pays for it. */
+     the two-column layout costs no wrapper. The key column is one fixed width
+     across every group, so each section's labels start at the same indent;
+     sized for the common chords, with the rare long one (`hold S / M / P / B`,
+     `Shift+F10 / Menu`) wrapping onto a second line inside its cell rather
+     than spilling out of it, as the old unwrapped 9rem column did. */
   .bindings {
     margin: 0;
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 5.5rem 1fr;
     column-gap: 0.65rem;
     row-gap: 0.1rem;
     align-items: center;
@@ -132,7 +135,13 @@
   .keys {
     margin: 0;
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
+    gap: 2px 3px;
+    align-items: center;
+  }
+  .alt {
+    display: inline-flex;
     gap: 3px;
     align-items: center;
   }
