@@ -107,6 +107,12 @@
   --border-accent: rgb(182, 159, 129);
   --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Panel nameplates (.nameplate). The letters are cut in: dark above,
+     lit below, the light warm like the greys. The rivet is a dull brass —
+     parchment sunk into the plate's grey, so it can't pass for the amber
+     lamp. */
+  --text-shadow-engraved: 0 -1px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 240, 210, 0.07);
+  --metal-rivet: color-mix(in srgb, var(--text-accent) 55%, var(--bg-header));
   /* Roving keyboard focus on list rows. Same parchment as the global
      :focus-visible outline below, drawn inset because a dense list has
      no room for that rule's 2px offset. A ring rather than a fill so it
@@ -696,19 +702,91 @@ dialog[open]::backdrop {
   text-transform: uppercase;
   line-height: 1.2;
   color: var(--text-accent);
-  /* The nameplate runs on as a hairline to whatever ends the masthead, the
-     way a manuscript rubric rules off its heading. The rule is part of the
-     voice; how far it runs is layout, so a component gives the title
-     flex: 1 to let it reach the header's control. */
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
 }
-.panel-title::after {
+
+/* --- Panel nameplates --- */
+
+/* A panel's masthead is an iron plate riveted to the chassis: a flat field
+   (no sheen, no bevel — the rivets and the cut lettering carry the metal)
+   with a brass rivet at each end. The plate spans the whole masthead so its
+   controls sit on the metal with the name, rather than a small plate
+   floating in the dock. Layout (padding clear of the rivets, where the
+   control sits) stays in the component. The header bar's grey, so the
+   plates and the app's menu bar read as one chassis. */
+.nameplate {
+  position: relative;
+  background: var(--bg-header);
+}
+/* Both rivets on one pseudo-element, painted as gradients, so the plate's
+   own text keeps its baseline. Each is a flat brass disc with no outline or
+   shading, like a DAW rack screw drawn as a graphic, not a render; only its
+   edge is softened by half a pixel so it doesn't alias. */
+.nameplate::before {
   content: '';
-  flex: 1;
-  height: 1px;
-  background: color-mix(in srgb, var(--text-accent) 25%, transparent);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0.45rem 50%, var(--metal-rivet) 2px, transparent 2.7px),
+    radial-gradient(circle at calc(100% - 0.45rem) 50%, var(--metal-rivet) 2px, transparent 2.7px);
+}
+.nameplate > .panel-title {
+  text-shadow: var(--text-shadow-engraved);
+}
+
+/* The masthead's control: bracketed text engraved into the plate, never an
+   icon, so every plate reads the same way. Mono because it is a
+   code-flavoured affordance; a step below the settings modal's 0.7rem
+   because it sits on a dense panel's masthead, and a control nobody reaches
+   for often shouldn't carry that weight. Parchment when it can act, with
+   the brackets a step quieter until hovered. */
+.plate-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-accent);
+  text-shadow: var(--text-shadow-engraved);
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast);
+}
+.plate-btn::before,
+.plate-btn::after {
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+.plate-btn::before {
+  content: '[';
+  margin-right: 0.15rem;
+}
+.plate-btn::after {
+  content: ']';
+  margin-left: 0.15rem;
+}
+.plate-btn:hover:not(:disabled) {
+  filter: brightness(1.25);
+}
+/* Hovered, or holding its menu open: the brackets light with the label. */
+.plate-btn:hover:not(:disabled)::before,
+.plate-btn:hover:not(:disabled)::after,
+.plate-btn[aria-expanded="true"]::before,
+.plate-btn[aria-expanded="true"]::after {
+  color: var(--text-accent);
+}
+.plate-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+/* Unavailable is a step down the text ramp, not a veil. The brackets go
+   with it: they sit at --text-secondary, lighter than tertiary, so leaving
+   them would light the frame around a dead label. */
+.plate-btn:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+.plate-btn:disabled::before,
+.plate-btn:disabled::after {
+  color: var(--text-tertiary);
 }
 
 

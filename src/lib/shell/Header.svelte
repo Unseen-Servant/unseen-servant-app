@@ -189,7 +189,8 @@
     height: var(--header-height);
     padding: 0 0.5rem;
     background: var(--bg-header);
-    border-bottom: 1px solid var(--border-subtle);
+    /* No bottom rule: the dock's panel plates share this grey and hang
+       straight off the bar. */
     flex-shrink: 0;
   }
 

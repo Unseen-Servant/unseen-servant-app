@@ -252,9 +252,9 @@
   on:mousedown={handlePanelMousedown}
   on:pointerleave={() => (hoveredRow = null)}
 >
-  <header class="panel-head">
+  <header class="panel-head nameplate">
     <span class="panel-title">Filters</span>
-    <button class="btn-link" on:click={onClearAll} disabled={!canReset}>reset</button>
+    <button class="plate-btn" on:click={onClearAll} disabled={!canReset}>reset</button>
   </header>
 
   <div class="panel-body">
@@ -512,10 +512,12 @@
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-    padding: 0.6rem 0.75rem 0.4rem;
+    /* Symmetric now that it's a plate; 1rem sides clear the rivets. */
+    padding: 0.45rem 1rem;
+    margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
-  /* Let the nameplate's rule run to the reset control. */
+  /* The name takes the slack, so the control sits at the plate's end. */
   .panel-title {
     flex: 1;
   }
@@ -667,55 +669,6 @@
     color: var(--text-tertiary);
   }
   .untagged-row .row-icon {
-    color: var(--text-tertiary);
-  }
-
-  /* Bracketed terminal-style action, matching LibrarySettings' btn-link:
-     brackets in muted color, label in accent, hover brightens. */
-  .btn-link {
-    margin-left: auto;
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: var(--font-mono);
-    /* A step below the settings modal's 0.7rem: same token, but this one
-       sits in the masthead of a dense panel rather than on a settings row,
-       and a reset nobody reaches for often shouldn't carry that weight. */
-    font-size: 0.65rem;
-    color: var(--text-accent);
-    cursor: pointer;
-    transition: filter var(--transition-fast);
-  }
-  .btn-link::before,
-  .btn-link::after {
-    color: var(--text-secondary);
-    transition: color var(--transition-fast);
-  }
-  .btn-link::before {
-    content: '[';
-    margin-right: 0.15rem;
-  }
-  .btn-link::after {
-    content: ']';
-    margin-left: 0.15rem;
-  }
-  .btn-link:hover:not(:disabled) {
-    filter: brightness(1.25);
-  }
-  .btn-link:hover:not(:disabled)::before,
-  .btn-link:hover:not(:disabled)::after {
-    color: var(--text-accent);
-  }
-  /* Unavailable is a step down the text ramp, not a veil: the same
-     --text-tertiary .row-disabled uses one section below. The brackets go
-     with it — they sit at --text-secondary, which is *lighter* than
-     tertiary, so leaving them would light the frame around a dead label. */
-  .btn-link:disabled {
-    color: var(--text-tertiary);
-    cursor: default;
-  }
-  .btn-link:disabled::before,
-  .btn-link:disabled::after {
     color: var(--text-tertiary);
   }
 

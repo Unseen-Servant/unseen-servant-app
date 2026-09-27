@@ -3628,8 +3628,8 @@
     <div class="workspace">
       {#if collectionsPanelOpen || filterPanelOpen}
         <!-- Left dock: collections on top, filters below. Each panel
-             scrolls its own rows; the dock owns the width and the
-             dividing rules.
+             scrolls its own rows; the dock owns the width, and each
+             panel's nameplate divides it from the one above.
 
              Both panes stay keyboard-live while the search view is open —
              the console must stay reachable while the mix is audible.
@@ -4031,9 +4031,6 @@
   .left-dock > :global(.filter-panel:only-child) {
     flex: 1 1 auto;
     max-height: none;
-  }
-  .left-dock > :global(* + *) {
-    border-top: 1px solid var(--border-subtle);
   }
 
   .file-tree-area {

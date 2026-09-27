@@ -678,25 +678,18 @@
   on:mousedown={handlePanelMousedown}
   on:pointerleave={clearHover}
 >
-  <header class="panel-head">
+  <header class="panel-head nameplate">
     <span class="panel-title">Collections</span>
     <div class="sort-wrapper">
       <button
-        class="sort-btn"
-        class:on={sortMenuOpen}
+        class="plate-btn"
         on:click|stopPropagation={toggleSortMenu}
         bind:this={sortBtn}
         title="Sort collections"
         aria-label="Sort collections"
         aria-haspopup="menu"
         aria-expanded={sortMenuOpen}
-      >
-        <!-- Arrow + shrinking lines — sort -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-          <path d="M11 5h10M11 9h7M11 13h4"/>
-          <path d="M5 5v14M5 19l-2.5-3M5 19l2.5-3"/>
-        </svg>
-      </button>
+      >sort</button>
       {#if sortMenuOpen}
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="sort-menu" role="menu" tabindex="-1" on:click|stopPropagation>
@@ -1051,42 +1044,21 @@
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-    padding: 0.6rem 0.75rem 0.4rem;
+    /* Symmetric now that it's a plate; 1rem sides clear the rivets. */
+    padding: 0.45rem 1rem;
+    margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
   .panel-title {
     flex: 1;
   }
 
+  /* Flex, not block: a block wrapper opens a line box at the panel's 16px
+     body size, which made this plate taller than the filter panel's, whose
+     control sits in the row directly. */
   .sort-wrapper {
     position: relative;
-    align-self: center;
-  }
-  .sort-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-  .sort-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-container);
-  }
-  .sort-btn.on {
-    color: var(--text-accent);
-  }
-  .sort-btn .icon {
-    width: 13px;
-    height: 13px;
-    display: block;
+    display: flex;
   }
   .sort-menu {
     position: absolute;
