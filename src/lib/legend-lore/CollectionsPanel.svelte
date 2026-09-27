@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { PENNANT_FILLED, PENNANT_OUTLINE } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
@@ -797,16 +797,16 @@
             aria-expanded={isExpanded}
           >{isExpanded ? '▾' : '▸'}</button>
           {#if col.color}
-            <!-- Pigment bookmark — this is where the color↔collection
-                 mapping is taught; the same ribbon reappears in scope
+            <!-- Pigment pennant — this is where the color↔collection
+                 mapping is taught; the same pennant reappears in scope
                  chips and search-result index cells. -->
             <svg class="bkm" style={`color: ${col.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d={RIBBON_FILLED}/>
+              <path d={PENNANT_FILLED}/>
             </svg>
           {:else}
-            <!-- Outline ribbon — uncolored, same grammar as the untagged die -->
+            <!-- Outline pennant — uncolored, same grammar as the untagged die -->
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={RIBBON_OUTLINE}/>
+              <path d={PENNANT_OUTLINE}/>
             </svg>
           {/if}
           {#if isRenamingRow}
@@ -941,7 +941,7 @@
       on:drop={handleNewDrop}
     >
       <span>+ New collection</span>
-      <span class="menu-chord" aria-hidden="true">{chord('collections.new')}</span>
+      <span class="new-chord" aria-hidden="true">{chord('collections.new')}</span>
     </button>
   {/if}
 </aside>
@@ -1002,7 +1002,7 @@
             >
               <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
               <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d={RIBBON_FILLED}/>
+                <path d={PENNANT_FILLED}/>
               </svg>
               <span>{pig.name}</span>
             </button>
@@ -1016,7 +1016,7 @@
           >
             <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={RIBBON_OUTLINE}/>
+              <path d={PENNANT_OUTLINE}/>
             </svg>
             <span>None</span>
           </button>
@@ -1057,8 +1057,10 @@
     padding: 0.6rem 0.75rem 0.4rem;
     flex-shrink: 0;
   }
+  /* The plate hugs its name (as in the filter panel); the space it used
+     to stretch across now just pushes the sort button right. */
   .panel-title {
-    flex: 1;
+    margin-right: auto;
   }
 
   .sort-wrapper {
@@ -1446,6 +1448,30 @@
   }
   /* Naming in place: the same box, now solid and holding a field, so the
      affordance you clicked is the one you're typing into. */
+  /* The same key cap as the search bar's ⌘K (Header.svelte .search-chord):
+     a shortcut on a standing button reads as a cap, one in a menu row as
+     plain text. */
+  .new-chord {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    margin-left: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-app);
+    font-family: var(--font-body);
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
+  }
   .add-coll.creating {
     cursor: default;
     border-style: solid;
