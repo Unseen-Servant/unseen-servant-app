@@ -2276,15 +2276,6 @@
       return;
     }
 
-    // `/`: the web's search key (Gmail, GitHub, Slack) and Vim's — a bare
-    // alias for ⌘K. Matched on event.key like `?`, and gated out of inputs
-    // so a literal slash still types.
-    if (event.key === '/' && !meta && !event.altKey && !inAnyInput) {
-      event.preventDefault();
-      headerComponent?.focus();
-      return;
-    }
-
     // Cmd/Ctrl+,: open Settings (always available).
     if (meta && !event.shiftKey && event.key === ',') {
       event.preventDefault();
