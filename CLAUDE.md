@@ -193,7 +193,7 @@ Tokens live in `src/app.css` `:root`; the app code is the source of truth (the c
 
 ### Typography
 
-- All serif: Crimson Text body, Almendra headings, Cinzel display.
+- All serif: Crimson Text body, Almendra headings.
 - Numeric readouts use `tabular-nums`; code-flavored affordances use `--font-mono`.
 
 ### Tokens only

@@ -92,7 +92,7 @@
          The switch is the same 18px hardware square the S and M buttons
          use, labelled with its own chord: the letter on the switch is the
          key that throws it. -->
-    <span class="scope-name panel-title">Scope</span>
+    <span class="scope-name ledger-label">Scope</span>
     <button
       type="button"
       class="sm-btn"

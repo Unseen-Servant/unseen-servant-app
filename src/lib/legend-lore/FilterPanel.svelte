@@ -253,7 +253,7 @@
   on:pointerleave={() => (hoveredRow = null)}
 >
   <header class="panel-head nameplate">
-    <span class="panel-title">Filters</span>
+    <span class="panel-name ledger-label">Filters</span>
     <button class="plate-btn" on:click={onClearAll} disabled={!canReset}>reset</button>
   </header>
 
@@ -521,7 +521,7 @@
     flex-shrink: 0;
   }
   /* The name takes the slack, so the control sits at the plate's end. */
-  .panel-title {
+  .panel-name {
     flex: 1;
   }
   .panel-body {

@@ -53,29 +53,12 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'Cinzel';
-  src: url('/fonts/Cinzel-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Cinzel';
-  src: url('/fonts/Cinzel-SemiBold.ttf') format('truetype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* --- Design Tokens --- */
 
 :root {
   /* Fonts */
   --font-body: 'Crimson Text', Georgia, serif;
   --font-heading: 'Almendra', serif;
-  --font-display: 'Cinzel', serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Background colors. The greys are warm iron, not neutral: each keeps
@@ -107,9 +90,6 @@
   --border-accent: rgb(182, 159, 129);
   --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
-  /* Panel nameplates (.nameplate). The letters are cut in: dark above,
-     lit below, the light warm like the greys. */
-  --text-shadow-engraved: 0 -1px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 240, 210, 0.07);
   /* Roving keyboard focus on list rows. Same parchment as the global
      :focus-visible outline below, drawn inset because a dense list has
      no room for that rule's 2px offset. A ring rather than a fill so it
@@ -683,28 +663,10 @@ dialog[open]::backdrop {
   font-family: var(--font-heading);
 }
 
-.font-display {
-  font-family: var(--font-display);
-}
-
-/* --- Header Voices --- */
-/* One class per header voice; recipe only (font, size, tracking, case,
-   line-height, default color) — layout stays in components.
-   See docs/design/2026-08-09-header-voices-design.md. */
-
-.panel-title {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  line-height: 1.2;
-  color: var(--text-accent);
-}
-
 /* --- Panel nameplates --- */
 
 /* A panel's masthead is a plate: a flat field (no sheen, no bevel, no
-   hardware — the cut lettering carries it) spanning the whole masthead, so
+   hardware) spanning the whole masthead, so
    the controls sit on it with the name rather than a small plate floating
    in the dock. --bg-container, the step halfway between the dock and the
    header bar: it reads apart from both, and the secondary text a plate can
@@ -718,12 +680,16 @@ dialog[open]::backdrop {
   min-height: 1.875rem;
   background: var(--bg-container);
 }
-.nameplate .panel-title {
-  text-shadow: var(--text-shadow-engraved);
+/* A plate names its module in the rail voice the modals use: .ledger-label
+   one step up the ramp, in secondary. Parchment is for content and data, and
+   a module's name is neither; the step up keeps it above the ledger labels
+   that head row groups inside the panel (tertiary). */
+.nameplate .ledger-label {
+  color: var(--text-secondary);
 }
 
-/* The masthead's control: bracketed text engraved into the plate, never an
-   icon, so every plate reads the same way. Mono because it is a
+/* The masthead's control: bracketed text on the plate, never an icon, so
+   every plate reads the same way. Mono because it is a
    code-flavoured affordance; a step below the settings modal's 0.7rem
    because it sits on a dense panel's masthead, and a control nobody reaches
    for often shouldn't carry that weight. Parchment when it can act, with
@@ -735,7 +701,6 @@ dialog[open]::backdrop {
   font-family: var(--font-mono);
   font-size: 0.65rem;
   color: var(--text-accent);
-  text-shadow: var(--text-shadow-engraved);
   cursor: pointer;
   transition: filter var(--transition-fast), transform var(--transition-fast);
 }
@@ -777,6 +742,11 @@ dialog[open]::backdrop {
   color: var(--text-tertiary);
 }
 
+
+/* --- Header Voices --- */
+/* One class per header voice; recipe only (font, size, tracking, case,
+   line-height, default color) — layout stays in components.
+   See docs/design/2026-08-09-header-voices-design.md. */
 
 .section-title {
   font-family: var(--font-heading);

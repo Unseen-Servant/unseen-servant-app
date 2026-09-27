@@ -679,7 +679,7 @@
   on:pointerleave={clearHover}
 >
   <header class="panel-head nameplate">
-    <span class="panel-title">Collections</span>
+    <span class="panel-name ledger-label">Collections</span>
     <div class="sort-wrapper">
       <button
         class="plate-btn"
@@ -1052,7 +1052,7 @@
     margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
-  .panel-title {
+  .panel-name {
     flex: 1;
   }
 
