@@ -12,7 +12,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, RIBBON_FILLED, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
+  import { BOOK, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -706,8 +706,8 @@
                 {#if ribbons.length > 0}
                   <span class="ribbons" title={ribbons.map((r) => r.name).join(', ')}>
                     {#each ribbonSplit.shown as r (r.name)}
-                      <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d={RIBBON_FILLED}/>
+                      <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                        <path d={RIBBON_OUTLINE}/>
                       </svg>
                     {/each}
                     {#if ribbonSplit.overflow > 0}

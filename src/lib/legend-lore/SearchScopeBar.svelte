@@ -8,7 +8,7 @@
   import { displaySystem } from './searchScope';
   import { chordHint } from '../shell/keybindings';
   import type { CurationKey } from './searchScope';
-  import { RIBBON_FILLED, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
+  import { RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
 
   // Chip glyph = axis (pigment bookmark = collection, outline bookmark =
   // curation bucket, monochrome shield = system); chip frame = operation
@@ -124,8 +124,8 @@
         <span class="chip-prefix micro-label">play</span>
         {#if chip.color}
           <!-- Bookmark ribbon — the collection axis keeps its pigment -->
-          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
-            <path d={RIBBON_FILLED}/>
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={RIBBON_OUTLINE}/>
           </svg>
         {:else}
           <!-- No pigment — outline ribbon, same grammar as the panel -->
@@ -149,8 +149,8 @@
         <span class="chip-prefix micro-label">mute</span>
         {#if chip.color}
           <!-- Bookmark ribbon — the collection keeps its pigment even muted -->
-          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
-            <path d={RIBBON_FILLED}/>
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={RIBBON_OUTLINE}/>
           </svg>
         {:else}
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -173,8 +173,8 @@
         <span class="chip-prefix micro-label">solo</span>
         {#if chip.color}
           <!-- Bookmark ribbon — the collection axis keeps its pigment -->
-          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
-            <path d={RIBBON_FILLED}/>
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={RIBBON_OUTLINE}/>
           </svg>
         {:else}
           <!-- No pigment — outline ribbon, same grammar as the panel -->
@@ -237,8 +237,8 @@
         <span class="chip-prefix micro-label">mute</span>
         {#if chip.color}
           <!-- Bookmark ribbon — dims with the chip ("removed, still recognizable") -->
-          <svg class="chip-mark" viewBox="0 0 24 24" fill={chip.color} aria-hidden="true">
-            <path d={RIBBON_FILLED}/>
+          <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={RIBBON_OUTLINE}/>
           </svg>
         {:else}
           <!-- No pigment — outline ribbon, same grammar as the panel -->

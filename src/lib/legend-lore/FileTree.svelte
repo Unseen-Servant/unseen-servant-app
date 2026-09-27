@@ -9,7 +9,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { memberStateFor, type ArmState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, RIBBON_FILLED } from '../ui/iconPaths';
+  import { BOOK, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -394,8 +394,8 @@
            mapping only has to be learned once. -->
       <span class="ribbons" title={ribbonTitle}>
         {#each ribbonSplit.shown as r (r.name)}
-          <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d={RIBBON_FILLED}/>
+          <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={RIBBON_OUTLINE}/>
           </svg>
         {/each}
         {#if ribbonSplit.overflow > 0}

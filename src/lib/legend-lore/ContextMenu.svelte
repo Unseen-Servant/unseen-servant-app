@@ -5,7 +5,7 @@
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from '../shell/keybindings';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
-  import { RIBBON_FILLED, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemTagRows from './SystemTagRows.svelte';
 
   export let x: number;
@@ -403,8 +403,8 @@
               <span class="menu-pip" class:on={state === 'all'} class:partial={state === 'some'} aria-hidden="true"></span>
               {#if col.color}
                 <!-- Bookmark ribbon — the collection keeps its pigment -->
-                <svg class="submenu-icon" viewBox="0 0 24 24" fill={col.color} aria-hidden="true">
-                  <path d={RIBBON_FILLED}/>
+                <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke={col.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                  <path d={RIBBON_OUTLINE}/>
                 </svg>
               {:else}
                 <!-- No pigment — outline ribbon, same grammar as the chips -->
