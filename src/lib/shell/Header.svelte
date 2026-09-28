@@ -216,7 +216,7 @@
      floor; open, it comes up on the raised fill. */
   .panel-keys {
     display: flex;
-    gap: 0.2rem;
+    gap: 0.3rem;
   }
   .key-well {
     display: flex;
