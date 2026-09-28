@@ -287,6 +287,18 @@
   }
 
   $: hasHidden = hiddenCount > 0;
+
+  // A folded section still owns up to what's thrown inside it: a lamp on the
+  // header, lit only while it's collapsed (open, the rows say it themselves).
+  // Hidden items counts its view switches too — unlike the header's Filters
+  // lamp, which tracks search narrowing only — since a forgotten lens behind
+  // a fold is exactly what this guards against. Show-hidden with nothing
+  // hidden is a disabled row, so it doesn't count.
+  $: sectionEngaged = {
+    curation: curationSolos.size > 0 || curationMutes.size > 0,
+    system: soloedSystems.size > 0 || excludedSystems.size > 0,
+    view: (showHidden && hasHidden) || hideUnindexed || hideOutOfScope,
+  } satisfies Record<FilterSection, boolean>;
   $: curationRows = [
     { key: 'collected' as CurationKey, name: 'In a collection', count: collectedCount },
     { key: 'loose' as CurationKey, name: 'Loose', count: uncollectedCount },
@@ -316,7 +328,7 @@
         aria-expanded={!collapsed.has('curation')}
         data-fm-key="sect:curation"
         on:click={() => clickHeader('curation')}
-      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('curation') ? '▸' : '▾'}</span>Curation</button>
+      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('curation') ? '▸' : '▾'}</span>Curation{#if collapsed.has('curation') && sectionEngaged.curation}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
       {#if !collapsed.has('curation')}
       {#each curationRows as ch (ch.key)}
         {@const soloed = curationSolos.has(ch.key)}
@@ -393,7 +405,7 @@
         aria-expanded={!collapsed.has('system')}
         data-fm-key="sect:system"
         on:click={() => clickHeader('system')}
-      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('system') ? '▸' : '▾'}</span>Game systems</button>
+      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('system') ? '▸' : '▾'}</span>Game systems{#if collapsed.has('system') && sectionEngaged.system}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
       {#if collapsed.has('system')}
         <!-- Folded shut: nothing below renders. -->
       {:else if systems.length > 0}
@@ -492,6 +504,7 @@
         aria-expanded={!collapsed.has('view')}
         on:click={() => clickHeader('view')}
       ><span class="sect-arrow" aria-hidden="true">{collapsed.has('view') ? '▸' : '▾'}</span>Hidden items</button>
+      {#if collapsed.has('view') && sectionEngaged.view}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}
       {#if hasHidden}
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
       {/if}
@@ -626,6 +639,28 @@
   .sect-toggle.kb-focused,
   .sect-split.kb-focused {
     box-shadow: var(--ring-focus);
+  }
+  /* The header keys' engagement lamp (Header.svelte), lit face only: it
+     appears when there's something to report and is otherwise absent, so
+     quiet headers stay quiet. Its right edge sits over the centre of the
+     rows' 18px count box — 0.75rem row padding + 4px. */
+  .sect-lamp {
+    align-self: center;
+    flex-shrink: 0;
+    width: 10px;
+    height: 2px;
+    margin: 0 calc(0.5rem + 4px) 0 auto;
+    border-radius: var(--radius-sm);
+    background: var(--text-active);
+    filter: var(--glow-active);
+  }
+  /* Outside the toggle here, between it and Clear, so the container's
+     0.75rem padding already does most of the inset. */
+  .sect-split .sect-lamp {
+    margin: 0 4px 0 0.4rem;
+  }
+  .sect-split .reset-link {
+    margin-left: 0.4rem;
   }
   .sect-arrow {
     width: 0.8rem;
