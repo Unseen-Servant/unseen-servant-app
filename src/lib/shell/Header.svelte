@@ -153,7 +153,10 @@
     {/if}
   </div>
   <div class="search-wrapper" class:disabled>
-    <span class="search-icon" aria-hidden="true">⌕</span>
+    <!-- Font Awesome "magnifying-glass" icon (src/lib/ui/icons/magnifying-glass-solid-full.svg) -->
+    <svg class="search-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+      <path d="M480 272C480 317.9 465.1 360.3 440 394.7L566.6 521.4C579.1 533.9 579.1 554.2 566.6 566.7C554.1 579.2 533.8 579.2 521.3 566.7L394.7 440C360.3 465.1 317.9 480 272 480C157.1 480 64 386.9 64 272C64 157.1 157.1 64 272 64C386.9 64 480 157.1 480 272zM272 416C351.5 416 416 351.5 416 272C416 192.5 351.5 128 272 128C192.5 128 128 192.5 128 272C128 351.5 192.5 416 272 416z"/>
+    </svg>
     <!-- The search field only ever holds the query — narrowings (solos
          and mutes on either axis) live as chips in the scope bar. -->
     <input
@@ -344,12 +347,13 @@
     opacity: 0.5;
   }
 
+  /* Same 12px box as the header's other Font Awesome glyphs. */
   .search-icon {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
     color: var(--text-secondary);
-    font-size: 1rem;
     margin-right: 0.4rem;
-    -webkit-user-select: none;
-    user-select: none;
   }
 
   .search-input {
