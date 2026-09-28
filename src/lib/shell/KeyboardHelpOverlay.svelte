@@ -106,10 +106,15 @@
   }
 
   /* Scopes are independent blocks, so multi-column does the whole job — the
-     groups flow and stay intact, halving a sheet that ran five screens. */
+     groups flow and stay intact, halving a sheet that ran five screens. The
+     gap below a group is padding, not margin: WebKit carries a trailing
+     margin across a column break, so the group that ended column one pushed
+     the top of column two down by exactly that much. Padding sits inside the
+     unbreakable box and stays with it. */
   .lgroup {
     break-inside: avoid;
-    margin: 0 0 1rem;
+    margin: 0;
+    padding-bottom: 1rem;
   }
   /* Still an <h3>: the sheet carried a heading per scope before this redesign,
      and dropping to the nameplate voice is a change of dress, not of outline. */
