@@ -1,7 +1,7 @@
 # Retrieval informed by how Legend Lore is searched
 
 **Date:** 2026-09-26
-**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7); item 4's cue stripping landed the same day (§8), its reranker choice is still open; item 3 (heading quality) started 2026-09-27.
+**Status:** agreed 2026-09-26; item 1 (typing vs committing) landed 2026-09-26 (§6); item 2 measured and deprioritized the same day (§7); item 4's cue stripping landed the same day (§8), its reranker choice is still open; item 3 (heading quality) started 2026-09-27.; item 3 closed 2026-09-27 (§11): junk filter kept, outline and entry-name headings NO-GO
 **Context:** after the library store swap (`../retrieval/2026-09-26-library-store-design.md`) and the first library tier (`evals/baselines/2026-09-26-v2-library`). The goal is broad improvements, not tuning to a document: every item below is a *class* of behaviour, judged across both eval suites.
 
 ---
@@ -157,4 +157,14 @@ Weighted by book size, about **33 %** of the library's units carry a misleading 
 - **Ancestors help when right and cost a little when wrong.** Leaf-only trails the full path on the corpus (decent headings; 7 worse, 3 better, mostly #1 → #2 where the leaf is a generic "Actions" and the name sits in the ancestor) and edges it on the library (bad headings; 0 worse, 1 better). The queries leaf-only wins are the misleading-ancestor cases ("osric falling damage", both Year Zero initiative queries).
 
 **Conclusion.** Keep headings in ranking; the item-3 direction is to make them *correct*, not to use less of them. That supports the outline design (`../retrieval/2026-09-27-outline-headings-design.md`): its main effects — no stale ancestors, no missed entry names — are exactly the two things this ablation shows matter. Not adopted: switching production to leaf-only (a corpus loss for a one-query library gain). A cheap follow-up worth one run after the outline work: prepend the nearest *named* segment rather than the raw leaf ("Ancient Gold Dragon", not "Actions"). The switches stay in the code so the same ablation can be re-run on corrected headings.
+
+## 11. Item 3 closed — what shipped and what did not (2026-09-27)
+
+| change | outcome | evidence |
+|---|---|---|
+| **Junk filter** (bb0922f): quote attributions, Label: value stat lines and sentences stop being headings | **kept** | Rejects only non-titles across 5,528 real heading segments; touches 32 % of the Dragonbane Bestiary's units and 37 % of Wight-Box's. Retrieval-neutral: the corpus suite reproduces `2026-09-26-v2-cue-strip` exactly, and a fresh library copy scores 0.963 (= the reference). Its value is in the titles shown and in section boundaries; it ships with `CHUNKER_VERSION` v4 and reaches the library on the next reindex. |
+| **Outline headings** (a27b898, `strategy="outline"`) | **NO-GO as default** (5cf8b5c), code kept | Collection sample 40.3 % → 39.5 % mis-headed (10 fixed, 8 broken); corpus 0.896 → 0.893 (single-book −0.10); breadcrumb split-letter rise. Details in `../retrieval/2026-09-27-outline-headings-design.md` §8. |
+| **Entry-name headings** — the heading from one level above the entry's name down, higher ancestors dropped; a segment is a generic label when it sits under ≥ 3 ancestor paths in its book | **NO-GO**, not kept | Corpus 0.896 → 0.888 (2 worse, 1 better), library 0.963 → 0.950 (1 worse), all #1 ↔ #2 flips: the dropped ancestors carried useful context more often than they misled. |
+
+**Conclusion.** For ranking, the full heading path stays the best of every variant measured (full, BM25-only, none, leaf, entry, outline-structured). About 40 % of passages across a random slice of the collection still carry a misleading heading, but the retrieval suites are not sensitive to most of it; the remaining cost is mostly in what the user sees (result titles, section boundaries, `get_section` spans). The causes the outline did not reach — headings shifted by one entry, neighbouring entries named, siblings nested by font level, TOC and credits lines as headings — are extraction problems for a later pass, best started from the collection sample's labelled examples (`evals/.eval_data/outline_validation/`, now a development set).
 
