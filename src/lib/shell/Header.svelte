@@ -81,9 +81,9 @@
         aria-label="Toggle collections panel"
         aria-pressed={panelOpen}
       >
-        <!-- Font Awesome "table-columns" icon (src/lib/ui/icons/table-columns-solid-full.svg) -->
+        <!-- Font Awesome "rectangle-list" icon (src/lib/ui/icons/rectangle-list-solid-full.svg) -->
         <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
-          <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
+          <path d="M128 128C92.7 128 64 156.7 64 192L64 448C64 483.3 92.7 512 128 512L512 512C547.3 512 576 483.3 576 448L576 192C576 156.7 547.3 128 512 128L128 128zM224 384C224 401.7 209.7 416 192 416C174.3 416 160 401.7 160 384C160 366.3 174.3 352 192 352C209.7 352 224 366.3 224 384zM192 288C174.3 288 160 273.7 160 256C160 238.3 174.3 224 192 224C209.7 224 224 238.3 224 256C224 273.7 209.7 288 192 288zM312 232L456 232C469.3 232 480 242.7 480 256C480 269.3 469.3 280 456 280L312 280C298.7 280 288 269.3 288 256C288 242.7 298.7 232 312 232zM312 360L456 360C469.3 360 480 370.7 480 384C480 397.3 469.3 408 456 408L312 408C298.7 408 288 397.3 288 384C288 370.7 298.7 360 312 360z"/>
         </svg>
       </button>
       <button
@@ -94,13 +94,9 @@
         aria-label="Toggle filter panel"
         aria-pressed={filterPanelOpen}
       >
-        <!-- Faders — three channel lines with offset knobs punched out of
-             the header background -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="toggle-icon">
-          <path d="M5 4v16M12 4v16M19 4v16"/>
-          <circle class="knob" cx="5" cy="15" r="2.6"/>
-          <circle class="knob" cx="12" cy="8" r="2.6"/>
-          <circle class="knob" cx="19" cy="12" r="2.6"/>
+        <!-- Font Awesome "filter" icon (src/lib/ui/icons/filter-solid-full.svg) -->
+        <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+          <path d="M96 128C83.1 128 71.4 135.8 66.4 147.8C61.4 159.8 64.2 173.5 73.4 182.6L256 365.3L256 480C256 488.5 259.4 496.6 265.4 502.6L329.4 566.6C338.6 575.8 352.3 578.5 364.3 573.5C376.3 568.5 384 556.9 384 544L384 365.3L566.6 182.7C575.8 173.5 578.5 159.8 573.5 147.8C568.5 135.8 556.9 128 544 128L96 128z"/>
         </svg>
       </button>
     {/if}
@@ -119,11 +115,9 @@
           aria-label="Tree view"
           aria-pressed={viewMode === 'tree'}
         >
-          <!-- List tree — folder hierarchy -->
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-            <path d="M21 6H9M21 12h-8M21 18h-8" />
-            <path d="M4 4v4c0 1.1.9 2 2 2h3" />
-            <path d="M4 8v8c0 1.1.9 2 2 2h3" />
+          <!-- Font Awesome "folder-tree" icon (src/lib/ui/icons/folder-tree-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+            <path d="M80 88C80 74.7 69.3 64 56 64C42.7 64 32 74.7 32 88L32 456C32 486.9 57.1 512 88 512L272 512L272 464L88 464C83.6 464 80 460.4 80 456L80 224L272 224L272 176L80 176L80 88zM368 288L560 288C586.5 288 608 266.5 608 240L608 144C608 117.5 586.5 96 560 96L477.3 96C468.8 96 460.7 92.6 454.7 86.6L446.1 78C437.1 69 424.9 63.9 412.2 63.9L368 64C341.5 64 320 85.5 320 112L320 240C320 266.5 341.5 288 368 288zM368 576L560 576C586.5 576 608 554.5 608 528L608 432C608 405.5 586.5 384 560 384L477.3 384C468.8 384 460.7 380.6 454.7 374.6L446.1 366C437.1 357 424.9 351.9 412.2 351.9L368 352C341.5 352 320 373.5 320 400L320 528C320 554.5 341.5 576 368 576z"/>
           </svg>
         </button>
         <button
@@ -135,11 +129,9 @@
           aria-label="Shelve by system"
           aria-pressed={viewMode === 'systems'}
         >
-          <!-- Layered stack — shelve by system -->
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
-            <path d="M12 2 L22 7 L12 12 L2 7 Z" />
-            <path d="M2 12 L12 17 L22 12" />
-            <path d="M2 17 L12 22 L22 17" />
+          <!-- Font Awesome "layer-group" icon (src/lib/ui/icons/layer-group-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+            <path d="M296.5 69.2C311.4 62.3 328.6 62.3 343.5 69.2L562.1 170.2C570.6 174.1 576 182.6 576 192C576 201.4 570.6 209.9 562.1 213.8L343.5 314.8C328.6 321.7 311.4 321.7 296.5 314.8L77.9 213.8C69.4 209.8 64 201.3 64 192C64 182.7 69.4 174.1 77.9 170.2L296.5 69.2zM112.1 282.4L276.4 358.3C304.1 371.1 336 371.1 363.7 358.3L528 282.4L562.1 298.2C570.6 302.1 576 310.6 576 320C576 329.4 570.6 337.9 562.1 341.8L343.5 442.8C328.6 449.7 311.4 449.7 296.5 442.8L77.9 341.8C69.4 337.8 64 329.3 64 320C64 310.7 69.4 302.1 77.9 298.2L112 282.4zM77.9 426.2L112 410.4L276.3 486.3C304 499.1 335.9 499.1 363.6 486.3L527.9 410.4L562 426.2C570.5 430.1 575.9 438.6 575.9 448C575.9 457.4 570.5 465.9 562 469.8L343.4 570.8C328.5 577.7 311.3 577.7 296.4 570.8L77.9 469.8C69.4 465.8 64 457.3 64 448C64 438.7 69.4 430.1 77.9 426.2z"/>
           </svg>
         </button>
       </div>
@@ -273,11 +265,6 @@
     width: 14px;
     height: 14px;
     display: block;
-  }
-  /* Fader knobs are punched out of the header so the channel line reads
-     as passing behind them. */
-  .toggle-icon .knob {
-    fill: var(--bg-header);
   }
 
   .search-wrapper {

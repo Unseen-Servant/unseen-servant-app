@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { BOOK, FOLDER_BACK, FOLDER_FLAP, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from './iconPaths';
+import { BOOK, FOLDER, FOLDER_OPEN, RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from './iconPaths';
 
 function vendoredPath(file: string): string {
   const svg = readFileSync(new URL(`./icons/${file}`, import.meta.url), 'utf8');
@@ -24,6 +24,12 @@ describe('vendored sources', () => {
   it('book matches its vendored file', () => {
     expect(BOOK).toBe(vendoredPath('book-solid-full.svg'));
   });
+  it('folder matches its vendored file', () => {
+    expect(FOLDER).toBe(vendoredPath('folder-solid-full.svg'));
+  });
+  it('folder-open matches its vendored file', () => {
+    expect(FOLDER_OPEN).toBe(vendoredPath('folder-open-solid-full.svg'));
+  });
 });
 
 describe('shared glyphs', () => {
@@ -32,8 +38,8 @@ describe('shared glyphs', () => {
     const src = fileURLToPath(new URL('../..', import.meta.url));
     const shared: Record<string, string> = {
       BOOK,
-      FOLDER_BACK,
-      FOLDER_FLAP,
+      FOLDER,
+      FOLDER_OPEN,
       RIBBON_OUTLINE,
       SHIELD,
       SHIELD_FESS,

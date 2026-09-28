@@ -1,7 +1,7 @@
 <script lang="ts">
   import { jobNotification, pendingNotification } from './notificationStore';
   import { chordHint } from './keybindings';
-  import { FOLDER_BACK, FOLDER_FLAP } from '../ui/iconPaths';
+  import { FOLDER, FOLDER_OPEN } from '../ui/iconPaths';
 
   export let selectedFolder: string;
   export let sidecarConnected: boolean;
@@ -91,10 +91,10 @@
         <span>{selectedCount} selected</span>
       {/if}
       <span class="separator">&middot;</span>
-      <button class="sync-btn folder-btn" on:click={onOpenFolder} title={`Reveal library folder${chordHint('library.reveal')}`}>
-        <svg class="sync-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d={FOLDER_BACK}/>
-          <path class="folder-flap" d={FOLDER_FLAP}/>
+      <button class="sync-btn" on:click={onOpenFolder} title={`Reveal library folder${chordHint('library.reveal')}`}>
+        <svg class="sync-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+          <path class="folder-shut" d={FOLDER}/>
+          <path class="folder-opened" d={FOLDER_OPEN}/>
         </svg>
       </button>
       {#if onSync}
@@ -136,18 +136,16 @@
     {/if}
   </div>
   <div class="statusbar-right">
-    <button class="license-link" on:click={onOpenSettings} title={`Settings${chordHint('settings.open')}`}>
-      <!-- Font Awesome "gear" icon. This is the v6 path, which bleeds to all four
-           edges of its native 0 0 512 512 box; the v7 icons around it sit inside
-           ~15% padding. Padding the viewBox to a 640 grid matches their size. -->
-      <svg class="license-icon" viewBox="-64 -64 640 640" fill="currentColor">
-        <path d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/>
+    <button class="license-link" on:click={onShowHelp} title={`Keyboard shortcuts${chordHint('help.overlay')}`}>
+      <!-- Font Awesome "keyboard" icon (src/lib/ui/icons/keyboard-solid-full.svg) -->
+      <svg class="license-icon" viewBox="0 0 640 640" fill="currentColor">
+        <path d="M96 128C60.7 128 32 156.7 32 192L32 448C32 483.3 60.7 512 96 512L544 512C579.3 512 608 483.3 608 448L608 192C608 156.7 579.3 128 544 128L96 128zM112 192L144 192C152.8 192 160 199.2 160 208L160 240C160 248.8 152.8 256 144 256L112 256C103.2 256 96 248.8 96 240L96 208C96 199.2 103.2 192 112 192zM96 304C96 295.2 103.2 288 112 288L144 288C152.8 288 160 295.2 160 304L160 336C160 344.8 152.8 352 144 352L112 352C103.2 352 96 344.8 96 336L96 304zM208 192L240 192C248.8 192 256 199.2 256 208L256 240C256 248.8 248.8 256 240 256L208 256C199.2 256 192 248.8 192 240L192 208C192 199.2 199.2 192 208 192zM192 304C192 295.2 199.2 288 208 288L240 288C248.8 288 256 295.2 256 304L256 336C256 344.8 248.8 352 240 352L208 352C199.2 352 192 344.8 192 336L192 304zM208 384L432 384C440.8 384 448 391.2 448 400L448 432C448 440.8 440.8 448 432 448L208 448C199.2 448 192 440.8 192 432L192 400C192 391.2 199.2 384 208 384zM288 208C288 199.2 295.2 192 304 192L336 192C344.8 192 352 199.2 352 208L352 240C352 248.8 344.8 256 336 256L304 256C295.2 256 288 248.8 288 240L288 208zM304 288L336 288C344.8 288 352 295.2 352 304L352 336C352 344.8 344.8 352 336 352L304 352C295.2 352 288 344.8 288 336L288 304C288 295.2 295.2 288 304 288zM384 208C384 199.2 391.2 192 400 192L432 192C440.8 192 448 199.2 448 208L448 240C448 248.8 440.8 256 432 256L400 256C391.2 256 384 248.8 384 240L384 208zM400 288L432 288C440.8 288 448 295.2 448 304L448 336C448 344.8 440.8 352 432 352L400 352C391.2 352 384 344.8 384 336L384 304C384 295.2 391.2 288 400 288zM480 208C480 199.2 487.2 192 496 192L528 192C536.8 192 544 199.2 544 208L544 240C544 248.8 536.8 256 528 256L496 256C487.2 256 480 248.8 480 240L480 208zM496 288L528 288C536.8 288 544 295.2 544 304L544 336C544 344.8 536.8 352 528 352L496 352C487.2 352 480 344.8 480 336L480 304C480 295.2 487.2 288 496 288z"/>
       </svg>
     </button>
-    <button class="license-link" on:click={onShowHelp} title={`Keyboard shortcuts${chordHint('help.overlay')}`}>
-      <!-- Font Awesome "circle-question" icon (src/lib/ui/icons/circle-question-solid-full.svg) -->
+    <button class="license-link" on:click={onOpenSettings} title={`Settings${chordHint('settings.open')}`}>
+      <!-- Font Awesome "sliders" icon (src/lib/ui/icons/sliders-solid-full.svg) -->
       <svg class="license-icon" viewBox="0 0 640 640" fill="currentColor">
-        <path d="M320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576zM320 240C302.3 240 288 254.3 288 272C288 285.3 277.3 296 264 296C250.7 296 240 285.3 240 272C240 227.8 275.8 192 320 192C364.2 192 400 227.8 400 272C400 319.2 364 339.2 344 346.5L344 350.3C344 363.6 333.3 374.3 320 374.3C306.7 374.3 296 363.6 296 350.3L296 342.2C296 321.7 310.8 307 326.1 302C332.5 299.9 339.3 296.5 344.3 291.7C348.6 287.5 352 281.7 352 272.1C352 254.4 337.7 240.1 320 240.1zM288 432C288 414.3 302.3 400 320 400C337.7 400 352 414.3 352 432C352 449.7 337.7 464 320 464C302.3 464 288 449.7 288 432z"/>
+        <path d="M96 128C78.3 128 64 142.3 64 160C64 177.7 78.3 192 96 192L182.7 192C195 220.3 223.2 240 256 240C288.8 240 317 220.3 329.3 192L544 192C561.7 192 576 177.7 576 160C576 142.3 561.7 128 544 128L329.3 128C317 99.7 288.8 80 256 80C223.2 80 195 99.7 182.7 128L96 128zM96 288C78.3 288 64 302.3 64 320C64 337.7 78.3 352 96 352L342.7 352C355 380.3 383.2 400 416 400C448.8 400 477 380.3 489.3 352L544 352C561.7 352 576 337.7 576 320C576 302.3 561.7 288 544 288L489.3 288C477 259.7 448.8 240 416 240C383.2 240 355 259.7 342.7 288L96 288zM96 448C78.3 448 64 462.3 64 480C64 497.7 78.3 512 96 512L150.7 512C163 540.3 191.2 560 224 560C256.8 560 285 540.3 297.3 512L544 512C561.7 512 576 497.7 576 480C576 462.3 561.7 448 544 448L297.3 448C285 419.7 256.8 400 224 400C191.2 400 163 419.7 150.7 448L96 448z"/>
       </svg>
     </button>
   </div>
@@ -307,9 +305,6 @@
   .sync-icon {
     width: 12px;
     height: 12px;
-  }
-  .folder-btn {
-    --folder-seam: var(--bg-header);
   }
   .sync-btn.spinning .sync-icon {
     animation: spin 1s linear infinite;

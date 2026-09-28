@@ -393,25 +393,22 @@ input {
 
 /* --- Folder glyph --- */
 
-/* FOLDER_BACK + FOLDER_FLAP. While its button is hovered or focused, the flap
-   hinges on its bottom edge and leans out. It also grows a stroke under its
-   fill (paint-order), so only the outer half shows: a seam where the flap
-   crosses the back panel, lost against the surface everywhere else. That only
-   works if the stroke is the surface colour: set --folder-seam on the button
-   when it doesn't sit on --bg-container. */
-.folder-flap {
-  stroke: var(--folder-seam, var(--bg-container));
-  stroke-width: 0;
-  stroke-linejoin: round;
-  paint-order: stroke;
-  transform-box: fill-box;
-  transform-origin: 0 100%;
-  transition: transform var(--transition-normal), stroke-width var(--transition-normal);
+/* FOLDER + FOLDER_OPEN, stacked in one <svg>: while its button is hovered
+   or focused, the open folder fades in over the shut one. */
+.folder-shut,
+.folder-opened {
+  transition: opacity var(--transition-fast);
 }
-button:hover:not(:disabled) .folder-flap,
-button:focus-visible .folder-flap {
-  stroke-width: 4;
-  transform: skewX(-20deg);
+.folder-opened {
+  opacity: 0;
+}
+button:hover:not(:disabled) .folder-shut,
+button:focus-visible .folder-shut {
+  opacity: 0;
+}
+button:hover:not(:disabled) .folder-opened,
+button:focus-visible .folder-opened {
+  opacity: 1;
 }
 
 /* --- Form Controls --- */
@@ -568,7 +565,8 @@ dialog[open]::backdrop {
   .motion-ready .commit-switch.danger:not(:disabled) .switch-face {
     animation: none;
   }
-  .folder-flap {
+  .folder-shut,
+  .folder-opened {
     transition: none;
   }
 }

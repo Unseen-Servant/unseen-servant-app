@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BackgroundCheckInterval, BucketPolicy, SyncPreferences } from './types';
   import { BACKGROUND_CHECK_OPTIONS, DEFAULT_SYNC_PREFERENCES } from './types';
-  import { FOLDER_BACK, FOLDER_FLAP } from '../ui/iconPaths';
+  import { FOLDER, FOLDER_OPEN } from '../ui/iconPaths';
   import ActionButton from '../ui/ActionButton.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
 
@@ -199,9 +199,9 @@
         title="Change library folder"
         aria-label="Change library folder"
       >
-        <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d={FOLDER_BACK}/>
-          <path class="folder-flap" d={FOLDER_FLAP}/>
+        <svg class="btn-icon-svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+          <path class="folder-shut" d={FOLDER}/>
+          <path class="folder-opened" d={FOLDER_OPEN}/>
         </svg>
       </button>
     </div>
@@ -311,9 +311,9 @@
         title="Open database folder"
         aria-label="Open database folder"
       >
-        <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d={FOLDER_BACK}/>
-          <path class="folder-flap" d={FOLDER_FLAP}/>
+        <svg class="btn-icon-svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+          <path class="folder-shut" d={FOLDER}/>
+          <path class="folder-opened" d={FOLDER_OPEN}/>
         </svg>
       </button>
     </div>
