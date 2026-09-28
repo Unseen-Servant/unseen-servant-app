@@ -103,27 +103,29 @@
     </span>
     {#if selectedFolder}
       {#if scopeBypassed}
-        <span class="separator">&middot;</span>
+        <span class="rule" aria-hidden="true"></span>
         <span
           class="bypass-lamp readout-label"
           title="Scope bypassed — every indexed file is in scope. B restores it."
         >BYPASS</span>
       {/if}
-      <span class="separator">&middot;</span>
+      <span class="rule" aria-hidden="true"></span>
       {#if indexedCount > 0}
-        <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
-        {#if gameSystemCount > 0}
-          <span class="separator">&middot;</span>
-          <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
-        {/if}
-        {#if storageBytes > 0}
-          <span class="separator">&middot;</span>
-          <span>{formatSize(storageBytes)}</span>
-        {/if}
+        <!-- Rules divide groups; readouts within a group sit apart on
+             spacing alone, so the two levels never look alike. -->
+        <span class="stats">
+          <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
+          {#if gameSystemCount > 0}
+            <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
+          {/if}
+          {#if storageBytes > 0}
+            <span>{formatSize(storageBytes)}</span>
+          {/if}
+        </span>
       {:else}
         <span>{selectedCount} selected</span>
       {/if}
-      <span class="separator">&middot;</span>
+      <span class="rule" aria-hidden="true"></span>
       <button class="icon-btn" on:click={onOpenFolder} aria-label="Reveal library folder" title={`Reveal library folder${chordHint('library.reveal')}`}>
         <svg class="btn-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
           <path class="folder-shut" d={FOLDER}/>
@@ -140,7 +142,7 @@
       {/if}
     {/if}
     {#if jobNote}
-      <span class="separator">&middot;</span>
+      <span class="rule" aria-hidden="true"></span>
       <div class="status-note" class:status-error={jobNote.type === 'error'}>
         {#if jobNote.type === 'progress'}
           <span class="status-note-msg">
@@ -152,7 +154,7 @@
       </div>
     {/if}
     {#if pendingNote}
-      <span class="separator">&middot;</span>
+      <span class="rule" aria-hidden="true"></span>
       <div class="status-note">
         <span class="status-note-msg">{pendingNote.message}</span>
         {#if pendingNote.actionLabel}
@@ -372,12 +374,19 @@
     filter: var(--glow-active);
   }
 
-  .separator {
-    opacity: 0.5;
-    /* Crimson Text sets the middot low: its ink centres 0.5px under the icon
-       row. Nudge it back onto the same line. */
-    position: relative;
-    top: -0.5px;
+  /* Group divider — the scope bar's master rule, same size and tone. A
+     box has no font metrics, so it centres on the icon row unaided. */
+  .rule {
+    width: 1px;
+    height: 12px;
+    margin: 0 0.15rem;
+    background: var(--bg-category);
+  }
+
+  .stats {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
   }
 
 </style>
