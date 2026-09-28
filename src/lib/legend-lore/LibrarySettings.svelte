@@ -281,7 +281,7 @@
         disabled={isSyncing}
         title="Check the library folder for changes"
       >
-        Sync now
+        Sync
       </button>
     </div>
   </section>
