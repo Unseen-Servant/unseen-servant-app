@@ -190,6 +190,22 @@
     collapsed = collapsed;
   }
 
+  // A group header's caret key. It shares focusedFilePath with the file
+  // rows so the page keeps one caret for the region; file paths are
+  // absolute, so the prefix can never collide with one. The page's file
+  // actions resolve through getFocusedItem, which answers null here.
+  function groupKey(tag: string): string {
+    return `group:${tag}`;
+  }
+
+  // A header click folds the group and parks the caret on the header, so
+  // ←/→ pick up from there.
+  function handleGroupHeadClick(tag: string) {
+    toggleSection(tag);
+    const i = navRows.findIndex((v) => v.entry === null && v.tag === tag);
+    if (i >= 0) setFocusedIdx(i);
+  }
+
   // One source of truth for the channel-dim rule — the template's
   // groupDimmed and the keyboard-nav model both call this; keep them
   // in sync through it, never by copy (same pattern as treeNav's
@@ -230,7 +246,7 @@
     // Pin focusedIdx to the specific (path, tag) the user clicked so the
     // multi-occurrence case lands on the right row. The reactive sync
     // would otherwise pick the first match for an external focus change.
-    const i = visibleEntries.findIndex((v) => v.path === entry.path && v.tag === groupTag);
+    const i = navRows.findIndex((v) => v.path === entry.path && v.tag === groupTag);
     if (i >= 0) setFocusedIdx(i);
     else onFocusFile(entry.path);
   }
@@ -311,17 +327,20 @@
     else onCollectionAdd(paths);
   }
 
-  // Flat list of entries the user can keyboard-navigate to: every entry
-  // from a non-collapsed group, in display order. A multi-tagged file
-  // appears once per group it belongs to — same as the rendered list,
-  // so ↓ walks visually adjacent rows. Mirrors the template's lens guards
-  // via isGroupDimmed and isIndexedRowOutOfScope so nav and render never
-  // drift: a group or row the lens drops is never focusable.
-  $: visibleEntries = (() => {
-    const out: { path: string; entry: FileStatusEntry; tag: string }[] = [];
+  // Flat list of rows the user can keyboard-navigate to, in display order:
+  // each group's header (entry null, path its groupKey), then — unless the
+  // group is collapsed — its entries. Headers are rows the way folders are
+  // in the tree, so ←/→ can fold them. A multi-tagged file appears once per
+  // group it belongs to — same as the rendered list, so ↓ walks visually
+  // adjacent rows. Mirrors the template's lens guards via isGroupDimmed and
+  // isIndexedRowOutOfScope so nav and render never drift: a group or row
+  // the lens drops is never focusable.
+  $: navRows = (() => {
+    const out: { path: string; entry: FileStatusEntry | null; tag: string }[] = [];
     for (const g of groups) {
-      if (collapsed.has(g.tag)) continue;
       if (hideOutOfScope && isGroupDimmed(g, soloedSystems, scopeBrightPaths, scopeBypassed)) continue;
+      out.push({ path: groupKey(g.tag), entry: null, tag: g.tag });
+      if (collapsed.has(g.tag)) continue;
       for (const e of g.entries) {
         if (hideOutOfScope && isIndexedRowOutOfScope(e.path, scopeBrightPaths)) continue;
         out.push({ path: e.path, entry: e, tag: g.tag });
@@ -344,21 +363,21 @@
   $: {
     if (focusedFilePath === null) {
       focusedIdx = null;
-    } else if (focusedIdx === null || visibleEntries[focusedIdx]?.path !== focusedFilePath) {
-      const i = visibleEntries.findIndex((v) => v.path === focusedFilePath);
+    } else if (focusedIdx === null || navRows[focusedIdx]?.path !== focusedFilePath) {
+      const i = navRows.findIndex((v) => v.path === focusedFilePath);
       focusedIdx = i >= 0 ? i : null;
     }
   }
 
   function isFocused(entry: FileStatusEntry, tag: string): boolean {
     if (focusedIdx === null) return false;
-    const f = visibleEntries[focusedIdx];
+    const f = navRows[focusedIdx];
     return f?.path === entry.path && f?.tag === tag;
   }
 
   function setFocusedIdx(i: number | null) {
     focusedIdx = i;
-    onFocusFile(i === null ? null : visibleEntries[i]?.path ?? null);
+    onFocusFile(i === null ? null : navRows[i]?.path ?? null);
   }
 
   $: if (focusedFilePath) scrollFocusedIntoView(focusedFilePath);
@@ -366,11 +385,13 @@
     await tick();
     // When the same path appears multiple times, scroll the focused
     // index's row specifically rather than the first DOM match.
-    const focused = focusedIdx !== null ? visibleEntries[focusedIdx] : null;
-    if (focused) {
+    const focused = focusedIdx !== null ? navRows[focusedIdx] : null;
+    if (focused?.entry === null) {
+      document.querySelector(`[data-sv-group="${CSS.escape(focused.tag)}"]`)?.scrollIntoView({ block: 'nearest' });
+    } else if (focused) {
       const rows = document.querySelectorAll(`[data-sv-row="${CSS.escape(focused.path)}"]`);
       const target = rows[
-        visibleEntries.slice(0, focusedIdx!).filter((v) => v.path === focused.path).length
+        navRows.slice(0, focusedIdx!).filter((v) => v.path === focused.path).length
       ];
       target?.scrollIntoView({ block: 'nearest' });
     } else {
@@ -379,22 +400,22 @@
   }
 
   function moveFocus(delta: number) {
-    if (visibleEntries.length === 0) return;
+    if (navRows.length === 0) return;
     const cur = focusedIdx;
     // No caret yet — the region owns the arrows but nothing is ringed. Place
     // the caret rather than stepping, so the first press lands *on* the
     // restored entry instead of one past it.
     if (cur === null) {
       const entry = materializeKey(
-        visibleEntries.map((v) => v.path),
+        navRows.map((v) => v.path),
         lastFocusedPath,
         delta > 0 ? 1 : -1,
       );
-      const i = entry === null ? -1 : visibleEntries.findIndex((v) => v.path === entry);
+      const i = entry === null ? -1 : navRows.findIndex((v) => v.path === entry);
       if (i >= 0) setFocusedIdx(i);
       return;
     }
-    setFocusedIdx(Math.max(0, Math.min(visibleEntries.length - 1, cur + delta)));
+    setFocusedIdx(Math.max(0, Math.min(navRows.length - 1, cur + delta)));
   }
 
   function handleWindowKey(event: KeyboardEvent) {
@@ -423,11 +444,13 @@
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+    const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
+    const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
 
     const edge = jumpEdge(event);
-    if (edge && visibleEntries.length > 0) {
+    if (edge && navRows.length > 0) {
       event.preventDefault();
-      setFocusedIdx(edge === 'first' ? 0 : visibleEntries.length - 1);
+      setFocusedIdx(edge === 'first' ? 0 : navRows.length - 1);
       return;
     }
 
@@ -443,8 +466,65 @@
     }
 
     if (focusedIdx === null) return;
-    const focused = visibleEntries[focusedIdx];
+    const focused = navRows[focusedIdx];
     if (!focused) return;
+
+    // ←/→ walk groups the way the tree walks folders: on a header, ← folds
+    // it and → unfolds it and steps onto its first file; on a file, ←
+    // climbs to its group's header.
+    if (isLeft || isRight) {
+      event.preventDefault();
+      const tag = focused.tag;
+      const headIdx = () => navRows.findIndex((v) => v.entry === null && v.tag === tag);
+      if (focused.entry !== null) {
+        if (isLeft) setFocusedIdx(headIdx());
+        return;
+      }
+      if (isLeft) {
+        if (!collapsed.has(tag)) toggleSection(tag);
+        return;
+      }
+      const enter = () => {
+        const i = headIdx();
+        if (i < 0 || focusedIdx !== i) return;
+        const next = navRows[i + 1];
+        if (next && next.entry !== null && next.tag === tag) setFocusedIdx(i + 1);
+      };
+      if (collapsed.has(tag)) {
+        toggleSection(tag);
+        // navRows re-derives on the next flush.
+        tick().then(enter);
+      } else {
+        enter();
+      }
+      return;
+    }
+
+    // On a header, S/M act on the group itself — bare or shifted, the way
+    // S/M on a tree folder act on the folder. X ticks the group's box.
+    // Untagged stays mute-only (#307), so S is inert there.
+    if (focused.entry === null) {
+      const tag = focused.tag;
+      if (!meta && !event.altKey && (lk === 's' || lk === 'm')) {
+        event.preventDefault();
+        if (event.repeat) return;
+        if (lk === 's') {
+          if (tag !== 'Untagged') holdLatch.press('s', () => onToggleSystemSolo(tag));
+        } else {
+          holdLatch.press('m', () => onToggleSystemFilter(tag === 'Untagged' ? UNTAGGED_KEY : tag));
+        }
+        return;
+      }
+      if (!meta && !event.altKey && lk === 'x' && curating) {
+        event.preventDefault();
+        handleGroupCheckboxClick(
+          { stopPropagation: () => {} } as MouseEvent,
+          groups.find((g) => g.tag === tag)?.entries ?? [],
+        );
+      }
+      return;
+    }
+    const entry = focused.entry;
 
     // S / M — bare letters solo/mute the focused row's file (the tree's
     // grammar: act on the row you're on); ⇧S/⇧M lift to the row's group.
@@ -457,7 +537,7 @@
       if (event.repeat) return;
       const latchId = scopeAction.kind === 'solo' ? 's' : 'm';
       if (scopeAction.axis === 'file') {
-        const item = entryToFileItem(focused.entry);
+        const item = entryToFileItem(entry);
         holdLatch.press(latchId, () =>
           scopeAction.kind === 'solo' ? onToggleScopeSolo(item) : onToggleScopeMute(item),
         );
@@ -480,7 +560,7 @@
       event.preventDefault();
       handleCheckboxClick(
         { shiftKey: event.shiftKey, stopPropagation: () => {} } as MouseEvent,
-        focused.entry,
+        entry,
         focused.tag,
         groups.find((g) => g.tag === focused.tag)?.entries ?? []
       );
@@ -508,8 +588,8 @@
   // leaves, so is_dir is hardcoded false.
   export function getFocusedItem(): FileItem | null {
     if (focusedIdx === null) return null;
-    const v = visibleEntries[focusedIdx];
-    return v ? entryToFileItem(v.entry) : null;
+    const v = navRows[focusedIdx];
+    return v?.entry ? entryToFileItem(v.entry) : null;
   }
 
   // Inline rename helpers. Enter commits with the extension preserved,
@@ -552,9 +632,9 @@
   // .file-tree-area mousedown, and leave the caret for the first arrow.
   export function claim(preferred: string | null = null) {
     if (focusedFilePath !== null) return;
-    if (visibleEntries.length === 0) return;
+    if (navRows.length === 0) return;
     if (preferred) {
-      const i = visibleEntries.findIndex((v) => v.path === preferred);
+      const i = navRows.findIndex((v) => v.path === preferred);
       if (i >= 0) { setFocusedIdx(i); return; }
     }
     setFocusedIdx(0);
@@ -580,6 +660,8 @@
           class:untagged={group.tag === 'Untagged'}
           class:muted={group.muted && !soloedSystems.has(group.tag)}
           class:hovered={hoveredGroup === group.tag}
+          class:focused={focusedIdx !== null && navRows[focusedIdx]?.entry === null && navRows[focusedIdx]?.tag === group.tag}
+          data-sv-group={group.tag}
           on:pointerenter={() => (hoveredGroup = group.tag)}
           on:pointerleave={() => { if (hoveredGroup === group.tag) hoveredGroup = null; }}
         >
@@ -594,7 +676,8 @@
           {/if}
           <button
             class="group-head"
-            on:click={() => toggleSection(group.tag)}
+            aria-expanded={!collapsed.has(group.tag)}
+            on:click={() => handleGroupHeadClick(group.tag)}
           >
             <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
             {#if group.tag !== 'Untagged'}
@@ -854,6 +937,7 @@
   }
   .group-head-row.hovered .sm-btn:not(.solo-on):not(.mute-on),
   .group-head-row:focus-within .sm-btn:not(.solo-on):not(.mute-on),
+  .group-head-row.focused .sm-btn:not(.solo-on):not(.mute-on),
   .file.hovered .sm-btn:not(.solo-on):not(.mute-on),
   .file:focus-within .sm-btn:not(.solo-on):not(.mute-on),
   .file.focused .sm-btn:not(.solo-on):not(.mute-on) {
@@ -980,7 +1064,8 @@
   .file.hovered {
     background: var(--bg-container);
   }
-  .file.focused {
+  .file.focused,
+  .group-head-row.focused {
     box-shadow: var(--ring-focus);
   }
   /* Hidden via the user's hide flag — only rendered when "Show hidden" is on.

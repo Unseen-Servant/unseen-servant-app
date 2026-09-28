@@ -102,6 +102,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete focused row (to Trash)', scope: 'fileTree' },
 
   // Systems view (when a row is focused)
+  { id: 'systems.expand',        keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand system / first file',   scope: 'systemsView' },
+  { id: 'systems.collapse',      keys: { mac: '← / H', other: '← / H' },        label: 'Collapse system / its header', scope: 'systemsView' },
   { id: 'systems.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused file',       scope: 'systemsView' },
   { id: 'systems.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename focused row',           scope: 'systemsView' },
   { id: 'systems.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox", scope: 'systemsView', switch: true },
@@ -135,6 +137,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filterPanel.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Move focus up',                scope: 'filterPanel' },
   { id: 'filterPanel.home',      keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first row',            scope: 'filterPanel' },
   { id: 'filterPanel.end',       keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last row',             scope: 'filterPanel' },
+  { id: 'filterPanel.expand',    keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand section / first row',   scope: 'filterPanel' },
+  { id: 'filterPanel.collapse',  keys: { mac: '← / H', other: '← / H' },        label: 'Collapse section / its header', scope: 'filterPanel' },
   // Channel rows (curation, system) answer with their M; view rows have no M,
   // so this hits their single switch instead. One key, "do this row's thing".
   { id: 'filterPanel.toggle',    keys: { mac: 'X',    other: 'X' },             label: "Tick the focused view row's checkbox", scope: 'filterPanel', switch: true },

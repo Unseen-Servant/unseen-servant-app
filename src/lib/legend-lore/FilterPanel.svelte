@@ -6,15 +6,15 @@
   // and clearing a chip resets the row. Unlike the old dropdown console,
   // S/M are hover-revealed like the tree's folder rows — the panel is
   // furniture, not a popover.
-  import { afterUpdate } from 'svelte';
-  import { computeFilterRows, stepFilterRow } from './filterRows';
+  import { afterUpdate, tick } from 'svelte';
+  import { computeFilterRows, sectionHeaderKey, stepFilterRow } from './filterRows';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
-  import type { FilterRowKind } from './filterRows';
+  import type { FilterSection } from './filterRows';
   import { RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
 
   // DAW-style filter state for game systems.
@@ -103,15 +103,18 @@
 
   let panelEl: HTMLElement;
 
-  // Sections folded shut, keyed by the kind of row each holds. Session
-  // state, like the systems view's collapsed groups. The header's mousedown
-  // already releases the caret (it isn't a row), so a caret can't be left
-  // parked inside a section as it closes.
-  let collapsed = new Set<FilterRowKind>();
-  function toggleSection(kind: FilterRowKind) {
-    if (collapsed.has(kind)) collapsed.delete(kind);
-    else collapsed.add(kind);
+  // Sections folded shut. Session state, like the systems view's collapsed
+  // groups. Headers are rows, so folding only ever happens with the caret
+  // on the header (a click parks it there) — never under a caret inside.
+  let collapsed = new Set<FilterSection>();
+  function toggleSection(section: FilterSection) {
+    if (collapsed.has(section)) collapsed.delete(section);
+    else collapsed.add(section);
     collapsed = collapsed;
+  }
+  function clickHeader(section: FilterSection) {
+    toggleSection(section);
+    clickRow(sectionHeaderKey(section));
   }
 
   // The navigable row set, derived not queried. Order is the j/k order.
@@ -129,7 +132,7 @@
   }
 
   // A mousedown on the panel's empty or non-selectable space — the masthead,
-  // [reset], a section label — points at the pane and deselects. Rows are
+  // [reset], the gap below the rows — points at the pane and deselects. Rows are
   // skipped so their own click (below) owns the caret, and so that mousing
   // an S/M button doesn't drop a caret parked on some other row.
   function handlePanelMousedown(event: MouseEvent) {
@@ -192,6 +195,8 @@
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
+    const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
+    const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
 
     if (event.key === 'Escape') {
       // Release the pane. Not a close — the panel is docked furniture whose
@@ -230,6 +235,36 @@
     // the only way to create. Escape stays above so it can still release an
     // active pane that never grew one.
     if (focusedRow === null) return;
+
+    // ←/→ walk sections the way the tree walks folders: on a header, ← folds
+    // it and → unfolds it and steps onto its first row; on a row, ← climbs
+    // to the header.
+    if (isLeft || isRight) {
+      event.preventDefault();
+      const row = rows.find((r) => r.key === focusedRow);
+      if (!row) return;
+      if (row.kind !== 'header') {
+        if (isLeft) onFocusRow(sectionHeaderKey(row.section));
+        return;
+      }
+      if (isLeft) {
+        if (!collapsed.has(row.section)) toggleSection(row.section);
+        return;
+      }
+      const enter = () => {
+        if (focusedRow !== row.key) return;
+        const next = rows[rows.findIndex((r) => r.key === row.key) + 1];
+        if (next && next.kind !== 'header' && next.section === row.section) onFocusRow(next.key);
+      };
+      if (collapsed.has(row.section)) {
+        toggleSection(row.section);
+        // rows re-derives on the next flush.
+        tick().then(enter);
+      } else {
+        enter();
+      }
+      return;
+    }
 
     // X ticks the focused row's checkbox, the same key both file views
     // spend on theirs. Channel rows carry S/M instead of a checkbox and
@@ -275,8 +310,10 @@
       <button
         type="button"
         class="sect sect-toggle ledger-label"
+        class:kb-focused={focusedRow === 'sect:curation'}
         aria-expanded={!collapsed.has('curation')}
-        on:click={() => toggleSection('curation')}
+        data-fm-key="sect:curation"
+        on:click={() => clickHeader('curation')}
       ><span class="sect-arrow" aria-hidden="true">{collapsed.has('curation') ? '▸' : '▾'}</span>Curation</button>
       {#if !collapsed.has('curation')}
       {#each curationRows as ch (ch.key)}
@@ -350,8 +387,10 @@
       <button
         type="button"
         class="sect sect-toggle ledger-label"
+        class:kb-focused={focusedRow === 'sect:system'}
         aria-expanded={!collapsed.has('system')}
-        on:click={() => toggleSection('system')}
+        data-fm-key="sect:system"
+        on:click={() => clickHeader('system')}
       ><span class="sect-arrow" aria-hidden="true">{collapsed.has('system') ? '▸' : '▾'}</span>Game systems</button>
       {#if collapsed.has('system')}
         <!-- Folded shut: nothing below renders. -->
@@ -444,12 +483,12 @@
 
     <!-- View-visibility switches last: they say what the tree shows, not
          what search sees, so they sit below the narrowing axes. -->
-    <div class="sect-split">
+    <div class="sect-split" class:kb-focused={focusedRow === 'sect:view'} data-fm-key="sect:view">
       <button
         type="button"
         class="sect sect-toggle ledger-label"
         aria-expanded={!collapsed.has('view')}
-        on:click={() => toggleSection('view')}
+        on:click={() => clickHeader('view')}
       ><span class="sect-arrow" aria-hidden="true">{collapsed.has('view') ? '▸' : '▾'}</span>Hidden items</button>
       {#if hasHidden}
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
@@ -581,6 +620,10 @@
   }
   .sect-toggle:hover {
     color: var(--text-secondary);
+  }
+  .sect-toggle.kb-focused,
+  .sect-split.kb-focused {
+    box-shadow: var(--ring-focus);
   }
   .sect-arrow {
     width: 0.8rem;

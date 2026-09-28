@@ -13,8 +13,9 @@ function input(over: Partial<FilterRowsInput> = {}): FilterRowsInput {
 }
 
 describe('computeFilterRows', () => {
-  it('always offers the two unconditional view rows', () => {
+  it('always offers the Hidden-items header and its two unconditional rows', () => {
     expect(computeFilterRows(input()).map(r => r.key)).toEqual([
+      'sect:view',
       'view:hideUnindexed',
       'view:hideOutOfScope',
     ]);
@@ -71,10 +72,13 @@ describe('computeFilterRows', () => {
       untaggedCount: 2,
     })).map(r => r.key);
     expect(keys).toEqual([
+      'sect:curation',
       'curation:collected',
       'curation:loose',
+      'sect:system',
       'system:D&D',
       'system:unknown',
+      'sect:view',
       'view:showHidden',
       'view:hideUnindexed',
       'view:hideOutOfScope',
@@ -94,7 +98,7 @@ describe('computeFilterRows', () => {
       .not.toBe(after.findIndex(r => r.key === 'system:D&D'));
   });
 
-  it('skips the rows of a collapsed section and keeps the others', () => {
+  it('skips the rows of a collapsed section but keeps its header', () => {
     const keys = computeFilterRows(input({
       hasHidden: true,
       showCollectionFilter: true,
@@ -103,29 +107,44 @@ describe('computeFilterRows', () => {
       untaggedCount: 2,
       collapsed: new Set(['system', 'view']),
     })).map(r => r.key);
-    expect(keys).toEqual(['curation:collected', 'curation:loose']);
+    expect(keys).toEqual([
+      'sect:curation',
+      'curation:collected',
+      'curation:loose',
+      'sect:system',
+      'sect:view',
+    ]);
   });
 
-  it('offers no rows when every section is collapsed', () => {
+  it('keeps only the headers when every section is collapsed', () => {
     expect(computeFilterRows(input({
       showCollectionFilter: true,
       showSystemFilter: true,
       systems: [{ name: 'D&D', count: 3 }],
       collapsed: new Set(['curation', 'system', 'view']),
-    }))).toEqual([]);
+    })).map(r => r.key)).toEqual(['sect:curation', 'sect:system', 'sect:view']);
+  });
+
+  it('tags every row with its section, headers included', () => {
+    const rows = computeFilterRows(input({
+      showSystemFilter: true,
+      systems: [{ name: 'D&D', count: 3 }],
+    }));
+    expect(rows.find(r => r.key === 'sect:system')).toEqual({ key: 'sect:system', kind: 'header', section: 'system' });
+    expect(rows.find(r => r.key === 'system:D&D')).toEqual({ key: 'system:D&D', kind: 'system', section: 'system' });
   });
 });
 
 describe('stepFilterRow', () => {
   const rows = computeFilterRows(input({ hasHidden: true }));
-  // rows: view:showHidden, view:hideUnindexed, view:hideOutOfScope
+  // rows: sect:view, view:showHidden, view:hideUnindexed, view:hideOutOfScope
 
   it('returns null for an empty row list', () => {
     expect(stepFilterRow([], null, 1)).toBeNull();
   });
 
   it('enters at the first row when moving down from nothing', () => {
-    expect(stepFilterRow(rows, null, 1)).toBe('view:showHidden');
+    expect(stepFilterRow(rows, null, 1)).toBe('sect:view');
   });
 
   it('enters at the last row when moving up from nothing', () => {
@@ -145,10 +164,10 @@ describe('stepFilterRow', () => {
   });
 
   it('clamps at the top rather than wrapping', () => {
-    expect(stepFilterRow(rows, 'view:showHidden', -1)).toBe('view:showHidden');
+    expect(stepFilterRow(rows, 'sect:view', -1)).toBe('sect:view');
   });
 
   it('recovers to an end row when the current key is stale', () => {
-    expect(stepFilterRow(rows, 'system:vanished', 1)).toBe('view:showHidden');
+    expect(stepFilterRow(rows, 'system:vanished', 1)).toBe('sect:view');
   });
 });
