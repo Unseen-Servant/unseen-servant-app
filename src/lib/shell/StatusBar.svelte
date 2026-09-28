@@ -41,8 +41,17 @@
   }
 
   $: [bookHead, bookTail] = splitBook(jobNote?.book ?? '');
+
+  // LED ladder for the current book — the result gauge's cells, doubled.
+  const METER_CELLS = Array.from({ length: 10 }, (_, i) => i);
+  $: meter = jobNote?.meter;
+  $: meterLit = meter ? Math.floor((meter.done / meter.total) * METER_CELLS.length) : 0;
+  $: meterText = meter
+    ? `${meter.done.toLocaleString()} / ${meter.total.toLocaleString()} chunks`
+    : '';
+
   $: jobTitle = jobNote
-    ? jobNote.detail ?? (jobNote.book ? `${jobNote.message} · ${jobNote.book}` : jobNote.message)
+    ? jobNote.detail ?? [jobNote.message, jobNote.book, meterText].filter(Boolean).join(' · ')
     : '';
 
   function handlePendingDismiss() {
@@ -162,6 +171,20 @@
         {#if jobNote.book}
           <span class="note-sep" aria-hidden="true">&middot;</span>
           <span class="note-book"><span class="note-book-head">{bookHead}</span><span class="note-book-tail">{bookTail}</span></span>
+        {/if}
+        {#if meter}
+          <span
+            class="note-meter"
+            role="progressbar"
+            aria-label="Book progress"
+            aria-valuemin={0}
+            aria-valuemax={meter.total}
+            aria-valuenow={meter.done}
+          >
+            {#each METER_CELLS as idx (idx)}
+              <span class="meter-cell" class:lit={idx < meterLit}></span>
+            {/each}
+          </span>
         {/if}
         {#if jobNote.dismissible}
           <button class="note-dismiss" on:click={() => jobNotification.dismiss()} aria-label="Dismiss">&times;</button>
@@ -319,6 +342,23 @@
   .note-book-tail {
     flex-shrink: 0;
     white-space: pre;
+  }
+  /* Same cells as the search-result gauge: unlit is the subtle border
+     grey, lit is parchment. No glow — it's a readout, not a mode. */
+  .note-meter {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .meter-cell {
+    width: 4px;
+    height: 8px;
+    border-radius: var(--radius-cell);
+    background: var(--border-subtle);
+  }
+  .meter-cell.lit {
+    background: var(--text-accent);
   }
   .note-action {
     background: none;

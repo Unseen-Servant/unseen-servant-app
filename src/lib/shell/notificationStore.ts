@@ -27,8 +27,10 @@ export interface Notification {
   detail?: string;
   // Sticky notes the user may close by hand.
   dismissible?: boolean;
-  // Progress only: the book being worked on, shown after the message.
+  // Progress only: the book being worked on, shown after the message,
+  // and how far into embedding it the job is.
   book?: string;
+  meter?: { done: number; total: number };
 }
 
 function createNotificationStore() {

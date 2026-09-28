@@ -9,6 +9,9 @@ export interface SyncProgressPayload {
   chunks_total: number;
   current_file: string;
   phase: string;
+  // The current book's embedding; 0/0 while it is extracted or between books.
+  book_chunks_done: number;
+  book_chunks_total: number;
 }
 
 export interface RunSyncJobOptions<TResult> {
@@ -50,6 +53,7 @@ export async function runSyncJob<TResult>(
         type: 'progress',
         message: label.message,
         book: label.book,
+        meter: label.meter,
         duration: null,
       });
     });

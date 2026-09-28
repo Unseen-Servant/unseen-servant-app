@@ -494,6 +494,31 @@ def test_sync_stream_names_each_book_before_extracting_it(
     }
 
 
+def test_sync_stream_reports_progress_within_each_book(
+    client, sample_pdf_path, test_store
+):
+    """Embedding ticks carry the book's own done/total, so the status bar
+    can show how far into a long book it is."""
+    response = client.post("/api/sync-index-stream", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+
+    ticks = [
+        event
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+        for event in [json.loads(line[len("data: "):])]
+        if "book_chunks_total" in event
+    ]
+
+    assert ticks
+    total = test_store.count_units()
+    assert all(t["book_chunks_total"] == total for t in ticks)
+    done = [t["book_chunks_done"] for t in ticks]
+    assert done == sorted(done)
+    assert done[-1] == total
+
+
 # ---------------------------------------------------------------------------
 # POST /api/delete-index
 # ---------------------------------------------------------------------------

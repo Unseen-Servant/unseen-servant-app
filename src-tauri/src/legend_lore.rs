@@ -103,6 +103,9 @@ struct SyncProgressPayload {
     chunks_total: u32,
     current_file: String,
     phase: String,
+    // How far into the current book's embedding; 0/0 outside it.
+    book_chunks_done: u32,
+    book_chunks_total: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -435,6 +438,8 @@ async fn consume_sync_stream(
                                 chunks_total: 0,
                                 current_file: String::new(),
                                 phase: String::new(),
+                                book_chunks_done: 0,
+                                book_chunks_total: 0,
                             };
                             let _ = app.emit("sync-progress", &payload);
                         }
@@ -448,6 +453,10 @@ async fn consume_sync_stream(
                                     .unwrap_or("")
                                     .to_string(),
                                 phase: json["phase"].as_str().unwrap_or("").to_string(),
+                                book_chunks_done: json["book_chunks_done"].as_u64().unwrap_or(0)
+                                    as u32,
+                                book_chunks_total: json["book_chunks_total"].as_u64().unwrap_or(0)
+                                    as u32,
                             };
                             let _ = app.emit("sync-progress", &payload);
                         }

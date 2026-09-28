@@ -37,7 +37,7 @@ export function bookName(filename: string): string {
 export function progressLabel(
   p: SyncProgressPayload,
   prevFilesDone: number,
-): { message: string; book: string } | null {
+): { message: string; book: string; meter?: { done: number; total: number } } | null {
   if (!p.phase || p.total_files === 0) return null;
   const ordinal = p.files_done > prevFilesDone
     ? p.files_done
@@ -45,6 +45,9 @@ export function progressLabel(
   return {
     message: `${VERBS[p.phase] ?? 'Syncing'} ${ordinal} of ${p.total_files}`,
     book: bookName(p.current_file),
+    meter: p.book_chunks_total > 0
+      ? { done: p.book_chunks_done, total: p.book_chunks_total }
+      : undefined,
   };
 }
 

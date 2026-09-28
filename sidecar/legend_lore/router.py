@@ -354,13 +354,17 @@ def build_router(
                 continue
 
             embed_units, parents = build_granularity(chunks)
+            # Per-book counts drive the status bar's meter: chunks_total runs
+            # across the whole sync, so it can't say how far into this book.
+            book_done = 0
             try:
                 for n in _atomic_index_pdf(
                     pdf_path, detected_system, detected_systems, embed_units,
                     parents, library, embed_fn, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
-                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+                    book_done += n
+                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add", "book_chunks_done": book_done, "book_chunks_total": len(embed_units)}
             except EmbedBatchError as e:
                 # Nothing was written for this book. No prior manifest entry
                 # exists for an add; just record the error so the user sees
@@ -411,13 +415,15 @@ def build_router(
                 continue
 
             embed_units, parents = build_granularity(chunks)
+            book_done = 0
             try:
                 for n in _atomic_index_pdf(
                     pdf_path, detected_system, detected_systems, embed_units,
                     parents, library, embed_fn, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
-                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
+                    book_done += n
+                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update", "book_chunks_done": book_done, "book_chunks_total": len(embed_units)}
             except EmbedBatchError as e:
                 err_msg = str(e)
                 errors.append(err_msg)

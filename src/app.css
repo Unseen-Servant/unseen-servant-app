@@ -102,6 +102,7 @@
   --outline-drop: 1px dashed var(--text-accent);
 
   /* Corner radii */
+  --radius-cell: 1px; /* LED gauge cells */
   --radius-sm: 3px;
   --radius-md: 4px;
   --radius-well: 6px; /* concentric wrap around --radius-md contents + 2px padding */

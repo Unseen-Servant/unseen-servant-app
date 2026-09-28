@@ -3,7 +3,10 @@ import { bookName, clearSummary, progressLabel, reindexSummary, syncSummary } fr
 import type { SyncResult } from './types';
 
 function payload(files_done: number, phase = 'add', current_file = 'Monster Manual.pdf') {
-  return { files_done, total_files: 12, chunks_total: 0, current_file, phase };
+  return {
+    files_done, total_files: 12, chunks_total: 0, current_file, phase,
+    book_chunks_done: 0, book_chunks_total: 0,
+  };
 }
 
 function result(overrides: Partial<SyncResult> = {}): SyncResult {
@@ -28,6 +31,12 @@ describe('progressLabel', () => {
   it('keeps the finished book numbered on its completion tick', () => {
     expect(progressLabel(payload(4), 3)?.message).toBe('Indexing 4 of 12');
     expect(progressLabel(payload(12), 11)?.message).toBe('Indexing 12 of 12');
+  });
+
+  it('meters the book only while it embeds', () => {
+    expect(progressLabel(payload(3), 3)?.meter).toBeUndefined();
+    expect(progressLabel({ ...payload(3), book_chunks_done: 412, book_chunks_total: 1380 }, 3)?.meter)
+      .toEqual({ done: 412, total: 1380 });
   });
 
   it('names the phase', () => {
