@@ -42,10 +42,3 @@ export const RIBBON_OUTLINE = 'M6 3h12v18l-6-4.4L6 21z';
  * collection ribbon. viewBox="0 0 24 24", stroke-width="2.2".
  */
 export const SHIELD = 'M12 3l7 2.5V11c0 5-3.3 8.2-7 10-3.7-1.8-7-5-7-10V5.5z';
-
-/**
- * The fess — a band across the shield, wall to wall where its sides stop
- * running straight. Drawn in the same <svg> as SHIELD when the system is
- * soloed: the shield taking up its charge is the active state.
- */
-export const SHIELD_FESS = 'M5 11h14';

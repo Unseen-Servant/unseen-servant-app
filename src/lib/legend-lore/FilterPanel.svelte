@@ -14,7 +14,7 @@
   import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
-  import { RIBBON_OUTLINE, SHIELD, SHIELD_FESS } from '../ui/iconPaths';
+  import { RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.
@@ -345,11 +345,9 @@
             on:pointerenter={() => enterRow(`system:${name}`)}
             on:pointerleave={() => leaveRow(`system:${name}`)}
           >
-            <!-- Shield — monochrome; systems don't carry color. Soloed, it
-                 takes up its fess (the active shield). -->
+            <!-- Shield — monochrome; systems don't carry color. -->
             <svg class="row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
               <path d={SHIELD}/>
-              {#if soloed}<path d={SHIELD_FESS}/>{/if}
             </svg>
             <span class="row-name">{name}</span>
             <span class="sm" class:engaged={soloed || muted}>
