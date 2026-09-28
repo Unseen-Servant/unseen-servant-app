@@ -953,18 +953,24 @@
   .group-checkbox {
     margin-left: 0.25rem;
   }
+  /* 0.25rem + the row's 0.4rem gap = the header's 0.4rem gap + 0.25rem
+     padding after its checkbox, so the book stays under the shield while
+     curating too. */
   .row-checkbox {
-    margin-right: 0.1rem;
+    margin-right: 0.25rem;
   }
 
   /* The right padding reserves the count column plus the cluster's own
      0.25rem gap, so a row's switches land in the same x as the group
-     header's — see --count-w. */
+     header's — see --count-w. The left padding centres the book under the
+     header's shield: that starts after 0.25rem padding + the 0.8rem arrow +
+     a 0.4rem gap, less this row's 0.25rem margin, and its box is 0.6px wider
+     than the book's 13px. */
   .file {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.25rem) 0.25rem 1.5rem;
+    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.25rem) 0.25rem calc(1.2rem + 0.3px);
     margin: 0 0.25rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
