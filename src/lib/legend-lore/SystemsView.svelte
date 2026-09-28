@@ -13,6 +13,7 @@
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import { BOOK, CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { hoverLive } from '../ui/inputModality';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -142,7 +143,8 @@
   // never moved, and :hover lights it with no leave ever queued. Same
   // fix the collections panel carries. File rows key on (tag, path):
   // a multi-tagged file renders once per group and only the row under
-  // the pointer should light.
+  // the pointer should light. Painted only while $hoverLive, so an arrow
+  // scrolling rows under a resting pointer doesn't light a second row.
   let hoveredGroup: string | null = null;
   let hoveredRow: string | null = null;
   function rowHoverKey(tag: string, path: string): string {
@@ -661,7 +663,7 @@
           class="group-head-row"
           class:untagged={group.tag === 'Untagged'}
           class:muted={group.muted && !soloedSystems.has(group.tag)}
-          class:hovered={hoveredGroup === group.tag}
+          class:hovered={$hoverLive && hoveredGroup === group.tag}
           class:focused={focusedIdx !== null && navRows[focusedIdx]?.entry === null && navRows[focusedIdx]?.tag === group.tag}
           data-sv-group={group.tag}
           on:pointerenter={() => (hoveredGroup = group.tag)}
@@ -741,7 +743,7 @@
                 class:focused={isFocused(entry, group.tag)}
                 class:hidden-item={rowHidden}
                 class:out-of-scope={rowOutOfScope && !groupDimmed && !rowHidden}
-                class:hovered={hoveredRow === rowHoverKey(group.tag, entry.path)}
+                class:hovered={$hoverLive && hoveredRow === rowHoverKey(group.tag, entry.path)}
                 data-sv-row={entry.path}
                 draggable={renamingFilePath !== entry.path}
                 on:dragstart={(e) => handleDragStart(e, entry)}

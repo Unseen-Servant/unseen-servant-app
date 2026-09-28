@@ -10,6 +10,7 @@
   import { memberStateFor, type ArmState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import { BOOK, CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -119,7 +120,8 @@
   // or ending a drag re-hit-tests whatever lands under a pointer that
   // never moved, and :hover lights it with no leave ever queued. Same
   // fix the collections panel carries. Per-instance state: this
-  // component IS one row.
+  // component IS one row. Painted only while $hoverLive, so an arrow
+  // scrolling rows under a resting pointer doesn't light a second row.
   let hovered = false;
   // Auto-fetch children when a folder is expanded but tree data was reloaded
   afterUpdate(() => {
@@ -291,7 +293,7 @@
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div
     class="row-container"
-    class:hovered
+    class:hovered={hovered && $hoverLive}
     on:pointerenter={() => (hovered = true)}
     on:pointerleave={() => (hovered = false)}
   >
