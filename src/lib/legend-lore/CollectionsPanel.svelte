@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
   import { CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
@@ -96,7 +97,9 @@
   // row lit up and stayed lit, because no event was coming to clear it.
   // Latching on a real pointerenter can't go stale that way: if the enter
   // never fires the control simply stays hidden, and if it does fire the
-  // pointer has somewhere to leave from.
+  // pointer has somewhere to leave from. Painted only while $hoverLive, so
+  // an arrow scrolling rows under a resting pointer doesn't light a second
+  // row.
   let hoveredRowName: string | null = null;
   let hoveredChildPath: string | null = null;
 
@@ -753,7 +756,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions a11y-no-static-element-interactions -->
         <div
           class="row-container"
-          class:hovered={hoveredRowName === col.name}
+          class:hovered={$hoverLive && hoveredRowName === col.name}
           class:armed
           class:archived={col.archived}
           class:kb-focused={focusedName === col.name}
@@ -888,7 +891,7 @@
               <button
                 type="button"
                 class="child-remove"
-                class:revealed={hoveredChildPath === f.path || focusedName === childKey}
+                class:revealed={($hoverLive && hoveredChildPath === f.path) || focusedName === childKey}
                 title={`Remove ${f.base} from ${col.name}${chordHint('collections.removeFile')}`}
                 aria-label={`Remove ${f.base} from ${col.name}`}
                 on:click|stopPropagation={() => onRemoveFile(col.name, f.path)}

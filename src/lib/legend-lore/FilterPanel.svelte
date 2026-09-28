@@ -16,6 +16,7 @@
   import type { CurationKey } from './searchScope';
   import type { FilterSection } from './filterRows';
   import { CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { hoverLive } from '../ui/inputModality';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.
@@ -154,6 +155,8 @@
   // menu or ending a drag re-hit-tests whatever lands under a pointer
   // that never moved, and :hover lights it with no leave ever queued.
   // Same fix the collections panel carries; see the note there.
+  // Painted only while $hoverLive, so an arrow scrolling rows under a
+  // resting pointer doesn't light a second row.
   let hoveredRow: string | null = null;
   function enterRow(key: string) {
     hoveredRow = key;
@@ -339,7 +342,7 @@
           class:soloed
           class:dimmed={muted && !soloed}
           class:kb-focused={focusedRow === `curation:${ch.key}`}
-          class:hovered={hoveredRow === `curation:${ch.key}`}
+          class:hovered={$hoverLive && hoveredRow === `curation:${ch.key}`}
           data-fm-key="curation:{ch.key}"
           on:click={() => clickRow(`curation:${ch.key}`)}
           on:pointerenter={() => enterRow(`curation:${ch.key}`)}
@@ -418,7 +421,7 @@
             class:soloed
             class:dimmed={muted && !soloed}
             class:kb-focused={focusedRow === `system:${name}`}
-            class:hovered={hoveredRow === `system:${name}`}
+            class:hovered={$hoverLive && hoveredRow === `system:${name}`}
             title={name}
             data-fm-key="system:{name}"
             on:click={() => clickRow(`system:${name}`)}
@@ -462,7 +465,7 @@
             class="row channel-row untagged-row"
             class:dimmed={muted}
             class:kb-focused={focusedRow === `system:${UNTAGGED_KEY}`}
-            class:hovered={hoveredRow === `system:${UNTAGGED_KEY}`}
+            class:hovered={$hoverLive && hoveredRow === `system:${UNTAGGED_KEY}`}
             title="Files with no game-system tag"
             data-fm-key="system:{UNTAGGED_KEY}"
             on:click={() => clickRow(`system:${UNTAGGED_KEY}`)}
@@ -515,7 +518,7 @@
       class="row"
       class:row-disabled={!hasHidden}
       class:kb-focused={focusedRow === 'view:showHidden'}
-      class:hovered={hoveredRow === 'view:showHidden'}
+      class:hovered={$hoverLive && hoveredRow === 'view:showHidden'}
       title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
       data-fm-key="view:showHidden"
       on:click={() => clickRow('view:showHidden')}
@@ -540,7 +543,7 @@
     <div
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideUnindexed'}
-      class:hovered={hoveredRow === 'view:hideUnindexed'}
+      class:hovered={$hoverLive && hoveredRow === 'view:hideUnindexed'}
       title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
       data-fm-key="view:hideUnindexed"
       on:click={() => clickRow('view:hideUnindexed')}
@@ -563,7 +566,7 @@
     <div
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideOutOfScope'}
-      class:hovered={hoveredRow === 'view:hideOutOfScope'}
+      class:hovered={$hoverLive && hoveredRow === 'view:hideOutOfScope'}
       title="Hide dimmed out-of-scope rows in the tree and systems view"
       data-fm-key="view:hideOutOfScope"
       on:click={() => clickRow('view:hideOutOfScope')}

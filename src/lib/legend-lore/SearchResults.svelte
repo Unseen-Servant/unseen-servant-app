@@ -5,6 +5,7 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
   import { displaySystem } from './searchScope';
+  import { hoverLive } from '../ui/inputModality';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
   export let results: SearchResultItem[] = [];
@@ -165,6 +166,7 @@
 <div
   class="search-results"
   class:dimmed={stale && results.length > 0}
+  class:hover-live={$hoverLive}
   aria-busy={stale && results.length > 0}
   role="listbox"
   aria-label="Search results"
@@ -371,7 +373,10 @@
     pointer-events: none;
   }
 
-  .result-row:hover {
+  /* Hover paints only while the pointer drives ($hoverLive): an arrow
+     scrolls rows under a resting pointer, and :hover would light the one
+     that slid beneath it beside the selected row. */
+  .hover-live .result-row:hover {
     background: var(--bg-container);
   }
 
@@ -412,7 +417,7 @@
   }
 
   .result-row.weak.selected,
-  .result-row.weak:hover {
+  .hover-live .result-row.weak:hover {
     opacity: 1;
   }
 
@@ -579,7 +584,7 @@
     margin-top: 0.2rem;
   }
 
-  .result-row:hover .gauge {
+  .hover-live .result-row:hover .gauge {
     opacity: 1;
   }
 
