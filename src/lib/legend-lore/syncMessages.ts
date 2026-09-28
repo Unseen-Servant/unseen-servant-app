@@ -17,7 +17,7 @@ export interface JobSummary {
 const VERBS: Record<string, string> = {
   remove: 'Removing',
   auto_remove: 'Removing',
-  rename: 'Renaming',
+  rename: 'Moving',
   add: 'Indexing',
   update: 'Re-indexing',
 };
@@ -68,7 +68,7 @@ export function syncSummary(r: SyncResult): JobSummary {
   const counts: [string, number][] = [
     ['Added', r.added],
     ['Removed', r.removed + r.auto_removed],
-    ['Renamed', r.renamed],
+    ['Moved', r.renamed],
     ['Updated', r.updated],
   ];
   const done = counts
@@ -77,7 +77,7 @@ export function syncSummary(r: SyncResult): JobSummary {
     .join(', ');
   const summary = withFailures(done, r.errors, 'Nothing to sync');
   if (r.auto_removed > 0) {
-    const note = `${books(r.auto_removed)} deleted from disk`;
+    const note = `${books(r.auto_removed)} missing on disk`;
     summary.detail = summary.detail ? `${note}\n${summary.detail}` : note;
   }
   return summary;

@@ -42,7 +42,7 @@ describe('progressLabel', () => {
   it('names the phase', () => {
     expect(progressLabel(payload(1, 'remove'), 0)?.message).toBe('Removing 1 of 12');
     expect(progressLabel(payload(1, 'auto_remove'), 0)?.message).toBe('Removing 1 of 12');
-    expect(progressLabel(payload(1, 'rename'), 0)?.message).toBe('Renaming 1 of 12');
+    expect(progressLabel(payload(1, 'rename'), 0)?.message).toBe('Moving 1 of 12');
     expect(progressLabel(payload(0, 'update'), 0)?.message).toBe('Re-indexing 1 of 12');
   });
 });
@@ -58,13 +58,13 @@ describe('syncSummary', () => {
   it('leads with the outcome and never mentions chunks', () => {
     expect(syncSummary(result({ added: 3, removed: 1, updated: 2 })).message)
       .toBe('Added 3 books, removed 1, updated 2');
-    expect(syncSummary(result({ renamed: 1 })).message).toBe('Renamed 1 book');
+    expect(syncSummary(result({ renamed: 1 })).message).toBe('Moved 1 book');
   });
 
-  it('folds disk deletions into removed and explains them in the tooltip', () => {
+  it('folds books missing on disk into removed and explains them in the tooltip', () => {
     const s = syncSummary(result({ removed: 1, auto_removed: 2 }));
     expect(s.message).toBe('Removed 3 books');
-    expect(s.detail).toBe('2 books deleted from disk');
+    expect(s.detail).toBe('2 books missing on disk');
   });
 
   it('counts failures and lists them in the tooltip', () => {
