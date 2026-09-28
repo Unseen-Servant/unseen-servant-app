@@ -344,8 +344,9 @@
     flex-shrink: 0;
     white-space: pre;
   }
-  /* Same cells as the search-result gauge: unlit is the subtle border
-     grey, lit is parchment. No glow — it's a readout, not a mode. */
+  /* Same cells as the search-result gauge, lit in parchment. Unlit takes
+     the divider-rule grey: the gauge's --border-subtle all but vanishes
+     on the header plate. No glow — it's a readout, not a mode. */
   .note-meter {
     display: inline-flex;
     align-items: center;
@@ -356,7 +357,7 @@
     width: 4px;
     height: 8px;
     border-radius: var(--radius-cell);
-    background: var(--border-subtle);
+    background: var(--bg-category);
   }
   .meter-cell.lit {
     background: var(--text-accent);
