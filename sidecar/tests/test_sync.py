@@ -466,6 +466,34 @@ def test_reindex_all_stream_reprocesses_up_to_date_files(
     assert test_store.count_units() == count_before
 
 
+def test_sync_stream_names_each_book_before_extracting_it(
+    client, sample_pdf_path
+):
+    """The first progress event for a book arrives before any of its work,
+    so the status bar can name the book during extraction."""
+    response = client.post("/api/sync-index-stream", json={
+        "selected_paths": [str(sample_pdf_path)]
+    })
+    assert response.status_code == 200
+
+    progress = [
+        event
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+        for event in [json.loads(line[len("data: "):])]
+        if event["event"] == "progress"
+    ]
+
+    assert progress[0] == {
+        "event": "progress",
+        "files_done": 0,
+        "total_files": 1,
+        "chunks_total": 0,
+        "current_file": "dragonbane_monsters.pdf",
+        "phase": "add",
+    }
+
+
 # ---------------------------------------------------------------------------
 # POST /api/delete-index
 # ---------------------------------------------------------------------------

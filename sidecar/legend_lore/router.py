@@ -335,6 +335,10 @@ def build_router(
         # Phase 2: Index new files
         for entry in diff["to_add"]:
             pdf_path = Path(entry["path"])
+            # Announce the book before extraction, which can run for minutes
+            # on a dense rulebook — otherwise the status bar keeps naming the
+            # previous book the whole time.
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
             override = (
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
@@ -389,6 +393,7 @@ def build_router(
         # previous successful manifest entry is preserved with last_error set.
         for entry in diff["to_update"]:
             pdf_path = Path(entry["path"])
+            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
             override = (
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None

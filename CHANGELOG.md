@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - The app is smaller: the sidecar no longer ships ChromaDB
 - **Naming a game system in a search no longer skews it.** "dragonbane fireball" used to rank Dragonbane's Dragon monster first, because the system's name was searched as if it were part of the question. A named system now only puts that system's books first, so questions that name a system find the right section far more often
 - **Search while you type understands an unfinished word.** Results as you type used to "correct" the word you were still typing into a different one ("grapp" became "grasp", "wea" became "sea"); the last word is now completed from your own books instead ("grapp" → "grapple", "against poi" → "poison"), so the list shows what you're heading for. Pressing Enter searches exactly what you typed
+- **Indexing progress says what it's doing.** The status bar reads "Indexing 4 of 12 · Player's Handbook" instead of a file and chunk tally, and the summary counts books ("Added 3 books, removed 1"). Failed books stay listed until you dismiss them; hover the note to see which ones and why
 
 ## [3.0.0] - 2026-09-24
 

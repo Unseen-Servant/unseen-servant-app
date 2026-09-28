@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { jobNotification } from '../shell/notificationStore';
+import { progressLabel, type JobSummary } from './syncMessages';
 
 export interface SyncProgressPayload {
   files_done: number;
@@ -16,8 +17,14 @@ export interface RunSyncJobOptions<TResult> {
   startMessage: string;
   errorPrefix: string;
   streamsProgress: boolean;
-  buildResultMessage: (result: TResult) => { message: string; isError: boolean };
+  buildResultMessage: (result: TResult) => JobSummary;
   onComplete?: (result: TResult) => void | Promise<void>;
+}
+
+// Failures stay up until dismissed or the next job starts — they are the
+// one outcome the user has to act on. Successes clear themselves.
+function showFailure(message: string, detail?: string) {
+  jobNotification.show({ type: 'error', message, detail, dismissible: true, duration: null });
 }
 
 export async function runSyncJob<TResult>(
@@ -29,22 +36,20 @@ export async function runSyncJob<TResult>(
   jobNotification.show({
     type: 'progress',
     message: opts.startMessage,
-    filesCompleted: 0,
-    filesTotal: 0,
-    chunksProcessed: 0,
     duration: null,
   });
 
   let unlisten: (() => void) | null = null;
   if (opts.streamsProgress) {
+    let prevFilesDone = 0;
     unlisten = await listen<SyncProgressPayload>('sync-progress', (event) => {
-      const p = event.payload;
+      const label = progressLabel(event.payload, prevFilesDone);
+      prevFilesDone = event.payload.files_done;
+      if (!label) return;
       jobNotification.show({
         type: 'progress',
-        message: `${p.files_done}/${p.total_files} files`,
-        filesCompleted: p.files_done,
-        filesTotal: p.total_files,
-        chunksProcessed: p.chunks_total,
+        message: label.message,
+        book: label.book,
         duration: null,
       });
     });
@@ -54,12 +59,12 @@ export async function runSyncJob<TResult>(
     const result = await invoke<TResult>(opts.command, opts.args ?? {});
     if (opts.onComplete) await opts.onComplete(result);
     await refreshAfter();
-    const { message, isError } = opts.buildResultMessage(result);
-    jobNotification.show({
-      type: isError ? 'error' : 'success',
-      message,
-      duration: 5000,
-    });
+    const { message, isError, detail } = opts.buildResultMessage(result);
+    if (isError) {
+      showFailure(message, detail);
+    } else {
+      jobNotification.show({ type: 'success', message, detail, duration: 5000 });
+    }
     return result;
   } catch (e) {
     const msg = String(e);
@@ -70,11 +75,7 @@ export async function runSyncJob<TResult>(
         duration: 4000,
       });
     } else {
-      jobNotification.show({
-        type: 'error',
-        message: `${opts.errorPrefix}: ${msg}`,
-        duration: 6000,
-      });
+      showFailure(`${opts.errorPrefix}: ${msg}`, msg);
     }
     return null;
   } finally {

@@ -31,6 +31,20 @@
   $: jobNote = $jobNotification;
   $: pendingNote = $pendingNotification;
 
+  // Long titles lose their middle, not their end, so "…Handbook (2024)"
+  // stays tellable from "…Handbook (2014)". The tail never shrinks.
+  const BOOK_TAIL = 8;
+  function splitBook(name: string): [string, string] {
+    return name.length > BOOK_TAIL * 2
+      ? [name.slice(0, -BOOK_TAIL), name.slice(-BOOK_TAIL)]
+      : [name, ''];
+  }
+
+  $: [bookHead, bookTail] = splitBook(jobNote?.book ?? '');
+  $: jobTitle = jobNote
+    ? jobNote.detail ?? (jobNote.book ? `${jobNote.message} · ${jobNote.book}` : jobNote.message)
+    : '';
+
   function handlePendingDismiss() {
     pendingNote?.onDismiss?.();
     pendingNotification.dismiss();
@@ -143,13 +157,14 @@
     {/if}
     {#if jobNote}
       <span class="rule" aria-hidden="true"></span>
-      <div class="status-note" class:status-error={jobNote.type === 'error'}>
-        {#if jobNote.type === 'progress'}
-          <span class="status-note-msg">
-            {jobNote.filesCompleted ?? 0}/{jobNote.filesTotal ?? 0} files &middot; {(jobNote.chunksProcessed ?? 0).toLocaleString()} chunks
-          </span>
-        {:else}
-          <span class="status-note-msg">{jobNote.message}</span>
+      <div class="status-note" class:status-error={jobNote.type === 'error'} title={jobTitle}>
+        <span class="status-note-msg" class:keep={jobNote.book}>{jobNote.message}</span>
+        {#if jobNote.book}
+          <span class="note-sep" aria-hidden="true">&middot;</span>
+          <span class="note-book"><span class="note-book-head">{bookHead}</span><span class="note-book-tail">{bookTail}</span></span>
+        {/if}
+        {#if jobNote.dismissible}
+          <button class="note-dismiss" on:click={() => jobNotification.dismiss()} aria-label="Dismiss">&times;</button>
         {/if}
       </div>
     {/if}
@@ -279,6 +294,31 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 40ch;
+  }
+  /* The verb and count ("Indexing 4 of 12") hold; the book name gives. */
+  .status-note-msg.keep {
+    flex-shrink: 0;
+  }
+  .note-sep {
+    color: var(--text-tertiary);
+  }
+  /* Parchment: the book is content, not chrome. */
+  .note-book {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 32ch;
+    color: var(--text-accent);
+  }
+  /* pre, not nowrap: a space at the split must survive on either side. */
+  .note-book-head {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+  }
+  .note-book-tail {
+    flex-shrink: 0;
+    white-space: pre;
   }
   .note-action {
     background: none;

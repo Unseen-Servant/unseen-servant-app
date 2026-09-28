@@ -23,9 +23,12 @@ export interface Notification {
   onAction?: () => void;
   onDismiss?: () => void;
   duration: number | null;
-  filesCompleted?: number;
-  filesTotal?: number;
-  chunksProcessed?: number;
+  // Tooltip: the full story behind a one-line message (e.g. which books failed).
+  detail?: string;
+  // Sticky notes the user may close by hand.
+  dismissible?: boolean;
+  // Progress only: the book being worked on, shown after the message.
+  book?: string;
 }
 
 function createNotificationStore() {

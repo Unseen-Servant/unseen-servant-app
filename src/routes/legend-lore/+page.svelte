@@ -32,6 +32,7 @@
   import { materializeKey } from '../../lib/shell/paneFocus';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
   import { runSyncJob } from '../../lib/legend-lore/syncJob';
+  import { clearSummary, reindexSummary, syncSummary } from '../../lib/legend-lore/syncMessages';
   import {
     indexedPathsUnder,
     collectionsContaining,
@@ -3477,23 +3478,6 @@
     await loadCollections();
   }
 
-  function buildSyncResultMessage(result: SyncResult): { message: string; isError: boolean } {
-    const parts: string[] = [];
-    if (result.added > 0) parts.push(`${result.added} added`);
-    if (result.removed > 0) parts.push(`${result.removed} removed`);
-    if (result.auto_removed > 0) parts.push(`${result.auto_removed} removed (deleted from disk)`);
-    if (result.renamed > 0) parts.push(`${result.renamed} renamed`);
-    if (result.updated > 0) parts.push(`${result.updated} updated`);
-    if (result.errors.length > 0) parts.push(`${result.errors.length} error(s)`);
-    const chunkStr = result.chunks_total > 0
-      ? ` ${result.chunks_total.toLocaleString()} chunks.`
-      : '';
-    const message = parts.length > 0
-      ? `Synced: ${parts.join(', ')}.${chunkStr}`
-      : 'Nothing to sync.';
-    return { message, isError: result.errors.length > 0 };
-  }
-
   // Sync index: add new, remove deselected, re-index modified
   async function handleSync() {
     if (isSyncing) return;
@@ -3506,7 +3490,7 @@
         startMessage: 'Starting sync...',
         errorPrefix: 'Sync failed',
         streamsProgress: true,
-        buildResultMessage: buildSyncResultMessage,
+        buildResultMessage: syncSummary,
         onComplete: async (r) => {
           // Reconcile selectedPaths with renames / auto-removals / stale paths
           for (const { old_path, new_path } of r.renames ?? []) {
@@ -3557,18 +3541,7 @@
         startMessage: 'Starting re-index...',
         errorPrefix: 'Re-index failed',
         streamsProgress: true,
-        buildResultMessage: (r) => {
-          const parts: string[] = [];
-          if (r.updated > 0) parts.push(`${r.updated} reprocessed`);
-          if (r.errors.length > 0) parts.push(`${r.errors.length} error(s)`);
-          const chunkStr = r.chunks_total > 0
-            ? ` ${r.chunks_total.toLocaleString()} chunks.`
-            : '';
-          const message = parts.length > 0
-            ? `Re-indexed: ${parts.join(', ')}.${chunkStr}`
-            : 'Nothing to re-index.';
-          return { message, isError: r.errors.length > 0 };
-        },
+        buildResultMessage: reindexSummary,
       }, refreshIndexAndCollections);
       if (result) lastSyncTime = new Date();
     } finally {
@@ -3584,17 +3557,10 @@
     try {
       await runSyncJob<{ removed_files: number; removed_chunks: number }>({
         command: 'delete_index',
-        startMessage: 'Deleting index...',
+        startMessage: 'Clearing index...',
         errorPrefix: 'Delete failed',
         streamsProgress: false,
-        buildResultMessage: (r) => {
-          const fileWord = r.removed_files === 1 ? 'file' : 'files';
-          const chunkWord = r.removed_chunks === 1 ? 'chunk' : 'chunks';
-          return {
-            message: `Index cleared: ${r.removed_files} ${fileWord}, ${r.removed_chunks.toLocaleString()} ${chunkWord} removed.`,
-            isError: false,
-          };
-        },
+        buildResultMessage: clearSummary,
       }, refreshIndexAndCollections);
     } finally {
       isSyncing = false;
