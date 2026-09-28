@@ -111,14 +111,16 @@
       {/if}
       <span class="separator">&middot;</span>
       {#if indexedCount > 0}
-        <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
+        <span>{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
         {#if gameSystemCount > 0}
           <span class="separator">&middot;</span>
           <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
         {/if}
-        {#if storageBytes > 0}
+        <!-- Chunks are what a search actually walks; the disk footprint is
+             housekeeping, so it rides in the tooltip. -->
+        {#if totalChunks > 0}
           <span class="separator">&middot;</span>
-          <span>{formatSize(storageBytes)}</span>
+          <span title="{formatSize(storageBytes)} on disk">{totalChunks.toLocaleString()} chunk{totalChunks === 1 ? '' : 's'}</span>
         {/if}
       {:else}
         <span>{selectedCount} selected</span>
@@ -199,6 +201,9 @@
     flex-shrink: 0;
     font-size: 0.75rem;
     color: var(--text-secondary);
+    /* Every number down here is a readout; fixed-width figures keep them
+       from jittering while indexing ticks them over. */
+    font-variant-numeric: tabular-nums;
     user-select: none;
     -webkit-user-select: none;
   }
@@ -263,7 +268,6 @@
     align-items: center;
     gap: 0.4rem;
     color: var(--text-secondary);
-    font-variant-numeric: tabular-nums;
     min-width: 0;
   }
   .status-note.status-error {
