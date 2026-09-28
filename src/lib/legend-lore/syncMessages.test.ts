@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookName, clearSummary, progressLabel, reindexSummary, syncSummary } from './syncMessages';
+import { bookName, clearSummary, progressLabel, reindexSummary, syncPromptMessage, syncSummary } from './syncMessages';
 import type { SyncResult } from './types';
 
 function payload(files_done: number, phase = 'add', current_file = 'Monster Manual.pdf') {
@@ -89,6 +89,24 @@ describe('reindexSummary', () => {
     expect(reindexSummary(result({ updated: 39, errors: ['x.pdf: boom'] })).message)
       .toBe('Re-indexed 39 books · 1 failed');
     expect(reindexSummary(result()).message).toBe('Nothing to re-index');
+  });
+});
+
+describe('syncPromptMessage', () => {
+  const none = { moved: 0, missing: 0, add: 0, remove: 0, update: 0, errors: 0 };
+
+  it('names each kind of disk change instead of lumping them', () => {
+    expect(syncPromptMessage({ ...none, moved: 2, missing: 1, add: 3 }))
+      .toBe('2 moved, 1 missing on disk, 3 to add');
+  });
+
+  it('is empty when there is nothing to ask about', () => {
+    expect(syncPromptMessage(none)).toBe('');
+  });
+
+  it('pluralizes errors', () => {
+    expect(syncPromptMessage({ ...none, errors: 1 })).toBe('1 error');
+    expect(syncPromptMessage({ ...none, remove: 1, errors: 2 })).toBe('1 to remove, 2 errors');
   });
 });
 

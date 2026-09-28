@@ -3,7 +3,7 @@
 // Counts are in books, never chunks — a sync's chunk tally mixes deleted
 // and embedded rows, so it has no meaning to report.
 
-import type { SyncResult } from './types';
+import type { PromptCounts, SyncResult } from './types';
 import type { SyncProgressPayload } from './syncJob';
 
 export interface JobSummary {
@@ -86,6 +86,19 @@ export function syncSummary(r: SyncResult): JobSummary {
 export function reindexSummary(r: SyncResult): JobSummary {
   const done = r.updated > 0 ? `Re-indexed ${books(r.updated)}` : '';
   return withFailures(done, r.errors, 'Nothing to re-index');
+}
+
+// The standing prompt before a sync: "2 moved, 1 missing on disk, 3 to add".
+// Empty when there is nothing to ask about.
+export function syncPromptMessage(c: PromptCounts): string {
+  const parts: string[] = [];
+  if (c.moved > 0) parts.push(`${c.moved} moved`);
+  if (c.missing > 0) parts.push(`${c.missing} missing on disk`);
+  if (c.add > 0) parts.push(`${c.add} to add`);
+  if (c.remove > 0) parts.push(`${c.remove} to remove`);
+  if (c.update > 0) parts.push(`${c.update} to update`);
+  if (c.errors > 0) parts.push(`${c.errors} error${c.errors === 1 ? '' : 's'}`);
+  return parts.join(', ');
 }
 
 export function clearSummary(r: { removed_files: number }): JobSummary {

@@ -32,7 +32,7 @@
   import { materializeKey } from '../../lib/shell/paneFocus';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
   import { runSyncJob } from '../../lib/legend-lore/syncJob';
-  import { clearSummary, reindexSummary, syncSummary } from '../../lib/legend-lore/syncMessages';
+  import { clearSummary, reindexSummary, syncPromptMessage, syncSummary } from '../../lib/legend-lore/syncMessages';
   import {
     indexedPathsUnder,
     collectionsContaining,
@@ -1323,7 +1323,8 @@
     return {
       kind: 'prompt',
       counts: {
-        disk: askDisk ? diskTotal : 0,
+        moved: askDisk ? rename : 0,
+        missing: askDisk ? auto_remove + stale : 0,
         add: askAdd ? add : 0,
         remove: askRemove ? remove : 0,
         update: askUpdate ? update : 0,
@@ -1354,22 +1355,16 @@
   function showSyncPrompt(counts: PromptCounts) {
     if (!indexStatus) return;
 
-    const parts: string[] = [];
-    if (counts.disk > 0) parts.push(`${counts.disk} disk change${counts.disk === 1 ? '' : 's'}`);
-    if (counts.add > 0) parts.push(`${counts.add} to add`);
-    if (counts.remove > 0) parts.push(`${counts.remove} to remove`);
-    if (counts.update > 0) parts.push(`${counts.update} to update`);
-    if (counts.errors > 0) parts.push(`${counts.errors} error${counts.errors === 1 ? '' : 's'}`);
-
-    if (parts.length === 0) {
+    const message = syncPromptMessage(counts);
+    if (!message) {
       pendingNotification.dismiss();
       return;
     }
 
     pendingNotification.show({
       type: 'action',
-      message: parts.join(', '),
-      actionLabel: isSyncing ? 'Sync queued' : 'Sync Now',
+      message,
+      actionLabel: isSyncing ? 'Sync queued' : 'Sync',
       actionDisabled: isSyncing,
       onAction: isSyncing ? undefined : handleSync,
       onDismiss: revertToSyncedPaths,
@@ -2374,7 +2369,7 @@
     }
 
     // Cmd/Ctrl+S: commit selected files to the index — the real sync work
-    // (same handler the "Sync Now" banner button calls). Standalone chord
+    // (same handler the "Sync" banner button calls). Standalone chord
     // because this is the headline action of the app.
     if (meta && !event.shiftKey && lk === 's') {
       event.preventDefault();

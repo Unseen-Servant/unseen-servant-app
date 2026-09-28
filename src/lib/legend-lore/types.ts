@@ -201,7 +201,10 @@ export const DEFAULT_SYNC_PREFERENCES: SyncPreferences = {
 };
 
 export interface PromptCounts {
-  disk: number;
+  // Disk events, split by what the user sees: an indexed book found under a
+  // new path, and a selected book no longer on disk (indexed or not).
+  moved: number;
+  missing: number;
   add: number;
   remove: number;
   update: number;

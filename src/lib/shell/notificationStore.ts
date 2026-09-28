@@ -7,7 +7,7 @@ import { writable } from 'svelte/store';
 //                         info. Lives in the left region.
 //   pendingNotification — owned by polling and selection-change handlers
 //                         (showSyncPrompt). Renders the standing "N to add,
-//                         M to remove [Sync Now]" prompt. Lives in the right
+//                         M to remove [Sync]" prompt. Lives in the right
 //                         region.
 //
 // Each call site imports exactly one channel; the regions never compete.
