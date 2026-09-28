@@ -613,8 +613,10 @@ dialog[open]::backdrop {
 }
 /* Hover and the keyboard cursor land on the same fill: one highlight, two ways
    of arriving at it. .kb-focused is applied imperatively by the menu that owns
-   the cursor, so it never appears in a component's markup. */
-.menu-row:hover,
+   the cursor, so it never appears in a component's markup. A menu carrying
+   .hover-dark (keyboard driving; see hoverLive) keeps hover off that fill, or
+   the row left under a resting pointer would read as a second cursor. */
+.menu-row:hover:not(.hover-dark *),
 .menu-row.kb-focused {
   background: var(--bg-container);
 }

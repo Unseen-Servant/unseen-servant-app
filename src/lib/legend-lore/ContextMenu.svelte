@@ -6,6 +6,7 @@
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
   import { CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { hoverLive } from '../ui/inputModality';
   import SystemTagRows from './SystemTagRows.svelte';
 
   export let x: number;
@@ -58,7 +59,8 @@
 
   let menuEl: HTMLDivElement;
   let openSubmenu: 'collection' | 'tag' | null = initialSubmenu;
-  // -1 means "no keyboard cursor yet" — stays that way for mouse users.
+  // -1 means "no cursor yet" — stays that way until the pointer lands on a
+  // row or the keyboard moves.
   // First ↑/↓ promotes to 0 (Math.max(0, -1 ± 1) clamps to 0). When the
   // menu opens directly into a submenu (C chord) the trigger's index is
   // resolved in refreshItemsAndFocus so ← from the submenu has somewhere
@@ -182,6 +184,31 @@
   });
   afterUpdate(() => refreshItemsAndFocus());
 
+  // One cursor, two hands, as in a native menu. Hover and .kb-focused share
+  // a fill here, so a hover that kept its own row read as a second
+  // selection. A real move over a row puts the cursor there and opens or
+  // closes submenus as it goes; $hoverLive filters out the moves WebKit
+  // fakes when → opens a submenu under a resting pointer. Off a row (a
+  // divider, the padding, outside the menu) the cursor stays put.
+  function handlePointerMove(event: PointerEvent) {
+    if (!$hoverLive) return;
+    const row = (event.target as Element).closest('[data-mi]') as HTMLElement | null;
+    if (!row) return;
+    const subIdx = submenuItems.indexOf(row);
+    if (subIdx >= 0) {
+      focusedSubmenuIdx = subIdx;
+    } else {
+      const idx = mainItems.indexOf(row);
+      if (idx < 0) return;
+      focusedIdx = idx;
+      focusedSubmenuIdx = null;
+      openSubmenu = row.dataset.mi === 'submenu-trigger'
+        ? (row.dataset.submenu as 'collection' | 'tag')
+        : null;
+    }
+    refreshItemsAndFocus();
+  }
+
   function handleKeydown(event: KeyboardEvent) {
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
@@ -196,14 +223,14 @@
     if (isDown) {
       event.preventDefault();
       if (inSub) focusedSubmenuIdx = Math.min(submenuItems.length - 1, (focusedSubmenuIdx ?? -1) + 1);
-      else       focusedIdx = Math.min(mainItems.length - 1, focusedIdx + 1);
+      else       { focusedIdx = Math.min(mainItems.length - 1, focusedIdx + 1); openSubmenu = null; }
       refreshItemsAndFocus();
       return;
     }
     if (isUp) {
       event.preventDefault();
       if (inSub) focusedSubmenuIdx = Math.max(0, (focusedSubmenuIdx ?? 0) - 1);
-      else       focusedIdx = Math.max(0, focusedIdx - 1);
+      else       { focusedIdx = Math.max(0, focusedIdx - 1); openSubmenu = null; }
       refreshItemsAndFocus();
       return;
     }
@@ -327,8 +354,10 @@
   class="context-menu"
   role="menu"
   tabindex="-1"
+  class:hover-dark={!$hoverLive}
   bind:this={menuEl}
   style="left: {clampedX}px; top: {clampedY}px; visibility: {positioned ? 'visible' : 'hidden'}"
+  on:pointermove={handlePointerMove}
   on:click|stopPropagation
   on:mousedown|stopPropagation
 >
@@ -372,7 +401,6 @@
     <hr class="menu-divider" />
   {/if}
   {#if canAddToCollection}
-    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
     <div
       class="menu-row submenu-trigger"
       class:open={openSubmenu === 'collection'}
@@ -383,8 +411,6 @@
       tabindex="-1"
       aria-haspopup="menu"
       aria-expanded={openSubmenu === 'collection'}
-      on:mouseenter={() => { openSubmenu = 'collection'; }}
-      on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Collection</span>
       <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')} aria-hidden="true">{chord('tree.addToCollection')}</span>
@@ -426,7 +452,6 @@
     </div>
   {/if}
   {#if canTag}
-    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
     <div
       class="menu-row submenu-trigger"
       class:open={openSubmenu === 'tag'}
@@ -436,8 +461,6 @@
       tabindex="-1"
       aria-haspopup="menu"
       aria-expanded={openSubmenu === 'tag'}
-      on:mouseenter={() => { openSubmenu = 'tag'; }}
-      on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Game system</span>
       <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
@@ -511,7 +534,7 @@
     align-items: center;
     user-select: none;
   }
-  .submenu-trigger:hover,
+  .context-menu:not(.hover-dark) .submenu-trigger:hover,
   .submenu-trigger.open {
     background: var(--bg-container);
   }
