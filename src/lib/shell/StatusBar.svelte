@@ -111,16 +111,14 @@
       {/if}
       <span class="separator">&middot;</span>
       {#if indexedCount > 0}
-        <span>{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
+        <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
         {#if gameSystemCount > 0}
           <span class="separator">&middot;</span>
           <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
         {/if}
-        <!-- Chunks are what a search actually walks; the disk footprint is
-             housekeeping, so it rides in the tooltip. -->
-        {#if totalChunks > 0}
+        {#if storageBytes > 0}
           <span class="separator">&middot;</span>
-          <span title="{formatSize(storageBytes)} on disk">{totalChunks.toLocaleString()} chunk{totalChunks === 1 ? '' : 's'}</span>
+          <span>{formatSize(storageBytes)}</span>
         {/if}
       {:else}
         <span>{selectedCount} selected</span>
