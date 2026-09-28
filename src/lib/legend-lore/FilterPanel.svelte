@@ -195,8 +195,10 @@
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
     const isDown = event.key === 'ArrowDown' || (bareLetter && lk === 'j');
     const isUp   = event.key === 'ArrowUp'   || (bareLetter && lk === 'k');
-    const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
-    const isRight = event.key === 'ArrowRight' || (bareLetter && lk === 'l');
+    // Unmodified only, as in the collections panel: ⌘⌥←/→ are the page's
+    // pane-jump chords and must not also fold the header they land on.
+    const isLeft  = bareLetter && (event.key === 'ArrowLeft'  || lk === 'h');
+    const isRight = bareLetter && (event.key === 'ArrowRight' || lk === 'l');
 
     if (event.key === 'Escape') {
       // Release the pane. Not a close — the panel is docked furniture whose
