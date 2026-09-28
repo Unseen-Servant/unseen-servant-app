@@ -14,6 +14,7 @@
   import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
+  import type { FilterRowKind } from './filterRows';
   import { RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
 
   // DAW-style filter state for game systems.
@@ -102,6 +103,17 @@
 
   let panelEl: HTMLElement;
 
+  // Sections folded shut, keyed by the kind of row each holds. Session
+  // state, like the systems view's collapsed groups. The header's mousedown
+  // already releases the caret (it isn't a row), so a caret can't be left
+  // parked inside a section as it closes.
+  let collapsed = new Set<FilterRowKind>();
+  function toggleSection(kind: FilterRowKind) {
+    if (collapsed.has(kind)) collapsed.delete(kind);
+    else collapsed.add(kind);
+    collapsed = collapsed;
+  }
+
   // The navigable row set, derived not queried. Order is the j/k order.
   $: rows = computeFilterRows({
     hasHidden,
@@ -109,6 +121,7 @@
     showSystemFilter,
     systems,
     untaggedCount,
+    collapsed,
   });
 
   function rowElByKey(key: string): HTMLElement | null {
@@ -259,7 +272,13 @@
 
   <div class="panel-body">
     {#if showCollectionFilter}
-      <div class="sect ledger-label">Curation</div>
+      <button
+        type="button"
+        class="sect sect-toggle ledger-label"
+        aria-expanded={!collapsed.has('curation')}
+        on:click={() => toggleSection('curation')}
+      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('curation') ? '▸' : '▾'}</span>Curation</button>
+      {#if !collapsed.has('curation')}
       {#each curationRows as ch (ch.key)}
         {@const soloed = curationSolos.has(ch.key)}
         {@const muted = curationMutes.has(ch.key)}
@@ -324,11 +343,19 @@
           <span class="row-count">{ch.count}</span>
         </div>
       {/each}
+      {/if}
     {/if}
 
     {#if showSystemFilter}
-      <div class="sect ledger-label">Game systems</div>
-      {#if systems.length > 0}
+      <button
+        type="button"
+        class="sect sect-toggle ledger-label"
+        aria-expanded={!collapsed.has('system')}
+        on:click={() => toggleSection('system')}
+      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('system') ? '▸' : '▾'}</span>Game systems</button>
+      {#if collapsed.has('system')}
+        <!-- Folded shut: nothing below renders. -->
+      {:else if systems.length > 0}
         {#each systems as { name, count } (name)}
           {@const soloed = soloedSystems.has(name)}
           {@const muted = excludedSystems.has(name)}
@@ -417,12 +444,18 @@
 
     <!-- View-visibility switches last: they say what the tree shows, not
          what search sees, so they sit below the narrowing axes. -->
-    <div class="sect sect-split ledger-label">
-      <span>Hidden items</span>
+    <div class="sect-split">
+      <button
+        type="button"
+        class="sect sect-toggle ledger-label"
+        aria-expanded={!collapsed.has('view')}
+        on:click={() => toggleSection('view')}
+      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('view') ? '▸' : '▾'}</span>Hidden items</button>
       {#if hasHidden}
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
       {/if}
     </div>
+    {#if !collapsed.has('view')}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
     <div
       class="row"
@@ -494,6 +527,7 @@
         on:click|stopPropagation={onToggleHideOutOfScope}
       ></button>
     </div>
+    {/if}
   </div>
 </aside>
 
@@ -530,9 +564,28 @@
   }
 
   /* Quiet small-caps section headers — ledger voice, like the tree.
-     No rule under them. */
+     No rule under them. The fold arrow sits in the left gutter so the
+     label lines up with the row icons (1.1rem padding + 3px solo rule). */
   .sect {
-    padding: 0.6rem 0.25rem 0.15rem 0.75rem;
+    padding: 0.6rem 0.25rem 0.15rem calc(0.3rem + 3px);
+  }
+  .sect-toggle {
+    display: flex;
+    align-items: baseline;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: color var(--transition-fast);
+  }
+  .sect-toggle:hover {
+    color: var(--text-secondary);
+  }
+  .sect-arrow {
+    width: 0.8rem;
+    flex-shrink: 0;
+    letter-spacing: 0;
   }
 
   .row {
@@ -570,8 +623,10 @@
   .sect-split {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
     padding-right: 0.75rem;
+  }
+  .sect-split .sect-toggle {
+    flex: 1;
   }
 
   /* Soloed channel — the tree's own soloed-collection treatment:

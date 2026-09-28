@@ -27,24 +27,31 @@ export interface FilterRowsInput {
   systems: { name: string; count: number }[];
   /** The untagged channel renders only when this is positive. */
   untaggedCount: number;
+  /** Sections folded shut in the panel. Their rows aren't rendered, so the
+   *  cursor can't land on them either. Keyed by the kind of row each
+   *  section holds. */
+  collapsed?: ReadonlySet<FilterRowKind>;
 }
 
 export function computeFilterRows(input: FilterRowsInput): FilterRow[] {
   const rows: FilterRow[] = [];
+  const open = (kind: FilterRowKind) => !input.collapsed?.has(kind);
 
-  if (input.showCollectionFilter) {
+  if (input.showCollectionFilter && open('curation')) {
     rows.push({ key: 'curation:collected', kind: 'curation' });
     rows.push({ key: 'curation:loose', kind: 'curation' });
   }
 
-  if (input.showSystemFilter) {
+  if (input.showSystemFilter && open('system')) {
     for (const s of input.systems) rows.push({ key: `system:${s.name}`, kind: 'system' });
     if (input.untaggedCount > 0) rows.push({ key: `system:${UNTAGGED_KEY}`, kind: 'system' });
   }
 
-  if (input.hasHidden) rows.push({ key: 'view:showHidden', kind: 'view' });
-  rows.push({ key: 'view:hideUnindexed', kind: 'view' });
-  rows.push({ key: 'view:hideOutOfScope', kind: 'view' });
+  if (open('view')) {
+    if (input.hasHidden) rows.push({ key: 'view:showHidden', kind: 'view' });
+    rows.push({ key: 'view:hideUnindexed', kind: 'view' });
+    rows.push({ key: 'view:hideOutOfScope', kind: 'view' });
+  }
 
   return rows;
 }

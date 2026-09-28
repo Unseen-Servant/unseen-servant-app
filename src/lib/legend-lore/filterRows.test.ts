@@ -93,6 +93,27 @@ describe('computeFilterRows', () => {
     expect(before.findIndex(r => r.key === 'system:D&D'))
       .not.toBe(after.findIndex(r => r.key === 'system:D&D'));
   });
+
+  it('skips the rows of a collapsed section and keeps the others', () => {
+    const keys = computeFilterRows(input({
+      hasHidden: true,
+      showCollectionFilter: true,
+      showSystemFilter: true,
+      systems: [{ name: 'D&D', count: 3 }],
+      untaggedCount: 2,
+      collapsed: new Set(['system', 'view']),
+    })).map(r => r.key);
+    expect(keys).toEqual(['curation:collected', 'curation:loose']);
+  });
+
+  it('offers no rows when every section is collapsed', () => {
+    expect(computeFilterRows(input({
+      showCollectionFilter: true,
+      showSystemFilter: true,
+      systems: [{ name: 'D&D', count: 3 }],
+      collapsed: new Set(['curation', 'system', 'view']),
+    }))).toEqual([]);
+  });
 });
 
 describe('stepFilterRow', () => {
