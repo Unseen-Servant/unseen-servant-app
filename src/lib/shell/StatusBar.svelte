@@ -46,9 +46,10 @@
   const METER_CELLS = Array.from({ length: 10 }, (_, i) => i);
   $: meter = jobNote?.meter;
   $: meterLit = meter ? Math.floor((meter.done / meter.total) * METER_CELLS.length) : 0;
-  $: meterText = meter
-    ? `${meter.done.toLocaleString()} / ${meter.total.toLocaleString()} chunks`
+  $: meterCount = meter
+    ? `${meter.done.toLocaleString()} / ${meter.total.toLocaleString()}`
     : '';
+  $: meterText = meterCount && `${meterCount} chunks`;
 
   $: jobTitle = jobNote
     ? jobNote.detail ?? [jobNote.message, jobNote.book, meterText].filter(Boolean).join(' · ')
@@ -185,6 +186,7 @@
               <span class="meter-cell" class:lit={idx < meterLit}></span>
             {/each}
           </span>
+          <span class="note-meter-count">{meterCount}</span>
         {/if}
         {#if jobNote.dismissible}
           <button class="note-dismiss" on:click={() => jobNotification.dismiss()} aria-label="Dismiss">&times;</button>
@@ -359,6 +361,11 @@
   }
   .meter-cell.lit {
     background: var(--text-accent);
+  }
+  /* The unit ("chunks") is left to the tooltip; beside the meter the
+     pair reads as its count. */
+  .note-meter-count {
+    flex-shrink: 0;
   }
   .note-action {
     background: none;
