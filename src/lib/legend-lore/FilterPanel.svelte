@@ -622,9 +622,12 @@
 
   /* Quiet small-caps section headers — ledger voice, like the tree.
      No rule under them. The fold arrow sits in the left gutter so the
-     label lines up with the row icons (1.1rem padding + 3px solo rule). */
+     label lines up with the row icons (1.1rem padding + 3px solo rule).
+     The gap above is margin, not padding, so the focus ring hugs the
+     label evenly instead of hanging empty space over it. */
   .sect {
-    padding: 0.6rem 0.25rem 0.15rem calc(0.3rem + 3px);
+    margin-top: 0.35rem;
+    padding: 0.2rem 0.25rem 0.2rem calc(0.3rem + 3px);
   }
   .sect-toggle {
     display: flex;
@@ -707,7 +710,12 @@
   .sect-split {
     display: flex;
     align-items: baseline;
+    margin-top: 0.35rem;
     padding-right: 0.75rem;
+  }
+  /* The container carries the gap here, since it carries the ring. */
+  .sect-split .sect {
+    margin-top: 0;
   }
   .sect-split .sect-toggle {
     flex: 1;
