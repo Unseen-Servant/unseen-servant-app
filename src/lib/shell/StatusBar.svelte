@@ -114,7 +114,7 @@
         <!-- Rules divide groups; readouts within a group sit apart on
              spacing alone, so the two levels never look alike. -->
         <span class="stats">
-          <span title="{indexedCount} PDF{indexedCount === 1 ? '' : 's'}, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} PDF{indexedCount === 1 ? '' : 's'} indexed</span>
+          <span title="{indexedCount} book{indexedCount === 1 ? '' : 's'} indexed, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} book{indexedCount === 1 ? '' : 's'}</span>
           {#if gameSystemCount > 0}
             <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
           {/if}
@@ -123,7 +123,7 @@
           {/if}
         </span>
       {:else}
-        <span>{selectedCount} selected</span>
+        <span>{selectedCount} book{selectedCount === 1 ? '' : 's'} selected</span>
       {/if}
       <span class="rule" aria-hidden="true"></span>
       <button class="icon-btn" on:click={onOpenFolder} aria-label="Reveal library folder" title={`Reveal library folder${chordHint('library.reveal')}`}>
