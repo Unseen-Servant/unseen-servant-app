@@ -141,10 +141,6 @@
       </div>
     {/if}
   </div>
-
-  <svelte:fragment slot="commit">
-    <span class="apply-note">Changes apply immediately</span>
-  </svelte:fragment>
 </Modal>
 
 <style>
@@ -201,22 +197,6 @@
   }
 
   /* `.rail-rule` is global (Task 3). */
-
-  /* Where a Save button would be. Saying why there isn't one is more useful
-     than the button would have been.
-
-     --text-secondary, not --text-tertiary: this is the same plate and the same
-     pair Modal.svelte's nameplate had to correct. Tertiary is 4.71:1 on the
-     --bg-app most .ledger-labels sit on, but only 3.64:1 here on --bg-header,
-     and this is prose rather than a badge, so it does not get the 3:1 floor
-     the escape's `esc` chord takes. One step up matches the nameplate it sits
-     opposite, which is also what it is: quiet chrome, not content. */
-  .apply-note {
-    margin-right: auto;
-    font-family: var(--font-body);
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-  }
 
   /* The pane region. It used to sit inside a `.panel-content` column that also
      held the tab band; with the band on the rail that wrapper was a flex item
