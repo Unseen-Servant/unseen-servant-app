@@ -5,6 +5,11 @@
 
   export let selectedFolder: string;
   export let sidecarConnected: boolean;
+  // Embedding runtime (process answers) vs. ready (it also has the model):
+  // the remedies differ — launch the runtime vs. pull the model — so the
+  // lamp shows the half-way state dim rather than folding it into "off".
+  export let embedderRunning: boolean = false;
+  export let embedderReady: boolean = false;
   export let mcpConnected: boolean = false;
   export let mcpActive: boolean = false;
   export let selectedCount: number;
@@ -31,9 +36,17 @@
     pendingNotification.dismiss();
   }
 
+  // lastSyncTime is stamped by every index-status check, not only by
+  // syncs, and this button runs a check — so name it for what it is.
   $: syncTooltip = (lastSyncTime
-    ? `Last synced ${lastSyncTime.toLocaleTimeString()}`
-    : 'Sync index') + chordHint('sync.run');
+    ? `Check for changes — last checked ${lastSyncTime.toLocaleTimeString()}`
+    : 'Check for changes') + chordHint('sync.run');
+
+  $: embedderTooltip = embedderReady
+    ? 'Embedder ready'
+    : embedderRunning
+      ? 'Embedder running — model missing'
+      : 'Embedder not running';
 
   function formatSize(bytes: number): string {
     if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
@@ -50,6 +63,17 @@
         <!-- Font Awesome "server" icon (src/lib/ui/icons/server-solid-full.svg) -->
         <svg class="indicator-icon" viewBox="0 0 640 640" fill="currentColor">
           <path d="M160 96C124.7 96 96 124.7 96 160L96 224C96 259.3 124.7 288 160 288L480 288C515.3 288 544 259.3 544 224L544 160C544 124.7 515.3 96 480 96L160 96zM376 168C389.3 168 400 178.7 400 192C400 205.3 389.3 216 376 216C362.7 216 352 205.3 352 192C352 178.7 362.7 168 376 168zM432 192C432 178.7 442.7 168 456 168C469.3 168 480 178.7 480 192C480 205.3 469.3 216 456 216C442.7 216 432 205.3 432 192zM160 352C124.7 352 96 380.7 96 416L96 480C96 515.3 124.7 544 160 544L480 544C515.3 544 544 515.3 544 480L544 416C544 380.7 515.3 352 480 352L160 352zM376 424C389.3 424 400 434.7 400 448C400 461.3 389.3 472 376 472C362.7 472 352 461.3 352 448C352 434.7 362.7 424 376 424zM432 448C432 434.7 442.7 424 456 424C469.3 424 480 434.7 480 448C480 461.3 469.3 472 456 472C442.7 472 432 461.3 432 448z"/>
+        </svg>
+      </span>
+      <span
+        class="indicator"
+        class:connected={embedderReady}
+        class:partial={embedderRunning && !embedderReady}
+        title={embedderTooltip}
+      >
+        <!-- Font Awesome "microchip" icon (src/lib/ui/icons/microchip-solid-full.svg) -->
+        <svg class="indicator-icon" viewBox="0 0 640 640" fill="currentColor">
+          <path d="M240 88C240 74.7 229.3 64 216 64C202.7 64 192 74.7 192 88L192 128C156.7 128 128 156.7 128 192L88 192C74.7 192 64 202.7 64 216C64 229.3 74.7 240 88 240L128 240L128 296L88 296C74.7 296 64 306.7 64 320C64 333.3 74.7 344 88 344L128 344L128 400L88 400C74.7 400 64 410.7 64 424C64 437.3 74.7 448 88 448L128 448C128 483.3 156.7 512 192 512L192 552C192 565.3 202.7 576 216 576C229.3 576 240 565.3 240 552L240 512L296 512L296 552C296 565.3 306.7 576 320 576C333.3 576 344 565.3 344 552L344 512L400 512L400 552C400 565.3 410.7 576 424 576C437.3 576 448 565.3 448 552L448 512C483.3 512 512 483.3 512 448L552 448C565.3 448 576 437.3 576 424C576 410.7 565.3 400 552 400L512 400L512 344L552 344C565.3 344 576 333.3 576 320C576 306.7 565.3 296 552 296L512 296L512 240L552 240C565.3 240 576 229.3 576 216C576 202.7 565.3 192 552 192L512 192C512 156.7 483.3 128 448 128L448 88C448 74.7 437.3 64 424 64C410.7 64 400 74.7 400 88L400 128L344 128L344 88C344 74.7 333.3 64 320 64C306.7 64 296 74.7 296 88L296 128L240 128L240 88zM224 192L416 192C433.7 192 448 206.3 448 224L448 416C448 433.7 433.7 448 416 448L224 448C206.3 448 192 433.7 192 416L192 224C192 206.3 206.3 192 224 192zM240 240L240 400L400 400L400 240L240 240z"/>
         </svg>
       </span>
       <span
@@ -195,6 +219,10 @@
   .indicator.connected {
     color: var(--text-connected);
   }
+  /* Lamp half-lit: the runtime answers but lacks the model. */
+  .indicator.partial {
+    color: color-mix(in srgb, var(--text-connected) 45%, transparent);
+  }
   .indicator.mcp.connected {
     color: var(--text-connected);
   }
@@ -292,7 +320,10 @@
     margin-left: 0.2rem;
   }
   .sync-btn:hover:not(:disabled) {
-    color: var(--text-accent);
+    color: var(--text-primary);
+  }
+  .sync-btn:active:not(:disabled) {
+    transform: scale(0.97);
   }
   .sync-btn:disabled {
     cursor: default;
@@ -349,7 +380,10 @@
     height: 12px;
   }
   .license-link:hover {
-    color: var(--text-accent);
+    color: var(--text-primary);
+  }
+  .license-link:active {
+    transform: scale(0.97);
   }
 
 </style>

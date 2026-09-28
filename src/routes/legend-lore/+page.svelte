@@ -3947,6 +3947,8 @@
   <StatusBar
     {selectedFolder}
     {sidecarConnected}
+    embedderRunning={ollamaRunning}
+    embedderReady={ollamaModelReady}
     {mcpConnected}
     {mcpActive}
     selectedCount={selectedPaths.size}

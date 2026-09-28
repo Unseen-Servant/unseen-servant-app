@@ -270,7 +270,7 @@
     </fieldset>
 
     <div class="meta-row">
-      <span class="meta-label readout-label">Last sync</span>
+      <span class="meta-label readout-label">Last checked</span>
       <span class="meta-value" title={lastSyncAbsolute}>
         {isSyncing ? 'Syncing…' : lastSyncRelative}
       </span>
