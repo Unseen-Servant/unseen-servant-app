@@ -586,7 +586,7 @@
   .cell {
     width: 5px;
     height: 9px;
-    border-radius: 1px;
+    border-radius: var(--radius-cell);
     background: var(--border-subtle);
     transition: background var(--transition-fast);
   }
