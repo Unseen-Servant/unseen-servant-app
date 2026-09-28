@@ -15,7 +15,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
   import type { FilterSection } from './filterRows';
-  import { RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.
@@ -328,7 +328,7 @@
         aria-expanded={!collapsed.has('curation')}
         data-fm-key="sect:curation"
         on:click={() => clickHeader('curation')}
-      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('curation') ? '▸' : '▾'}</span>Curation{#if collapsed.has('curation') && sectionEngaged.curation}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
+      ><svg class="caret sect-arrow" class:open={!collapsed.has('curation')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>Curation{#if collapsed.has('curation') && sectionEngaged.curation}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
       {#if !collapsed.has('curation')}
       {#each curationRows as ch (ch.key)}
         {@const soloed = curationSolos.has(ch.key)}
@@ -405,7 +405,7 @@
         aria-expanded={!collapsed.has('system')}
         data-fm-key="sect:system"
         on:click={() => clickHeader('system')}
-      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('system') ? '▸' : '▾'}</span>Game systems{#if collapsed.has('system') && sectionEngaged.system}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
+      ><svg class="caret sect-arrow" class:open={!collapsed.has('system')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>Game systems{#if collapsed.has('system') && sectionEngaged.system}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
       {#if collapsed.has('system')}
         <!-- Folded shut: nothing below renders. -->
       {:else if systems.length > 0}
@@ -503,7 +503,7 @@
         class="sect sect-toggle ledger-label"
         aria-expanded={!collapsed.has('view')}
         on:click={() => clickHeader('view')}
-      ><span class="sect-arrow" aria-hidden="true">{collapsed.has('view') ? '▸' : '▾'}</span>Hidden items</button>
+      ><svg class="caret sect-arrow" class:open={!collapsed.has('view')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>Hidden items</button>
       {#if collapsed.has('view') && sectionEngaged.view}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}
       {#if hasHidden}
         <button class="reset-link" on:click={onClearHidden}>Clear</button>
@@ -662,10 +662,11 @@
   .sect-split .reset-link {
     margin-left: 0.4rem;
   }
+  /* The toggle aligns on baseline, which for an <svg> is its bottom edge;
+     centre it instead. The margin restores the old text arrow's gap. */
   .sect-arrow {
-    width: 0.8rem;
-    flex-shrink: 0;
-    letter-spacing: 0;
+    align-self: center;
+    margin-right: 0.3rem;
   }
 
   .row {

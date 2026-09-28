@@ -28,6 +28,15 @@ export const FOLDER_OPEN =
   'M88 289.6L64.4 360.2L64.4 160C64.4 124.7 93.1 96 128.4 96L267.1 96C280.9 96 294.4 100.5 305.5 108.8L343.9 137.6C349.4 141.8 356.2 144 363.1 144L480.4 144C515.7 144 544.4 172.7 544.4 208L544.4 224L179 224C137.7 224 101 250.4 87.9 289.6zM509.8 512L131 512C98.2 512 75.1 479.9 85.5 448.8L133.5 304.8C140 285.2 158.4 272 179 272L557.8 272C590.6 272 613.7 304.1 603.3 335.2L555.3 479.2C548.8 498.8 530.4 512 509.8 512z';
 
 /**
+ * Font Awesome "caret-right". Disclosure arrows draw it through the .caret
+ * rule in app.css, which turns it a quarter down while open. Drawn with
+ * viewBox="96 64 512 512" — the vendored 640 box recentred on the glyph, so
+ * the rotation pivots in place. Source: ./icons/caret-right-solid-full.svg
+ */
+export const CARET_RIGHT =
+  'M441.3 299.8C451.5 312.4 450.8 330.9 439.1 342.6L311.1 470.6C301.9 479.8 288.2 482.5 276.2 477.5C264.2 472.5 256.5 460.9 256.5 448L256.5 192C256.5 179.1 264.3 167.4 276.3 162.4C288.3 157.4 302 160.2 311.2 169.3L439.2 297.3L441.4 299.7z';
+
+/**
  * Bookmark ribbon, hollow — always stroked, never filled (stroke-width 2.2).
  * A collection's ribbon is stroked in its pigment; one without a pigment,
  * and the "in a collection" bucket, in tertiary grey; Loose dashes it.

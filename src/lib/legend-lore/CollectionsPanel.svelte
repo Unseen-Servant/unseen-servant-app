@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
@@ -1014,7 +1014,7 @@
            it stay pigments in code, where Ribbon is already collectionRibbons'
            per-file type. -->
       <span>Ribbon</span>
-      <span class="submenu-caret" aria-hidden="true">&#9656;</span>
+      <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if ctxPigmentOpen}
         <div class="submenu" role="menu">
           {#each PIGMENTS as pig (pig.hex)}

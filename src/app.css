@@ -412,6 +412,22 @@ button:focus-visible .folder-opened {
   opacity: 1;
 }
 
+/* --- Caret --- */
+
+/* CARET_RIGHT as a disclosure arrow: one em tall, so the host's font-size
+   sets its size; .open turns it to point down. The baseline nudge only
+   matters in running text — flex rows centre it anyway. */
+.caret {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+.caret.open {
+  transform: rotate(90deg);
+}
+
 /* --- Form Controls --- */
 
 /* Themed checkbox matching the file-tree look (parchment border, accent fill,

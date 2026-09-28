@@ -1,5 +1,6 @@
 <script lang="ts">
   import OllamaStatus from '../shell/OllamaStatus.svelte';
+  import { CARET_RIGHT } from '../ui/iconPaths';
 
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;
@@ -33,7 +34,7 @@
     </div>
     <OllamaStatus {ollamaRunning} {ollamaModelReady} />
     <button class="expander" on:click={() => toggleExpand(0)}>
-      {expanded.has(0) ? '▾' : '▸'} Why bge-m3?
+      <svg class="caret" class:open={expanded.has(0)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg> Why bge-m3?
     </button>
     {#if expanded.has(0)}
       <p class="field-desc detail">
@@ -67,7 +68,7 @@
       <button class="btn-link" on:click={onSelectFolder}>choose folder</button>
     {/if}
     <button class="expander" on:click={() => toggleExpand(1)}>
-      {expanded.has(1) ? '▾' : '▸'} Where does my data live?
+      <svg class="caret" class:open={expanded.has(1)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg> Where does my data live?
     </button>
     {#if expanded.has(1)}
       <p class="field-desc detail">
@@ -102,7 +103,7 @@
       button in the status bar.
     </p>
     <button class="expander" on:click={() => toggleExpand(2)}>
-      {expanded.has(2) ? '▾' : '▸'} Why chunks instead of whole PDFs?
+      <svg class="caret" class:open={expanded.has(2)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg> Why chunks instead of whole PDFs?
     </button>
     {#if expanded.has(2)}
       <p class="field-desc detail">
@@ -168,7 +169,7 @@
     </div>
     <button class="btn-link" on:click={onCopyMcpConfig}>copy MCP config</button>
     <button class="expander" on:click={() => toggleExpand(4)}>
-      {expanded.has(4) ? '▾' : '▸'} How is this still local?
+      <svg class="caret" class:open={expanded.has(4)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg> How is this still local?
     </button>
     {#if expanded.has(4)}
       <p class="field-desc detail">

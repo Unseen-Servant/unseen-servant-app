@@ -5,7 +5,7 @@
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from '../shell/keybindings';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
-  import { RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemTagRows from './SystemTagRows.svelte';
 
   export let x: number;
@@ -388,7 +388,7 @@
     >
       <span>Collection</span>
       <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')} aria-hidden="true">{chord('tree.addToCollection')}</span>
-      <span class="submenu-caret">&#9656;</span>
+      <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if openSubmenu === 'collection'}
         <div class="submenu" role="menu">
           {#each activeCollections as col}
@@ -440,7 +440,7 @@
       on:mouseleave={() => { openSubmenu = null; }}
     >
       <span>Game system</span>
-      <span class="submenu-caret">&#9656;</span>
+      <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if openSubmenu === 'tag'}
         <div class="submenu" role="menu">
           <SystemTagRows

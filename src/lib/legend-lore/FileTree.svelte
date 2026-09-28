@@ -9,7 +9,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { memberStateFor, type ArmState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { BOOK, CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -295,6 +295,14 @@
     on:pointerenter={() => (hovered = true)}
     on:pointerleave={() => (hovered = false)}
   >
+    <!-- Arrow leads the row so the checkbox sits flush against the type
+         icon; files keep a phantom slot so every checkbox forms one column. -->
+    {#if item.is_dir}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <svg on:click={handleRowClick} class="caret icon arrow" class:open={isExpanded} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
+    {:else}
+      <span class="icon gutter" aria-hidden="true"></span>
+    {/if}
     <button
       class="app-checkbox row-checkbox"
       class:collecting={arm !== null}
@@ -319,7 +327,6 @@
       on:mousedown={handleMouseDown}
     >
       {#if item.is_dir}
-        <span class="icon arrow" aria-hidden="true">{isExpanded ? '\u25BE' : '\u25B8'}</span>
         <span class="icon type-icon folder-glyph" aria-hidden="true">
           <!-- Font Awesome "folder" \u2014 identity lives on the icon, the arrow
                carries expand state, mirroring the systems view's headers -->
@@ -328,8 +335,6 @@
           </svg>
         </span>
       {:else}
-        <!-- Phantom arrow slot so file and folder icons form one column -->
-        <span class="icon gutter" aria-hidden="true"></span>
         <span class="icon type-icon file-glyph" aria-hidden="true">
           <!-- Font Awesome "book" \u2014 matches systems-view file rows -->
           <svg viewBox="0 0 640 640" fill="currentColor">
@@ -545,8 +550,7 @@
     color: var(--text-secondary);
     font-size: 0.7rem;
     width: 0.8rem;
-    display: inline-block;
-    text-align: center;
+    cursor: pointer;
   }
   .gutter {
     width: 0.8rem;

@@ -12,7 +12,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { BOOK, CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -681,7 +681,7 @@
             aria-expanded={!collapsed.has(group.tag)}
             on:click={() => handleGroupHeadClick(group.tag)}
           >
-            <span class="group-arrow" aria-hidden="true">{collapsed.has(group.tag) ? '▸' : '▾'}</span>
+            <svg class="caret group-arrow" class:open={!collapsed.has(group.tag)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
             {#if group.tag !== 'Untagged'}
               <span class="group-icon" aria-hidden="true">
                 <!-- Shield — a game system -->
