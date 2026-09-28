@@ -215,7 +215,7 @@
           disabled={isSyncing}
           title="Clear the library folder and return to the Getting Started screen"
         >
-          Deselect folder
+          deselect folder
         </button>
       </div>
     {/if}
@@ -281,7 +281,7 @@
         disabled={isSyncing}
         title="Check the library folder for changes"
       >
-        Sync
+        sync
       </button>
     </div>
   </section>
@@ -351,7 +351,7 @@
           {/if}
         </span>
         <ActionButton
-          label={isSyncing ? 'Sync in progress…' : 'Re-index all'}
+          label={isSyncing ? 'sync in progress…' : 're-index all'}
           onClick={handleReindexClick}
           disabled={isSyncing || indexedFileCount === 0}
         />
@@ -364,7 +364,7 @@
         </span>
         <ActionButton
           danger
-          label="Delete index"
+          label="delete index"
           onClick={handleDeleteClick}
           disabled={isSyncing || indexedFileCount === 0}
         />

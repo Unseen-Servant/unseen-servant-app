@@ -1364,7 +1364,7 @@
     pendingNotification.show({
       type: 'action',
       message,
-      actionLabel: isSyncing ? 'Sync queued' : 'Sync',
+      actionLabel: isSyncing ? 'sync queued' : 'sync',
       actionDisabled: isSyncing,
       onAction: isSyncing ? undefined : handleSync,
       onDismiss: revertToSyncedPaths,

@@ -56,7 +56,7 @@
 
     <footer class="frame-strip frame-strip-bottom">
       <button type="button" class="btn-link" on:click={onOpenHelp}>
-        More setup info in Help → Guides
+        more setup info in Help → Guides
       </button>
     </footer>
   </div>

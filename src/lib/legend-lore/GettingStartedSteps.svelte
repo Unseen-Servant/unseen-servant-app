@@ -64,7 +64,7 @@
       </p>
     </div>
     {#if !folderSelected}
-      <button class="btn-link" on:click={onSelectFolder}>Choose folder</button>
+      <button class="btn-link" on:click={onSelectFolder}>choose folder</button>
     {/if}
     <button class="expander" on:click={() => toggleExpand(1)}>
       {expanded.has(1) ? '▾' : '▸'} Where does my data live?
@@ -166,7 +166,7 @@
         standalone.
       </p>
     </div>
-    <button class="btn-link" on:click={onCopyMcpConfig}>Copy MCP config</button>
+    <button class="btn-link" on:click={onCopyMcpConfig}>copy MCP config</button>
     <button class="expander" on:click={() => toggleExpand(4)}>
       {expanded.has(4) ? '▾' : '▸'} How is this still local?
     </button>

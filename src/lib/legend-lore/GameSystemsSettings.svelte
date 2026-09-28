@@ -264,9 +264,9 @@
                 : 'Remove this tag and its keywords. Files already tagged are not changed.'}
             </span>
             {#if editIsBuiltin}
-              <ActionButton danger label="Reset to defaults" onClick={handleReset} />
+              <ActionButton danger label="reset to defaults" onClick={handleReset} />
             {:else}
-              <ActionButton danger label="Delete" onClick={handleDelete} />
+              <ActionButton danger label="delete" onClick={handleDelete} />
             {/if}
           </div>
         </div>

@@ -47,7 +47,7 @@
           class="btn-link"
           on:click={onOpenDataDir}
           disabled={!dataDir}
-        >Reveal</button>
+        >reveal</button>
       </dd>
     </dl>
   </section>
@@ -62,7 +62,7 @@
         <span class="link-desc">project homepage</span>
       </li>
       <li>
-        <button class="btn-link" on:click={() => open(LICENSE_URL)}>Software license</button>
+        <button class="btn-link" on:click={() => open(LICENSE_URL)}>software license</button>
         <span class="link-desc">Unseen Servant Games Software License</span>
       </li>
     </ul>

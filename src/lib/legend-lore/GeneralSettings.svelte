@@ -194,7 +194,7 @@
 
       <div class="meta-row">
         <button type="button" class="btn-link" on:click={restoreDefaults}>
-          Restore defaults
+          restore defaults
         </button>
       </div>
     </section>
