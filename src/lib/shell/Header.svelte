@@ -7,6 +7,10 @@
   export let panelToggleVisible: boolean = true;
   export let filterPanelOpen: boolean = false;
   export let onToggleFilterPanel: () => void = () => {};
+  // Engagement lamps — lit while the panel's own narrowings are thrown,
+  // open or closed. Visibility is the key's raised fill; the lamp is the mix.
+  export let collectionsEngaged: boolean = false;
+  export let filtersEngaged: boolean = false;
   export let onSubmit: (q: string) => void = () => {};
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
@@ -73,32 +77,39 @@
 <header class="header">
   <div class="header-controls">
     {#if panelToggleVisible}
-      <button
-        class="panel-toggle"
-        class:active={panelOpen}
-        on:click={onTogglePanel}
-        title={(panelOpen ? 'Hide collections panel' : 'Show collections panel') + chordHint('sidebar.toggle')}
-        aria-label="Toggle collections panel"
-        aria-pressed={panelOpen}
-      >
-        <!-- Font Awesome "rectangle-list" icon (src/lib/ui/icons/rectangle-list-solid-full.svg) -->
-        <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
-          <path d="M128 128C92.7 128 64 156.7 64 192L64 448C64 483.3 92.7 512 128 512L512 512C547.3 512 576 483.3 576 448L576 192C576 156.7 547.3 128 512 128L128 128zM224 384C224 401.7 209.7 416 192 416C174.3 416 160 401.7 160 384C160 366.3 174.3 352 192 352C209.7 352 224 366.3 224 384zM192 288C174.3 288 160 273.7 160 256C160 238.3 174.3 224 192 224C209.7 224 224 238.3 224 256C224 273.7 209.7 288 192 288zM312 232L456 232C469.3 232 480 242.7 480 256C480 269.3 469.3 280 456 280L312 280C298.7 280 288 269.3 288 256C288 242.7 298.7 232 312 232zM312 360L456 360C469.3 360 480 370.7 480 384C480 397.3 469.3 408 456 408L312 408C298.7 408 288 397.3 288 384C288 370.7 298.7 360 312 360z"/>
-        </svg>
-      </button>
-      <button
-        class="panel-toggle"
-        class:active={filterPanelOpen}
-        on:click={onToggleFilterPanel}
-        title={(filterPanelOpen ? 'Hide filter panel' : 'Show filter panel') + chordHint('filter.toggle')}
-        aria-label="Toggle filter panel"
-        aria-pressed={filterPanelOpen}
-      >
-        <!-- Font Awesome "filter" icon (src/lib/ui/icons/filter-solid-full.svg) -->
-        <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
-          <path d="M96 128C83.1 128 71.4 135.8 66.4 147.8C61.4 159.8 64.2 173.5 73.4 182.6L256 365.3L256 480C256 488.5 259.4 496.6 265.4 502.6L329.4 566.6C338.6 575.8 352.3 578.5 364.3 573.5C376.3 568.5 384 556.9 384 544L384 365.3L566.6 182.7C575.8 173.5 578.5 159.8 573.5 147.8C568.5 135.8 556.9 128 544 128L96 128z"/>
-        </svg>
-      </button>
+      <!-- Panel keys — hardware latches in their own well. Open is the
+           raised fill the view switch uses (a view, not a mode); the LED
+           under each icon is the only purple, and it answers for the mix. -->
+      <div class="key-well" role="group" aria-label="Panels">
+        <button
+          class="panel-key"
+          class:open={panelOpen}
+          on:click={onTogglePanel}
+          title={(panelOpen ? 'Hide collections panel' : 'Show collections panel') + chordHint('sidebar.toggle')}
+          aria-label="Toggle collections panel"
+          aria-pressed={panelOpen}
+        >
+          <!-- Font Awesome "rectangle-list" icon (src/lib/ui/icons/rectangle-list-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+            <path d="M128 128C92.7 128 64 156.7 64 192L64 448C64 483.3 92.7 512 128 512L512 512C547.3 512 576 483.3 576 448L576 192C576 156.7 547.3 128 512 128L128 128zM224 384C224 401.7 209.7 416 192 416C174.3 416 160 401.7 160 384C160 366.3 174.3 352 192 352C209.7 352 224 366.3 224 384zM192 288C174.3 288 160 273.7 160 256C160 238.3 174.3 224 192 224C209.7 224 224 238.3 224 256C224 273.7 209.7 288 192 288zM312 232L456 232C469.3 232 480 242.7 480 256C480 269.3 469.3 280 456 280L312 280C298.7 280 288 269.3 288 256C288 242.7 298.7 232 312 232zM312 360L456 360C469.3 360 480 370.7 480 384C480 397.3 469.3 408 456 408L312 408C298.7 408 288 397.3 288 384C288 370.7 298.7 360 312 360z"/>
+          </svg>
+          <span class="lamp" class:lit={collectionsEngaged} aria-hidden="true"></span>
+        </button>
+        <button
+          class="panel-key"
+          class:open={filterPanelOpen}
+          on:click={onToggleFilterPanel}
+          title={(filterPanelOpen ? 'Hide filter panel' : 'Show filter panel') + chordHint('filter.toggle')}
+          aria-label="Toggle filter panel"
+          aria-pressed={filterPanelOpen}
+        >
+          <!-- Font Awesome "filter" icon (src/lib/ui/icons/filter-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor" class="toggle-icon">
+            <path d="M96 128C83.1 128 71.4 135.8 66.4 147.8C61.4 159.8 64.2 173.5 73.4 182.6L256 365.3L256 480C256 488.5 259.4 496.6 265.4 502.6L329.4 566.6C338.6 575.8 352.3 578.5 364.3 573.5C376.3 568.5 384 556.9 384 544L384 365.3L566.6 182.7C575.8 173.5 578.5 159.8 573.5 147.8C568.5 135.8 556.9 128 544 128L96 128z"/>
+          </svg>
+          <span class="lamp" class:lit={filtersEngaged} aria-hidden="true"></span>
+        </button>
+      </div>
     {/if}
     {#if viewToggleVisible}
       <!-- View switch — a picker, not a mode: one view is always on, so the
@@ -186,38 +197,72 @@
     flex-shrink: 0;
   }
 
-  /* Tighter cluster for icon-button siblings — keeps the panel toggles
-     and the view switch close while preserving header gap to the search
-     wrapper. */
+  /* Tighter cluster for the two wells — keeps the panel keys and the view
+     switch close while preserving header gap to the search wrapper. */
   .header-controls {
     display: flex;
     align-items: center;
-    gap: 0.15rem;
+    gap: 0.3rem;
     flex-shrink: 0;
   }
 
-  .panel-toggle {
+  /* Panel keys sit in a well cut like the view switch's. At rest a key is
+     flush with the well floor; open, it comes up on the raised fill. */
+  .key-well {
     display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-well);
+  }
+  .panel-key {
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    gap: 3px;
+    width: 26px;
+    height: 22px;
     background: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: var(--radius-md);
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     cursor: pointer;
     padding: 0;
     transition: all var(--transition-fast);
     flex-shrink: 0;
   }
-  .panel-toggle:hover {
+  .panel-key:hover {
     color: var(--text-primary);
   }
-  .panel-toggle.active {
-    color: var(--text-active);
+  .panel-key:active {
+    transform: scale(0.97);
   }
-  .panel-toggle.active .toggle-icon {
+  .panel-key.open {
+    background: var(--bg-header);
+    color: var(--text-primary);
+  }
+  .panel-key .toggle-icon {
+    width: 12px;
+    height: 12px;
+  }
+  /* The LED: a dark slot at rest, so the key reads as hardware with a lamp
+     that is off rather than a key with no lamp. Lit, it takes the transport's
+     purple and glow. */
+  .lamp {
+    width: 10px;
+    height: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--border-subtle);
+    transition: background var(--transition-fast);
+  }
+  .panel-key.open .lamp {
+    background: var(--bg-app);
+  }
+  .lamp.lit,
+  .panel-key.open .lamp.lit {
+    background: var(--text-active);
     filter: var(--glow-active);
   }
 

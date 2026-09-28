@@ -1110,6 +1110,19 @@
     hideOutOfScope ||
     hideUnindexed;
 
+  // Header lamps split scopeNarrowingEngaged by the panel that throws each
+  // term: the collections transport (play, mute, arm) on one key, the
+  // filter console's axes — systems, curation, tree paths — on the other.
+  $: collectionsEngaged =
+    playingCollections.size > 0 || mutedCollectionNames.size > 0 || armedCollection !== null;
+  $: filtersEngaged =
+    filterExcludedSystems.size > 0 ||
+    soloedSystems.size > 0 ||
+    scopeSolos.size > 0 ||
+    scopeMutes.size > 0 ||
+    soloCuration.size > 0 ||
+    mutedCuration.size > 0;
+
   $: hiddenCount = hiddenPaths.size;
 
   function isPathHidden(path: string): boolean {
@@ -3612,6 +3625,8 @@
     panelToggleVisible={!!selectedFolder}
     {filterPanelOpen}
     onToggleFilterPanel={toggleFilterPanel}
+    {collectionsEngaged}
+    {filtersEngaged}
     onSubmit={handleSearchSubmit}
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
