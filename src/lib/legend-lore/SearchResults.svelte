@@ -1,7 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type { SearchResultItem } from './types';
-  import { pageHint } from './pdfUrl';
+  import { pageCitation } from './pdfUrl';
+  import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import { isPathOrAncestorIn } from './selectionUtils';
   import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
   import { displaySystem } from './searchScope';
@@ -87,18 +88,6 @@
   // scoped miss doesn't masquerade as a confident answer.
   $: dividerAt = weakDividerIndex(results);
   $: allResultsWeak = allWeak(results);
-
-  function pageSpan(start: number, end: number): string {
-    return pageHint(start, end);
-  }
-
-  function stripBold(s: string): string {
-    return s.replace(/\*\*(.+?)\*\*/g, '$1');
-  }
-
-  function breadcrumbSegments(s: string): string[] {
-    return s.split(' > ').map(stripBold).filter(Boolean);
-  }
 
   // Snippet preview: strip markdown markers and collapse whitespace so the
   // single-line row stays scannable. The full markdown still renders in the
@@ -198,8 +187,19 @@
     {#each results as result, i (i)}
       {@const cells = tierCells(result.tier, result.relevance)}
       {@const label = tierLabel(result.tier, result.relevance)}
-      {@const span = pageSpan(result.page_start, result.page_end)}
+      <!-- The printed page, as the inspector cites it — the number the
+           reader turns to, not the PDF's index from the cover. -->
+      {@const span = pageCitation(
+        result.page_start,
+        result.page_end,
+        result.page_label_start,
+        result.page_label_end
+      )}
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
+      <!-- The row keeps the tail of the path: the leaf is what tells
+           sibling hits apart, and the root is usually shared by the whole
+           list. The inspector shows the full path. -->
+      {@const crumbs = segments.slice(-2)}
       {@const collColor = collectionColorByPath.get(result.source) ?? null}
       {#if i === dividerAt}
         <!-- ⁂ drawn, not typed: none of the bundled fonts carry U+2042,
@@ -246,10 +246,13 @@
         <span class="index-cell" aria-hidden="true">{i + 1}</span>
         <div class="row-body">
           {#if segments.length > 0}
-            <div class="breadcrumb">
-              {#each segments as segment, idx (idx)}
-                {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
-                <span class="bc-segment">{segment}</span>
+            <div class="breadcrumb" title={segments.join(' ❧ ')}>
+              {#if segments.length > crumbs.length}
+                <span class="bc-sep bc-elided" aria-hidden="true">…</span>
+              {/if}
+              {#each crumbs as segment, idx (idx)}
+                {#if idx > 0 || segments.length > crumbs.length}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
+                <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
               {/each}
             </div>
           {/if}
@@ -491,33 +494,55 @@
     min-width: 0;
   }
 
+  /* One line, and the leaf is the last thing to give way: the parent
+     shrinks to a stub first (heavy flex-shrink), then the leaf takes its
+     own ellipsis. */
   .breadcrumb {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
     font-family: var(--font-body);
     font-size: 0.75rem;
     color: var(--text-secondary);
     margin-bottom: 0.15rem;
     line-height: 1.3;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .bc-segment {
-    word-break: keep-all;
+    flex: 0 1000 auto;
+    min-width: 1.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .bc-segment:last-child {
+    flex-shrink: 1;
+    min-width: 0;
     color: var(--text-primary);
+  }
+
+  /* Headings set in capitals in the source sit level with mixed-case
+     ones instead of shouting over them. */
+  .caps {
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.04em;
   }
 
   /* A fleuron (❧, carried by Crimson Text) instead of a chevron. Tertiary
      rather than the old border grey: the chevron's straight strokes read
      at that level, the fleuron's hairlines vanish into the row. */
   .bc-sep {
+    flex-shrink: 0;
     color: var(--text-tertiary);
     -webkit-user-select: none;
     user-select: none;
     margin: 0 0.3rem;
+  }
+
+  .bc-elided {
+    margin-left: 0;
   }
 
   .snippet {
