@@ -10,6 +10,8 @@ Your collection has 2,629 PDFs. With that many files, you WILL encounter:
 
 import pytest
 
+from legend_lore.service import load_manifest
+
 
 def test_index_non_pdf_file(client, tmp_path):
     """Sending a non-PDF file path should handle gracefully."""
@@ -20,10 +22,31 @@ def test_index_non_pdf_file(client, tmp_path):
         "paths": [str(txt_file)]
     })
 
-    # PyMuPDF will raise an error trying to read a .txt as PDF
+    # Refused by the extension check before PyMuPDF sees it.
+    data = response.json()
+    assert data["indexed"] == 0
+    assert data["errors"] == ["notes.txt: Not a PDF: notes.txt"]
+
+
+@pytest.mark.parametrize("damage", ["garbage", "truncated"])
+def test_index_corrupt_pdf(client, sample_pdf_path, test_store, tmp_path, damage):
+    """A .pdf PyMuPDF can't read is reported against its name and leaves
+    nothing behind: no manifest entry, no document in the store."""
+    bad = tmp_path / "broken.pdf"
+    if damage == "garbage":
+        bad.write_bytes(b"this is not a pdf at all")
+    else:
+        data = sample_pdf_path.read_bytes()
+        bad.write_bytes(data[: len(data) // 3])
+
+    response = client.post("/api/index-files", json={"paths": [str(bad)]})
+
     data = response.json()
     assert data["indexed"] == 0
     assert len(data["errors"]) == 1
+    assert data["errors"][0].startswith("broken.pdf: ")
+    assert str(bad) not in load_manifest(tmp_path).files
+    assert all(d.path != str(bad) for d in test_store.documents())
 
 
 def test_index_special_characters_filename(client, special_chars_pdf_path):
