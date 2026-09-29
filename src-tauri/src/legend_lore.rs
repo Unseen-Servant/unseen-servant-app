@@ -410,6 +410,18 @@ pub async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, S
     Ok(result)
 }
 
+/// The error for a sync-stream request the sidecar refused. 409 keeps the
+/// `sync-busy:` prefix syncJob.ts matches on; anything else carries the
+/// sidecar's own message rather than reaching the stream parser, which
+/// would report it as a sync that finished without a result.
+fn sync_refusal(status: reqwest::StatusCode, body: &str) -> String {
+    if status == reqwest::StatusCode::CONFLICT {
+        "sync-busy: a sync is already in progress".to_string()
+    } else {
+        format!("Sidecar error ({}): {}", status, body)
+    }
+}
+
 async fn consume_sync_stream(
     app: tauri::AppHandle,
     response: reqwest::Response,
@@ -496,8 +508,10 @@ pub async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<Syn
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
-    if response.status() == reqwest::StatusCode::CONFLICT {
-        return Err("sync-busy: a sync is already in progress".to_string());
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(sync_refusal(status, &body));
     }
     consume_sync_stream(app, response).await
 }
@@ -511,8 +525,10 @@ pub async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
-    if response.status() == reqwest::StatusCode::CONFLICT {
-        return Err("sync-busy: a sync is already in progress".to_string());
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(sync_refusal(status, &body));
     }
     consume_sync_stream(app, response).await
 }
@@ -1201,6 +1217,23 @@ pub async fn delete_folder(path: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_refusal_keeps_the_busy_prefix_the_frontend_matches() {
+        let msg = sync_refusal(reqwest::StatusCode::CONFLICT, "Sync in progress");
+        assert!(msg.starts_with("sync-busy:"), "{msg}");
+    }
+
+    #[test]
+    fn sync_refusal_surfaces_other_statuses_with_the_sidecar_body() {
+        let msg = sync_refusal(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            r#"{"detail":"No data directory configured"}"#,
+        );
+        assert!(!msg.starts_with("sync-busy:"), "{msg}");
+        assert!(msg.contains("500"), "{msg}");
+        assert!(msg.contains("No data directory configured"), "{msg}");
+    }
 
     #[test]
     fn validate_rename_name_accepts_normal_names() {
