@@ -7,6 +7,7 @@
   import { pdfFileUrl } from '../../lib/legend-lore/pdfUrl';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../../lib/legend-lore/types';
+  import { decideSyncAction } from '../../lib/legend-lore/syncPolicy';
   import { DEFAULT_SYNC_PREFERENCES } from '../../lib/legend-lore/types';
   import FileTree from '../../lib/legend-lore/FileTree.svelte';
   import ContextMenu from '../../lib/legend-lore/ContextMenu.svelte';
@@ -1304,51 +1305,6 @@
     }
   }
 
-  function decideSyncAction(
-    status: IndexStatusResult,
-    prefs: SyncPreferences,
-    userTriggered: boolean
-  ): SyncAction {
-    if (prefs.backgroundCheckInterval === 0 && !userTriggered) {
-      return { kind: 'noop' };
-    }
-
-    const { add, remove, update, errors, rename, auto_remove, stale } = status.summary;
-    const diskTotal = rename + auto_remove + stale;
-
-    const askDisk = prefs.diskEventsPolicy === 'ask' && diskTotal > 0;
-    const askAdd = prefs.selectionPolicy === 'ask' && add > 0;
-    const askRemove = prefs.deselectionPolicy === 'ask' && remove > 0;
-    const askUpdate = prefs.modificationPolicy === 'ask' && update > 0;
-    const anyAsk = askDisk || askAdd || askRemove || askUpdate;
-
-    const silentDisk = prefs.diskEventsPolicy === 'silent' && diskTotal > 0;
-    const silentAdd = prefs.selectionPolicy === 'silent' && add > 0;
-    const silentRemove = prefs.deselectionPolicy === 'silent' && remove > 0;
-    const silentUpdate = prefs.modificationPolicy === 'silent' && update > 0;
-    const anySilent = silentDisk || silentAdd || silentRemove || silentUpdate;
-
-    if (!anyAsk && !anySilent && errors === 0) {
-      return { kind: 'noop' };
-    }
-
-    if (!anyAsk && errors === 0) {
-      return { kind: 'silent' };
-    }
-
-    return {
-      kind: 'prompt',
-      counts: {
-        moved: askDisk ? rename : 0,
-        missing: askDisk ? auto_remove + stale : 0,
-        add: askAdd ? add : 0,
-        remove: askRemove ? remove : 0,
-        update: askUpdate ? update : 0,
-        errors,
-      },
-    };
-  }
-
   async function applySyncAction(action: SyncAction) {
     if (action.kind === 'noop') {
       pendingNotification.dismiss();
@@ -1364,7 +1320,7 @@
   async function refreshIndexStatus(options: { userTriggered?: boolean } = {}) {
     const status = await fetchIndexStatus();
     if (!status) return;
-    const action = decideSyncAction(status, syncPreferences, options.userTriggered ?? false);
+    const action = decideSyncAction(status.summary, syncPreferences, options.userTriggered ?? false);
     await applySyncAction(action);
   }
 
