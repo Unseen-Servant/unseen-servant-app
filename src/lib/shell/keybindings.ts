@@ -165,6 +165,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the result's file (narrow search to it)", scope: 'searchResults' },
   { id: 'results.mute',          keys: { mac: 'M',    other: 'M' },             label: "Mute the result's file (drop from search)",    scope: 'searchResults' },
   { id: 'results.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox (while armed)", scope: 'searchResults', switch: true },
+  { id: 'results.toMatch',       keys: { mac: 'G',    other: 'G' },             label: 'Scroll the preview back to the match', scope: 'searchResults' },
   { id: 'results.info',          keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused result', scope: 'searchResults' },
   { id: 'results.toInput',       keys: { mac: 'Esc',  other: 'Esc' },           label: 'Back to search input',         scope: 'searchResults' },
 

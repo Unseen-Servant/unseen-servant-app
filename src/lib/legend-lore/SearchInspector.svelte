@@ -9,6 +9,7 @@
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import { queryTerms, rehypeMarkTerms } from './snippetHits';
+  import { chordHint } from '../shell/keybindings';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -30,6 +31,11 @@
 
   // The marked passage, for scrolling it into view.
   let matchEl: HTMLElement | null = null;
+  let bodyEl: HTMLElement | null = null;
+
+  // Where the match sits on the scrollbar track, in px from its top.
+  // Null when there's no match or nothing to scroll.
+  let mark: { top: number; height: number } | null = null;
 
   $: tags = (result && gameSystemMap.get(result.source)) || [];
 
@@ -58,16 +64,45 @@
     followMatch = false;
   }
 
+  /** Scroll back to the match and follow it again, as on selection. */
+  export function returnToMatch() {
+    followMatch = true;
+    centreMatch();
+  }
+
+  function measureMark() {
+    if (!bodyEl || !matchEl || bodyEl.scrollHeight <= bodyEl.clientHeight) {
+      mark = null;
+      return;
+    }
+    const scale = bodyEl.clientHeight / bodyEl.scrollHeight;
+    const y =
+      matchEl.getBoundingClientRect().top -
+      bodyEl.getBoundingClientRect().top +
+      bodyEl.scrollTop;
+    mark = {
+      top: y * scale,
+      height: Math.max(3, matchEl.offsetHeight * scale),
+    };
+  }
+
   function followResizes(node: HTMLElement) {
-    const observer = new ResizeObserver(centreMatch);
+    const observer = new ResizeObserver(() => {
+      centreMatch();
+      measureMark();
+    });
     observer.observe(node);
     return { destroy: () => observer.disconnect() };
   }
 
   $: if (result && matchEl) {
     followMatch = true;
-    tick().then(centreMatch);
+    tick().then(() => {
+      centreMatch();
+      measureMark();
+    });
   }
+  $: if (!matchEl) mark = null;
 
   function toggleSystem(tag: string) {
     if (!result) return;
@@ -116,9 +151,13 @@
         </div>
         {#if segments.length > 0}
           <div class="breadcrumb" aria-label="Section path">
+            <!-- Each separator rides with the segment after it, so a wrap
+                 never leaves one hanging at a line end. -->
             {#each segments as segment, idx (idx)}
-              {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
-              <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
+              <span class="bc-item">
+                {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
+                <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
+              </span>
             {/each}
           </div>
         {/if}
@@ -141,59 +180,75 @@
       onClear={clearSystem}
     />
 
-    <!-- Wheel, a scrollbar drag or a key hands the scroll to the reader;
-         the listeners only observe, so the body stays a plain region. -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="body"
-      use:followResizes
-      on:wheel|passive={releaseMatch}
-      on:pointerdown={releaseMatch}
-      on:keydown={releaseMatch}
-    >
-      {#if result.also_in.length > 0}
-        <!-- Cross-edition twins collapsed into this result (roadmap 2.3).
-             Each opens its own book at its own page. -->
-        <div class="also-in">
-          <span class="micro-label">also in</span>
-          {#each result.also_in as twin, idx (idx)}
-            {@const twinCite = pageCitation(
-              twin.page_start,
-              twin.page_end,
-              twin.page_label_start,
-              twin.page_label_end
-            )}
-            <button
-              type="button"
-              class="also-chip"
-              title={`Open ${bookTitle(twin.filename)}${twinCite ? ` at ${twinCite}` : ''}`}
-              on:click={() => onOpenResult(twin.source, twin.filename, twin.page_start)}
-            >
-              {bookTitle(twin.filename)}{twinCite ? ` · ${twinCite}` : ''}
-            </button>
-          {/each}
-        </div>
-      {/if}
-
-      <div class="snippet" use:followResizes>
-        {#if parts}
-          <!-- Three documents, not one: the range is snapped to whole
-               Markdown blocks so a table straddling it stays renderable. -->
-          {#if parts.before}
-            <Markdown md={parts.before} plugins={mdPlugins} />
-          {/if}
-          {#if parts.match}
-            <div class="matched" bind:this={matchEl}>
-              <Markdown md={parts.match} plugins={mdPlugins} />
-            </div>
-          {/if}
-          {#if parts.after}
-            <Markdown md={parts.after} plugins={mdPlugins} />
-          {/if}
-        {:else}
-          <Markdown md={result.text} plugins={mdPlugins} />
+    <div class="body-frame">
+      <!-- Wheel, a scrollbar drag or a key hands the scroll to the reader;
+           the listeners only observe, so the body stays a plain region. -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="body"
+        bind:this={bodyEl}
+        use:followResizes
+        on:wheel|passive={releaseMatch}
+        on:pointerdown={releaseMatch}
+        on:keydown={releaseMatch}
+      >
+        {#if result.also_in.length > 0}
+          <!-- Cross-edition twins collapsed into this result (roadmap 2.3).
+               Each opens its own book at its own page. -->
+          <div class="also-in">
+            <span class="micro-label">also in</span>
+            {#each result.also_in as twin, idx (idx)}
+              {@const twinCite = pageCitation(
+                twin.page_start,
+                twin.page_end,
+                twin.page_label_start,
+                twin.page_label_end
+              )}
+              <button
+                type="button"
+                class="also-chip"
+                title={`Open ${bookTitle(twin.filename)}${twinCite ? ` at ${twinCite}` : ''}`}
+                on:click={() => onOpenResult(twin.source, twin.filename, twin.page_start)}
+              >
+                {bookTitle(twin.filename)}{twinCite ? ` · ${twinCite}` : ''}
+              </button>
+            {/each}
+          </div>
         {/if}
+
+        <div class="snippet" use:followResizes>
+          {#if parts}
+            <!-- Three documents, not one: the range is snapped to whole
+                 Markdown blocks so a table straddling it stays renderable. -->
+            {#if parts.before}
+              <Markdown md={parts.before} plugins={mdPlugins} />
+            {/if}
+            {#if parts.match}
+              <div class="matched" bind:this={matchEl}>
+                <Markdown md={parts.match} plugins={mdPlugins} />
+              </div>
+            {/if}
+            {#if parts.after}
+              <Markdown md={parts.after} plugins={mdPlugins} />
+            {/if}
+          {:else}
+            <Markdown md={result.text} plugins={mdPlugins} />
+          {/if}
+        </div>
       </div>
+      {#if mark}
+        <!-- The match's place in the section, drawn on the scrollbar track
+             the way find-in-page marks are; the thumb already shows where
+             the reader is. Clicking it goes back. -->
+        <button
+          type="button"
+          class="match-mark"
+          style="top: {mark.top}px; height: {mark.height}px"
+          title={`Back to the match${chordHint('results.toMatch')}`}
+          aria-label="Back to the match"
+          on:click={returnToMatch}
+        ></button>
+      {/if}
     </div>
   {/if}
 </aside>
@@ -228,11 +283,42 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  .body-frame {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   .body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     padding: 0.7rem 1.1rem 1rem;
+  }
+
+  /* Laid over the scrollbar track, the width app.css gives
+     ::-webkit-scrollbar. Parchment, as the match's margin rule. */
+  .match-mark {
+    position: absolute;
+    right: 0;
+    width: 8px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-cell);
+    background: var(--text-accent);
+    cursor: pointer;
+    transition: filter var(--transition-fast);
+  }
+
+  .match-mark:hover {
+    filter: brightness(1.25);
+  }
+
+  .match-mark:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 1px;
   }
 
   .head-text {
@@ -300,11 +386,18 @@
     row-gap: 0.1rem;
   }
 
+  .bc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
   .bc-segment {
     word-break: break-word;
   }
 
-  .bc-segment:last-child {
+  .bc-item:last-child .bc-segment {
     color: var(--text-primary);
   }
 
@@ -314,7 +407,7 @@
     letter-spacing: 0.04em;
   }
 
-  /* Fleuron separator — see SearchResults.svelte .bc-sep */
+  /* Path separator — see SearchResults.svelte .bc-sep */
   .bc-sep {
     color: var(--text-tertiary);
     -webkit-user-select: none;

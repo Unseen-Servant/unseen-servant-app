@@ -238,15 +238,15 @@
         <span class="index-cell" aria-hidden="true">{i + 1}</span>
         <div class="row-body">
           {#if segments.length > 0}
-            <div class="breadcrumb" title={segments.join(' ❧ ')}>
+            <div class="breadcrumb" title={segments.join(' › ')}>
               {#if parent}
                 <span class="bc-head">
                   {#if segments.length > 2}
                     <span class="bc-sep bc-elided" aria-hidden="true">…</span>
-                    <span class="bc-sep" aria-hidden="true">❧</span>
+                    <span class="bc-sep" aria-hidden="true">›</span>
                   {/if}
                   <span class="bc-segment" class:caps={isAllCaps(parent)}>{parent}</span>
-                  <span class="bc-sep" aria-hidden="true">❧</span>
+                  <span class="bc-sep" aria-hidden="true">›</span>
                 </span>
               {/if}
               <span class="bc-segment bc-leaf" class:caps={isAllCaps(leaf)}>{leaf}</span>
@@ -458,8 +458,8 @@
     min-width: 0;
   }
 
-  /* One line, and the leaf keeps its full width: only the head (… ❧
-     parent ❧) gives way, the parent taking the ellipsis. A leaf wider
+  /* One line, and the leaf keeps its full width: only the head (… ›
+     parent ›) gives way, the parent taking the ellipsis. A leaf wider
      than the row fills it with its own ellipsis and the head drops out.
      No shrink ratios — WebKit didn't honour them. */
   .breadcrumb {
@@ -502,9 +502,8 @@
     letter-spacing: 0.04em;
   }
 
-  /* A fleuron (❧, carried by Crimson Text) instead of a chevron. Tertiary
-     rather than the old border grey: the chevron's straight strokes read
-     at that level, the fleuron's hairlines vanish into the row. */
+  /* A single guillemet in the body serif, in place of the earlier ❧
+     fleuron. */
   .bc-sep {
     flex-shrink: 0;
     color: var(--text-tertiary);
