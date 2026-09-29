@@ -1,6 +1,6 @@
 # Docs
 
-Design specs, plans, and planning notes for Legend Lore. Two buckets, one
+Design specs and planning notes for Legend Lore. Two buckets, one
 level deep — pick by the part of the project a doc is about:
 
 - **[`roadmap/`](roadmap/)** — where the project is going: goals, strategy, and
@@ -13,9 +13,11 @@ each rule is written as a comment where it's enforced (e.g. the scope doctrine
 in `src/routes/legend-lore/+page.svelte`, the confirm keyboard in
 `src/lib/ui/confirmKeys.ts`). Visual conventions live in CLAUDE.md.
 
-**Naming:** `YYYY-MM-DD-<topic>-design.md` is the spec; a paired
-`…-plan.md` is its implementation plan. One-offs use `…-audit.md`. The folder
-is the source of truth; this index is just a map and may lag new files.
+**Naming:** `YYYY-MM-DD-<topic>-design.md` is the spec. Step-by-step
+implementation plans aren't kept once the work lands — outcomes go in the
+spec or the roadmap's decision log, and the code is the record of the steps.
+The folder is the source of truth; this index is just a map and may lag new
+files.
 
 ---
 
@@ -33,7 +35,7 @@ is the source of truth; this index is just a map and may lag new files.
 
 ## retrieval/
 
-- Table linearization — [design](retrieval/2026-07-02-table-linearization-design.md) · [plan](retrieval/2026-07-02-table-linearization.md)
+- Table linearization — [design](retrieval/2026-07-02-table-linearization-design.md)
 - Typo tolerance — [design](retrieval/2026-07-10-typo-tolerance-design.md)
 - Search settings — [design](retrieval/2026-07-11-search-settings-design.md)
 - v3 scaffold — [spec](retrieval/2026-08-14-v3-scaffold.md) (implements roadmap §7)

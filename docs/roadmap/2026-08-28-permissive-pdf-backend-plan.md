@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28 (revised 2026-08-29)
 
-**Status:** active research and implementation plan
+**Status:** closed — NO-GO, verdict in §9; v2 ingestion kept
 
 **Decision:** Legend Lore will retain its proprietary application license and
 replace the AGPL PyMuPDF/PyMuPDF4LLM runtime. It will not ship that dependency

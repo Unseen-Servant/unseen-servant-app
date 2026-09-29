@@ -1,6 +1,6 @@
 # Retrieval workstream — handoff, 2026-09-23
 
-Where the v2 retrieval roadmap stands and what is left. Written to pick the work up cold. The roadmap itself is `2026-09-02-v2-retrieval-improvement-roadmap.md` (§5 bars, §8 decision log); the phase plans are `2026-09-09-v2-retrieval-phase1-plan.md` and `2026-09-12-v2-retrieval-phase2-plan.md`.
+Where the v2 retrieval roadmap stands and what is left. Written to pick the work up cold. The roadmap itself is `2026-09-02-v2-retrieval-improvement-roadmap.md` (§5 bars, §8 decision log).
 
 ## State on main (all pushed, CI green)
 

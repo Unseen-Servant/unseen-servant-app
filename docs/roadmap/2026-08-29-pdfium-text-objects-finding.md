@@ -1,7 +1,7 @@
 # PDFium Text Objects — Do They Bound Table Cells?
 
 **Date:** 2026-08-29
-**Status:** finding — measurement complete, feeds Task 4 of [2026-08-29-pdfium-block-builder-plan.md](2026-08-29-pdfium-block-builder-plan.md).
+**Status:** finding — measurement complete, fed the PDFium block builder; its verdict is §9 of [2026-08-28-permissive-pdf-backend-plan.md](2026-08-28-permissive-pdf-backend-plan.md).
 **Question:** PDFium's current adapter reconstructs table cells by splitting a row
 of characters wherever a horizontal gap looks wide enough, and that heuristic is
 responsible for 13 of 18 quality regressions vs. PyMuPDF (whole rows collapse
