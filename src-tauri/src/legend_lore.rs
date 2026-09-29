@@ -422,6 +422,69 @@ fn sync_refusal(status: reqwest::StatusCode, body: &str) -> String {
     }
 }
 
+/// Splits an SSE byte stream into its `data:` frames' JSON. Buffers bytes,
+/// not text, so a multibyte character split across chunks survives; frames
+/// that aren't JSON data (comments, keep-alives) are skipped.
+#[derive(Default)]
+struct SseFrames {
+    buffer: Vec<u8>,
+}
+
+impl SseFrames {
+    fn push(&mut self, chunk: &[u8]) -> Vec<serde_json::Value> {
+        self.buffer.extend_from_slice(chunk);
+        let mut out = Vec::new();
+        while let Some(pos) = self.buffer.windows(2).position(|w| w == b"\n\n") {
+            let frame: Vec<u8> = self.buffer.drain(..pos + 2).collect();
+            if let Some(data) = frame[..pos].strip_prefix(b"data: ") {
+                if let Ok(json) = serde_json::from_slice(data) {
+                    out.push(json);
+                }
+            }
+        }
+        out
+    }
+}
+
+#[derive(Debug)]
+enum SyncEvent {
+    Progress(SyncProgressPayload),
+    Complete(SyncResult),
+}
+
+/// What one sync-stream frame means to the app: progress to relay, the
+/// final result, or nothing (`error` frames — failures reach the UI through
+/// the result's `errors`). A `complete` that doesn't deserialize is an
+/// error, not a sync that ended without a result.
+fn sync_event(json: &serde_json::Value) -> Result<Option<SyncEvent>, String> {
+    let count = |key: &str| json[key].as_u64().unwrap_or(0) as u32;
+    let text = |key: &str| json[key].as_str().unwrap_or("").to_string();
+    match json.get("event").and_then(|e| e.as_str()) {
+        Some("started") => Ok(Some(SyncEvent::Progress(SyncProgressPayload {
+            files_done: 0,
+            total_files: count("total_files"),
+            chunks_total: 0,
+            current_file: String::new(),
+            phase: String::new(),
+            book_chunks_done: 0,
+            book_chunks_total: 0,
+        }))),
+        Some("progress") => Ok(Some(SyncEvent::Progress(SyncProgressPayload {
+            files_done: count("files_done"),
+            total_files: count("total_files"),
+            chunks_total: count("chunks_total"),
+            current_file: text("current_file"),
+            phase: text("phase"),
+            book_chunks_done: count("book_chunks_done"),
+            book_chunks_total: count("book_chunks_total"),
+        }))),
+        Some("complete") => serde_json::from_value(json.clone())
+            .map(|r| Some(SyncEvent::Complete(r)))
+            .map_err(|e| format!("Invalid sync result: {}", e)),
+        _ => Ok(None),
+    }
+}
+
 async fn consume_sync_stream(
     app: tauri::AppHandle,
     response: reqwest::Response,
@@ -429,68 +492,18 @@ async fn consume_sync_stream(
     use futures_util::StreamExt;
 
     let mut stream = response.bytes_stream();
-    let mut buffer = String::new();
+    let mut frames = SseFrames::default();
     let mut final_result: Option<SyncResult> = None;
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(&String::from_utf8_lossy(&chunk));
-
-        while let Some(pos) = buffer.find("\n\n") {
-            let frame = buffer[..pos].to_string();
-            buffer = buffer[pos + 2..].to_string();
-
-            if let Some(data) = frame.strip_prefix("data: ") {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    match json.get("event").and_then(|e| e.as_str()) {
-                        Some("started") => {
-                            let payload = SyncProgressPayload {
-                                files_done: 0,
-                                total_files: json["total_files"].as_u64().unwrap_or(0) as u32,
-                                chunks_total: 0,
-                                current_file: String::new(),
-                                phase: String::new(),
-                                book_chunks_done: 0,
-                                book_chunks_total: 0,
-                            };
-                            let _ = app.emit("sync-progress", &payload);
-                        }
-                        Some("progress") => {
-                            let payload = SyncProgressPayload {
-                                files_done: json["files_done"].as_u64().unwrap_or(0) as u32,
-                                total_files: json["total_files"].as_u64().unwrap_or(0) as u32,
-                                chunks_total: json["chunks_total"].as_u64().unwrap_or(0) as u32,
-                                current_file: json["current_file"]
-                                    .as_str()
-                                    .unwrap_or("")
-                                    .to_string(),
-                                phase: json["phase"].as_str().unwrap_or("").to_string(),
-                                book_chunks_done: json["book_chunks_done"].as_u64().unwrap_or(0)
-                                    as u32,
-                                book_chunks_total: json["book_chunks_total"].as_u64().unwrap_or(0)
-                                    as u32,
-                            };
-                            let _ = app.emit("sync-progress", &payload);
-                        }
-                        Some("complete") => {
-                            final_result = serde_json::from_value(serde_json::json!({
-                                "added": json["added"],
-                                "removed": json["removed"],
-                                "auto_removed": json["auto_removed"],
-                                "renamed": json["renamed"],
-                                "updated": json["updated"],
-                                "errors": json["errors"],
-                                "total_indexed": json["total_indexed"],
-                                "chunks_total": json["chunks_total"],
-                                "renames": json["renames"],
-                                "auto_removed_paths": json["auto_removed_paths"],
-                                "stale_paths": json["stale_paths"],
-                            }))
-                            .ok();
-                        }
-                        _ => {}
-                    }
+        for json in frames.push(&chunk) {
+            match sync_event(&json)? {
+                Some(SyncEvent::Progress(payload)) => {
+                    let _ = app.emit("sync-progress", &payload);
                 }
+                Some(SyncEvent::Complete(result)) => final_result = Some(result),
+                None => {}
             }
         }
     }
@@ -1217,6 +1230,92 @@ pub async fn delete_folder(path: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sse_frames_reassembles_frames_split_across_chunks() {
+        let mut frames = SseFrames::default();
+        assert!(frames.push(b"data: {\"event\":\"prog").is_empty());
+        let out = frames.push(b"ress\"}\n\ndata: {\"event\":\"started\"}\n\n");
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0]["event"], "progress");
+        assert_eq!(out[1]["event"], "started");
+    }
+
+    #[test]
+    fn sse_frames_keeps_a_multibyte_char_split_across_chunks() {
+        let bytes = "data: {\"current_file\":\"Grimoire é.pdf\"}\n\n".as_bytes();
+        let cut = bytes.iter().position(|&b| b == 0xC3).unwrap() + 1;
+        let mut frames = SseFrames::default();
+        assert!(frames.push(&bytes[..cut]).is_empty());
+        let out = frames.push(&bytes[cut..]);
+        assert_eq!(out[0]["current_file"], "Grimoire é.pdf");
+    }
+
+    #[test]
+    fn sse_frames_skips_frames_that_are_not_json_data() {
+        let mut frames = SseFrames::default();
+        let out =
+            frames.push(b": keep-alive\n\ndata: not json\n\ndata: {\"event\":\"started\"}\n\n");
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["event"], "started");
+    }
+
+    #[test]
+    fn sync_event_reads_started_and_progress_as_progress() {
+        let started = serde_json::json!({"event": "started", "total_files": 12});
+        match sync_event(&started) {
+            Ok(Some(SyncEvent::Progress(p))) => {
+                assert_eq!((p.files_done, p.total_files), (0, 12));
+                assert_eq!(p.phase, "");
+            }
+            other => panic!("expected progress, got {:?}", other),
+        }
+
+        let progress = serde_json::json!({
+            "event": "progress", "files_done": 3, "total_files": 12,
+            "chunks_total": 40, "current_file": "Monster Manual.pdf", "phase": "add",
+        });
+        match sync_event(&progress) {
+            Ok(Some(SyncEvent::Progress(p))) => {
+                assert_eq!((p.files_done, p.total_files, p.chunks_total), (3, 12, 40));
+                assert_eq!(p.current_file, "Monster Manual.pdf");
+                assert_eq!(p.phase, "add");
+                assert_eq!((p.book_chunks_done, p.book_chunks_total), (0, 0));
+            }
+            other => panic!("expected progress, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn sync_event_reads_complete_as_the_result() {
+        let complete = serde_json::json!({
+            "event": "complete", "added": 2, "removed": 0, "auto_removed": 0,
+            "renamed": 1, "updated": 0, "errors": ["bad.pdf: no text"],
+            "total_indexed": 9, "chunks_total": 120,
+            "renames": [{"old_path": "/a.pdf", "new_path": "/b.pdf"}],
+            "auto_removed_paths": [], "stale_paths": [],
+        });
+        match sync_event(&complete) {
+            Ok(Some(SyncEvent::Complete(r))) => {
+                assert_eq!((r.added, r.renamed, r.total_indexed), (2, 1, 9));
+                assert_eq!(r.errors, vec!["bad.pdf: no text"]);
+            }
+            other => panic!("expected complete, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn sync_event_rejects_a_malformed_complete() {
+        let complete = serde_json::json!({"event": "complete", "added": "lots"});
+        let err = sync_event(&complete).unwrap_err();
+        assert!(err.starts_with("Invalid sync result"), "{err}");
+    }
+
+    #[test]
+    fn sync_event_ignores_other_events() {
+        let error = serde_json::json!({"event": "error", "file": "x.pdf", "message": "boom"});
+        assert!(matches!(sync_event(&error), Ok(None)));
+    }
 
     #[test]
     fn sync_refusal_keeps_the_busy_prefix_the_frontend_matches() {
