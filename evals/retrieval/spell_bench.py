@@ -18,7 +18,7 @@ stopwords are reported apart — fixing one by breaking the other is not
 an improvement.
 
     uv run --project sidecar python -m evals.retrieval.spell_bench \\
-        --data-dir evals/.eval_data/v2-p3
+        --data-dir evals/.eval_data/v2-store
 """
 from __future__ import annotations
 

@@ -5,7 +5,7 @@ keep-warm ticker re-embeds inside that window, so a search taken after
 a long lull should cost about what a warm one costs. This probe
 measures that against a sidecar that is already running::
 
-    uv run --project sidecar python sidecar/server.py --data-dir evals/.eval_data/v2 --port 8420
+    uv run --project sidecar python sidecar/server.py --data-dir evals/.eval_data/v2-store --port 8420
     uv run --project sidecar python -m evals.retrieval.idle_probe --idle 600
 
 Not part of any suite — it spends its idle window in wall-clock time by
