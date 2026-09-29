@@ -78,6 +78,35 @@ def mock_sidecar(monkeypatch):
     return mock
 
 
+@pytest.fixture
+def http_sidecar(monkeypatch):
+    """The real SidecarClient, its HTTP answered by a handler the test sets.
+
+    For error paths: the client, not a mock, has to turn a refused
+    connection or an error status into the message the tool returns.
+    """
+    import argparse
+    import httpx
+    import mcp_server
+
+    handler = {}
+    real_client = httpx.AsyncClient
+
+    def client_factory(**kwargs):
+        transport = httpx.MockTransport(lambda request: handler["fn"](request))
+        return real_client(transport=transport, **kwargs)
+
+    monkeypatch.setattr(mcp_server.httpx, "AsyncClient", client_factory)
+    args = argparse.Namespace(sidecar_url="http://sidecar.test", data_dir=None)
+    monkeypatch.setattr(mcp_server, "sidecar", mcp_server.SidecarClient(args))
+    return handler
+
+
+def _refuse(request):
+    import httpx
+    raise httpx.ConnectError("connection refused", request=request)
+
+
 # ---------------------------------------------------------------------------
 # search_library tests
 # ---------------------------------------------------------------------------
@@ -153,8 +182,8 @@ async def test_search_library_surfaces_resolution_note_with_results(mock_sidecar
 
 
 @pytest.mark.asyncio
-async def test_search_library_sidecar_down(mock_sidecar):
-    mock_sidecar.set_post("/api/search", "Cannot connect to Legend Lore app.")
+async def test_search_library_sidecar_down(http_sidecar):
+    http_sidecar["fn"] = _refuse
 
     result = await search_library("anything")
     assert "Cannot connect" in result
@@ -462,15 +491,25 @@ async def test_get_section_does_not_flag_a_whole_section(mock_sidecar):
 
 
 @pytest.mark.asyncio
-async def test_get_section_not_found(mock_sidecar):
-    mock_sidecar.set_get("/api/section/nope", "Sidecar error: 404 — Section not found: nope")
+async def test_get_section_not_found(http_sidecar):
+    import httpx
+    seen = {}
+
+    def not_found(request):
+        seen["path"] = request.url.path
+        seen["source"] = request.headers.get("x-source")
+        return httpx.Response(404, json={"detail": "Section not found: nope"})
+
+    http_sidecar["fn"] = not_found
     result = await get_section("nope")
     assert "404" in result
+    assert "Section not found: nope" in result
+    assert seen == {"path": "/api/section/nope", "source": "mcp"}
 
 
 @pytest.mark.asyncio
-async def test_get_section_sidecar_down(mock_sidecar):
-    mock_sidecar.set_get("/api/section/s_k", "Cannot connect to Legend Lore app.")
+async def test_get_section_sidecar_down(http_sidecar):
+    http_sidecar["fn"] = _refuse
     result = await get_section("s_k")
     assert "Cannot connect" in result
 
@@ -493,10 +532,8 @@ async def test_get_pages_formats_range_and_text(mock_sidecar):
 
 
 @pytest.mark.asyncio
-async def test_get_pages_sidecar_down(mock_sidecar):
-    mock_sidecar.set_get(
-        "/api/source/X.pdf/pages?start=1&end=1", "Cannot connect to Legend Lore app."
-    )
+async def test_get_pages_sidecar_down(http_sidecar):
+    http_sidecar["fn"] = _refuse
     result = await get_pages("X.pdf", 1, 1)
     assert "Cannot connect" in result
 
@@ -688,8 +725,8 @@ async def test_search_library_without_collection(mock_sidecar):
 def test_registered_tools_are_the_public_surface():
     from mcp_server import mcp
     names = {t.name for t in asyncio.run(mcp.list_tools())}
-    assert "search_library" in names
-    assert "get_section" in names
-    assert "get_pages" in names
-    assert "_page_span" not in names
+    assert names == {
+        "search_library", "get_section", "get_pages",
+        "list_sources", "list_game_systems", "list_collections",
+    }
 
