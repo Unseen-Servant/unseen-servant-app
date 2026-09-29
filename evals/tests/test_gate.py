@@ -4,12 +4,7 @@ The 30-page mean let g28 drop 1.0 → 0.5 inside a 0.94 aggregate that "beat
 v2" — three times over. The gate compares every page's every metric against a
 reference baseline; any drop fails the run, whatever the mean does.
 """
-import json
-from pathlib import Path
-
 from evals.extraction import gate
-
-BASELINES = Path(__file__).resolve().parents[1] / "baselines"
 
 
 def test_page_below_reference_is_a_regression():
@@ -35,15 +30,6 @@ def test_equal_within_tolerance_passes():
     ref = [{"id": "g01", "content_recall": 2 / 3}]
     cur = [{"id": "g01", "content_recall": 0.6666666666}]
     assert gate.page_regressions(cur, ref) == []
-
-
-def test_committed_v3_baseline_would_have_failed_against_v2_on_g28():
-    # The historical miss the gate exists for: 2026-08-16 v3 extraction "beat"
-    # v2 on the mean (0.940 > 0.935) while the goblin page halved.
-    ref = json.loads((BASELINES / "2026-08-15-v2-extraction.json").read_text())["pages"]
-    cur = json.loads((BASELINES / "2026-08-16-v3-extraction.json").read_text())["pages"]
-    regs = gate.page_regressions(cur, ref)
-    assert {"id": "g28", "metric": "table_cells", "ref": 1.0, "cur": 0.5} in regs
 
 
 def test_format_lists_each_regression_on_one_line():

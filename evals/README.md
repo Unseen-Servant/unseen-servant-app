@@ -4,7 +4,7 @@ Engine-agnostic evaluation for the retrieval pipeline. It grades the **live v2
 sidecar** (via an in-process TestClient) — same queries, same grader, so every
 change is measured against a committed baseline it must beat. It was built for
 the v3 rebuild, which is parked in the experiments repo (`v3_pipeline/`); its
-v3 baselines stay here as history. See
+v3 baselines moved with it (`v3_pipeline/baselines/`). See
 [docs/retrieval/2026-08-14-v3-scaffold.md](../docs/retrieval/2026-08-14-v3-scaffold.md)
 and [docs/roadmap/2026-08-13-pipeline-rebuild-plan.md](../docs/roadmap/2026-08-13-pipeline-rebuild-plan.md).
 
