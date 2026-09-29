@@ -6,7 +6,6 @@
   import { bookTitle, pageCitation, pageHint } from './pdfUrl';
   import { findMatchedRange, splitAround, type MatchedParts } from './matchedSpan';
   import { isPathOrAncestorIn } from './selectionUtils';
-  import { GAUGE_CELLS, tierCells, tierLabel } from './searchTiers';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import SystemBadge from './SystemBadge.svelte';
@@ -24,8 +23,6 @@
 
   // Rulebook pages are half tables — without GFM they render as pipe soup.
   const mdPlugins = [gfmPlugin()];
-
-  const gaugeCells = Array.from({ length: GAUGE_CELLS }, (_, idx) => idx);
 
   // The marked passage, for scrolling it into view.
   let matchEl: HTMLElement | null = null;
@@ -86,8 +83,6 @@
   {#if !result}
     <div class="empty">Select a result to preview.</div>
   {:else}
-    {@const cells = tierCells(result.tier, result.relevance)}
-    {@const label = tierLabel(result.tier, result.relevance)}
     {@const span = pageHint(result.page_start, result.page_end)}
     {@const cite = pageCitation(
       result.page_start,
@@ -95,18 +90,15 @@
       result.page_label_start,
       result.page_label_end
     )}
-    {@const openLabel = result.page_start ? `Open PDF at ${span}` : 'Open PDF'}
     {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
 
+    <!-- The selected row already carries the gauge and the book line; the
+         header keeps what the row can't: the full section path, pinned
+         above the body so it stays in view while the match is centred. -->
     <header class="head">
       <div class="head-text">
         <div class="meta">
           <span class="filename" title={result.source}>{bookTitle(result.filename)}</span>
-          {#if isPathOrAncestorIn(result.source, hiddenPaths)}
-            <span class="badge micro-label" title="This file is hidden in the tree.">hidden</span>
-          {/if}
-        </div>
-        <div class="sub">
           {#if result.game_system === UNTAGGED_KEY}
             <span class="sysname">untagged</span>
           {:else if result.game_system}
@@ -114,33 +106,27 @@
               <SystemBadge tag={displaySystem(result.game_system)} />
             </button>
           {/if}
-          {#if cite}
-            <span class="dot">·</span>
-            <!-- The printed page leads; the physical one stays in reach
-                 for PDF viewers, which count from the cover. -->
-            <span title={!span || cite === span ? undefined : `PDF ${span}`}>{cite}</span>
+          {#if isPathOrAncestorIn(result.source, hiddenPaths)}
+            <span class="badge micro-label" title="This file is hidden in the tree.">hidden</span>
           {/if}
-          <span class="dot">·</span>
-          <span class="gauge" role="img" aria-label={label} title={label}>
-            {#each gaugeCells as idx (idx)}
-              <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
-            {/each}
-          </span>
-          <span class="pct">{label}</span>
         </div>
+        {#if segments.length > 0}
+          <div class="breadcrumb" aria-label="Section path">
+            {#each segments as segment, idx (idx)}
+              {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
+              <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
+            {/each}
+          </div>
+        {/if}
       </div>
+      <!-- The printed page leads, as on the row; the physical one stays in
+           the tooltip for PDF viewers, which count from the cover. -->
       <button
         type="button"
         class="open-btn"
         on:click={() => onOpenResult(result.source, result.filename, result.page_start)}
-        title={openLabel}
-        aria-label={openLabel}
-      >
-        <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-          <path d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z"/>
-        </svg>
-        <span>Open</span>
-      </button>
+        title={span && cite !== span ? `Open PDF at ${span}` : undefined}
+      >{cite ? `open ${cite}` : 'open'}</button>
     </header>
 
     <SystemTagMenu
@@ -161,15 +147,6 @@
       on:pointerdown={releaseMatch}
       on:keydown={releaseMatch}
     >
-      {#if segments.length > 0}
-        <div class="breadcrumb" aria-label="Section path">
-          {#each segments as segment, idx (idx)}
-            {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
-            <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
-          {/each}
-        </div>
-      {/if}
-
       {#if result.also_in.length > 0}
         <!-- Cross-edition twins collapsed into this result (roadmap 2.3).
              Each opens its own book at its own page. -->
@@ -259,7 +236,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.3rem;
   }
 
   .meta {
@@ -287,21 +264,16 @@
     font-style: italic;
   }
 
-  .sub {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
+  /* Tagged files carry the system badge; "untagged" stays plain text —
+     no pill, no dropdown trigger beyond what the tree already offers. */
+  .sysname {
+    flex-shrink: 0;
     font-size: 0.8rem;
     color: var(--text-secondary);
   }
 
-  /* Tagged files carry the system badge; "untagged" stays plain text —
-     no pill, no dropdown trigger beyond what the tree already offers. */
-  .sysname {
-    color: var(--text-secondary);
-  }
-
   .sys-btn {
+    flex-shrink: 0;
     display: inline-flex;
     padding: 0;
     background: none;
@@ -313,35 +285,9 @@
     border-color: var(--text-accent);
   }
 
-  .dot {
-    color: var(--border-subtle);
-  }
-
-  .pct {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .gauge {
-    display: inline-flex;
-    gap: 2px;
-    align-items: center;
-  }
-
-  .cell {
-    width: 6px;
-    height: 10px;
-    border-radius: 1px;
-    background: var(--border-subtle);
-  }
-
-  .cell.filled {
-    background: var(--text-accent);
-  }
-
   .breadcrumb {
     font-size: 0.78rem;
     color: var(--text-secondary);
-    margin-bottom: 0.6rem;
     line-height: 1.35;
     display: flex;
     flex-wrap: wrap;
@@ -504,32 +450,50 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
+  /* Bracketed text, parchment like the plate controls: opening the book
+     is an action on content, not a mode, so not the modal purple. The
+     brackets sit a step quieter and light with the label on hover. */
   .open-btn {
     flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.55rem;
-    background: transparent;
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
+    padding: 0.1rem 0;
+    background: none;
+    border: none;
     color: var(--text-accent);
     font-family: var(--font-body);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition: filter var(--transition-fast), transform var(--transition-fast);
   }
 
-  .open-btn svg {
-    width: 12px;
-    height: 12px;
-    display: block;
+  .open-btn::before,
+  .open-btn::after {
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
   }
 
-  /* Grey step only — glows are reserved for activated states, and hover
-     never introduces hue (see Design Conventions in CLAUDE.md). */
+  .open-btn::before {
+    content: '[';
+    margin-right: 0.15rem;
+  }
+
+  .open-btn::after {
+    content: ']';
+    margin-left: 0.15rem;
+  }
+
   .open-btn:hover {
-    background: var(--bg-focused);
+    filter: brightness(1.25);
+  }
+
+  .open-btn:hover::before,
+  .open-btn:hover::after {
+    color: var(--text-accent);
+  }
+
+  .open-btn:active {
+    transform: scale(0.97);
   }
 
   .open-btn:focus-visible {
