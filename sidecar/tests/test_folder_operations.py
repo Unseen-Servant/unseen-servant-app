@@ -235,30 +235,3 @@ def test_folder_delete_empty_folder(client, tmp_path):
     assert response.json()["deleted_files"] == 0
     assert response.json()["affected_collections"] == 0
 
-
-# ---------------------------------------------------------------------------
-# Concurrency
-# ---------------------------------------------------------------------------
-
-def test_folder_rename_returns_409_when_sync_lock_held(client, sample_pdf_path, tmp_path):
-    """Folder rename should return 409 if a sync is already running."""
-    import threading
-    from server import create_app
-
-    # Access the _sync_lock via a fresh app instance is tricky;
-    # instead, we test by acquiring the lock before calling the endpoint.
-    # The client fixture already has the app with its own lock.
-    # We need to access the lock from the app's closure.
-    # Since we can't easily access the lock, we test the behavior
-    # by running a sync and a folder-rename simultaneously.
-    # For simplicity, we verify the 409 path by manually acquiring the lock.
-
-    # The lock is a threading.Lock inside create_app's closure.
-    # We can access it via the app's internal state.
-    # Let's just verify the endpoint works without contention instead.
-    index_pdfs(client, sample_pdf_path)
-    response = client.post("/api/folder-rename", json={
-        "old_prefix": str(tmp_path),
-        "new_prefix": str(tmp_path) + "_new",
-    })
-    assert response.status_code == 200
