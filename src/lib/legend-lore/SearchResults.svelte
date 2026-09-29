@@ -6,7 +6,8 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { allWeak, GAUGE_CELLS, tierCells, tierLabel } from './searchTiers';
   import { markSnippet, queryTerms } from './snippetHits';
-  import { displaySystem } from './searchScope';
+  import { displaySystem, UNTAGGED_KEY } from './searchScope';
+  import { SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
@@ -200,11 +201,15 @@
         result.page_label_end
       )}
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
-      <!-- The row keeps the tail of the path: the leaf is what tells
-           sibling hits apart, and the root is usually shared by the whole
-           list. The inspector shows the full path. -->
-      {@const leaf = segments[segments.length - 1]}
+      <!-- Section first: the row is titled by what matched, the leaf
+           heading, and the book drops to the source line. A section-less
+           hit is titled by its book instead. The parent rides in the
+           source line to tell sibling leaves apart; the full path is the
+           title's tooltip, and the inspector's header. -->
+      {@const leaf = segments[segments.length - 1] ?? null}
       {@const parent = segments.length > 1 ? segments[segments.length - 2] : null}
+      {@const book = bookTitle(result.filename)}
+      {@const title = leaf ?? book}
       {@const collColor = collectionColorByPath.get(result.source) ?? null}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <div
@@ -235,23 +240,28 @@
             aria-checked={collectionPaths.has(result.source)}
           ></button>
         {/if}
-        <span class="index-cell" aria-hidden="true">{i + 1}</span>
+        <!-- The rank, with the relevance meter under it, so the meters
+             line up as a column down the list. -->
+        <span class="lead">
+          <span class="index-cell" aria-hidden="true">{i + 1}</span>
+          <span
+            class="gauge"
+            role="img"
+            aria-label={label}
+            title={label}
+          >
+            {#each gaugeCells as idx (idx)}
+              <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
+            {/each}
+          </span>
+        </span>
         <div class="row-body">
-          {#if segments.length > 0}
-            <div class="breadcrumb" title={segments.join(' › ')}>
-              {#if parent}
-                <span class="bc-head">
-                  {#if segments.length > 2}
-                    <span class="bc-sep bc-elided" aria-hidden="true">…</span>
-                    <span class="bc-sep" aria-hidden="true">›</span>
-                  {/if}
-                  <span class="bc-segment" class:caps={isAllCaps(parent)}>{parent}</span>
-                  <span class="bc-sep" aria-hidden="true">›</span>
-                </span>
-              {/if}
-              <span class="bc-segment bc-leaf" class:caps={isAllCaps(leaf)}>{leaf}</span>
-            </div>
-          {/if}
+          <div class="title-line" title={segments.length > 0 ? segments.join(' › ') : undefined}>
+            <span class="row-title" class:caps={leaf !== null && isAllCaps(leaf)}>{title}</span>
+            {#if span}
+              <span class="row-page">{span}</span>
+            {/if}
+          </div>
           <!-- The row shows why it matched: `text` is the whole section
                now, whose opening line is rarely the hit (roadmap 2.5). -->
           <div class="snippet">{#each markSnippet(snippetPreview(result.matched_text || result.text), terms) as part, idx (idx)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</div>
@@ -259,9 +269,23 @@
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
               <span class="hidden-badge micro-label" title="This file is hidden in the tree.">hidden</span>
             {/if}
-            <span class="meta-text">
-              {bookTitle(result.filename)}{result.game_system ? ` · ${displaySystem(result.game_system)}` : ''}{span ? ` · ${span}` : ''}
-            </span>
+            {#if parent}
+              <span class="meta-parent">in <span class:caps={isAllCaps(parent)}>{parent}</span></span>
+              <span class="meta-sep" aria-hidden="true">·</span>
+            {/if}
+            {#if leaf}
+              <span class="meta-book">{book}</span>
+            {/if}
+            {#if result.game_system && result.game_system !== UNTAGGED_KEY}
+              <span class="meta-system">
+                <svg class="meta-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                  <path d={SHIELD}/>
+                </svg>
+                {result.game_system}
+              </span>
+            {:else if result.game_system}
+              <span class="meta-system">{displaySystem(result.game_system)}</span>
+            {/if}
           </div>
           {#if result.also_in.length > 0}
             <!-- Cross-edition twins folded into this row (roadmap 2.3);
@@ -274,16 +298,6 @@
             </div>
           {/if}
         </div>
-        <span
-          class="gauge"
-          role="img"
-          aria-label={label}
-          title={label}
-        >
-          {#each gaugeCells as idx (idx)}
-            <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
-          {/each}
-        </span>
       </div>
     {/each}
     {#if isLoading && !stale && results.length > 0}
@@ -430,8 +444,16 @@
     border-radius: 2px;
   }
 
-  .index-cell {
+  .lead {
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.05rem;
+  }
+
+  .index-cell {
     width: 1.35rem;
     height: 1.15rem;
     display: inline-flex;
@@ -450,7 +472,6 @@
     color: var(--collection-color, var(--text-accent));
     -webkit-user-select: none;
     user-select: none;
-    margin-top: 0.05rem;
   }
 
   .row-body {
@@ -458,41 +479,34 @@
     min-width: 0;
   }
 
-  /* One line, and the leaf keeps its full width: only the head (… ›
-     parent ›) gives way, the parent taking the ellipsis. A leaf wider
-     than the row fills it with its own ellipsis and the head drops out.
-     No shrink ratios — WebKit didn't honour them. */
-  .breadcrumb {
+  /* The three lines step down the text ramp: title primary, snippet
+     secondary, source tertiary. */
+  .title-line {
     display: flex;
     align-items: baseline;
+    gap: 0.5rem;
     min-width: 0;
     font-family: var(--font-body);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-bottom: 0.15rem;
     line-height: 1.3;
-    overflow: hidden;
-    white-space: nowrap;
   }
 
-  .bc-head {
-    display: flex;
-    align-items: baseline;
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .bc-segment {
+  .row-title {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
   }
 
-  .bc-leaf {
-    flex: 0 0 auto;
-    max-width: 100%;
-    color: var(--text-primary);
+  /* The printed page, as the inspector cites it. */
+  .row-page {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
   }
 
   /* Headings set in capitals in the source sit level with mixed-case
@@ -502,24 +516,11 @@
     letter-spacing: 0.04em;
   }
 
-  /* A single guillemet in the body serif, in place of the earlier ❧
-     fleuron. */
-  .bc-sep {
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    -webkit-user-select: none;
-    user-select: none;
-    margin: 0 0.3rem;
-  }
-
-  .bc-elided {
-    margin-left: 0;
-  }
-
+  /* A step down from the title, so the query terms stand out in it. */
   .snippet {
     font-family: var(--font-body);
-    font-size: 0.9rem;
-    color: var(--text-primary);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
     line-height: 1.35;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -532,22 +533,44 @@
   }
 
   .meta-row {
-    margin-top: 0.2rem;
+    margin-top: 0.15rem;
     font-family: var(--font-body);
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
     min-width: 0;
+    white-space: nowrap;
   }
 
-  .meta-text {
-    flex: 1;
+  /* Parent and book both give way to a narrow pane; the system stays. */
+  .meta-parent,
+  .meta-book {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+
+  .meta-parent {
+    font-style: italic;
+  }
+
+  .meta-sep {
+    flex-shrink: 0;
+  }
+
+  .meta-system {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.15rem;
+  }
+
+  .meta-shield {
+    width: 9px;
+    height: 9px;
   }
 
   .hidden-badge {
@@ -578,20 +601,19 @@
   .gauge {
     display: inline-flex;
     gap: 2px;
-    flex-shrink: 0;
-    align-items: center;
     opacity: 0.7;
     transition: opacity var(--transition-fast);
-    margin-top: 0.2rem;
   }
 
   .hover-live .result-row:hover .gauge {
     opacity: 1;
   }
 
+  /* Flatter than tall under the rank cell, so the pair reads as one
+     column mark. */
   .cell {
     width: 5px;
-    height: 9px;
+    height: 6px;
     border-radius: var(--radius-cell);
     background: var(--border-subtle);
     transition: background var(--transition-fast);

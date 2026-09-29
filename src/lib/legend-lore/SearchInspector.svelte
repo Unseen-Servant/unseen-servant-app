@@ -142,45 +142,52 @@
     )}
     {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
 
-    <!-- The selected row already carries the gauge and the book line; the
-         header keeps what the row can't: the full section path, pinned
-         above the body so it stays in view while the match is centred. -->
+    {@const book = bookTitle(result.filename)}
+    {@const title = segments.length > 0 ? segments[segments.length - 1] : book}
+
+    <!-- Section first, as on the row: the leaf heading is the headline,
+         its ancestors lead into it, and the book is the source under it.
+         A section-less hit is headed by its book. Pinned above the body
+         so it stays in view while the match is centred. -->
     <header class="head">
-      <div class="head-text">
-        <div class="meta">
-          <span class="filename" title={result.source}>{bookTitle(result.filename)}</span>
-          {#if result.game_system === UNTAGGED_KEY}
-            <span class="sysname">untagged</span>
-          {:else if result.game_system}
-            <button class="sys-btn" on:click={(e) => tagMenu?.toggle(e)} aria-label="Edit game system tags">
-              <SystemBadge tag={displaySystem(result.game_system)} />
-            </button>
-          {/if}
-          {#if isPathOrAncestorIn(result.source, hiddenPaths)}
-            <span class="badge micro-label" title="This file is hidden in the tree.">hidden</span>
-          {/if}
+      {#if segments.length > 1}
+        <div class="breadcrumb" aria-label="Section path">
+          <!-- Each separator rides with the segment before it: the path
+               runs on into the headline below. -->
+          {#each segments.slice(0, -1) as segment, idx (idx)}
+            <span class="bc-item">
+              <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
+              <span class="bc-sep" aria-hidden="true">›</span>
+            </span>
+          {/each}
         </div>
+      {/if}
+      <div class="title-row">
+        <h2 class="title" class:caps={segments.length > 0 && isAllCaps(title)}>{title}</h2>
+        <!-- The printed page leads, as on the row; the physical one stays in
+             the tooltip for PDF viewers, which count from the cover. -->
+        <button
+          type="button"
+          class="open-btn"
+          on:click={() => onOpenResult(result.source, result.filename, result.page_start)}
+          title={span && cite !== span ? `Open PDF at ${span}` : undefined}
+        >{cite ? `open ${cite}` : 'open'}</button>
+      </div>
+      <div class="meta">
         {#if segments.length > 0}
-          <div class="breadcrumb" aria-label="Section path">
-            <!-- Each separator rides with the segment after it, so a wrap
-                 never leaves one hanging at a line end. -->
-            {#each segments as segment, idx (idx)}
-              <span class="bc-item">
-                {#if idx > 0}<span class="bc-sep" aria-hidden="true">›</span>{/if}
-                <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
-              </span>
-            {/each}
-          </div>
+          <span class="filename" title={result.source}>{book}</span>
+        {/if}
+        {#if result.game_system === UNTAGGED_KEY}
+          <span class="sysname">untagged</span>
+        {:else if result.game_system}
+          <button class="sys-btn" on:click={(e) => tagMenu?.toggle(e)} aria-label="Edit game system tags">
+            <SystemBadge tag={displaySystem(result.game_system)} />
+          </button>
+        {/if}
+        {#if isPathOrAncestorIn(result.source, hiddenPaths)}
+          <span class="badge micro-label" title="This file is hidden in the tree.">hidden</span>
         {/if}
       </div>
-      <!-- The printed page leads, as on the row; the physical one stays in
-           the tooltip for PDF viewers, which count from the cover. -->
-      <button
-        type="button"
-        class="open-btn"
-        on:click={() => onOpenResult(result.source, result.filename, result.page_start)}
-        title={span && cite !== span ? `Open PDF at ${span}` : undefined}
-      >{cite ? `open ${cite}` : 'open'}</button>
     </header>
 
     <SystemTagMenu
@@ -296,10 +303,9 @@
   .head {
     flex-shrink: 0;
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.7rem;
-    padding: 1rem 1.1rem 0.6rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.9rem 1.1rem 0.7rem;
     border-bottom: 1px solid var(--border-subtle);
   }
 
@@ -389,12 +395,24 @@
     outline-offset: 1px;
   }
 
-  .head-text {
+  .title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  /* A heading, so primary rather than the data parchment. */
+  .title {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--text-primary);
+    word-break: break-word;
   }
 
   .meta {
@@ -405,8 +423,7 @@
   }
 
   .filename {
-    font-family: var(--font-heading);
-    font-size: 1.05rem;
+    font-size: 0.85rem;
     color: var(--text-accent);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -465,17 +482,13 @@
     word-break: break-word;
   }
 
-  .bc-item:last-child .bc-segment {
-    color: var(--text-primary);
-  }
-
   /* Small caps for capitalised headings — see SearchResults.svelte .caps */
   .caps {
     font-variant-caps: all-small-caps;
     letter-spacing: 0.04em;
   }
 
-  /* Path separator — see SearchResults.svelte .bc-sep */
+  /* Path separator: a single guillemet in the body serif. */
   .bc-sep {
     color: var(--text-tertiary);
     -webkit-user-select: none;
