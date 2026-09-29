@@ -3,14 +3,14 @@ import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
 
 describe('tierCells', () => {
   it('maps tiers to gauge cells', () => {
-    expect(tierCells('strong', 0.9)).toBe(5);
-    expect(tierCells('good', 0.5)).toBe(3);
+    expect(tierCells('strong', 0.9)).toBe(3);
+    expect(tierCells('good', 0.5)).toBe(2);
     expect(tierCells('weak', 0.2)).toBe(1);
   });
 
   it('falls back to the legacy relevance mapping when tier is missing', () => {
-    expect(tierCells(undefined, 1.0)).toBe(5);
-    expect(tierCells(undefined, 0.45)).toBe(3);
+    expect(tierCells(undefined, 1.0)).toBe(3);
+    expect(tierCells(undefined, 0.45)).toBe(2);
     expect(tierCells(undefined, 0)).toBe(0);
   });
 });

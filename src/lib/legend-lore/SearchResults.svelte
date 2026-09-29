@@ -1,10 +1,11 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type { SearchResultItem } from './types';
-  import { pageCitation } from './pdfUrl';
+  import { bookTitle, pageCitation } from './pdfUrl';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import { isPathOrAncestorIn } from './selectionUtils';
-  import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
+  import { allWeak, GAUGE_CELLS, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
+  import { markSnippet, queryTerms } from './snippetHits';
   import { displaySystem } from './searchScope';
   import { hoverLive } from '../ui/inputModality';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
@@ -87,6 +88,8 @@
   // weak results, and an all-weak list gets an explicit callout so a
   // scoped miss doesn't masquerade as a confident answer.
   $: dividerAt = weakDividerIndex(results);
+  $: terms = queryTerms(query);
+  const gaugeCells = Array.from({ length: GAUGE_CELLS }, (_, idx) => idx);
   $: allResultsWeak = allWeak(results);
 
   // Snippet preview: strip markdown markers and collapse whitespace so the
@@ -263,20 +266,20 @@
           {/if}
           <!-- The row shows why it matched: `text` is the whole section
                now, whose opening line is rarely the hit (roadmap 2.5). -->
-          <div class="snippet">{snippetPreview(result.matched_text || result.text)}</div>
+          <div class="snippet">{#each markSnippet(snippetPreview(result.matched_text || result.text), terms) as part, idx (idx)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</div>
           <div class="meta-row">
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
               <span class="hidden-badge micro-label" title="This file is hidden in the tree.">hidden</span>
             {/if}
             <span class="meta-text">
-              {result.filename}{result.game_system ? ` · ${displaySystem(result.game_system)}` : ''}{span ? ` · ${span}` : ''}
+              {bookTitle(result.filename)}{result.game_system ? ` · ${displaySystem(result.game_system)}` : ''}{span ? ` · ${span}` : ''}
             </span>
           </div>
           {#if result.also_in.length > 0}
             <!-- Cross-edition twins folded into this row (roadmap 2.3);
                  the inspector lists and opens them. -->
             <div class="also-row">
-              <span class="also-chip" title={result.also_in.map((a) => a.filename).join(', ')}>
+              <span class="also-chip" title={result.also_in.map((a) => bookTitle(a.filename)).join(', ')}>
                 +{result.also_in.length}
                 {result.also_in.length === 1 ? 'edition' : 'editions'}
               </span>
@@ -289,7 +292,7 @@
           aria-label={label}
           title={label}
         >
-          {#each [0, 1, 2, 3, 4] as idx (idx)}
+          {#each gaugeCells as idx (idx)}
             <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
           {/each}
         </span>
@@ -566,6 +569,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Query terms in the data colour — parchment, no fill, no glow. */
+  .hit {
+    color: var(--text-accent);
   }
 
   .meta-row {

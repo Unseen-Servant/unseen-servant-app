@@ -3,10 +3,10 @@
   import Markdown from 'svelte-exmarkdown';
   import { gfmPlugin } from 'svelte-exmarkdown/gfm';
   import type { SearchResultItem, KnownGameSystem } from './types';
-  import { pageCitation, pageHint } from './pdfUrl';
+  import { bookTitle, pageCitation, pageHint } from './pdfUrl';
   import { findMatchedRange, splitAround, type MatchedParts } from './matchedSpan';
   import { isPathOrAncestorIn } from './selectionUtils';
-  import { tierCells, tierLabel } from './searchTiers';
+  import { GAUGE_CELLS, tierCells, tierLabel } from './searchTiers';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import SystemBadge from './SystemBadge.svelte';
@@ -24,6 +24,8 @@
 
   // Rulebook pages are half tables — without GFM they render as pipe soup.
   const mdPlugins = [gfmPlugin()];
+
+  const gaugeCells = Array.from({ length: GAUGE_CELLS }, (_, idx) => idx);
 
   // The marked passage, for scrolling it into view.
   let matchEl: HTMLElement | null = null;
@@ -99,7 +101,7 @@
     <header class="head">
       <div class="head-text">
         <div class="meta">
-          <span class="filename" title={result.source}>{result.filename}</span>
+          <span class="filename" title={result.source}>{bookTitle(result.filename)}</span>
           {#if isPathOrAncestorIn(result.source, hiddenPaths)}
             <span class="badge micro-label" title="This file is hidden in the tree.">hidden</span>
           {/if}
@@ -120,7 +122,7 @@
           {/if}
           <span class="dot">·</span>
           <span class="gauge" role="img" aria-label={label} title={label}>
-            {#each [0, 1, 2, 3, 4] as idx (idx)}
+            {#each gaugeCells as idx (idx)}
               <span class="cell" class:filled={idx < cells} aria-hidden="true"></span>
             {/each}
           </span>
@@ -183,10 +185,10 @@
             <button
               type="button"
               class="also-chip"
-              title={`Open ${twin.filename}${twinCite ? ` at ${twinCite}` : ''}`}
+              title={`Open ${bookTitle(twin.filename)}${twinCite ? ` at ${twinCite}` : ''}`}
               on:click={() => onOpenResult(twin.source, twin.filename, twin.page_start)}
             >
-              {twin.filename}{twinCite ? ` · ${twinCite}` : ''}
+              {bookTitle(twin.filename)}{twinCite ? ` · ${twinCite}` : ''}
             </button>
           {/each}
         </div>

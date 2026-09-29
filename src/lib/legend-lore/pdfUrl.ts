@@ -61,3 +61,8 @@ export function pageCitation(
   }
   return physical;
 }
+
+/** A book's display name: its filename without the `.pdf` extension. */
+export function bookTitle(filename: string): string {
+  return filename.replace(/\.pdf$/i, '');
+}

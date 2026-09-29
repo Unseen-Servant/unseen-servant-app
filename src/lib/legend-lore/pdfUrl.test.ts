@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pdfFileUrl, pageHint, pageCitation } from './pdfUrl';
+import { pdfFileUrl, pageHint, pageCitation, bookTitle } from './pdfUrl';
 
 describe('pdfFileUrl', () => {
   it('builds a plain file URL for a POSIX path with no page', () => {
@@ -76,5 +76,13 @@ describe('pageCitation', () => {
     expect(pageCitation(24, 26, '', '')).toBe('pp.24–26');
     expect(pageCitation(24, 24)).toBe('p.24');
     expect(pageCitation(0, 0, '', '')).toBe('');
+  });
+});
+
+describe('bookTitle', () => {
+  it('drops the .pdf extension, any case, and nothing else', () => {
+    expect(bookTitle('OSRIC_2E.pdf')).toBe('OSRIC_2E');
+    expect(bookTitle('Wight-Box_PDF_1.3.PDF')).toBe('Wight-Box_PDF_1.3');
+    expect(bookTitle('notes.pdf.txt')).toBe('notes.pdf.txt');
   });
 });
