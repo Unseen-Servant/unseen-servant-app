@@ -8,6 +8,8 @@
   import { markSnippet, queryTerms } from './snippetHits';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
   import { SHIELD } from '../ui/iconPaths';
+  import type { KnownGameSystem } from './types';
+  import SystemTagMenu from './SystemTagMenu.svelte';
   import { hoverLive } from '../ui/inputModality';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
@@ -53,6 +55,29 @@
   export let collectionPaths: Set<string> = new Set();
   export let onCollectionAdd: (paths: string[]) => void = () => {};
   export let onCollectionRemove: (paths: string[]) => void = () => {};
+  // The selected row's system badge edits its book's tags, with the menu
+  // FileTree uses; left-aligned under the badge.
+  export let knownSystems: KnownGameSystem[] = [];
+  export let gameSystemMap: Map<string, string[]> = new Map();
+  export let onSetGameSystems: (path: string, tags: string[]) => void = () => {};
+
+  let tagMenu: SystemTagMenu | undefined;
+
+  $: selectedSource = results[selectedIndex]?.source ?? null;
+  $: selectedTags = (selectedSource && gameSystemMap.get(selectedSource)) || [];
+
+  function toggleSystem(tag: string) {
+    if (!selectedSource) return;
+    const next = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    onSetGameSystems(selectedSource, next);
+  }
+
+  function clearSystem() {
+    if (!selectedSource) return;
+    onSetGameSystems(selectedSource, []);
+  }
 
   // Scroll-near-bottom triggers an upstream fetch for more results. The
   // parent's canLoadMore prop reflects the actual load gate (not searching,
@@ -202,13 +227,13 @@
       )}
       {@const segments = result.section_heading ? breadcrumbSegments(result.section_heading) : []}
       <!-- Section first: the row is titled by what matched, the leaf
-           heading, and the book drops to the source line. A section-less
-           hit is titled by its book instead. The parent rides in the
-           source line to tell sibling leaves apart; the full path is the
-           title's tooltip, and the inspector's header. -->
+           heading, under a source line naming the book and its system —
+           the one place the search view names them. A section-less hit is
+           titled by its book instead. The full path is the title's
+           tooltip, and the inspector plate's for the selected row. -->
       {@const leaf = segments[segments.length - 1] ?? null}
-      {@const parent = segments.length > 1 ? segments[segments.length - 2] : null}
       {@const book = bookTitle(result.filename)}
+      {@const selected = i === selectedIndex}
       {@const title = leaf ?? book}
       {@const collColor = collectionColorByPath.get(result.source) ?? null}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
@@ -256,37 +281,52 @@
           </span>
         </span>
         <div class="row-body">
-          <div class="title-line" title={segments.length > 0 ? segments.join(' › ') : undefined}>
-            <span class="row-title" class:caps={leaf !== null && isAllCaps(leaf)}>{title}</span>
-            {#if span}
-              <span class="row-page">{span}</span>
-            {/if}
-          </div>
-          <!-- The row shows why it matched: `text` is the whole section
-               now, whose opening line is rarely the hit (roadmap 2.5). -->
-          <div class="snippet">{#each markSnippet(snippetPreview(result.matched_text || result.text), terms) as part, idx (idx)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</div>
-          <div class="meta-row">
+          <!-- The source strip over the title, like a track's name over its
+               clip. On the selected row the system is also the trigger for
+               the book's tags — the inspector has no header left to carry
+               it — but it looks the same as on every row: no pill, it only
+               brightens on hover. "untagged" stays plain text. -->
+          <div class="source-line">
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
               <span class="hidden-badge micro-label" title="This file is hidden in the tree.">hidden</span>
             {/if}
-            {#if parent}
-              <span class="meta-parent">in <span class:caps={isAllCaps(parent)}>{parent}</span></span>
-              <span class="meta-sep" aria-hidden="true">·</span>
-            {/if}
             {#if leaf}
-              <span class="meta-book">{book}</span>
+              <span class="source-book">{book}</span>
             {/if}
-            {#if result.game_system && result.game_system !== UNTAGGED_KEY}
-              <span class="meta-system">
-                <svg class="meta-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            {#if result.game_system === UNTAGGED_KEY}
+              <span class="source-system">{displaySystem(result.game_system)}</span>
+            {:else if result.game_system && selected}
+              <button
+                type="button"
+                class="source-system sys-btn"
+                aria-label="Edit game system tags for {book}"
+                on:click={(e) => tagMenu?.toggle(e)}
+                on:mousedown|stopPropagation
+                on:dblclick|stopPropagation
+              >
+                <svg class="source-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                  <path d={SHIELD}/>
+                </svg>
+                {result.game_system}
+              </button>
+            {:else if result.game_system}
+              <span class="source-system">
+                <svg class="source-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
                   <path d={SHIELD}/>
                 </svg>
                 {result.game_system}
               </span>
-            {:else if result.game_system}
-              <span class="meta-system">{displaySystem(result.game_system)}</span>
+            {/if}
+            {#if span}
+              <span class="row-page">{span}</span>
             {/if}
           </div>
+          <div class="title-line" title={segments.length > 0 ? segments.join(' › ') : undefined}>
+            <span class="row-title" class:caps={leaf !== null && isAllCaps(leaf)}>{title}</span>
+          </div>
+          <!-- The row shows why it matched: `text` is the whole section
+               now, whose opening line is rarely the hit (roadmap 2.5). -->
+          <div class="snippet">{#each markSnippet(snippetPreview(result.matched_text || result.text), terms) as part, idx (idx)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</div>
           {#if result.also_in.length > 0}
             <!-- Cross-edition twins folded into this row (roadmap 2.3);
                  the inspector lists and opens them. -->
@@ -305,6 +345,14 @@
     {/if}
   {/if}
 </div>
+
+<SystemTagMenu
+  bind:this={tagMenu}
+  {knownSystems}
+  tags={selectedTags}
+  onToggleSystem={toggleSystem}
+  onClear={clearSystem}
+/>
 
 <style>
   .search-results {
@@ -359,7 +407,7 @@
      optical line, since the row aligns flex-start. */
   .row-checkbox {
     flex-shrink: 0;
-    margin-top: 0.05rem;
+    margin-top: 1.1rem;
   }
 
   /* Stale-results state: a new search is in flight against a different
@@ -450,7 +498,8 @@
     flex-direction: column;
     align-items: center;
     gap: 0.3rem;
-    margin-top: 0.05rem;
+    /* Level with the title line, under the source strip. */
+    margin-top: 1.1rem;
   }
 
   .index-cell {
@@ -479,20 +528,70 @@
     min-width: 0;
   }
 
-  /* The three lines step down the text ramp: title primary, snippet
-     secondary, source tertiary. */
-  .title-line {
+  /* The source strip: the book, then its system, one voice for both, and
+     the printed page at the far edge. The book gives way to a narrow pane;
+     the system and page stay. */
+  .source-line {
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    margin-bottom: 0.05rem;
+    font-family: var(--font-body);
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .source-book {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .source-system {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .source-shield {
+    width: 9px;
+    height: 9px;
+  }
+
+  /* The selected row's system, as a trigger: unstyled so it reads the
+     same as every row's. Hover brightens — no glow, no new hue. */
+  .sys-btn {
+    padding: 0;
+    background: none;
+    border: none;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: filter var(--transition-fast);
+  }
+
+  .sys-btn:hover {
+    filter: brightness(1.35);
+  }
+
+  .sys-btn:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 2px;
+  }
+
+  .title-line {
     min-width: 0;
     font-family: var(--font-body);
     line-height: 1.3;
   }
 
   .row-title {
-    flex: 1;
-    min-width: 0;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -504,6 +603,7 @@
   /* The printed page, as the inspector cites it. */
   .row-page {
     flex-shrink: 0;
+    margin-left: auto;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     color: var(--text-secondary);
@@ -527,50 +627,19 @@
     white-space: nowrap;
   }
 
+  /* The selected row opens its snippet to two lines — the one row whose
+     reason for matching the reader is weighing. */
+  .result-row.selected .snippet {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+
   /* Query terms in the data colour — parchment, no fill, no glow. */
   .hit {
     color: var(--text-accent);
-  }
-
-  .meta-row {
-    margin-top: 0.15rem;
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  /* Parent and book both give way to a narrow pane; the system stays. */
-  .meta-parent,
-  .meta-book {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .meta-parent {
-    font-style: italic;
-  }
-
-  .meta-sep {
-    flex-shrink: 0;
-  }
-
-  .meta-system {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-left: 0.15rem;
-  }
-
-  .meta-shield {
-    width: 9px;
-    height: 9px;
   }
 
   .hidden-badge {

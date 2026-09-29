@@ -15,6 +15,7 @@
   import SearchResults from '../../lib/legend-lore/SearchResults.svelte';
   import SearchInspector from '../../lib/legend-lore/SearchInspector.svelte';
   import SearchScopeBar from '../../lib/legend-lore/SearchScopeBar.svelte';
+  import InspectorPlate from '../../lib/legend-lore/InspectorPlate.svelte';
   import StatusBar from '../../lib/shell/StatusBar.svelte';
   import GettingStartedPage from '../../lib/legend-lore/GettingStartedPage.svelte';
   import SettingsModal from '../../lib/shell/SettingsModal.svelte';
@@ -3640,36 +3641,53 @@
         <!-- The scope bar is the readout in every mode: chips for each
              narrowing, plus the hits meter while a search is active. The
              console itself is the docked FilterPanel. -->
-        <SearchScopeBar
-          {scopeBypassed}
-          onToggleBypass={toggleScopeBypass}
-          {collectionPlays}
-          {collectionSolos}
-          {collectionMutes}
-          {collectionTrackMutes}
-          excludedSystems={filterExcludedSystems}
-          {soloedSystems}
-          curationSolos={soloCuration}
-          curationMutes={mutedCuration}
-          {showHidden}
-          {hideOutOfScope}
-          {hideUnindexed}
-          resultCount={searchResults.length}
-          indexedFileCount={searchableFileCount}
-          isLoading={isSearching}
-          searchActive={searchViewOpen && searchActive}
-          onClearCollectionPlay={togglePlayCollection}
-          onClearCollectionSolo={handleClearCollectionSolo}
-          onClearCollectionMute={handleClearCollectionMute}
-          onClearCollectionTrackMute={toggleCollectionMute}
-          onToggleSystemFilter={toggleSystemFilter}
-          onToggleSystemSolo={toggleSystemSolo}
-          onToggleCurationSolo={toggleCurationSolo}
-          onToggleCurationMute={toggleCurationMute}
-          onToggleShowHidden={toggleShowHidden}
-          onToggleHideOutOfScope={toggleHideOutOfScope}
-          onToggleHideUnindexed={toggleHideUnindexed}
-        />
+        {#snippet scopeBar()}
+          <SearchScopeBar
+            {scopeBypassed}
+            onToggleBypass={toggleScopeBypass}
+            {collectionPlays}
+            {collectionSolos}
+            {collectionMutes}
+            {collectionTrackMutes}
+            excludedSystems={filterExcludedSystems}
+            {soloedSystems}
+            curationSolos={soloCuration}
+            curationMutes={mutedCuration}
+            {showHidden}
+            {hideOutOfScope}
+            {hideUnindexed}
+            resultCount={searchResults.length}
+            indexedFileCount={searchableFileCount}
+            isLoading={isSearching}
+            searchActive={searchViewOpen && searchActive}
+            onClearCollectionPlay={togglePlayCollection}
+            onClearCollectionSolo={handleClearCollectionSolo}
+            onClearCollectionMute={handleClearCollectionMute}
+            onClearCollectionTrackMute={toggleCollectionMute}
+            onToggleSystemFilter={toggleSystemFilter}
+            onToggleSystemSolo={toggleSystemSolo}
+            onToggleCurationSolo={toggleCurationSolo}
+            onToggleCurationMute={toggleCurationMute}
+            onToggleShowHidden={toggleShowHidden}
+            onToggleHideOutOfScope={toggleHideOutOfScope}
+            onToggleHideUnindexed={toggleHideUnindexed}
+          />
+        {/snippet}
+        {#if searchViewOpen}
+          <!-- In search mode the bar splits at the list/inspector seam: the
+               scope readout over the list, the inspector's plate — the
+               selected section's path and [open] — over the text. Both
+               columns size as the split's panes do, so the seam runs
+               straight down. -->
+          <div class="search-plates">
+            <div class="search-list-pane">{@render scopeBar()}</div>
+            <div class="search-inspector-pane">
+              <InspectorPlate result={selectedResult} onOpenResult={handleOpenResult} />
+            </div>
+          </div>
+        {:else}
+          {@render scopeBar()}
+        {/if}
         {#if searchViewOpen}
           <div class="search-split">
             <div class="search-list-pane">
@@ -3697,6 +3715,9 @@
                 collectionPaths={armState?.paths ?? EMPTY_PATHS}
                 onCollectionAdd={curationAdd}
                 onCollectionRemove={curationRemove}
+                {knownSystems}
+                gameSystemMap={effectiveGameSystemMap}
+                onSetGameSystems={handleSetGameSystems}
               />
             </div>
             <div class="search-inspector-pane">
@@ -3704,11 +3725,7 @@
                 bind:this={searchInspectorComponent}
                 result={selectedResult}
                 query={committedQuery}
-                {hiddenPaths}
-                {knownSystems}
-                gameSystemMap={effectiveGameSystemMap}
                 onOpenResult={handleOpenResult}
-                onSetGameSystems={handleSetGameSystems}
               />
             </div>
           </div>
@@ -3999,6 +4016,17 @@
     flex-direction: column;
     overflow: hidden;
     padding: 0;
+  }
+
+  .search-plates {
+    flex-shrink: 0;
+    display: flex;
+  }
+
+  /* The scope bar fills its column's height, so a chip row that wraps
+     grows both plates together. */
+  .search-plates > .search-list-pane > :global(.scope-bar) {
+    flex: 1;
   }
 
   .search-split {
