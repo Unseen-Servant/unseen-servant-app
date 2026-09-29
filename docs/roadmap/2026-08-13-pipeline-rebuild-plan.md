@@ -1,6 +1,7 @@
 # Pipeline Rebuild Plan — Ingestion & Retrieval v3
 
 **Date:** 2026-08-13
+**Status:** paused 2026-09-28 after Phase 3 and recovery W1; the shipping pipeline stayed v2 ([2026-09-02-v2-retrieval-improvement-roadmap.md](2026-09-02-v2-retrieval-improvement-roadmap.md)), and what v3 taught is that roadmap's §8 "v3 rebuild paused" row.
 **Scope:** Full greenfield rebuild of the PDF ingestion and retrieval pipeline — extraction → structure → chunking → indexing → query → rank → assembly — plus the storage layer and the sidecar's internal architecture.
 **Constraints (locked):** Strictly local — no cloud calls, ever. ONNX-not-PyTorch for anything packaged. Indexing may get slower if quality jumps (target: still under ~15 min for a 400-page book). Search must get much faster *and* much better. **English-first** — the library is predominantly English; French becomes an additive later phase, not a design driver. Queries arrive as **keywords or natural language**, both first-class. The pipeline must serve **small local LLM consumers (Qwen3.5-4B class)** as well as the app UI and Claude.
 **Method:** Built on the 2026-07-01 roadmap's verified findings, the eight completed experiment spikes (the ninth, `marker_docling_spike`, was never run — see §6), the production eval baselines, and a full read of the current sidecar.

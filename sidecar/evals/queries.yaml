@@ -240,7 +240,7 @@ queries:
 
   # ───────── typo_variant queries ─────────
   # Misspelled variants of 10 locked queries above (typo-tolerance design,
-  # docs/specs/retrieval/2026-07-10-typo-tolerance-design.md): one
+  # docs/retrieval/2026-07-10-typo-tolerance-design.md): one
   # character-deletion and one adjacent-transposition each, keeping the
   # original source/pages/answer anchors. Spacing variants (section B,
   # variant expansion) exist for the 5 originals with a natural compound

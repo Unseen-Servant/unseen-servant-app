@@ -12,7 +12,6 @@ Read docs/roadmap/2026-08-13-pipeline-rebuild-plan.md before any work. Non-negot
 
 ---
 
-**Status: skeleton (Phase 0).** Only `domain/models.py` carries the typed IR. Every module under
-`ingest/`, `index/`, `query/`, and `api/` is an intentional placeholder — no pipeline code is written
-before the Phase 1 spike verdicts (scaffold §2). Fill them in ablation-ladder order, each behind a
-committed `evals/baselines/` rung.
+**Status: paused 2026-09-28.** Phases 0–3 and recovery W1 are built; the shipping pipeline stayed v2.
+Before resuming, read the "v3 rebuild paused" row in §8 of
+docs/roadmap/2026-09-02-v2-retrieval-improvement-roadmap.md — what v3 taught and what would reopen it.
