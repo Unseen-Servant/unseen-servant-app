@@ -2,6 +2,8 @@
 Tests for GET /api/stats.
 """
 
+from tests.test_search_scoping import twin_pdfs  # noqa: F401
+
 
 def test_stats_empty_db(client):
     """Stats on empty DB should show zero counts."""
@@ -37,3 +39,12 @@ def test_stats_multiple_documents(client, sample_pdf_path, large_text_pdf_path):
     assert data["total_documents"] == 2
     # Total chunks should be more than the document count
     assert data["total_chunks"] > 2
+
+
+def test_stats_counts_same_named_files_in_different_folders(client, twin_pdfs):
+    """Two monsters.pdf in different folders are two documents, as they
+    are everywhere else the library keys sources by path."""
+    a, b = twin_pdfs
+    client.post("/api/index-files", json={"paths": [str(a), str(b)]})
+
+    assert client.get("/api/stats").json()["total_documents"] == 2

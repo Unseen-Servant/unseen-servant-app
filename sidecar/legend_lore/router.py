@@ -835,7 +835,7 @@ def build_router(
 
             return {
                 "total_chunks": library.count_units(),
-                "total_documents": len({d.filename for d in library.documents()}),
+                "total_documents": len({d.path for d in library.documents()}),
                 "storage_bytes": storage_bytes,
             }
         except Exception as e:
