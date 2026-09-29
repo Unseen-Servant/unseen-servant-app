@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import Markdown from 'svelte-exmarkdown';
+  import Markdown, { type Plugin } from 'svelte-exmarkdown';
   import { gfmPlugin } from 'svelte-exmarkdown/gfm';
   import type { SearchResultItem, KnownGameSystem } from './types';
   import { bookTitle, pageCitation, pageHint } from './pdfUrl';
@@ -8,10 +8,12 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
+  import { queryTerms, rehypeMarkTerms } from './snippetHits';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
   export let result: SearchResultItem | null = null;
+  export let query: string = '';
   export let hiddenPaths: Set<string> = new Set();
   export let knownSystems: KnownGameSystem[] = [];
   export let gameSystemMap: Map<string, string[]> = new Map();
@@ -22,7 +24,9 @@
   let tagMenu: SystemTagMenu | undefined;
 
   // Rulebook pages are half tables — without GFM they render as pipe soup.
-  const mdPlugins = [gfmPlugin()];
+  // Query terms light the way they do on the rows.
+  let mdPlugins: Plugin[];
+  $: mdPlugins = [gfmPlugin(), { rehypePlugin: [rehypeMarkTerms, queryTerms(query)] }];
 
   // The marked passage, for scrolling it into view.
   let matchEl: HTMLElement | null = null;
@@ -353,9 +357,10 @@
     outline-offset: 2px;
   }
 
-  /* The unit that actually matched, inside the section around it. */
+  /* The unit that actually matched, inside the section around it: a
+     margin rule only. A wash tinted everything under it, tables included,
+     and blurred where the unit started and stopped. */
   .matched {
-    background: color-mix(in srgb, var(--text-accent) 14%, transparent);
     border-left: 2px solid var(--text-accent);
     padding-left: 0.5rem;
   }
@@ -370,6 +375,17 @@
     color: var(--text-primary);
     line-height: 1.45;
     word-break: break-word;
+  }
+
+  /* Prose keeps a reading measure on a wide pane; tables stay free to
+     take the width their columns need. */
+  .snippet :global(:is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6)) {
+    max-width: 68ch;
+  }
+
+  /* Query terms in the data colour, as on the rows — no fill, no glow. */
+  .snippet :global(.hit) {
+    color: var(--text-accent);
   }
 
   .snippet :global(> *:first-child) { margin-top: 0; }

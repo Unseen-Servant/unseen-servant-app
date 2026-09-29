@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { markSnippet, queryTerms } from './snippetHits';
+import { markSnippet, queryTerms, rehypeMarkTerms } from './snippetHits';
 
 const hits = (text: string, query: string) =>
   markSnippet(text, queryTerms(query))
@@ -42,5 +42,27 @@ describe('markSnippet', () => {
     expect(joined.startsWith('…')).toBe(true);
     expect(joined.endsWith('the sword adds to its ego')).toBe(true);
     expect(joined.indexOf('sword')).toBeLessThan(48);
+  });
+});
+
+describe('rehypeMarkTerms', () => {
+  const text = (value: string) => ({ type: 'text', value });
+
+  it('wraps hits in text nodes at any depth in span.hit', () => {
+    const tree = {
+      type: 'root',
+      children: [{ type: 'element', tagName: 'td', children: [text('90 ft swimming')] }],
+    };
+    rehypeMarkTerms(queryTerms('swim'))(tree);
+    expect(tree.children[0].children).toEqual([
+      text('90 ft '),
+      { type: 'element', tagName: 'span', properties: { className: ['hit'] }, children: [text('swimming')] },
+    ]);
+  });
+
+  it('leaves the tree alone without terms', () => {
+    const tree = { type: 'root', children: [text('swimming')] };
+    rehypeMarkTerms([])(tree);
+    expect(tree.children).toEqual([text('swimming')]);
   });
 });

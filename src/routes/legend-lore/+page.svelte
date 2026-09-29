@@ -3767,6 +3767,7 @@
             <div class="search-inspector-pane">
               <SearchInspector
                 result={selectedResult}
+                query={committedQuery}
                 {hiddenPaths}
                 {knownSystems}
                 gameSystemMap={effectiveGameSystemMap}
