@@ -8,6 +8,8 @@ Your collection has 2,629 PDFs. With that many files, you WILL encounter:
 - Duplicate indexing requests (clicking "Index" twice)
 """
 
+import pytest
+
 
 def test_index_non_pdf_file(client, tmp_path):
     """Sending a non-PDF file path should handle gracefully."""
@@ -78,19 +80,16 @@ def test_search_missing_query(client):
     assert response.status_code == 422
 
 
-def test_search_negative_n_results(client, sample_pdf_path):
-    """Negative n_results: should either error or return empty.
-
-    This is a boundary condition. The vector store may handle it
-    differently than expected. The test documents the actual behavior.
-    """
+@pytest.mark.parametrize("n_results", [-1, 0])
+def test_search_rejects_non_positive_n_results(client, sample_pdf_path, n_results):
+    """A request for no results is a malformed request: 422, not a 500
+    carrying the vector store's knn error."""
     client.post("/api/index-files", json={
         "paths": [str(sample_pdf_path)]
     })
 
     response = client.post("/api/search", json={
         "query": "dragon",
-        "n_results": -1
+        "n_results": n_results,
     })
-    # Document the behavior — either 200 with empty or 422/500
-    assert response.status_code in [200, 422, 500]
+    assert response.status_code == 422
