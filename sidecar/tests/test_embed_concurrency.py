@@ -7,6 +7,7 @@ writes them against. These tests force out-of-order embed completion and
 assert the collected vectors are still in submission order.
 """
 
+import threading
 import time
 from pathlib import Path
 
@@ -44,23 +45,31 @@ def _make_units(n: int) -> list[EmbedUnit]:
 
 
 def test_vector_order_is_deterministic_under_out_of_order_embed_completion():
-    """Earlier batches that embed slowly must still be collected first.
+    """Earlier batches that finish last must still be collected first.
 
-    Inverts the natural latency: later batches return faster than earlier
-    ones, so a naive `as_completed` drain would collect them out of order
-    and pair vectors with the wrong units.
+    The first batch waits until the last one has finished, so completion
+    order is inverted for certain, not just probably; a naive
+    `as_completed` drain would pair vectors with the wrong units.
     """
     units = _make_units(30)  # 10 batches at batch_size=3
+    last_done = threading.Event()
+    finished: list[int] = []
 
-    # First batch (ordinal 0) sleeps the longest; last batch (ordinal 27)
-    # returns almost instantly. Forces out-of-order completion.
-    embed = _delayed_embed(lambda o: max(0, (30 - o) * 0.005))
+    def embed(texts):
+        first = int(texts[0].split()[1])
+        if first == 0:
+            assert last_done.wait(timeout=10), "last batch never finished"
+        finished.append(first)
+        if first == 27:
+            last_done.set()
+        return [[float(t.split()[1])] * 4 for t in texts]
 
     vectors: list[list[float]] = []
     list(_embed_units(
         embed, units, Path("test.pdf"), vectors, batch_size=3, concurrency=4,
     ))
 
+    assert finished.index(27) < finished.index(0)
     flat = [int(v[0]) for v in vectors]
     assert flat == list(range(30)), (
         f"Expected vector ordinals to be monotonic 0..29, got: {flat}"
