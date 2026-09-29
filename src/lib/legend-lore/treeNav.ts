@@ -131,3 +131,18 @@ export function indexOfPath(rows: VisibleRow[], path: string | null): number {
   for (let i = 0; i < rows.length; i++) if (rows[i].path === path) return i;
   return -1;
 }
+
+// The file paths a shift-range covers: every visible file row between
+// anchor and current, inclusive, in tree order. Built from the rows
+// computeVisibleRows yields, so a range never reaches a row the user
+// can't see (hidden, filtered, unindexed-hidden, out of scope). Null when
+// either end isn't visible.
+export function visibleFileSpan(rows: VisibleRow[], anchor: string, current: string): string[] | null {
+  const a = indexOfPath(rows, anchor);
+  const b = indexOfPath(rows, current);
+  if (a === -1 || b === -1) return null;
+  return rows
+    .slice(Math.min(a, b), Math.max(a, b) + 1)
+    .filter((r) => !r.item.is_dir)
+    .map((r) => r.path);
+}

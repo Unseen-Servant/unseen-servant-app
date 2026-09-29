@@ -28,7 +28,7 @@
   import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
   import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../../lib/legend-lore/selectionUtils';
-  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, type VisibleRow } from '../../lib/legend-lore/treeNav';
+  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, visibleFileSpan, type VisibleRow } from '../../lib/legend-lore/treeNav';
   import { materializeKey } from '../../lib/shell/paneFocus';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
   import { runSyncJob } from '../../lib/legend-lore/syncJob';
@@ -1474,38 +1474,16 @@
 
   let lastIndexClickedPath: string | null = null;
 
-  function flattenVisibleFilePaths(items: FileItem[]): string[] {
-    const out: string[] = [];
-    function walk(list: FileItem[]) {
-      for (const item of list) {
-        if (item.is_dir) {
-          if (expandedPaths.has(item.path) && item.children) {
-            walk(item.children);
-          }
-        } else {
-          out.push(item.path);
-        }
-      }
-    }
-    walk(items);
-    return out;
-  }
-
   function applyRangeToggle(
     target: Set<string>,
     anchor: string,
     current: string,
     requireIndexed: boolean,
   ): boolean {
-    const flat = flattenVisibleFilePaths(files);
-    const a = flat.indexOf(anchor);
-    const b = flat.indexOf(current);
-    if (a === -1 || b === -1) return false;
-    const lo = Math.min(a, b);
-    const hi = Math.max(a, b);
+    const span = visibleFileSpan(visibleTreeRows, anchor, current);
+    if (span === null) return false;
     const shouldSelect = !target.has(current);
-    for (let i = lo; i <= hi; i++) {
-      const p = flat[i];
+    for (const p of span) {
       if (requireIndexed && !indexedPaths.has(p)) continue;
       if (shouldSelect) target.add(p);
       else target.delete(p);
@@ -3080,13 +3058,9 @@
     // checkbox and the systems view both offer. Only indexed rows in the
     // span take part — the rest can't be members.
     if (shiftKey && !item.is_dir && lastCollectClickedPath) {
-      const flat = flattenVisibleFilePaths(files);
-      const a = flat.indexOf(lastCollectClickedPath);
-      const b = flat.indexOf(item.path);
-      if (a !== -1 && b !== -1) {
-        const span = flat
-          .slice(Math.min(a, b), Math.max(a, b) + 1)
-          .filter((p) => indexedPaths.has(p));
+      const visible = visibleFileSpan(visibleTreeRows, lastCollectClickedPath, item.path);
+      if (visible !== null) {
+        const span = visible.filter((p) => indexedPaths.has(p));
         if (span.length > 0) {
           const adding = !armState.paths.has(item.path);
           lastCollectClickedPath = item.path;

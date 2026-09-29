@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FileItem } from './types';
-import { computeVisibleRows, indexOfPath, isRowOutOfScope, isIndexedRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial, type LibraryKnowledge, type ScopeVisibility } from './treeNav';
+import { computeVisibleRows, indexOfPath, visibleFileSpan, isRowOutOfScope, isIndexedRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial, type LibraryKnowledge, type ScopeVisibility } from './treeNav';
 
 // --- Helpers (mirroring selectionUtils.test.ts style) ---
 
@@ -414,5 +414,40 @@ describe('indexOfPath', () => {
     expect(indexOfPath(rows, '/a')).toBe(0);
     expect(indexOfPath(rows, '/b')).toBe(1);
     expect(indexOfPath(rows, '/c')).toBe(2);
+  });
+});
+
+// --- visibleFileSpan ---
+
+describe('visibleFileSpan', () => {
+  const expanded = new Set(['/root/A']);
+
+  it('spans the visible files between anchor and current, inclusive, in either direction', () => {
+    const rows = computeVisibleRows(flatTree(), expanded, null, new Set(), false);
+    const all = ['/root/A/a.pdf', '/root/A/b.pdf', '/root/A/c.pdf'];
+    expect(visibleFileSpan(rows, '/root/A/a.pdf', '/root/A/c.pdf')).toEqual(all);
+    expect(visibleFileSpan(rows, '/root/A/c.pdf', '/root/A/a.pdf')).toEqual(all);
+  });
+
+  it('skips a hidden file inside the span', () => {
+    const rows = computeVisibleRows(flatTree(), expanded, null, new Set(['/root/A/b.pdf']), false);
+    expect(visibleFileSpan(rows, '/root/A/a.pdf', '/root/A/c.pdf')).toEqual(['/root/A/a.pdf', '/root/A/c.pdf']);
+  });
+
+  it('skips files outside the collection filter', () => {
+    const display = new Set(['/root/A', '/root/A/a.pdf', '/root/A/c.pdf']);
+    const rows = computeVisibleRows(flatTree(), expanded, display, new Set(), false);
+    expect(visibleFileSpan(rows, '/root/A/a.pdf', '/root/A/c.pdf')).toEqual(['/root/A/a.pdf', '/root/A/c.pdf']);
+  });
+
+  it('skips folders and the files of collapsed folders', () => {
+    const rows = computeVisibleRows(nestedTree(), new Set(['/root/parent']), null, new Set(), false);
+    // sub is collapsed: x.pdf and y.pdf aren't rows at all.
+    expect(visibleFileSpan(rows, '/root/parent/sibling.pdf', '/root/parent/sibling.pdf')).toEqual(['/root/parent/sibling.pdf']);
+  });
+
+  it('returns null when the anchor is no longer visible', () => {
+    const rows = computeVisibleRows(flatTree(), expanded, null, new Set(['/root/A/a.pdf']), false);
+    expect(visibleFileSpan(rows, '/root/A/a.pdf', '/root/A/c.pdf')).toBeNull();
   });
 });
