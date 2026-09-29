@@ -199,7 +199,8 @@
       <!-- The row keeps the tail of the path: the leaf is what tells
            sibling hits apart, and the root is usually shared by the whole
            list. The inspector shows the full path. -->
-      {@const crumbs = segments.slice(-2)}
+      {@const leaf = segments[segments.length - 1]}
+      {@const parent = segments.length > 1 ? segments[segments.length - 2] : null}
       {@const collColor = collectionColorByPath.get(result.source) ?? null}
       {#if i === dividerAt}
         <!-- ⁂ drawn, not typed: none of the bundled fonts carry U+2042,
@@ -247,13 +248,17 @@
         <div class="row-body">
           {#if segments.length > 0}
             <div class="breadcrumb" title={segments.join(' ❧ ')}>
-              {#if segments.length > crumbs.length}
-                <span class="bc-sep bc-elided" aria-hidden="true">…</span>
+              {#if parent}
+                <span class="bc-head">
+                  {#if segments.length > 2}
+                    <span class="bc-sep bc-elided" aria-hidden="true">…</span>
+                    <span class="bc-sep" aria-hidden="true">❧</span>
+                  {/if}
+                  <span class="bc-segment" class:caps={isAllCaps(parent)}>{parent}</span>
+                  <span class="bc-sep" aria-hidden="true">❧</span>
+                </span>
               {/if}
-              {#each crumbs as segment, idx (idx)}
-                {#if idx > 0 || segments.length > crumbs.length}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
-                <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
-              {/each}
+              <span class="bc-segment bc-leaf" class:caps={isAllCaps(leaf)}>{leaf}</span>
             </div>
           {/if}
           <!-- The row shows why it matched: `text` is the whole section
@@ -494,9 +499,10 @@
     min-width: 0;
   }
 
-  /* One line, and the leaf is the last thing to give way: the parent
-     shrinks to a stub first (heavy flex-shrink), then the leaf takes its
-     own ellipsis. */
+  /* One line, and the leaf keeps its full width: only the head (… ❧
+     parent ❧) gives way, the parent taking the ellipsis. A leaf wider
+     than the row fills it with its own ellipsis and the head drops out.
+     No shrink ratios — WebKit didn't honour them. */
   .breadcrumb {
     display: flex;
     align-items: baseline;
@@ -510,16 +516,23 @@
     white-space: nowrap;
   }
 
+  .bc-head {
+    display: flex;
+    align-items: baseline;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .bc-segment {
-    flex: 0 1000 auto;
-    min-width: 1.5em;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .bc-segment:last-child {
-    flex-shrink: 1;
-    min-width: 0;
+  .bc-leaf {
+    flex: 0 0 auto;
+    max-width: 100%;
     color: var(--text-primary);
   }
 
