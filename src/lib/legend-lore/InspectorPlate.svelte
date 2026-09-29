@@ -2,6 +2,8 @@
   import type { SearchResultItem } from './types';
   import { bookTitle, pageCitation, pageHint } from './pdfUrl';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
+  import { displaySystem, UNTAGGED_KEY } from './searchScope';
+  import { SHIELD } from '../ui/iconPaths';
 
   export let result: SearchResultItem | null = null;
   export let onOpenResult: (source: string, filename: string, page?: number | null) => void = () => {};
@@ -16,12 +18,32 @@
     : null;
 </script>
 
-<!-- The inspector's plate, level with the scope bar across the split seam.
-     The selected row already names the book and its system; the plate
-     keeps what the row can't — the full section path — and the one action,
-     so the text below gets the pane's whole height. -->
+<!-- The inspector's plate, level with the scope bar across the split seam:
+     the source (book and system, in the row's voice), the full section
+     path, and the one action — so the text below gets the pane's whole
+     height. -->
 <div class="inspector-plate nameplate">
   {#if result}
+    <!-- One baseline for the source and the path: centring each in its
+         own box let Crimson and Almendra drift a pixel apart. The plate
+         centres the row as a whole. -->
+    <div class="line">
+    <!-- Capped, so a long filename can't crowd the path; the book takes
+         the ellipsis and the system stays whole. -->
+    <span class="source" title={result.source}>
+      <span class="source-book">{bookTitle(result.filename)}</span>
+      {#if result.game_system === UNTAGGED_KEY}
+        <span class="source-system">{displaySystem(result.game_system)}</span>
+      {:else if result.game_system}
+        <span class="source-system">
+          <svg class="source-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={SHIELD}/>
+          </svg>
+          {result.game_system}
+        </span>
+      {/if}
+    </span>
+    <span class="rule" aria-hidden="true"></span>
     <nav class="path" aria-label="Section path" title={segments.join(' › ') || undefined}>
       <!-- One line, and the title keeps its full width: only the
            ancestors give way, each taking its own ellipsis. A title wider
@@ -37,6 +59,7 @@
       {/if}
       <h2 class="title" class:caps={segments.length > 0 && isAllCaps(title)}>{title}</h2>
     </nav>
+    </div>
     <!-- The printed page leads, as on the row; the physical one stays in
          the tooltip for PDF viewers, which count from the cover. -->
     <button
@@ -56,10 +79,60 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     padding: 0.3rem 0.9rem 0.3rem 1.1rem;
     border-left: 1px solid var(--border-subtle);
     font-family: var(--font-body);
+  }
+
+  /* The book and system as the result row sets them: one secondary
+     voice at 0.75rem. */
+  .line {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+
+  .source {
+    flex: 0 0 auto;
+    max-width: 10rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .source-book {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .source-system {
+    flex-shrink: 0;
+  }
+
+  /* On the text's baseline, a pixel down — SystemBadge's recipe; centring
+     in the line box set it low against Crimson's high-riding glyphs. */
+  .source-shield {
+    width: 9px;
+    height: 9px;
+    margin-right: 0.25rem;
+    vertical-align: -1px;
+  }
+
+  /* The scope bar's master rule, between the source and the path. */
+  .rule {
+    flex-shrink: 0;
+    align-self: center;
+    width: 1px;
+    height: 12px;
+    background: var(--bg-category);
   }
 
   .path {
@@ -109,7 +182,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     font-family: var(--font-heading);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     font-weight: 400;
     color: var(--text-primary);
   }
