@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import sse_events
+
 from legend_lore.service import (
     EmbedBatchError,
     MANIFEST_FILENAME,
@@ -331,10 +333,11 @@ def test_sync_stream_phase3_failure_preserves_old_chunks(
 
     monkeypatch.setattr(service, "_embed_batch", selective_boom)
 
-    resp = client.post("/api/sync-index", json={"selected_paths": paths})
+    resp = client.post("/api/sync-index-stream", json={"selected_paths": paths})
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["errors"], "expected at least one error in the sync result"
+    complete = sse_events(resp)[-1]
+    assert complete["event"] == "complete"
+    assert complete["errors"], "expected at least one error in the sync result"
 
     # Sample's old chunks are still there — the failed book was never written
     assert _unit_ids(test_store, str(sample_pdf_path)) == sample_initial_ids
@@ -360,12 +363,31 @@ def test_sync_stream_phase3_failure_releases_lock(
         lambda embed_fn, batch: (_ for _ in ()).throw(RuntimeError("everything fails"))
     )
 
-    # First sync — fails on the embed, but should return 200 with errors,
+    # First sync — fails on the embed, but should complete with errors,
     # not 500, and must release the lock for the next call.
-    resp1 = client.post("/api/sync-index", json={"selected_paths": [str(sample_pdf_path)]})
+    resp1 = client.post("/api/sync-index-stream", json={"selected_paths": [str(sample_pdf_path)]})
     assert resp1.status_code == 200
-    assert resp1.json()["errors"]
+    assert sse_events(resp1)[-1]["errors"]
 
     # Second sync — would 409 if the lock leaked
-    resp2 = client.post("/api/sync-index", json={"selected_paths": [str(sample_pdf_path)]})
+    resp2 = client.post("/api/sync-index-stream", json={"selected_paths": [str(sample_pdf_path)]})
     assert resp2.status_code == 200
+
+
+def test_sync_stream_crash_releases_lock(client, sample_pdf_path, monkeypatch):
+    """The stream takes the lock before its generator runs; once running,
+    the generator's ``finally`` is the only release. A crash mid-stream
+    must still free it."""
+    from legend_lore import router as router_mod
+
+    def crash(*args, **kwargs):
+        raise RuntimeError("sync crashed")
+
+    monkeypatch.setattr(router_mod, "compute_diff", crash)
+    with pytest.raises(RuntimeError, match="sync crashed"):
+        client.post("/api/sync-index-stream", json={"selected_paths": [str(sample_pdf_path)]})
+
+    monkeypatch.undo()
+    resp = client.post("/api/sync-index-stream", json={"selected_paths": [str(sample_pdf_path)]})
+    assert resp.status_code == 200
+    assert sse_events(resp)[-1]["event"] == "complete"

@@ -9,6 +9,7 @@ Key concepts:
   This means each test starts with a clean, empty database.
 """
 
+import json
 import os
 
 # Skip the cross-encoder model load in unit tests. Tests that need to
@@ -91,6 +92,15 @@ def client(test_store, test_embed_fn, tmp_path):
     """
     app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
     return TestClient(app)
+
+
+def sse_events(response):
+    """The JSON payloads of an SSE response's ``data:`` frames, in order."""
+    return [
+        json.loads(line[len("data: "):])
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
 
 
 # ---------------------------------------------------------------------------
