@@ -4,7 +4,7 @@
   import { bookTitle, pageCitation } from './pdfUrl';
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import { isPathOrAncestorIn } from './selectionUtils';
-  import { allWeak, GAUGE_CELLS, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
+  import { allWeak, GAUGE_CELLS, tierCells, tierLabel } from './searchTiers';
   import { markSnippet, queryTerms } from './snippetHits';
   import { displaySystem } from './searchScope';
   import { hoverLive } from '../ui/inputModality';
@@ -84,10 +84,9 @@
     el?.focus();
   }
 
-  // Weak-tier presentation (issues #306/#310): a divider demotes trailing
-  // weak results, and an all-weak list gets an explicit callout so a
-  // scoped miss doesn't masquerade as a confident answer.
-  $: dividerAt = weakDividerIndex(results);
+  // Weak-tier presentation (issues #306/#310): weak rows are dimmed in
+  // place, and an all-weak list gets an explicit callout so a scoped miss
+  // doesn't masquerade as a confident answer.
   $: terms = queryTerms(query);
   const gaugeCells = Array.from({ length: GAUGE_CELLS }, (_, idx) => idx);
   $: allResultsWeak = allWeak(results);
@@ -205,19 +204,6 @@
       {@const leaf = segments[segments.length - 1]}
       {@const parent = segments.length > 1 ? segments[segments.length - 2] : null}
       {@const collColor = collectionColorByPath.get(result.source) ?? null}
-      {#if i === dividerAt}
-        <!-- ⁂ drawn, not typed: none of the bundled fonts carry U+2042,
-             and the system fallbacks differ between macOS and Windows. -->
-        <div class="weak-divider" role="separator">
-          <svg class="asterism" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" aria-hidden="true">
-            <path d="M6 1.5v4M4.27 2.5l3.46 2M4.27 4.5l3.46-2M3 7.5v4M1.27 8.5l3.46 2M1.27 10.5l3.46-2M9 7.5v4M7.27 8.5l3.46 2M7.27 10.5l3.46-2"/>
-          </svg>
-          weak matches
-          <svg class="asterism" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" aria-hidden="true">
-            <path d="M6 1.5v4M4.27 2.5l3.46 2M4.27 4.5l3.46-2M3 7.5v4M1.27 8.5l3.46 2M1.27 10.5l3.46-2M9 7.5v4M7.27 8.5l3.46 2M7.27 10.5l3.46-2"/>
-          </svg>
-        </div>
-      {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <div
         class="result-row"
@@ -430,38 +416,6 @@
   .result-row.weak.selected,
   .hover-live .result-row.weak:hover {
     opacity: 1;
-  }
-
-  .weak-divider {
-    margin: 0.35rem 0 0.15rem;
-    padding: 0 0.5rem;
-    font-size: 0.7rem;
-    font-variant: small-caps;
-    letter-spacing: 0.08em;
-    color: var(--text-tertiary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  /* The rules fade in toward the ornament rather than running edge to
-     edge, so the asterisms read as the centre of the divider. */
-  .weak-divider::before,
-  .weak-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(to right, transparent, var(--border-subtle));
-  }
-
-  .weak-divider::after {
-    background: linear-gradient(to left, transparent, var(--border-subtle));
-  }
-
-  .asterism {
-    width: 0.75rem;
-    height: 0.8rem;
-    flex-shrink: 0;
   }
 
   .weak-callout {

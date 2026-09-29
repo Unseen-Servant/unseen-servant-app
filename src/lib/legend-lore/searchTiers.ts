@@ -33,14 +33,6 @@ export function tierLabel(tier: string | undefined, relevance: number): string {
   return `${Math.round(relevance * 100)}% match`;
 }
 
-/** Index of the first weak result when at least one stronger result
- * precedes it; -1 otherwise (no weak results, all weak, or untiered). */
-export function weakDividerIndex(results: { tier?: string }[]): number {
-  const first = results.findIndex((r) => r.tier === 'weak');
-  if (first <= 0) return -1;
-  return results.slice(0, first).some((r) => isTier(r.tier)) ? first : -1;
-}
-
 /** True only for a non-empty result list where every result is weak. */
 export function allWeak(results: { tier?: string }[]): boolean {
   return results.length > 0 && results.every((r) => r.tier === 'weak');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allWeak, tierCells, tierLabel, weakDividerIndex } from './searchTiers';
+import { allWeak, tierCells, tierLabel } from './searchTiers';
 
 describe('tierCells', () => {
   it('maps tiers to gauge cells', () => {
@@ -24,26 +24,6 @@ describe('tierLabel', () => {
 
   it('falls back to the legacy percent label when tier is missing', () => {
     expect(tierLabel(undefined, 0.85)).toBe('85% match');
-  });
-});
-
-describe('weakDividerIndex', () => {
-  it('finds the first weak result after at least one stronger one', () => {
-    const results = [{ tier: 'strong' }, { tier: 'good' }, { tier: 'weak' }, { tier: 'weak' }];
-    expect(weakDividerIndex(results)).toBe(2);
-  });
-
-  it('returns -1 when nothing is weak', () => {
-    expect(weakDividerIndex([{ tier: 'strong' }, { tier: 'good' }])).toBe(-1);
-  });
-
-  it('returns -1 when everything is weak (the all-weak callout handles it)', () => {
-    expect(weakDividerIndex([{ tier: 'weak' }, { tier: 'weak' }])).toBe(-1);
-  });
-
-  it('returns -1 for empty or untiered results', () => {
-    expect(weakDividerIndex([])).toBe(-1);
-    expect(weakDividerIndex([{}, {}])).toBe(-1);
   });
 });
 
