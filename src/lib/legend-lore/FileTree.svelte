@@ -4,7 +4,7 @@
   import { openPath } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
   import type { FileItem, KnownGameSystem } from './types';
-  import { areAllDescendantsSelected, isPathOrAncestorIn } from './selectionUtils';
+  import { checkboxState, isPathOrAncestorIn } from './selectionUtils';
   import { isRowOutOfScope, rowHasIndexedMaterial, rowHasLibraryMaterial } from './treeNav';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { memberStateFor, type ArmState } from './collectionMembership';
@@ -132,17 +132,7 @@
     }
   });
 
-  // Check if this item has any selection — O(1) Set lookup, works even for unloaded folders
-  $: isSelected = item.is_dir
-    ? foldersWithSelections.has(item.path)
-    : selectedPaths.has(item.path);
-
-  // For folders: computed locally from item.children (which has correct data in this component)
-  $: isFullySelected = item.is_dir && item.children !== null &&
-    areAllDescendantsSelected(item, selectedPaths);
-
-  $: isChecked = item.is_dir ? isFullySelected : isSelected;
-  $: isIndeterminate = item.is_dir && isSelected && !isFullySelected;
+  $: ({ isChecked, isIndeterminate } = checkboxState(item, selectedPaths, foldersWithSelections));
 
   $: isFocused = item.path === focusedFilePath;
   $: isRenaming = item.path === renamingFilePath;

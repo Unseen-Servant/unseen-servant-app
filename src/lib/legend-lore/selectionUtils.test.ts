@@ -5,6 +5,7 @@ import {
   hasAnyDescendantSelected,
   hasSelectableDescendants,
   computeAncestorPaths,
+  checkboxState,
 } from './selectionUtils';
 
 // --- Helpers ---
@@ -281,56 +282,40 @@ describe('computeAncestorPaths', () => {
 });
 
 // =====================================================================
-// Composite state derivation (simulating FileTree reactive logic)
+// checkboxState — FileTree's checkbox, as FileTree derives it
 // =====================================================================
 
-describe('composite checkbox state', () => {
-  function deriveState(item: FileItem, selectedPaths: Set<string>) {
-    const hasAny = item.is_dir && (
-      item.children !== null
-        ? hasAnyDescendantSelected(item, selectedPaths)
-        : computeAncestorPaths(selectedPaths).has(item.path)
-    );
-    const isFullySelected = item.is_dir && item.children !== null &&
-      areAllDescendantsSelected(item, selectedPaths);
-    const isChecked = item.is_dir ? isFullySelected : selectedPaths.has(item.path);
-    const isIndeterminate = item.is_dir && hasAny && !isFullySelected;
-    return { isChecked, isIndeterminate };
+describe('checkboxState', () => {
+  // FileTree receives foldersWithSelections from the page, which builds
+  // it this way from the selection.
+  function stateFor(item: FileItem, selected: Set<string>) {
+    return checkboxState(item, selected, computeAncestorPaths(selected));
   }
 
   it('folder with no selections → unchecked, not indeterminate', () => {
-    const f = flatFolder();
-    const { isChecked, isIndeterminate } = deriveState(f, new Set());
-    expect(isChecked).toBe(false);
-    expect(isIndeterminate).toBe(false);
+    expect(stateFor(flatFolder(), new Set())).toEqual({ isChecked: false, isIndeterminate: false });
   });
 
   it('folder with partial selections → unchecked, indeterminate', () => {
-    const f = flatFolder();
-    const { isChecked, isIndeterminate } = deriveState(f, new Set(['/root/A/a.pdf']));
-    expect(isChecked).toBe(false);
-    expect(isIndeterminate).toBe(true);
+    expect(stateFor(flatFolder(), new Set(['/root/A/a.pdf']))).toEqual({ isChecked: false, isIndeterminate: true });
   });
 
   it('folder with all selected → checked, not indeterminate', () => {
-    const f = flatFolder();
     const selected = new Set(['/root/A/a.pdf', '/root/A/b.pdf', '/root/A/c.pdf']);
-    const { isChecked, isIndeterminate } = deriveState(f, selected);
-    expect(isChecked).toBe(true);
-    expect(isIndeterminate).toBe(false);
+    expect(stateFor(flatFolder(), selected)).toEqual({ isChecked: true, isIndeterminate: false });
+  });
+
+  it('unloaded folder with a selection below → indeterminate, never checked', () => {
+    // Children aren't loaded, so "all selected" can't be known.
+    const unloaded = folder('A', '/root', null);
+    expect(stateFor(unloaded, new Set(['/root/A/deep/x.pdf']))).toEqual({ isChecked: false, isIndeterminate: true });
   });
 
   it('file selected → checked', () => {
-    const f = file('a.pdf', '/root');
-    const { isChecked, isIndeterminate } = deriveState(f, new Set(['/root/a.pdf']));
-    expect(isChecked).toBe(true);
-    expect(isIndeterminate).toBe(false);
+    expect(stateFor(file('a.pdf', '/root'), new Set(['/root/a.pdf']))).toEqual({ isChecked: true, isIndeterminate: false });
   });
 
   it('file not selected → unchecked', () => {
-    const f = file('a.pdf', '/root');
-    const { isChecked, isIndeterminate } = deriveState(f, new Set());
-    expect(isChecked).toBe(false);
-    expect(isIndeterminate).toBe(false);
+    expect(stateFor(file('a.pdf', '/root'), new Set())).toEqual({ isChecked: false, isIndeterminate: false });
   });
 });

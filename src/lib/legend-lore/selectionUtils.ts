@@ -94,3 +94,23 @@ export function isPathOrAncestorIn(path: string, roots: Set<string>): boolean {
   }
   return false;
 }
+
+/**
+ * A FileTree row's indexing checkbox. A file is checked when selected. A
+ * folder is checked only when its loaded children are all selected, and
+ * indeterminate when something below it is selected but not all of it —
+ * `foldersWithSelections` (computeAncestorPaths of the selection) answers
+ * that in O(1), even for a folder whose children aren't loaded.
+ */
+export function checkboxState(
+  item: FileItem,
+  selectedPaths: Set<string>,
+  foldersWithSelections: Set<string>,
+): { isChecked: boolean; isIndeterminate: boolean } {
+  if (!item.is_dir) return { isChecked: selectedPaths.has(item.path), isIndeterminate: false };
+  const isFullySelected = item.children !== null && areAllDescendantsSelected(item, selectedPaths);
+  return {
+    isChecked: isFullySelected,
+    isIndeterminate: foldersWithSelections.has(item.path) && !isFullySelected,
+  };
+}
