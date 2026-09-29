@@ -69,6 +69,31 @@
 </script>
 
 <div class="general-settings">
+  <section class="field">
+    <div class="field-head">
+      <h3 class="field-title section-title">Search results</h3>
+      <p class="field-desc">How the result list presents what search found.</p>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-head">
+        <div class="setting-row-title">Dim weak matches</div>
+        <div class="setting-row-desc">
+          Weak matches stay in the list but fade back, so the strong ones
+          stand out.
+        </div>
+      </div>
+      <select
+        class="setting-select"
+        value={dimWeakResults ? 'on' : 'off'}
+        on:change={(e) => onDimWeakResultsChange(e.currentTarget.value === 'on')}
+      >
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+    </div>
+  </section>
+
   {#if loadError}
     <section class="field">
       <div class="field-head">
@@ -204,31 +229,6 @@
       </div>
     </section>
   {/if}
-
-  <section class="field">
-    <div class="field-head">
-      <h3 class="field-title section-title">Search results</h3>
-      <p class="field-desc">How the result list presents what search found.</p>
-    </div>
-
-    <div class="setting-row">
-      <div class="setting-row-head">
-        <div class="setting-row-title">Dim weak matches</div>
-        <div class="setting-row-desc">
-          Weak matches stay in the list but fade back, so the strong ones
-          stand out.
-        </div>
-      </div>
-      <select
-        class="setting-select"
-        value={dimWeakResults ? 'on' : 'off'}
-        on:change={(e) => onDimWeakResultsChange(e.currentTarget.value === 'on')}
-      >
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </div>
-  </section>
 </div>
 
 <style>
