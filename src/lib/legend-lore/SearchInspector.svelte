@@ -361,20 +361,26 @@
     background: var(--text-accent);
   }
 
-  /* Parchment, as the match's margin rule, on the lane's inner edge. */
+  /* Parchment, as the match's margin rule, on the lane's inner edge. A
+     transparent border takes the target out to where the ticks start;
+     on hover it widens to 8px, so it's easy to hit once found. */
   .match-mark {
     position: absolute;
-    right: 11px;
-    width: 3px;
+    left: calc(100% - 14px);
+    width: 5px;
     padding: 0;
     border: none;
-    border-radius: var(--radius-cell);
+    border-right: 2px solid transparent;
     background: var(--text-accent);
+    background-clip: padding-box;
+    border-radius: var(--radius-cell);
     cursor: pointer;
-    transition: filter var(--transition-fast);
+    transition: filter var(--transition-fast), width var(--transition-fast);
   }
 
   .match-mark:hover {
+    width: 8px;
+    border-right-width: 0;
     filter: brightness(1.25);
   }
 
