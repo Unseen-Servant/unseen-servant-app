@@ -797,13 +797,30 @@ class IndexManifest(BaseModel):
     files: dict[str, ManifestEntry] = {}
 
 
+def _load_json_store(path: Path, parse):
+    """``parse`` the JSON at ``path``; None when the file is missing.
+
+    An unreadable or wrongly-shaped file is renamed to
+    ``<name>.corrupt-<timestamp>`` and treated as missing. The stores are
+    written atomically, so this is a hand edit or disk damage; moving it
+    aside keeps the sidecar booting without letting the next save
+    overwrite what the user may want to repair.
+    """
+    if not path.exists():
+        return None
+    try:
+        return parse(json.loads(path.read_text()))
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
+        aside = path.with_name(f"{path.name}.corrupt-{time.strftime('%Y%m%dT%H%M%S')}")
+        os.replace(path, aside)
+        print(f"Unreadable {path.name} ({e}); moved to {aside.name}, starting empty")
+        return None
+
+
 def load_manifest(data_dir: Path) -> IndexManifest:
     """Load the index manifest from disk, or return an empty one."""
-    manifest_path = data_dir / MANIFEST_FILENAME
-    if manifest_path.exists():
-        raw = json.loads(manifest_path.read_text())
-        return IndexManifest(**raw)
-    return IndexManifest()
+    manifest = _load_json_store(data_dir / MANIFEST_FILENAME, lambda raw: IndexManifest(**raw))
+    return manifest if manifest is not None else IndexManifest()
 
 
 def manifest_digest(manifest: IndexManifest) -> str:
@@ -898,19 +915,18 @@ def _migrate_collection_record(name: str, raw: dict) -> dict:
 
 def load_collections(data_dir: Path) -> CollectionsStore:
     """Load collections from disk, migrating legacy records to the current schema."""
-    path = data_dir / COLLECTIONS_FILENAME
-    if not path.exists():
-        return CollectionsStore()
-    raw = json.loads(path.read_text())
-    raw_collections = raw.get("collections", {})
-    migrated = {
-        name: _migrate_collection_record(name, c)
-        for name, c in raw_collections.items()
-    }
-    return CollectionsStore(
-        version=COLLECTIONS_STORE_VERSION,
-        collections=migrated,
-    )
+    def parse(raw):
+        migrated = {
+            name: _migrate_collection_record(name, c)
+            for name, c in raw.get("collections", {}).items()
+        }
+        return CollectionsStore(
+            version=COLLECTIONS_STORE_VERSION,
+            collections=migrated,
+        )
+
+    store = _load_json_store(data_dir / COLLECTIONS_FILENAME, parse)
+    return store if store is not None else CollectionsStore()
 
 
 def save_collections(data_dir: Path, store: CollectionsStore) -> None:
@@ -943,11 +959,10 @@ class CustomGameSystemsStore(BaseModel):
 
 def load_custom_systems(data_dir: Path) -> CustomGameSystemsStore:
     """Load custom game systems from disk, or return an empty store."""
-    path = data_dir / CUSTOM_SYSTEMS_FILENAME
-    if path.exists():
-        raw = json.loads(path.read_text())
-        return CustomGameSystemsStore(**raw)
-    return CustomGameSystemsStore()
+    store = _load_json_store(
+        data_dir / CUSTOM_SYSTEMS_FILENAME, lambda raw: CustomGameSystemsStore(**raw)
+    )
+    return store if store is not None else CustomGameSystemsStore()
 
 
 def save_custom_systems(data_dir: Path, store: CustomGameSystemsStore) -> None:
