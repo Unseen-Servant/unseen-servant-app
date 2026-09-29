@@ -30,26 +30,35 @@ def test_rerank_false_skips_reranker(indexed_client, monkeypatch):
     assert response.status_code == 200
 
 
-def test_rerank_reorders_top_candidates(indexed_client, monkeypatch):
-    """A reranker that prefers the *last* candidate should bubble it up."""
+def _seeded_headings(client, test_store, test_embed_fn, **request):
+    """Section headings of a 3-section search, in result order. The
+    fixture PDF is one section, too few to show a reorder."""
+    from tests.test_search_tiers import _seed_parents
+
+    _seed_parents(test_store, test_embed_fn, 3)
+    response = client.post("/api/search", json={"query": "dragon", "n_results": 3, **request})
+    assert response.status_code == 200, response.text
+    return [r["section_heading"] for r in response.json()["results"]], response.json()["results"]
+
+
+def test_rerank_reorders_top_candidates(client, test_store, test_embed_fn, monkeypatch):
+    """A reranker that prefers the *last* candidate should bubble it up:
+    scores rising with input position reverse the order it was given."""
     from legend_lore import service
 
     captured = {}
 
     def fake_scores(query, docs):
         captured["docs"] = list(docs)
-        # Score in reverse order: last doc gets the highest score.
         return [float(i) for i in range(len(docs))]
 
     monkeypatch.setattr(service, "rerank_scores", fake_scores)
 
-    response = indexed_client.post("/api/search", json={
-        "query": "dragon", "n_results": 3, "rerank": True,
-    })
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["results"]) > 0
-    assert "docs" in captured  # rerank_scores actually called
+    headings, results = _seeded_headings(client, test_store, test_embed_fn, rerank=True)
+    given = [d.split("\n\n", 1)[0] for d in captured["docs"]]
+    assert len(given) == 3
+    assert headings == list(reversed(given))
+    assert all(r["reranked"] for r in results)
 
 
 def test_rerank_input_prepends_section_heading(
@@ -95,19 +104,18 @@ def test_rerank_input_prepends_section_heading(
     ), f"Expected at least one input to start with the breadcrumb; got: {docs}"
 
 
-def test_rerank_falls_back_when_scores_none(indexed_client, monkeypatch):
+def test_rerank_falls_back_when_scores_none(client, test_store, test_embed_fn, monkeypatch):
     """If rerank_scores returns None (model failed), keep cosine order."""
     from legend_lore import service
 
-    monkeypatch.setattr(service, "rerank_scores", lambda q, d: None)
+    cosine, _ = _seeded_headings(client, test_store, test_embed_fn, rerank=False)
 
-    response = indexed_client.post("/api/search", json={
-        "query": "dragon", "n_results": 3, "rerank": True,
-    })
-    assert response.status_code == 200
-    # No assertion on order — just that the response is well-formed.
-    data = response.json()
-    assert len(data["results"]) > 0
+    monkeypatch.setattr(service, "rerank_scores", lambda q, d: None)
+    response = client.post("/api/search", json={"query": "dragon", "n_results": 3, "rerank": True})
+    results = response.json()["results"]
+
+    assert [r["section_heading"] for r in results] == cosine
+    assert not any(r["reranked"] for r in results)
 
 
 def test_rerank_relevance_uses_score_when_reranked(indexed_client, monkeypatch):
