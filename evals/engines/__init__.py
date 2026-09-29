@@ -14,8 +14,4 @@ def get_engine(name: str, **kwargs):
         from .v2 import V2Engine
 
         return V2Engine(**kwargs)
-    if name == "v3":
-        raise NotImplementedError(
-            "the v3 engine lands with sidecar-v3 (plan §4, Phase 2)"
-        )
-    raise ValueError(f"unknown engine {name!r} (expected 'v2' or 'v3')")
+    raise ValueError(f"unknown engine {name!r} (expected 'v2')")

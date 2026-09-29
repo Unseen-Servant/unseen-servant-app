@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       sidecar: ${{ steps.filter.outputs.sidecar }}
-      v3: ${{ steps.filter.outputs.v3 }}
+      evals: ${{ steps.filter.outputs.evals }}
       rust: ${{ steps.filter.outputs.rust }}
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:
@@ -43,9 +43,10 @@ jobs:
             sidecar:
               - 'sidecar/**'
               - 'scripts/build-sidecar.sh'
-            v3:
-              - 'sidecar-v3/**'
+            evals:
               - 'evals/**'
+              - 'sidecar/pyproject.toml'
+              - 'sidecar/uv.lock'
               - 'third_party/**'
               - 'scripts/check-third-party.py'
             rust:
@@ -82,11 +83,10 @@ jobs:
           cd sidecar
           uv run --frozen pytest -v
 
-  # The rebuild and its eval harness have independent dependencies and must
-  # receive the same Linux-only CI coverage as the production sidecar.
-  v3-checks:
+  # The eval harness's unit tests, run under the production sidecar's env.
+  evals-checks:
     needs: changes
-    if: needs.changes.outputs.v3 == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.evals == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -97,13 +97,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: sidecar-v3/uv.lock
+          cache-dependency-glob: sidecar/uv.lock
 
       - name: Check component inventory
         run: python scripts/check-third-party.py
 
-      - name: Run v3 and harness tests
-        run: uv run --frozen --project sidecar-v3 pytest sidecar-v3/tests evals/tests
+      - name: Run harness tests
+        run: uv run --frozen --project sidecar pytest evals/tests
 
   # Rust formatting + lint + unit tests. Catches anything that would
   # break the Tauri compile or trip clippy. Uses Ubuntu because Tauri's

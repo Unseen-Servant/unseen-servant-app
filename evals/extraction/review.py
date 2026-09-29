@@ -61,31 +61,27 @@ h1{{color:rgb(182,159,129)}} h2{{margin:30px 0 10px;color:rgb(182,159,129)}} h3{
 figure,section{{margin:0;border:1px solid #323232;background:#232323;padding:10px}} img{{width:100%;height:auto;display:block}}
 figcaption{{color:#8b949e;margin-top:7px;font:12px ui-monospace,monospace}} pre{{margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.45;font:12px ui-monospace,monospace}}
 @media(max-width:1000px){{.grid{{grid-template-columns:1fr}}}}
-</style><h1>{html.escape(title)}</h1><p>Compare the rendered source with each pipeline's extraction and the PDF engine's native text blocks. Engine columns show the <strong>per-page extraction the gate measures</strong> &mdash; for v3 that is Stage&nbsp;A+B block text, before <code>linearize.py</code> turns tables into per-row units, so it is not the final chunk payload. v2 emits markdown because pymupdf4llm does; v3 emits one line per cell. Both can carry the same content. This report is local and self-contained.</p>{''.join(rows)}"""
+</style><h1>{html.escape(title)}</h1><p>Compare the rendered source with each pipeline's extraction and the PDF engine's native text blocks. Engine columns show the <strong>per-page extraction the gate measures</strong>. v2 emits markdown because pymupdf4llm does. This report is local and self-contained.</p>{''.join(rows)}"""
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--engine", default="v3",
-                    help="one or more of v2,v3 — e.g. 'v2,v3' renders them side by side")
-    ap.add_argument("--pdf-backend", default="pymupdf",
-                    choices=["pymupdf", "pdfium", "pdfplumber"],
-                    help="v3 extraction backend; ignored by v2")
+    ap.add_argument("--engine", default="v2", help="the pipeline to extract with (v2)")
     ap.add_argument("--doc", required=True, help="document id from corpus.manifest.json")
     ap.add_argument("--pages", required=True, help="1-based pages, e.g. 30,183 or 324-325")
     ap.add_argument("--dump", type=Path, default=None,
                     help="write this run's extraction as JSON, to --load into a later run")
     ap.add_argument("--load", action="append", default=[], metavar="LABEL=PATH",
                     help="merge a --dump from another environment as an extra column; "
-                         "repeatable. v2 and v3 have disjoint dependency sets, so a "
-                         "cross-pipeline comparison needs one pass per environment.")
+                         "repeatable — how a pipeline that needs another environment "
+                         "joins the comparison.")
     ap.add_argument("--output", type=Path, default=None)
     ap.add_argument("--open", action="store_true")
     args = ap.parse_args()
     engines = [name.strip() for name in args.engine.split(",") if name.strip()]
-    unknown = [name for name in engines if name not in ("v2", "v3")]
+    unknown = [name for name in engines if name != "v2"]
     if unknown or not engines:
-        raise SystemExit(f"--engine takes v2 and/or v3, got {args.engine!r}")
+        raise SystemExit(f"--engine takes v2, got {args.engine!r}")
     wanted = parse_pages(args.pages)
     corpus = require_corpus()
     doc = next((item for item in corpus.documents if item.id == args.doc), None)
@@ -95,11 +91,10 @@ def main() -> int:
         raise SystemExit(f"page {wanted[-1]} exceeds {args.doc}'s page count")
     columns, by_engine = [], {}
     for name in engines:
-        label = f"{name} ({args.pdf_backend})" if name == "v3" else name
-        columns.append(label)
-        engine = build_engine(name, None, args.pdf_backend) if name == "v3" else build_engine(name, None)
+        columns.append(name)
+        engine = build_engine(name, None)
         try:
-            by_engine[label] = {page.page_number: page.text for page in engine.extract(doc.pdf_path)}
+            by_engine[name] = {page.page_number: page.text for page in engine.extract(doc.pdf_path)}
         finally:
             engine.close()
     for spec in args.load:

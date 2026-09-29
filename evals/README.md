@@ -1,9 +1,10 @@
-# evals — the v3 retrieval harness
+# evals — the retrieval harness
 
 Engine-agnostic evaluation for the retrieval pipeline. It grades the **live v2
-sidecar today** (via an in-process TestClient) and will grade **sidecar-v3** as
-it is built — same queries, same grader, so every Phase-1+ change is measured
-against a committed baseline it must beat. See
+sidecar** (via an in-process TestClient) — same queries, same grader, so every
+change is measured against a committed baseline it must beat. It was built for
+the v3 rebuild, which is parked in the experiments repo (`v3_pipeline/`); its
+v3 baselines stay here as history. See
 [docs/retrieval/2026-08-14-v3-scaffold.md](../docs/retrieval/2026-08-14-v3-scaffold.md)
 and [docs/roadmap/2026-08-13-pipeline-rebuild-plan.md](../docs/roadmap/2026-08-13-pipeline-rebuild-plan.md).
 
@@ -46,15 +47,14 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --baseline section
 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline sections-norerank --no-rerank
 
 # A candidate retrieval rung must not regress headline metrics in any scope.
-uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --baseline rung-9 \
-    --gate evals/baselines/<last-committed>-v3-<rung>.json
+uv run --project sidecar python -m evals.run_eval --engine v2 --baseline <rung> \
+    --gate evals/baselines/<last-committed>-v2-<rung>.json
 
 # Extraction QA — no Ollama; grades hand-authored golden pages. --gate fails
 # the run (exit 1) if ANY page's metric drops below the reference baseline —
 # the per-page min, not the mean, is what gates an extraction change.
-uv run --project sidecar python -m evals.run_eval --engine v2 --suite extraction
-uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite extraction \
-    --gate evals/baselines/<last-committed>-v3-extraction.json
+uv run --project sidecar python -m evals.run_eval --engine v2 --suite extraction \
+    --gate evals/baselines/<last-committed>-v2-extraction.json
 
 # Author-time guard: every anchor present in BOTH reference and PDF (gates a
 # query commit; also confirms cross_page anchors straddle their declared pages).
@@ -62,13 +62,13 @@ uv run --project sidecar python -m evals.retrieval.verify_anchors
 
 # Corpus-wide extraction QA — every page with native text blocks, the PDF as
 # the oracle, no embedding
-# (~7 min). The inner loop for extraction work; v3 runs under its own env.
-uv run --project sidecar-v3 python -m evals.run_eval --engine v3 --suite corpus-qa
+# (~7 min). The inner loop for extraction work.
+uv run --project sidecar python -m evals.run_eval --engine v2 --suite corpus-qa
 
-# Local visual review: original rendered page, v3 extraction, and native-text
+# Local visual review: original rendered page, v2 extraction, and native-text
 # oracle side by side. Start with the former trouble pages.
-uv run --project sidecar-v3 python -m evals.extraction.review \
-    --engine v3 --doc srd_5_2_1 --pages 30,183 --open
+uv run --project sidecar python -m evals.extraction.review \
+    --doc srd_5_2_1 --pages 30,183 --open
 
 # Breadcrumb QA — every chunk's section_heading graded for markup, split
 # letters, small-caps damage, furniture roots (no Ollama, ~8 min). The gate
@@ -87,7 +87,7 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb
 uv run --project sidecar python -m evals.retrieval.idle_probe
 
 # Harness unit tests (pure, CI-safe).
-uv run --project sidecar-v3 pytest evals/tests
+uv run --project sidecar pytest evals/tests
 ```
 
 ## What gates what
@@ -96,7 +96,7 @@ uv run --project sidecar-v3 pytest evals/tests
 |---|---|---|
 | corpus PDF hash + path-sensitive reference digest | `corpus.py` (`require_corpus`) | any eval run, on drift |
 | every anchor in ref ∧ PDF | `retrieval/verify_anchors.py` (exit 1) | committing a query |
-| the committed baseline (MRR@5, success@3) | `--gate` | a v3 rung that regresses in any scope |
+| the committed baseline (MRR@5, success@3) | `--gate` | a rung that regresses in any scope |
 | every golden page ≥ its reference score | `extraction/gate.py` (`--gate`, exit 1) | an extraction change that helps the mean and hurts a page |
 | anchor grade vs a human (Cohen's κ) | `blind/score.py` | trusting the automated number |
 | chunks a human can read (`readable@5`) | `blind/score.py` (the "garbled" tick) | calling a pipeline search-ready on anchors alone |
@@ -178,7 +178,8 @@ uv run --project sidecar python -m evals.blind.transfer evals/baselines/<scored-
 
 `engines/base.py` is the `Engine` protocol (index / warmup / search / extract /
 close). `engines/v2.py` drives the live sidecar in-process (its real pipeline).
-`engines/v3.py` is a stub until sidecar-v3 has a pipeline (Phase 2).
+The v3 adapter was removed when v3 moved to the experiments repo; restore
+`engines/v3.py` from history to evaluate it again.
 
 ## MCP tools
 

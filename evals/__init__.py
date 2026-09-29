@@ -1,7 +1,7 @@
 """Engine-agnostic eval harness (Phase 0 of the v3 pipeline rebuild).
 
 Grades any pipeline that implements ``evals.engines.base.Engine`` —
-today the production v2 sidecar, later sidecar-v3 — against the corpus
+today the production v2 sidecar (v3 was parked in the experiments repo) — against the corpus
 manifest and query suites in this directory.
 
 See docs/retrieval/2026-08-14-v3-scaffold.md for the layout and

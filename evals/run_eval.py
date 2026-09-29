@@ -29,9 +29,9 @@ from evals.retrieval import grade, metrics
 QUERIES_PATH = Path(__file__).resolve().parent / "retrieval" / "queries.yaml"
 BASELINE_DIR = Path(__file__).resolve().parent / "baselines"
 
-# Rung-6 system-boost keyword map — the eval's stand-in for the product's tag
-# keyword lists (user-defined + defaults). Keyword → the doc ids it names; built
-# into {keyword: {filenames}} against the corpus. Production wires this to tags.
+# System-boost keywords per doc id — the eval's stand-in for the product's tag
+# keyword lists (user-defined + defaults). SYSTEM_TAGS below turns them into the
+# tags v2 stores; production wires the same thing to the user's tag lists.
 SYSTEM_KEYWORDS = {
     "bfrpg_4e": ["basic fantasy", "bfrpg"],
     "black_hack_1e": ["black hack"],
@@ -41,14 +41,6 @@ SYSTEM_KEYWORDS = {
     "osric_2e": ["osric"],
     "yze_srd": ["year zero", "yze"],
 }
-
-
-def _system_map(corpus) -> dict:
-    m: dict[str, set] = {}
-    for d in corpus.documents:
-        for kw in SYSTEM_KEYWORDS.get(d.id, []):
-            m.setdefault(kw, set()).add(d.pdf_path.name)
-    return m
 
 
 # The same information as SYSTEM_KEYWORDS, in the shape the v2 product stores
@@ -77,15 +69,11 @@ def query_docs(q: dict) -> list[str]:
     return list(doc) if isinstance(doc, list) else [doc]
 
 
-def build_engine(name: str, data_dir: Path | None, pdf_backend: str = "pymupdf"):
+def build_engine(name: str, data_dir: Path | None):
     if name == "v2":
         from evals.engines.v2 import V2Engine, DEFAULT_DATA_DIR
 
         return V2Engine(data_dir=data_dir or DEFAULT_DATA_DIR)
-    if name == "v3":
-        from evals.engines.v3 import V3Engine, DEFAULT_DATA_DIR
-
-        return V3Engine(data_dir=data_dir or DEFAULT_DATA_DIR, pdf_backend=pdf_backend)
     raise SystemExit(f"unknown engine {name!r}")
 
 
@@ -424,9 +412,7 @@ def run_breadcrumb_qa(engine, corpus) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--engine", default="v2", choices=["v2", "v3"])
-    ap.add_argument("--pdf-backend", default="pymupdf", choices=["pymupdf", "pdfium", "pdfplumber"],
-                    help="v3 extraction backend; non-default backends are evaluation candidates")
+    ap.add_argument("--engine", default="v2", choices=["v2"])
     ap.add_argument("--suite", default="retrieval",
                     choices=["retrieval", "extraction", "corpus-qa", "breadcrumb-qa", "library"])
     ap.add_argument("--baseline", default=None, help="baseline name (rung); default: the suite name")
@@ -497,9 +483,7 @@ def main() -> int:
     if args.suite == "retrieval" and not args.reuse_index:
         temporary_index = tempfile.TemporaryDirectory(prefix=f"legend-lore-eval-{args.engine}-")
         data_dir = Path(temporary_index.name)
-    if args.engine == "v2" and args.pdf_backend != "pymupdf":
-        raise SystemExit("non-default --pdf-backend values are available only with --engine v3")
-    engine = build_engine(args.engine, data_dir, args.pdf_backend)
+    engine = build_engine(args.engine, data_dir)
 
     try:
         if args.suite == "extraction":
@@ -528,7 +512,7 @@ def main() -> int:
             opts = SearchOptions(n_results=args.n_results, hybrid=args.hybrid,
                                  rerank=not args.no_rerank,
                                  max_context_chars=args.max_context_chars,
-                                 extra={"system_map": {}, **_request_extra(args)})
+                                 extra=_request_extra(args))
             result = run(engine, queries, corpus, opts, do_index=False)
             result["skipped_queries"], result["missing_docs"] = skipped, missing
         else:
@@ -543,16 +527,9 @@ def main() -> int:
                 rng = random.Random(args.typos)
                 queries = [{**q, "query": typo_query(q["query"], rng)[0]} for q in queries]
             queries = _apply_prefix(queries, args.prefix)
-            # v3 takes the rung-6 keyword map in-process; v2 gets the same
-            # information as tags (SYSTEM_TAGS) and its request body is JSON,
-            # which a dict of sets is not.
-            extra: dict = {"system_map": _system_map(corpus)} if args.engine == "v3" else {}
-            extra.update(_request_extra(args))
+            extra: dict = _request_extra(args)
             if args.lex_weight is not None:
-                if args.engine == "v3":
-                    extra["weights"] = [1.0, args.lex_weight]
-                else:
-                    extra["lex_weight"] = args.lex_weight
+                extra["lex_weight"] = args.lex_weight
             if args.rerank_weight is not None:
                 extra["rerank_weight"] = args.rerank_weight
             if args.lex_pool is not None:

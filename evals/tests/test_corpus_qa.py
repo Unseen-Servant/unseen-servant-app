@@ -6,7 +6,7 @@ block survive contiguously in the engine's page text?" detects exactly the
 defect the 30-page golden mean could not see. Pure functions; no model, no
 corpus. Run from the repo root:
 
-    uv run --project sidecar-v3 pytest evals/tests
+    uv run --project sidecar pytest evals/tests
 """
 import pymupdf
 
