@@ -460,7 +460,7 @@ async def get_pages(filename: str, start: int, end: int) -> str:
     Args:
         filename: Indexed PDF filename (e.g., "dragonbane_core.pdf").
         start: First page to fetch, 1-based inclusive.
-        end: Last page to fetch, 1-based inclusive (at most 20 pages from start).
+        end: Last page to fetch, 1-based inclusive (the span is at most 20 pages).
     """
     data = await sidecar.get(
         f"/api/source/{quote(filename, safe='')}/pages?start={start}&end={end}"

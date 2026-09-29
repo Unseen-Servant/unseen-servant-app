@@ -118,6 +118,16 @@ def test_get_pages_range_too_wide_is_400(client, sample_pdf_path):
     assert response.status_code == 400
 
 
+def test_get_pages_span_caps_at_twenty_pages_inclusive(client, sample_pdf_path):
+    """1–20 is twenty pages; 1–21 is twenty-one, one past the cap the
+    MCP tool documents."""
+    _index(client, sample_pdf_path)
+    url = "/api/source/dragonbane_monsters.pdf/pages"
+
+    assert client.get(url, params={"start": 1, "end": 20}).status_code == 200
+    assert client.get(url, params={"start": 1, "end": 21}).status_code == 400
+
+
 def test_get_pages_end_before_start_is_400(client, sample_pdf_path):
     _index(client, sample_pdf_path)
 

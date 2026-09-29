@@ -1187,7 +1187,7 @@ def build_router(
         Another drill-in for the MCP tools: content a section-based search
         doesn't surface well (a table of contents, a map, an appendix).
         """
-        if end < start or end - start > 20:
+        if end < start or end - start + 1 > 20:
             raise HTTPException(
                 status_code=400,
                 detail="end must be >= start and span at most 20 pages",
