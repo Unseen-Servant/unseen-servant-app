@@ -37,6 +37,10 @@
   // Null when there's no match or nothing to scroll.
   let mark: { top: number; height: number } | null = null;
 
+  // Where each query hit sits on the track, in px from its top. Empty
+  // when there's nothing to scroll.
+  let hitTicks: number[] = [];
+
   $: tags = (result && gameSystemMap.get(result.source)) || [];
 
   // `text` is the whole assembled section now (roadmap 2.5), so the hit
@@ -70,26 +74,32 @@
     centreMatch();
   }
 
-  function measureMark() {
-    if (!bodyEl || !matchEl || bodyEl.scrollHeight <= bodyEl.clientHeight) {
+  function measureLane() {
+    if (!bodyEl || bodyEl.scrollHeight <= bodyEl.clientHeight) {
       mark = null;
+      hitTicks = [];
       return;
     }
     const scale = bodyEl.clientHeight / bodyEl.scrollHeight;
-    const y =
-      matchEl.getBoundingClientRect().top -
-      bodyEl.getBoundingClientRect().top +
-      bodyEl.scrollTop;
-    mark = {
-      top: y * scale,
-      height: Math.max(3, matchEl.offsetHeight * scale),
-    };
+    const origin = bodyEl.getBoundingClientRect().top - bodyEl.scrollTop;
+    const trackY = (el: Element) => (el.getBoundingClientRect().top - origin) * scale;
+    mark = matchEl
+      ? { top: trackY(matchEl), height: Math.max(3, matchEl.offsetHeight * scale) }
+      : null;
+    // A tick is 2px; hits closer than that on the track would stack into
+    // a smear, so one tick stands for them all.
+    const ticks: number[] = [];
+    for (const el of bodyEl.querySelectorAll('.hit')) {
+      const y = Math.round(trackY(el));
+      if (ticks.length === 0 || y - ticks[ticks.length - 1] >= 3) ticks.push(y);
+    }
+    hitTicks = ticks;
   }
 
   function followResizes(node: HTMLElement) {
     const observer = new ResizeObserver(() => {
       centreMatch();
-      measureMark();
+      measureLane();
     });
     observer.observe(node);
     return { destroy: () => observer.disconnect() };
@@ -99,10 +109,11 @@
     followMatch = true;
     tick().then(() => {
       centreMatch();
-      measureMark();
+      measureLane();
     });
   }
-  $: if (!matchEl) mark = null;
+  // Hits move with the result, and with the query's terms under it.
+  $: if (result && mdPlugins) tick().then(measureLane);
 
   function toggleSystem(tag: string) {
     if (!result) return;
@@ -236,10 +247,19 @@
           {/if}
         </div>
       </div>
+      {#if hitTicks.length > 0}
+        <!-- Every query hit on the scrollbar track, the way find-in-page
+             marks them. Pointer-transparent: the thumb under them drags. -->
+        <div class="hit-ticks" aria-hidden="true">
+          {#each hitTicks as y (y)}
+            <span class="hit-tick" style="top: {y}px"></span>
+          {/each}
+        </div>
+      {/if}
       {#if mark}
-        <!-- The match's place in the section, drawn on the scrollbar track
-             the way find-in-page marks are; the thumb already shows where
-             the reader is. Clicking it goes back. -->
+        <!-- The match's place in the section, an edge down the track's
+             inner side; the thumb already shows where the reader is.
+             Clicking it goes back. -->
         <button
           type="button"
           class="match-mark"
@@ -298,12 +318,54 @@
     padding: 0.7rem 1.1rem 1rem;
   }
 
-  /* Laid over the scrollbar track, the width app.css gives
-     ::-webkit-scrollbar. Parchment, as the match's margin rule. */
+  /* The hit lane: the scrollbar widened from app.css's 8px to 14px and
+     recessed into --bg-app, so it reads as an overview of the section.
+     The ticks and the match edge below are laid over it at that width. */
+  .body::-webkit-scrollbar {
+    width: 14px;
+  }
+
+  .body::-webkit-scrollbar-track {
+    background: var(--bg-app);
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  /* Inset 2px so the lane's edge shows around it. */
+  .body::-webkit-scrollbar-thumb {
+    background: var(--bg-category);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+  }
+
+  .body::-webkit-scrollbar-thumb:hover {
+    background-color: var(--bg-header);
+  }
+
+  .hit-ticks {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    pointer-events: none;
+  }
+
+  /* Parchment, as the hits in the text. Clear of the match edge. */
+  .hit-tick {
+    position: absolute;
+    left: 5px;
+    right: 2px;
+    height: 2px;
+    border-radius: var(--radius-cell);
+    background: var(--text-accent);
+  }
+
+  /* Parchment, as the match's margin rule, on the lane's inner edge. */
   .match-mark {
     position: absolute;
-    right: 0;
-    width: 8px;
+    right: 11px;
+    width: 3px;
     padding: 0;
     border: none;
     border-radius: var(--radius-cell);
