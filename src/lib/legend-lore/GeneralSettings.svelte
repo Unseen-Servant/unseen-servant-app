@@ -327,7 +327,10 @@
     flex-direction: column;
     gap: 0.1rem;
   }
+  /* Sized to its text: WebKit stretches a flex fieldset's legend to the
+     full width, cutting the top border away up to the far corner. */
   .experimental-legend {
+    width: fit-content;
     padding: 0 0.3rem;
   }
 

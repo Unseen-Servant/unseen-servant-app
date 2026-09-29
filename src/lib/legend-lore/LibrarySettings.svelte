@@ -596,7 +596,10 @@
     border-top: 1px solid var(--border-subtle);
   }
 
+  /* Sized to its text: WebKit stretches a flex fieldset's legend to the
+     full width, cutting the top border away up to the far corner. */
   .policy-legend {
+    width: fit-content;
     padding: 0 0.3rem;
   }
 
