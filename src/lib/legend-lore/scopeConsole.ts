@@ -1,8 +1,7 @@
 // Serialization of the scope console (solo/mute/play/lens state) for
-// full console recall across launches — spec: docs/frontend/
-// 2026-08-08-solo-mute-play-doctrine-design.md. One store key holds
-// the whole console; parsing is defensive per field, so one corrupt
-// field falls back to empty without nuking the rest. Stale collection
+// full console recall across launches. One store key holds the whole
+// console; parsing is defensive per field, so one corrupt field falls
+// back to empty without nuking the rest. Stale collection
 // names and paths are kept as-is: resolution intersects them away, and
 // their chips stay visible and removable rather than silently ignored.
 

@@ -788,8 +788,7 @@ dialog[open]::backdrop {
 
 /* --- Header Voices --- */
 /* One class per header voice; recipe only (font, size, tracking, case,
-   line-height, default color) — layout stays in components.
-   See docs/design/2026-08-09-header-voices-design.md. */
+   line-height, default color) — layout stays in components. */
 
 .section-title {
   font-family: var(--font-heading);
@@ -832,8 +831,7 @@ dialog[open]::backdrop {
    The rails themselves are layout and live in Modal.svelte; the vocabulary
    every unit is built from — bays, wells, readouts, the commit switch —
    lives here. Some of it has one caller today and is global anyway: these
-   are one grammar, and a scoped copy per modal is how surfaces drift apart.
-   See docs/specs/ui/2026-08-12-modal-rack-units-design.md. */
+   are one grammar, and a scoped copy per modal is how surfaces drift apart. */
 
 .modal-bays {
   padding: var(--modal-pad);

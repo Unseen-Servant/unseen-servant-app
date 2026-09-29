@@ -13,8 +13,6 @@ import { writable } from 'svelte/store';
  * app ships on both WKWebView and WebView2 with no minimum system version
  * pinned — it has already been bitten once assuming ::backdrop behaved
  * uniformly across engines. State is cheap and certain.
- *
- * See docs/frontend/2026-08-13-scrim-extent-and-depth-design.md.
  */
 export function createDialogStack() {
   const { subscribe, update } = writable(0);

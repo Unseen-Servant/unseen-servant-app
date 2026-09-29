@@ -7,8 +7,7 @@
   import { trackInputModality, type InputModality } from './inputModality';
 
   // Mounted once at page level; the store decides whether it is on screen and
-  // what it asks. See confirmStore.ts for the call-site shape and
-  // docs/frontend/2026-08-12-modal-rack-units-design.md for the unit.
+  // what it asks. See confirmStore.ts for the call-site shape.
 
   const MESSAGE_ID = 'confirm-dialog-message';
 

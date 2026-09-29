@@ -61,8 +61,7 @@
   export let onToggleHideOutOfScope: () => void = () => {};
 
   // "Hide unindexed items" — the bulk gesture for material scope can't
-  // speak about, sibling to per-item hide. Spec: docs/frontend/
-  // 2026-08-09-hide-unindexed-design.md.
+  // speak about, sibling to per-item hide.
   export let hideUnindexed: boolean = false;
   export let onToggleHideUnindexed: () => void = () => {};
 

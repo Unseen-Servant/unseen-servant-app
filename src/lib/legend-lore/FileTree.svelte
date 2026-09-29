@@ -57,8 +57,7 @@
   export let onToggleScopeSolo: (item: FileItem) => void = () => {};
   export let onToggleScopeMute: (item: FileItem) => void = () => {};
 
-  // Scope membership (spec: docs/frontend/2026-08-08-solo-mute-play-
-  // doctrine-design.md). null = no narrowing engaged, nothing dims.
+  // Scope membership. null = no narrowing engaged, nothing dims.
   // Contains every in-scope indexed file plus its ancestor folders, so
   // the path to in-scope material stays bright.
   export let scopeBrightPaths: Set<string> | null = null;
