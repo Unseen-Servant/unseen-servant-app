@@ -8,6 +8,7 @@
   import { isPathOrAncestorIn } from './selectionUtils';
   import { tierCells, tierLabel } from './searchTiers';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
+  import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -40,9 +41,29 @@
   }
 
   // A section can run several screens; the hit is often below the fold.
-  // Same tick-then-scroll shape as the result list's row scrolling.
-  $: if (result) {
-    tick().then(() => matchEl?.scrollIntoView({ block: 'center' }));
+  // Centring once isn't enough: tables, fonts and pane widths can settle
+  // after the scroll and slide the match off-centre (seen landing at the
+  // bottom edge). So the view follows the match through any resize until
+  // the reader takes the scroll themselves.
+  let followMatch = false;
+
+  function centreMatch() {
+    if (followMatch) matchEl?.scrollIntoView({ block: 'center' });
+  }
+
+  function releaseMatch() {
+    followMatch = false;
+  }
+
+  function followResizes(node: HTMLElement) {
+    const observer = new ResizeObserver(centreMatch);
+    observer.observe(node);
+    return { destroy: () => observer.disconnect() };
+  }
+
+  $: if (result && matchEl) {
+    followMatch = true;
+    tick().then(centreMatch);
   }
 
   function toggleSystem(tag: string) {
@@ -56,14 +77,6 @@
   function clearSystem() {
     if (!result) return;
     onSetGameSystems(result.source, []);
-  }
-
-  function stripBold(s: string): string {
-    return s.replace(/\*\*(.+?)\*\*/g, '$1');
-  }
-
-  function breadcrumbSegments(s: string): string[] {
-    return s.split(' > ').map(stripBold).filter(Boolean);
   }
 </script>
 
@@ -136,12 +149,21 @@
       onClear={clearSystem}
     />
 
-    <div class="body">
+    <!-- Wheel, a scrollbar drag or a key hands the scroll to the reader;
+         the listeners only observe, so the body stays a plain region. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="body"
+      use:followResizes
+      on:wheel|passive={releaseMatch}
+      on:pointerdown={releaseMatch}
+      on:keydown={releaseMatch}
+    >
       {#if segments.length > 0}
         <div class="breadcrumb" aria-label="Section path">
           {#each segments as segment, idx (idx)}
             {#if idx > 0}<span class="bc-sep" aria-hidden="true">❧</span>{/if}
-            <span class="bc-segment">{segment}</span>
+            <span class="bc-segment" class:caps={isAllCaps(segment)}>{segment}</span>
           {/each}
         </div>
       {/if}
@@ -170,7 +192,7 @@
         </div>
       {/if}
 
-      <div class="snippet">
+      <div class="snippet" use:followResizes>
         {#if parts}
           <!-- Three documents, not one: the range is snapped to whole
                Markdown blocks so a table straddling it stays renderable. -->
@@ -334,6 +356,12 @@
     color: var(--text-primary);
   }
 
+  /* Small caps for capitalised headings — see SearchResults.svelte .caps */
+  .caps {
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.04em;
+  }
+
   /* Fleuron separator — see SearchResults.svelte .bc-sep */
   .bc-sep {
     color: var(--text-tertiary);
@@ -436,8 +464,11 @@
   .snippet :global(a) { color: var(--text-accent); }
   .snippet :global(img) { max-width: 100%; height: auto; }
 
+  /* Block (for the horizontal scroll) but sized to the cells, so the
+     border hugs the table instead of boxing empty space beside it. */
   .snippet :global(table) {
     display: block;
+    width: fit-content;
     max-width: 100%;
     overflow-x: auto;
     border-collapse: collapse;
