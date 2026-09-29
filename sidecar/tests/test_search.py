@@ -95,6 +95,7 @@ def test_search_relevance_is_numeric(indexed_client):
         "n_results": 5
     })
 
+    assert response.json()["results"]
     for result in response.json()["results"]:
         assert isinstance(result["relevance"], float), \
             f"Expected float, got {type(result['relevance'])}"
@@ -102,14 +103,16 @@ def test_search_relevance_is_numeric(indexed_client):
             f"Relevance out of bounds: {result['relevance']}"
 
 
-def test_search_respects_n_results(indexed_client):
-    """Should return at most n_results items."""
-    response = indexed_client.post("/api/search", json={
-        "query": "dragon",
-        "n_results": 1
-    })
+def test_search_respects_n_results(multi_indexed_client):
+    """Should return at most n_results items. Results are sections and
+    each fixture book is one section, so two books make the cap visible."""
+    query = "dragon dungeon adventurer"
+    uncapped = multi_indexed_client.post("/api/search", json={"query": query, "n_results": 10})
+    assert len(uncapped.json()["results"]) == 2
 
-    assert len(response.json()["results"]) <= 1
+    response = multi_indexed_client.post("/api/search", json={"query": query, "n_results": 1})
+    assert len(response.json()["results"]) == 1
+    assert response.json()["exhausted"] is False
 
 
 def test_search_empty_collection(client):
@@ -120,16 +123,21 @@ def test_search_empty_collection(client):
     })
 
     assert response.status_code == 200
+    assert response.json()["results"] == []
+    assert response.json()["exhausted"] is True
 
 
-def test_search_default_n_results(indexed_client):
+def test_search_default_n_results(client, test_store, test_embed_fn):
     """If n_results is omitted, default should be 15."""
-    response = indexed_client.post("/api/search", json={
+    from tests.test_search_tiers import _seed_parents
+
+    _seed_parents(test_store, test_embed_fn, 20)
+    response = client.post("/api/search", json={
         "query": "dragon"
     })
 
     assert response.status_code == 200
-    assert len(response.json()["results"]) <= 15
+    assert len(response.json()["results"]) == 15
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +180,7 @@ def test_filtered_search_excludes_other_sources(multi_indexed_client):
     })
 
     data = response.json()
+    assert data["results"]
     for result in data["results"]:
         assert result["filename"] != "core_rules.pdf"
 
@@ -198,9 +207,7 @@ def test_unfiltered_search_still_works(multi_indexed_client):
 
     data = response.json()
     filenames = {r["filename"] for r in data["results"]}
-    # Should have results from both indexed PDFs
-    assert len(filenames) >= 1  # At least one source
-    assert response.status_code == 200
+    assert filenames == {"dragonbane_monsters.pdf", "core_rules.pdf"}
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +259,7 @@ def test_search_no_game_system_returns_all(multi_system_client):
 
     data = response.json()
     systems = {r["game_system"] for r in data["results"]}
-    assert len(systems) >= 1
+    assert systems == {"D&D 5E", "Dragonbane"}
 
 
 def test_search_combined_filters(multi_system_client):
@@ -265,6 +272,7 @@ def test_search_combined_filters(multi_system_client):
     })
 
     data = response.json()
+    assert data["results"]
     for result in data["results"]:
         assert result["filename"] == "dragonbane_core.pdf"
         assert result["game_system"] == "Dragonbane"
@@ -341,7 +349,7 @@ def test_search_game_systems_list_multiple(multi_system_client):
 
     data = response.json()
     systems = {r["game_system"] for r in data["results"]}
-    assert systems.issubset({"D&D 5E", "Dragonbane"})
+    assert systems == {"D&D 5E", "Dragonbane"}
 
 
 # ---------------------------------------------------------------------------
