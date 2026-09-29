@@ -285,6 +285,8 @@
 
   // User-configurable behavior
   let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
+  // Weak search results fade back in the list (General settings).
+  let dimWeakResults = true;
   let dataDir = '';
 
   // Ollama health
@@ -746,6 +748,10 @@
       if (savedFilterPanelOpen !== undefined) {
         filterPanelOpen = savedFilterPanelOpen;
       }
+      const savedDimWeakResults = parseBoolean(await store.get('dimWeakResults'));
+      if (savedDimWeakResults !== undefined) {
+        dimWeakResults = savedDimWeakResults;
+      }
       const savedCollectionsSort = parseEnum(
         await store.get('collectionsSortKey'),
         ['custom', 'name', 'size', 'created'] as const,
@@ -898,6 +904,17 @@
       }
     }
     return migrated;
+  }
+
+  async function handleDimWeakResultsChange(value: boolean) {
+    dimWeakResults = value;
+    try {
+      const store = await load('settings.json');
+      await store.set('dimWeakResults', dimWeakResults);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist dimWeakResults:', e);
+    }
   }
 
   async function handleSyncPreferencesChange(partial: Partial<SyncPreferences>) {
@@ -3735,6 +3752,7 @@
                 canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
                 {hiddenPaths}
                 {collectionColorByPath}
+                dimWeak={dimWeakResults}
                 onSelect={(i) => { selectedResultIndex = i; setActivePane('files'); }}
                 onLoadMore={loadMoreResults}
                 onOpenResult={handleOpenResult}
@@ -3954,6 +3972,8 @@
   onReindexAll={handleReindexAll}
   onDeleteIndex={handleDeleteIndex}
   onSyncPreferencesChange={handleSyncPreferencesChange}
+  {dimWeakResults}
+  onDimWeakResultsChange={handleDimWeakResultsChange}
   onOpenDataDir={handleOpenDataDir}
   onSync={handleManualSync}
   onCopyMcpConfig={handleCopyMcpConfig}

@@ -29,6 +29,8 @@
   export let onReindexAll: () => void = () => {};
   export let onDeleteIndex: () => void = () => {};
   export let onSyncPreferencesChange: (partial: Partial<SyncPreferences>) => void = () => {};
+  export let dimWeakResults: boolean = true;
+  export let onDimWeakResultsChange: (value: boolean) => void = () => {};
   export let onOpenDataDir: () => void = () => {};
   export let onSync: () => void = () => {};
   export let onCopyMcpConfig: () => void = () => {};
@@ -81,7 +83,7 @@
 
   <div class="tab-body">
     {#if activeTab === 'general'}
-      <GeneralSettings />
+      <GeneralSettings {dimWeakResults} {onDimWeakResultsChange} />
     {:else if activeTab === 'game-systems'}
       <GameSystemsSettings {knownSystems} {onSystemsChanged} />
     {:else if activeTab === 'library'}

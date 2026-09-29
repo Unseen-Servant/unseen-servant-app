@@ -31,6 +31,8 @@
   // File path → collection pigment, resolved by the parent. Color is
   // reserved for collections — systems are monochrome (shield + parchment).
   export let collectionColorByPath: Map<string, string> = new Map();
+  // Weak matches fade back unless the General setting turns it off.
+  export let dimWeak: boolean = true;
   export let selectedIndex: number = 0;
   export let canLoadMore: boolean = false;
   export let onSelect: (index: number) => void = () => {};
@@ -208,7 +210,7 @@
       <div
         class="result-row"
         class:selected={i === selectedIndex}
-        class:weak={result.tier === 'weak'}
+        class:weak={dimWeak && result.tier === 'weak'}
         style={collColor ? `--collection-color: ${collColor}` : ''}
         bind:this={rowEls[i]}
         draggable="true"
