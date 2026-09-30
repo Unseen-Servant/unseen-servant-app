@@ -8,13 +8,8 @@ the client must be configured with a generous timeout so the ceiling
 isn't hit for a normal search that the sidecar answers with 200 OK.
 """
 import argparse
-import sys
 
 import httpx
-import pytest
-
-# Prevent argparse from reading pytest's arguments (mirrors test_mcp_tools).
-sys.argv = ["mcp_server.py"]
 
 import mcp_server
 from mcp_server import SidecarClient
@@ -43,7 +38,6 @@ class _RaisingClient:
         raise self._exc
 
 
-@pytest.mark.asyncio
 async def test_post_returns_message_on_read_timeout(monkeypatch):
     """A slow (read-timeout) search must return a string, not raise."""
     monkeypatch.setattr(
@@ -56,7 +50,6 @@ async def test_post_returns_message_on_read_timeout(monkeypatch):
     assert "timed out" in result.lower()
 
 
-@pytest.mark.asyncio
 async def test_get_returns_message_on_read_timeout(monkeypatch):
     """The same guard applies to GET requests."""
     monkeypatch.setattr(
@@ -69,7 +62,6 @@ async def test_get_returns_message_on_read_timeout(monkeypatch):
     assert "timed out" in result.lower()
 
 
-@pytest.mark.asyncio
 async def test_client_configured_with_generous_timeout(monkeypatch):
     """The client must not rely on httpx's 5s default (shorter than a warm
     reranked search); it must pass an explicit, generous timeout."""

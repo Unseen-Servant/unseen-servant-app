@@ -11,12 +11,8 @@ In production, it calls the sidecar over HTTP. In tests, we
 simulate those HTTP responses to verify formatting and error handling.
 """
 
-import sys
 import asyncio
 import pytest
-
-# Prevent argparse from reading pytest's arguments
-sys.argv = ["mcp_server.py"]
 
 from mcp_server import (
     search_library,
@@ -111,7 +107,6 @@ def _refuse(request):
 # search_library tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_search_library_returns_formatted_results(mock_sidecar):
     mock_sidecar.set_post("/api/search", {
         "results": [
@@ -135,7 +130,6 @@ async def test_search_library_returns_formatted_results(mock_sidecar):
     assert "[Dragonbane]" in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_no_results(mock_sidecar):
     mock_sidecar.set_post("/api/search", {"results": []})
 
@@ -143,7 +137,6 @@ async def test_search_library_no_results(mock_sidecar):
     assert "No results found" in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_surfaces_server_message_on_empty(mock_sidecar):
     """The server explains WHY the result set is empty (bad filter value,
     empty collection) — that explanation must reach the model instead of
@@ -160,7 +153,6 @@ async def test_search_library_surfaces_server_message_on_empty(mock_sidecar):
     assert "Available: D&D 5E, Dragonbane" in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_surfaces_resolution_note_with_results(mock_sidecar):
     """When the server auto-resolved a near-miss filter, the note is shown
     so the model learns the exact value for follow-up calls."""
@@ -181,7 +173,6 @@ async def test_search_library_surfaces_resolution_note_with_results(mock_sidecar
     assert "Grappling rules." in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_sidecar_down(http_sidecar):
     http_sidecar["fn"] = _refuse
 
@@ -189,7 +180,6 @@ async def test_search_library_sidecar_down(http_sidecar):
     assert "Cannot connect" in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_with_game_system(mock_sidecar):
     """game_system parameter should be included in the payload."""
     captured = {}
@@ -220,7 +210,6 @@ def _result(text, tier, relevance=0.5):
     }
 
 
-@pytest.mark.asyncio
 async def test_search_library_prints_tier_not_raw_relevance(mock_sidecar):
     """Results show the ordinal tier; the raw cross-scale number is dropped."""
     mock_sidecar.set_post("/api/search", {
@@ -232,7 +221,6 @@ async def test_search_library_prints_tier_not_raw_relevance(mock_sidecar):
     assert "0.999" not in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_inserts_weak_divider(mock_sidecar):
     """A divider warns the model before the first weak result."""
     mock_sidecar.set_post("/api/search", {
@@ -247,7 +235,6 @@ async def test_search_library_inserts_weak_divider(mock_sidecar):
     assert result.find("Good grappling text.") < divider < result.find("Marginal text.")
 
 
-@pytest.mark.asyncio
 async def test_search_library_divider_opens_the_trailing_weak_run(mock_sidecar):
     """A weak result followed by a strong one (system-boost partition,
     straggler scoring) must not put the strong one below the line."""
@@ -264,7 +251,6 @@ async def test_search_library_divider_opens_the_trailing_weak_run(mock_sidecar):
     assert result.count("scored poorly") == 1
 
 
-@pytest.mark.asyncio
 async def test_search_library_all_weak_prefaces_warning(mock_sidecar):
     """When every result is weak, say so up front so the model doesn't
     synthesize a confident answer from noise."""
@@ -280,7 +266,6 @@ async def test_search_library_all_weak_prefaces_warning(mock_sidecar):
     assert "without filters" in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_no_divider_when_all_strong(mock_sidecar):
     mock_sidecar.set_post("/api/search", {
         "results": [
@@ -316,7 +301,6 @@ def _section_result(section_id="s_abc123", matched="Short match.", text=None,
     }
 
 
-@pytest.mark.asyncio
 async def test_search_library_compact_shows_id_and_snippet(mock_sidecar):
     mock_sidecar.set_post("/api/search", {
         "results": [_section_result(matched="The kraken makes three tentacle attacks.")],
@@ -327,7 +311,6 @@ async def test_search_library_compact_shows_id_and_snippet(mock_sidecar):
     assert 'Full section: get_section("s_abc123")' in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_compact_trims_long_matches(mock_sidecar):
     """A per-result block stays small even when the full section is huge —
     the compact default is what makes an 8k budget hold many results."""
@@ -342,7 +325,6 @@ async def test_search_library_compact_trims_long_matches(mock_sidecar):
     assert len(block) < 800  # snippet cap + a few header lines, nowhere near 4500
 
 
-@pytest.mark.asyncio
 async def test_search_library_prints_whole_text_when_there_is_no_section_id(mock_sidecar):
     """A legacy row has no section to drill into, so the compact snippet
     would strand the rest of its text with no way to ask for it — print
@@ -357,7 +339,6 @@ async def test_search_library_prints_whole_text_when_there_is_no_section_id(mock
     assert "Full section:" not in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_full_text_prints_whole_text(mock_sidecar):
     full_text = "Kraken. AC 18, HP 472. " * 10
     mock_sidecar.set_post("/api/search", {
@@ -370,7 +351,6 @@ async def test_search_library_full_text_prints_whole_text(mock_sidecar):
     assert "Full section:" not in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_full_text_still_offers_get_section_when_truncated(
     mock_sidecar
 ):
@@ -385,7 +365,6 @@ async def test_search_library_full_text_still_offers_get_section_when_truncated(
     assert 'Full section: get_section("s_abc123")' in result
 
 
-@pytest.mark.asyncio
 async def test_search_library_compact_sends_no_context_budget(mock_sidecar):
     """Compact mode prints at most MATCHED_SNIPPET_CHARS per result, so the
     payload is already bounded by n_results. Billing the full sections
@@ -404,7 +383,6 @@ async def test_search_library_compact_sends_no_context_budget(mock_sidecar):
     assert captured["max_context_chars"] is None
 
 
-@pytest.mark.asyncio
 async def test_search_library_full_text_sends_the_budget(mock_sidecar):
     captured = {}
 
@@ -418,7 +396,6 @@ async def test_search_library_full_text_sends_the_budget(mock_sidecar):
     assert captured.get("max_context_chars") == 8000
 
 
-@pytest.mark.asyncio
 async def test_search_library_max_context_chars_override(mock_sidecar):
     """The budget is a full_text-mode knob: it caps what the server
     assembles for the sections we are about to print in full."""
@@ -438,7 +415,6 @@ async def test_search_library_max_context_chars_override(mock_sidecar):
 # get_section
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_get_section_formats_heading_and_text(mock_sidecar):
     mock_sidecar.set_get("/api/section/s_k", {
         "section_id": "s_k",
@@ -455,7 +431,6 @@ async def test_get_section_formats_heading_and_text(mock_sidecar):
     assert "Kraken. AC 18, HP 472. A gargantuan monstrosity." in result
 
 
-@pytest.mark.asyncio
 async def test_get_section_flags_a_windowed_section(mock_sidecar):
     """A section bigger than the assembly cap comes back as a window, not
     the whole thing — say so, or the model reads a truncated rule as
@@ -474,7 +449,6 @@ async def test_get_section_flags_a_windowed_section(mock_sidecar):
     assert "(partial: this section exceeds the cap; showing its first part)" in result
 
 
-@pytest.mark.asyncio
 async def test_get_section_does_not_flag_a_whole_section(mock_sidecar):
     mock_sidecar.set_get("/api/section/s_k", {
         "section_id": "s_k",
@@ -490,7 +464,6 @@ async def test_get_section_does_not_flag_a_whole_section(mock_sidecar):
     assert "partial:" not in result
 
 
-@pytest.mark.asyncio
 async def test_get_section_not_found(http_sidecar):
     import httpx
     seen = {}
@@ -507,7 +480,6 @@ async def test_get_section_not_found(http_sidecar):
     assert seen == {"path": "/api/section/nope", "source": "mcp"}
 
 
-@pytest.mark.asyncio
 async def test_get_section_sidecar_down(http_sidecar):
     http_sidecar["fn"] = _refuse
     result = await get_section("s_k")
@@ -518,7 +490,6 @@ async def test_get_section_sidecar_down(http_sidecar):
 # get_pages
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_get_pages_formats_range_and_text(mock_sidecar):
     mock_sidecar.set_get("/api/source/X.pdf/pages?start=3&end=4", {
         "filename": "X.pdf",
@@ -531,14 +502,12 @@ async def test_get_pages_formats_range_and_text(mock_sidecar):
     assert "Page three text." in result
 
 
-@pytest.mark.asyncio
 async def test_get_pages_sidecar_down(http_sidecar):
     http_sidecar["fn"] = _refuse
     result = await get_pages("X.pdf", 1, 1)
     assert "Cannot connect" in result
 
 
-@pytest.mark.asyncio
 async def test_get_pages_url_encodes_special_characters_in_filename(mock_sidecar):
     """A raw '#' in the filename would otherwise be read as a URL fragment
     delimiter (truncating the path, dropping the query) and a raw '?' as
@@ -560,7 +529,6 @@ async def test_get_pages_url_encodes_special_characters_in_filename(mock_sidecar
 # list_collections
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_list_collections_plain_listing(mock_sidecar):
     mock_sidecar.set_get("/api/collections", {
         "collections": {
@@ -579,7 +547,6 @@ async def test_list_collections_plain_listing(mock_sidecar):
 # list_sources tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_list_sources_shows_documents(mock_sidecar):
     mock_sidecar.set_get("/api/sources", {
         "sources": [
@@ -597,7 +564,6 @@ async def test_list_sources_shows_documents(mock_sidecar):
     assert "[D&D 5E]" in result
 
 
-@pytest.mark.asyncio
 async def test_list_sources_empty(mock_sidecar):
     mock_sidecar.set_get("/api/sources", {"sources": [], "count": 0})
 
@@ -609,7 +575,6 @@ async def test_list_sources_empty(mock_sidecar):
 # list_game_systems tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_list_game_systems_shows_systems(mock_sidecar):
     mock_sidecar.set_get("/api/game-systems", {
         "game_systems": ["D&D 5E", "Dragonbane", "unknown"],
@@ -622,7 +587,6 @@ async def test_list_game_systems_shows_systems(mock_sidecar):
     assert "Dragonbane" in result
 
 
-@pytest.mark.asyncio
 async def test_list_game_systems_empty(mock_sidecar):
     mock_sidecar.set_get("/api/game-systems", {
         "game_systems": [],
@@ -637,7 +601,6 @@ async def test_list_game_systems_empty(mock_sidecar):
 # list_collections tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_list_collections_shows_collections(mock_sidecar):
     mock_sidecar.set_get("/api/collections", {
         "collections": {
@@ -658,7 +621,6 @@ async def test_list_collections_shows_collections(mock_sidecar):
     assert "Campaign prep" in result
 
 
-@pytest.mark.asyncio
 async def test_list_collections_empty(mock_sidecar):
     mock_sidecar.set_get("/api/collections", {"collections": {}, "count": 0})
 
@@ -666,7 +628,6 @@ async def test_list_collections_empty(mock_sidecar):
     assert "No collections" in result
 
 
-@pytest.mark.asyncio
 async def test_list_collections_no_description(mock_sidecar):
     mock_sidecar.set_get("/api/collections", {
         "collections": {
@@ -692,7 +653,6 @@ async def test_list_collections_no_description(mock_sidecar):
 # search_library with collection parameter
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_search_library_with_collection(mock_sidecar):
     """collection parameter should be included in the payload."""
     captured = {}
@@ -707,7 +667,6 @@ async def test_search_library_with_collection(mock_sidecar):
     assert captured.get("collection") == "Monsters Only"
 
 
-@pytest.mark.asyncio
 async def test_search_library_without_collection(mock_sidecar):
     """Without collection, the payload should not include the key."""
     captured = {}

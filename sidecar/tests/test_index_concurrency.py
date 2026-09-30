@@ -77,7 +77,6 @@ async def _measure_health_during(app, slow_call):
         return health_resp, when_returned, slow_resp
 
 
-@pytest.mark.asyncio
 async def test_index_files_does_not_block_event_loop(slow_app, dummy_pdf):
     """/health must respond during a slow /api/index-files call."""
 
@@ -100,7 +99,6 @@ async def test_index_files_does_not_block_event_loop(slow_app, dummy_pdf):
     )
 
 
-@pytest.mark.asyncio
 async def test_reindex_file_does_not_block_event_loop(slow_app, dummy_pdf):
     """/health must respond during a slow /api/reindex-file call."""
 
