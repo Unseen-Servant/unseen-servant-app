@@ -30,13 +30,18 @@
       // No version line, nothing else lost.
     }
 
-    // The window starts hidden so its blank first frame never shows. Reveal
-    // it once the card has painted in its own fonts.
+    // The window starts hidden and shows itself once the card is in the DOM
+    // in its own fonts: macOS shapes the shadow of a transparent window from
+    // what it holds when it appears. Nothing here may wait on a frame — a
+    // hidden webview never runs requestAnimationFrame — and the font wait is
+    // capped, since a stall would keep the splash from ever appearing.
     await tick();
-    await document.fonts.ready;
-    requestAnimationFrame(() => {
-      void getCurrentWebviewWindow().show();
-    });
+    await Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 500))]);
+    try {
+      await getCurrentWebviewWindow().show();
+    } catch (e) {
+      console.error('Splash could not show itself:', e);
+    }
   });
 
   onDestroy(() => unlisten?.());
