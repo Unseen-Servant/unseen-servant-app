@@ -833,11 +833,9 @@
                   class:armed
                   on:click|stopPropagation={() => onArm(col.name)}
                   aria-pressed={armed}
-                  title={armed
-                    ? `Disarm ${col.name} (E)`
-                    : `Arm ${col.name} (E) — then click books in the tree to file them`}
+                  title={`${armed ? 'Disarm' : 'Arm'} ${col.name} (E)`}
                 >
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg>
+                  <span class="arm-dot" aria-hidden="true"></span>
                 </button>
                 <!-- Archived rows carry no transport — unarchive to play. -->
                 <button
@@ -849,7 +847,7 @@
                   title={`${playing ? 'Stop' : 'Play'} ${col.name} (P${slotOf.has(col.name) ? ` · ${slotChord(slotOf.get(col.name)!)}` : ''})`}
                 >
                   {#if playing}
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5h14v14H5z"/></svg>
+                    <span class="stop-mark" aria-hidden="true"></span>
                   {:else}
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4.2v15.6L20 12z"/></svg>
                   {/if}
@@ -944,7 +942,7 @@
       <!-- A new collection lands armed: say so before it exists. Not a
            control — the real arm button arrives with the row. -->
       <span class="tr-btn arm-btn armed ghost-arm" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+        <span class="arm-dot"></span>
       </span>
     </div>
     <div class="ghost-keys micro-label" aria-hidden="true">
@@ -1352,6 +1350,20 @@
     width: 9px;
     height: 9px;
     display: block;
+  }
+  /* Boxes, not SVGs: a 9px SVG can't centre in the 16px interior on
+     whole pixels (3.5px either side), so on a 1x screen the dot and the
+     stop square sat half a pixel off their border. A 6px box leaves an
+     even 5px. The ▶ stays an SVG — it is deliberately off-centre (the
+     optical centre of a triangle sits left of its box). */
+  .arm-dot,
+  .stop-mark {
+    width: 6px;
+    height: 6px;
+    background: currentColor;
+  }
+  .arm-dot {
+    border-radius: 50%;
   }
   .tr-btn:hover {
     color: var(--text-secondary);
