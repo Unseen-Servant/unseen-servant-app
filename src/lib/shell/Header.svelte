@@ -176,7 +176,7 @@
           class:current={viewMode === 'tree'}
           class:dimmed={searchViewOpen}
           on:click={() => (repeatsTree ? onCollapseAll() : onSetViewMode('tree'))}
-          title={(repeatsTree ? 'Tree view — again collapses all' : 'Tree view') + chordHint('view.tree')}
+          title={repeatsTree ? `Tree view — again collapses all${chordHint('tree.collapseAll')}` : `Tree view${chordHint('view.toggle')}`}
           aria-label="Tree view"
           aria-pressed={viewMode === 'tree'}
         >
@@ -190,7 +190,7 @@
           class:current={viewMode === 'systems'}
           class:dimmed={searchViewOpen}
           on:click={() => { if (!repeatsSystems) onSetViewMode('systems'); }}
-          title={'Shelve by system' + chordHint('view.systems')}
+          title={'Shelve by system' + chordHint('view.toggle')}
           aria-label="Shelve by system"
           aria-pressed={viewMode === 'systems'}
         >

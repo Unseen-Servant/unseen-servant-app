@@ -1880,6 +1880,15 @@
     expandedPaths = new Set();
   }
 
+  async function collapseAllKeepingCaret() {
+    const was = focusedFilePath;
+    collapseAll();
+    if (!was) return;
+    await tick();
+    const top = visibleTreeRows.find((r) => was === r.path || was.startsWith(r.path + '/'));
+    if (top) focusTreeRow(top.path);
+  }
+
   async function focusTreeRow(path: string) {
     // Go through the setter so the focusedCollectionName mutex clears too —
     // assigning focusedFilePath directly leaves a stale collection focus
@@ -1992,6 +2001,15 @@
       if (visibleTreeRows.length > 0) {
         focusTreeRow(visibleTreeRows[edge === 'first' ? 0 : visibleTreeRows.length - 1].path);
       }
+      return true;
+    }
+
+    // ⇧← / ⇧H: collapse the whole tree — the row's collapse key, shifted
+    // up to every folder. The caret climbs to the top-level row that held
+    // it, so it never sits on a row that just vanished.
+    if (event.shiftKey && !meta && !event.altKey && (event.key === 'ArrowLeft' || lk === 'h')) {
+      event.preventDefault();
+      void collapseAllKeepingCaret();
       return true;
     }
 
@@ -2297,26 +2315,26 @@
     // Cmd/Ctrl + digit. Bare: play only collection N (again stops it) —
     // track select, the way a DAW numbers its tracks, and live from
     // anywhere, search input included. ⇧: add N to the mix or take it out.
-    // ⌥1 / ⌥2: Tree view (again collapses the whole tree) / Systems view,
-    // numbered because that's Finder's view-mode pattern; the view switch
-    // is prep-time, so it takes the longer chord.
     const digit = selectedFolder ? digitChord(event) : null;
     if (digit) {
       event.preventDefault();
-      if (digit.alt) {
-        if (digit.shift || searchViewOpen) return;
-        if (digit.digit === 2) {
-          setViewMode('systems');
-        } else if (digit.digit === 1) {
-          if (viewMode === 'tree') collapseAll();
-          else setViewMode('tree');
-        }
-        return;
-      }
+      if (digit.alt) return;
       const name = collectionSlots[digit.digit - 1];
       if (!name) return;
       if (digit.shift) togglePlayCollection(name);
       else playOnlyCollection(name);
+      return;
+    }
+
+    // Tab: flip between the tree and the systems view — Ableton's
+    // Session/Arrangement key, for the same two-views-of-one-set job. Only
+    // in the browse view and only off text fields and menus, so Tab keeps
+    // its meaning wherever there is something to type into or pick from.
+    // ⇧Tab flips too: with two views, direction means nothing.
+    if (event.key === 'Tab' && !meta && !event.altKey && selectedFolder && !searchViewOpen
+        && !inAnyInput && !contextMenu && !renamingFilePath && !menuSlotHeld()) {
+      event.preventDefault();
+      void setViewMode(viewMode === 'tree' ? 'systems' : 'tree');
       return;
     }
 
