@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { chord, chordHint } from './keybindings';
+  import { mentionAt, removeMention, stripMentions, type Mention } from './mention';
 
   export let searchQuery: string = '';
   export let disabled: boolean = false;
@@ -21,6 +23,11 @@
   export let viewMode: 'tree' | 'systems' = 'tree';
   export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
   export let searchViewOpen: boolean = false;
+  // `@` completion. The bar reports the @-word under the caret (its text
+  // after the @, or null when there is none) and, while one is open, offers
+  // each key to the menu in the `mention` slot before handling it itself.
+  export let onMentionChange: (query: string | null) => void = () => {};
+  export let onMentionKey: (event: KeyboardEvent) => boolean = () => false;
 
   // The switch always marks the browse view you came from — while the search
   // view is up that mark dims rather than clearing, so the view you'd return
@@ -33,9 +40,31 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let inputEl: HTMLInputElement | null = null;
   let focused = false;
+  let mention: Mention | null = null;
+  // The query as last handed to the page, @-words stripped. Typing inside a
+  // mention leaves it unchanged, and then nothing is re-searched.
+  let dispatched = stripMentions(searchQuery);
 
   export function focus() {
     inputEl?.focus();
+  }
+
+  function syncMention() {
+    const m = focused && inputEl ? mentionAt(searchQuery, inputEl.selectionStart ?? searchQuery.length) : null;
+    const query = m ? m.query : null;
+    const changed = query !== (mention ? mention.query : null);
+    mention = m;
+    if (changed) onMentionChange(query);
+  }
+
+  /** Take the open @-word out of the bar — it was picked, or dismissed. */
+  export async function consumeMention() {
+    if (!mention || !inputEl) return;
+    const next = removeMention(searchQuery, mention);
+    searchQuery = next.value;
+    await tick();
+    inputEl.setSelectionRange(next.caret, next.caret);
+    syncMention();
   }
 
   function clearDebounce() {
@@ -46,8 +75,11 @@
   }
 
   function handleInput() {
+    syncMention();
+    const current = stripMentions(searchQuery);
+    if (current === dispatched) return;
+    dispatched = current;
     clearDebounce();
-    const current = searchQuery;
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
       onDebouncedChange(current);
@@ -55,10 +87,25 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    // An open @-menu has first claim, and whatever it takes stops here —
+    // ↓ must not drop into the results, nor Esc leave the search view.
+    if (mention && !e.isComposing) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        void consumeMention();
+        return;
+      }
+      if (onMentionKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       clearDebounce();
-      onSubmit(searchQuery);
+      onSubmit(stripMentions(searchQuery));
     }
     // Escape is handled by the page-level ladder: it steps the search
     // view closed and never clears the query — × is the only clear.
@@ -67,6 +114,8 @@
   function handleClear() {
     clearDebounce();
     searchQuery = '';
+    dispatched = '';
+    syncMention();
     onClear();
     // Refocus only inside the search view — × on a leftover query from a
     // browse view is a tidy-up, not an entry (focus would reopen the view).
@@ -153,23 +202,29 @@
     {/if}
   </div>
   <div class="search-wrapper" class:disabled>
+    {#if mention}
+      <div class="mention-pop"><slot name="mention" /></div>
+    {/if}
     <!-- Font Awesome "magnifying-glass" icon (src/lib/ui/icons/magnifying-glass-solid-full.svg) -->
     <svg class="search-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
       <path d="M480 272C480 317.9 465.1 360.3 440 394.7L566.6 521.4C579.1 533.9 579.1 554.2 566.6 566.7C554.1 579.2 533.8 579.2 521.3 566.7L394.7 440C360.3 465.1 317.9 480 272 480C157.1 480 64 386.9 64 272C64 157.1 157.1 64 272 64C386.9 64 480 157.1 480 272zM272 416C351.5 416 416 351.5 416 272C416 192.5 351.5 128 272 128C192.5 128 128 192.5 128 272C128 351.5 192.5 416 272 416z"/>
     </svg>
     <!-- The search field only ever holds the query — narrowings (solos
-         and mutes on either axis) live as chips in the scope bar. -->
+         and mutes on either axis) live as chips in the scope bar. An
+         @-word is on its way to becoming one: it is never searched. -->
     <input
       bind:this={inputEl}
       bind:value={searchQuery}
       class="search-input"
       type="text"
-      placeholder="Search your library…"
+      placeholder="Search the library, or @ a collection…"
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
-      on:focus={() => { focused = true; onFocus(); }}
-      on:blur={() => (focused = false)}
+      on:keyup={syncMention}
+      on:click={syncMention}
+      on:focus={() => { focused = true; onFocus(); syncMention(); }}
+      on:blur={() => { focused = false; syncMention(); }}
       aria-label="Search library"
     />
     <!-- One trailing slot, and a query outranks the hint: × shows whenever
@@ -325,6 +380,7 @@
   }
 
   .search-wrapper {
+    position: relative;
     display: flex;
     align-items: center;
     flex: 1;
@@ -341,6 +397,14 @@
 
   .search-wrapper:focus-within {
     border-color: var(--text-accent);
+  }
+
+  /* The @-menu hangs from the bar's left edge, over whatever is below. */
+  .mention-pop {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 200;
   }
 
   .search-wrapper.disabled {

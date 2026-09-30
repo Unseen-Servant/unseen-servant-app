@@ -59,7 +59,7 @@ export function playOnly(playing: Set<string>, name: string): Set<string> {
   return new Set([name]);
 }
 
-/** The picker's filter: case-insensitive substring, with names that start
+/** The @-menu's filter: case-insensitive substring, with names that start
  *  with the query ahead of ones that merely contain it. Order within each
  *  group is the input order (panel order). An empty query keeps everything. */
 export function filterByQuery(names: string[], query: string): string[] {

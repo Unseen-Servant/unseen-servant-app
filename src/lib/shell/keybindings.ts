@@ -62,7 +62,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'focus.dockUp',          keys: { mac: '⌘⌥↑',  other: 'Ctrl+Alt+↑' },    label: 'Dock: Filters → Collections', scope: 'global' },
   { id: 'view.tree',             keys: { mac: '⌘⌥1',  other: 'Ctrl+Alt+1' },    label: 'Tree view (again collapses all)', scope: 'global' },
   { id: 'view.systems',          keys: { mac: '⌘⌥2',  other: 'Ctrl+Alt+2' },    label: 'Shelve by system',            scope: 'global' },
-  { id: 'collections.pick',      keys: { mac: '⌘P',   other: 'Ctrl+P' },        label: 'Pick a collection to play (⇧↵ adds it to the mix)', scope: 'global' },
   { id: 'collections.slot',      keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Play only collection N (again stops it)', scope: 'global' },
   { id: 'collections.slotMix',   keys: { mac: '⌘⇧1–9', other: 'Ctrl+Shift+1–9' }, label: 'Add collection N to the mix, or take it out', scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
@@ -81,6 +80,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
 
   // Search input
   { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Submit search',                scope: 'searchInput' },
+  { id: 'search.mention',        keys: { mac: '@',    other: '@' },             label: 'Pick a collection to play — ↵ plays it alone, ⇧↵ adds it to the mix', scope: 'searchInput' },
   { id: 'search.intoResults',    keys: { mac: '↓',    other: '↓' },             label: 'Move focus into results',      scope: 'searchInput' },
   { id: 'search.exit',           keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave search — back to browse view', scope: 'searchInput' },
 
@@ -330,7 +330,7 @@ export function digitChord(event: ChordEvent): DigitChord | null {
   return { digit: Number(m[1]), shift: event.shiftKey, alt: event.altKey };
 }
 
-// The display chord for track-select slot N, for tooltips and the picker's
+// The display chord for track-select slot N, for tooltips and the @-menu's
 // hint column.
 export function slotChord(n: number): string {
   return isMac ? `⌘${n}` : `Ctrl+${n}`;

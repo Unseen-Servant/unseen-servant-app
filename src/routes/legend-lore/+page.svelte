@@ -26,7 +26,7 @@
   import { confirmPrompt } from '../../lib/shell/confirmStore';
   import { holdLatch } from '../../lib/ui/holdLatch';
   import CollectionsPanel from '../../lib/legend-lore/CollectionsPanel.svelte';
-  import CollectionPicker from '../../lib/legend-lore/CollectionPicker.svelte';
+  import CollectionMenu from '../../lib/legend-lore/CollectionMenu.svelte';
   import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
   import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
@@ -1056,7 +1056,7 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Track select (⌘1–9, the ⌘P picker): play this collection alone — or
+  // Track select (⌘1–9, the search bar's @-menu): play this collection alone — or
   // stop it, when it already plays alone.
   function playOnlyCollection(name: string) {
     playingCollections = playOnly(playingCollections, name);
@@ -1067,21 +1067,19 @@
   // Slot N is the Nth transport row as the panel sorts it.
   $: collectionSlots = transportNames(Object.values(collections), collectionsSortKey, collectionsCustomOrder);
 
-  let collectionPickerOpen = false;
-  let pickerReturnFocus: HTMLElement | null = null;
+  // The @-word under the search bar's caret, minus the @; null while none.
+  let mentionQuery: string | null = null;
+  let collectionMenu: CollectionMenu | undefined;
 
-  function openCollectionPicker() {
-    pickerReturnFocus = document.activeElement as HTMLElement | null;
-    collectionPickerOpen = true;
-  }
-
-  function closeCollectionPicker(restore: boolean) {
-    if (!collectionPickerOpen) return;
-    // Flip first: restoring focus blurs the picker's input, which calls
-    // back in here with restore=false.
-    collectionPickerOpen = false;
-    if (restore && pickerReturnFocus?.isConnected) pickerReturnFocus.focus({ preventScroll: true });
-    pickerReturnFocus = null;
+  // ↵ plays the collection alone and hands the bar back its query; ⇧↵
+  // toggles it in the mix and leaves the @-word open for the next pick.
+  function chooseMentionedCollection(name: string, mix: boolean) {
+    if (mix) {
+      togglePlayCollection(name);
+    } else {
+      playOnlyCollection(name);
+      void headerComponent?.consumeMention();
+    }
   }
 
   // Mute a collection — carve its files from the mix (or from the
@@ -2302,15 +2300,6 @@
       if (!name) return;
       if (digit.shift) togglePlayCollection(name);
       else playOnlyCollection(name);
-      return;
-    }
-
-    // Cmd/Ctrl+P: the collection picker — ⌘1–9 by name, for past the
-    // ninth track or when the number isn't in your head. Again closes it.
-    if (meta && !event.shiftKey && !event.altKey && lk === 'p' && selectedFolder) {
-      event.preventDefault();
-      if (collectionPickerOpen) closeCollectionPicker(true);
-      else openCollectionPicker();
       return;
     }
 
@@ -3558,18 +3547,6 @@
 
 <LaunchSplash visible={showSplash} onDismiss={dismissSplash} />
 
-{#if collectionPickerOpen && selectedFolder}
-  <CollectionPicker
-    names={collectionSlots}
-    {collections}
-    playingNames={playingCollections}
-    mutedNames={mutedCollectionNames}
-    onPlayOnly={playOnlyCollection}
-    onToggleMix={togglePlayCollection}
-    onClose={closeCollectionPicker}
-  />
-{/if}
-
 <main class="app-layout" class:motion-ready={motionReady}>
   <Header
     bind:this={headerComponent}
@@ -3591,7 +3568,20 @@
     {searchViewOpen}
     {viewMode}
     onSetViewMode={setViewMode}
-  />
+    onMentionChange={(q) => (mentionQuery = q)}
+    onMentionKey={(e) => collectionMenu?.handleKey(e) ?? false}
+  >
+    <CollectionMenu
+      slot="mention"
+      bind:this={collectionMenu}
+      names={collectionSlots}
+      {collections}
+      playingNames={playingCollections}
+      mutedNames={mutedCollectionNames}
+      query={mentionQuery ?? ''}
+      onChoose={chooseMentionedCollection}
+    />
+  </Header>
 
   {#if selectedFolder}
     <div class="workspace">
