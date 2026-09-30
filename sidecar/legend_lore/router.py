@@ -1095,32 +1095,6 @@ def build_router(
 
         return {"tag": request.tag, "disabled": request.disabled}
 
-    @router.get("/api/source/{filename}/content")
-    async def get_source_content(filename: str):
-        """Retrieve the full text content of an indexed PDF.
-
-        Concatenates the book's units in reading order. Same-named books
-        in different folders resolve to the first by path.
-        """
-        try:
-            doc = next(
-                (d for d in library.documents() if d.filename == filename), None
-            )
-            if doc is None:
-                raise HTTPException(
-                    status_code=404, detail=f"Source not found: {filename}"
-                )
-
-            return {
-                "filename": filename,
-                "chunks": doc.units,
-                "content": library.document_text(doc.path),
-            }
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
     @router.get("/api/section/{section_id}")
     async def get_section(section_id: str):
         """Fetch one assembled section by its id (a search result's `section_id`).
@@ -1156,7 +1130,7 @@ def build_router(
     ):
         """Fetch the raw text of a page range directly from the PDF.
 
-        Resolves `filename` through the manifest, like `/content` does.
+        Resolves `filename` through the manifest.
         Another drill-in for the MCP tools: content a section-based search
         doesn't surface well (a table of contents, a map, an appendix).
         """

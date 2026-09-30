@@ -63,6 +63,14 @@ def test_store(tmp_path):
     store.close()
 
 
+def document_text(store, path):
+    """A book's stored unit texts in reading order, newline-joined."""
+    return "\n".join(t for (t,) in store.conn().execute(
+        "SELECT u.text FROM units u JOIN documents d ON d.id = u.document_id "
+        "WHERE d.path = ? ORDER BY u.ordinal", (str(path),),
+    ))
+
+
 def seed_book(store, embed_fn, path, units, parents=(), game_system="unknown",
               systems=(), page_labels=None):
     """Write one book's EmbedUnits (and parents) straight into the store,

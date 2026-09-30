@@ -509,19 +509,6 @@ class LibraryStore:
     def count_units(self) -> int:
         return self._conn().execute("SELECT count(*) FROM units").fetchone()[0]
 
-    def document_text(self, path: str) -> str | None:
-        """A book's unit texts in reading order, or None when not indexed."""
-        conn = self._conn()
-        row = conn.execute(
-            "SELECT id FROM documents WHERE path = ?", (path,)
-        ).fetchone()
-        if row is None:
-            return None
-        return "\n".join(t for (t,) in conn.execute(
-            "SELECT text FROM units WHERE document_id = ? ORDER BY ordinal",
-            (row[0],),
-        ))
-
     def fts_texts(self) -> Iterator[str]:
         """Every unit's embed text — the spell corrector's vocabulary source."""
         for (text,) in self._conn().execute("SELECT text FROM unit_fts"):

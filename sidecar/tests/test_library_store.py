@@ -7,6 +7,7 @@ import pytest
 
 from legend_lore.granularity import EmbedUnit, ParentDoc
 from legend_lore.library_store import LibraryStore
+from tests.conftest import document_text
 
 DIM = 4
 MODEL = "test-model"
@@ -129,7 +130,7 @@ def test_reindex_replaces_every_row_of_the_book(store):
            [_axis(0), _axis(1), _axis(2)])
     _index(store, "/lib/a.pdf", ["only"], [_axis(3)])
 
-    assert store.document_text("/lib/a.pdf") == "only"
+    assert document_text(store, "/lib/a.pdf") == "only"
     for table in ("units", "unit_vec", "unit_fts", "parents", "documents"):
         assert _rows(store, table) == 1, table
     assert store.fts("three", k=5) == []
@@ -146,7 +147,7 @@ def test_failed_reindex_leaves_previous_index_intact(store):
         store.replace_document("/lib/a.pdf", "unknown", (), units,
                                ["x", "y"], [_axis(0), _axis(1)], [])
 
-    assert store.document_text("/lib/a.pdf") == "dragon"
+    assert document_text(store, "/lib/a.pdf") == "dragon"
     assert len(store.knn(_axis(0), k=5)) == 1
 
 
@@ -274,13 +275,6 @@ def test_documents_lists_books_with_unit_counts(store):
         ("b.pdf", "unknown", (), 1, 1),
     ]
     assert store.count_units() == 3
-
-
-def test_document_text_is_in_reading_order(store):
-    _index(store, "/lib/a.pdf", ["first", "second", "third"],
-           [_axis(0), _axis(1), _axis(2)])
-    assert store.document_text("/lib/a.pdf") == "first\nsecond\nthird"
-    assert store.document_text("/lib/missing.pdf") is None
 
 
 def test_fts_texts_and_phrase_counts_read_the_embed_text(store):

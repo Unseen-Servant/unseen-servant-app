@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import sse_events
+from tests.conftest import document_text, sse_events
 
 from legend_lore.service import (
     EmbedBatchError,
@@ -212,7 +212,7 @@ def test_atomic_index_pdf_replaces_book_on_success(store):
     ))
 
     assert len(_unit_ids(store, str(pdf_path))) == 4
-    assert store.document_text(str(pdf_path)) == "text 0\ntext 1\ntext 2\ntext 3"
+    assert document_text(store, pdf_path) == "text 0\ntext 1\ntext 2\ntext 3"
     # The FTS rows swap with the chunks — one row per surviving unit.
     assert len(store.fts("text", k=100)) == 4
 
