@@ -433,6 +433,12 @@ fn wait_for_sidecar(
         std::thread::sleep(Duration::from_millis(100));
     }
 
+    Err(sidecar_not_ready_message(log_path))
+}
+
+/// The error when the sidecar never came up: where its log is, plus the
+/// log's last 20 lines when there are any.
+fn sidecar_not_ready_message(log_path: &Path) -> String {
     let mut log_tail = String::new();
     if let Ok(log_contents) = std::fs::read_to_string(log_path) {
         if !log_contents.is_empty() {
@@ -455,7 +461,7 @@ fn wait_for_sidecar(
     if !log_tail.is_empty() {
         msg.push_str(&format!("\n--- last 20 lines ---\n{}", log_tail));
     }
-    Err(msg)
+    msg
 }
 
 fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
@@ -764,6 +770,91 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A fresh directory under the system temp dir, unique to this test.
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "unseen-servant-test-{}-{}",
+            std::process::id(),
+            name
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn wait_for_sidecar_returns_the_published_port_once_it_accepts() {
+        let dir = scratch_dir("wait-ready");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::fs::write(dir.join("sidecar.port"), format!("{port}\n")).unwrap();
+        let mut port_seen = 0;
+
+        let got = wait_for_sidecar(&dir.join("sidecar.port"), &dir.join("sidecar.log"), || {
+            port_seen += 1
+        });
+
+        assert_eq!(got, Ok(port));
+        assert_eq!(port_seen, 1);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn not_ready_message_names_the_log_and_quotes_its_last_20_lines() {
+        let dir = scratch_dir("not-ready-tail");
+        let log = dir.join("sidecar.log");
+        let lines: Vec<String> = (1..=25).map(|i| format!("line {i}")).collect();
+        std::fs::write(&log, lines.join("\n")).unwrap();
+
+        let msg = sidecar_not_ready_message(&log);
+
+        assert!(msg.contains(&log.display().to_string()), "{msg}");
+        assert!(
+            msg.contains("line 6\n") && msg.ends_with("line 25"),
+            "{msg}"
+        );
+        assert!(!msg.contains("line 5\n"), "{msg}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn not_ready_message_without_a_log_has_no_tail() {
+        let dir = scratch_dir("not-ready-nolog");
+        let msg = sidecar_not_ready_message(&dir.join("missing.log"));
+        assert!(msg.starts_with("Sidecar did not become ready"), "{msg}");
+        assert!(!msg.contains("last 20 lines"), "{msg}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn migrate_legacy_data_dir_moves_the_old_identifier_dir_once() {
+        let root = scratch_dir("migrate");
+        let legacy = root.join("games.unseenservant.legendlore");
+        let current = root.join("games.unseenservant.app");
+        std::fs::create_dir(&legacy).unwrap();
+        std::fs::write(legacy.join("settings.json"), b"{}").unwrap();
+
+        migrate_legacy_data_dir(&current);
+
+        assert!(current.join("settings.json").is_file());
+        assert!(!legacy.exists());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn migrate_legacy_data_dir_leaves_both_alone_when_the_new_dir_exists() {
+        let root = scratch_dir("migrate-exists");
+        let legacy = root.join("games.unseenservant.legendlore");
+        let current = root.join("games.unseenservant.app");
+        std::fs::create_dir(&legacy).unwrap();
+        std::fs::create_dir(&current).unwrap();
+
+        migrate_legacy_data_dir(&current);
+
+        assert!(legacy.is_dir() && current.is_dir());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn sanitize_window_size_raises_a_too_small_value_to_the_floor() {
