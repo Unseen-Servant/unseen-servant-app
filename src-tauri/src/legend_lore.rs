@@ -1231,6 +1231,75 @@ pub async fn delete_folder(path: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    /// A fresh directory under the system temp dir, unique to this test.
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "unseen-servant-test-{}-{}",
+            std::process::id(),
+            name
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn list_files_puts_folders_first_then_sorts_case_insensitively() {
+        let dir = scratch_dir("list-files-order");
+        for f in ["b.PDF", "a.pdf", "notes.txt", ".DS_Store"] {
+            fs::write(dir.join(f), b"").unwrap();
+        }
+        for d in ["Zeta", "alpha"] {
+            fs::create_dir(dir.join(d)).unwrap();
+        }
+
+        let items = list_files(dir.to_string_lossy().into_owned()).unwrap();
+
+        let names: Vec<(&str, bool)> = items.iter().map(|i| (i.name.as_str(), i.is_dir)).collect();
+        assert_eq!(
+            names,
+            vec![
+                ("alpha", true),
+                ("Zeta", true),
+                ("a.pdf", false),
+                ("b.PDF", false)
+            ]
+        );
+        assert_eq!(items[2].path, dir.join("a.pdf").to_string_lossy());
+        assert!(items.iter().all(|i| i.children.is_none()));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn list_files_rejects_a_path_that_is_not_a_directory() {
+        let dir = scratch_dir("list-files-not-dir");
+        let file = dir.join("a.pdf");
+        fs::write(&file, b"").unwrap();
+
+        assert!(list_files(file.to_string_lossy().into_owned()).is_err());
+        assert!(list_files(dir.join("missing").to_string_lossy().into_owned()).is_err());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn count_pdfs_in_dir_counts_nested_pdfs_in_any_case() {
+        let dir = scratch_dir("count-pdfs");
+        fs::create_dir_all(dir.join("sub/deeper")).unwrap();
+        for f in [
+            "a.pdf",
+            "sub/b.PDF",
+            "sub/deeper/c.Pdf",
+            "sub/notes.txt",
+            "sub/pdf",
+        ] {
+            fs::write(dir.join(f), b"").unwrap();
+        }
+
+        assert_eq!(count_pdfs_in_dir(&dir), 3);
+        assert_eq!(count_pdfs_in_dir(&dir.join("missing")), 0);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn sse_frames_reassembles_frames_split_across_chunks() {
         let mut frames = SseFrames::default();
