@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { FileItem } from './types';
 import {
   areAllDescendantsSelected,
-  hasAnyDescendantSelected,
   hasSelectableDescendants,
   computeAncestorPaths,
   checkboxState,
@@ -183,41 +182,6 @@ describe('areAllDescendantsSelected with filter', () => {
     const filter = new Set(['/root/parent/sub/x.pdf', '/root/parent/sibling.pdf']);
     const selected = new Set(['/root/parent/sub/x.pdf', '/root/parent/sibling.pdf']);
     expect(areAllDescendantsSelected(f, selected, filter)).toBe(true);
-  });
-});
-
-// =====================================================================
-// hasAnyDescendantSelected
-// =====================================================================
-
-describe('hasAnyDescendantSelected', () => {
-  it('returns false when no descendants are selected', () => {
-    const f = flatFolder();
-    expect(hasAnyDescendantSelected(f, new Set())).toBe(false);
-  });
-
-  it('returns true when one file in nested subfolder is selected', () => {
-    const f = nestedFolder();
-    const selected = new Set(['/root/parent/sub/x.pdf']);
-    expect(hasAnyDescendantSelected(f, selected)).toBe(true);
-  });
-
-  it('returns true when all descendants are selected', () => {
-    const f = flatFolder();
-    const selected = new Set(['/root/A/a.pdf', '/root/A/b.pdf', '/root/A/c.pdf']);
-    expect(hasAnyDescendantSelected(f, selected)).toBe(true);
-  });
-
-  it('returns false for folder with null children', () => {
-    const f = folder('A', '/root', null);
-    expect(hasAnyDescendantSelected(f, new Set(['/root/A/a.pdf']))).toBe(false);
-  });
-
-  it('respects filter in collection mode', () => {
-    const f = flatFolder();
-    const filter = new Set(['/root/A/b.pdf']);
-    const selected = new Set(['/root/A/a.pdf']); // a.pdf selected but not in filter
-    expect(hasAnyDescendantSelected(f, selected, filter)).toBe(false);
   });
 });
 

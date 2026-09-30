@@ -24,27 +24,6 @@ export function areAllDescendantsSelected(
 }
 
 /**
- * Check if ANY file descendant of a folder is in the selected set.
- * Returns false for folders with null children.
- */
-export function hasAnyDescendantSelected(
-  folder: FileItem,
-  selected: Set<string>,
-  filter?: Set<string>
-): boolean {
-  if (!folder.children) return false;
-
-  for (const child of folder.children) {
-    if (child.is_dir) {
-      if (hasAnyDescendantSelected(child, selected, filter)) return true;
-    } else if (!filter || filter.has(child.path)) {
-      if (selected.has(child.path)) return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Check if a folder has any selectable file descendants.
  * When filter is provided, only files in the filter count.
  */
