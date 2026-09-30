@@ -103,6 +103,16 @@ def sse_events(response):
     ]
 
 
+def run_sync(client, body):
+    """Sync through ``/api/sync-index-stream``, the route the app uses, and
+    return its ``complete`` event's result."""
+    response = client.post("/api/sync-index-stream", json=body)
+    assert response.status_code == 200, response.text
+    result = sse_events(response)[-1]
+    assert result.pop("event") == "complete", result
+    return result
+
+
 # ---------------------------------------------------------------------------
 # PDF fixture factories
 # ---------------------------------------------------------------------------

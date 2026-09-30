@@ -19,6 +19,7 @@ from legend_lore.service import (
     compute_diff,
     file_content_hash,
 )
+from tests.conftest import run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -305,11 +306,10 @@ def test_manifest_backward_compat_content_hash():
 def test_sync_rename_preserves_chunks(client, sample_pdf_path, tmp_path):
     """Renaming a file should transfer chunks without re-indexing."""
     # Step 1: Index the file
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
-    assert response.status_code == 200
-    data = response.json()
+    data = response
     assert data["added"] == 1
     original_total = data["total_indexed"]
 
@@ -318,11 +318,10 @@ def test_sync_rename_preserves_chunks(client, sample_pdf_path, tmp_path):
     shutil.copy2(sample_pdf_path, new_path)
 
     # Step 3: Sync with new path only (old path deselected)
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(new_path)]
     })
-    assert response.status_code == 200
-    data = response.json()
+    data = response
     assert data["renamed"] == 1
     assert data["added"] == 0
     assert data["removed"] == 0
@@ -333,7 +332,7 @@ def test_sync_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_pat
     """Rename should copy the old entry's pipeline_version, never recompute it."""
     from legend_lore.service import load_manifest, save_manifest
 
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
     manifest = load_manifest(tmp_path)
@@ -343,11 +342,10 @@ def test_sync_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_pat
     new_path = tmp_path / "renamed_monsters.pdf"
     shutil.copy2(sample_pdf_path, new_path)
 
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(new_path)]
     })
-    assert response.status_code == 200
-    assert response.json()["renamed"] == 1
+    assert response["renamed"] == 1
 
     manifest = load_manifest(tmp_path)
     assert manifest.files[str(new_path)].pipeline_version == "old/x"
@@ -356,7 +354,7 @@ def test_sync_rename_preserves_pipeline_version(client, sample_pdf_path, tmp_pat
 def test_sync_rename_updates_metadata(client, sample_pdf_path, tmp_path):
     """After rename, chunk metadata should reflect the new path/filename."""
     # Index the file
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -364,7 +362,7 @@ def test_sync_rename_updates_metadata(client, sample_pdf_path, tmp_path):
     new_path = tmp_path / "renamed_dragons.pdf"
     shutil.copy2(sample_pdf_path, new_path)
 
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(new_path)]
     })
 
@@ -381,7 +379,7 @@ def test_sync_rename_updates_metadata(client, sample_pdf_path, tmp_path):
 def test_sync_rename_updates_manifest(client, sample_pdf_path, tmp_path):
     """After rename, manifest should have new path and content_hash."""
     # Index
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -389,7 +387,7 @@ def test_sync_rename_updates_manifest(client, sample_pdf_path, tmp_path):
     new_path = tmp_path / "new_name.pdf"
     shutil.copy2(sample_pdf_path, new_path)
 
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(new_path)]
     })
 
@@ -407,7 +405,7 @@ def test_sync_rename_updates_manifest(client, sample_pdf_path, tmp_path):
 def test_sync_rename_updates_collections(client, sample_pdf_path, tmp_path):
     """Collections referencing the old path should be updated."""
     # Index the file
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -421,7 +419,7 @@ def test_sync_rename_updates_collections(client, sample_pdf_path, tmp_path):
     new_path = tmp_path / "moved_book.pdf"
     shutil.copy2(sample_pdf_path, new_path)
 
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(new_path)]
     })
 
@@ -436,7 +434,7 @@ def test_sync_rename_updates_collections(client, sample_pdf_path, tmp_path):
 def test_sync_rename_response_includes_count(client, sample_pdf_path, tmp_path):
     """Sync response should include the 'renamed' field."""
     # Index
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -444,10 +442,10 @@ def test_sync_rename_response_includes_count(client, sample_pdf_path, tmp_path):
     new_path = tmp_path / "another_name.pdf"
     shutil.copy2(sample_pdf_path, new_path)
 
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(new_path)]
     })
-    data = response.json()
+    data = response
     assert "renamed" in data
     assert data["renamed"] == 1
 
@@ -456,11 +454,10 @@ def test_sync_rename_from_stale_selection(client, sample_pdf_path, tmp_path):
     """Full integration: index a file, rename on disk, sync with stale path.
     The sync should detect the rename and return renames list."""
     # Step 1: Index
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
-    assert response.status_code == 200
-    assert response.json()["added"] == 1
+    assert response["added"] == 1
 
     # Step 2: "Rename" — copy to new path in same directory
     new_path = sample_pdf_path.parent / "renamed_bestiary.pdf"
@@ -468,11 +465,10 @@ def test_sync_rename_from_stale_selection(client, sample_pdf_path, tmp_path):
     sample_pdf_path.unlink()
 
     # Step 3: Sync with STALE path (the old path that no longer exists)
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
-    assert response.status_code == 200
-    data = response.json()
+    data = response
     assert data["renamed"] == 1
     assert data["added"] == 0
     assert len(data["renames"]) == 1
@@ -486,7 +482,7 @@ def test_sync_rename_from_stale_selection(client, sample_pdf_path, tmp_path):
 def test_index_status_shows_rename(client, sample_pdf_path, tmp_path):
     """The index-status endpoint should report renames in its summary."""
     # Index
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -509,21 +505,19 @@ def test_index_status_shows_rename(client, sample_pdf_path, tmp_path):
 def test_sync_auto_removes_deleted_file(client, sample_pdf_path, tmp_path):
     """A file deleted from disk should be auto-removed from the index."""
     # Index
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
-    assert response.status_code == 200
-    assert response.json()["added"] == 1
+    assert response["added"] == 1
 
     # Delete the file
     sample_pdf_path.unlink()
 
     # Sync with stale path (file no longer exists)
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
-    assert response.status_code == 200
-    data = response.json()
+    data = response
     assert data["auto_removed"] == 1
     assert str(sample_pdf_path) in data["auto_removed_paths"]
     assert data["total_indexed"] == 0
@@ -532,7 +526,7 @@ def test_sync_auto_removes_deleted_file(client, sample_pdf_path, tmp_path):
 def test_auto_remove_updates_collections(client, sample_pdf_path, tmp_path):
     """Collections referencing a deleted file should have the path removed."""
     # Index
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -546,7 +540,7 @@ def test_auto_remove_updates_collections(client, sample_pdf_path, tmp_path):
     sample_pdf_path.unlink()
 
     # Sync
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -560,7 +554,7 @@ def test_auto_remove_updates_collections(client, sample_pdf_path, tmp_path):
 def test_index_status_shows_auto_remove(client, sample_pdf_path, tmp_path):
     """The index-status endpoint should report auto_remove in its summary."""
     # Index
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 

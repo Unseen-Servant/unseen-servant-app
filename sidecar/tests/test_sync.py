@@ -16,6 +16,7 @@ from legend_lore.service import (
     IndexManifest,
     ManifestEntry,
 )
+from tests.conftest import run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -156,12 +157,10 @@ def test_sync_adds_new_files(
     client, sample_pdf_path, test_store, tmp_path
 ):
     """Sync should index new files and write them to the manifest."""
-    response = client.post("/api/sync-index", json={
+    data = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
-    assert response.status_code == 200
-    data = response.json()
     assert data["added"] == 1
     assert data["removed"] == 0
     assert data["updated"] == 0
@@ -180,17 +179,16 @@ def test_sync_removes_files(
 ):
     """Sync should delete chunks for files no longer selected."""
     # First, index a file
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
     assert test_store.count_units() > 0
 
     # Now sync with empty selection — should remove it
-    response = client.post("/api/sync-index", json={
+    data = run_sync(client, {
         "selected_paths": []
     })
 
-    data = response.json()
     assert data["removed"] == 1
     assert data["total_indexed"] == 0
 
@@ -207,7 +205,7 @@ def test_sync_updates_modified_files(
 ):
     """Sync should re-index files whose mtime has changed."""
     # Index the file first
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
     count_before = test_store.count_units()
@@ -219,11 +217,10 @@ def test_sync_updates_modified_files(
     (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(manifest_raw))
 
     # Sync again — should detect the "modification" and re-index
-    response = client.post("/api/sync-index", json={
+    data = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
-    data = response.json()
     assert data["updated"] == 1
     assert data["added"] == 0
 
@@ -236,16 +233,15 @@ def test_sync_mixed_operations(
 ):
     """Sync with a mix of adds and removes in one call."""
     # Index sample_pdf first
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
     # Now sync with large_text_pdf selected instead (swap)
-    response = client.post("/api/sync-index", json={
+    data = run_sync(client, {
         "selected_paths": [str(large_text_pdf_path)]
     })
 
-    data = response.json()
     assert data["added"] == 1       # large_text_pdf
     assert data["removed"] == 1     # sample_pdf
     assert data["total_indexed"] == 1
@@ -258,7 +254,7 @@ def test_sync_mixed_operations(
 
 def test_manifest_persists_after_sync(client, sample_pdf_path, tmp_path):
     """The manifest file should survive a reload after sync."""
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 
@@ -307,7 +303,7 @@ def test_sync_stores_game_system_in_manifest(
     client, dnd5e_pdf_path, tmp_path
 ):
     """Sync should store detected game_system in the manifest."""
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(dnd5e_pdf_path)]
     })
 
@@ -320,7 +316,7 @@ def test_sync_with_game_system_override(
     client, untagged_pdf_path, tmp_path
 ):
     """Game system overrides should be stored in the manifest."""
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(untagged_pdf_path)],
         "game_system_overrides": {
             str(untagged_pdf_path): "Call of Cthulhu",
@@ -365,7 +361,7 @@ def test_sync_update_with_fewer_chunks_removes_orphans(
     c.save()
 
     # Index it
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(pdf_path)]
     })
     count_before = test_store.count_units()
@@ -382,10 +378,10 @@ def test_sync_update_with_fewer_chunks_removes_orphans(
     (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(manifest_raw))
 
     # Sync again — should re-index with fewer chunks
-    response = client.post("/api/sync-index", json={
+    data = run_sync(client, {
         "selected_paths": [str(pdf_path)]
     })
-    data = response.json()
+
     assert data["updated"] == 1
 
     # The key assertion: stored unit count should match the new (smaller) chunk count,
@@ -433,16 +429,16 @@ def test_reindex_all_stream_reprocesses_up_to_date_files(
 ):
     """POST /api/reindex-all-stream should force-update every manifest file."""
     # Prime the index so the manifest has one up-to-date entry.
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
     count_before = test_store.count_units()
     assert count_before > 0
 
     # A plain sync with the same selection should be a no-op (nothing changed).
-    noop = client.post("/api/sync-index", json={
+    noop = run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
-    }).json()
+    })
     assert noop["updated"] == 0
 
     # Force-reindex via the new endpoint. StreamingResponse → parse SSE.
@@ -527,7 +523,7 @@ def test_delete_index_clears_manifest_and_chunks(
     client, sample_pdf_path, test_store, tmp_path
 ):
     """POST /api/delete-index should purge chunks and empty the manifest."""
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
     chunks_before = test_store.count_units()
@@ -569,7 +565,7 @@ def test_delete_index_preserves_collections(
     valid on disk after the index is cleared, and will resolve again
     once the next sync re-creates their chunks.
     """
-    client.post("/api/sync-index", json={
+    run_sync(client, {
         "selected_paths": [str(sample_pdf_path)]
     })
 

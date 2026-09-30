@@ -37,7 +37,6 @@ def held_sync_lock(client, sample_pdf_path, monkeypatch):
 
 GUARDED_ROUTES = [
     ("/api/reindex-file", lambda p: {"path": str(p)}),
-    ("/api/sync-index", lambda p: {"selected_paths": [str(p)]}),
     ("/api/sync-index-stream", lambda p: {"selected_paths": [str(p)]}),
     ("/api/reindex-all-stream", lambda p: None),
     ("/api/delete-index", lambda p: None),

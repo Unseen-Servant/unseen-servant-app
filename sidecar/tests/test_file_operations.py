@@ -11,6 +11,7 @@ import json
 import shutil
 
 from legend_lore.service import MANIFEST_FILENAME
+from tests.conftest import run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -19,11 +20,10 @@ from legend_lore.service import MANIFEST_FILENAME
 
 def index_pdfs(client, *pdf_paths):
     """Index one or more PDFs via sync-index and assert success."""
-    response = client.post("/api/sync-index", json={
+    response = run_sync(client, {
         "selected_paths": [str(p) for p in pdf_paths]
     })
-    assert response.status_code == 200
-    return response.json()
+    return response
 
 
 def read_manifest(tmp_path):

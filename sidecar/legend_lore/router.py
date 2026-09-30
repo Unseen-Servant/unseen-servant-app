@@ -253,7 +253,7 @@ def build_router(
 
 
     def _sync_core(request: SyncIndexRequest):
-        """Core sync generator shared by both endpoints.
+        """Core sync generator shared by the two streaming endpoints.
 
         Yields progress dicts with an ``event`` key (``started``, ``progress``,
         or ``complete``).  The ``complete`` event contains the full result.
@@ -493,36 +493,9 @@ def build_router(
             "stale_paths": diff["stale_paths"],
         }
 
-    def _do_sync(request: SyncIndexRequest):
-        """Run sync and return the final result dict.
-
-        Synchronous helper used by ``/api/sync-index`` (test convenience
-        endpoint). Production callers use the streaming variant below.
-        """
-        if not data_dir:
-            raise HTTPException(
-                status_code=500, detail="No data directory configured"
-            )
-        result = None
-        for event in _sync_core(request):
-            if event["event"] == "complete":
-                result = event
-        if result:
-            del result["event"]
-        return result
-
-    @router.post("/api/sync-index")
-    async def sync_index(request: SyncIndexRequest):
-        """Apply index changes synchronously (test convenience endpoint).
-
-        Production code uses ``/api/sync-index-stream`` for SSE progress.
-        """
-        with sync_lock_or_409():
-            return _do_sync(request)
-
     @router.post("/api/sync-index-stream")
     async def sync_index_stream(request: SyncIndexRequest):
-        """Streaming version of sync-index that emits SSE progress events.
+        """Apply index changes, emitting SSE progress events.
 
         Acquires the sync lock synchronously so 409 surfaces as a normal
         HTTP error. Once the lock is held, the only release path is the
