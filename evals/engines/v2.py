@@ -259,7 +259,7 @@ def _main() -> None:
                     help="query to run (repeatable)")
     ap.add_argument("--n-results", type=int, default=SearchOptions.n_results)
     ap.add_argument("--no-rerank", action="store_true")
-    ap.add_argument("--hybrid", action="store_true")
+    ap.add_argument("--hybrid", action=argparse.BooleanOptionalAction, default=SearchOptions.hybrid)
     ap.add_argument("--no-spell-correction", action="store_true")
     args = ap.parse_args()
 

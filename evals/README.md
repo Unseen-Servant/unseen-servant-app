@@ -151,7 +151,7 @@ never a PDF. `--suite library --data-dir <app data dir>`; verify with
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
-The v2 reference is `2026-09-26-v2-cue-strip` (run with `--hybrid`); gate against it. The local library tier's reference is `2026-09-26-v2-library-cue-strip` (`--suite library --data-dir <app data dir> --hybrid`, app closed).
+The v2 reference is `2026-09-26-v2-cue-strip` (hybrid on, which is now the default, as in the app; `--no-hybrid` for dense-only); gate against it. The local library tier's reference is `2026-09-26-v2-library-cue-strip` (`--suite library --data-dir <app data dir>`, app closed).
 Every baseline records the corpus fingerprint, Git revision, and explicit query
 knobs. Retrieval baselines always use a fresh temporary index; exploratory
 reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a

@@ -422,7 +422,8 @@ def main() -> int:
     ap.add_argument("--no-index", action="store_true", help="retrieval: assume corpus already indexed")
     ap.add_argument("--reuse-index", action="store_true",
                     help="retrieval: use --data-dir for an exploratory, non-baseline run")
-    ap.add_argument("--hybrid", action="store_true", help="retrieval: fuse dense + BM25/FTS (rung 5)")
+    ap.add_argument("--hybrid", action=argparse.BooleanOptionalAction, default=SearchOptions.hybrid,
+                    help="retrieval: fuse dense + BM25/FTS (production default; --no-hybrid for dense-only)")
     ap.add_argument("--no-rerank", action="store_true",
                     help="retrieval: search with the cross-encoder off (latency measurement)")
     ap.add_argument("--lex-weight", type=float, default=None,

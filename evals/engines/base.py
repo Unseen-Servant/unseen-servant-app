@@ -39,7 +39,7 @@ class SearchOptions:
 
     n_results: int = 25          # UI first-page size; metrics graded @10
     rerank: bool = True          # production default (search-settings design)
-    hybrid: bool = False         # experimental flag, default-off in v2
+    hybrid: bool = True          # production default since 2026-09-23
     spell_correction: bool = True
     variant_expansion: bool = False
     source_filter: str | None = None   # filename (v2 semantics)
