@@ -150,7 +150,7 @@ def test_search_reports_ollama_unreachable(production_embed_client, monkeypatch)
     response = production_embed_client.post("/api/search", json={"query": "dragon"})
 
     assert response.status_code == 500
-    assert response.json()["detail"]
+    assert response.json()["detail"].startswith("Embedder not running — ")
 
 
 def test_search_reports_the_model_missing(production_embed_client, monkeypatch):

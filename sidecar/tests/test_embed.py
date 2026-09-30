@@ -63,6 +63,32 @@ def test_embed_error_without_json_body(ollama):
         embedder.embed(["x"])
 
 
+def test_embed_explains_an_embedder_that_is_not_running(monkeypatch):
+    def refused(url, json, timeout):
+        raise httpx.ConnectError("[Errno 61] Connection refused")
+
+    monkeypatch.setattr(httpx, "post", refused)
+    with pytest.raises(RuntimeError) as err:
+        embedder.embed(["fire drake"])
+    assert str(err.value) == (
+        "Embedder not running — nothing answered at http://localhost:11434. "
+        "Start it and try again."
+    )
+
+
+def test_embed_explains_an_embedder_that_does_not_answer(monkeypatch):
+    def slow(url, json, timeout):
+        raise httpx.ReadTimeout("timed out")
+
+    monkeypatch.setattr(httpx, "post", slow)
+    with pytest.raises(RuntimeError) as err:
+        embedder.embed(["fire drake"])
+    assert str(err.value) == (
+        "Embedder not answering — no reply after 120s. "
+        "It may be busy or stuck; try again in a moment."
+    )
+
+
 def test_background_helpers_default_to_embed(ollama, monkeypatch):
     """The truncation probe and keep-warm ticker use embed() when no
     embedder is injected (they used to build Chroma's function)."""

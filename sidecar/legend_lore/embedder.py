@@ -50,15 +50,30 @@ def embed(texts: list[str]) -> list[list[float]]:
     exact request the ``ollama`` client (and so chromadb's
     ``OllamaEmbeddingFunction``) sends, so vectors match every index
     built before this function existed. Raises on a non-200 answer with
-    Ollama's own error message.
+    Ollama's own error message, and on no answer with a plain one.
     """
     import httpx
 
-    resp = httpx.post(
-        f"{EMBED_BASE_URL}/api/embed",
-        json={"model": EMBEDDING_MODEL, "input": list(texts)},
-        timeout=_embed_timeout(),
-    )
+    timeout = _embed_timeout()
+    # The raw httpx errors ("[Errno 61] Connection refused") reach the
+    # search error, Claude via MCP, and a sync's per-book errors verbatim;
+    # say what they mean in the status bar's own terms instead.
+    try:
+        resp = httpx.post(
+            f"{EMBED_BASE_URL}/api/embed",
+            json={"model": EMBEDDING_MODEL, "input": list(texts)},
+            timeout=timeout,
+        )
+    except httpx.ConnectError as e:
+        raise RuntimeError(
+            f"Embedder not running — nothing answered at {EMBED_BASE_URL}. "
+            "Start it and try again."
+        ) from e
+    except httpx.TimeoutException as e:
+        raise RuntimeError(
+            f"Embedder not answering — no reply after {timeout:.0f}s. "
+            "It may be busy or stuck; try again in a moment."
+        ) from e
     if resp.status_code != 200:
         try:
             detail = resp.json().get("error", resp.text)
