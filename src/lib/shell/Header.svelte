@@ -23,9 +23,10 @@
   export let viewMode: 'tree' | 'systems' = 'tree';
   export let onSetViewMode: (mode: 'tree' | 'systems') => void = () => {};
   export let searchViewOpen: boolean = false;
-  // `@` completion. The bar reports the @-word under the caret (its text
-  // after the @, or null when there is none) and, while one is open, offers
-  // each key to the menu in the `mention` slot before handling it itself.
+  // `@` picks. The bar reports the @-word under the caret (its text after
+  // the @, or null when there is none) and, while one is open, offers each
+  // key to whoever plays the pick out — the collections panel — before
+  // handling it itself.
   export let onMentionChange: (query: string | null) => void = () => {};
   export let onMentionKey: (event: KeyboardEvent) => boolean = () => false;
 
@@ -87,7 +88,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    // An open @-menu has first claim, and whatever it takes stops here —
+    // An open @-pick has first claim, and whatever it takes stops here —
     // ↓ must not drop into the results, nor Esc leave the search view.
     if (mention && !e.isComposing) {
       if (e.key === 'Escape') {
@@ -202,9 +203,6 @@
     {/if}
   </div>
   <div class="search-wrapper" class:disabled>
-    {#if mention}
-      <div class="mention-pop"><slot name="mention" /></div>
-    {/if}
     <!-- Font Awesome "magnifying-glass" icon (src/lib/ui/icons/magnifying-glass-solid-full.svg) -->
     <svg class="search-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
       <path d="M480 272C480 317.9 465.1 360.3 440 394.7L566.6 521.4C579.1 533.9 579.1 554.2 566.6 566.7C554.1 579.2 533.8 579.2 521.3 566.7L394.7 440C360.3 465.1 317.9 480 272 480C157.1 480 64 386.9 64 272C64 157.1 157.1 64 272 64C386.9 64 480 157.1 480 272zM272 416C351.5 416 416 351.5 416 272C416 192.5 351.5 128 272 128C192.5 128 128 192.5 128 272C128 351.5 192.5 416 272 416z"/>
@@ -380,7 +378,6 @@
   }
 
   .search-wrapper {
-    position: relative;
     display: flex;
     align-items: center;
     flex: 1;
@@ -397,14 +394,6 @@
 
   .search-wrapper:focus-within {
     border-color: var(--text-accent);
-  }
-
-  /* The @-menu hangs from the bar's left edge, over whatever is below. */
-  .mention-pop {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 200;
   }
 
   .search-wrapper.disabled {

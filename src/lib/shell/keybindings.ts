@@ -330,8 +330,8 @@ export function digitChord(event: ChordEvent): DigitChord | null {
   return { digit: Number(m[1]), shift: event.shiftKey, alt: event.altKey };
 }
 
-// The display chord for track-select slot N, for tooltips and the @-menu's
-// hint column.
+// The display chord for track-select slot N, for tooltips and the badges
+// the collections panel wears during an @-pick.
 export function slotChord(n: number): string {
   return isMac ? `⌘${n}` : `Ctrl+${n}`;
 }

@@ -67,6 +67,13 @@
   export let onTogglePlay: (name: string) => void = () => {};
   export let onSetSortKey: (key: 'custom' | 'name' | 'size' | 'created') => void = () => {};
   export let onReorder: (order: string[]) => void = () => {};
+  // The search bar's @-pick, played out on these rows: the @-word's text
+  // (null while there is none), the names it matches, and the one ↵ will
+  // play. While it runs the panel shows the pick, not the mix — only
+  // non-matches fade, and the badges turn into their ⌘N.
+  export let pickQuery: string | null = null;
+  export let pickMatches: string[] = [];
+  export let pickCursor: string | null = null;
 
   const SORT_OPTIONS: { value: typeof sortKey; label: string }[] = [
     { value: 'custom', label: 'Custom order' },
@@ -199,6 +206,10 @@
 
   // Track-select slot per name (⌘1–9), for the play button's tooltip.
   $: slotOf = new Map(transportNames(Object.values(collections), sortKey, customOrder).slice(0, 9).map((n, i) => [n, i + 1]));
+
+  $: picking = pickQuery !== null;
+  $: pickSet = new Set(pickMatches);
+  $: if (pickCursor) void scrollFocusedIntoView(pickCursor);
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
@@ -675,6 +686,10 @@
 >
   <header class="panel-head nameplate">
     <span class="panel-name ledger-label">Collections</span>
+    {#if picking}
+      <!-- Echo of the bar's @-word: the panel is what it's searching. -->
+      <span class="pick-echo" aria-hidden="true">@{pickQuery}</span>
+    {:else}
     <div class="sort-wrapper">
       <button
         class="plate-btn"
@@ -715,6 +730,7 @@
         </div>
       {/if}
     </div>
+    {/if}
   </header>
 
   <!-- No collections at all needs no message of its own: the ghost track
@@ -746,9 +762,9 @@
           class:hovered={$hoverLive && hoveredRowName === col.name}
           class:armed
           class:archived={col.archived}
-          class:kb-focused={focusedName === col.name}
+          class:kb-focused={picking ? pickCursor === col.name : focusedName === col.name}
           class:playing
-          class:dimmed={!col.archived && (muted || (anyPlaying && !playing))}
+          class:dimmed={picking ? !pickSet.has(col.name) : !col.archived && (muted || (anyPlaying && !playing))}
           class:dragging={draggingName === col.name}
           class:drop-before={dropInsertIndex === i}
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
@@ -849,7 +865,11 @@
               >M</button>
             </span>
           {/if}
-          <span class="row-count">{col.file_count}</span>
+          {#if picking && slotOf.has(col.name)}
+            <span class="new-chord" aria-hidden="true">{slotChord(slotOf.get(col.name) ?? 0)}</span>
+          {:else}
+            <span class="row-count">{col.file_count}</span>
+          {/if}
         </div>
         {#if isExpanded}
           {#each childFiles(col) as f (f.path)}
@@ -858,8 +878,8 @@
             <div
               class="child-row"
               class:washed={playing && !muted}
-              class:dimmed={muted || (anyPlaying && !playing)}
-              class:kb-focused={focusedName === childKey}
+              class:dimmed={picking ? !pickSet.has(col.name) : muted || (anyPlaying && !playing)}
+              class:kb-focused={!picking && focusedName === childKey}
               title={f.path}
               data-cp-row={childKey}
               on:click={() => onFocusCollection(childKey)}
@@ -890,7 +910,7 @@
             </div>
           {/each}
           {#if col.file_paths.length === 0}
-            <div class="child-row child-empty" class:washed={playing && !muted} class:dimmed={muted || (anyPlaying && !playing)}>
+            <div class="child-row child-empty" class:washed={playing && !muted} class:dimmed={picking ? !pickSet.has(col.name) : muted || (anyPlaying && !playing)}>
               <span class="indent" aria-hidden="true"></span>
               <span class="child-name">No files yet</span>
             </div>
@@ -1086,6 +1106,15 @@
   .sort-wrapper {
     position: relative;
     display: flex;
+  }
+  /* Same voice as the plate's [sort], which it stands in for. */
+  .pick-echo {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .sort-menu {
     position: absolute;

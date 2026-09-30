@@ -59,7 +59,7 @@ export function playOnly(playing: Set<string>, name: string): Set<string> {
   return new Set([name]);
 }
 
-/** The @-menu's filter: case-insensitive substring, with names that start
+/** The @-pick's filter: case-insensitive substring, with names that start
  *  with the query ahead of ones that merely contain it. Order within each
  *  group is the input order (panel order). An empty query keeps everything. */
 export function filterByQuery(names: string[], query: string): string[] {
@@ -73,4 +73,14 @@ export function filterByQuery(names: string[], query: string): string[] {
     else if (i > 0) inner.push(n);
   }
   return [...prefix, ...inner];
+}
+
+/** Move the @-pick's cursor one match. Clamps rather than wrapping, like
+ *  every list in the app; a cursor that fell out of the matches (the query
+ *  narrowed past it) re-enters at the first. */
+export function stepPick(matches: string[], current: string | null, delta: 1 | -1): string | null {
+  if (matches.length === 0) return null;
+  const i = current === null ? -1 : matches.indexOf(current);
+  if (i < 0) return matches[0];
+  return matches[Math.min(matches.length - 1, Math.max(0, i + delta))];
 }

@@ -26,7 +26,6 @@
   import { confirmPrompt } from '../../lib/shell/confirmStore';
   import { holdLatch } from '../../lib/ui/holdLatch';
   import CollectionsPanel from '../../lib/legend-lore/CollectionsPanel.svelte';
-  import CollectionMenu from '../../lib/legend-lore/CollectionMenu.svelte';
   import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
   import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
@@ -50,7 +49,7 @@
   import { createCommitScheduler, mergeArmedCollection } from '../../lib/legend-lore/collectionCommit';
   import { setTreePathsPayload, type TreePathsPayload } from '../../lib/legend-lore/dragPayload';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
-  import { playOnly, transportNames } from '../../lib/legend-lore/collectionOrder';
+  import { filterByQuery, playOnly, stepPick, transportNames } from '../../lib/legend-lore/collectionOrder';
   import { menuSlotHeld } from '../../lib/shell/menuSlot';
   import {
     parseString,
@@ -1056,7 +1055,7 @@
     if (committedQuery) runSearch(committedQuery);
   }
 
-  // Track select (⌘1–9, the search bar's @-menu): play this collection alone — or
+  // Track select (⌘1–9, the search bar's @-pick): play this collection alone — or
   // stop it, when it already plays alone.
   function playOnlyCollection(name: string) {
     playingCollections = playOnly(playingCollections, name);
@@ -1067,19 +1066,37 @@
   // Slot N is the Nth transport row as the panel sorts it.
   $: collectionSlots = transportNames(Object.values(collections), collectionsSortKey, collectionsCustomOrder);
 
-  // The @-word under the search bar's caret, minus the @; null while none.
+  // The @-pick: the search bar's @-word (minus the @; null while there is
+  // none) played out on the collections panel. The bar keeps focus and
+  // forwards its keys here; the panel draws the matches and the cursor.
   let mentionQuery: string | null = null;
-  let collectionMenu: CollectionMenu | undefined;
+  $: pickMatches = mentionQuery === null ? [] : filterByQuery(collectionSlots, mentionQuery);
+  // A new @-word re-aims at its best match; ↑/↓ move from there.
+  let pickCursor: string | null = null;
+  $: pickCursor = pickMatches[0] ?? null;
+  // A closed panel opens for the pick and closes behind it — the pick
+  // happens on the console, so the console has to be on screen.
+  $: collectionsPanelShown = collectionsPanelOpen || mentionQuery !== null;
 
-  // ↵ plays the collection alone and hands the bar back its query; ⇧↵
-  // toggles it in the mix and leaves the @-word open for the next pick.
-  function chooseMentionedCollection(name: string, mix: boolean) {
-    if (mix) {
-      togglePlayCollection(name);
-    } else {
-      playOnlyCollection(name);
-      void headerComponent?.consumeMention();
+  function handleMentionKey(event: KeyboardEvent): boolean {
+    if (event.metaKey || event.ctrlKey || event.altKey) return false;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      pickCursor = stepPick(pickMatches, pickCursor, event.key === 'ArrowDown' ? 1 : -1);
+      return true;
     }
+    if (event.key === 'Enter') {
+      // ↵ plays the cursor's collection alone and hands the bar back its
+      // query; ⇧↵ toggles it in the mix and leaves the @-word open for the
+      // next pick.
+      if (pickCursor && event.shiftKey) {
+        togglePlayCollection(pickCursor);
+      } else if (pickCursor) {
+        playOnlyCollection(pickCursor);
+        void headerComponent?.consumeMention();
+      }
+      return true;
+    }
+    return false;
   }
 
   // Mute a collection — carve its files from the mix (or from the
@@ -3569,23 +3586,12 @@
     {viewMode}
     onSetViewMode={setViewMode}
     onMentionChange={(q) => (mentionQuery = q)}
-    onMentionKey={(e) => collectionMenu?.handleKey(e) ?? false}
-  >
-    <CollectionMenu
-      slot="mention"
-      bind:this={collectionMenu}
-      names={collectionSlots}
-      {collections}
-      playingNames={playingCollections}
-      mutedNames={mutedCollectionNames}
-      query={mentionQuery ?? ''}
-      onChoose={chooseMentionedCollection}
-    />
-  </Header>
+    onMentionKey={handleMentionKey}
+  />
 
   {#if selectedFolder}
     <div class="workspace">
-      {#if collectionsPanelOpen || filterPanelOpen}
+      {#if collectionsPanelShown || filterPanelOpen}
         <!-- Left dock: collections on top, filters below. Each panel
              scrolls its own rows; the dock owns the width, and each
              panel's nameplate divides it from the one above.
@@ -3597,7 +3603,7 @@
              block yields whenever a dock pane holds it, and ⌘⌥←/→ move
              between the two sides. -->
         <div class="left-dock">
-          {#if collectionsPanelOpen}
+          {#if collectionsPanelShown}
             <CollectionsPanel
               bind:this={collectionsPanelComponent}
               {collections}
@@ -3629,6 +3635,9 @@
               active={activePane === 'collections'}
               onActivate={() => pointAtEmpty('collections')}
               onFocusCollection={setFocusedCollectionName}
+              pickQuery={mentionQuery}
+              {pickMatches}
+              {pickCursor}
             />
           {/if}
           {#if filterPanelOpen}

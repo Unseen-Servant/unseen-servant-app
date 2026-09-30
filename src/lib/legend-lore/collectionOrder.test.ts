@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { filterByQuery, orderCollections, playOnly, transportNames } from './collectionOrder';
+import { filterByQuery, orderCollections, playOnly, stepPick, transportNames } from './collectionOrder';
 
 const col = (name: string, over: Partial<{ file_count: number; created_at: string; archived: boolean }> = {}) => ({
   name,
@@ -60,5 +60,19 @@ describe('filterByQuery', () => {
 
   test('no match is empty', () => {
     expect(filterByQuery(names, 'xyz')).toEqual([]);
+  });
+});
+
+describe('stepPick', () => {
+  test('moves one match and clamps at both ends', () => {
+    expect(stepPick(['a', 'b', 'c'], 'a', 1)).toBe('b');
+    expect(stepPick(['a', 'b', 'c'], 'c', 1)).toBe('c');
+    expect(stepPick(['a', 'b', 'c'], 'a', -1)).toBe('a');
+  });
+
+  test('a cursor outside the matches re-enters at the first; no matches, no cursor', () => {
+    expect(stepPick(['a', 'b'], 'z', 1)).toBe('a');
+    expect(stepPick(['a', 'b'], null, -1)).toBe('a');
+    expect(stepPick([], 'a', 1)).toBeNull();
   });
 });
