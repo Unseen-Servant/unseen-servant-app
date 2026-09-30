@@ -198,9 +198,9 @@
     overflow: hidden;
     /* Vellum: warmer and lighter than the list's ground, and not the
        plate's grey, so the text reads as its own surface under the plate.
-       Tables, code and the hit lane recess to --bg-app. */
+       Tables, code and the hit lane recess to --bg-app. No left border:
+       the list pane's right border is the one seam. */
     background: var(--bg-vellum);
-    border-left: 1px solid var(--border-subtle);
     font-family: var(--font-body);
     color: var(--text-primary);
   }

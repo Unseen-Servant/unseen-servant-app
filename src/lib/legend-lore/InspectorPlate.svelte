@@ -73,7 +73,7 @@
 
 <style>
   /* Padded to the inspector body's inset, so the path starts over the
-     text it names. */
+     text it names. No left border: the list column's is the one seam. */
   .inspector-plate {
     flex: 1;
     min-width: 0;
@@ -81,7 +81,6 @@
     align-items: center;
     gap: 0.6rem;
     padding: 0.3rem 0.9rem 0.3rem 1.1rem;
-    border-left: 1px solid var(--border-subtle);
     font-family: var(--font-body);
   }
 
