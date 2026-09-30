@@ -8,9 +8,15 @@ Your collection has 2,629 PDFs. With that many files, you WILL encounter:
 - Duplicate indexing requests (clicking "Index" twice)
 """
 
+import httpx
 import pytest
+from fastapi.testclient import TestClient
 
+from legend_lore import embedder
+from legend_lore.granularity import EmbedUnit
 from legend_lore.service import load_manifest
+from server import create_app
+from tests.conftest import seed_book
 
 
 def test_index_non_pdf_file(client, tmp_path):
@@ -116,3 +122,48 @@ def test_search_rejects_non_positive_n_results(client, sample_pdf_path, n_result
         "n_results": n_results,
     })
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Query-time embedding failure: Ollama down, or bge-m3 not pulled. Search
+# must answer with an error that says so, not hang or return empty.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def production_embed_client(test_store, test_embed_fn, tmp_path):
+    """Search over an indexed book, with queries embedded by the real
+    Ollama client (embedder.embed) instead of the test model."""
+    seed_book(test_store, test_embed_fn, "/lib/bestiary.pdf", [EmbedUnit(
+        chunk_id="c0", text="The fire drake breathes flame.", parent_id="p0",
+        chunk_type="prose", section_heading="Fire Drake",
+        source_pdf="/lib/bestiary.pdf", page_start=1, page_end=1, ordinal=0,
+    )])
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=embedder.embed)
+    return TestClient(app)
+
+
+def test_search_reports_ollama_unreachable(production_embed_client, monkeypatch):
+    # Port 1 on loopback: nothing listens, the connection is refused.
+    monkeypatch.setattr(embedder, "EMBED_BASE_URL", "http://127.0.0.1:1")
+
+    response = production_embed_client.post("/api/search", json={"query": "dragon"})
+
+    assert response.status_code == 500
+    assert response.json()["detail"]
+
+
+def test_search_reports_the_model_missing(production_embed_client, monkeypatch):
+    def not_pulled(url, json, timeout):
+        return httpx.Response(
+            404, json={"error": 'model "bge-m3" not found, try pulling it first'},
+        )
+
+    monkeypatch.setattr(httpx, "post", not_pulled)
+
+    response = production_embed_client.post("/api/search", json={"query": "dragon"})
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        'embed failed (404): model "bge-m3" not found, try pulling it first'
+    )
