@@ -23,10 +23,10 @@ from legend_lore.granularity import EmbedUnit
 from server import create_app
 from tests.conftest import seed_book
 
-# How long the fake query holds the gate if the test fails to release it.
-# Bounds the damage when the event loop *is* blocked: the test fails by
-# timeout instead of hanging the suite.
-GATE_TIMEOUT = 3.0
+# How long the fake query waits for /health before giving up. Only a
+# blocked event loop ever reaches it (the test then fails instead of
+# hanging the suite); a passing run is released at once.
+GATE_TIMEOUT = 10.0
 
 
 @pytest.fixture
@@ -51,46 +51,43 @@ async def test_search_does_not_block_the_event_loop(app, test_store, monkeypatch
     block has already lifted.
 
     So the dependency is inverted. The fake query parks until /health has
-    completed, and /health can only complete if the loop is free:
+    been served and records whether it was released or gave up; /health
+    is only requested once the query has entered:
 
-    - threadpooled (fixed): query runs on a worker, the loop serves
-      /health, the event fires, the query returns at once.
-    - inline (broken):      the query owns the loop, /health can never be
-      served, and the query only unparks on its own timeout.
-
-    Elapsed time therefore separates the two cases cleanly.
+    - threadpooled (fixed): the query parks on a worker, the loop serves
+      /health, the query is released.
+    - inline (broken):      the query owns the loop, /health can't be
+      served until the query has given up waiting for it.
     """
     served_health = threading.Event()
     entered_query = threading.Event()
+    released = {}
 
     def blocking_query(*args, **kwargs):
         entered_query.set()
-        served_health.wait(timeout=GATE_TIMEOUT)
+        released["by_health"] = served_health.wait(timeout=GATE_TIMEOUT)
         return []
 
     monkeypatch.setattr(test_store, "knn", blocking_query)
 
+    loop = asyncio.get_running_loop()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        loop = asyncio.get_running_loop()
-        started = loop.time()
-
         search = asyncio.create_task(
             c.post("/api/search", json={"query": "anything", "n_results": 3})
         )
-        health = asyncio.create_task(c.get("/health"))
-        health.add_done_callback(lambda _: served_health.set())
+        entered = await loop.run_in_executor(None, entered_query.wait, GATE_TIMEOUT)
+        assert entered, "search never reached the query call"
+        health_res = await c.get("/health")
+        served_health.set()
+        search_res = await search
 
-        search_res, health_res = await asyncio.gather(search, health)
-        elapsed = loop.time() - started
-
-    assert entered_query.is_set(), "search never reached the query call"
     assert health_res.status_code == 200
     assert health_res.json()["status"] == "ok"
     assert search_res.status_code == 200
-    assert elapsed < GATE_TIMEOUT / 2, (
-        f"/health was not served for {elapsed:.2f}s while a search was in "
-        f"flight — the search handler is blocking the event loop (#344)"
+    assert released["by_health"] is True, (
+        "/health was only served after the search gave up waiting for it — "
+        "the search handler is blocking the event loop (#344)"
     )
 
 
