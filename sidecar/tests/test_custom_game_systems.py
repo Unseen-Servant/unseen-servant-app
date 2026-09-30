@@ -298,8 +298,7 @@ def test_missing_file_loads_empty(client):
 
 def test_custom_keywords_in_detection(client, tmp_path):
     """Custom system keywords should participate in auto-detection."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
+    from tests.conftest import make_pdf
 
     # Create a custom system
     client.post("/api/custom-game-systems", json={
@@ -308,12 +307,10 @@ def test_custom_keywords_in_detection(client, tmp_path):
     })
 
     # Create a PDF in a "Mothership" folder
-    mothership_dir = tmp_path / "Mothership"
-    mothership_dir.mkdir()
-    pdf_path = mothership_dir / "panic_engine.pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.drawString(72, 750, "Welcome to the Mothership RPG sci-fi horror experience.")
-    c.save()
+    pdf_path = make_pdf(
+        tmp_path / "Mothership" / "panic_engine.pdf",
+        "Welcome to the Mothership RPG sci-fi horror experience.",
+    )
 
     # Index the file — should auto-detect "Mothership"
     client.post("/api/index-files", json={

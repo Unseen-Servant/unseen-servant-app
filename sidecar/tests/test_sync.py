@@ -16,7 +16,7 @@ from legend_lore.service import (
     IndexManifest,
     ManifestEntry,
 )
-from tests.conftest import run_sync
+from tests.conftest import make_pdf, run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -368,9 +368,7 @@ def test_sync_update_with_fewer_chunks_removes_orphans(
     assert count_before > 2  # Should have multiple chunks
 
     # Rewrite the PDF with much less text (fewer chunks)
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.drawString(72, 750, "Short book now.")
-    c.save()
+    make_pdf(pdf_path, "Short book now.")
 
     # Force mtime mismatch so sync detects a modification
     manifest_raw = json.loads((tmp_path / MANIFEST_FILENAME).read_text())

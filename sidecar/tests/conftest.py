@@ -175,23 +175,23 @@ def seed_parents(store, embed_fn, n: int) -> None:
     ) for i in range(n)], game_system="5e")
 
 
-def _marker_pdf(path, marker: str) -> None:
-    """Tiny one-page PDF whose text contains a distinguishing marker."""
+def make_pdf(path, *lines):
+    """A one-page PDF with each line drawn below the last (no lines: a
+    page with no text layer). Creates missing parent folders."""
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
 
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=letter)
-    text = c.beginText(72, 720)
-    for line in (
-        f"{marker} dragon bestiary",
-        "The dragon guards its lair.",
-        "Armor Class: 15",
-    ):
-        text.textLine(line)
-    c.drawText(text)
-    c.showPage()
+    for i, line in enumerate(lines):
+        c.drawString(72, 750 - 15 * i, line)
     c.save()
+    return path
+
+
+def _marker_pdf(path, marker: str) -> None:
+    """Tiny one-page PDF whose text contains a distinguishing marker."""
+    make_pdf(path, f"{marker} dragon bestiary", "The dragon guards its lair.", "Armor Class: 15")
 
 
 @pytest.fixture
@@ -218,12 +218,6 @@ def sample_pdf_path(tmp_path):
     tmp_path is a pytest built-in — a temporary directory that gets
     cleaned up automatically after the test.
     """
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    pdf_path = tmp_path / "dragonbane_monsters.pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-
     text_content = (
         "Fire Drake\n"
         "Armor Class: 14\n"
@@ -234,14 +228,7 @@ def sample_pdf_path(tmp_path):
         "They are territorial and will attack intruders on sight. "
         "Weakness: vulnerable to cold damage."
     )
-
-    y = 750
-    for line in text_content.split("\n"):
-        c.drawString(72, y, line)
-        y -= 15
-
-    c.save()
-    return pdf_path
+    return make_pdf(tmp_path / "dragonbane_monsters.pdf", *text_content.split("\n"))
 
 
 @pytest.fixture
@@ -252,13 +239,7 @@ def empty_pdf_path(tmp_path):
     extract text from images without OCR, so the sidecar should
     handle this gracefully rather than crashing.
     """
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    pdf_path = tmp_path / "scanned_module.pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.save()
-    return pdf_path
+    return make_pdf(tmp_path / "scanned_module.pdf")
 
 
 @pytest.fixture
@@ -311,14 +292,10 @@ def special_chars_pdf_path(tmp_path):
     These can break URL encoding, filesystem operations,
     and ChromaDB chunk IDs.
     """
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    pdf_path = tmp_path / "D&D 5E - Player's Guide (2024).pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.drawString(72, 750, "This is the player's guide to dragons and dungeons.")
-    c.save()
-    return pdf_path
+    return make_pdf(
+        tmp_path / "D&D 5E - Player's Guide (2024).pdf",
+        "This is the player's guide to dragons and dungeons.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -328,41 +305,22 @@ def special_chars_pdf_path(tmp_path):
 @pytest.fixture
 def dnd5e_pdf_path(tmp_path):
     """PDF in a D&D 5E folder for game system detection testing."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    dnd_dir = tmp_path / "D&D 5E"
-    dnd_dir.mkdir()
-    pdf_path = dnd_dir / "player_handbook.pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.drawString(72, 750, "Character creation rules for heroes and adventurers.")
-    c.save()
-    return pdf_path
+    return make_pdf(
+        tmp_path / "D&D 5E" / "player_handbook.pdf",
+        "Character creation rules for heroes and adventurers.",
+    )
 
 
 @pytest.fixture
 def dragonbane_pdf_path(tmp_path):
     """PDF in a Dragonbane folder for game system detection testing."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    db_dir = tmp_path / "Dragonbane"
-    db_dir.mkdir()
-    pdf_path = db_dir / "dragonbane_core.pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.drawString(72, 750, "Welcome to the Misty Vale, a land of adventure.")
-    c.save()
-    return pdf_path
+    return make_pdf(
+        tmp_path / "Dragonbane" / "dragonbane_core.pdf",
+        "Welcome to the Misty Vale, a land of adventure.",
+    )
 
 
 @pytest.fixture
 def untagged_pdf_path(tmp_path):
     """PDF in a generic folder with no game system hints."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    pdf_path = tmp_path / "random_supplement.pdf"
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
-    c.drawString(72, 750, "A collection of random tables for any game.")
-    c.save()
-    return pdf_path
+    return make_pdf(tmp_path / "random_supplement.pdf", "A collection of random tables for any game.")

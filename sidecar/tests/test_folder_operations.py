@@ -8,7 +8,7 @@ all indexed PDFs under that folder — transferring chunks without re-embedding
 
 
 from legend_lore.service import COLLECTIONS_FILENAME
-from tests.conftest import index_pdfs, read_manifest
+from tests.conftest import index_pdfs, make_pdf, read_manifest
 
 
 # ---------------------------------------------------------------------------
@@ -106,25 +106,10 @@ def test_folder_rename_preserves_chunk_count(client, sample_pdf_path, tmp_path):
 
 def test_folder_rename_nested_subfolders(client, tmp_path):
     """Files in nested subfolders should all be updated."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
     # Create nested structure: parent/sub1/a.pdf, parent/sub2/b.pdf
     parent = tmp_path / "library"
-    sub1 = parent / "sub1"
-    sub2 = parent / "sub2"
-    sub1.mkdir(parents=True)
-    sub2.mkdir(parents=True)
-
-    pdf_a = sub1 / "book_a.pdf"
-    c = canvas.Canvas(str(pdf_a), pagesize=letter)
-    c.drawString(72, 750, "Content for book A about elves and forests.")
-    c.save()
-
-    pdf_b = sub2 / "book_b.pdf"
-    c = canvas.Canvas(str(pdf_b), pagesize=letter)
-    c.drawString(72, 750, "Content for book B about dwarves and mines.")
-    c.save()
+    pdf_a = make_pdf(parent / "sub1" / "book_a.pdf", "Content for book A about elves and forests.")
+    pdf_b = make_pdf(parent / "sub2" / "book_b.pdf", "Content for book B about dwarves and mines.")
 
     index_pdfs(client, pdf_a, pdf_b)
 
