@@ -453,9 +453,9 @@ enum SyncEvent {
 }
 
 /// What one sync-stream frame means to the app: progress to relay, the
-/// final result, or nothing (`error` frames — failures reach the UI through
-/// the result's `errors`). A `complete` that doesn't deserialize is an
-/// error, not a sync that ended without a result.
+/// final result (failures reach the UI through its `errors`), or nothing
+/// for an event this build doesn't know. A `complete` that doesn't
+/// deserialize is an error, not a sync that ended without a result.
 fn sync_event(json: &serde_json::Value) -> Result<Option<SyncEvent>, String> {
     let count = |key: &str| json[key].as_u64().unwrap_or(0) as u32;
     let text = |key: &str| json[key].as_str().unwrap_or("").to_string();
@@ -1312,9 +1312,9 @@ mod tests {
     }
 
     #[test]
-    fn sync_event_ignores_other_events() {
-        let error = serde_json::json!({"event": "error", "file": "x.pdf", "message": "boom"});
-        assert!(matches!(sync_event(&error), Ok(None)));
+    fn sync_event_ignores_unknown_events() {
+        let unknown = serde_json::json!({"event": "something-new", "file": "x.pdf"});
+        assert!(matches!(sync_event(&unknown), Ok(None)));
     }
 
     #[test]

@@ -372,7 +372,6 @@ def build_router(
                 err_msg = str(e)
                 errors.append(err_msg)
                 files_done += 1
-                yield {"event": "error", "file": pdf_path.name, "message": err_msg, "phase": "add"}
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
                 continue
 
@@ -410,7 +409,6 @@ def build_router(
                 errors.append(error)
                 files_done += 1
                 _mark_manifest_error(manifest, data_dir, entry["path"], error)
-                yield {"event": "error", "file": pdf_path.name, "message": error, "phase": "update"}
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
                 continue
 
@@ -429,7 +427,6 @@ def build_router(
                 errors.append(err_msg)
                 files_done += 1
                 _mark_manifest_error(manifest, data_dir, entry["path"], err_msg)
-                yield {"event": "error", "file": pdf_path.name, "message": err_msg, "phase": "update"}
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
                 continue
 
