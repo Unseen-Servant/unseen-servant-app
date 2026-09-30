@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { holdsQuery, mentionAt, removeMention, stripMentions } from './mention';
+import { holdsQuery, mentionAt, removeMention, searchText, stripMentions, viewFilter } from './mention';
 
 describe('mentionAt', () => {
   test('finds the @-word around the caret', () => {
@@ -58,5 +58,39 @@ describe('holdsQuery', () => {
     expect(holdsQuery('@mon troll')).toBe(true);
     expect(holdsQuery('troll @mon')).toBe(true);
     expect(holdsQuery('a@b')).toBe(true);
+  });
+
+  test('false while the bar is a / filter', () => {
+    expect(holdsQuery('/')).toBe(false);
+    expect(holdsQuery('/dragon')).toBe(false);
+    expect(holdsQuery('@mon /dragon')).toBe(false);
+  });
+});
+
+describe('viewFilter', () => {
+  test('a leading / makes the rest of the bar a filter', () => {
+    expect(viewFilter('/')).toBe('');
+    expect(viewFilter('/dragon mag')).toBe('dragon mag');
+    expect(viewFilter('  /dragon')).toBe('dragon');
+  });
+
+  test('@-words are not part of the filter, wherever they sit', () => {
+    expect(viewFilter('/dragon @mon')).toBe('dragon ');
+    expect(viewFilter('@mon /dragon')).toBe('dragon');
+  });
+
+  test('null for a search, including a / inside it', () => {
+    expect(viewFilter('')).toBeNull();
+    expect(viewFilter('troll')).toBeNull();
+    expect(viewFilter('1/2 cover')).toBeNull();
+    expect(viewFilter('troll /regen')).toBeNull();
+  });
+});
+
+describe('searchText', () => {
+  test('the query without @-words, or nothing for a filter', () => {
+    expect(searchText('troll @mon')).toBe('troll ');
+    expect(searchText('/dragon')).toBe('');
+    expect(searchText('@mon /dragon')).toBe('');
   });
 });

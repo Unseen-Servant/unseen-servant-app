@@ -600,6 +600,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             legend_lore::select_folder,
             legend_lore::list_files,
+            legend_lore::list_tree,
             legend_lore::count_pdfs_recursive,
             legend_lore::rename_file,
             legend_lore::delete_file,

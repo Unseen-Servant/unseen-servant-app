@@ -11,6 +11,7 @@
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import { BOOK, CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
+  import { markName } from './nameFilter';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -42,6 +43,9 @@
   // Includes ancestor folders of every shown file so the tree structure
   // remains intact.
   export let displayPaths: Set<string> | null = null;
+  // The bar's / filter, as words (empty = off). Only marks what matched —
+  // displayPaths already carries which rows the filter keeps.
+  export let filterWords: string[] = [];
 
   // User-hidden files/folders. Stores explicit hides; descendants of a
   // hidden folder are hidden via prefix match. When `showHidden` is true,
@@ -342,7 +346,7 @@
           use:autofocus
         />
       {:else}
-        <span class="name">{item.name}</span>
+        <span class="name">{#each markName(item.name, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
       {/if}
     </button>
 
@@ -433,6 +437,7 @@
           {onRenameSubmit}
           {onRenameCancel}
           {displayPaths}
+          {filterWords}
           {hiddenPaths}
           {showHidden}
           {soloedScopePaths}
@@ -577,6 +582,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* What the / filter matched — the same mark the search rows use. */
+  .hit {
+    color: var(--text-accent);
   }
   .rename-input {
     background: var(--bg-container);

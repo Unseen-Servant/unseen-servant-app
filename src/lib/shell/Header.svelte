@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { chord, chordHint } from './keybindings';
-  import { holdsQuery, mentionAt, removeMention, stripMentions, type Mention } from './mention';
+  import { holdsQuery, mentionAt, removeMention, searchText, viewFilter, type Mention } from './mention';
 
   export let searchQuery: string = '';
   export let disabled: boolean = false;
@@ -46,9 +46,10 @@
   let inputEl: HTMLInputElement | null = null;
   let focused = false;
   let mention: Mention | null = null;
-  // The query as last handed to the page, @-words stripped. Typing inside a
-  // mention leaves it unchanged, and then nothing is re-searched.
-  let dispatched = stripMentions(searchQuery);
+  // The query as last handed to the page, @-words stripped (and empty while
+  // the bar is a / filter). Typing inside a mention leaves it unchanged, and
+  // then nothing is re-searched.
+  let dispatched = searchText(searchQuery);
 
   export function focus() {
     inputEl?.focus();
@@ -82,7 +83,7 @@
   function handleInput() {
     syncMention();
     if (holdsQuery(searchQuery)) onQuery();
-    const current = stripMentions(searchQuery);
+    const current = searchText(searchQuery);
     if (current === dispatched) return;
     dispatched = current;
     clearDebounce();
@@ -108,10 +109,12 @@
         return;
       }
     }
-    if (e.key === 'Enter') {
+    // A / filter has nothing to submit: its ↵ goes on to the page, which
+    // drops it into the first match.
+    if (e.key === 'Enter' && viewFilter(searchQuery) === null) {
       e.preventDefault();
       clearDebounce();
-      onSubmit(stripMentions(searchQuery));
+      onSubmit(searchText(searchQuery));
     }
     // Escape is handled by the page-level ladder: it steps the search
     // view closed and never clears the query — × is the only clear.
@@ -214,13 +217,14 @@
     </svg>
     <!-- The search field only ever holds the query — narrowings (solos
          and mutes on either axis) live as chips in the scope bar. An
-         @-word is on its way to becoming one: it is never searched. -->
+         @-word is on its way to becoming one: it is never searched. Nor is
+         a bar that leads with /: that is a name filter on the browse view. -->
     <input
       bind:this={inputEl}
       bind:value={searchQuery}
       class="search-input"
       type="text"
-      placeholder="Search the library, or @ a collection…"
+      placeholder="Search the library, @ a collection, / to filter…"
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}

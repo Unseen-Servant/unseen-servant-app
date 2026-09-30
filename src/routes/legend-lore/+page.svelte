@@ -50,6 +50,8 @@
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
   import { filterByQuery, playOnly, stepPick, transportNames } from '../../lib/legend-lore/collectionOrder';
   import { menuSlotHeld } from '../../lib/shell/menuSlot';
+  import { viewFilter } from '../../lib/shell/mention';
+  import { filterTree, filterWords, nameMatches } from '../../lib/legend-lore/nameFilter';
   import {
     parseString,
     parseBoolean,
@@ -64,6 +66,22 @@
   let selectedPaths = new Set<string>;
   let syncedPaths = new Set<string>;
   let expandedPaths = new Set<string>();
+  // The whole library, every level down — the / filter has to see inside
+  // folders nobody has opened, and `files` only holds what has been. Walked
+  // on the filter's first keystroke in the tree, and again after every
+  // reload while the filter is up; the last walk stays on screen until the
+  // next lands, so a background check never blinks the tree unfiltered.
+  // fullTreeWalk tells a live walk from one a reload has overtaken (0 = walk
+  // again when next needed); fullTreeRoot keeps another folder's walk out.
+  let fullTree: FileItem[] | null = null;
+  let fullTreeRoot = '';
+  let fullTreeWalk = 0;
+  let fullTreeSeq = 0;
+  // Folds as they stood before the filter opened its own; handed back when
+  // it ends. Never persisted, like the rest of the expansion state.
+  // filterFoldsFor is the words the current folds were opened for.
+  let expandedBeforeFilter: Set<string> | null = null;
+  let filterFoldsFor: string | null = null;
   let error = '';
 
   let totalFilesFound = 0;
@@ -306,6 +324,14 @@
   // ladder). Never persisted — the app launches into the browse
   // view. searchActive (committed query) keeps meaning "has a query".
   let searchViewOpen = false;
+  // A bar that leads with / is a name filter on the browse view, not a
+  // search (mention.ts). It lives exactly as long as that text in the bar:
+  // focus can leave, × or Esc in the bar ends it. Typing one steps out of
+  // the search view — the filter narrows the tree or systems view, so that
+  // has to be what's on screen.
+  $: nameFilter = viewFilter(searchQuery);
+  $: filterWordList = nameFilter === null ? [] : filterWords(nameFilter);
+  $: if (nameFilter !== null) searchViewOpen = false;
   let searchResults: SearchResultItem[] = [];
   // Tracks which query produced the rows currently in `searchResults`.
   // Used to distinguish a fresh search-in-flight (committedQuery !==
@@ -1442,7 +1468,9 @@
       // breaking keyboard nav for any focus inside an expanded folder.
       // Sort shallowest-first so a child can find its parent populated.
       // Splits on both separators so Windows paths (\\) sort correctly too.
-      const sortedExpanded = Array.from(expandedPaths)
+      // Under a / filter the tree renders from the walk, so only the folds
+      // the filter will hand back need loading here.
+      const sortedExpanded = Array.from(expandedBeforeFilter ?? expandedPaths)
         .sort((a, b) => a.split(/[/\\]/).length - b.split(/[/\\]/).length);
       for (const expandedPath of sortedExpanded) {
         const node = findTreeNode(newFiles, expandedPath);
@@ -1456,6 +1484,7 @@
         }
       }
       files = newFiles;
+      fullTreeWalk = 0;
       error = '';
       refreshTotalFilesFound();
       if (missingFolderToastId) {
@@ -1465,6 +1494,8 @@
     } catch (e) {
       error = String(e);
       files = [];
+      fullTree = null;
+      fullTreeWalk = 0;
       totalFilesFound = 0;
     }
   }
@@ -1764,9 +1795,51 @@
     return new Set<string>([...baseFiles, ...computeAncestorPaths(baseFiles)]);
   })();
 
+  // The / filter in the tree: walk the whole library once, then keep the
+  // rows filterTree picks and open the folders on the way to each match.
+  // Until the walk lands the tree shows as it is — a blink on a local disk.
+  $: treeFiltering = filterWordList.length > 0 && viewMode === 'tree' && !!selectedFolder;
+  $: if (treeFiltering && fullTreeWalk === 0) void loadFullTree(selectedFolder);
+  $: treeFilter = treeFiltering && fullTree && fullTreeRoot === selectedFolder
+    ? filterTree(fullTree, filterWordList)
+    : null;
+  $: syncFilterFolds(treeFilter, filterWordList.join(' '));
+  $: treeRoots = treeFilter && fullTree ? fullTree : files;
+  $: treeDisplayPaths = treeFilter ? treeFilter.show : displayPaths;
+
+  async function loadFullTree(folder: string) {
+    const walk = ++fullTreeSeq;
+    fullTreeWalk = walk;
+    try {
+      const tree = await invoke<FileItem[]>('list_tree', { folderPath: folder });
+      if (fullTreeWalk === walk) { fullTree = tree; fullTreeRoot = folder; }
+    } catch (e) {
+      console.error('Failed to walk the library:', e);
+      if (fullTreeWalk === walk) { fullTree = files; fullTreeRoot = folder; }
+    }
+  }
+
+  // Each change of words re-opens the way to every match; folding while
+  // filtering lasts until the next keystroke, and a fresh walk of the same
+  // words leaves the folds alone. The folds from before come back when the
+  // filter ends.
+  function syncFilterFolds(filter: typeof treeFilter, words: string) {
+    if (filter) {
+      if (expandedBeforeFilter === null) expandedBeforeFilter = expandedPaths;
+      if (words !== filterFoldsFor) {
+        expandedPaths = new Set(filter.open);
+        filterFoldsFor = words;
+      }
+    } else if (expandedBeforeFilter !== null) {
+      expandedPaths = expandedBeforeFilter;
+      expandedBeforeFilter = null;
+      filterFoldsFor = null;
+    }
+  }
+
   // Flat list of currently-visible tree rows for keyboard nav. Mirrors what
   // FileTree renders, so consecutive entries here are visually adjacent.
-  $: visibleTreeRows = computeVisibleRows(files, expandedPaths, displayPaths, hiddenPaths, showHidden, {
+  $: visibleTreeRows = computeVisibleRows(treeRoots, expandedPaths, treeDisplayPaths, hiddenPaths, showHidden, {
     scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope,
   }, {
     indexedPaths, indexedFolderPaths, selectedPaths, foldersWithSelections, hideUnindexed,
@@ -1865,7 +1938,8 @@
       expandedPaths.delete(path);
       expandedPaths = expandedPaths;
     } else {
-      await ensureChildrenLoaded(path);
+      // Under the filter the walked tree already holds every level.
+      if (!treeFilter) await ensureChildrenLoaded(path);
       expandedPaths.add(path);
       expandedPaths = expandedPaths;
     }
@@ -1957,6 +2031,18 @@
       ? lastFocusedFilePath
       : visibleTreeRows[0].path;
     focusTreeRow(restore);
+  }
+
+  // ↓ or ↵ out of a / filter lands on the first row it matched, not back
+  // where the caret was — that row may be anywhere, or filtered away.
+  function focusFirstMatch() {
+    if (focusedFilePath !== null) return;
+    if (viewMode === 'systems') {
+      systemsViewComponent?.claim(null);
+      return;
+    }
+    const row = visibleTreeRows.find((r) => nameMatches(r.item.name, filterWordList)) ?? visibleTreeRows[0];
+    if (row) focusTreeRow(row.path);
   }
 
   // A mousedown on the file pane's empty or non-selectable space — the scope
@@ -2196,8 +2282,10 @@
   //   2. Inline rename in flight         → cancel
   //   3. Competing popover               → its own handler
   //   4. Search view, focus not in bar   → focus the search bar
-  //   5. Focus in bar                    → leave to the browse view
-  //   6. Focused tree row                → clear focus
+  //   5. Focus in bar                    → drop a / filter, else leave to
+  //                                         the browse view
+  //   6. Row under a / filter            → focus the search bar
+  //   7. Focused tree row                → clear focus
   //   (modal Esc handled by Modal.svelte; the docked filter panel claims
   //   its own Esc while focus is inside it)
 
@@ -2260,12 +2348,23 @@
         // Esc funnels to the bar.
         return;
       }
-      // The bar outside the search view (nothing typed yet, or an @-pick
-      // just dropped): hand focus back to the rows it sits above.
+      // The bar outside the search view. A / filter goes first, the way an
+      // @-word does; then focus goes back to the rows the bar sits above.
       if (inSearchInput) {
         event.preventDefault();
+        if (nameFilter !== null) {
+          searchQuery = '';
+          return;
+        }
         (target as HTMLInputElement).blur();
         focusFileRegion();
+        return;
+      }
+      // Rows under a / filter funnel to the bar, as the search view's do —
+      // the filter is edited, and ended, there.
+      if (nameFilter !== null && activePane === 'files' && !inAnyInput) {
+        event.preventDefault();
+        headerComponent?.focus();
         return;
       }
       if (focusedFilePath) { focusedFilePath = null; }
@@ -2506,12 +2605,16 @@
 
     // ↓ from the bar outside the search view drops into the browse view's
     // rows — the same move that takes the search view into its results.
-    if (inSearchInput && !searchViewOpen && selectedFolder && event.key === 'ArrowDown'
+    // Under a / filter ↵ does too (there is nothing to submit), and both
+    // land on the first match.
+    if (inSearchInput && !searchViewOpen && selectedFolder
+        && (event.key === 'ArrowDown' || (event.key === 'Enter' && nameFilter !== null))
         && !meta && !event.altKey && !event.shiftKey && !event.isComposing
         && activePane === 'files') {
       event.preventDefault();
       (target as HTMLInputElement).blur();
-      focusFileRegion();
+      if (nameFilter !== null) focusFirstMatch();
+      else focusFileRegion();
       return;
     }
 
@@ -3797,6 +3900,7 @@
             bind:this={systemsViewComponent}
             entries={indexedEntries}
             {displayPaths}
+            filterWords={filterWordList}
             {scopeBrightPaths}
             {hideOutOfScope}
             {scopeBypassed}
@@ -3832,8 +3936,10 @@
             <div class="scope-empty">Everything is out of scope.</div>
           {:else if hideUnindexed && indexedPaths.size === 0 && selectedPaths.size === 0}
             <div class="scope-empty">Nothing in the library yet.</div>
+          {:else if treeFilter && treeFilter.show.size === 0}
+            <div class="scope-empty">No folder or file name matches.</div>
           {/if}
-          {#each files as file (file.path)}
+          {#each treeRoots as file (file.path)}
             <FileTree
               item={file}
               level={0}
@@ -3852,7 +3958,8 @@
               {renamingFilePath}
               onRenameSubmit={handleRenameSubmit}
               onRenameCancel={handleRenameCancel}
-              {displayPaths}
+              displayPaths={treeDisplayPaths}
+              filterWords={filterWordList}
               {hiddenPaths}
               {showHidden}
               {soloedScopePaths}

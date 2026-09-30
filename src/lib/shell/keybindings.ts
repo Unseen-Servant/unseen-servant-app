@@ -80,6 +80,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Search input
   { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Submit search',                scope: 'searchInput' },
   { id: 'search.mention',        keys: { mac: '@',    other: '@' },             label: 'Pick a collection to play — ↵ plays it alone, ⇧↵ adds it to the mix', scope: 'searchInput' },
+  { id: 'search.filter',         keys: { mac: '/',    other: '/' },             label: 'Lead with / to filter the tree or systems view by name — ↓ or ↵ jumps to the first match', scope: 'searchInput' },
   { id: 'search.intoResults',    keys: { mac: '↓',    other: '↓' },             label: 'Move focus into results, or the browse view', scope: 'searchInput' },
   { id: 'search.exit',           keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave search — back to browse view', scope: 'searchInput' },
 

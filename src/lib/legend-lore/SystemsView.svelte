@@ -14,6 +14,7 @@
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import { BOOK, CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
+  import { markName, markPath, nameMatches, pathMatches } from './nameFilter';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -59,6 +60,11 @@
 
   // Same scope/filter narrowing as the tree view. null = no narrowing.
   export let displayPaths: Set<string> | null = null;
+
+  // The bar's / filter, as words (empty = off). A group is this view's
+  // folder: one whose name matches keeps all its files; otherwise a file
+  // stays under it by its own name or a folder on its path.
+  export let filterWords: string[] = [];
 
   // DAW-style channel state, shared with the filter menu. Muted (excluded)
   // groups stay visible but dim — hiding them would take the M button
@@ -157,6 +163,20 @@
 
   // Section collapse state — transient (not persisted).
   let collapsed = new Set<string>();
+  // A filter opens every group so its matches are on screen, and hands the
+  // folds back when it ends. Folding while filtering lasts until the next
+  // keystroke re-opens them.
+  let collapsedBeforeFilter: Set<string> | null = null;
+  $: syncFilterFolds(filterWords);
+  function syncFilterFolds(words: string[]) {
+    if (words.length > 0) {
+      if (collapsedBeforeFilter === null) collapsedBeforeFilter = collapsed;
+      collapsed = new Set();
+    } else if (collapsedBeforeFilter !== null) {
+      collapsed = collapsedBeforeFilter;
+      collapsedBeforeFilter = null;
+    }
+  }
 
   $: groups = (() => {
     const byTag = new Map<string, FileStatusEntry[]>();
@@ -168,7 +188,9 @@
         : (e.game_system && e.game_system !== 'unknown' ? [e.game_system] : ['Untagged']);
       // A multi-tagged file appears under every group it belongs to.
       // Muted groups are kept (marked, dimmed below) — never hidden.
+      const pathHit = filterWords.length > 0 && pathMatches(e.path, libraryRoot, filterWords);
       for (const tag of tags) {
+        if (filterWords.length > 0 && !pathHit && !nameMatches(tag, filterWords)) continue;
         const list = byTag.get(tag) ?? [];
         list.push(e);
         byTag.set(tag, list);
@@ -641,7 +663,10 @@
       const i = navRows.findIndex((v) => v.path === preferred);
       if (i >= 0) { setFocusedIdx(i); return; }
     }
-    setFocusedIdx(0);
+    // Under a filter every file row is there for a reason; land on the
+    // first rather than on its group's header.
+    const first = filterWords.length > 0 ? navRows.findIndex((v) => v.entry !== null) : -1;
+    setFocusedIdx(Math.max(first, 0));
   }
 </script>
 
@@ -699,7 +724,7 @@
                 </svg>
               </span>
             {/if}
-            <span class="group-name ledger-label">{group.tag}</span>
+            <span class="group-name ledger-label">{#each markName(group.tag, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
           </button>
           <span class="head-cluster">
             <span class="sm">
@@ -783,11 +808,11 @@
                     use:autofocus
                   />
                 {:else}
-                  <span class="file-name">{entry.filename}</span>
+                  <span class="file-name">{#each markName(entry.filename, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
                 {/if}
                 {#if relParent}
                   <span class="file-sep" aria-hidden="true">·</span>
-                  <span class="file-path" title={entry.path}>{relParent}</span>
+                  <span class="file-path" title={entry.path}>{#each markPath(relParent, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
                 {/if}
                 {#if ribbons.length > 0}
                   <span class="ribbons" title={ribbons.map((r) => r.name).join(', ')}>
@@ -919,6 +944,14 @@
   .group-name {
     flex: 1;
     color: inherit;
+  }
+  /* What the / filter matched — the same mark the search rows use. The
+     group label is brass already, so there the mark brightens instead. */
+  .hit {
+    color: var(--text-accent);
+  }
+  .group-name .hit {
+    color: var(--text-primary);
   }
 
   /* S/M clusters — always drawn. A mixer's channel switches are simply on

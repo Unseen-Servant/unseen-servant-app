@@ -48,9 +48,23 @@ export function stripMentions(value: string): string {
   return out;
 }
 
-/** Whether the bar holds anything to search once its @-words are out. The
- *  first keystroke that makes this true is what opens the search view —
- *  an @-pick alone plays out over the browse view. */
+/** A bar that leads with `/` (once its @-words are out) is not a search
+ *  but a name filter on the browse view. Its text after the `/`, or null
+ *  when the bar is a search. */
+export function viewFilter(value: string): string | null {
+  const s = stripMentions(value).trimStart();
+  return s.startsWith('/') ? s.slice(1) : null;
+}
+
+/** What the bar searches for: the query without its @-words, and nothing
+ *  at all while the bar is a filter. */
+export function searchText(value: string): string {
+  return viewFilter(value) === null ? stripMentions(value) : '';
+}
+
+/** Whether the bar holds anything to search. The first keystroke that
+ *  makes this true is what opens the search view — an @-pick or a `/`
+ *  filter plays out over the browse view. */
 export function holdsQuery(value: string): boolean {
-  return stripMentions(value).trim() !== '';
+  return searchText(value).trim() !== '';
 }

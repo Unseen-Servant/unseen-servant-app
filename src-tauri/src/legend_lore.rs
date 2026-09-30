@@ -404,6 +404,19 @@ pub fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
     Ok(items)
 }
 
+/// `list_files` all the way down: every folder carries its children. The
+/// search bar's `/` filter needs names inside folders nobody has opened.
+/// Symlinked folders aren't followed (`list_files` doesn't list them as
+/// folders), so the walk can't loop.
+#[tauri::command]
+pub fn list_tree(folder_path: String) -> Result<Vec<FileItem>, String> {
+    let mut items = list_files(folder_path)?;
+    for item in items.iter_mut().filter(|i| i.is_dir) {
+        item.children = Some(list_tree(item.path.clone()).unwrap_or_default());
+    }
+    Ok(items)
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands — indexing (calls the Python sidecar via HTTP)
 // ---------------------------------------------------------------------------
@@ -1316,6 +1329,30 @@ mod tests {
 
         assert!(list_files(file.to_string_lossy().into_owned()).is_err());
         assert!(list_files(dir.join("missing").to_string_lossy().into_owned()).is_err());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn list_tree_fills_every_folder_with_its_listing() {
+        let dir = scratch_dir("list-tree");
+        fs::create_dir_all(dir.join("Core/Deep")).unwrap();
+        fs::create_dir(dir.join("Empty")).unwrap();
+        for f in ["Core/b.pdf", "Core/Deep/c.PDF", "Core/notes.txt", "a.pdf"] {
+            fs::write(dir.join(f), b"").unwrap();
+        }
+
+        let items = list_tree(dir.to_string_lossy().into_owned()).unwrap();
+
+        let names: Vec<&str> = items.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["Core", "Empty", "a.pdf"]);
+        let core = items[0].children.as_ref().unwrap();
+        let core_names: Vec<&str> = core.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(core_names, vec!["Deep", "b.pdf"]);
+        let deep = core[0].children.as_ref().unwrap();
+        assert_eq!(deep[0].path, ui_path(&dir.join("Core/Deep/c.PDF")));
+        assert!(deep[0].children.is_none());
+        assert!(items[1].children.as_ref().unwrap().is_empty());
+        assert!(items[2].children.is_none());
         fs::remove_dir_all(&dir).unwrap();
     }
 
