@@ -5,6 +5,7 @@ import {
   hasSelectableDescendants,
   computeAncestorPaths,
   checkboxState,
+  renamePathKeys,
 } from './selectionUtils';
 
 // --- Helpers ---
@@ -281,5 +282,27 @@ describe('checkboxState', () => {
 
   it('file not selected → unchecked', () => {
     expect(stateFor(file('a.pdf', '/root'), new Set())).toEqual({ isChecked: false, isIndeterminate: false });
+  });
+});
+
+// =====================================================================
+// renamePathKeys
+// =====================================================================
+
+describe('renamePathKeys', () => {
+  it('moves the renamed path itself, so an expanded folder stays expanded', () => {
+    expect(renamePathKeys(new Set(['/lib/Core']), '/lib/Core', '/lib/Rules')).toEqual(new Set(['/lib/Rules']));
+  });
+
+  it('moves every descendant', () => {
+    const paths = new Set(['/lib/Core/sub', '/lib/Core/sub/a.pdf', '/lib/Core/b.pdf']);
+    expect(renamePathKeys(paths, '/lib/Core', '/lib/Rules')).toEqual(
+      new Set(['/lib/Rules/sub', '/lib/Rules/sub/a.pdf', '/lib/Rules/b.pdf']),
+    );
+  });
+
+  it('leaves siblings whose name merely starts the same', () => {
+    const paths = new Set(['/lib/Core Rules', '/lib/Core Rules/a.pdf', '/lib/Other']);
+    expect(renamePathKeys(paths, '/lib/Core', '/lib/Rules')).toEqual(paths);
   });
 });

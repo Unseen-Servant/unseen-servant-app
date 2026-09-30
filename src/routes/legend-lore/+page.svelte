@@ -28,7 +28,7 @@
   import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
   import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
-  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn } from '../../lib/legend-lore/selectionUtils';
+  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn, renamePathKeys } from '../../lib/legend-lore/selectionUtils';
   import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, visibleFileSpan, type VisibleRow } from '../../lib/legend-lore/treeNav';
   import { materializeKey } from '../../lib/shell/paneFocus';
   import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
@@ -2761,19 +2761,9 @@
     }
   }
 
-  function updatePathPrefix(paths: Set<string>, oldPrefix: string, newPrefix: string): Set<string> {
-    const childPrefix = oldPrefix + '/';
-    const updated = new Set<string>();
-    for (const p of paths) {
-      updated.add(p.startsWith(childPrefix) ? newPrefix + p.slice(oldPrefix.length) : p);
-    }
-    return updated;
-  }
-
-  // Path solo/mute migration for renames — unlike updatePathPrefix (which
-  // only re-keys descendants), a scope ref can be keyed exactly at the
-  // renamed path itself, so that entry moves too and picks up the new
-  // basename as its label. Descendant entries (folder rename only) keep
+  // Path solo/mute migration for renames — like renamePathKeys, the entry
+  // keyed exactly at the renamed path moves too, and it also picks up the
+  // new basename as its label. Descendant entries (folder rename only) keep
   // their own basename — only their ancestor's segment of the path changed.
   function updateScopeRefMap(
     map: Map<string, ScopeRef>,
@@ -2803,9 +2793,12 @@
       let newPath: string;
       if (isDir) {
         newPath = await invoke<string>('rename_folder', { oldPath, newName });
-        selectedPaths = updatePathPrefix(selectedPaths, oldPath, newPath);
-        syncedPaths = updatePathPrefix(syncedPaths, oldPath, newPath);
-        expandedPaths = updatePathPrefix(expandedPaths, oldPath, newPath);
+        selectedPaths = renamePathKeys(selectedPaths, oldPath, newPath);
+        syncedPaths = renamePathKeys(syncedPaths, oldPath, newPath);
+        expandedPaths = renamePathKeys(expandedPaths, oldPath, newPath);
+        if (focusedFilePath !== null && (focusedFilePath === oldPath || focusedFilePath.startsWith(oldPath + '/'))) {
+          focusedFilePath = newPath + focusedFilePath.slice(oldPath.length);
+        }
       } else {
         newPath = await invoke<string>('rename_file', { oldPath, newName });
         if (focusedFilePath === oldPath) focusedFilePath = newPath;
@@ -2815,6 +2808,12 @@
           selectedPaths.add(newPath);
           selectedPaths = selectedPaths;
         }
+      }
+      // Hidden flags follow the rename, or the renamed folder or file
+      // reappears and its old path stays in settings for good.
+      if ([...hiddenPaths].some((p) => p === oldPath || p.startsWith(oldPath + '/'))) {
+        hiddenPaths = renamePathKeys(hiddenPaths, oldPath, newPath);
+        persistHidden();
       }
       // Scope solos/mutes follow the rename too — same treatment
       // renameCollection gives its name sets. Without this, a soloed

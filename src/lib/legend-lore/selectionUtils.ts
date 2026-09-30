@@ -93,3 +93,18 @@ export function checkboxState(
     isIndeterminate: foldersWithSelections.has(item.path) && !isFullySelected,
   };
 }
+
+/**
+ * Re-key a set of paths for a rename: `oldPath` itself and everything
+ * under it move to `newPath`. The path itself matters for folder-keyed
+ * state (an expanded or hidden folder); paths that merely share a name
+ * prefix ("/lib/Core Rules" for "/lib/Core") are left alone.
+ */
+export function renamePathKeys(paths: Set<string>, oldPath: string, newPath: string): Set<string> {
+  const childPrefix = oldPath + '/';
+  const updated = new Set<string>();
+  for (const p of paths) {
+    updated.add(p === oldPath || p.startsWith(childPrefix) ? newPath + p.slice(oldPath.length) : p);
+  }
+  return updated;
+}
