@@ -8,11 +8,12 @@ for the entire indexing duration. Real-world consequence: the frontend's
 facing "Add to index" / "Re-index" right-click actions look broken.
 
 The fix is to declare the endpoints as plain ``def`` so FastAPI runs them in
-a worker thread, leaving the event loop free.
+a worker thread, leaving the event loop free. The tests pin that as an
+ordering (the indexer waits for /health) rather than a wall-clock bound.
 """
 
 import asyncio
-import time
+import threading
 
 import httpx
 import pytest
@@ -21,25 +22,32 @@ from httpx import ASGITransport
 import server
 from legend_lore import router
 
-
-SLOW_S = 1.5
-HEALTH_DELAY_S = 0.2
+# How long the fake indexer waits for /health before giving up. Only a
+# blocked event loop ever reaches it; a passing run is released at once.
+GATE_TIMEOUT = 10.0
 
 
 @pytest.fixture
-def slow_app(monkeypatch, test_store, test_embed_fn, tmp_path):
-    """App where index_single_pdf sleeps for SLOW_S to simulate a real PDF."""
+def gate():
+    return {"entered": threading.Event(), "health_served": threading.Event(), "released": None}
 
-    def slow_index(pdf_path, store, embed_fn, **kwargs):
-        time.sleep(SLOW_S)
+
+@pytest.fixture
+def gated_app(monkeypatch, gate, test_store, test_embed_fn, tmp_path):
+    """App whose index_single_pdf parks until /health has been served.
+
+    It records whether /health released it (True) or it gave up waiting
+    (False) — which only happens when the endpoint runs on the event loop,
+    so /health can't be served until it returns.
+    """
+
+    def gated_index(pdf_path, store, embed_fn, **kwargs):
+        gate["entered"].set()
+        gate["released"] = gate["health_served"].wait(timeout=GATE_TIMEOUT)
         return 1, None, "unknown", []
 
-    monkeypatch.setattr(router, "index_single_pdf", slow_index)
-
-    app = server.create_app(
-        store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn,
-    )
-    return app
+    monkeypatch.setattr(router, "index_single_pdf", gated_index)
+    return server.create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
 
 
 @pytest.fixture
@@ -50,70 +58,51 @@ def dummy_pdf(tmp_path):
     return p
 
 
-async def _measure_health_during(app, slow_call):
-    """Fire ``slow_call`` and a /health request concurrently.
+async def _health_during(app, gate, slow_call):
+    """Start ``slow_call``; once its indexer is running, request /health.
 
-    Returns (health_response, when_health_returned_s, slow_response).
-
-    ``when_health_returned_s`` is wall time from the start of the gather to
-    when /health returned. If the event loop is blocked by the slow call,
-    /health can't return until the slow call finishes, so the value will be
-    >= SLOW_S. If the loop stays responsive, /health returns close to
-    HEALTH_DELAY_S after a small initial delay.
+    Ordering, not timing: /health is only requested after the indexer has
+    entered, so on a blocked loop it cannot be served until the indexer
+    has already given up. Returns (health_response, slow_response).
     """
+    loop = asyncio.get_running_loop()
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-        t_start = time.perf_counter()
-
-        async def health_after_delay():
-            await asyncio.sleep(HEALTH_DELAY_S)
-            response = await ac.get("/health")
-            return response, time.perf_counter() - t_start
-
-        slow_resp, (health_resp, when_returned) = await asyncio.gather(
-            slow_call(ac),
-            health_after_delay(),
-        )
-        return health_resp, when_returned, slow_resp
+        slow = asyncio.create_task(slow_call(ac))
+        entered = await loop.run_in_executor(None, gate["entered"].wait, GATE_TIMEOUT)
+        assert entered, "the endpoint never reached index_single_pdf"
+        health = await ac.get("/health")
+        gate["health_served"].set()
+        return health, await slow
 
 
-async def test_index_files_does_not_block_event_loop(slow_app, dummy_pdf):
+async def test_index_files_does_not_block_event_loop(gated_app, gate, dummy_pdf):
     """/health must respond during a slow /api/index-files call."""
 
     async def kick_index(ac):
-        return await ac.post(
-            "/api/index-files",
-            json={"paths": [str(dummy_pdf)]},
-            timeout=10.0,
-        )
+        return await ac.post("/api/index-files", json={"paths": [str(dummy_pdf)]}, timeout=30.0)
 
-    health, when_returned, index_resp = await _measure_health_during(slow_app, kick_index)
+    health, index_resp = await _health_during(gated_app, gate, kick_index)
 
     assert health.status_code == 200
     assert index_resp.status_code == 200
-    # /health must come back well before the slow indexing finishes.
-    # Generous bound: half the indexing duration.
-    assert when_returned < SLOW_S / 2, (
-        f"/health returned {when_returned:.2f}s after start while /api/index-files "
-        f"was blocking ({SLOW_S}s) — event loop is blocked."
+    assert gate["released"] is True, (
+        "/api/index-files held the event loop: /health was only served after "
+        "indexing gave up waiting for it."
     )
 
 
-async def test_reindex_file_does_not_block_event_loop(slow_app, dummy_pdf):
+async def test_reindex_file_does_not_block_event_loop(gated_app, gate, dummy_pdf):
     """/health must respond during a slow /api/reindex-file call."""
 
     async def kick_reindex(ac):
-        return await ac.post(
-            "/api/reindex-file",
-            json={"path": str(dummy_pdf)},
-            timeout=10.0,
-        )
+        return await ac.post("/api/reindex-file", json={"path": str(dummy_pdf)}, timeout=30.0)
 
-    health, when_returned, reindex_resp = await _measure_health_during(slow_app, kick_reindex)
+    health, reindex_resp = await _health_during(gated_app, gate, kick_reindex)
 
     assert health.status_code == 200
     assert reindex_resp.status_code == 200
-    assert when_returned < SLOW_S / 2, (
-        f"/health returned {when_returned:.2f}s after start while /api/reindex-file "
-        f"was blocking ({SLOW_S}s) — event loop is blocked."
+    assert gate["released"] is True, (
+        "/api/reindex-file held the event loop: /health was only served after "
+        "indexing gave up waiting for it."
     )
