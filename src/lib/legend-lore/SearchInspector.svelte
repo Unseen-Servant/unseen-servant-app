@@ -196,10 +196,10 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    /* The dock's ground: the plate above is --bg-container, so the pane
-       reads as a panel under its nameplate, like Collections and Filters.
-       Tables and code lift to --bg-container to stay set apart. */
-    background: var(--bg-app);
+    /* Vellum: warmer and lighter than the list's ground, and not the
+       plate's grey, so the text reads as its own surface under the plate.
+       Tables, code and the hit lane recess to --bg-app. */
+    background: var(--bg-vellum);
     border-left: 1px solid var(--border-subtle);
     font-family: var(--font-body);
     color: var(--text-primary);
@@ -229,22 +229,20 @@
   }
 
   /* The hit lane: the scrollbar widened from app.css's 8px to 14px and
-     lifted to the plate's --bg-container off the --bg-app page, so it
-     reads as its own strip — an overview of the section, like a plate on
-     its side. The ticks and the match edge below are laid over it at
-     that width. */
+     recessed into --bg-app off the vellum, so it reads as its own strip —
+     an overview of the section. The ticks and the match edge below are
+     laid over it at that width. */
   .body::-webkit-scrollbar {
     width: 14px;
   }
 
   .body::-webkit-scrollbar-track {
-    background: var(--bg-container);
+    background: var(--bg-app);
     border-left: 1px solid var(--border-subtle);
   }
 
-  /* Inset 2px so the lane's edge shows around it. No hover step: the
-     app's darkens to --bg-header, which all but vanishes on the lifted
-     track, and this rule outranks the global one. */
+  /* Inset 2px so the lane's edge shows around it. No hover step: this
+     rule outranks the global one, which darkens the thumb. */
   .body::-webkit-scrollbar-thumb {
     background: var(--bg-category);
     background-clip: padding-box;
@@ -386,13 +384,13 @@
     font-family: var(--font-mono);
     font-size: 0.9em;
     padding: 0 0.25em;
-    background: var(--bg-container);
+    background: var(--bg-app);
     border-radius: 2px;
   }
   .snippet :global(pre) {
     margin: 0.45em 0;
     padding: 0.4em 0.6em;
-    background: var(--bg-container);
+    background: var(--bg-app);
     border-radius: var(--radius-sm);
     overflow-x: auto;
   }
@@ -417,7 +415,7 @@
     margin: 0.5em 0;
     font-size: 0.88em;
     border: 1px solid var(--border-subtle);
-    background: var(--bg-container);
+    background: var(--bg-app);
   }
   .snippet :global(thead) {
     background: var(--bg-header);

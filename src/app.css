@@ -74,6 +74,10 @@
   --bg-active-focused: #7c61a8;
   --bg-selected: rgb(182, 159, 129);
   --bg-selected-focused: rgb(236, 204, 162);
+  /* The inspector's reading surface: the app ground under an 8% parchment
+     wash — the tint recipe, lit warm rather than a step up the greys, so
+     the text reads apart from the list without matching the plates. */
+  --bg-vellum: color-mix(in srgb, var(--text-accent) 8%, var(--bg-app));
 
   /* Text colors */
   --text-primary: #d4cfc9;
