@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   KEYBINDINGS,
   commitKeyShortcut,
+  digitChord,
   eventMatchKey,
   isBareKeyChord,
   isDeleteChord,
@@ -330,5 +331,22 @@ describe('systemsRowScopeKey', () => {
   test('other keys are not scope chords', () => {
     expect(systemsRowScopeKey(ev({ key: 'x' }), false)).toBeNull();
     expect(systemsRowScopeKey(ev({ key: 'Enter' }), false)).toBeNull();
+  });
+});
+
+describe('digitChord', () => {
+  test('reads the digit from the physical key, so shifted and layout-remapped keys still land', () => {
+    expect(digitChord(ev({ key: '3', code: 'Digit3', metaKey: true }))).toEqual({ digit: 3, shift: false, alt: false });
+    // US ⇧3 reports '#'; AZERTY's unshifted 3 key reports '"'.
+    expect(digitChord(ev({ key: '#', code: 'Digit3', metaKey: true, shiftKey: true }))).toEqual({ digit: 3, shift: true, alt: false });
+    expect(digitChord(ev({ key: '"', code: 'Digit3', ctrlKey: true }))).toEqual({ digit: 3, shift: false, alt: false });
+    expect(digitChord(ev({ key: '¡', code: 'Digit1', metaKey: true, altKey: true }))).toEqual({ digit: 1, shift: false, alt: true });
+  });
+
+  test('needs Cmd/Ctrl, and ignores 0, the numpad and non-digit keys', () => {
+    expect(digitChord(ev({ key: '1', code: 'Digit1' }))).toBeNull();
+    expect(digitChord(ev({ key: '0', code: 'Digit0', metaKey: true }))).toBeNull();
+    expect(digitChord(ev({ key: '1', code: 'Numpad1', metaKey: true }))).toBeNull();
+    expect(digitChord(ev({ key: 'p', code: 'KeyP', metaKey: true }))).toBeNull();
   });
 });

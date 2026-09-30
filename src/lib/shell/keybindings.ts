@@ -60,8 +60,11 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Focus right pane',            scope: 'global' },
   { id: 'focus.dockDown',        keys: { mac: '⌘⌥↓',  other: 'Ctrl+Alt+↓' },    label: 'Dock: Collections → Filters', scope: 'global' },
   { id: 'focus.dockUp',          keys: { mac: '⌘⌥↑',  other: 'Ctrl+Alt+↑' },    label: 'Dock: Filters → Collections', scope: 'global' },
-  { id: 'view.tree',             keys: { mac: '⌘1',   other: 'Ctrl+1' },        label: 'Tree view (again collapses all)', scope: 'global' },
-  { id: 'view.systems',          keys: { mac: '⌘2',   other: 'Ctrl+2' },        label: 'Shelve by system',            scope: 'global' },
+  { id: 'view.tree',             keys: { mac: '⌘⌥1',  other: 'Ctrl+Alt+1' },    label: 'Tree view (again collapses all)', scope: 'global' },
+  { id: 'view.systems',          keys: { mac: '⌘⌥2',  other: 'Ctrl+Alt+2' },    label: 'Shelve by system',            scope: 'global' },
+  { id: 'collections.pick',      keys: { mac: '⌘P',   other: 'Ctrl+P' },        label: 'Pick a collection to play (⇧↵ adds it to the mix)', scope: 'global' },
+  { id: 'collections.slot',      keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Play only collection N (again stops it)', scope: 'global' },
+  { id: 'collections.slotMix',   keys: { mac: '⌘⇧1–9', other: 'Ctrl+Shift+1–9' }, label: 'Add collection N to the mix, or take it out', scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global', match: 'meta+i' },
@@ -159,7 +162,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.home',          keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first result',         scope: 'searchResults' },
   { id: 'results.end',           keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last result',          scope: 'searchResults' },
   { id: 'results.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused result',       scope: 'searchResults' },
-  { id: 'results.jumpN',         keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Jump to result N',             scope: 'searchResults' },
   // No switch flag: the search rows draw no S/M squares — the lit state
   // materializes as a scope-bar chip instead.
   { id: 'results.solo',          keys: { mac: 'S',    other: 'S' },             label: "Solo the result's file (narrow search to it)", scope: 'searchResults' },
@@ -308,6 +310,30 @@ export function systemsRowScopeKey(
   if (!event.shiftKey) return { axis: 'file', kind };
   if (kind === 'solo' && untagged) return null;
   return { axis: 'system', kind };
+}
+
+export interface DigitChord {
+  digit: number;
+  shift: boolean;
+  alt: boolean;
+}
+
+// Cmd/Ctrl + a digit key, read from event.code: ⇧ turns '1' into '!' and ⌥
+// into '¡' on a US mac, and AZERTY needs ⇧ to type a digit at all, so
+// event.key can't identify the key across the chords that share it. Top row
+// only — the numpad isn't a place anyone reaches for a transport. Callers
+// decide what ⇧/⌥ mean.
+export function digitChord(event: ChordEvent): DigitChord | null {
+  if (!(event.metaKey || event.ctrlKey)) return null;
+  const m = /^Digit([1-9])$/.exec(event.code);
+  if (!m) return null;
+  return { digit: Number(m[1]), shift: event.shiftKey, alt: event.altKey };
+}
+
+// The display chord for track-select slot N, for tooltips and the picker's
+// hint column.
+export function slotChord(n: number): string {
+  return isMac ? `⌘${n}` : `Ctrl+${n}`;
 }
 
 // The match key for a binding id, or '' when the binding has no accelerator.

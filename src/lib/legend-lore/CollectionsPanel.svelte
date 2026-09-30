@@ -5,13 +5,14 @@
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
   import { onDestroy, tick } from 'svelte';
-  import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut } from '../shell/keybindings';
+  import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut, slotChord } from '../shell/keybindings';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
   import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from '../ui/menuGeometry';
+  import { orderCollections, transportNames } from './collectionOrder';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against
@@ -190,28 +191,14 @@
   // ------------------------------------------------------------------
   // Sorting + drag reorder
   // ------------------------------------------------------------------
-  $: rows = (() => {
-    const list = Object.values(collections);
-    const visible = showArchived ? list : list.filter(c => !c.archived);
-    if (sortKey === 'name') {
-      visible.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortKey === 'size') {
-      visible.sort((a, b) => b.file_count - a.file_count);
-    } else if (sortKey === 'created') {
-      visible.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-    } else {
-      // Custom order — persisted name array; names it doesn't know yet
-      // (created since the last drag) sort after it, alphabetically.
-      const idx = new Map(customOrder.map((n, i) => [n, i]));
-      visible.sort((a, b) => {
-        const ia = idx.has(a.name) ? idx.get(a.name)! : Infinity;
-        const ib = idx.has(b.name) ? idx.get(b.name)! : Infinity;
-        if (ia !== ib) return ia - ib;
-        return a.name.localeCompare(b.name);
-      });
-    }
-    return visible;
-  })();
+  $: rows = orderCollections(
+    showArchived ? Object.values(collections) : Object.values(collections).filter(c => !c.archived),
+    sortKey,
+    customOrder,
+  );
+
+  // Track-select slot per name (⌘1–9), for the play button's tooltip.
+  $: slotOf = new Map(transportNames(Object.values(collections), sortKey, customOrder).slice(0, 9).map((n, i) => [n, i + 1]));
 
   $: archivedCount = Object.values(collections).filter(c => c.archived).length;
   $: hasNone = Object.keys(collections).length === 0;
@@ -843,7 +830,7 @@
                   class:playing
                   on:click|stopPropagation={() => onTogglePlay(col.name)}
                   aria-pressed={playing}
-                  title={playing ? `Stop ${col.name} (P)` : `Play ${col.name} (P)`}
+                  title={`${playing ? 'Stop' : 'Play'} ${col.name} (P${slotOf.has(col.name) ? ` · ${slotChord(slotOf.get(col.name)!)}` : ''})`}
                 >
                   {#if playing}
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5h14v14H5z"/></svg>

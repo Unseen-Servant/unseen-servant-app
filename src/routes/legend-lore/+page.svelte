@@ -26,6 +26,7 @@
   import { confirmPrompt } from '../../lib/shell/confirmStore';
   import { holdLatch } from '../../lib/ui/holdLatch';
   import CollectionsPanel from '../../lib/legend-lore/CollectionsPanel.svelte';
+  import CollectionPicker from '../../lib/legend-lore/CollectionPicker.svelte';
   import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
   import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
   import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
@@ -48,7 +49,8 @@
   import { buildRibbonIndex, firstColorByPath } from '../../lib/legend-lore/collectionRibbons';
   import { createCommitScheduler, mergeArmedCollection } from '../../lib/legend-lore/collectionCommit';
   import { setTreePathsPayload, type TreePathsPayload } from '../../lib/legend-lore/dragPayload';
-  import { chord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
+  import { chord, digitChord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
+  import { playOnly, transportNames } from '../../lib/legend-lore/collectionOrder';
   import { menuSlotHeld } from '../../lib/shell/menuSlot';
   import {
     parseString,
@@ -1052,6 +1054,34 @@
     playingCollections = playingCollections;
     persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
+  }
+
+  // Track select (⌘1–9, the ⌘P picker): play this collection alone — or
+  // stop it, when it already plays alone.
+  function playOnlyCollection(name: string) {
+    playingCollections = playOnly(playingCollections, name);
+    persistScopeConsole();
+    if (committedQuery) runSearch(committedQuery);
+  }
+
+  // Slot N is the Nth transport row as the panel sorts it.
+  $: collectionSlots = transportNames(Object.values(collections), collectionsSortKey, collectionsCustomOrder);
+
+  let collectionPickerOpen = false;
+  let pickerReturnFocus: HTMLElement | null = null;
+
+  function openCollectionPicker() {
+    pickerReturnFocus = document.activeElement as HTMLElement | null;
+    collectionPickerOpen = true;
+  }
+
+  function closeCollectionPicker(restore: boolean) {
+    if (!collectionPickerOpen) return;
+    // Flip first: restoring focus blurs the picker's input, which calls
+    // back in here with restore=false.
+    collectionPickerOpen = false;
+    if (restore && pickerReturnFocus?.isConnected) pickerReturnFocus.focus({ preventScroll: true });
+    pickerReturnFocus = null;
   }
 
   // Mute a collection — carve its files from the mix (or from the
@@ -2249,24 +2279,38 @@
       return;
     }
 
-    // Cmd/Ctrl+1: Tree view, or collapse the whole tree when already there
-    // (the view switch's repeat action). Cmd/Ctrl+2: Systems view. Numbered
-    // rather than lettered because that's Finder's view-mode pattern, and
-    // because the old ⌘T / ⌘J both collided with strong browser defaults
-    // (new tab, downloads) while meaning nothing mnemonically.
-    //
-    // Gated on the search view being closed: while it's open Cmd+1-9 jumps to
-    // result N, and one number cannot mean both. Escape remains the way out of
-    // search, so no exit is lost — only the shortcut that used to double as one.
-    if (meta && !event.shiftKey && !searchViewOpen && selectedFolder && (event.key === '1' || event.key === '2')) {
+    // Cmd/Ctrl + digit. Bare: play only collection N (again stops it) —
+    // track select, the way a DAW numbers its tracks, and live from
+    // anywhere, search input included. ⇧: add N to the mix or take it out.
+    // ⌥1 / ⌥2: Tree view (again collapses the whole tree) / Systems view,
+    // numbered because that's Finder's view-mode pattern; the view switch
+    // is prep-time, so it takes the longer chord.
+    const digit = selectedFolder ? digitChord(event) : null;
+    if (digit) {
       event.preventDefault();
-      if (event.key === '2') {
-        setViewMode('systems');
-      } else if (viewMode === 'tree') {
-        collapseAll();
-      } else {
-        setViewMode('tree');
+      if (digit.alt) {
+        if (digit.shift || searchViewOpen) return;
+        if (digit.digit === 2) {
+          setViewMode('systems');
+        } else if (digit.digit === 1) {
+          if (viewMode === 'tree') collapseAll();
+          else setViewMode('tree');
+        }
+        return;
       }
+      const name = collectionSlots[digit.digit - 1];
+      if (!name) return;
+      if (digit.shift) togglePlayCollection(name);
+      else playOnlyCollection(name);
+      return;
+    }
+
+    // Cmd/Ctrl+P: the collection picker — ⌘1–9 by name, for past the
+    // ninth track or when the number isn't in your head. Again closes it.
+    if (meta && !event.shiftKey && !event.altKey && lk === 'p' && selectedFolder) {
+      event.preventDefault();
+      if (collectionPickerOpen) closeCollectionPicker(true);
+      else openCollectionPicker();
       return;
     }
 
@@ -2452,26 +2496,12 @@
 
     // Gate on the view being on screen, not on the committed query —
     // after exiting, query and results persist while tree/systems is
-    // visible, and Cmd+1–9 must not jump to rows that aren't rendered.
+    // visible, and the list's keys must not act on rows that aren't rendered.
     if (!searchViewOpen || searchResults.length === 0) return;
 
     const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
-
-    // Cmd/Ctrl + 1..9: jump to result N and move focus to it so Enter
-    // opens. Works regardless of where focus currently lives — moving
-    // into the list reclaims the search side from a dock pane.
-    if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
-      const idx = parseInt(event.key, 10) - 1;
-      if (idx < searchResults.length) {
-        event.preventDefault();
-        setActivePane('files');
-        selectedResultIndex = idx;
-        searchResultsComponent?.focusRow(idx);
-      }
-      return;
-    }
 
     // While a dock pane holds the arrows (⌘⌥← mid-search), the list's
     // keys stand down — the pane's window handler owns the keyboard
@@ -3527,6 +3557,18 @@
 />
 
 <LaunchSplash visible={showSplash} onDismiss={dismissSplash} />
+
+{#if collectionPickerOpen && selectedFolder}
+  <CollectionPicker
+    names={collectionSlots}
+    {collections}
+    playingNames={playingCollections}
+    mutedNames={mutedCollectionNames}
+    onPlayOnly={playOnlyCollection}
+    onToggleMix={togglePlayCollection}
+    onClose={closeCollectionPicker}
+  />
+{/if}
 
 <main class="app-layout" class:motion-ready={motionReady}>
   <Header
