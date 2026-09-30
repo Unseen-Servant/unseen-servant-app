@@ -2,7 +2,9 @@
 Tests for POST /api/reindex-file (single-file force rebuild).
 """
 
-import time
+from datetime import datetime, timedelta, timezone
+
+from legend_lore import router
 
 
 def test_reindex_file_rebuilds_chunks(client, sample_pdf_path, test_store):
@@ -21,14 +23,24 @@ def test_reindex_file_rebuilds_chunks(client, sample_pdf_path, test_store):
     assert test_store.count_units() == chunks_before
 
 
-def test_reindex_file_advances_indexed_at(client, sample_pdf_path):
+class _TickingClock:
+    """Stands in for router's ``datetime``: each now() is a second later,
+    so ordering doesn't depend on the real clock's resolution."""
+
+    t = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    @classmethod
+    def now(cls, tz=None):
+        cls.t += timedelta(seconds=1)
+        return cls.t
+
+
+def test_reindex_file_advances_indexed_at(client, sample_pdf_path, monkeypatch):
     """The indexed_at timestamp should move forward after a re-index."""
+    monkeypatch.setattr(router, "datetime", _TickingClock)
     client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
     first = client.get("/api/sources").json()["sources"][0]["indexed_at"]
     assert first is not None
-
-    # Sleep so the ISO timestamp advances at second precision.
-    time.sleep(1.1)
 
     client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
     second = client.get("/api/sources").json()["sources"][0]["indexed_at"]
