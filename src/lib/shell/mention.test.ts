@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { mentionAt, removeMention, stripMentions } from './mention';
+import { holdsQuery, mentionAt, removeMention, stripMentions } from './mention';
 
 describe('mentionAt', () => {
   test('finds the @-word around the caret', () => {
@@ -41,5 +41,22 @@ describe('stripMentions', () => {
 
   test('leaves mid-word @ alone', () => {
     expect(stripMentions('a@b c')).toBe('a@b c');
+  });
+});
+
+describe('holdsQuery', () => {
+  test('false for an empty bar, whitespace, or @-words alone', () => {
+    expect(holdsQuery('')).toBe(false);
+    expect(holdsQuery('   ')).toBe(false);
+    expect(holdsQuery('@')).toBe(false);
+    expect(holdsQuery('@mon')).toBe(false);
+    expect(holdsQuery('@mon @sp ')).toBe(false);
+  });
+
+  test('true once a word outside an @-word is typed', () => {
+    expect(holdsQuery('t')).toBe(true);
+    expect(holdsQuery('@mon troll')).toBe(true);
+    expect(holdsQuery('troll @mon')).toBe(true);
+    expect(holdsQuery('a@b')).toBe(true);
   });
 });

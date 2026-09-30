@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { chord, chordHint } from './keybindings';
-  import { mentionAt, removeMention, stripMentions, type Mention } from './mention';
+  import { holdsQuery, mentionAt, removeMention, stripMentions, type Mention } from './mention';
 
   export let searchQuery: string = '';
   export let disabled: boolean = false;
@@ -17,6 +17,10 @@
   export let onDebouncedChange: (q: string) => void = () => {};
   export let onClear: () => void = () => {};
   export let onFocus: () => void = () => {};
+  // Fires on every focus or keystroke that leaves something to search in the
+  // bar. Focus alone doesn't: an @-pick plays out over the browse view, and
+  // the search view opens on the first real query.
+  export let onQuery: () => void = () => {};
   export let onTogglePanel: () => void = () => {};
   export let onCollapseAll: () => void = () => {};
   export let viewToggleVisible: boolean = false;
@@ -77,6 +81,7 @@
 
   function handleInput() {
     syncMention();
+    if (holdsQuery(searchQuery)) onQuery();
     const current = stripMentions(searchQuery);
     if (current === dispatched) return;
     dispatched = current;
@@ -221,7 +226,7 @@
       on:keydown={handleKeydown}
       on:keyup={syncMention}
       on:click={syncMention}
-      on:focus={() => { focused = true; onFocus(); syncMention(); }}
+      on:focus={() => { focused = true; onFocus(); if (holdsQuery(searchQuery)) onQuery(); syncMention(); }}
       on:blur={() => { focused = false; syncMention(); }}
       aria-label="Search library"
     />

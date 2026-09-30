@@ -47,3 +47,10 @@ export function stripMentions(value: string): string {
   }
   return out;
 }
+
+/** Whether the bar holds anything to search once its @-words are out. The
+ *  first keystroke that makes this true is what opens the search view —
+ *  an @-pick alone plays out over the browse view. */
+export function holdsQuery(value: string): boolean {
+  return stripMentions(value).trim() !== '';
+}

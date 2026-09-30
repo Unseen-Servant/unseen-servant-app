@@ -300,8 +300,9 @@
   // possibly unfinished. Scope toggles and load-more re-run the same query,
   // so they re-send the same flag; Enter clears it.
   let committedPartial = false;
-  // The search view is stateful, not derived: entered by focusing the
-  // search bar, left only explicitly (view switch or the Escape
+  // The search view is stateful, not derived: entered by the first real
+  // query in the search bar (focus alone, or an @-word, stays in the
+  // browse view), left only explicitly (view switch or the Escape
   // ladder). Never persisted — the app launches into the browse
   // view. searchActive (committed query) keeps meaning "has a query".
   let searchViewOpen = false;
@@ -619,13 +620,16 @@
   }
 
   function handleSearchFocus() {
-    searchViewOpen = true;
-    // Entering search points the pane model at the search side. A dock
-    // caret left over from browse mode would otherwise stay ringed —
-    // and, since the dock stays keyboard-live during search, keep the
-    // arrows — while the user is looking at results. Nothing is lost:
-    // lastFocused* remembers every position.
+    // The bar sits on the file side in either view, so focusing it points
+    // the pane model there. A dock caret left over would otherwise stay
+    // ringed — and, since the dock stays keyboard-live, keep the arrows —
+    // while the user types. Nothing is lost: lastFocused* remembers every
+    // position.
     pointAtEmpty('files');
+  }
+
+  function handleSearchQuery() {
+    searchViewOpen = true;
   }
 
   function resolvePathForFilename(filename: string): string | null {
@@ -2192,7 +2196,7 @@
   //   2. Inline rename in flight         → cancel
   //   3. Competing popover               → its own handler
   //   4. Search view, focus not in bar   → focus the search bar
-  //   5. Search view, focus in bar       → leave to the browse view
+  //   5. Focus in bar                    → leave to the browse view
   //   6. Focused tree row                → clear focus
   //   (modal Esc handled by Modal.svelte; the docked filter panel claims
   //   its own Esc while focus is inside it)
@@ -2254,6 +2258,14 @@
         // An active dock pane keeps its own Esc semantics (its window
         // handler clears the highlight and releases the arrows); the next
         // Esc funnels to the bar.
+        return;
+      }
+      // The bar outside the search view (nothing typed yet, or an @-pick
+      // just dropped): hand focus back to the rows it sits above.
+      if (inSearchInput) {
+        event.preventDefault();
+        (target as HTMLInputElement).blur();
+        focusFileRegion();
         return;
       }
       if (focusedFilePath) { focusedFilePath = null; }
@@ -2490,6 +2502,17 @@
     // the filter panel, which the old check never considered.
     if (selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath && !competingMenuOpen && activePane === 'files' && viewMode === 'tree') {
       if (!inAnyInput && handleTreeNavKey(event)) return;
+    }
+
+    // ↓ from the bar outside the search view drops into the browse view's
+    // rows — the same move that takes the search view into its results.
+    if (inSearchInput && !searchViewOpen && selectedFolder && event.key === 'ArrowDown'
+        && !meta && !event.altKey && !event.shiftKey && !event.isComposing
+        && activePane === 'files') {
+      event.preventDefault();
+      (target as HTMLInputElement).blur();
+      focusFileRegion();
+      return;
     }
 
     // Gate on the view being on screen, not on the committed query —
@@ -3577,6 +3600,7 @@
     onDebouncedChange={handleSearchDebounced}
     onClear={handleSearchClear}
     onFocus={handleSearchFocus}
+    onQuery={handleSearchQuery}
     onTogglePanel={togglePanel}
     onCollapseAll={collapseAll}
     viewToggleVisible={!!selectedFolder}
