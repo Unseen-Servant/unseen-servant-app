@@ -517,8 +517,8 @@
   .context-menu {
     position: fixed;
     z-index: 200;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     min-width: var(--menu-width);
@@ -536,7 +536,7 @@
   }
   .context-menu:not(.hover-dark) .submenu-trigger:hover,
   .submenu-trigger.open {
-    background: var(--bg-container);
+    background: var(--bg-focused);
   }
   .submenu-caret {
     font-size: 0.7rem;
@@ -566,8 +566,8 @@
     position: absolute;
     left: 100%;
     top: -0.15rem;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     min-width: var(--submenu-width);

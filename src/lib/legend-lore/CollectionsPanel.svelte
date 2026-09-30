@@ -1119,8 +1119,8 @@
     position: absolute;
     right: 0;
     top: calc(100% + 4px);
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.15rem 0;
@@ -1144,12 +1144,12 @@
     transition: background var(--transition-fast);
   }
   .sort-item:hover {
-    background: var(--bg-container);
+    background: var(--bg-focused);
   }
   .menu-divider {
     margin: 0.15rem 0;
     border: none;
-    border-top: 1px solid var(--bg-category);
+    border-top: 1px solid var(--border-subtle);
   }
   .sort-toggle {
     display: flex;
@@ -1163,7 +1163,7 @@
     transition: background var(--transition-fast);
   }
   .sort-toggle:hover {
-    background: var(--bg-container);
+    background: var(--bg-focused);
   }
   .sort-toggle input {
     cursor: pointer;
@@ -1585,8 +1585,8 @@
   /* Context menu — same visual family as the file tree's ContextMenu. */
   .context-menu {
     position: fixed;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     min-width: var(--menu-width);
@@ -1614,7 +1614,7 @@
   }
   .context-item:hover,
   .context-item.open {
-    background: var(--bg-container);
+    background: var(--bg-focused);
   }
   .context-item.danger {
     color: var(--text-danger);
@@ -1631,8 +1631,8 @@
     position: absolute;
     left: 100%;
     top: -0.15rem;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: 0.15rem 0;

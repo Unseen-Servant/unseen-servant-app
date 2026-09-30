@@ -100,8 +100,8 @@
   .dropdown {
     position: fixed;
     z-index: 200;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     min-width: var(--menu-width);

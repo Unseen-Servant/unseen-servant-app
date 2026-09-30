@@ -111,6 +111,7 @@
   --radius-md: 4px;
   --radius-well: 6px; /* concentric wrap around --radius-md contents + 2px padding */
   --radius-lg: 8px;
+  --radius-window: 12px; /* the splash, a borderless window drawn in its own webview */
 
   /* LED-style glows for engaged controls. Purple = mode on,
      brass = content/data armed. Reserved for activated states only —
@@ -622,7 +623,7 @@ dialog[open]::backdrop {
    the row left under a resting pointer would read as a second cursor. */
 .menu-row:hover:not(.hover-dark *),
 .menu-row.kb-focused {
-  background: var(--bg-container);
+  background: var(--bg-focused);
 }
 /* Danger is a hue swap, not a new shape — per the design conventions. */
 .menu-row.danger {
@@ -631,7 +632,7 @@ dialog[open]::backdrop {
 .menu-divider {
   margin: 0.15rem 0;
   border: none;
-  border-top: 1px solid var(--bg-category);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* Menu selection lamp — reports which option is in effect on rows whose whole
@@ -664,7 +665,8 @@ dialog[open]::backdrop {
 }
 
 /* Keyboard hint riding at the trailing edge of a menu row. --text-secondary is
-   4.17:1 on --bg-focused, below AA for small text: an accepted gap, consistent
+   5.08:1 on the menu's --bg-container, but 4.14:1 on the highlighted row's
+   --bg-focused, below AA for small text: an accepted gap, consistent
    with the tertiary gaps recorded in the header-voices pass. The chord is
    supplementary — the row label names the command, and the ? overlay repeats
    every binding on a darker surface. Primary would clear AA but would make the
