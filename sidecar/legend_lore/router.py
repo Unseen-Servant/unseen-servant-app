@@ -24,6 +24,7 @@ from .library_store import LibraryStore
 from .parents_store import fetch_section_by_id
 from .service import (
     _atomic_index_pdf,
+    path_key,
     Collection,
     compute_diff,
     CreateCollectionRequest,
@@ -310,7 +311,7 @@ def build_router(
 
             transferred = (
                 entry["chunk_count"]
-                if library.rename_document(old_path_str, str(new_path)) else 0
+                if library.rename_document(old_path_str, path_key(new_path)) else 0
             )
 
             old_entry = manifest.files[old_path_str]

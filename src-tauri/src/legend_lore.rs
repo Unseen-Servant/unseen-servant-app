@@ -302,6 +302,22 @@ pub struct SearchResponse {
 // Tauri commands — file system
 // ---------------------------------------------------------------------------
 
+/// A tree path as the UI and sidecar spell it: '/' separators on every
+/// platform. Both split and prefix-match on '/', and Windows APIs accept
+/// '/' as well as '\'. Only Windows is rewritten — '\' is a legal
+/// filename character on macOS and Linux.
+fn ui_path_string(raw: &str, windows: bool) -> String {
+    if windows {
+        raw.replace('\\', "/")
+    } else {
+        raw.to_string()
+    }
+}
+
+fn ui_path(path: &Path) -> String {
+    ui_path_string(&path.to_string_lossy(), cfg!(windows))
+}
+
 #[tauri::command]
 pub async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -313,7 +329,7 @@ pub async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
         .blocking_pick_folder();
 
     match folder {
-        Some(path) => Ok(path.to_string()),
+        Some(path) => Ok(ui_path_string(&path.to_string(), cfg!(windows))),
         None => Err("No folder selected".to_string()),
     }
 }
@@ -365,7 +381,7 @@ pub fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
         let file_type = metadata.file_type();
         let is_dir = file_type.is_dir();
         let name = entry.file_name().to_string_lossy().into_owned();
-        let path = folder.join(&name).to_string_lossy().into_owned();
+        let path = ui_path(&folder.join(&name));
         let is_pdf = !is_dir && name.to_lowercase().ends_with(".pdf");
 
         if is_dir || is_pdf {
@@ -1130,7 +1146,7 @@ pub async fn rename_file(old_path: String, new_name: String) -> Result<String, S
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
 
-    let new_path_str = new_path.to_string_lossy().into_owned();
+    let new_path_str = ui_path(&new_path);
 
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
     let client = reqwest::Client::new();
@@ -1188,7 +1204,7 @@ pub async fn rename_folder(old_path: String, new_name: String) -> Result<String,
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
 
-    let new_path_str = new_path.to_string_lossy().into_owned();
+    let new_path_str = ui_path(&new_path);
 
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
     let client = reqwest::Client::new();
@@ -1231,6 +1247,28 @@ pub async fn delete_folder(path: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn ui_path_string_turns_windows_separators_into_slashes() {
+        assert_eq!(
+            ui_path_string(r"C:\lib\Core\a.pdf", true),
+            "C:/lib/Core/a.pdf"
+        );
+        // Path::join on a '/'-spelled folder gives a mixed path on Windows.
+        assert_eq!(
+            ui_path_string(r"C:/lib/Core\a.pdf", true),
+            "C:/lib/Core/a.pdf"
+        );
+    }
+
+    #[test]
+    fn ui_path_string_leaves_unix_paths_alone() {
+        // '\' is a legal filename character on macOS and Linux.
+        assert_eq!(
+            ui_path_string(r"/lib/odd\name.pdf", false),
+            r"/lib/odd\name.pdf"
+        );
+    }
+
     /// A fresh directory under the system temp dir, unique to this test.
     fn scratch_dir(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -1265,7 +1303,7 @@ mod tests {
                 ("b.PDF", false)
             ]
         );
-        assert_eq!(items[2].path, dir.join("a.pdf").to_string_lossy());
+        assert_eq!(items[2].path, ui_path(&dir.join("a.pdf")));
         assert!(items.iter().all(|i| i.children.is_none()));
         fs::remove_dir_all(&dir).unwrap();
     }

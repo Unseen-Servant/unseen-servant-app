@@ -16,7 +16,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import pymupdf
 import pymupdf4llm
@@ -535,6 +535,14 @@ def _page_labels(pdf_path: Path) -> dict[int, str]:
 def _extract_pdf_text(pdf_path: Path) -> str:
     """Flat-string view of the PDF — used by game-system detection."""
     return "\n\n".join(p.markdown for p in _extract_pdf_pages(pdf_path))
+
+
+def path_key(path: PurePath) -> str:
+    """A tree path as the UI, manifest and store spell it: '/' separators
+    on every platform. The UI receives '/'-spelled paths from the Tauri
+    shell and splits on '/'; a Windows Path prints with '\\', so a path
+    rebuilt from a Path is re-spelled here before it becomes a key."""
+    return path.as_posix()
 
 
 def file_content_hash(path: Path) -> str:
@@ -1252,7 +1260,7 @@ def _atomic_index_pdf(
         embed_fn, embed_units, pdf_path, vectors, batch_size=batch_size,
     )
     store.replace_document(
-        str(pdf_path), game_system, game_systems, embed_units,
+        path_key(pdf_path), game_system, game_systems, embed_units,
         embed_texts=[_fts_text(eu) for eu in embed_units],
         vectors=vectors, parents=parents, page_labels=page_labels,
     )
@@ -1320,7 +1328,7 @@ def _extract_and_chunk(
         # colliding parent_ids — the second file dies on the parents-store
         # UNIQUE constraint and never indexes (issue #308 family). The
         # parents store itself is already keyed by full path.
-        chunks = structure_aware(pages, source_pdf=str(pdf_path))
+        chunks = structure_aware(pages, source_pdf=path_key(pdf_path))
         return chunks, resolved_system, resolved_systems, None
     except Exception as e:
         return [], "unknown", [], f"{pdf_path.name}: {str(e)}"
@@ -1485,7 +1493,7 @@ def compute_diff(
                 for candidate in parent.iterdir():
                     if candidate.suffix.lower() != ".pdf":
                         continue
-                    cand_str = str(candidate)
+                    cand_str = path_key(candidate)
                     if cand_str in selected or cand_str in indexed:
                         continue  # already tracked
                     try:
