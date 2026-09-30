@@ -159,32 +159,6 @@ def _extend_one(
     )
 
 
-def fetch_parents_extended(
-    store: LibraryStore,
-    parent_ids: list[str],
-    max_extra_chars: int = SECTION_EXPANSION_MAX_EXTRA_CHARS,
-) -> dict[str, ParentDoc]:
-    """Like `fetch_parents`, but stitches each parent with rowid-adjacent
-    sibling parents that share the same source + section identity
-    (section_id when both rows carry one, else section_heading).
-
-    Section-aware result expansion: a section that exceeded
-    PARENT_HARD_CAP at indexing time was split across multiple parents.
-    Without stitching, a search hit on a middle slice loses surrounding
-    context. With stitching, the returned text rounds out to the full
-    section (or `max_extra_chars` worth, whichever is first).
-    """
-    if not parent_ids:
-        return {}
-    out: dict[str, ParentDoc] = {}
-    conn = store.conn()
-    for pid in parent_ids:
-        doc = _extend_one(conn, pid, max_extra_chars)
-        if doc is not None:
-            out[pid] = doc
-    return out
-
-
 # ---------------------------------------------------------------------------
 # Section assembly by section_path prefix (roadmap 2.1)
 # ---------------------------------------------------------------------------

@@ -6,7 +6,6 @@ from legend_lore.granularity import EmbedUnit, ParentDoc
 from legend_lore.library_store import LibraryStore
 from legend_lore.parents_store import (
     fetch_parents,
-    fetch_parents_extended,
     SECTION_CAP,
     _heading_at_depth,
     _prefix_range,
@@ -120,8 +119,14 @@ def test_fetch_with_empty_id_list(store):
 
 
 # ---------------------------------------------------------------------------
-# fetch_parents_extended — section-aware result expansion
+# fetch_sections, legacy rows — a hit with no section_path takes the
+# heading walk: rowid-adjacent parents of the same source and section
+# stitch back into the section indexing split
 # ---------------------------------------------------------------------------
+
+
+def legacy_sections(store, parent_ids):
+    return fetch_sections(store, [(pid, None, None) for pid in parent_ids])
 
 
 def test_extended_single_parent_returns_unchanged(store):
@@ -131,7 +136,7 @@ def test_extended_single_parent_returns_unchanged(store):
         _p("p_b", "/lib/x.pdf", "alone", "My Section"),
         _p("p_c", "/lib/x.pdf", "after", "Different Section"),
     ])
-    fetched = fetch_parents_extended(store, ["p_b"])
+    fetched = legacy_sections(store, ["p_b"])
     assert fetched["p_b"].text == "alone"
 
 
@@ -142,7 +147,7 @@ def test_extended_stitches_split_section_forward(store):
         _p("p_b", "/lib/x.pdf", "second half", "Combat", page_start=2, page_end=3),
         _p("p_c", "/lib/x.pdf", "next", "Movement", page_start=3, page_end=4),
     ])
-    fetched = fetch_parents_extended(store, ["p_a"])
+    fetched = legacy_sections(store, ["p_a"])
     assert fetched["p_a"].text == "first half\n\nsecond half"
     assert fetched["p_a"].page_start == 1
     assert fetched["p_a"].page_end == 3
@@ -156,7 +161,7 @@ def test_extended_walks_both_directions(store):
         _p("p_c", "/lib/x.pdf", "forward", "Combat", page_start=3, page_end=3),
         _p("p_d", "/lib/x.pdf", "next", "Movement", page_start=4, page_end=4),
     ])
-    fetched = fetch_parents_extended(store, ["p_b"])
+    fetched = legacy_sections(store, ["p_b"])
     assert fetched["p_b"].text == "back\n\nmiddle\n\nforward"
     assert fetched["p_b"].page_start == 1
     assert fetched["p_b"].page_end == 3
@@ -169,17 +174,20 @@ def test_extended_stops_at_section_boundary(store):
         _p("p_b", "/lib/x.pdf", "target", "Combat"),
         _p("p_c", "/lib/x.pdf", "different", "Movement"),
     ])
-    fetched = fetch_parents_extended(store, ["p_b"])
+    fetched = legacy_sections(store, ["p_b"])
     assert fetched["p_b"].text == "target"
 
 
-def test_extended_skips_neighbor_over_budget(store):
+def test_extended_skips_neighbor_over_budget(store, monkeypatch):
     """A neighbor too large for the budget is skipped (no truncation)."""
+    from legend_lore import parents_store
+
+    monkeypatch.setattr(parents_store, "SECTION_EXPANSION_MAX_EXTRA_CHARS", 50)
     upsert_parents(store, "/lib/x.pdf", [
         _p("p_a", "/lib/x.pdf", "x" * 100, "Combat"),
         _p("p_b", "/lib/x.pdf", "target", "Combat"),
     ])
-    fetched = fetch_parents_extended(store, ["p_b"], max_extra_chars=50)
+    fetched = legacy_sections(store, ["p_b"])
     assert fetched["p_b"].text == "target"
 
 
@@ -187,8 +195,8 @@ def test_extended_does_not_cross_sources(store):
     """Adjacent rowids in different sources should never stitch."""
     upsert_parents(store, "/lib/a.pdf", [_p("p_a", "/lib/a.pdf", "in a", "Combat")])
     upsert_parents(store, "/lib/b.pdf", [_p("p_b", "/lib/b.pdf", "in b", "Combat")])
-    assert fetch_parents_extended(store, ["p_a"])["p_a"].text == "in a"
-    assert fetch_parents_extended(store, ["p_b"])["p_b"].text == "in b"
+    assert legacy_sections(store, ["p_a"])["p_a"].text == "in a"
+    assert legacy_sections(store, ["p_b"])["p_b"].text == "in b"
 
 
 def test_extended_stitches_null_section_siblings(store):
@@ -197,7 +205,7 @@ def test_extended_stitches_null_section_siblings(store):
         _p("p_a", "/lib/x.pdf", "first", None),
         _p("p_b", "/lib/x.pdf", "second", None),
     ])
-    fetched = fetch_parents_extended(store, ["p_a"])
+    fetched = legacy_sections(store, ["p_a"])
     assert fetched["p_a"].text == "first\n\nsecond"
 
 
@@ -207,20 +215,20 @@ def test_extended_batch_returns_all(store):
         _p("p_a", "/lib/x.pdf", "alpha", "S1"),
         _p("p_b", "/lib/x.pdf", "beta", "S2"),
     ])
-    fetched = fetch_parents_extended(store, ["p_a", "p_b"])
+    fetched = legacy_sections(store, ["p_a", "p_b"])
     assert set(fetched.keys()) == {"p_a", "p_b"}
 
 
 def test_extended_missing_id_silently_absent(store):
     upsert_parents(store, "/lib/x.pdf", [_p("p_only", "/lib/x.pdf", "only", "S")])
-    fetched = fetch_parents_extended(store, ["p_only", "p_missing"])
+    fetched = legacy_sections(store, ["p_only", "p_missing"])
     assert "p_only" in fetched
     assert "p_missing" not in fetched
 
 
 def test_extended_empty_id_list(store):
     upsert_parents(store, "/lib/x.pdf", [_p("p_x", "/lib/x.pdf", "x", "S")])
-    assert fetch_parents_extended(store, []) == {}
+    assert legacy_sections(store, []) == {}
 
 
 def test_extended_stops_partway_when_third_neighbor_breaks_section(store):
@@ -231,7 +239,7 @@ def test_extended_stops_partway_when_third_neighbor_breaks_section(store):
         _p("p_b", "/lib/x.pdf", "b-text", "Combat", page_start=2, page_end=2),
         _p("p_c", "/lib/x.pdf", "c-text", "Movement", page_start=3, page_end=3),
     ])
-    fetched = fetch_parents_extended(store, ["p_a"])
+    fetched = legacy_sections(store, ["p_a"])
     assert fetched["p_a"].text == "a-text\n\nb-text"
     assert fetched["p_a"].page_end == 2
 
@@ -246,7 +254,7 @@ def test_extended_stops_at_section_id_boundary_even_with_equal_headings(store):
         _p("p1", "x.pdf", "a" * 10, "Actions", sid="s_k"),
         _p("p2", "x.pdf", "b" * 10, "Actions", sid="s_m"),
     ])
-    got = fetch_parents_extended(store, ["p1"])
+    got = legacy_sections(store, ["p1"])
     assert got["p1"].text == "a" * 10
 
 
