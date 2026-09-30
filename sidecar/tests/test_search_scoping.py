@@ -12,37 +12,6 @@ filter fails the corresponding test below. The two clauses are
 independent fix sites and were reverted separately.
 """
 
-import pytest
-
-
-def _make_pdf(path, marker: str) -> None:
-    """Tiny one-page PDF whose text contains a distinguishing marker."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    c = canvas.Canvas(str(path), pagesize=letter)
-    text = c.beginText(72, 720)
-    for line in (
-        f"{marker} dragon bestiary",
-        "The dragon guards its lair.",
-        "Armor Class: 15",
-    ):
-        text.textLine(line)
-    c.drawText(text)
-    c.showPage()
-    c.save()
-
-
-@pytest.fixture
-def twin_pdfs(tmp_path):
-    """Two PDFs with the SAME filename in different folders."""
-    a = tmp_path / "campaign" / "monsters.pdf"
-    b = tmp_path / "other-system" / "monsters.pdf"
-    _make_pdf(a, "alpha")
-    _make_pdf(b, "beta")
-    return a, b
-
 
 def test_same_named_files_both_index(client, twin_pdfs):
     """Parent IDs must be path-unique: two same-named PDFs previously

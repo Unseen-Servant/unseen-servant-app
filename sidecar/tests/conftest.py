@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 
 # We can import these safely now — no side effects at import time.
 from legend_lore.library_store import LIBRARY_FILENAME, LibraryStore
-from legend_lore.service import _embed_text
+from legend_lore.service import MANIFEST_FILENAME, _embed_text
 from server import create_app
 
 
@@ -119,6 +119,89 @@ def run_sync(client, body):
     result = sse_events(response)[-1]
     assert result.pop("event") == "complete", result
     return result
+
+
+# ---------------------------------------------------------------------------
+# Shared indexed states
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def indexed_client(client, sample_pdf_path):
+    """Client with one PDF already indexed.
+
+    Pattern: fixture that depends on another fixture.
+    This builds a "ready to search" state without repeating
+    the indexing call in every test.
+    """
+    client.post("/api/index-files", json={
+        "paths": [str(sample_pdf_path)]
+    })
+    return client
+
+
+@pytest.fixture
+def multi_indexed_client(client, sample_pdf_path, large_text_pdf_path):
+    """Client with two PDFs indexed, for filtering and scoping tests.
+
+    - dragonbane_monsters.pdf: dragon/fire content
+    - core_rules.pdf: dungeon/adventurer content
+    """
+    client.post("/api/index-files", json={
+        "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
+    })
+    return client
+
+
+def index_pdfs(client, *pdf_paths):
+    """Sync exactly these PDFs into the index; returns the sync result."""
+    return run_sync(client, {"selected_paths": [str(p) for p in pdf_paths]})
+
+
+def read_manifest(tmp_path):
+    """Load the manifest from disk."""
+    return json.loads((tmp_path / MANIFEST_FILENAME).read_text())
+
+
+def seed_parents(store, embed_fn, n: int) -> None:
+    """Synthetic units across n distinct parents: one book of n sections,
+    for tests that need more results than a fixture PDF's one section."""
+    from legend_lore.granularity import EmbedUnit
+
+    seed_book(store, embed_fn, "/lib/synth.pdf", [EmbedUnit(
+        chunk_id=f"synth_{i}", text=f"dragon lore text variant {i}",
+        parent_id=f"p_synth_{i}", chunk_type="prose",
+        section_heading=f"Dragons > Entry {i}", source_pdf="/lib/synth.pdf",
+        page_start=i + 1, page_end=i + 1, ordinal=i,
+    ) for i in range(n)], game_system="5e")
+
+
+def _marker_pdf(path, marker: str) -> None:
+    """Tiny one-page PDF whose text contains a distinguishing marker."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=letter)
+    text = c.beginText(72, 720)
+    for line in (
+        f"{marker} dragon bestiary",
+        "The dragon guards its lair.",
+        "Armor Class: 15",
+    ):
+        text.textLine(line)
+    c.drawText(text)
+    c.showPage()
+    c.save()
+
+
+@pytest.fixture
+def twin_pdfs(tmp_path):
+    """Two PDFs with the SAME filename in different folders."""
+    a = tmp_path / "campaign" / "monsters.pdf"
+    b = tmp_path / "other-system" / "monsters.pdf"
+    _marker_pdf(a, "alpha")
+    _marker_pdf(b, "beta")
+    return a, b
 
 
 # ---------------------------------------------------------------------------

@@ -5,8 +5,6 @@ Collections are named subsets of indexed files that let users scope
 their searches to a specific campaign or session prep context.
 """
 
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # CRUD tests
@@ -543,19 +541,6 @@ def test_legacy_active_context_key_is_shed(test_store, test_embed_fn, tmp_path):
 # ---------------------------------------------------------------------------
 # Search with collection filter
 # ---------------------------------------------------------------------------
-
-@pytest.fixture
-def multi_indexed_client(client, sample_pdf_path, large_text_pdf_path):
-    """Client with two PDFs indexed — for testing collection filtering.
-
-    - dragonbane_monsters.pdf: dragon/fire content
-    - core_rules.pdf: dungeon/adventurer content
-    """
-    client.post("/api/index-files", json={
-        "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
-    })
-    return client
-
 
 def test_search_with_collection_filter(
     multi_indexed_client, sample_pdf_path

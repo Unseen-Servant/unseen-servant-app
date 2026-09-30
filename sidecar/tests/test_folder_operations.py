@@ -6,28 +6,14 @@ all indexed PDFs under that folder — transferring chunks without re-embedding
 (rename) or removing them entirely (delete).
 """
 
-import json
 
-from legend_lore.service import MANIFEST_FILENAME, COLLECTIONS_FILENAME
-from tests.conftest import run_sync
+from legend_lore.service import COLLECTIONS_FILENAME
+from tests.conftest import index_pdfs, read_manifest
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def index_pdfs(client, *pdf_paths):
-    """Index one or more PDFs via sync-index and assert success."""
-    response = run_sync(client, {
-        "selected_paths": [str(p) for p in pdf_paths]
-    })
-    return response
-
-
-def read_manifest(tmp_path):
-    """Load the manifest from disk."""
-    return json.loads((tmp_path / MANIFEST_FILENAME).read_text())
-
 
 # ---------------------------------------------------------------------------
 # Folder rename

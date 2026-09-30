@@ -2,8 +2,6 @@
 Tests for GET /api/stats.
 """
 
-from tests.test_search_scoping import twin_pdfs  # noqa: F401
-
 
 def test_stats_empty_db(client):
     """Stats on empty DB should show zero counts."""

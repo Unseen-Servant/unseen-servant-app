@@ -9,7 +9,6 @@ rather than guessed.
 """
 
 from legend_lore.service import load_manifest
-from tests.test_search_scoping import twin_pdfs  # noqa: F401
 
 
 def _index_twins(client, twin_pdfs):

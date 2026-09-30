@@ -10,20 +10,6 @@ dragon-related chunks — not just that "something came back."
 import pytest
 
 
-@pytest.fixture
-def indexed_client(client, sample_pdf_path):
-    """Client with one PDF already indexed.
-
-    Pattern: fixture that depends on another fixture.
-    This builds a "ready to search" state without repeating
-    the indexing call in every test.
-    """
-    client.post("/api/index-files", json={
-        "paths": [str(sample_pdf_path)]
-    })
-    return client
-
-
 def test_search_returns_results(indexed_client):
     """A query matching indexed content should return results."""
     response = indexed_client.post("/api/search", json={
@@ -129,9 +115,9 @@ def test_search_empty_collection(client):
 
 def test_search_default_n_results(client, test_store, test_embed_fn):
     """If n_results is omitted, default should be 15."""
-    from tests.test_search_tiers import _seed_parents
+    from tests.conftest import seed_parents
 
-    _seed_parents(test_store, test_embed_fn, 20)
+    seed_parents(test_store, test_embed_fn, 20)
     response = client.post("/api/search", json={
         "query": "dragon"
     })
@@ -143,19 +129,6 @@ def test_search_default_n_results(client, test_store, test_embed_fn):
 # ---------------------------------------------------------------------------
 # Filtered search tests (source_filter)
 # ---------------------------------------------------------------------------
-
-@pytest.fixture
-def multi_indexed_client(client, sample_pdf_path, large_text_pdf_path):
-    """Client with two PDFs indexed — useful for testing source_filter.
-
-    - dragonbane_monsters.pdf: dragon/fire content
-    - core_rules.pdf: dungeon/adventurer content
-    """
-    client.post("/api/index-files", json={
-        "paths": [str(sample_pdf_path), str(large_text_pdf_path)]
-    })
-    return client
-
 
 def test_filtered_search_returns_only_matching_source(multi_indexed_client):
     """With source_filter, results should only come from that file."""

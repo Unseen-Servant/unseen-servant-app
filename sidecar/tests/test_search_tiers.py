@@ -12,13 +12,7 @@ Mutation-verified 2026-07-09: collapsing ``_tier_for`` to a constant
 ``test_picked_tail_stragglers_are_rescored``.
 """
 
-import pytest
-
-
-@pytest.fixture
-def indexed_client(client, sample_pdf_path):
-    client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
-    return client
+from tests.conftest import seed_parents
 
 
 # ---------------------------------------------------------------------------
@@ -102,20 +96,6 @@ def test_non_ascii_query_gets_cosine_tiers(indexed_client, monkeypatch):
 # Single-scale by construction: tail stragglers get cross-encoded
 # ---------------------------------------------------------------------------
 
-def _seed_parents(store, embed_fn, n: int) -> None:
-    """Synthetic units across n distinct parents (mirrors the pattern in
-    test_search_rerank.py — the fixture PDF only yields one parent)."""
-    from legend_lore.granularity import EmbedUnit
-    from tests.conftest import seed_book
-
-    seed_book(store, embed_fn, "/lib/synth.pdf", [EmbedUnit(
-        chunk_id=f"synth_{i}", text=f"dragon lore text variant {i}",
-        parent_id=f"p_synth_{i}", chunk_type="prose",
-        section_heading=f"Dragons > Entry {i}", source_pdf="/lib/synth.pdf",
-        page_start=i + 1, page_end=i + 1, ordinal=i,
-    ) for i in range(n)], game_system="5e")
-
-
 def test_picked_tail_stragglers_are_rescored(
     client, test_store, test_embed_fn, monkeypatch
 ):
@@ -126,7 +106,7 @@ def test_picked_tail_stragglers_are_rescored(
     from legend_lore import service
 
     n_parents = service.RERANK_POOL_MIN + 2
-    _seed_parents(test_store, test_embed_fn, n_parents)
+    seed_parents(test_store, test_embed_fn, n_parents)
     calls = []
 
     def fake_scores(query, docs):
@@ -162,7 +142,7 @@ def test_straggler_rescore_failure_keeps_honest_mixed_flags(
     from legend_lore import service
 
     n_parents = service.RERANK_POOL_MIN + 2
-    _seed_parents(test_store, test_embed_fn, n_parents)
+    seed_parents(test_store, test_embed_fn, n_parents)
     calls = []
 
     def fake_scores(query, docs):

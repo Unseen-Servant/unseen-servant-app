@@ -6,14 +6,6 @@ monkey-patch the rerank module directly to feed deterministic scores
 into the search handler and verify the reorder behaviour.
 """
 
-import pytest
-
-
-@pytest.fixture
-def indexed_client(client, sample_pdf_path):
-    client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
-    return client
-
 
 def test_rerank_false_skips_reranker(indexed_client, monkeypatch):
     """When rerank=False, the reranker is never invoked."""
@@ -33,9 +25,9 @@ def test_rerank_false_skips_reranker(indexed_client, monkeypatch):
 def _seeded_headings(client, test_store, test_embed_fn, **request):
     """Section headings of a 3-section search, in result order. The
     fixture PDF is one section, too few to show a reorder."""
-    from tests.test_search_tiers import _seed_parents
+    from tests.conftest import seed_parents
 
-    _seed_parents(test_store, test_embed_fn, 3)
+    seed_parents(test_store, test_embed_fn, 3)
     response = client.post("/api/search", json={"query": "dragon", "n_results": 3, **request})
     assert response.status_code == 200, response.text
     return [r["section_heading"] for r in response.json()["results"]], response.json()["results"]

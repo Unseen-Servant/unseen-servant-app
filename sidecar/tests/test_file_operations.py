@@ -7,29 +7,14 @@ or removing them immediately (delete) — instead of waiting for the
 next auto-sync poll to discover the change.
 """
 
-import json
 import shutil
 
-from legend_lore.service import MANIFEST_FILENAME
-from tests.conftest import run_sync
+from tests.conftest import index_pdfs, read_manifest
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def index_pdfs(client, *pdf_paths):
-    """Index one or more PDFs via sync-index and assert success."""
-    response = run_sync(client, {
-        "selected_paths": [str(p) for p in pdf_paths]
-    })
-    return response
-
-
-def read_manifest(tmp_path):
-    """Load the manifest from disk."""
-    return json.loads((tmp_path / MANIFEST_FILENAME).read_text())
-
 
 # ---------------------------------------------------------------------------
 # File rename

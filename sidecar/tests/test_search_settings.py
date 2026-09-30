@@ -9,7 +9,6 @@ built-in default (docs/retrieval/2026-07-11-search-settings-design.md).
 
 import json
 
-import pytest
 
 from legend_lore import service
 from legend_lore.service import (
@@ -21,12 +20,6 @@ from legend_lore.service import (
     resolve_search_knobs,
     save_search_settings,
 )
-
-
-@pytest.fixture
-def indexed_client(client, sample_pdf_path):
-    client.post("/api/index-files", json={"paths": [str(sample_pdf_path)]})
-    return client
 
 
 # ---------------------------------------------------------------------------
