@@ -20,7 +20,6 @@
   import GettingStartedPage from '../../lib/legend-lore/GettingStartedPage.svelte';
   import SettingsModal from '../../lib/shell/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../../lib/shell/KeyboardHelpOverlay.svelte';
-  import LaunchSplash from '../../lib/shell/LaunchSplash.svelte';
   import DocumentStatsModal from '../../lib/legend-lore/DocumentStatsModal.svelte';
   import ConfirmDialog from '../../lib/ui/ConfirmDialog.svelte';
   import { confirmPrompt } from '../../lib/shell/confirmStore';
@@ -277,10 +276,8 @@
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
   let showHelpOverlay = false;
-  let showSplash = true;
   // Gates the engage detent (app.css). See where it's set in onMount.
   let motionReady = false;
-  let splashTimer: ReturnType<typeof setTimeout> | null = null;
   let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
   let healthInterval: ReturnType<typeof setInterval> | null = null;
@@ -682,15 +679,10 @@
   let missingFolderToastId: string | null = null;
 
   onMount(async () => {
-    splashTimer = setTimeout(() => {
-      showSplash = false;
-      splashTimer = null;
-    }, 1200);
-
     // Sidecar failed to start at app launch — show one sticky banner so the
     // user gets a single clear failure message instead of N "failed to
-    // connect" toasts on every per-call attempt. The setup() emit happens
-    // before the webview is ready, so we also poll the stashed state here;
+    // connect" toasts on every per-call attempt. The boot emits it before
+    // this window even exists, so we also poll the stashed state here;
     // the listener covers any future failures (e.g. mid-session restart).
     function showSidecarFailure(payload: { log_path: string; message: string }) {
       jobNotification.show({
@@ -946,7 +938,6 @@
     if (healthInterval) clearInterval(healthInterval);
     if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
-    if (splashTimer) clearTimeout(splashTimer);
     if (unlistenSidecarFailed) unlistenSidecarFailed();
   });
 
@@ -2205,14 +2196,6 @@
   //   6. Focused tree row                → clear focus
   //   (modal Esc handled by Modal.svelte; the docked filter panel claims
   //   its own Esc while focus is inside it)
-  function dismissSplash() {
-    if (!showSplash) return;
-    showSplash = false;
-    if (splashTimer) {
-      clearTimeout(splashTimer);
-      splashTimer = null;
-    }
-  }
 
   // The release half of every hold. Unconditional on purpose: whatever
   // gating applied when the key went down, the key coming back up must
@@ -2222,15 +2205,6 @@
   }
 
   function handleGlobalKeydown(event: KeyboardEvent) {
-    // While the launch splash is up, swallow the first keypress to dismiss
-    // it. Users who hit a shortcut on launch shouldn't have it interpreted
-    // as both "skip splash" and "trigger shortcut".
-    if (showSplash) {
-      dismissSplash();
-      event.preventDefault();
-      return;
-    }
-
     // When a native <dialog> is open via showModal(), the browser inerts
     // the rest of the page (clicks, focus, screen-readers all skip), but
     // window-level keydown listeners still fire because keydown bubbles
@@ -3580,7 +3554,6 @@
   on:contextmenu|preventDefault
 />
 
-<LaunchSplash visible={showSplash} onDismiss={dismissSplash} />
 
 <main class="app-layout" class:motion-ready={motionReady}>
   <Header

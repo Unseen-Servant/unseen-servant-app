@@ -7,6 +7,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
+mod boot;
 mod legend_lore;
 
 // ---------------------------------------------------------------------------
@@ -87,9 +88,8 @@ fn window_size_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 
 /// Apply the size the user last left the window at.
 ///
-/// Called early in setup(), before the sidecar startup blocks: restoring after
-/// it would leave the window at its default size for a couple of seconds and
-/// then jump.
+/// Called while the window is still hidden behind the splash, so it never
+/// shows at its default size and then jumps.
 fn restore_window_size(app: &tauri::AppHandle) {
     let Some(path) = window_size_path(app) else {
         return;
@@ -114,6 +114,26 @@ fn restore_window_size(app: &tauri::AppHandle) {
 
     if let Some(size) = sanitize_window_size(saved, max) {
         let _ = window.set_size(tauri::LogicalSize::new(size.width, size.height));
+    }
+}
+
+/// Create the Legend Lore window, hidden, from its tauri.conf.json entry
+/// (`create: false` keeps Tauri from opening it at launch). The boot calls
+/// this once the sidecar has settled and shows it when the splash closes.
+fn open_tool_window(app: &tauri::AppHandle) {
+    let Some(config) = app.config().app.windows.iter().find(|w| w.label == "main") else {
+        return;
+    };
+    match tauri::WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()) {
+        Ok(_) => restore_window_size(app),
+        Err(e) => eprintln!("Failed to open the Legend Lore window: {}", e),
+    }
+}
+
+fn show_tool_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
     }
 }
 
@@ -353,11 +373,22 @@ fn sidecar_binary_path(name: &str) -> Result<std::path::PathBuf, String> {
 // ---------------------------------------------------------------------------
 
 /// Return the stashed startup-failure payload, if any. The frontend calls
-/// this on mount to recover from the race where ``setup()`` emits
+/// this on mount to recover from the race where the boot emits
 /// ``sidecar://failed`` before the webview has loaded a listener.
 #[tauri::command]
 fn get_sidecar_failure(state: tauri::State<SidecarFailureState>) -> Option<SidecarFailedPayload> {
     state.0.lock().ok().and_then(|g| g.clone())
+}
+
+/// Stash a startup failure for the Legend Lore window's late mount AND emit
+/// it for any listener that's already attached.
+fn record_sidecar_failure(app: &tauri::AppHandle, payload: SidecarFailedPayload) {
+    if let Some(state) = app.try_state::<SidecarFailureState>() {
+        if let Ok(mut guard) = state.0.lock() {
+            *guard = Some(payload.clone());
+        }
+    }
+    let _ = app.emit("sidecar://failed", &payload);
 }
 
 /// Block until the sidecar publishes its port file and accepts a TCP
@@ -368,16 +399,28 @@ fn get_sidecar_failure(state: tauri::State<SidecarFailureState>) -> Option<Sidec
 /// learn what that port is by polling for ``data_dir/sidecar.port`` to
 /// appear. PyInstaller ``--onefile`` extraction in production can take a
 /// few seconds on first run, hence the longer attempt budget there.
-fn wait_for_sidecar(port_file: &Path, log_path: &Path) -> Result<u16, String> {
+///
+/// ``on_port`` fires once, when the port file first parses: Python is up.
+/// The socket only accepts later, once the store is open and the app serves.
+fn wait_for_sidecar(
+    port_file: &Path,
+    log_path: &Path,
+    mut on_port: impl FnMut(),
+) -> Result<u16, String> {
     use std::net::TcpStream;
     use std::time::Duration;
 
     let max_attempts: u32 = if cfg!(debug_assertions) { 50 } else { 150 };
     let connect_timeout = Duration::from_millis(200);
+    let mut port_seen = false;
 
     for attempt in 1..=max_attempts {
         if let Ok(contents) = std::fs::read_to_string(port_file) {
             if let Ok(port) = contents.trim().parse::<u16>() {
+                if !port_seen {
+                    port_seen = true;
+                    on_port();
+                }
                 let addr = format!("127.0.0.1:{}", port);
                 if let Ok(socket_addr) = addr.parse() {
                     if TcpStream::connect_timeout(&socket_addr, connect_timeout).is_ok() {
@@ -580,6 +623,7 @@ pub fn run() {
             legend_lore::rename_collection,
             legend_lore::delete_collection,
             get_sidecar_failure,
+            boot::get_boot_state,
             legend_lore::search_index,
             legend_lore::get_search_settings,
             legend_lore::update_search_settings
@@ -593,61 +637,27 @@ pub fn run() {
             migrate_legacy_data_dir(&app_data_dir);
             std::fs::create_dir_all(&app_data_dir).ok();
 
-            // Before the sidecar startup below, which blocks.
-            restore_window_size(app.handle());
-
             let chroma_dir = app_data_dir.join("chroma_db");
 
-            let sidecar_log = app_data_dir.join("sidecar.log");
-
             app.manage(SidecarFailureState(Mutex::new(None)));
+            app.manage(boot::BootState::new());
 
-            // record_failure: stash for the frontend's late mount AND emit for
-            // any listener that's already attached (e.g. mid-session restart).
-            let record_failure = |app: &tauri::AppHandle, payload: SidecarFailedPayload| {
-                if let Some(state) = app.try_state::<SidecarFailureState>() {
-                    if let Ok(mut guard) = state.0.lock() {
-                        *guard = Some(payload.clone());
-                    }
-                }
-                let _ = app.emit("sidecar://failed", &payload);
-            };
-
-            // Start the Python sidecar
-            let port_file = chroma_dir.join("sidecar.port");
-            match start_sidecar(&chroma_dir) {
+            // Spawning is quick; waiting for the sidecar to serve is not, so
+            // that part runs in the boot thread behind the splash window.
+            let spawned = match start_sidecar(&chroma_dir) {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));
-                    match wait_for_sidecar(&port_file, &sidecar_log) {
-                        Ok(port) => {
-                            SIDECAR_PORT.store(port, Ordering::Relaxed);
-                        }
-                        Err(msg) => {
-                            eprintln!("{}", msg);
-                            record_failure(
-                                app.handle(),
-                                SidecarFailedPayload {
-                                    log_path: sidecar_log.to_string_lossy().into_owned(),
-                                    message: msg,
-                                },
-                            );
-                        }
-                    }
+                    Ok(())
                 }
                 Err(e) => {
                     eprintln!("Warning: Could not start sidecar: {}", e);
                     eprintln!("Indexing features will be unavailable.");
                     app.manage(SidecarState(Mutex::new(None)));
-                    record_failure(
-                        app.handle(),
-                        SidecarFailedPayload {
-                            log_path: sidecar_log.to_string_lossy().into_owned(),
-                            message: format!("Could not start sidecar: {}", e),
-                        },
-                    );
+                    Err(format!("Could not start sidecar: {}", e))
                 }
-            }
+            };
+            boot::start(app.handle().clone(), spawned, app_data_dir);
 
             // ---------------------------------------------------------------
             // System tray
@@ -705,7 +715,10 @@ pub fn run() {
                 } => {
                     // Hide window instead of closing — app stays alive in tray
                     api.prevent_close();
-                    save_window_size(app_handle, &label);
+                    // The splash would overwrite the tool window's saved size.
+                    if label != boot::SPLASH_LABEL {
+                        save_window_size(app_handle, &label);
+                    }
                     if let Some(window) = app_handle.get_webview_window(&label) {
                         let _ = window.hide();
                     }

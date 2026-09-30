@@ -1059,7 +1059,7 @@ def resolve_collection_paths(
 # ---------------------------------------------------------------------------
 
 
-def warm_search_stack(get_spell_corrector) -> None:
+def warm_search_stack(get_spell_corrector, report=lambda step, state: None) -> None:
     """Pay search's lazy loads at boot rather than in the first query.
 
     Two things in the search path build themselves on first use: the
@@ -1070,16 +1070,26 @@ def warm_search_stack(get_spell_corrector) -> None:
     Diagnostics-grade error handling, like ``keep_embedder_warm``: a
     warm-up that fails must never take the sidecar down at boot, and the
     next real search reports the problem with far better context.
+
+    ``report(step, state)`` feeds the splash window's lamps (``/api/boot``):
+    each step goes ``running`` before its load and ``done`` or ``failed``
+    after it; a disabled reranker is ``skipped``.
     """
-    if os.getenv("RERANK_DISABLED") != "1":
+    if os.getenv("RERANK_DISABLED") == "1":
+        report("reranker", "skipped")
+    else:
+        report("reranker", "running")
         try:
             rerank_scores("warm", ["warm"])
+            report("reranker", "done")
         except Exception:
-            pass
+            report("reranker", "failed")
+    report("spelling", "running")
     try:
         get_spell_corrector()
+        report("spelling", "done")
     except Exception:
-        pass
+        report("spelling", "failed")
 
 
 # How much of the heading path each ranking input carries: "path" (the

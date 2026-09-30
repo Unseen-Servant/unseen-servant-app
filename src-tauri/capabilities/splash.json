@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "splash",
+  "description": "Capability for the launch splash, which shows itself once it has painted",
+  "windows": [
+    "splash"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show"
+  ]
+}

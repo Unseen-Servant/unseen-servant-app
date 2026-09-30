@@ -49,6 +49,7 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 - `src/lib/legend-lore/types.ts` — Legend Lore TypeScript types
 - `src-tauri/src/lib.rs` — `run()`, sidecar lifecycle, tray, windows, health checks
 - `src-tauri/src/legend_lore.rs` — Legend Lore Tauri commands (proxy to the sidecar)
+- `src-tauri/src/boot.rs` — cold start behind the splash window (`src/routes/splash/`); tool windows open when it settles
 - `sidecar/server.py` — FastAPI app construction, lifecycle, health; mounts each tool's router
 - `sidecar/legend_lore/` — Legend Lore routes (`router.py`), indexing + search (`service.py`), retrieval modules
 - `sidecar/mcp_server.py` — MCP tool definitions for Claude Desktop

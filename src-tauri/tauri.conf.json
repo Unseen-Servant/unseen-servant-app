@@ -17,7 +17,21 @@
         "height": 800,
         "minWidth": 940,
         "minHeight": 600,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "create": false,
+        "visible": false
+      },
+      {
+        "label": "splash",
+        "title": "Unseen Servant",
+        "url": "splash",
+        "width": 560,
+        "height": 352,
+        "resizable": false,
+        "decorations": false,
+        "center": true,
+        "visible": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

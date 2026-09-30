@@ -128,3 +128,38 @@ def test_warm_search_stack_survives_a_failing_reranker(monkeypatch):
     warm_search_stack(lambda: built.append(1))  # must not raise
 
     assert built == [1]
+
+
+# The splash window lights one lamp per step from these reports, so each
+# step must announce itself before the slow part and settle after it.
+
+def test_warm_search_stack_reports_each_step(monkeypatch):
+    monkeypatch.delenv("RERANK_DISABLED", raising=False)
+    monkeypatch.setattr(service, "rerank_scores", lambda query, docs: [0.0])
+    reports = []
+
+    warm_search_stack(lambda: None, report=lambda step, state: reports.append((step, state)))
+
+    assert reports == [
+        ("reranker", "running"),
+        ("reranker", "done"),
+        ("spelling", "running"),
+        ("spelling", "done"),
+    ]
+
+
+def test_warm_search_stack_reports_failures_and_skips(monkeypatch):
+    monkeypatch.setenv("RERANK_DISABLED", "1")
+
+    def no_vocabulary():
+        raise RuntimeError("store closed")
+
+    reports = []
+
+    warm_search_stack(no_vocabulary, report=lambda step, state: reports.append((step, state)))
+
+    assert reports == [
+        ("reranker", "skipped"),
+        ("spelling", "running"),
+        ("spelling", "failed"),
+    ]

@@ -20,6 +20,15 @@ def test_health_returns_ok(client):
     assert response.json() == {"status": "ok"}
 
 
+def test_boot_lists_the_warm_up_steps(client):
+    """GET /api/boot is what the splash window polls. Nothing warms the stack
+    under TestClient (the warm-up thread starts in ``__main__``), so both
+    steps sit at pending."""
+    response = client.get("/api/boot")
+    assert response.status_code == 200
+    assert response.json() == {"steps": {"reranker": "pending", "spelling": "pending"}}
+
+
 # ---------------------------------------------------------------------------
 # CORS contract — sidecar accepts only known Tauri origins
 # ---------------------------------------------------------------------------

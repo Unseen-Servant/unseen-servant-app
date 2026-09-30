@@ -150,14 +150,24 @@ def create_app(
     app.state.mcp_last_heartbeat = None
     app.state.mcp_last_query = None
 
+    # Warm-up progress, written by the ``warm_search_stack`` thread that
+    # ``__main__`` starts. Plain strings under the GIL; nothing else writes.
+    app.state.boot_steps = {"reranker": "pending", "spelling": "pending"}
+
     # ------------------------------------------------------------------
-    # Workstation endpoints: liveness and MCP connection state
+    # Workstation endpoints: liveness, boot progress and MCP connection state
     # ------------------------------------------------------------------
 
     @app.get("/health")
     async def health():
         """Health check for startup detection."""
         return {"status": "ok"}
+
+    @app.get("/api/boot")
+    async def boot():
+        """Warm-up progress, polled by the splash window until each step
+        settles (``done``, ``failed`` or ``skipped``)."""
+        return {"steps": app.state.boot_steps}
 
     @app.get("/api/models/status")
     def models_status():
@@ -271,7 +281,7 @@ if __name__ == "__main__":
     # Needs the app, so it starts here rather than beside the ticker.
     threading.Thread(
         target=warm_search_stack,
-        args=(application.state.get_spell_corrector,),
+        args=(application.state.get_spell_corrector, application.state.boot_steps.__setitem__),
         daemon=True,
     ).start()
 
