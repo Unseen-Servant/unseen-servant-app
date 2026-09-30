@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { onMount, onDestroy, tick, flushSync } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
@@ -2597,6 +2597,14 @@
   }
 
   function handleContextMenu(event: MouseEvent, item: FileItem, initialSubmenu: 'collection' | null = null) {
+    // A right-click on another row while the menu is up has to mount a new
+    // menu, not re-point the open one: ContextMenu places itself and resets
+    // its cursor only as it mounts, so a reused menu stayed at the first
+    // row's spot while acting on the second.
+    if (contextMenu) {
+      contextMenu = null;
+      flushSync();
+    }
     // Highlight whatever was right-clicked / triggered via M, including
     // folders — keyboard nav allows folder focus since chunk b.
     setFocusedFilePath(item.path);

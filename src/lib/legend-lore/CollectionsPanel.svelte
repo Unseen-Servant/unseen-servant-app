@@ -4,7 +4,7 @@
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
-  import { onDestroy, tick } from 'svelte';
+  import { flushSync, onDestroy, tick } from 'svelte';
   import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut, slotChord } from '../shell/keybindings';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
@@ -383,6 +383,13 @@
   function openContextMenu(e: MouseEvent, name: string) {
     e.preventDefault();
     e.stopPropagation();
+    // A second right-click has to mount a new menu: placeContextMenu runs
+    // only as the menu mounts, so a reused one stayed hidden while still
+    // holding the menu slot, and the arrow keys went nowhere.
+    if (ctxMenu) {
+      closeContextMenu();
+      flushSync();
+    }
     onFocusCollection(name);
     ctxPigmentOpen = false;
     ctxPositioned = false;
