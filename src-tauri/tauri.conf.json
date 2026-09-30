@@ -10,6 +10,7 @@
     "frontendDist": "../build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Legend Lore",
@@ -31,7 +32,8 @@
         "decorations": false,
         "center": true,
         "visible": false,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "transparent": true
       }
     ],
     "security": {

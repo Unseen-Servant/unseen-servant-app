@@ -47,3 +47,12 @@
 </svelte:head>
 
 <LaunchSplash {snapshot} {version} />
+
+<style>
+  /* app.css paints the page; here only the card may, or the transparent
+     window's corners come out square again. */
+  :global(html),
+  :global(body) {
+    background: transparent;
+  }
+</style>

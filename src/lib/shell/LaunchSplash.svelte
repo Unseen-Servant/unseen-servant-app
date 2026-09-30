@@ -49,12 +49,17 @@
 </div>
 
 <style>
+  /* The window is transparent, so the card is the window: its corners and
+     edge are drawn here. */
   .splash {
     position: fixed;
     inset: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-window);
     cursor: default;
     user-select: none;
     -webkit-user-select: none;

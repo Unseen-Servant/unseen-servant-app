@@ -642,6 +642,14 @@ pub fn run() {
             app.manage(SidecarFailureState(Mutex::new(None)));
             app.manage(boot::BootState::new());
 
+            // The splash draws its own rounded corners on a transparent window.
+            // macOS shapes the shadow to them; Windows would frame the square
+            // window in a 1px white border instead, so it goes without.
+            #[cfg(windows)]
+            if let Some(splash) = app.get_webview_window(boot::SPLASH_LABEL) {
+                let _ = splash.set_shadow(false);
+            }
+
             // Spawning is quick; waiting for the sidecar to serve is not, so
             // that part runs in the boot thread behind the splash window.
             let spawned = match start_sidecar(&chroma_dir) {
