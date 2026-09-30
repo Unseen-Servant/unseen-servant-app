@@ -37,6 +37,19 @@ export const CARET_RIGHT =
   'M441.3 299.8C451.5 312.4 450.8 330.9 439.1 342.6L311.1 470.6C301.9 479.8 288.2 482.5 276.2 477.5C264.2 472.5 256.5 460.9 256.5 448L256.5 192C256.5 179.1 264.3 167.4 276.3 162.4C288.3 157.4 302 160.2 311.2 169.3L439.2 297.3L441.4 299.7z';
 
 /**
+ * Font Awesome "circle" (solid) and "circle" (regular, a ring). The record-arm
+ * glyph: the ring while a collection is disarmed, the solid circle once armed.
+ * Drawn with viewBox="64 64 512 512" — the vendored 640 box cropped to the
+ * circle, so the rendered size is the glyph's size.
+ * Sources: ./icons/circle-solid-full.svg, ./icons/circle-regular-full.svg
+ */
+export const CIRCLE =
+  'M64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z';
+
+export const CIRCLE_RING =
+  'M528 320C528 205.1 434.9 112 320 112C205.1 112 112 205.1 112 320C112 434.9 205.1 528 320 528C434.9 528 528 434.9 528 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z';
+
+/**
  * Bookmark ribbon, hollow — always stroked, never filled (stroke-width 2.2).
  * A collection's ribbon is stroked in its pigment; one without a pigment,
  * and the "in a collection" bucket, in tertiary grey; Loose dashes it.

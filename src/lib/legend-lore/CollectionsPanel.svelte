@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, RIBBON_OUTLINE } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
@@ -835,7 +835,7 @@
                   aria-pressed={armed}
                   title={`${armed ? 'Disarm' : 'Arm'} ${col.name} (E)`}
                 >
-                  <span class="arm-dot" aria-hidden="true"></span>
+                  <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true"><path d={armed ? CIRCLE : CIRCLE_RING}/></svg>
                 </button>
                 <!-- Archived rows carry no transport — unarchive to play. -->
                 <button
@@ -849,7 +849,8 @@
                   {#if playing}
                     <span class="stop-mark" aria-hidden="true"></span>
                   {:else}
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4.2v15.6L20 12z"/></svg>
+                    <!-- Font Awesome "play" icon (src/lib/ui/icons/play-solid-full.svg) -->
+                    <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z"/></svg>
                   {/if}
                 </button>
               {/if}
@@ -942,7 +943,7 @@
       <!-- A new collection lands armed: say so before it exists. Not a
            control — the real arm button arrives with the row. -->
       <span class="tr-btn arm-btn armed ghost-arm" aria-hidden="true">
-        <span class="arm-dot"></span>
+        <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor"><path d={CIRCLE}/></svg>
       </span>
     </div>
     <div class="ghost-keys micro-label" aria-hidden="true">
@@ -1351,19 +1352,20 @@
     height: 9px;
     display: block;
   }
-  /* Boxes, not SVGs: a 9px SVG can't centre in the 16px interior on
-     whole pixels (3.5px either side), so on a 1x screen the dot and the
-     stop square sat half a pixel off their border. A 6px box leaves an
-     even 5px. The ▶ stays an SVG — it is deliberately off-centre (the
+  /* Even sizes: a 9px glyph can't centre in the 16px interior on whole
+     pixels (3.5px either side), so on a 1x screen the arm circle and the
+     stop square sat half a pixel off their border. The arm circle draws
+     at 8px (its viewBox is cropped to the circle) and the stop square is
+     a 6px box. The ▶ stays 9px — it is deliberately off-centre (the
      optical centre of a triangle sits left of its box). */
-  .arm-dot,
+  .tr-btn .arm-glyph {
+    width: 8px;
+    height: 8px;
+  }
   .stop-mark {
     width: 6px;
     height: 6px;
     background: currentColor;
-  }
-  .arm-dot {
-    border-radius: 50%;
   }
   .tr-btn:hover {
     color: var(--text-secondary);
