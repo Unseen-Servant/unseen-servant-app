@@ -1,23 +1,27 @@
-// Manuscript-pigment palette for user-assigned collection colors.
-// Collections only — game systems are monochrome (shield + parchment ink).
-// All hues share oklch L 0.64, C 0.10 so no color shouts over another on
-// the dark shell. Hue gaps ≥35° keep neighbors distinguishable. Reserved
-// UI hues are deliberately excluded so user colors can't impersonate
-// semantics: mode purple (~300°), parchment/brass, pilot-lamp amber,
-// bright danger red.
+// Sorcerer's-cabinet palette for user-assigned collection colors: minerals
+// and dyes off a sorcerer's shelf. Collections only — game systems are
+// monochrome (shield + parchment ink).
+// The warm hues belong to the interface — vermilion danger/mute, pilot-lamp
+// amber, parchment/brass — and so does mode purple (~300°); every pigment
+// sits ≥ ΔE 10 (OKLab ×100) from them so user colors can't impersonate
+// semantics. Lightness varies (0.62–0.78) rather than being shared: at one
+// shared L, red/green pairs collapse for deuteranopes. Closest pair is
+// ΔE 8 (Malachite/Verdigris), 6 under deuteranopia or protanopia. L stays
+// ≥ 0.61 so --text-inverse clears 4.5:1 on a selected index cell's fill.
+// Collections store the hex itself: when a pigment changes, remap the old
+// hex in the sidecar's _migrate_collection_record.
 export interface Pigment {
   name: string;
   hex: string;
 }
 
 export const PIGMENTS: Pigment[] = [
-  { name: 'Madder',    hex: '#c2736d' }, // oklch(0.64 0.10 25)
-  { name: 'Ember',     hex: '#bb7b4e' }, // oklch(0.64 0.10 55)
-  { name: 'Gilt',      hex: '#9f8b3e' }, // oklch(0.64 0.10 95)
-  { name: 'Moss',      hex: '#6b9b60' }, // oklch(0.64 0.10 140)
-  { name: 'Verdigris', hex: '#2fa094' }, // oklch(0.64 0.10 185)
-  { name: 'Woad',      hex: '#5b90c7' }, // oklch(0.64 0.10 250)
-  { name: 'Plum',      hex: '#b5739f' }, // oklch(0.64 0.10 340)
+  { name: 'Madder',    hex: '#d07c87' }, // oklch(0.68 0.105 12)
+  { name: 'Arsenic',   hex: '#abc279' }, // oklch(0.78 0.10 123)
+  { name: 'Malachite', hex: '#4e9766' }, // oklch(0.615 0.105 153)
+  { name: 'Verdigris', hex: '#43a49f' }, // oklch(0.66 0.09 191)
+  { name: 'Woad',      hex: '#6b9ad0' }, // oklch(0.675 0.095 252)
+  { name: 'Murex',     hex: '#dba2c3' }, // oklch(0.775 0.08 343)
 ];
 
 export const PALETTE: string[] = PIGMENTS.map((p) => p.hex);

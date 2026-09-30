@@ -354,6 +354,41 @@ def test_v1_collections_migrate_on_load(test_store, test_embed_fn, tmp_path):
     assert col["archived"] is False
 
 
+def test_retired_pigments_remap_on_load(test_store, test_embed_fn, tmp_path):
+    """Colors from the retired pigment palette load as their successors; others pass through."""
+    import json
+    from server import create_app
+    from fastapi.testclient import TestClient
+
+    def record(name, color):
+        return {
+            "name": name,
+            "file_paths": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "color": color,
+        }
+
+    stored = {
+        "version": 2,
+        "collections": {
+            "Gilt": record("Gilt", "#9f8b3e"),
+            "Ember": record("Ember", "#bb7b4e"),
+            "Custom": record("Custom", "#336699"),
+            "Plain": record("Plain", None),
+        },
+    }
+    (tmp_path / "collections.json").write_text(json.dumps(stored))
+
+    app = create_app(store=test_store, data_dir=tmp_path, embed_fn=test_embed_fn)
+    client = TestClient(app)
+
+    cols = client.get("/api/collections").json()["collections"]
+    assert cols["Gilt"]["color"] == "#abc279"  # Arsenic
+    assert cols["Ember"]["color"] == "#d07c87"  # folds into Madder
+    assert cols["Custom"]["color"] == "#336699"
+    assert cols["Plain"]["color"] is None
+
+
 # ---------------------------------------------------------------------------
 # Atomic rename — POST /api/collections/{name}/rename
 # ---------------------------------------------------------------------------

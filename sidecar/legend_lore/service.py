@@ -897,9 +897,28 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Collections store their pigment's hex, so a palette change remaps here.
+# The retired manuscript pigments → their sorcerer's-cabinet successors
+# (src/lib/legend-lore/palette.ts). Ember folds into Madder: the cabinet
+# leaves orange to the interface's amber and vermilion.
+_RETIRED_PIGMENTS = {
+    "#c2736d": "#d07c87",  # Madder    → Madder
+    "#bb7b4e": "#d07c87",  # Ember     → Madder
+    "#9f8b3e": "#abc279",  # Gilt      → Arsenic
+    "#6b9b60": "#4e9766",  # Moss      → Malachite
+    "#2fa094": "#43a49f",  # Verdigris → Verdigris
+    "#5b90c7": "#6b9ad0",  # Woad      → Woad
+    "#b5739f": "#dba2c3",  # Plum      → Murex
+}
+
+
 def _migrate_collection_record(name: str, raw: dict) -> dict:
-    """Fill in v2 fields for an on-disk record. v1 records get sensible defaults."""
+    """Fill in v2 fields for an on-disk record. v1 records get sensible defaults.
+
+    Colors from the retired pigment palette load as their successors.
+    """
     created_at = raw.get("created_at") or _now_iso()
+    color = raw.get("color")
     return {
         "id": raw.get("id") or str(uuid.uuid4()),
         "name": raw.get("name") or name,
@@ -908,7 +927,7 @@ def _migrate_collection_record(name: str, raw: dict) -> dict:
         "updated_at": raw.get("updated_at") or created_at,
         "last_used_at": raw.get("last_used_at"),
         "description": raw.get("description", ""),
-        "color": raw.get("color"),
+        "color": _RETIRED_PIGMENTS.get(color, color),
         "archived": raw.get("archived", False),
     }
 
