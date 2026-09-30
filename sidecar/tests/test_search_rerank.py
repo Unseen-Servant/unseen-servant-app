@@ -1,7 +1,7 @@
 """Integration tests for /api/search re-ranking.
 
 Conftest sets ``RERANK_DISABLED=1`` for the rest of the suite (so unit
-tests don't trigger a 120 MB model download). These tests
+tests don't trigger a ~23 MB model download). These tests
 monkey-patch the rerank module directly to feed deterministic scores
 into the search handler and verify the reorder behaviour.
 """

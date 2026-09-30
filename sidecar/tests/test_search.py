@@ -2,9 +2,10 @@
 Tests for POST /api/search.
 
 These tests verify that semantic search returns relevant results.
-Because we use ChromaDB's DefaultEmbeddingFunction (real ONNX
-embeddings), we can actually test that "dragon" queries return
-dragon-related chunks — not just that "something came back."
+Because the suite embeds with a real model (fastembed's
+all-MiniLM-L6-v2, see conftest), we can actually test that "dragon"
+queries return dragon-related chunks — not just that "something came
+back."
 """
 
 import pytest

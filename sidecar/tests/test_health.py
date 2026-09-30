@@ -2,7 +2,7 @@
 Health endpoint tests.
 
 This is the best file to write first (after chunking) because:
-1. It has zero dependencies on ChromaDB data
+1. It has zero dependencies on the library store
 2. It verifies the TestClient fixture works
 3. It builds confidence before tackling complex tests
 

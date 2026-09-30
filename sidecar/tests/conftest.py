@@ -290,7 +290,7 @@ def special_chars_pdf_path(tmp_path):
     "D&D 5E - Player's Handbook (2024).pdf"
 
     These can break URL encoding, filesystem operations,
-    and ChromaDB chunk IDs.
+    and chunk IDs.
     """
     return make_pdf(
         tmp_path / "D&D 5E - Player's Guide (2024).pdf",

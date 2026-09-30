@@ -31,7 +31,7 @@ def test_get_settings_defaults(client):
     assert response.status_code == 200
     assert response.json() == {
         "rerank": True,
-        "rerank_candidates": 50,
+        "rerank_candidates": service.RERANK_CANDIDATE_POOL,
         "spell_correction": True,
         "hybrid": True,
         "variant_expansion": False,

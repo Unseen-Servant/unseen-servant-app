@@ -22,11 +22,13 @@ from tests.conftest import seed_parents
 def test_tier_for_rerank_scale():
     from legend_lore import service
 
-    assert service._tier_for(0.999, reranked=True) == "strong"
-    assert service._tier_for(0.98, reranked=True) == "strong"  # boundary
-    assert service._tier_for(0.9, reranked=True) == "good"
-    assert service._tier_for(0.5, reranked=True) == "good"     # boundary
-    assert service._tier_for(0.3, reranked=True) == "weak"
+    strong = service.RERANK_TIER_STRONG
+    weak = service.RERANK_TIER_WEAK
+    assert service._tier_for((strong + 1) / 2, reranked=True) == "strong"
+    assert service._tier_for(strong, reranked=True) == "strong"    # boundary
+    assert service._tier_for((strong + weak) / 2, reranked=True) == "good"
+    assert service._tier_for(weak, reranked=True) == "good"        # boundary
+    assert service._tier_for(weak - 0.2, reranked=True) == "weak"
 
 
 def test_tier_for_cosine_scale():

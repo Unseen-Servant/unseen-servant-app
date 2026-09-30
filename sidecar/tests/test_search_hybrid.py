@@ -1,10 +1,9 @@
-"""Experimental BM25 hybrid retrieval (default-off `hybrid` search flag).
+"""BM25 hybrid retrieval (the `hybrid` search flag, default-on since 2026-09-23).
 
 Per the 2026-07-01 roadmap's BM25 REOPEN item: a BM25 index over the
 heading-prepended chunk texts (the same view the embedder and reranker
 see) is fused with the dense candidate ranking via reciprocal-rank
-fusion, then handed to the unchanged boost/rerank/dedupe pipeline. The
-flag defaults to off and must not change production search behavior.
+fusion, then handed to the unchanged boost/rerank/dedupe pipeline.
 
 Since roadmap 1.6 (S5) the BM25 rows are persisted (now in the library
 store's `unit_fts`), written at index time in the same transaction as the

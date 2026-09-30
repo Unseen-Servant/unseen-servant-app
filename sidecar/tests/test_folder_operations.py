@@ -161,7 +161,7 @@ def test_folder_delete_removes_from_manifest(client, sample_pdf_path, large_text
 
 
 def test_folder_delete_removes_chunks(client, sample_pdf_path, tmp_path):
-    """ChromaDB should have zero chunks after folder delete."""
+    """The store should have zero chunks after folder delete."""
     index_pdfs(client, sample_pdf_path)
 
     # Verify chunks exist before delete

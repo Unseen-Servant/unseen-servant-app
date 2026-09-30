@@ -166,7 +166,7 @@ def test_sync_adds_new_files(
     assert data["updated"] == 0
     assert data["total_indexed"] == 1
 
-    # Verify chunks in ChromaDB
+    # Verify chunks in the store
     assert test_store.count_units() > 0
 
     # Verify manifest was written
@@ -192,7 +192,7 @@ def test_sync_removes_files(
     assert data["removed"] == 1
     assert data["total_indexed"] == 0
 
-    # Verify chunks deleted from ChromaDB
+    # Verify chunks deleted from the store
     assert test_store.count_units() == 0
 
     # Verify manifest entry removed
