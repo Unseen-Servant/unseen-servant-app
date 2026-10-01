@@ -53,11 +53,17 @@ export const CIRCLE_RING =
  * Gem, hollow — always stroked, never filled (stroke-width 2.2). Font Awesome
  * "gem" (regular) traced along the centre of its bands, so it takes a stroke
  * and a dash. A collection's gem is stroked in its pigment; one without a
- * pigment, and the "in a collection" bucket, in tertiary grey; Loose dashes it.
- * The header's collections key draws the solid gem.
+ * pigment, and the "in a collection" bucket, in tertiary grey. The header's
+ * collections key draws the solid gem.
  * viewBox="0 0 24 24". Source: ./icons/gem-regular-full.svg
+ *
+ * GEM_OUTLINE is its silhouette without the facets: Loose dashes it, since
+ * dashes run across the facets and turn the whole gem to noise. GEM is built
+ * on it so the two can't drift.
  */
-export const GEM = 'M7.5 4.5h9l4 5.5-8.5 9.5L3.5 10zM3.5 10h17M7.5 4.5 12 10l4.5-5.5';
+export const GEM_OUTLINE = 'M7.5 4.5h9l4 5.5-8.5 9.5L3.5 10z';
+
+export const GEM = `${GEM_OUTLINE}M3.5 10h17M7.5 4.5 12 10l4.5-5.5`;
 
 /**
  * Heater shield — a game system. Always stroked, never filled: systems are
