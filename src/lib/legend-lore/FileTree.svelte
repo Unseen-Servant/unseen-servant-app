@@ -282,7 +282,9 @@
 </script>
 
 {#if !hidden}
-<div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope && !isHiddenItem} style="padding-left: {level * 1.5}rem;" data-tree-row={item.path}>
+<!-- A child row renders inside its parent's .item and inherits its indent,
+     so each level adds one step — not level × step, which compounded. -->
+<div class="item" class:focused={isFocused} class:hidden-item={isHiddenItem} class:out-of-scope={outOfScope && !isHiddenItem} style="padding-left: {level > 0 ? 1.5 : 0}rem;" data-tree-row={item.path}>
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div
     class="row-container"
