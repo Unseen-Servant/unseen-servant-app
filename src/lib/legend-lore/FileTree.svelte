@@ -9,7 +9,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { memberStateFor, type ArmState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { BOOK, CARET_RIGHT, GEM } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { markName } from './nameFilter';
   import SystemBadge from './SystemBadge.svelte';
@@ -72,7 +72,7 @@
   // dimming them. Browsing surfaces only — console surfaces never hide.
   export let hideOutOfScope: boolean = false;
   // File path → the collections holding it, colored ones first. Drawn as
-  // a ribbon strip so curation is visible while browsing; folders carry
+  // a strip of gems so curation is visible while browsing; folders carry
   // no membership of their own and get nothing.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
 
@@ -391,13 +391,13 @@
     {/if}
 
     {#if ribbons.length > 0}
-      <!-- Which collections hold this book. Same ribbon the panel rows,
+      <!-- Which collections hold this book. Same gem the panel rows,
            scope chips and search results use, so the pigment↔collection
            mapping only has to be learned once. -->
       <span class="ribbons" title={ribbonTitle}>
         {#each ribbonSplit.shown as r (r.name)}
           <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/each}
         {#if ribbonSplit.overflow > 0}

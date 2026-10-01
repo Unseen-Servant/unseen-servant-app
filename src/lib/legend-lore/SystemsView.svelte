@@ -12,7 +12,7 @@
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { BOOK, CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { BOOK, CARET_RIGHT, GEM, SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { markName, markPath, nameMatches, pathMatches } from './nameFilter';
 
@@ -818,7 +818,7 @@
                   <span class="ribbons" title={ribbons.map((r) => r.name).join(', ')}>
                     {#each ribbonSplit.shown as r (r.name)}
                       <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                        <path d={RIBBON_OUTLINE}/>
+                        <path d={GEM}/>
                       </svg>
                     {/each}
                     {#if ribbonSplit.overflow > 0}

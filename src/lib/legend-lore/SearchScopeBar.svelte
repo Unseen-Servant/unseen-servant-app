@@ -8,9 +8,9 @@
   import { displaySystem } from './searchScope';
   import { chordHint } from '../shell/keybindings';
   import type { CurationKey } from './searchScope';
-  import { RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { GEM, SHIELD } from '../ui/iconPaths';
 
-  // Chip glyph = axis (pigment bookmark = collection, outline bookmark =
+  // Chip glyph = axis (pigment gem = collection, outline gem =
   // curation bucket, monochrome shield = system); chip frame = operation
   // (purple play/solo / danger-edged mute).
   export let collectionPlays: { key: string; label: string; color: string | null }[] = [];
@@ -123,14 +123,14 @@
       >
         <span class="chip-prefix micro-label">play</span>
         {#if chip.color}
-          <!-- Bookmark ribbon — the collection axis keeps its pigment -->
+          <!-- Gem — the collection axis keeps its pigment -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {:else}
-          <!-- No pigment — outline ribbon, same grammar as the panel -->
+          <!-- No pigment — outline gem, same grammar as the panel -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/if}
         <span class="chip-label">{chip.label}</span>
@@ -148,13 +148,13 @@
       >
         <span class="chip-prefix micro-label">mute</span>
         {#if chip.color}
-          <!-- Bookmark ribbon — the collection keeps its pigment even muted -->
+          <!-- Gem — the collection keeps its pigment even muted -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {:else}
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/if}
         <span class="chip-label">{chip.label}</span>
@@ -172,14 +172,14 @@
       >
         <span class="chip-prefix micro-label">solo</span>
         {#if chip.color}
-          <!-- Bookmark ribbon — the collection axis keeps its pigment -->
+          <!-- Gem — the collection axis keeps its pigment -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {:else}
-          <!-- No pigment — outline ribbon, same grammar as the panel -->
+          <!-- No pigment — outline gem, same grammar as the panel -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/if}
         <span class="chip-label">{chip.label}</span>
@@ -197,9 +197,9 @@
       >
         <span class="chip-prefix micro-label">solo</span>
         {#if key === 'collected'}
-          <!-- Outline bookmark — the curation bucket, not a specific collection -->
+          <!-- Outline gem — the curation bucket, not a specific collection -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/if}
         <span class="chip-label">{CURATION_LABELS[key]}</span>
@@ -235,14 +235,14 @@
       >
         <span class="chip-prefix micro-label">mute</span>
         {#if chip.color}
-          <!-- Bookmark ribbon — dims with the chip ("removed, still recognizable") -->
+          <!-- Gem — dims with the chip ("removed, still recognizable") -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {:else}
-          <!-- No pigment — outline ribbon, same grammar as the panel -->
+          <!-- No pigment — outline gem, same grammar as the panel -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/if}
         <span class="chip-label">{chip.label}</span>
@@ -261,7 +261,7 @@
         <span class="chip-prefix micro-label">mute</span>
         {#if key === 'collected'}
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
         {/if}
         <span class="chip-label">{CURATION_LABELS[key]}</span>

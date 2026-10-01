@@ -15,7 +15,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
   import type { FilterSection } from './filterRows';
-  import { CARET_RIGHT, RIBBON_OUTLINE, SHIELD } from '../ui/iconPaths';
+  import { CARET_RIGHT, GEM, SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
 
   // DAW-style filter state for game systems.
@@ -347,9 +347,9 @@
           on:pointerenter={() => enterRow(`curation:${ch.key}`)}
           on:pointerleave={() => leaveRow(`curation:${ch.key}`)}
         >
-          <!-- Outline bookmark — same ribbon as the chip bookmarks, unfilled:
+          <!-- Outline gem — same gem as the chip gems, unfilled:
                the channel is the curation bucket, not a specific collection.
-               Loose dashes that same ribbon rather than taking a shape of its
+               Loose dashes that same gem rather than taking a shape of its
                own — the systems section walks the same ladder (a shield for
                a tagged system, that shield dashed for Untagged), so dashed
                means "in none" on both axes. A strike or
@@ -366,7 +366,7 @@
             stroke-dasharray={ch.key === 'loose' ? '3.2 2.4' : undefined}
             aria-hidden="true"
           >
-            <path d={RIBBON_OUTLINE}/>
+            <path d={GEM}/>
           </svg>
           <span class="row-name">{ch.name}</span>
           <span class="sm" class:engaged={soloed || muted}>

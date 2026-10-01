@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, GEM } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
@@ -372,7 +372,7 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): the transport first
-  // (Arm / Play / Mute), then the track's properties (Ribbon ▸ / Rename /
+  // (Arm / Play / Mute), then the track's properties (Gem ▸ / Rename /
   // Archive), then Delete. Same visual family as the file tree's
   // ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
@@ -804,16 +804,16 @@
             aria-hidden="true"
           >{sortKey === 'custom' ? '⠿' : ''}</span>
           {#if col.color}
-            <!-- Pigment bookmark — this is where the color↔collection
-                 mapping is taught; the same ribbon reappears in scope
+            <!-- Pigment gem — this is where the color↔collection
+                 mapping is taught; the same gem reappears in scope
                  chips and search-result index cells. -->
             <svg class="bkm" style={`color: ${col.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={RIBBON_OUTLINE}/>
+              <path d={GEM}/>
             </svg>
           {:else}
-            <!-- Outline ribbon — uncolored, same grammar as the untagged shield -->
+            <!-- Outline gem — uncolored, same grammar as the untagged shield -->
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={RIBBON_OUTLINE}/>
+              <path d={GEM}/>
             </svg>
           {/if}
           {#if isRenamingRow}
@@ -936,7 +936,7 @@
     <div class="row-container ghost naming">
       <span class="grip" aria-hidden="true"></span>
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-        <path d={RIBBON_OUTLINE}/>
+        <path d={GEM}/>
       </svg>
       <input
         class="new-coll-input"
@@ -969,7 +969,7 @@
     >
       <span class="grip" aria-hidden="true"></span>
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-        <path d={RIBBON_OUTLINE}/>
+        <path d={GEM}/>
       </svg>
       {#if dropIntoNew && newDropPreview}
         <!-- Under a drag, say what the drop will make. -->
@@ -1026,10 +1026,9 @@
       aria-haspopup="menu"
       aria-expanded={ctxPigmentOpen}
     >
-      <!-- "Ribbon" names the glyph the user sees; the palette entries behind
-           it stay pigments in code, where Ribbon is already collectionRibbons'
-           per-file type. -->
-      <span>Ribbon</span>
+      <!-- "Gem" names the glyph the user sees; the palette entries behind
+           it stay pigments in code. -->
+      <span>Gem</span>
       <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if ctxPigmentOpen}
         <div class="submenu" role="menu">
@@ -1042,7 +1041,7 @@
             >
               <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
               <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                <path d={RIBBON_OUTLINE}/>
+                <path d={GEM}/>
               </svg>
               <span>{pig.name}</span>
             </button>
@@ -1056,7 +1055,7 @@
           >
             <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
             <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={RIBBON_OUTLINE}/>
+              <path d={GEM}/>
             </svg>
             <span>None</span>
           </button>
@@ -1199,7 +1198,7 @@
     /* Right gutter matches the filter panel's rows so the two panels'
        count readouts share a column down the dock. On the left, 0.25rem +
        the grip (0.55rem) + the gap (0.3rem) is the filter row's 1.1rem
-       inset, so the ribbon lands in the same column as the filter panel's
+       inset, so the gem lands in the same column as the filter panel's
        shields, with the grip in front of it. */
     padding: 0.22rem 0.75rem 0.22rem 0.25rem;
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
@@ -1471,7 +1470,7 @@
 
   /* The ghost track — the next collection, waiting. It wears .row-container,
      so it is a row's exact geometry, drawn in outline: a plain tertiary
-     ribbon in the icon column (not dashed — dashes are Loose's, "in no
+     gem in the icon column (not dashed — dashes are Loose's, "in no
      collection", in the filter panel), an italic tertiary name, the ⌘N cap
      at its end. Hover is the rows' own grey step. */
   .ghost {

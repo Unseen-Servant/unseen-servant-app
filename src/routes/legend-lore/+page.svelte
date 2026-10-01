@@ -379,7 +379,7 @@
   }
   $: selectedResult = searchResults.length > 0 ? searchResults[selectedResultIndex] ?? null : null;
   // A playing collection materializes a chip exactly as a solo does —
-  // its bookmark takes the collection pigment — with the "play" prefix
+  // its gem takes the collection pigment — with the "play" prefix
   // naming the transport that armed it. Clicking the chip stops the
   // track. Folder/file solos and mutes stay on the tertiary fallback.
   $: collectionPlays = [...playingCollections].map((name) => ({
@@ -391,7 +391,7 @@
   }));
   $: collectionSolos = [...scopeSolos].map(([key, ref]) => ({ key, label: ref.label, color: null }));
   $: collectionMutes = [...scopeMutes].map(([key, ref]) => ({ key, label: ref.label, color: null }));
-  // Collection-track mutes chip like plays — pigment ribbon, mute
+  // Collection-track mutes chip like plays — pigment gem, mute
   // dressing. Never suppressed: mute wins over play on the mix layer.
   $: collectionTrackMutes = [...mutedCollectionNames].map((name) => ({
     key: name,
@@ -3523,7 +3523,7 @@
     }
   }
 
-  // Pigment change from the panel's context menu — bookmarks, chips, and
+  // Pigment change from the panel's context menu — gems, chips, and
   // index cells all derive from `collections`, so a reload updates them.
   async function setCollectionColor(name: string, color: string | null) {
     try {
@@ -3532,7 +3532,7 @@
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not set ribbon: ${String(e)}`,
+        message: `Could not set gem: ${String(e)}`,
         duration: 5000,
       });
     }

@@ -51,7 +51,7 @@
   /* Tags are user-written and uncapped — ellipsize against --menu-max-width
      rather than stretching the menu or scrolling it sideways. The label stays
      primary ink: identity rides on the shield, the same way a collection row
-     carries its pigment in the ribbon and not the name. */
+     carries its pigment in the gem and not the name. */
   .sys-tag {
     min-width: 0;
     overflow: hidden;

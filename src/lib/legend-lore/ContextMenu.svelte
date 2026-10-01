@@ -5,7 +5,7 @@
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from '../shell/keybindings';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
-  import { CARET_RIGHT, RIBBON_OUTLINE } from '../ui/iconPaths';
+  import { CARET_RIGHT, GEM } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemTagRows from './SystemTagRows.svelte';
 
@@ -428,14 +428,14 @@
             >
               <span class="menu-pip" class:on={state === 'all'} class:partial={state === 'some'} aria-hidden="true"></span>
               {#if col.color}
-                <!-- Bookmark ribbon — the collection keeps its pigment -->
+                <!-- Gem — the collection keeps its pigment -->
                 <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke={col.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                  <path d={RIBBON_OUTLINE}/>
+                  <path d={GEM}/>
                 </svg>
               {:else}
-                <!-- No pigment — outline ribbon, same grammar as the chips -->
+                <!-- No pigment — outline gem, same grammar as the chips -->
                 <svg class="submenu-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                  <path d={RIBBON_OUTLINE}/>
+                  <path d={GEM}/>
                 </svg>
               {/if}
               <span class="submenu-name" title={col.name}>{col.name}</span>

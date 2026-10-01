@@ -50,17 +50,19 @@ export const CIRCLE_RING =
   'M528 320C528 205.1 434.9 112 320 112C205.1 112 112 205.1 112 320C112 434.9 205.1 528 320 528C434.9 528 528 434.9 528 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z';
 
 /**
- * Bookmark ribbon, hollow — always stroked, never filled (stroke-width 2.2).
- * A collection's ribbon is stroked in its pigment; one without a pigment,
- * and the "in a collection" bucket, in tertiary grey; Loose dashes it.
- * viewBox="0 0 24 24".
+ * Gem, hollow — always stroked, never filled (stroke-width 2.2). Font Awesome
+ * "gem" (regular) traced along the centre of its bands, so it takes a stroke
+ * and a dash. A collection's gem is stroked in its pigment; one without a
+ * pigment, and the "in a collection" bucket, in tertiary grey; Loose dashes it.
+ * The header's collections key draws the solid gem.
+ * viewBox="0 0 24 24". Source: ./icons/gem-regular-full.svg
  */
-export const RIBBON_OUTLINE = 'M6 3h12v18l-6-4.4L6 21z';
+export const GEM = 'M7.5 4.5h9l4 5.5-8.5 9.5L3.5 10zM3.5 10h17M7.5 4.5 12 10l4.5-5.5';
 
 /**
  * Heater shield — a game system. Always stroked, never filled: systems are
  * monochrome and carry no colour of their own. The Untagged bucket draws the
  * same shield dashed (a placeholder, not an identity), as Loose does with the
- * collection ribbon. viewBox="0 0 24 24", stroke-width="2.2".
+ * collection gem. viewBox="0 0 24 24", stroke-width="2.2".
  */
 export const SHIELD = 'M12 3l7 2.5V11c0 5-3.3 8.2-7 10-3.7-1.8-7-5-7-10V5.5z';
