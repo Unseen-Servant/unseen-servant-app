@@ -981,11 +981,15 @@
 
   async function setViewMode(mode: 'tree' | 'systems') {
     // Selecting a view is also the exit from the search view. Blur the
-    // bar if it holds focus — a focused input would keep feeding a view
-    // no longer on screen.
+    // bar if it holds focus there — a focused input would keep feeding a
+    // view no longer on screen. Outside it the bar is empty or a / filter
+    // on the view being swapped in, so it keeps focus and Tab can flip
+    // again while you type.
+    if (searchViewOpen) {
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae?.classList.contains('search-input')) ae.blur();
+    }
     searchViewOpen = false;
-    const ae = document.activeElement as HTMLElement | null;
-    if (ae?.classList.contains('search-input')) ae.blur();
     viewMode = mode;
     try {
       const store = await load('settings.json');
@@ -2415,9 +2419,13 @@
     // Session/Arrangement key, for the same two-views-of-one-set job. Only
     // in the browse view and only off text fields and menus, so Tab keeps
     // its meaning wherever there is something to type into or pick from.
+    // The search bar is the exception: its Tab stops (× and the dock
+    // behind it) are the mouse's, so there Tab flips too — out of the
+    // search view, as either half of the view switch does.
     // ⇧Tab flips too: with two views, direction means nothing.
-    if (event.key === 'Tab' && !meta && !event.altKey && selectedFolder && !searchViewOpen
-        && !inAnyInput && !contextMenu && !renamingFilePath && !menuSlotHeld()) {
+    const tabFlips = inSearchInput ? !event.isComposing : !searchViewOpen && !inAnyInput;
+    if (event.key === 'Tab' && !meta && !event.altKey && selectedFolder && tabFlips
+        && !contextMenu && !renamingFilePath && !menuSlotHeld()) {
       event.preventDefault();
       void setViewMode(viewMode === 'tree' ? 'systems' : 'tree');
       return;
