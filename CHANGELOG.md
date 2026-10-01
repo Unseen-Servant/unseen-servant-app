@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-10-01
+
+### Fixed
+
+- **The macOS app starts its indexer again.** In 3.1.0 the sidecar quit at launch while opening the library store, so search and indexing never came up. Coming from 3.0, re-index your library after updating (see 3.1.0)
+
 ## [3.1.0] - 2026-09-30
 
 **Re-index your library after updating.** The index moves to a new store, and the old one is removed the first time the app starts, so search returns nothing until you re-index. Library settings lists every file as needing it. Your PDFs, collections and game-system settings are untouched.
