@@ -6,7 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-09-30
+
 **Re-index your library after updating.** The index moves to a new store, and the old one is removed the first time the app starts, so search returns nothing until you re-index. Library settings lists every file as needing it. Your PDFs, collections and game-system settings are untouched.
+
+### Added
+
+- **Pick a collection from the search bar with `@`.** Type `@` and a few letters: the Collections panel narrows to the matches and rings the one `↵` will play. `↵` plays it alone, `⇧↵` adds it to the mix, and the `@`-word is never searched, so scope and question go in one breath (`⌘K`, `@mon ↵`, `troll regeneration ↵`)
+- **`⌘1`–`⌘9` play a collection from anywhere.** Collection N in the panel's current order plays alone (press again to stop it); `⌘⇧1`–`⌘⇧9` add it to the mix or take it out
+- **Find a book by name.** Start the search bar with `/` and the tree or systems view narrows to the books and folders whose names hold every word you type, opening the folders on the way to each match. `↓` or `↵` jumps to the first match; `Esc` drops the filter
+- **The inspector's scrollbar maps the section.** A tick marks every place the query's words appear and an edge mark shows the passage that matched; click the mark, or press `G` in the results, to scroll back to the match
+- **Filter panel sections fold.** Curation, Game systems and Hidden items fold shut from their header or with `←`/`→`, and so do the systems view's groups. A folded section with a solo, mute or view switch on inside lights a lamp so it isn't forgotten
+- A "Dim weak matches" setting under General → Search results (on by default)
+- An embedder lamp in the status bar, between the sidecar and MCP lamps: lit when the embedding model is ready, dim when the runtime answers but the model is missing
+- More keys: `↵` opens the focused file or folds a folder in every list, `⇧X` ticks every row from the last tick to here, `⌥↑`/`⌥↓` jump to the first or last row on a Mac, and `⌘/` opens the shortcut sheet even from the search bar
 
 ### Changed
 
@@ -20,6 +33,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Indexing progress says what it's doing.** The status bar reads "Indexing 4 of 12 · Player's Handbook" instead of a file and chunk tally, with a small meter showing how far into a long book it is, and the summary counts books ("Added 3 books, removed 1"). Failed books stay listed until you dismiss them; hover the note to see which ones and why
 - **Unseen Servant opens on a splash that shows the cold start.** It comes up before any tool window, with a lamp for each part as it starts: settings, sidecar and library store, then Legend Lore's embedder, reranker, spelling vocabulary and library folder. If one fails (the embedder isn't running, the library drive isn't mounted) the splash names it before the tools open anyway. The splash closes on its own and can no longer be clicked or keyed away, and the Legend Lore window no longer carries one of its own
 - **Collections wear a gem instead of a ribbon.** Panel rows, file rows, scope chips and menus draw a gem in the collection's pigment, and the header's collections key shows a gem too. The context menu's `Ribbon` submenu is now `Gem`, still named for the glyph on the row. Loose draws only the gem's outline, dashed, so the dashes don't break up the facets
+- **Tab switches between the tree and systems view**, replacing `⌘1`/`⌘2`, which now play collections; `⌘1`–`⌘9` no longer jump to a search result. Collapse the whole tree with `⇧←` or `⇧H`
+- **Results lead with the section that matched.** Each card names its book and system above the section title, cites the printed page, and lights your query's words in the snippet. Book names drop `.pdf`, and the relevance gauge has one cell per tier. The weak-matches divider is gone; weak results stay dimmed
+- **The inspector reads like a page.** The section's path and `[open p.N]` stay pinned above the text, your query's words are lit, prose keeps a readable line length, and the matched passage is marked by a rule in the margin
+- **Fewer stray section headings.** Bold quote attributions, stat lines ("Ferocity: 2 Size: Small") and sentences are no longer promoted to headings, which cleans up bestiaries and OSR books most (it changes about a third of the Dragonbane Bestiary's and Wight-Box's passages)
+- **The search view waits for a query.** `⌘K` or an `@`-pick no longer blanks the tree; results take its place on the first keystroke that leaves something to search
+- **The sync prompt says what changed**: "2 moved, 1 missing on disk, 3 to add" instead of "3 disk changes", and its action reads `[sync]`
+- The header's Collections and Filters keys light a lamp while anything in their panel is engaged, even with the panel closed
+- The collections panel ends in an empty "New collection" track; click it or press `⌘N` to name one in place. A click on a collection row opens its books
+- Game systems wear a shield instead of a die. Collections come in six new pigments chosen to stay clear of the interface's own colours; existing collections move to their nearest successor on their own
+- The status bar counts "books" rather than "PDFs indexed"
+
+### Fixed
+
+- Two PDFs with the same filename in different folders no longer both take the game-system tags you give one of them, and the status bar counts them as two books
+- A damaged collections, manifest or custom game-systems file no longer stops the sidecar from starting or breaks its panel; it is set aside as `<name>.corrupt-<timestamp>` for repair and the app starts with an empty one (a set-aside manifest means the next sync re-indexes)
+- When the embedder isn't running, search, sync and Claude say "Embedder not running" instead of "[Errno 61] Connection refused"
+- A sync the sidecar refuses shows its reason instead of "Sync completed but no result received"
+- Result rows cite the printed page, matching the inspector, instead of the PDF page
+- Renaming a folder keeps it expanded, focused and hidden
+- A shift-click or `⇧X` range ticks only the rows the tree shows, not hidden or filtered-out files between them
+- Right-clicking another row while a context menu is open opens a fresh menu for that row
+- Deeply nested folders no longer drift further right with every level
+- While the arrow keys move the cursor, the row under a resting pointer no longer lights up beside it
+- On Windows, paths reach the app with `/` separators, which folder selection, hidden folders, and renaming or deleting a folder rely on
 
 ## [3.0.0] - 2026-09-24
 
