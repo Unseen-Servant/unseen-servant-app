@@ -50,6 +50,11 @@ jobs:
 
       - name: Install Python dependencies and PyInstaller
         if: steps.sidecar-dist.outputs.cache-hit != 'true'
+        # uv's own Python, not the runner's python.org framework build: that
+        # one's sqlite3 lacks enable_load_extension, so the bundled sidecar
+        # can't load sqlite-vec and dies at startup.
+        env:
+          UV_PYTHON_PREFERENCE: only-managed
         run: |
           cd sidecar
           uv sync --frozen --group build

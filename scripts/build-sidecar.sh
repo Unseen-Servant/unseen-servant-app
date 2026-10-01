@@ -23,6 +23,9 @@ cd "$SIDECAR_DIR"
 
 # Sync the project venv (Python from .python-version) with the build group,
 # which provides PyInstaller. Frozen so the release build matches uv.lock.
+# uv's own Python only: the python.org macOS build's sqlite3 lacks
+# enable_load_extension, so a bundle built on it can't load sqlite-vec.
+export UV_PYTHON_PREFERENCE=only-managed
 uv sync --frozen --group build
 
 echo "==> Building legend-lore-sidecar (FastAPI server)..."
