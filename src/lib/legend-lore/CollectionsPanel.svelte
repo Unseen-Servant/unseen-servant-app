@@ -1277,6 +1277,10 @@
     width: 0.8rem;
     height: 0.8rem;
     flex-shrink: 0;
+    /* Tops the row's 0.3rem gap up to the filter rows' 0.45rem, so names
+       start in one column down the dock. The gap itself stays 0.3rem: the
+       grip-to-gem inset above depends on it. */
+    margin-right: 0.15rem;
   }
 
   .row-name {
