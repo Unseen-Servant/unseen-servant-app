@@ -484,7 +484,7 @@
   // predicate is allowed to speak about.
   $: indexedFolderPaths = computeAncestorPaths(indexedPaths);
 
-  async function runSearch(q: string) {
+  async function runSearch(q: string, focusResults = false) {
     const trimmed = q.trim();
     if (!trimmed) {
       searchResults = [];
@@ -584,6 +584,15 @@
       searchResults = next;
       resultsQuery = trimmed;
       if (!wasGrowing) selectedResultIndex = 0;
+      if (focusResults && next.length > 0) {
+        // Only while the bar still holds focus — a click or chord during
+        // the wait has already put the user somewhere else.
+        const active = document.activeElement as HTMLElement | null;
+        if (active?.classList.contains('search-input')) {
+          await tick();
+          searchResultsComponent?.focusRow(selectedResultIndex);
+        }
+      }
     } catch (e) {
       if (seq !== searchSeq) return;
       searchError = String(e);
@@ -611,16 +620,16 @@
     runSearch(q);
   }
 
-  // Enter in the search input always (re-)submits. To open a result, the
-  // user moves focus into the list with ArrowDown (or clicks a row) and
-  // presses Enter there. This combobox split avoids the overloaded-Enter
-  // ambiguity we tried earlier.
+  // Enter in the search input always (re-)submits, then hands focus to the
+  // first result once the list lands — Enter there opens it. With no hits
+  // focus stays in the bar to retype. The bar is re-entered with ⌘K (or a
+  // click), never by arrowing up out of the list.
   function handleSearchSubmit(q: string) {
     const trimmed = q.trim();
     if (trimmed !== committedQuery) resetPageSize();
     committedQuery = trimmed;
     committedPartial = false; // Enter commits the query as typed
-    runSearch(q);
+    runSearch(q, true);
   }
 
   // Scroll-to-bottom in the result list bumps the page size and re-runs
@@ -2285,9 +2294,9 @@
   //   1. Open context menu               → close
   //   2. Inline rename in flight         → cancel
   //   3. Competing popover               → its own handler
-  //   4. Search view, focus not in bar   → focus the search bar
-  //   5. Focus in bar                    → drop a / filter, else leave to
-  //                                         the browse view
+  //   4. Search view                     → leave to the browse view
+  //   5. Focus in bar                    → drop a / filter, else back to
+  //                                         the browse view's rows
   //   6. Row under a / filter            → focus the search bar
   //   7. Focused tree row                → clear focus
   //   (modal Esc handled by Modal.svelte; the docked filter panel claims
@@ -2332,24 +2341,22 @@
       // Escape mid-IME-composition just cancels the composition — never
       // step the ladder on it.
       if (event.isComposing) return;
-      // Search-view ladder: anywhere in the view funnels focus to the
-      // bar; the bar steps out to the browse view. The query is never
-      // cleared here — × is the only clear, and it isn't an exit.
+      // Search view: Esc from the bar or the results steps straight out
+      // to the browse view — the bar is reached only with ⌘K (or a click),
+      // never on the way out. The query is never cleared here — × is the
+      // only clear, and it isn't an exit.
       if (searchViewOpen) {
-        if (inSearchInput) {
+        if (inSearchInput || activePane === 'files') {
           event.preventDefault();
           searchViewOpen = false;
-          (target as HTMLInputElement).blur();
+          (document.activeElement as HTMLElement | null)?.blur?.();
           // The browse view isn't in the DOM until Svelte flushes the
           // swap; focusFileRegion queries rows / the SystemsView binding.
           void tick().then(() => focusFileRegion());
-        } else if (activePane === 'files') {
-          event.preventDefault();
-          headerComponent?.focus();
         }
         // An active dock pane keeps its own Esc semantics (its window
         // handler clears the highlight and releases the arrows); the next
-        // Esc funnels to the bar.
+        // Esc leaves the search view.
         return;
       }
       // The bar outside the search view. A / filter goes first, the way an
@@ -2364,8 +2371,8 @@
         focusFileRegion();
         return;
       }
-      // Rows under a / filter funnel to the bar, as the search view's do —
-      // the filter is edited, and ended, there.
+      // Rows under a / filter funnel to the bar — the filter is edited,
+      // and ended, there.
       if (nameFilter !== null && activePane === 'files' && !inAnyInput) {
         event.preventDefault();
         headerComponent?.focus();
@@ -2377,12 +2384,13 @@
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
 
-    // Cmd/Ctrl+K: focus the search input from anywhere in the app. Not ⌘F —
-    // that's the browser/OS find-in-page chord, and here it opens the Filters
-    // panel instead (below). ⌘K is the command-bar convention.
+    // Cmd/Ctrl+K: focus the search input from anywhere in the app, query
+    // selected so typing replaces it and → edits it. Not ⌘F — that's the
+    // browser/OS find-in-page chord, and here it opens the Filters panel
+    // instead (below). ⌘K is the command-bar convention.
     if (meta && !event.shiftKey && lk === 'k') {
       event.preventDefault();
-      headerComponent?.focus();
+      headerComponent?.focusAndSelect();
       return;
     }
 
@@ -2631,7 +2639,6 @@
     // visible, and the list's keys must not act on rows that aren't rendered.
     if (!searchViewOpen || searchResults.length === 0) return;
 
-    const inInput = inSearchInput;
     const inList = target?.closest('.search-results') !== null;
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
 
@@ -2640,34 +2647,27 @@
     // until Esc, ⌘⌥→, or a click on the search side hands it back.
     if (activePane !== 'files') return;
 
-    // Combobox flow: ArrowDown from the input pops focus into the list at
-    // the current selection. Arrow nav within the list moves both
-    // selection and focus together (j/k ride along, list-only — they must
-    // type in the input). ArrowUp from the first row pops back to the
-    // input. Enter or ⌘O opens; Escape is handled by the ladder above.
-    const isDown = event.key === 'ArrowDown' || (bareLetter && inList && lk === 'j');
-    const isUp = event.key === 'ArrowUp' || (bareLetter && inList && lk === 'k');
+    // Enter in the bar lands focus on the first result (handleSearchSubmit);
+    // the arrows never cross between bar and list — ↑ on the first row
+    // stays put. Arrow nav within the list moves both selection and focus
+    // together (j/k ride along). Enter or ⌘O opens; Escape is handled by
+    // the ladder above.
+    const isDown = inList && (event.key === 'ArrowDown' || (bareLetter && lk === 'j'));
+    const isUp = inList && (event.key === 'ArrowUp' || (bareLetter && lk === 'k'));
     const edge = inList ? jumpEdge(event) : null;
     if (edge) {
       event.preventDefault();
       selectedResultIndex = edge === 'first' ? 0 : searchResults.length - 1;
       searchResultsComponent?.focusRow(selectedResultIndex);
     } else if (isDown) {
-      if (inInput) {
-        event.preventDefault();
-        searchResultsComponent?.focusRow(selectedResultIndex);
-      } else if (inList) {
-        event.preventDefault();
-        selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
-        searchResultsComponent?.focusRow(selectedResultIndex);
-      }
-    } else if (isUp && inList) {
+      event.preventDefault();
+      selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
+      searchResultsComponent?.focusRow(selectedResultIndex);
+    } else if (isUp) {
       event.preventDefault();
       if (selectedResultIndex > 0) {
         selectedResultIndex -= 1;
         searchResultsComponent?.focusRow(selectedResultIndex);
-      } else {
-        headerComponent?.focus();
       }
     } else if (event.key === 'Enter' && inList) {
       event.preventDefault();

@@ -55,6 +55,13 @@
     inputEl?.focus();
   }
 
+  /** ⌘K: focus with the query selected, so typing replaces it. */
+  export function focusAndSelect() {
+    inputEl?.focus();
+    inputEl?.select();
+    syncMention();
+  }
+
   function syncMention() {
     const m = focused && inputEl ? mentionAt(searchQuery, inputEl.selectionStart ?? searchQuery.length) : null;
     const query = m ? m.query : null;

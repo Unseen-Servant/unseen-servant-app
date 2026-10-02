@@ -66,7 +66,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global', match: 'meta+i' },
-  { id: 'search.focus',          keys: { mac: '⌘K',   other: 'Ctrl+K' },        label: 'Focus search input',          scope: 'global' },
+  { id: 'search.focus',          keys: { mac: '⌘K',   other: 'Ctrl+K' },        label: 'Focus search input, query selected', scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
   { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal library folder in OS', scope: 'global' },
@@ -78,10 +78,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'app.escape',            keys: { mac: 'Esc',  other: 'Esc' },           label: 'Cancel / close / step back', scope: 'global' },
 
   // Search input
-  { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Submit search',                scope: 'searchInput' },
+  { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Submit search and move focus to the first result', scope: 'searchInput' },
   { id: 'search.mention',        keys: { mac: '@',    other: '@' },             label: 'Pick a collection to play — ↵ plays it alone, ⇧↵ adds it to the mix', scope: 'searchInput' },
   { id: 'search.filter',         keys: { mac: '/',    other: '/' },             label: 'Lead with / to filter the tree or systems view by name — ↓ or ↵ jumps to the first match', scope: 'searchInput' },
-  { id: 'search.intoResults',    keys: { mac: '↓',    other: '↓' },             label: 'Move focus into results, or the browse view', scope: 'searchInput' },
+  { id: 'search.intoBrowse',     keys: { mac: '↓',    other: '↓' },             label: 'Move focus into the browse view', scope: 'searchInput' },
   { id: 'search.exit',           keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave search — back to browse view', scope: 'searchInput' },
 
   // File tree (when a row is focused)
@@ -159,7 +159,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
 
   // Search results list
   { id: 'results.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Next result',                  scope: 'searchResults' },
-  { id: 'results.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Previous result (or back to input)', scope: 'searchResults' },
+  { id: 'results.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Previous result',              scope: 'searchResults' },
   { id: 'results.home',          keys: { mac: 'Home / ⌥↑', other: 'Home' },          label: 'Jump to first result',         scope: 'searchResults' },
   { id: 'results.end',           keys: { mac: 'End / ⌥↓', other: 'End' },           label: 'Jump to last result',          scope: 'searchResults' },
   { id: 'results.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open focused result',       scope: 'searchResults' },
@@ -170,7 +170,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's collection checkbox (while armed)", scope: 'searchResults', switch: true },
   { id: 'results.toMatch',       keys: { mac: 'G',    other: 'G' },             label: 'Scroll the preview back to the match', scope: 'searchResults' },
   { id: 'results.info',          keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused result', scope: 'searchResults' },
-  { id: 'results.toInput',       keys: { mac: 'Esc',  other: 'Esc' },           label: 'Back to search input',         scope: 'searchResults' },
+  { id: 'results.exit',          keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave search — back to browse view', scope: 'searchResults' },
 
   // Modal — excluded from the cheat sheet by both KeyboardHelpOverlay's and
   // help/ReferencePane's SCOPE_ORDER; each keeps its own copy of that list,

@@ -104,7 +104,7 @@
   }
 
   // Imperative handle for the parent so it can move keyboard focus into the
-  // list (e.g. ArrowDown from the search input). Selection state and focus
+  // list (e.g. after Enter in the search input). Selection state and focus
   // are kept in lockstep so Enter on a focused row opens the visible
   // selection without ambiguity.
   export function focusRow(index: number): void {
