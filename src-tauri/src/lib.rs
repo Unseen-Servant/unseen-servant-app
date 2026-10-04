@@ -7,6 +7,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
+mod app_context;
 mod boot;
 mod legend_lore;
 
@@ -633,7 +634,10 @@ pub fn run() {
             boot::get_boot_state,
             legend_lore::search_index,
             legend_lore::get_search_settings,
-            legend_lore::update_search_settings
+            legend_lore::update_search_settings,
+            app_context::get_app_context,
+            app_context::set_active_campaign,
+            app_context::set_active_session
         ])
         .setup(|app| {
             // Determine where the sidecar keeps its data (library store, manifest)
@@ -648,6 +652,7 @@ pub fn run() {
 
             app.manage(SidecarFailureState(Mutex::new(None)));
             app.manage(boot::BootState::new());
+            app.manage(app_context::AppContext::default());
 
             // The splash draws its own rounded corners on a transparent window.
             // macOS shapes the shadow to them; Windows would frame the square
