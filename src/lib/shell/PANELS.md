@@ -18,6 +18,8 @@ window defaults in `src-tauri/src/panels.rs`, because it creates the windows.
 - **`active: boolean`** — true while the panel is visible. Always true in its
   own window; in the main window, true only for the selected tab. Inactive
   docked panels stay mounted (hidden), so their state survives tab switches.
+  A panel with no window-level listeners may leave it undeclared;
+  `PanelView.svelte` passes it to those that take it.
 - **The shell context**, read through `shellState.ts`: `appContext` (active
   campaign and session, both optional). It mirrors Rust and updates in every
   window when any window changes it.
