@@ -46,7 +46,7 @@ necessary-not-sufficient. Reported per category —
 
 **The harness mimics the application experience**: requests send
 `n_results=25` by default — the UI's first page (`PAGE_SIZE_INITIAL` in
-`src/routes/legend-lore/+page.svelte`, pinned by `tests/test_eval_config.py`) — while
+`src/lib/legend-lore/LegendLorePanel.svelte`, pinned by `tests/test_eval_config.py`) — while
 metrics stay graded on the top 10. Search behavior can depend on the
 requested page size (the rerank candidate pool may scale with it), so
 gating at a size the app never sends validates the wrong config: the

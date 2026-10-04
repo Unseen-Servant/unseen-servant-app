@@ -10,7 +10,7 @@ level deep — pick by the part of the project a doc is about:
 
 UI and interaction rules have no bucket: the code is the source of truth, and
 each rule is written as a comment where it's enforced (e.g. the scope doctrine
-in `src/routes/legend-lore/+page.svelte`, the confirm keyboard in
+in `src/lib/legend-lore/LegendLorePanel.svelte`, the confirm keyboard in
 `src/lib/ui/confirmKeys.ts`). Visual conventions live in CLAUDE.md.
 
 **Naming:** `YYYY-MM-DD-<topic>-design.md` is the spec. Step-by-step

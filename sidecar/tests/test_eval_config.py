@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PAGE_SVELTE = REPO_ROOT / "src" / "routes" / "legend-lore" / "+page.svelte"
+PAGE_SVELTE = REPO_ROOT / "src" / "lib" / "legend-lore" / "LegendLorePanel.svelte"
 
 
 def _ui_initial_page_size() -> int:
@@ -27,6 +27,6 @@ def test_eval_default_page_size_matches_ui_first_page():
 
     assert DEFAULT_PAGE_SIZE == _ui_initial_page_size(), (
         "evals.run_eval.DEFAULT_PAGE_SIZE must track PAGE_SIZE_INITIAL in "
-        "src/routes/legend-lore/+page.svelte — the eval gates quality at the page size "
+        "src/lib/legend-lore/LegendLorePanel.svelte — the eval gates quality at the page size "
         "the UI actually sends (metrics stay graded @TOP_K)"
     )

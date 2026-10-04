@@ -43,7 +43,7 @@ bash scripts/bump-version.sh 1.2.0  # Bump version in package.json, tauri.conf.j
 
 ### Key files
 
-- `src/routes/legend-lore/+page.svelte` — Legend Lore main UI page
+- `src/lib/legend-lore/LegendLorePanel.svelte` — Legend Lore main UI (a panel; see `src/lib/shell/PANELS.md`)
 - `src/lib/{shell,ui,legend-lore}/` — workstation chrome, shared primitives, Legend Lore components
 - `src/lib/legend-lore/FileTree.svelte` — Recursive file tree component
 - `src/lib/legend-lore/types.ts` — Legend Lore TypeScript types
