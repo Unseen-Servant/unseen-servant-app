@@ -70,25 +70,24 @@ describe('splitRibbons', () => {
   });
 
   it('draws every colored ribbon up to the cap', () => {
-    expect(splitRibbons([c('A', '#a'), c('B', '#b')]).shown.map((r) => r.name)).toEqual(['A', 'B']);
+    const five = ['A', 'B', 'C', 'D', 'E'];
+    expect(splitRibbons(five.map((n) => c(n, '#a'))).shown.map((r) => r.name)).toEqual(five);
   });
 
   it('counts colored collections past the cap as overflow', () => {
-    const { shown, overflow } = splitRibbons([c('A', '#a'), c('B', '#b'), c('C', '#c')]);
-    expect(shown.map((r) => r.name)).toEqual(['A', 'B']);
+    const { shown, overflow } = splitRibbons(['A', 'B', 'C', 'D', 'E', 'F'].map((n) => c(n, '#a')));
+    expect(shown.map((r) => r.name)).toEqual(['A', 'B', 'C', 'D', 'E']);
     expect(overflow).toBe(1);
   });
 
-  // An outline ribbon says nothing a second outline ribbon doesn't, but
-  // the membership still has to be visible somewhere.
-  it('spends no slot on uncolored collections yet still counts them', () => {
+  it('gives uncolored collections a slot after the colored ones', () => {
     const { shown, overflow } = splitRibbons([c('A', '#a'), c('Y', null), c('Z', null)]);
-    expect(shown.map((r) => r.name)).toEqual(['A']);
-    expect(overflow).toBe(2);
+    expect(shown.map((r) => r.name)).toEqual(['A', 'Y', 'Z']);
+    expect(overflow).toBe(0);
   });
 
-  it('shows only an overflow count when nothing is colored', () => {
-    expect(splitRibbons([c('Y', null), c('Z', null)])).toEqual({ shown: [], overflow: 2 });
+  it('draws uncolored collections when nothing is colored', () => {
+    expect(splitRibbons([c('Y', null), c('Z', null)]).shown.map((r) => r.name)).toEqual(['Y', 'Z']);
   });
 
   it('honours a custom cap', () => {

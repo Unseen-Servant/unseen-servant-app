@@ -817,7 +817,7 @@
                 {#if ribbons.length > 0}
                   <span class="ribbons" title={ribbons.map((r) => r.name).join(', ')}>
                     {#each ribbonSplit.shown as r (r.name)}
-                      <svg class="ribbon" style={`color: ${r.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+                      <svg class="ribbon" style={`color: ${r.color ?? 'var(--text-tertiary)'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
                         <path d={GEM}/>
                       </svg>
                     {/each}

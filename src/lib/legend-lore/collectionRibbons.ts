@@ -10,7 +10,7 @@ export interface Ribbon {
 export const EMPTY_RIBBONS: readonly Ribbon[] = Object.freeze([]);
 
 /**
- * File path → the collections holding it, colored ones first so the two
+ * File path → the collections holding it, colored ones first so the five
  * ribbon slots a row can spend go to the collections that can actually be
  * told apart. Alphabetical within each group, which keeps the strip stable
  * as unrelated collections come and go.
@@ -46,23 +46,17 @@ export function buildRibbonIndex(
 
 /**
  * Split a row's ribbons into the ones that get drawn and a count for the
- * rest. Only colored collections earn a slot — an outline ribbon says
- * nothing a second outline ribbon doesn't — but every membership is
- * accounted for in the overflow, so nothing is silently invisible.
- *
- * Relies on buildRibbonIndex's colored-first ordering, so the scan can
- * stop at the first uncolored entry.
+ * rest. Every collection earns a slot up to the cap — uncolored ones draw
+ * as a tertiary-ink gem, the same grammar as the scope chips — and
+ * buildRibbonIndex's colored-first ordering hands the slots to the
+ * collections that can be told apart before the ones that can't.
  */
 export function splitRibbons(
   ribbons: readonly Ribbon[],
-  max = 2
+  max = 5
 ): { shown: readonly Ribbon[]; overflow: number } {
   if (ribbons.length === 0) return { shown: EMPTY_RIBBONS, overflow: 0 };
-  const shown: Ribbon[] = [];
-  for (const r of ribbons) {
-    if (!r.color || shown.length === max) break;
-    shown.push(r);
-  }
+  const shown = ribbons.slice(0, max);
   return { shown, overflow: ribbons.length - shown.length };
 }
 
