@@ -4,36 +4,36 @@
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { pdfFileUrl } from '../../lib/legend-lore/pdfUrl';
+  import { pdfFileUrl } from './pdfUrl';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../../lib/legend-lore/types';
-  import { decideSyncAction } from '../../lib/legend-lore/syncPolicy';
-  import { DEFAULT_SYNC_PREFERENCES } from '../../lib/legend-lore/types';
-  import FileTree from '../../lib/legend-lore/FileTree.svelte';
-  import ContextMenu from '../../lib/legend-lore/ContextMenu.svelte';
-  import Header from '../../lib/shell/Header.svelte';
-  import SearchResults from '../../lib/legend-lore/SearchResults.svelte';
-  import SearchInspector from '../../lib/legend-lore/SearchInspector.svelte';
-  import SearchScopeBar from '../../lib/legend-lore/SearchScopeBar.svelte';
-  import InspectorPlate from '../../lib/legend-lore/InspectorPlate.svelte';
-  import StatusBar from '../../lib/shell/StatusBar.svelte';
-  import GettingStartedPage from '../../lib/legend-lore/GettingStartedPage.svelte';
-  import SettingsModal from '../../lib/shell/SettingsModal.svelte';
-  import KeyboardHelpOverlay from '../../lib/shell/KeyboardHelpOverlay.svelte';
-  import DocumentStatsModal from '../../lib/legend-lore/DocumentStatsModal.svelte';
-  import ConfirmDialog from '../../lib/ui/ConfirmDialog.svelte';
-  import { confirmPrompt } from '../../lib/shell/confirmStore';
-  import { holdLatch } from '../../lib/ui/holdLatch';
-  import CollectionsPanel from '../../lib/legend-lore/CollectionsPanel.svelte';
-  import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
-  import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
-  import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
-  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn, renamePathKeys } from '../../lib/legend-lore/selectionUtils';
-  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, visibleFileSpan, type VisibleRow } from '../../lib/legend-lore/treeNav';
-  import { materializeKey } from '../../lib/shell/paneFocus';
-  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
-  import { runSyncJob } from '../../lib/legend-lore/syncJob';
-  import { clearSummary, reindexSummary, syncPromptMessage, syncSummary } from '../../lib/legend-lore/syncMessages';
+  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from './types';
+  import { decideSyncAction } from './syncPolicy';
+  import { DEFAULT_SYNC_PREFERENCES } from './types';
+  import FileTree from './FileTree.svelte';
+  import ContextMenu from './ContextMenu.svelte';
+  import Header from '../shell/Header.svelte';
+  import SearchResults from './SearchResults.svelte';
+  import SearchInspector from './SearchInspector.svelte';
+  import SearchScopeBar from './SearchScopeBar.svelte';
+  import InspectorPlate from './InspectorPlate.svelte';
+  import StatusBar from '../shell/StatusBar.svelte';
+  import GettingStartedPage from './GettingStartedPage.svelte';
+  import SettingsModal from '../shell/SettingsModal.svelte';
+  import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
+  import DocumentStatsModal from './DocumentStatsModal.svelte';
+  import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+  import { confirmPrompt } from '../shell/confirmStore';
+  import { holdLatch } from '../ui/holdLatch';
+  import CollectionsPanel from './CollectionsPanel.svelte';
+  import FilterPanel from './FilterPanel.svelte';
+  import SystemsView from './SystemsView.svelte';
+  import { jobNotification, pendingNotification } from '../shell/notificationStore';
+  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn, renamePathKeys } from './selectionUtils';
+  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, visibleFileSpan, type VisibleRow } from './treeNav';
+  import { materializeKey } from '../shell/paneFocus';
+  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from './searchScope';
+  import { runSyncJob } from './syncJob';
+  import { clearSummary, reindexSummary, syncPromptMessage, syncSummary } from './syncMessages';
   import {
     indexedPathsUnder,
     collectionsContaining,
@@ -43,23 +43,27 @@
     memberStateFor,
     addMembers,
     removeMembers,
-  } from '../../lib/legend-lore/collectionMembership';
-  import { buildRibbonIndex, firstColorByPath } from '../../lib/legend-lore/collectionRibbons';
-  import { createCommitScheduler, mergeArmedCollection } from '../../lib/legend-lore/collectionCommit';
-  import { setTreePathsPayload, type TreePathsPayload } from '../../lib/legend-lore/dragPayload';
-  import { chord, digitChord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
-  import { filterByQuery, playOnly, stepPick, transportNames } from '../../lib/legend-lore/collectionOrder';
-  import { menuSlotHeld } from '../../lib/shell/menuSlot';
-  import { viewFilter } from '../../lib/shell/mention';
-  import { filterTree, filterWords, nameMatches } from '../../lib/legend-lore/nameFilter';
+  } from './collectionMembership';
+  import { buildRibbonIndex, firstColorByPath } from './collectionRibbons';
+  import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
+  import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
+  import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
+  import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
+  import { menuSlotHeld } from '../shell/menuSlot';
+  import { viewFilter } from '../shell/mention';
+  import { filterTree, filterWords, nameMatches } from './nameFilter';
   import {
     parseString,
     parseBoolean,
     parseStringArray,
     parseEnum,
-  } from '../../lib/shell/storeParsers';
-  import { parseScopeConsoleState } from '../../lib/legend-lore/scopeConsole';
-  import type { ScopeConsoleState } from '../../lib/legend-lore/scopeConsole';
+  } from '../shell/storeParsers';
+  import { parseScopeConsoleState } from './scopeConsole';
+  import type { ScopeConsoleState } from './scopeConsole';
+
+  /** False while another panel's tab is showing (PANELS.md): the window's
+   *  keyboard belongs to that panel then. */
+  export let active = true;
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -2310,6 +2314,7 @@
   }
 
   function handleGlobalKeydown(event: KeyboardEvent) {
+    if (!active) return;
     // When a native <dialog> is open via showModal(), the browser inerts
     // the rest of the page (clicks, focus, screen-readers all skip), but
     // window-level keydown listeners still fire because keydown bubbles
@@ -3765,7 +3770,7 @@
               onReorder={reorderCollections}
               focusedName={focusedCollectionName}
               lastFocusedName={lastFocusedCollectionName}
-              active={activePane === 'collections'}
+              active={active && activePane === 'collections'}
               onActivate={() => pointAtEmpty('collections')}
               onFocusCollection={setFocusedCollectionName}
               pickQuery={mentionQuery}
@@ -3802,7 +3807,7 @@
               canReset={scopeConsoleEngaged}
               focusedRow={focusedFilterRow}
               lastFocusedRow={lastFocusedFilterRow}
-              active={activePane === 'filters'}
+              active={active && activePane === 'filters'}
               onActivate={() => pointAtEmpty('filters')}
               onFocusRow={setFocusedFilterRow}
             />
@@ -3925,7 +3930,7 @@
             libraryRoot={selectedFolder}
             {focusedFilePath}
             lastFocusedPath={lastFocusedFilePath}
-            active={activePane === 'files'}
+            active={active && activePane === 'files'}
             onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
             {renamingFilePath}
@@ -4120,7 +4125,7 @@
   .app-layout {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
     background: var(--bg-app);
   }
@@ -4236,9 +4241,9 @@
 
   .error-banner {
     padding: 0.4rem 1rem;
-    background: rgba(239, 68, 68, 0.1);
+    background: color-mix(in srgb, var(--text-danger) 10%, transparent);
     color: var(--text-danger);
-    border-top: 1px solid rgba(239, 68, 68, 0.3);
+    border-top: 1px solid color-mix(in srgb, var(--text-danger) 30%, transparent);
     font-size: 0.85rem;
     flex-shrink: 0;
   }
