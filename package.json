@@ -1,6 +1,6 @@
 {
   "name": "unseen-servant-app",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "Local-first, AI-augmented toolkit for tabletop RPG Gamemasters",
   "author": "Unseen Servant Games <guild@unseenservant.games>",
   "type": "module",

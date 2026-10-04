@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-10-03
+
+### Changed
+
+- **Enter lands on the results.** Submitting a search moves focus to the first result as soon as the list arrives (with no hits it stays in the bar so you can retype). `Esc` from the results leaves search in one press, and the arrows no longer cross between the bar and the list. `⌘K` is the way back to the bar, and it selects the query so typing replaces it and `→` edits it
+- **A row shows every collection it belongs to**, up to five gems: coloured collections first, then the uncoloured ones in plain ink, instead of one gem and a `+N`
+
 ## [3.1.1] - 2026-10-01
 
 ### Fixed
