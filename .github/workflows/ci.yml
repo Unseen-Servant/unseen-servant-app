@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, workstation]
   push:
-    branches: [main]
+    branches: [main, workstation]
 
 # dorny/paths-filter calls the PR Files API to detect which surfaces a
 # PR touches. The repo's default GITHUB_TOKEN doesn't grant that, so
@@ -14,7 +14,7 @@ permissions:
   pull-requests: read
 
 # Cancel an in-progress PR run when a new commit lands on the same PR.
-# Pushes to main aren't cancelled — those are the canonical post-merge
+# Pushes to main or workstation aren't cancelled — those are the canonical post-merge
 # validation, so the latest run for each commit must complete.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +22,8 @@ concurrency:
 
 jobs:
   # Detect which surfaces a PR actually touches so the Linux jobs below
-  # can opt out when irrelevant. On push to main everything runs so the
+  # can opt out when irrelevant. On push (to main, or to the workstation
+  # integration branch) everything runs so the
   # post-merge state is fully validated regardless of which file paths
   # changed. Cross-platform builds are NOT done here — release.yml
   # cross-compiles on tag push and is the canonical macOS/Windows gate.
