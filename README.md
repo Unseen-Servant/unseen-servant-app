@@ -257,14 +257,15 @@ Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe`
 unseen-servant-app/
 ├── src/                        # Frontend (SvelteKit + TypeScript)
 │   ├── routes/
-│   │   ├── legend-lore/
-│   │   │   └── +page.svelte    # Legend Lore UI: folder picker, file tree, search
-│   │   ├── +page.ts            # Root route redirects to /legend-lore
+│   │   ├── +page.svelte        # Main window: one tab per tool panel
+│   │   ├── panel/[id]/         # A panel popped out into its own window
 │   │   └── +layout.ts          # Disables SSR (SPA mode for Tauri)
 │   └── lib/
-│       ├── shell/              # Workstation chrome: header, status bar, settings, dialogs
+│       ├── shell/              # Workstation chrome: panel hosts (PANELS.md), header, status bar, settings, dialogs
 │       ├── ui/                 # Shared primitives: buttons, confirm dialog, icons
-│       └── legend-lore/        # Legend Lore components (file tree, search, collections)
+│       ├── legend-lore/        # Legend Lore panel and components (file tree, search, collections)
+│       ├── command/            # Command panel (placeholder)
+│       └── servant/            # Servant panel (placeholder)
 │
 ├── src-tauri/                  # Backend (Rust)
 │   ├── src/

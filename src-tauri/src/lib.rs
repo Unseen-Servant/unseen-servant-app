@@ -119,7 +119,7 @@ fn restore_window_size(app: &tauri::AppHandle) {
     }
 }
 
-/// Create the Legend Lore window, hidden, from its tauri.conf.json entry
+/// Create the main window, hidden, from its tauri.conf.json entry
 /// (`create: false` keeps Tauri from opening it at launch). The boot calls
 /// this once the sidecar has settled and shows it when the splash closes.
 fn open_tool_window(app: &tauri::AppHandle) {
@@ -128,7 +128,7 @@ fn open_tool_window(app: &tauri::AppHandle) {
     };
     match tauri::WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()) {
         Ok(_) => restore_window_size(app),
-        Err(e) => eprintln!("Failed to open the Legend Lore window: {}", e),
+        Err(e) => eprintln!("Failed to open the main window: {}", e),
     }
 }
 
