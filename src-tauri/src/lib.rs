@@ -10,6 +10,7 @@ use tauri::{Emitter, Manager};
 mod app_context;
 mod boot;
 mod legend_lore;
+mod panels;
 
 // ---------------------------------------------------------------------------
 // Sidecar state — holds the Python child process handle and any startup
@@ -637,7 +638,10 @@ pub fn run() {
             legend_lore::update_search_settings,
             app_context::get_app_context,
             app_context::set_active_campaign,
-            app_context::set_active_session
+            app_context::set_active_session,
+            panels::get_popped_panels,
+            panels::pop_out_panel,
+            panels::dock_panel
         ])
         .setup(|app| {
             // Determine where the sidecar keeps its data (library store, manifest)
@@ -653,6 +657,7 @@ pub fn run() {
             app.manage(SidecarFailureState(Mutex::new(None)));
             app.manage(boot::BootState::new());
             app.manage(app_context::AppContext::default());
+            app.manage(panels::PoppedPanels::default());
 
             // The splash draws its own rounded corners on a transparent window.
             // macOS shapes the shadow to them; Windows would frame the square
@@ -732,7 +737,7 @@ pub fn run() {
                     label,
                     event: tauri::WindowEvent::CloseRequested { api, .. },
                     ..
-                } => {
+                } if panels::panel_of_label(&label).is_none() => {
                     // Hide window instead of closing — app stays alive in tray
                     api.prevent_close();
                     // The splash would overwrite the tool window's saved size.
@@ -743,6 +748,13 @@ pub fn run() {
                         let _ = window.hide();
                     }
                 }
+                // A pop-out's close goes through, unlike the arm above: the
+                // window is destroyed and its panel docks back.
+                tauri::RunEvent::WindowEvent {
+                    label,
+                    event: tauri::WindowEvent::Destroyed,
+                    ..
+                } => panels::on_window_destroyed(app_handle, &label),
                 tauri::RunEvent::ExitRequested { api, code, .. } => {
                     if code.is_some() {
                         // Triggered by app.exit() (tray Quit or Cmd+Q) — let it proceed.
