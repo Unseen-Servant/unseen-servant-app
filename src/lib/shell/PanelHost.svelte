@@ -3,6 +3,7 @@
   // and only the selected one is shown and active; a popped-out panel is
   // unmounted here and its tab holds the way back to it (PANELS.md).
   import ActionButton from '../ui/ActionButton.svelte';
+  import DockToggle from './DockToggle.svelte';
   import PanelView from './PanelView.svelte';
   import { PANELS, panelTitle, type PanelId } from './panels';
   import { appContext, dock, popOut, poppedPanels, setCampaign } from './shellState';
@@ -86,7 +87,9 @@
           </div>
         </div>
       {:else}
-        <PanelView id={panel.id} active={selected === panel.id} />
+        <PanelView id={panel.id} active={selected === panel.id}>
+          {#snippet windowKey()}<DockToggle id={panel.id} popped={false} />{/snippet}
+        </PanelView>
       {/if}
     </div>
   {/each}

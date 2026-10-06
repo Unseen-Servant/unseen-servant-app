@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick, flushSync } from 'svelte';
+  import { onMount, onDestroy, tick, flushSync, type Snippet } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
@@ -64,6 +64,8 @@
   /** False while another panel's tab is showing (PANELS.md): the window's
    *  keyboard belongs to that panel then. */
   export let active = true;
+  // The host's dock toggle, drawn at the right end of the header (PANELS.md).
+  export let windowKey: Snippet | undefined = undefined;
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -3725,6 +3727,7 @@
     onSetViewMode={setViewMode}
     onMentionChange={(q) => (mentionQuery = q)}
     onMentionKey={handleMentionKey}
+    {windowKey}
   />
 
   {#if selectedFolder}

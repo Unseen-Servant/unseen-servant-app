@@ -7,8 +7,8 @@ into its own window. Two hosts render panels, and both go through
 
 | Host | Window label | Route | Chrome around the panel |
 |---|---|---|---|
-| `PanelHost.svelte` | `main` | `/` | tab strip, pop-out per tab |
-| `StandaloneFrame.svelte` | `panel-<id>` | `/panel/<id>` | title strip, `[dock back]` |
+| `PanelHost.svelte` | `main` | `/` | tab strip, pop-out per tab, dock toggle |
+| `StandaloneFrame.svelte` | `panel-<id>` | `/panel/<id>` | dock toggle only |
 
 The panel ids and titles live in `panels.ts`; Rust keeps its own copy of the
 window defaults in `src-tauri/src/panels.rs`, because it creates the windows.
@@ -24,6 +24,11 @@ window defaults in `src-tauri/src/panels.rs`, because it creates the windows.
   campaign and session, both optional). It mirrors Rust and updates in every
   window when any window changes it.
 - **Its own tool's Tauri commands and events.**
+- **`windowKey`**, a snippet holding the host's dock toggle (`DockToggle.svelte`):
+  unlit in the main window, where it pops the panel out; latched and lit in
+  its own window, where it docks it back. A panel with a header renders it
+  there (Legend Lore: right of the search bar); one without leaves it
+  out and is popped out from its tab.
 
 ## What a panel may emit
 
@@ -32,7 +37,8 @@ window defaults in `src-tauri/src/panels.rs`, because it creates the windows.
   and broadcasts `app-context://changed` to every window, the caller included —
   render from the store, not from what you just sent.
 
-Popping out and docking belong to the host chrome, not the panel.
+Popping out and docking belong to the host chrome, not the panel: the panel
+only gives the toggle a place.
 
 ## What a panel must not assume
 
