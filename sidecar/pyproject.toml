@@ -14,6 +14,7 @@ dependencies = [
     "symspellpy==6.10.0",
     "sqlite-vec==0.1.9",
     "numpy==2.5.0",
+    "watchfiles==1.3.0",
 ]
 
 [dependency-groups]

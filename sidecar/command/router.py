@@ -6,14 +6,16 @@ rewriting links across the campaign can't interleave with a save.
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import vault
+from .events import VaultWatcher
 from .settings import CommandSettings, load_settings, save_settings
 
 
@@ -75,6 +77,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     router = APIRouter(prefix="/api/command")
     write_lock = threading.Lock()
     state = {"settings": load_settings(data_dir)}
+    watcher = VaultWatcher(lambda: Path(r) if (r := state["settings"].root) else None)
 
     @app.exception_handler(vault.VaultError)
     async def vault_error(_request: Request, exc: vault.VaultError):
@@ -113,7 +116,20 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         with write_lock:
             save_settings(data_dir, settings)
             state["settings"] = settings
+        watcher.root_changed()
         return settings.model_dump()
+
+    # -- change events -----------------------------------------------------
+
+    @router.get("/events")
+    async def events():
+        """Server-sent ``vault`` events (``command/events.py``) for as long
+        as the caller stays connected. Rust relays them to every window."""
+        async def stream():
+            async for event in watcher.listen():
+                yield f"data: {json.dumps(event)}\n\n"
+
+        return StreamingResponse(stream(), media_type="text/event-stream")
 
     # -- campaigns ---------------------------------------------------------
 
