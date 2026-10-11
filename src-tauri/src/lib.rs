@@ -646,6 +646,7 @@ pub fn run() {
             panels::dock_panel,
             command::command_get_settings,
             command::command_set_root,
+            command::command_choose_root,
             command::command_list_campaigns,
             command::command_create_campaign,
             command::command_rename_campaign,

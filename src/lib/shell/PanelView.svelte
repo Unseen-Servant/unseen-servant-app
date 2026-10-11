@@ -18,7 +18,7 @@
 {#if id === 'legend-lore'}
   <LegendLorePanel {active} {windowKey} />
 {:else if id === 'command'}
-  <CommandPanel />
+  <CommandPanel {windowKey} />
 {:else}
   <ServantPanel />
 {/if}

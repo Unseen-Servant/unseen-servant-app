@@ -1,7 +1,7 @@
 # Command — design
 
 **Date:** 2026-10-11
-**Status:** draft for review. The model, the vault layout and session management were agreed in conversation on 2026-10-11; the open questions in §10 are not settled.
+**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11; the open questions in §10 are not settled. Phases 0 and 1 done 2026-10-11 (§9); where the build departed from this doc, the text below says so.
 **Objective:** specify Command, the workstation's second tool (architecture doc §6 Step 4), before any code: what the vault looks like on disk, how sessions work, what Prep and Play show, and where each piece lives across the three layers.
 
 ---
@@ -182,7 +182,7 @@ Nothing new beyond the grid cell. Each meaning maps to an existing token or idio
 
 | Meaning | Treatment |
 |---|---|
-| Track identity | a pigment from `src/lib/legend-lore/palette.ts`, gem in the column header (extends the collection pigments to tracks) |
+| Track identity | *deferred to phase 2.* Phase 1 tracks are plain nameplates. In Legend Lore a pigment gem marks a curated set — here that is a beat, not a track — so whether tracks take a pigment, and in what form, is decided with beats on screen |
 | Note in the live set | brass glow, `--glow-accent` — content armed |
 | Play view on | purple latch in the existing view-switch well — a mode switched on |
 | Armed beat | Legend Lore's arm glyph in `--text-active` |
@@ -200,7 +200,7 @@ Placement follows the architecture doc (D2, D4, D5, §4 Q4).
 
 - **`router.py`** with `build_router(...)`, mounted in `server.py` beside Legend Lore's.
 - **Settings** in `command_settings.json` in the data dir — the root folder and *mark beats played on launch* — following `search_settings.json`.
-- **Index:** in memory, per campaign, rebuilt from a scan when the campaign opens: tracks, notes (name → path, frontmatter, outgoing links), backlinks, ambiguous names. A few hundred notes scan in a fraction of a second; no SQLite until a measurement says otherwise.
+- **Index:** *as built, no cache at all:* every read scans the campaign folder (tracks, notes with track and group, ambiguous names), and a rename scans the notes' text for links. A few hundred notes take a fraction of a second; a cache — in memory, then SQLite — only when a measurement asks for one. Frontmatter isn't parsed yet: phase 1 owns no keys, and renames rewrite links in the raw text, so `ruamel.yaml` arrives with phase 2.
 - **Watcher:** `watchfiles` on the root. Changes update the index and go out on the event stream. Command's own writes take the same path, so there is one way a change becomes visible.
 - **Writer:** §3.5 — round-trip YAML (`ruamel.yaml`), atomic writes, the hash check, link rewriting on rename.
 - **Event stream:** `GET /command/events`, server-sent events: `vault` (campaign, changed paths) and `live` (a snapshot with `seq`).
@@ -221,8 +221,9 @@ The active campaign and session stay owned by Rust (`app_context.rs`, unchanged)
 
 - `CommandPanel.svelte` replaces the placeholder: the Prep/Play switch, taking `active` and `windowKey` per PANELS.md.
 - The live set is a `rustMirror` (`command://live` plus a pull command); `vault` events refetch what they name.
-- The TEMP campaign picker in `PanelHost.svelte` is replaced by one fed from Command's campaign list. It stays shell chrome — the active campaign is workstation context — and calls Command's Tauri command rather than importing Command UI.
-- A Command pane in `SettingsModal` (root folder, *mark beats played on launch*), hosted as the Legend Lore panes are today.
+- *As built:* the campaign switcher is the campaign name in Command's own header (a menu: other campaigns, new, rename, reveal, close, change folder, trash), not shell chrome. The tab strip exists only in the main window, so a shell picker would leave a popped-out Command unable to switch. The TEMP picker in `PanelHost.svelte` is gone; the active campaign itself still lives in `app_context.rs`.
+- `<ConfirmDialog />` moved from Legend Lore's panel to the two window hosts (`PanelHost`, `StandaloneFrame`), one per window, so a popped-out Command can ask.
+- The campaigns folder is chosen from Command's empty state and its campaign menu (`command_choose_root`, the native picker). A Command pane in `SettingsModal` waits for phase 3's *mark beats played on launch*.
 
 ---
 
@@ -250,8 +251,8 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 
 | # | Phase | Delivers | Verify |
 |---|---|---|---|
-| 0 | Dev data | `~/Unseen Servant` cleared of the Electron app's `Campaigns/` and `Library/` (moved aside, not deleted) | the root holds only campaigns |
-| 1 | Vault | settings, scan and index, watcher, writer, event relay; the campaign picker; the Prep grid of tracks; the editor; create, rename, move and delete for notes, tracks and campaigns | pytest: scan, link resolution, rename rewriting, byte-preserving round trip, 409 on a stale hash. By hand, with the root open in Obsidian: an edit on either side shows up on the other; a rename in Command updates the links Obsidian shows |
+| 0 | Dev data | `~/Unseen Servant` cleared of the Electron app's `Campaigns/` and `Library/` (moved aside, not deleted) | the root holds only campaigns — **done 2026-10-11**: moved to `~/Unseen Servant (Electron)/`, Misty Vale copied back as the dev fixture |
+| 1 | Vault — **done 2026-10-11** | settings, scan and index, watcher, writer, event relay; the campaign picker; the Prep grid of tracks; the editor; create, rename, move and delete for notes, tracks and campaigns | pytest: scan, link resolution, rename rewriting, byte-preserving round trip, 409 on a stale hash. By hand, with the root open in Obsidian: an edit on either side shows up on the other; a rename in Command updates the links Obsidian shows |
 | 2 | Beats and sessions | `Beats/`, the launcher column, arming and membership, sessions, plan order, `[new session]` carry-forward, spent | pytest: carry-forward rules; `notes`, `beats` and `spent` round trips |
 | 3 | Play | live state and its persistence, launch, stop, capture, live-set cards, the arrangement, the log, jots, *mark beats played on launch* | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian |
 | 4 | Cross-tool | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |

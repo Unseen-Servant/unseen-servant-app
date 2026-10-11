@@ -171,6 +171,23 @@ pub async fn command_set_root(root: Option<String>) -> Result<CommandSettings, S
     .await
 }
 
+/// Ask for the campaigns folder with the native picker and make it the
+/// root. `None` when the GM cancels.
+#[tauri::command]
+pub async fn command_choose_root(app: AppHandle) -> Result<Option<CommandSettings>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Choose the folder your campaigns live in")
+        .blocking_pick_folder();
+    match picked {
+        Some(path) => command_set_root(Some(path.to_string())).await.map(Some),
+        None => Ok(None),
+    }
+}
+
 #[tauri::command]
 pub async fn command_list_campaigns() -> Result<Vec<String>, String> {
     #[derive(Deserialize)]
