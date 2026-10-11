@@ -244,7 +244,7 @@ Lift Ollama status, sidecar health and sync/reindex progress to Rust source of t
 
 ### Step 4 — Command
 
-Greenfield (§4 Q5). Second window; Svelte UI over Tauri proxy commands; state and vault I/O in `sidecar/command/` (§4 Q4, D6); its MCP tools registered in `mcp_server.py`. Needs its own design doc before code. **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
+Greenfield (§4 Q5). Second window; Svelte UI over Tauri proxy commands; state and vault I/O in `sidecar/command/` (§4 Q4, D6); its MCP tools registered in `mcp_server.py`. Design: [2026-10-11-command-design.md](2026-10-11-command-design.md). **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
 
 ### Step 5 — Servant
 
