@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import vault
+from . import prep, vault
 from .events import VaultWatcher
 from .settings import CommandSettings, load_settings, save_settings
 
@@ -71,6 +71,40 @@ class NoteMove(BaseModel):
 class Locate(BaseModel):
     campaign: str
     path: str | None = None
+
+
+class BeatCreate(BaseModel):
+    campaign: str
+    name: str
+    notes: list[str] = []
+    session: str | None = None
+
+
+class Membership(BaseModel):
+    campaign: str
+    beat: str
+    note: str
+    member: bool
+
+
+class SessionCreate(BaseModel):
+    campaign: str
+
+
+class PlanEdit(BaseModel):
+    campaign: str
+    session: str
+    op: str
+    beat: str | None = None
+    at: int | None = None
+    to: int | None = None
+    expect: str | None = None
+
+
+class Spent(BaseModel):
+    campaign: str
+    path: str
+    spent: bool
 
 
 def build_router(app, data_dir: Path | None) -> APIRouter:
@@ -150,7 +184,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.get("/campaign")
     def get_campaign(name: str):
-        return vault.scan(campaign_path(name))
+        return prep.index(campaign_path(name))
 
     # -- tracks ------------------------------------------------------------
 
@@ -195,6 +229,39 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         with write_lock:
             path, rewritten = vault.move_note(campaign_path(body.campaign), body.path, body.folder)
         return {"path": path, "rewritten": rewritten}
+
+    # -- prep: beats, sessions, spent (design §4, §5.1) --------------------
+
+    @router.post("/beats")
+    def create_beat(body: BeatCreate):
+        with write_lock:
+            path = prep.create_beat(campaign_path(body.campaign), body.name, body.notes, body.session)
+        return {"path": path}
+
+    @router.post("/beats/members")
+    def set_member(body: Membership):
+        with write_lock:
+            notes = prep.set_member(campaign_path(body.campaign), body.beat, body.note, body.member)
+        return {"notes": notes}
+
+    @router.post("/sessions")
+    def create_session(body: SessionCreate):
+        with write_lock:
+            return prep.create_session(campaign_path(body.campaign))
+
+    @router.post("/sessions/plan")
+    def edit_plan(body: PlanEdit):
+        with write_lock:
+            beats = prep.edit_plan(
+                campaign_path(body.campaign), body.session, body.op,
+                beat=body.beat, at=body.at, to=body.to, expect=body.expect,
+            )
+        return {"beats": beats}
+
+    @router.post("/spent")
+    def set_spent(body: Spent):
+        with write_lock:
+            return {"spent": prep.set_spent(campaign_path(body.campaign), body.path, body.spent)}
 
     # -- deletion is Rust's (the OS trash); this only vouches for the path --
 

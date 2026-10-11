@@ -216,15 +216,25 @@ def content_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def read_note(campaign: Path, rel: str) -> dict:
+def note_path(campaign: Path, rel: str) -> Path:
+    """The note at ``rel``, refusing anything that isn't one."""
     path = resolve(campaign, rel)
     if not path.is_file() or not _is_note_file(path.name):
         raise Invalid(f"Not a note: {rel!r}")
-    data = path.read_bytes()
+    return path
+
+
+def read_text(path: Path) -> str:
     try:
-        content = data.decode("utf-8")
+        return path.read_bytes().decode("utf-8")
     except UnicodeDecodeError:
-        raise Invalid(f"{rel!r} isn't UTF-8 text, so Command won't edit it")
+        raise Invalid(f"{path.name!r} isn't UTF-8 text, so Command won't edit it")
+
+
+def read_note(campaign: Path, rel: str) -> dict:
+    path = note_path(campaign, rel)
+    data = path.read_bytes()
+    content = read_text(path)
     return {
         "path": _rel(campaign, path),
         "name": _stem(path.name),

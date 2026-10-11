@@ -88,3 +88,36 @@ def test_locate_vouches_only_for_paths_inside_the_campaign(cmd, campaign_root):
     }
     assert cmd.post("/api/command/locate", json={"campaign": "Strahd", "path": "../Other"}).status_code == 422
     assert cmd.post("/api/command/locate", json={"campaign": "..", "path": None}).status_code == 422
+
+
+def test_prep_round_trip_over_http(cmd, campaign_root, monkeypatch):
+    from datetime import date
+
+    from command import prep
+
+    monkeypatch.setattr(prep, "today", lambda: date(2026, 10, 18))
+    cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Ismark"})
+    made = cmd.post("/api/command/sessions", json={"campaign": "Strahd"}).json()
+    assert made == {"path": "Sessions/Session 1.md", "name": "Session 1", "carried": []}
+
+    beat = cmd.post("/api/command/beats", json={
+        "campaign": "Strahd", "name": "Ambush", "notes": ["NPCs/Ismark.md"], "session": made["path"],
+    }).json()["path"]
+    assert cmd.post("/api/command/beats/members", json={
+        "campaign": "Strahd", "beat": beat, "note": "NPCs/Ismark.md", "member": False,
+    }).json() == {"notes": []}
+    assert cmd.post("/api/command/spent", json={
+        "campaign": "Strahd", "path": beat, "spent": True,
+    }).json() == {"spent": "2026-10-18"}
+
+    index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert index["sessions"] == [{
+        "name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
+        "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}],
+    }]
+    assert index["beats"] == [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": "2026-10-18", "notes": []}]
+
+    stale = cmd.post("/api/command/sessions/plan", json={
+        "campaign": "Strahd", "session": made["path"], "op": "remove", "at": 0, "expect": "Nope",
+    })
+    assert stale.status_code == 409
