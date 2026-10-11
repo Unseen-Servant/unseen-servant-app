@@ -36,6 +36,32 @@ pub struct NoteEntry {
     path: String,
     track: Option<String>,
     group: Option<String>,
+    /// The date it was spent, as written; None while unspent.
+    spent: Option<String>,
+}
+
+/// A link from a beat or a session's plan: the name it gives, and the note
+/// it resolves to (None when no single note answers to the name).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LinkRef {
+    link: String,
+    path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BeatEntry {
+    name: String,
+    path: String,
+    spent: Option<String>,
+    notes: Vec<LinkRef>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SessionEntry {
+    name: String,
+    path: String,
+    date: Option<String>,
+    beats: Vec<LinkRef>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,6 +70,15 @@ pub struct CampaignIndex {
     tracks: Vec<String>,
     notes: Vec<NoteEntry>,
     ambiguous: Vec<String>,
+    beats: Vec<BeatEntry>,
+    sessions: Vec<SessionEntry>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewSession {
+    path: String,
+    name: String,
+    carried: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -323,6 +358,104 @@ pub async fn command_move_note(
     .await
 }
 
+// -- prep: beats, sessions, spent ------------------------------------------
+
+#[tauri::command]
+pub async fn command_create_beat(
+    campaign: String,
+    name: String,
+    notes: Vec<String>,
+    session: Option<String>,
+) -> Result<String, String> {
+    answer::<AtPath>(client().post(api("/beats")).json(&serde_json::json!({
+        "campaign": campaign, "name": name, "notes": notes, "session": session,
+    })))
+    .await
+    .map(|p| p.path)
+}
+
+/// Put a note in a beat or take it out. Returns the beat's notes after.
+#[tauri::command]
+pub async fn command_set_member(
+    campaign: String,
+    beat: String,
+    note: String,
+    member: bool,
+) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct Members {
+        notes: Vec<String>,
+    }
+    answer::<Members>(
+        client()
+            .post(api("/beats/members"))
+            .json(&serde_json::json!({
+                "campaign": campaign, "beat": beat, "note": note, "member": member,
+            })),
+    )
+    .await
+    .map(|m| m.notes)
+}
+
+#[tauri::command]
+pub async fn command_create_session(campaign: String) -> Result<NewSession, String> {
+    answer(
+        client()
+            .post(api("/sessions"))
+            .json(&serde_json::json!({ "campaign": campaign })),
+    )
+    .await
+}
+
+/// Add, move or remove an entry of a session's plan (`op`). Returns the
+/// plan after. A move or removal names the entry it expects at `at`.
+// The arguments are the IPC contract with the frontend: each is a named key
+// in the `invoke` payload.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn command_edit_plan(
+    campaign: String,
+    session: String,
+    op: String,
+    beat: Option<String>,
+    at: Option<u32>,
+    to: Option<u32>,
+    expect: Option<String>,
+) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct Plan {
+        beats: Vec<String>,
+    }
+    answer::<Plan>(
+        client()
+            .post(api("/sessions/plan"))
+            .json(&serde_json::json!({
+                "campaign": campaign, "session": session, "op": op,
+                "beat": beat, "at": at, "to": to, "expect": expect,
+            })),
+    )
+    .await
+    .map(|p| p.beats)
+}
+
+/// Mark a note spent (today) or unspent. Returns the spent date, if any.
+#[tauri::command]
+pub async fn command_set_spent(
+    campaign: String,
+    path: String,
+    spent: bool,
+) -> Result<Option<String>, String> {
+    #[derive(Deserialize)]
+    struct Spent {
+        spent: Option<String>,
+    }
+    answer::<Spent>(client().post(api("/spent")).json(&serde_json::json!({
+        "campaign": campaign, "path": path, "spent": spent,
+    })))
+    .await
+    .map(|s| s.spent)
+}
+
 /// Move a campaign (no `path`), or a note or folder inside one, to the OS
 /// trash. The sidecar vouches for the path first, with the same checks as
 /// every other Command route; the watcher reports the deletion.
@@ -430,6 +563,22 @@ mod tests {
             ]
         );
         assert!(url.path().ends_with("/api/command/note"), "{url}");
+    }
+
+    #[test]
+    fn campaign_index_keeps_prep_fields_on_the_way_through() {
+        // Rust re-serialises what the sidecar sends: a field the struct
+        // doesn't name would silently vanish before the frontend sees it.
+        let sidecar = serde_json::json!({
+            "name": "Strahd", "tracks": ["NPCs"], "ambiguous": [],
+            "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18"}],
+            "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,
+                       "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
+            "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
+                          "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}]}],
+        });
+        let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
+        assert_eq!(serde_json::to_value(index).unwrap(), sidecar);
     }
 
     #[test]
