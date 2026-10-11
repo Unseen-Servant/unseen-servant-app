@@ -1,26 +1,35 @@
 <script lang="ts">
-  // Command (docs/roadmap/2026-10-11-command-design.md). Phase 1, the vault:
-  // campaigns as folders, the Prep grid of tracks, and the note editor.
-  // Everything shown is re-read from the sidecar; file state lives in
-  // NoteBuffer, which owns the save rules.
+  // Command (docs/roadmap/2026-10-11-command-design.md). Prep: campaigns as
+  // folders, the grid of tracks, the beat launcher for the active session,
+  // and the note editor. Everything shown is re-read from the sidecar; file
+  // state lives in NoteBuffer, which owns the save rules.
   import { onDestroy, onMount, type Snippet } from 'svelte';
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
-  import { appContext, setCampaign } from '../shell/shellState';
+  import { menuSlotHeld } from '../shell/menuSlot';
+  import { appContext, setCampaign, setSession } from '../shell/shellState';
+  import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
   import NoteEditor from './NoteEditor.svelte';
   import TrackGrid from './TrackGrid.svelte';
-  import { commandApi, onVaultChange } from './api';
+  import { commandApi, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, linkableNames, type Column } from './columns';
   import { action, divider, heading, type OpenMenu } from './menu';
   import { NoteBuffer, type BufferState } from './noteBuffer';
-  import type { CampaignIndex, CommandSettings, NoteEntry, VaultEvent } from './types';
+  import { activeSession, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
+  import type { BeatEntry, CampaignIndex, CommandSettings, NoteEntry, VaultEvent } from './types';
 
+  // True while the panel is visible: window-level keys do nothing otherwise
+  // (PANELS.md).
+  export let active: boolean = true;
   // The host's dock toggle (PANELS.md), drawn at the right of the bar.
   export let windowKey: Snippet | undefined = undefined;
+
+  /** What a rename, move, spend or trash needs of a note or a beat. */
+  type Named = { name: string; path: string };
 
   let settings: CommandSettings | null = null;
   let campaigns: string[] = [];
@@ -32,6 +41,10 @@
   let naming: 'campaign' | 'rename-campaign' | null = null;
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
+
+  /** The beat whose notes are lit; the armed one, if any, is also selected. */
+  let selectedBeat: string | null = null;
+  let armedBeat: string | null = null;
 
   let editor: NoteEditor | undefined;
   let bufState: BufferState = { path: null, status: 'empty', error: null };
@@ -53,6 +66,15 @@
   $: cols = index ? columns(index) : ([] as Column[]);
   $: nameSet = new Set((index?.notes ?? []).map((n) => n.name.toLowerCase()));
   $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
+  $: session = index ? activeSession(index, $appContext.session) : null;
+  $: rows = index ? planRows(index, session) : [];
+  $: spare = index ? unscheduled(index, session) : [];
+  $: beatAt = (path: string | null) => index?.beats.find((b) => b.path === path) ?? null;
+  $: members = memberPaths(beatAt(selectedBeat));
+  $: inSession = index ? sessionNotePaths(index, session) : new Set<string>();
+  // A beat that left (renamed, trashed) can't stay selected or armed.
+  $: if (index && selectedBeat && !beatAt(selectedBeat)) selectedBeat = null;
+  $: if (index && armedBeat && !beatAt(armedBeat)) armedBeat = null;
 
   // -- running things -----------------------------------------------------
 
@@ -79,6 +101,15 @@
     await buffer.close();
     campaign = null;
     index = null;
+    selectedBeat = armedBeat = null;
+  }
+
+  /** Point the workstation's session at one of this campaign's: the one
+   *  already chosen if it's here, else the latest. */
+  async function settleSession() {
+    if (!index) return;
+    const wantedSession = activeSession(index, $appContext.session)?.name ?? null;
+    if (wantedSession !== $appContext.session) await setSession(wantedSession);
   }
 
   async function enterCampaign(name: string | null) {
@@ -87,6 +118,7 @@
     if (name && campaigns.includes(name)) {
       index = await commandApi.getCampaign(name);
       campaign = name;
+      await settleSession();
     }
   }
 
@@ -95,6 +127,7 @@
     try {
       index = await commandApi.getCampaign(campaign);
       editor?.refreshLinks();
+      await settleSession();
     } catch {
       await refreshAll();
     }
@@ -107,6 +140,7 @@
       index = await commandApi.getCampaign(campaign);
       editor?.refreshLinks();
       await buffer.diskChanged();
+      await settleSession();
     }
     await enterCampaign($appContext.campaign);
   }
@@ -125,6 +159,19 @@
     if (bufState.path && event.paths.includes(bufState.path)) void buffer.diskChanged();
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => run(refreshIndex), 120);
+  }
+
+  /** Before Command rewrites a note's frontmatter, save what the editor
+   *  holds for it, so the rewrite lands on it instead of conflicting. */
+  async function settle(path: string) {
+    if (bufState.path === path) await buffer.flush();
+  }
+
+  function onKeydown(e: KeyboardEvent) {
+    if (!active || e.key !== 'Escape' || !armedBeat || menuSlotHeld()) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, textarea, .cm-editor')) return;
+    armedBeat = null;
   }
 
   onMount(() => {
@@ -150,17 +197,19 @@
 
   // -- notes --------------------------------------------------------------
 
-  function openNote(note: NoteEntry) {
-    if (note.path === bufState.path) return;
+  function openPath(path: string) {
+    if (path === bufState.path) return;
     run(async () => {
       freshOpen = true;
-      await buffer.open(note.path);
+      await buffer.open(path);
     });
   }
 
   function createNote(folder: string, name: string) {
     run(async () => {
       const path = await commandApi.createNote(campaign!, folder, name);
+      // A note started while a beat is armed lands in it.
+      if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
       await refreshIndex();
       freshOpen = true;
       await buffer.open(path);
@@ -171,10 +220,10 @@
   function followLink(name: string) {
     const target = index?.notes.find((n) => n.name.toLowerCase() === name.toLowerCase());
     if (target) {
-      openNote(target);
+      openPath(target.path);
       return;
     }
-    const track = openEntry?.track ?? cols[0]?.track;
+    const track = openEntry?.track && index?.tracks.includes(openEntry.track) ? openEntry.track : cols[0]?.track;
     if (!track || !name) return;
     run(async () => {
       const create = await confirmPrompt.request({
@@ -186,11 +235,17 @@
     });
   }
 
-  function renameNote(note: NoteEntry, name: string) {
+  function retargetSelection(from: string, to: string) {
+    if (selectedBeat === from) selectedBeat = to;
+    if (armedBeat === from) armedBeat = to;
+  }
+
+  function renameNote(note: Named, name: string) {
     run(async () => {
       const isOpen = note.path === bufState.path;
       if (isOpen) await buffer.flush();
       const moved = await commandApi.renameNote(campaign!, note.path, name);
+      retargetSelection(note.path, moved.path);
       if (isOpen) await buffer.retarget(moved.path);
       await refreshIndex();
     });
@@ -206,11 +261,11 @@
     });
   }
 
-  function trashNote(note: NoteEntry) {
+  function trashNote(note: Named, kind = 'Note') {
     run(async () => {
       const confirmed = await confirmPrompt.request({
         title: 'Move to Trash',
-        rows: [{ label: 'Note', value: note.name }],
+        rows: [{ label: kind, value: note.name }],
         message: 'Links to it will show as missing until it comes back.',
         confirmLabel: 'Move to Trash',
         danger: true,
@@ -220,6 +275,132 @@
       await commandApi.trash(campaign!, note.path);
       await refreshIndex();
     });
+  }
+
+  function setSpent(note: Named, spent: boolean) {
+    run(async () => {
+      await settle(note.path);
+      await commandApi.setSpent(campaign!, note.path, spent);
+      await refreshIndex();
+    });
+  }
+
+  // -- beats --------------------------------------------------------------
+
+  function selectBeat(beat: BeatEntry) {
+    selectedBeat = beat.path;
+    if (armedBeat !== beat.path) armedBeat = null;
+    openPath(beat.path);
+  }
+
+  function armBeat(beat: BeatEntry) {
+    if (armedBeat === beat.path) {
+      armedBeat = null;
+      return;
+    }
+    armedBeat = selectedBeat = beat.path;
+    openPath(beat.path);
+  }
+
+  function toggleMember(note: NoteEntry) {
+    const beat = armedBeat;
+    if (!beat) return;
+    run(async () => {
+      await settle(beat);
+      await commandApi.setMember(campaign!, beat, note.path, !memberPaths(beatAt(beat)).has(note.path));
+      await refreshIndex();
+    });
+  }
+
+  function landBeat(path: string) {
+    armedBeat = selectedBeat = path;
+    freshOpen = true;
+    return buffer.open(path);
+  }
+
+  function createBeat(name: string) {
+    run(async () => {
+      const path = await commandApi.createBeat(campaign!, name, [], session?.path ?? null);
+      await refreshIndex();
+      await landBeat(path);
+    });
+  }
+
+  /** A plan entry naming a beat nobody has written yet: write it. */
+  function writeBeat(row: PlanRow) {
+    run(async () => {
+      const path = await commandApi.createBeat(campaign!, row.link, [], null);
+      await refreshIndex();
+      await landBeat(path);
+    });
+  }
+
+  function editPlan(op: PlanOp, edit: PlanEdit) {
+    const target = session;
+    if (!target) return;
+    run(async () => {
+      await settle(target.path);
+      try {
+        await commandApi.editPlan(campaign!, target.path, op, edit);
+      } finally {
+        await refreshIndex();
+      }
+    });
+  }
+
+  // -- sessions -----------------------------------------------------------
+
+  function newSession() {
+    run(async () => {
+      const made = await commandApi.createSession(campaign!);
+      await setSession(made.name);
+      await refreshIndex();
+    });
+  }
+
+  function trashSession() {
+    const target = session;
+    if (!target) return;
+    run(async () => {
+      const confirmed = await confirmPrompt.request({
+        title: 'Move to Trash',
+        rows: [
+          { label: 'Session', value: target.name },
+          { label: 'Beats', value: String(target.beats.length), to: 'kept', unchanged: true },
+        ],
+        message: 'The session note goes; its beats stay in Beats/.',
+        confirmLabel: 'Move to Trash',
+        danger: true,
+      });
+      if (!confirmed) return;
+      if (bufState.path === target.path) await buffer.close();
+      await commandApi.trash(campaign!, target.path);
+      await setSession(null);
+      await refreshIndex();
+    });
+  }
+
+  function sessionMenu(e: MouseEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const others = [...(index?.sessions ?? [])].reverse().filter((s) => s.path !== session?.path);
+    menu = {
+      x: box.left,
+      y: box.bottom + 4,
+      items: [
+        ...(others.length
+          ? [heading('sessions'), ...others.map((s) => action(s.date ? `${s.name} · ${s.date}` : s.name, () => run(() => setSession(s.name)))), divider]
+          : []),
+        action('New session', newSession),
+        ...(session
+          ? [
+              action('Edit session note', () => openPath(session!.path)),
+              action('Show in Finder', () => reveal(session!.path)),
+              divider,
+              action('Move to Trash', trashSession, true),
+            ]
+          : []),
+      ],
+    };
   }
 
   // -- tracks -------------------------------------------------------------
@@ -344,6 +525,8 @@
   };
 </script>
 
+<svelte:window on:keydown={onKeydown} />
+
 <section class="command">
   <header class="bar">
     {#if naming}
@@ -365,6 +548,14 @@
       <button type="button" class="campaign-key" title="Campaigns" on:click={campaignMenu}>
         {campaign}<span class="drop" aria-hidden="true">▾</span>
       </button>
+      <span class="bar-sep" aria-hidden="true">·</span>
+      {#if session}
+        <button type="button" class="session-key" title="Sessions" on:click={sessionMenu}>
+          {session.name}{#if session.date}<span class="session-date">{session.date}</span>{/if}<span class="drop" aria-hidden="true">▾</span>
+        </button>
+      {:else}
+        <button type="button" class="session-key ghost" on:click={newSession}>+ session</button>
+      {/if}
     {:else}
       <span class="bar-title">Command</span>
     {/if}
@@ -397,17 +588,22 @@
         </p>
       </div>
     {:else}
-      <div class="prep">
+      <div class="prep" class:arming={!!armedBeat}>
         <div class="grid-pane">
           <TrackGrid
             {cols}
             openPath={bufState.path}
+            {members}
+            {inSession}
+            armed={!!armedBeat}
             ambiguous={(name) => isAmbiguous(index!, name)}
-            onOpen={openNote}
+            onOpen={(note) => openPath(note.path)}
+            onToggleMember={toggleMember}
+            onSpent={setSpent}
             onCreateNote={createNote}
             onRenameNote={renameNote}
             onMoveNote={moveNote}
-            onTrashNote={trashNote}
+            onTrashNote={(note) => trashNote(note)}
             onRevealNote={(note) => reveal(note.path)}
             onCreateTrack={createTrack}
             onRenameTrack={renameTrack}
@@ -416,7 +612,28 @@
           />
         </div>
 
-        <aside class="inspector">
+        <BeatColumn
+          {rows}
+          {spare}
+          sessionName={session?.name ?? null}
+          selectedPath={selectedBeat}
+          armedPath={armedBeat}
+          onSelect={selectBeat}
+          onArm={armBeat}
+          onCreate={createBeat}
+          onWrite={writeBeat}
+          onAddToPlan={(beat) => editPlan('add', { beat: beat.path })}
+          onMove={(row, to) => editPlan('move', { at: row.at, to, expect: row.link })}
+          onRemove={(row) => editPlan('remove', { at: row.at, expect: row.link })}
+          onRename={renameNote}
+          onSpent={setSpent}
+          onReveal={(beat) => reveal(beat.path)}
+          onTrash={(beat) => trashNote(beat, 'Beat')}
+        />
+
+        <!-- Kept mounted while closed, so a note opening has an editor to
+             land in; closed, it gives the grid its width back. -->
+        <aside class="inspector" class:closed={bufState.status === 'empty'}>
           {#if bufState.status !== 'empty'}
             <div class="inspector-head">
               <span class="note-name">{openEntry?.name ?? bufState.path?.split('/').pop()?.replace(/\.md$/, '')}</span>
@@ -424,6 +641,19 @@
                 <span class="crumb">{[openEntry.track, openEntry.group].filter(Boolean).join(' › ')}</span>
               {/if}
               <span class="save-state">{STATUS_TEXT[bufState.status] ?? ''}</span>
+              {#if openEntry}
+                {@const note = openEntry}
+                <label class="spent-toggle" title={note.spent ? `Spent ${note.spent}` : 'Mark spent'}>
+                  <input
+                    type="checkbox"
+                    class="app-checkbox"
+                    checked={!!note.spent}
+                    on:change={(e) => setSpent(note, e.currentTarget.checked)}
+                  />
+                  spent
+                </label>
+              {/if}
+              <ActionButton label="close" title="Close the note" onClick={() => run(() => buffer.close())} />
             </div>
             {#if bufState.status === 'conflict'}
               <div class="notice" role="alert">
@@ -438,10 +668,8 @@
             {:else if bufState.error}
               <div class="notice" role="alert"><span>Not saved: {bufState.error}</span></div>
             {/if}
-          {:else}
-            <p class="inspector-hint">Pick a note to edit it, or <em>+ note</em> to start one.</p>
           {/if}
-          <div class="editor-slot" class:hidden={bufState.status === 'empty'}>
+          <div class="editor-slot">
             <NoteEditor
               bind:this={editor}
               names={() => (index ? linkableNames(index) : [])}
@@ -481,7 +709,7 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     height: var(--header-height);
     padding: 0 0.75rem;
     background: var(--bg-header);
@@ -499,7 +727,12 @@
     color: var(--text-secondary);
   }
 
-  .campaign-key {
+  .bar-sep {
+    color: var(--text-tertiary);
+  }
+
+  .campaign-key,
+  .session-key {
     display: flex;
     align-items: baseline;
     gap: 0.35rem;
@@ -508,15 +741,34 @@
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition: background var(--transition-fast), color var(--transition-fast);
   }
 
-  .campaign-key:hover {
+  .session-key {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+  }
+
+  .session-key.ghost {
+    color: var(--text-tertiary);
+  }
+
+  .campaign-key:hover,
+  .session-key:hover {
     background: var(--bg-focused);
+    color: var(--text-primary);
   }
 
-  .campaign-key:active {
+  .campaign-key:active,
+  .session-key:active {
     transform: scale(0.97);
+  }
+
+  .session-date {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-tertiary);
   }
 
   .drop {
@@ -628,6 +880,12 @@
     min-width: 0;
   }
 
+  /* While a beat is armed, a click on a note edits the beat: the cursor
+     says so before the click does. */
+  .prep.arming .grid-pane {
+    cursor: copy;
+  }
+
   /* The inspector reads on vellum, as Legend Lore's does. */
   .inspector {
     flex: 0 0 min(36%, 30rem);
@@ -638,12 +896,16 @@
     border-left: 1px solid var(--border-subtle);
   }
 
+  .inspector.closed {
+    display: none;
+  }
+
   .inspector-head {
     flex-shrink: 0;
     display: flex;
     align-items: baseline;
     gap: 0.6rem;
-    padding: 0.55rem 1rem 0.4rem;
+    padding: 0.55rem 0.75rem 0.4rem 1rem;
     border-bottom: 1px solid var(--border-subtle);
   }
 
@@ -669,6 +931,16 @@
     color: var(--text-tertiary);
   }
 
+  .spent-toggle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
   .notice {
     flex-shrink: 0;
     display: flex;
@@ -681,25 +953,9 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  .inspector-hint {
-    margin: auto;
-    padding: 2rem;
-    color: var(--text-tertiary);
-    text-align: center;
-  }
-
-  .inspector-hint em {
-    font-style: normal;
-    color: var(--text-secondary);
-  }
-
   .editor-slot {
     flex: 1;
     min-height: 0;
-  }
-
-  .editor-slot.hidden {
-    display: none;
   }
 
   .error-line {

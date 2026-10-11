@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest';
+import { activeSession, memberPaths, planRows, sessionNotePaths, unscheduled } from './prep';
+import type { CampaignIndex } from './types';
+
+const index: CampaignIndex = {
+  name: 'Strahd',
+  tracks: ['NPCs'],
+  ambiguous: [],
+  notes: [],
+  beats: [
+    { name: 'Ambush', path: 'Beats/Ambush.md', spent: null, notes: [
+      { link: 'Ismark', path: 'NPCs/Ismark.md' },
+      { link: 'Wolves', path: null },
+    ] },
+    { name: 'Tser Pool', path: 'Beats/Tser Pool.md', spent: null, notes: [{ link: 'Madam Eva', path: 'NPCs/Madam Eva.md' }] },
+    { name: 'Played', path: 'Beats/Played.md', spent: '2026-10-04', notes: [] },
+    { name: 'Bonegrinder', path: 'Beats/Bonegrinder.md', spent: null, notes: [] },
+    { name: 'Abbey', path: 'Beats/Abbey.md', spent: null, notes: [] },
+  ],
+  sessions: [
+    { name: 'Session 12', path: 'Sessions/Session 12.md', date: '2026-10-11', beats: [{ link: 'Played', path: 'Beats/Played.md' }] },
+    { name: 'Session 13', path: 'Sessions/Session 13.md', date: '2026-10-18', beats: [
+      { link: 'Ambush', path: 'Beats/Ambush.md' },
+      { link: 'Not written yet', path: null },
+      { link: 'Tser Pool', path: 'Beats/Tser Pool.md' },
+    ] },
+  ],
+};
+
+describe('prep', () => {
+  it('opens on the session asked for, else the latest', () => {
+    expect(activeSession(index, 'Session 12')?.name).toBe('Session 12');
+    expect(activeSession(index, null)?.name).toBe('Session 13');
+    expect(activeSession(index, 'Gone')?.name).toBe('Session 13');
+    expect(activeSession({ ...index, sessions: [] }, null)).toBeNull();
+  });
+
+  it('lays the plan out in order, keeping beats not written yet', () => {
+    const rows = planRows(index, activeSession(index, null));
+    expect(rows.map((r) => [r.at, r.link, r.beat?.path ?? null])).toEqual([
+      [0, 'Ambush', 'Beats/Ambush.md'],
+      [1, 'Not written yet', null],
+      [2, 'Tser Pool', 'Beats/Tser Pool.md'],
+    ]);
+  });
+
+  it('lists unplanned, unplayed beats as potential scenes', () => {
+    expect(unscheduled(index, activeSession(index, null)).map((b) => b.name)).toEqual(['Abbey', 'Bonegrinder']);
+  });
+
+  it('marks a beat\'s notes and every note the session holds', () => {
+    expect([...memberPaths(index.beats[0])]).toEqual(['NPCs/Ismark.md']);
+    expect([...sessionNotePaths(index, activeSession(index, null))].sort()).toEqual(['NPCs/Ismark.md', 'NPCs/Madam Eva.md']);
+    expect(memberPaths(null).size).toBe(0);
+  });
+});

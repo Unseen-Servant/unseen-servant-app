@@ -26,8 +26,10 @@ export const editorTheme = EditorView.theme(
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-accent)' },
     '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
       { backgroundColor: 'color-mix(in srgb, var(--text-accent) 22%, transparent)' },
-    '.cm-wikilink': { color: 'var(--text-accent)' },
-    '.cm-wikilink-missing': {
+    // Syntax colouring (a YAML string, say) can nest inside the link mark;
+    // the link's colour still wins.
+    '.cm-wikilink, .cm-wikilink span': { color: 'var(--text-accent)' },
+    '.cm-wikilink-missing, .cm-wikilink-missing span': {
       color: 'var(--text-secondary)',
       textDecoration: 'underline dashed',
       textDecorationColor: 'var(--text-accent)',

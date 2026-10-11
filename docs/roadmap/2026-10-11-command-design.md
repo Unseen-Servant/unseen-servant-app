@@ -1,7 +1,7 @@
 # Command — design
 
 **Date:** 2026-10-11
-**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11; the open questions in §10 are not settled. Phases 0 and 1 done 2026-10-11 (§9); where the build departed from this doc, the text below says so.
+**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11; the open questions in §10 are not settled. Phases 0–2 done 2026-10-11 (§9); where the build departed from this doc, the text below says so.
 **Objective:** specify Command, the workstation's second tool (architecture doc §6 Step 4), before any code: what the vault looks like on disk, how sessions work, what Prep and Play show, and where each piece lives across the three layers.
 
 ---
@@ -159,6 +159,7 @@ Further rules:
 - **Marks.** Notes in the selected beat are lit; notes used anywhere in the session's plan carry a quieter mark; spent notes are dimmed with a check.
 - **The editor** shows the selected note (§7). Whether it is a right-hand inspector on the vellum surface or Live's bottom detail view is decided in the app at 1280×800, not in a mockup.
 - **Actions:** `[new note]` per column, `[new track]`, `[new beat]`, `[new session]`; rename, move to another track and delete (to the trash) from a note's context menu.
+- *As built (phase 2):* selecting a beat also opens it in the editor (its `notes` list updates live as membership changes); a new beat lands armed and selected, as a new collection does in Legend Lore; a note started while a beat is armed lands in it; Escape disarms; the session switcher sits beside the campaign's in the bar. The inspector closes (`[close]`) and gives its width back, so with no note open all six default tracks and the launcher fit at 1280×800 — the placement question in §10 stays open.
 
 ### 5.2 Play
 
@@ -200,9 +201,9 @@ Placement follows the architecture doc (D2, D4, D5, §4 Q4).
 
 - **`router.py`** with `build_router(...)`, mounted in `server.py` beside Legend Lore's.
 - **Settings** in `command_settings.json` in the data dir — the root folder and *mark beats played on launch* — following `search_settings.json`.
-- **Index:** *as built, no cache at all:* every read scans the campaign folder (tracks, notes with track and group, ambiguous names), and a rename scans the notes' text for links. A few hundred notes take a fraction of a second; a cache — in memory, then SQLite — only when a measurement asks for one. Frontmatter isn't parsed yet: phase 1 owns no keys, and renames rewrite links in the raw text, so `ruamel.yaml` arrives with phase 2.
+- **Index:** *as built, no cache at all:* every read scans the campaign folder (tracks, notes with track and group, ambiguous names), and a rename scans the notes' text for links. A few hundred notes take a fraction of a second; a cache — in memory, then SQLite — only when a measurement asks for one. Phase 2 parses every note's frontmatter on each read, leniently — one broken block doesn't hide the campaign.
 - **Watcher:** `watchfiles` on the root. Changes update the index and go out on the event stream. Command's own writes take the same path, so there is one way a change becomes visible.
-- **Writer:** §3.5 — round-trip YAML (`ruamel.yaml`), atomic writes, the hash check, link rewriting on rename.
+- **Writer:** §3.5 — atomic writes, the hash check, link rewriting on rename. *As built (phase 2):* frontmatter is never re-serialised. `command/frontmatter.py` replaces only the lines of the one key it writes, then parses the result back (PyYAML) and refuses unless that key holds exactly what was written and every other key is unchanged. `ruamel.yaml` was dropped: it re-indents sequences document-wide, which touches keys Command doesn't own.
 - **Event stream:** `GET /command/events`, server-sent events: `vault` (campaign, changed paths) and `live` (a snapshot with `seq`).
 
 ### 6.2 Live state
@@ -253,7 +254,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 |---|---|---|---|
 | 0 | Dev data | `~/Unseen Servant` cleared of the Electron app's `Campaigns/` and `Library/` (moved aside, not deleted) | the root holds only campaigns — **done 2026-10-11**: moved to `~/Unseen Servant (Electron)/`, Misty Vale copied back as the dev fixture |
 | 1 | Vault — **done 2026-10-11** | settings, scan and index, watcher, writer, event relay; the campaign picker; the Prep grid of tracks; the editor; create, rename, move and delete for notes, tracks and campaigns | pytest: scan, link resolution, rename rewriting, byte-preserving round trip, 409 on a stale hash. By hand, with the root open in Obsidian: an edit on either side shows up on the other; a rename in Command updates the links Obsidian shows |
-| 2 | Beats and sessions | `Beats/`, the launcher column, arming and membership, sessions, plan order, `[new session]` carry-forward, spent | pytest: carry-forward rules; `notes`, `beats` and `spent` round trips |
+| 2 | Beats and sessions — **done 2026-10-11** | `Beats/`, the launcher column, arming and membership, sessions, plan order, `[new session]` carry-forward, spent | pytest: carry-forward rules; `notes`, `beats` and `spent` round trips |
 | 3 | Play | live state and its persistence, launch, stop, capture, live-set cards, the arrangement, the log, jots, *mark beats played on launch* | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian |
 | 4 | Cross-tool | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
 

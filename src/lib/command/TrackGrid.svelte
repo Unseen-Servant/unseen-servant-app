@@ -1,8 +1,13 @@
 <script lang="ts">
   // The Prep grid (design §5.1): one column per track, every note in it,
-  // subfolders as groups. Clicking a note opens it; right-click for rename,
-  // move and trash. The ghost rows at the foot of each column and the end
-  // of the grid name a new note or track in place.
+  // subfolders as groups. Clicking a note opens it — or, while a beat is
+  // armed, puts it in the beat or takes it out. Right-click for rename,
+  // spent, move and trash. The ghost rows at the foot of each column and the
+  // end of the grid name a new note or track in place.
+  //
+  // Each row's slot reads the session at a glance: a parchment dot for a
+  // note in the selected beat, a ring for one some other planned beat holds.
+  // A spent note dims and carries a check.
   import InlineName from './InlineName.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import { action, divider, heading, type OpenMenu } from './menu';
@@ -11,6 +16,14 @@
 
   export let cols: Column[];
   export let openPath: string | null;
+  /** Notes in the selected beat. */
+  export let members: Set<string>;
+  /** Notes some beat of the session's plan holds. */
+  export let inSession: Set<string>;
+  /** A beat is armed: a click toggles membership instead of opening. */
+  export let armed: boolean;
+  export let onToggleMember: (note: NoteEntry) => void;
+  export let onSpent: (note: NoteEntry, spent: boolean) => void;
   export let ambiguous: (name: string) => boolean;
   export let onOpen: (note: NoteEntry) => void;
   export let onCreateNote: (track: string, name: string) => void;
@@ -36,6 +49,7 @@
       y: e.clientY,
       items: [
         action('Rename', () => (renamingPath = note.path)),
+        action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
         ...(others.length ? [divider, heading('move to'), ...others.map((t) => action(t, () => onMoveNote(note, t)))] : []),
         divider,
         action('Show in Finder', () => onRevealNote(note)),
@@ -112,12 +126,23 @@
                 class:open={note.path === openPath}
                 class:grouped={group.group !== null}
                 class:ambiguous={ambiguous(note.name)}
-                title={ambiguous(note.name) ? `Another note is also named “${note.name}”, so links to it are ambiguous` : note.name}
-                on:click={() => onOpen(note)}
+                class:member={members.has(note.path)}
+                class:in-session={inSession.has(note.path)}
+                class:spent={!!note.spent}
+                class:arming={armed}
+                aria-pressed={armed ? members.has(note.path) : undefined}
+                title={ambiguous(note.name)
+                  ? `Another note is also named “${note.name}”, so links to it are ambiguous`
+                  : note.spent
+                    ? `${note.name} — spent ${note.spent}`
+                    : note.name}
+                on:click={() => (armed ? onToggleMember(note) : onOpen(note))}
                 on:dblclick={() => (renamingPath = note.path)}
                 on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
               >
-                {note.name}
+                <span class="slot" aria-hidden="true"></span>
+                <span class="label">{note.name}</span>
+                {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
               </button>
             {/if}
           {/each}
@@ -247,8 +272,7 @@
   }
 
   .note-row,
-  .ghost-row,
-  .ghost-track {
+  .ghost-row {
     display: block;
     width: 100%;
     padding: 0.15rem 0.4rem;
@@ -268,12 +292,68 @@
   }
 
   .note-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding-left: 0.25rem;
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
 
   .note-row.grouped {
-    padding-left: 0.9rem;
+    padding-left: 0.75rem;
+  }
+
+  .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* The clip slot: empty, a ring (the session holds this note), or a
+     parchment dot (the selected beat does). Content, not a mode: no glow —
+     the lit lamp belongs to Play's live set. */
+  .slot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+  }
+
+  .note-row.in-session .slot {
+    border-color: var(--text-tertiary);
+  }
+
+  .note-row.member .slot {
+    background: var(--text-accent);
+    border-color: var(--text-accent);
+  }
+
+  .note-row.member .label {
+    color: var(--text-accent);
+  }
+
+  /* Armed: every slot offers itself, so the click's meaning shows. */
+  .note-row.arming:hover:not(.member) .slot {
+    border-color: var(--text-accent);
+  }
+
+  .note-row.spent .label,
+  .note-row.spent .slot {
+    opacity: var(--opacity-out-of-scope);
+  }
+
+  .note-row.spent:hover .label,
+  .note-row.spent:hover .slot {
+    opacity: var(--opacity-out-of-scope-hover);
+  }
+
+  .spent-mark {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
   }
 
   .note-row:hover {
@@ -313,8 +393,13 @@
     color: var(--text-primary);
   }
 
+  /* Keeps the nameplate's ledger-label type, like the plates beside it. */
   .ghost-track {
     padding: 0;
+    background: none;
+    border: none;
     color: var(--text-tertiary);
+    cursor: pointer;
+    white-space: nowrap;
   }
 </style>

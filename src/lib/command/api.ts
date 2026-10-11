@@ -3,7 +3,27 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { CampaignIndex, CommandSettings, Moved, Note, Renamed, SaveOutcome, VaultEvent } from './types';
+import type {
+  CampaignIndex,
+  CommandSettings,
+  Moved,
+  NewSession,
+  Note,
+  Renamed,
+  SaveOutcome,
+  VaultEvent,
+} from './types';
+
+export type PlanOp = 'add' | 'move' | 'remove';
+
+export interface PlanEdit {
+  beat?: string;
+  at?: number;
+  to?: number;
+  /** The entry's name expected at `at`: a move or removal is refused when
+   *  the plan on disk no longer has it there. */
+  expect?: string;
+}
 
 type MaybeSettings = CommandSettings | null;
 
@@ -27,6 +47,23 @@ export const commandApi = {
     invoke<Moved>('command_rename_note', { campaign, path, newName }),
   moveNote: (campaign: string, path: string, folder: string) =>
     invoke<Moved>('command_move_note', { campaign, path, folder }),
+  createBeat: (campaign: string, name: string, notes: string[], session: string | null) =>
+    invoke<string>('command_create_beat', { campaign, name, notes, session }),
+  setMember: (campaign: string, beat: string, note: string, member: boolean) =>
+    invoke<string[]>('command_set_member', { campaign, beat, note, member }),
+  createSession: (campaign: string) => invoke<NewSession>('command_create_session', { campaign }),
+  editPlan: (campaign: string, session: string, op: PlanOp, edit: PlanEdit) =>
+    invoke<string[]>('command_edit_plan', {
+      campaign,
+      session,
+      op,
+      beat: edit.beat ?? null,
+      at: edit.at ?? null,
+      to: edit.to ?? null,
+      expect: edit.expect ?? null,
+    }),
+  setSpent: (campaign: string, path: string, spent: boolean) =>
+    invoke<string | null>('command_set_spent', { campaign, path, spent }),
   /** A campaign (no path), or a note or folder inside one, to the OS trash. */
   trash: (campaign: string, path: string | null) => invoke<void>('command_trash', { campaign, path }),
 };
