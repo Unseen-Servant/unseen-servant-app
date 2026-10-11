@@ -3,14 +3,11 @@
   // and only the selected one is shown and active; a popped-out panel is
   // unmounted here and its tab holds the way back to it (PANELS.md).
   import ActionButton from '../ui/ActionButton.svelte';
+  import ConfirmDialog from '../ui/ConfirmDialog.svelte';
   import DockToggle from './DockToggle.svelte';
   import PanelView from './PanelView.svelte';
   import { PANELS, panelTitle, type PanelId } from './panels';
-  import { appContext, dock, popOut, poppedPanels, setCampaign } from './shellState';
-
-  // TEMP: cross-window sync proof — remove with the picker below once
-  // Command owns campaigns.
-  const CAMPAIGNS = ['Curse of Strahd', 'Into the Odd'];
+  import { dock, popOut, poppedPanels } from './shellState';
 
   let selected: PanelId = 'legend-lore';
 
@@ -28,11 +25,6 @@
 
   function report(action: Promise<void>, what: string) {
     action.catch((err) => console.error(`Failed to ${what}:`, err));
-  }
-
-  function onCampaignChange(event: Event) {
-    const value = (event.currentTarget as HTMLSelectElement).value;
-    report(setCampaign(value || null), 'set the campaign');
   }
 </script>
 
@@ -63,17 +55,6 @@
         </div>
       {/each}
     </div>
-
-    <!-- TEMP: cross-window sync proof. -->
-    <label class="campaign">
-      <span>campaign</span>
-      <select value={$appContext.campaign ?? ''} on:change={onCampaignChange}>
-        <option value="">none</option>
-        {#each CAMPAIGNS as name}
-          <option value={name}>{name}</option>
-        {/each}
-      </select>
-    </label>
   </nav>
 
   {#each PANELS as panel (panel.id)}
@@ -93,6 +74,9 @@
       {/if}
     </div>
   {/each}
+
+  <!-- One prompt per window, for whichever panel asks (confirmStore). -->
+  <ConfirmDialog />
 </div>
 
 <style>
@@ -171,25 +155,6 @@
   .tab-name:active,
   .pop-out:active {
     transform: scale(0.97);
-  }
-
-  .campaign {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
-  }
-
-  .campaign select {
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    padding: 0.15rem 0.4rem;
-    background: var(--bg-focused);
-    color: var(--text-accent);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 
   .slot {

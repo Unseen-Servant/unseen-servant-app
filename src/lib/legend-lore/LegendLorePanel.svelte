@@ -21,7 +21,6 @@
   import SettingsModal from '../shell/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
   import DocumentStatsModal from './DocumentStatsModal.svelte';
-  import ConfirmDialog from '../ui/ConfirmDialog.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
   import { holdLatch } from '../ui/holdLatch';
   import CollectionsPanel from './CollectionsPanel.svelte';
@@ -4057,9 +4056,6 @@
       onClose={() => { statsModalPath = null; }}
     />
   {/if}
-
-  <!-- One prompt for the whole app; confirmStore decides when it shows. -->
-  <ConfirmDialog />
 
   <StatusBar
     {selectedFolder}
