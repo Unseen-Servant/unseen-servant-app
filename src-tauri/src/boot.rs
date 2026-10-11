@@ -171,6 +171,9 @@ fn run(app: &AppHandle, spawned: Result<(), String>, app_data_dir: &Path) {
     });
 
     let up = settle_sidecar(app, spawned, app_data_dir, &set);
+    if up {
+        crate::command::start_event_relay(app.clone());
+    }
 
     // The tool window loads behind the splash from here on. Its first calls
     // need the sidecar settled, whichever way it went.

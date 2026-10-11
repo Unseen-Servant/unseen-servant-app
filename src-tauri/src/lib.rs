@@ -9,8 +9,10 @@ use tauri::{Emitter, Manager};
 
 mod app_context;
 mod boot;
+mod command;
 mod legend_lore;
 mod panels;
+mod sse;
 
 // ---------------------------------------------------------------------------
 // Sidecar state — holds the Python child process handle and any startup
@@ -641,7 +643,21 @@ pub fn run() {
             app_context::set_active_session,
             panels::get_popped_panels,
             panels::pop_out_panel,
-            panels::dock_panel
+            panels::dock_panel,
+            command::command_get_settings,
+            command::command_set_root,
+            command::command_list_campaigns,
+            command::command_create_campaign,
+            command::command_rename_campaign,
+            command::command_get_campaign,
+            command::command_create_track,
+            command::command_rename_track,
+            command::command_read_note,
+            command::command_save_note,
+            command::command_create_note,
+            command::command_rename_note,
+            command::command_move_note,
+            command::command_trash
         ])
         .setup(|app| {
             // Determine where the sidecar keeps its data (library store, manifest)
