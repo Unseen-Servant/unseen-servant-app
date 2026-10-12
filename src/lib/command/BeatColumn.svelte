@@ -63,9 +63,11 @@
 
 {#snippet beatRow(beat: BeatEntry, onMenu: (e: MouseEvent) => void)}
   {#if renamingPath === beat.path}
-    <div class="row-edit">
+    <div class="row-edit renaming">
+      <span class="arm-spacer"></span>
       <InlineName
         value={beat.name}
+        rename
         label="Rename beat"
         onCommit={(name) => {
           renamingPath = null;
@@ -329,6 +331,17 @@
     padding: 0.05rem 0;
     font-size: 0.9rem;
     line-height: 1.5;
+  }
+
+  /* A rename takes the name's place, as in Legend Lore: the arm key's
+     column stays, so the field starts where the name did. The left inset
+     counts the row's 2px rule. */
+  .row-edit.renaming {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-left: calc(0.35rem + 2px);
+    padding-right: 0.35rem;
   }
 
   .ghost-row {

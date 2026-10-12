@@ -106,9 +106,11 @@
 
 {#snippet row(note: NoteEntry)}
   {#if renamingPath === note.path}
-    <div class="row-edit">
+    <div class="row-edit renaming">
+      <span class="slot" aria-hidden="true"></span>
       <InlineName
         value={note.name}
+        rename
         label="Rename note"
         onCommit={(name) => {
           renamingPath = null;
@@ -411,6 +413,16 @@
     padding: 0.05rem 0;
     font-size: 0.9rem;
     line-height: 1.5;
+  }
+
+  /* A rename takes the name's place, as in Legend Lore: the row's slot
+     keeps its column, so the field starts where the name did. */
+  .row-edit.renaming {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding-left: 0.25rem;
+    padding-right: 0.4rem;
   }
 
   .ghost-row {

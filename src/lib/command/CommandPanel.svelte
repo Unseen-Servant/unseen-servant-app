@@ -660,6 +660,7 @@
         <InlineName
           value={untitled ? '' : campaign}
           placeholder="Campaign name"
+          rename
           label={untitled ? 'Name campaign' : 'Rename campaign'}
           onCommit={(name) => {
             renaming = false;
@@ -870,6 +871,7 @@
                   <InlineName
                     value={openName}
                     placeholder="Note name"
+                    rename
                     label="Rename note"
                     onCommit={(name) => {
                       renamingOpen = false;
@@ -1261,13 +1263,11 @@
     cursor: default;
   }
 
-  /* Pulled left by the field's own padding, so the name's text doesn't move
-     when the title becomes the field. */
+  /* As a Legend Lore rename: the field starts where the name did. */
   .note-name-field {
     flex: 1;
     min-width: 0;
     max-width: 22rem;
-    margin-left: -0.35rem;
     font-size: 1rem;
   }
 
