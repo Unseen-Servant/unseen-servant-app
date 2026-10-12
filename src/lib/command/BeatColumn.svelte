@@ -14,7 +14,7 @@
   import InlineName from './InlineName.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
-  import { CIRCLE, CIRCLE_RING, PLAY } from '../ui/iconPaths';
+  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, PLAY } from '../ui/iconPaths';
   import { action, divider, heading, type MenuItem, type OpenMenu } from './menu';
   import { draggedNote, isNoteDrag } from './noteDrag';
   import { planMoveTo, type PlanRow } from './prep';
@@ -57,9 +57,24 @@
   // Legend Lore's "Show archived": local to the column, and only offered
   // while there's something to show.
   let showSpent = false;
+
+  // Groups folded shut, as Legend Lore's filter sections: for this sitting
+  // only. A folded group's title still owns up to an armed or live beat in
+  // it, with Legend Lore's section lamp. Without a session there are no
+  // titles, so nothing stays folded out of reach.
+  let folded = new Set<'plan' | 'spare'>();
+  function fold(group: 'plan' | 'spare') {
+    if (folded.has(group)) folded.delete(group);
+    else folded.add(group);
+    folded = folded;
+  }
+  $: planOpen = !sessionName || !folded.has('plan');
+  $: spareOpen = !sessionName || !folded.has('spare');
+  $: planLit = rows.some((r) => !!r.beat && (r.beat.path === armedPath || r.beat.path === liveBeat));
   $: spentCount = spare.filter((b) => b.spent).length;
   $: if (!spentCount) showSpent = false;
   $: shown = showSpent ? spare : spare.filter((b) => !b.spent);
+  $: spareLit = shown.some((b) => b.path === armedPath || b.path === liveBeat);
 
   // Hover latched on pointerenter, as Legend Lore's rows (FileTree).
   let hovered: string | null = null;
@@ -374,6 +389,29 @@
   {/if}
 {/snippet}
 
+<!-- A group's title: the fold toggle, and a drop target for beats from the
+     other group. -->
+{#snippet groupHead(group: 'plan' | 'spare', label: string, count: number, lit: boolean)}
+  {@const open = !folded.has(group)}
+  <button
+    type="button"
+    class="group-head"
+    class:spare-head={group === 'spare'}
+    class:drop-into={dropOn === group}
+    aria-expanded={open}
+    on:click={() => fold(group)}
+    on:dragover={(e) => overHead(e, group)}
+    on:drop={dropBeat}
+  >
+    <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+    <span class="ledger-label">{label}</span>
+    {#if !open && lit}
+      <span class="sect-lamp" role="img" aria-label="A beat in here is armed or live" title="A beat in here is armed or live"></span>
+    {/if}
+    <span class="count">{count}</span>
+  </button>
+{/snippet}
+
 <section class="beats" aria-label="Beats">
   <header class="nameplate">
     <span class="ledger-label title">beats</span>
@@ -392,104 +430,97 @@
     <!-- Without a session there's one group, all the beats, and the plate
          already names it. -->
     {#if sessionName}
-      <div
-        class="group-head"
-        class:drop-into={dropOn === 'plan'}
-        role="presentation"
-        on:dragover={(e) => overHead(e, 'plan')}
-        on:drop={dropBeat}
-      >
-        <span class="ledger-label">{sessionName}</span>
-        <span class="count">{rows.length}</span>
-      </div>
+      {@render groupHead('plan', sessionName, rows.length, planLit)}
     {/if}
-    {#each rows as row (row.at + ':' + row.link)}
-      {#if row.beat}
-        {@const beat = row.beat}
-        {@render beatRow(beat, row, (e) => rowMenu(e, row))}
+    {#if planOpen}
+      {#each rows as row (row.at + ':' + row.link)}
+        {#if row.beat}
+          {@const beat = row.beat}
+          {@render beatRow(beat, row, (e) => rowMenu(e, row))}
+        {:else}
+          <button
+            type="button"
+            class="beat-row missing"
+            data-row
+            class:hovered={$hoverLive && hovered === row.link}
+            class:dragging={dragging === row}
+            class:drop-before={dropSlot === row.at}
+            title={`No beat is named “${row.link}” yet — click to write it`}
+            draggable="true"
+            on:dragstart={(e) => startBeatDrag(e, row, row.link)}
+            on:dragend={endBeatDrag}
+            on:dragover={(e) => overSlot(e, row.at)}
+            on:drop={dropBeat}
+            on:click={() => onWrite(row)}
+            on:pointerenter={() => (hovered = row.link)}
+            on:pointerleave={() => leave(row.link)}
+            on:contextmenu|preventDefault={(e) => rowMenu(e, row)}
+          >
+            <span class="grip filled" aria-hidden="true">⠿</span>
+            <span class="beat-name">{row.link}</span>
+          </button>
+        {/if}
+      {/each}
+
+      <!-- Legend Lore's ghost track: the next beat, waiting, drawn as a row in
+           outline. It sits after the plan, where a new beat lands. Naming
+           dresses it as the row it becomes; nothing exists until Enter. A
+           note dropped on it starts the beat with that note. -->
+      {#if creating}
+        <div class="beat-row ghost naming">
+          <span class="grip" aria-hidden="true"></span>
+          <InlineName
+            bare
+            placeholder={seed ? `Beat with ${seed.name}…` : 'Beat name…'}
+            label="New beat"
+            onCommit={(name) => {
+              creating = false;
+              onCreate(name, seed ? [seed.path] : []);
+              seed = null;
+            }}
+            onCancel={() => {
+              creating = false;
+              seed = null;
+            }}
+          />
+          <!-- A new beat lands armed: say so before it exists, in the column
+               its arm key will take. Not a control. -->
+          <span class="tr engaged" aria-hidden="true">
+            <span class="tr-btn armed promise">
+              <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor"><path d={CIRCLE} /></svg>
+            </span>
+            <span class="key-slot"></span>
+          </span>
+          {#if seed}
+            <span class="row-count">1</span>
+          {:else}
+            <span class="count-slot" aria-hidden="true"></span>
+          {/if}
+        </div>
+        <div class="ghost-keys micro-label" aria-hidden="true">
+          <span><kbd>↵</kbd> create</span><span><kbd>esc</kbd> back</span>
+        </div>
       {:else}
         <button
           type="button"
-          class="beat-row missing"
-          data-row
-          class:hovered={$hoverLive && hovered === row.link}
-          class:dragging={dragging === row}
-          class:drop-before={dropSlot === row.at}
-          title={`No beat is named “${row.link}” yet — click to write it`}
-          draggable="true"
-          on:dragstart={(e) => startBeatDrag(e, row, row.link)}
-          on:dragend={endBeatDrag}
-          on:dragover={(e) => overSlot(e, row.at)}
-          on:drop={dropBeat}
-          on:click={() => onWrite(row)}
-          on:pointerenter={() => (hovered = row.link)}
-          on:pointerleave={() => leave(row.link)}
-          on:contextmenu|preventDefault={(e) => rowMenu(e, row)}
+          class="beat-row ghost"
+          class:drop-before={dropSlot === rows.length}
+          class:drop-into={incoming !== null}
+          title="New beat — or drop a note here"
+          on:click={() => (creating = true)}
+          on:dragover={overGhost}
+          on:drop={dropOnGhost}
         >
-          <span class="grip filled" aria-hidden="true">⠿</span>
-          <span class="beat-name">{row.link}</span>
+          <span class="grip" aria-hidden="true"></span>
+          <!-- Under a drag, say what the drop will make. One label throughout:
+               swapping the element under the pointer mid-drag detaches the
+               drag's target, and WebKit then refuses the drop. -->
+          <span class="ghost-label">New beat{#if incoming}&nbsp;with <em>{incoming.name}</em>{/if}</span>
+          {#if incoming}<span class="row-count">1</span>{/if}
         </button>
-      {/if}
-    {/each}
-
-    <!-- Legend Lore's ghost track: the next beat, waiting, drawn as a row in
-         outline. It sits after the plan, where a new beat lands. Naming
-         dresses it as the row it becomes; nothing exists until Enter. A
-         note dropped on it starts the beat with that note. -->
-    {#if creating}
-      <div class="beat-row ghost naming">
-        <span class="grip" aria-hidden="true"></span>
-        <InlineName
-          bare
-          placeholder={seed ? `Beat with ${seed.name}…` : 'Beat name…'}
-          label="New beat"
-          onCommit={(name) => {
-            creating = false;
-            onCreate(name, seed ? [seed.path] : []);
-            seed = null;
-          }}
-          onCancel={() => {
-            creating = false;
-            seed = null;
-          }}
-        />
-        <!-- A new beat lands armed: say so before it exists, in the column
-             its arm key will take. Not a control. -->
-        <span class="tr engaged" aria-hidden="true">
-          <span class="tr-btn armed promise">
-            <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor"><path d={CIRCLE} /></svg>
-          </span>
-          <span class="key-slot"></span>
-        </span>
-        {#if seed}
-          <span class="row-count">1</span>
-        {:else}
-          <span class="count-slot" aria-hidden="true"></span>
+        {#if !rows.length && !spare.length}
+          <div class="ledger-label empty-hint">or drag a note here</div>
         {/if}
-      </div>
-      <div class="ghost-keys micro-label" aria-hidden="true">
-        <span><kbd>↵</kbd> create</span><span><kbd>esc</kbd> back</span>
-      </div>
-    {:else}
-      <button
-        type="button"
-        class="beat-row ghost"
-        class:drop-before={dropSlot === rows.length}
-        class:drop-into={incoming !== null}
-        title="New beat — or drop a note here"
-        on:click={() => (creating = true)}
-        on:dragover={overGhost}
-        on:drop={dropOnGhost}
-      >
-        <span class="grip" aria-hidden="true"></span>
-        <!-- Under a drag, say what the drop will make. One label throughout:
-             swapping the element under the pointer mid-drag detaches the
-             drag's target, and WebKit then refuses the drop. -->
-        <span class="ghost-label">New beat{#if incoming}&nbsp;with <em>{incoming.name}</em>{/if}</span>
-        {#if incoming}<span class="row-count">1</span>{/if}
-      </button>
-      {#if !rows.length && !spare.length}
-        <div class="ledger-label empty-hint">or drag a note here</div>
       {/if}
     {/if}
 
@@ -497,20 +528,13 @@
          beats under it: dropped on it, the entry leaves the plan. -->
     {#if shown.length || draggingEntry}
       {#if sessionName}
-        <div
-          class="group-head spare-head"
-          class:drop-into={dropOn === 'spare'}
-          role="presentation"
-          on:dragover={(e) => overHead(e, 'spare')}
-          on:drop={dropBeat}
-        >
-          <span class="ledger-label">not in this session</span>
-          <span class="count">{shown.length}</span>
-        </div>
+        {@render groupHead('spare', 'not in this session', shown.length, spareLit)}
       {/if}
-      {#each shown as beat (beat.path)}
-        {@render beatRow(beat, null, (e) => spareMenu(e, beat))}
-      {/each}
+      {#if spareOpen}
+        {#each shown as beat (beat.path)}
+          {@render beatRow(beat, null, (e) => spareMenu(e, beat))}
+        {/each}
+      {/if}
     {/if}
   </div>
 </section>
@@ -552,23 +576,61 @@
     color: var(--text-secondary);
   }
 
-  /* A group's heading: what it holds and how many, the label starting at
-     the rows' grip and the count over theirs. */
+  /* A group's title, the fold toggle of Legend Lore's filter sections
+     (FilterPanel .sect-toggle): the caret, what the group holds, and how
+     many over the rows' counts. Hover is a step up the text ramp, as there. */
   .group-head {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 0.4rem;
+    gap: 0.3rem;
+    width: 100%;
     margin: 0.2rem 0 0.05rem;
-    /* Room inside for the drop outline when a beat is dragged over it. */
-    padding: 0.15rem calc(0.35rem + 0.3rem) 0.15rem calc(0.35rem + 3px);
+    /* Room inside for the drop outline when a beat is dragged over it. On
+       the left, the caret sits under the plate's title as the filter
+       panel's sits under FILTERS: its box 0.45rem - 3px before the title
+       (there 0.75rem against 0.3rem + 3px), here the plate's 0.6rem inset
+       less the list's 0.25rem padding. */
+    padding: 0.15rem calc(0.35rem + 0.3rem) 0.15rem calc(0.6rem - 0.25rem - 0.45rem + 3px);
+    background: none;
+    border: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 
   .group-head .ledger-label {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: color var(--transition-fast);
+  }
+
+  /* The label's size; centred, since an <svg> sits on the baseline by its
+     bottom edge (FilterPanel .sect-arrow). */
+  .group-head .caret {
+    align-self: center;
+    width: 0.7rem;
+    height: 0.7rem;
+    color: var(--text-tertiary);
+  }
+
+  .group-head:hover .ledger-label,
+  .group-head:hover .caret {
+    color: var(--text-secondary);
+  }
+
+  /* Legend Lore's section lamp (FilterPanel .sect-lamp): lit face only, on
+     a folded group holding the armed or the live beat. */
+  .sect-lamp {
+    align-self: center;
+    flex-shrink: 0;
+    width: 10px;
+    height: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--text-active);
+    filter: var(--glow-active);
   }
 
   .list {
