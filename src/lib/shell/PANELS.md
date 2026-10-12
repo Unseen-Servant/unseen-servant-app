@@ -38,7 +38,10 @@ window defaults in `src-tauri/src/panels.rs`, because it creates the windows.
   render from the store, not from what you just sent.
 
 Popping out and docking belong to the host chrome, not the panel: the panel
-only gives the toggle a place.
+only gives the toggle a place. Rust can also bring a panel forward
+(`show_panel` in `panels.rs`, used by the macOS File menu): it focuses the
+panel's own window, or shows the main window and sends it `panels://show`
+with the id, and `PanelHost` selects that tab.
 
 ## What a panel must not assume
 

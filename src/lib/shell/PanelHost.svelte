@@ -2,14 +2,23 @@
   // The main window: one tab per tool panel. Every docked panel stays mounted
   // and only the selected one is shown and active; a popped-out panel is
   // unmounted here and its tab holds the way back to it (PANELS.md).
+  import { onDestroy } from 'svelte';
+  import { listen } from '@tauri-apps/api/event';
   import ActionButton from '../ui/ActionButton.svelte';
   import ConfirmDialog from '../ui/ConfirmDialog.svelte';
   import DockToggle from './DockToggle.svelte';
   import PanelView from './PanelView.svelte';
-  import { PANELS, panelTitle, type PanelId } from './panels';
+  import { PANELS, isPanelId, panelTitle, type PanelId } from './panels';
   import { dock, popOut, poppedPanels } from './shellState';
 
   let selected: PanelId = 'legend-lore';
+
+  // Rust asks for a panel's tab (panels.rs show_panel): the File menu brings
+  // Command forward when it opens a campaign.
+  const unlistenShow = listen<string>('panels://show', (e) => {
+    if (isPanelId(e.payload)) selected = e.payload;
+  });
+  onDestroy(() => void unlistenShow.then((stop) => stop()));
 
   $: popped = new Set($poppedPanels.popped);
 
