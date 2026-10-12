@@ -103,7 +103,7 @@
   $: renamable = bufState.status !== 'conflict' && bufState.status !== 'unreadable';
   $: session = index ? activeSession(index, $appContext.session) : null;
   $: rows = index ? planRows(index, session) : [];
-  $: spare = index ? unscheduled(index, session) : [];
+  $: spare = index ? unscheduled(index, session, true) : [];
   $: beatAt = (path: string | null) => index?.beats.find((b) => b.path === path) ?? null;
   $: members = memberPaths(beatAt(selectedBeat));
   $: inSession = index ? sessionNotePaths(index, session) : new Set<string>();

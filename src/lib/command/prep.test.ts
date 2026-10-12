@@ -48,6 +48,10 @@ describe('prep', () => {
     expect(unscheduled(index, activeSession(index, null)).map((b) => b.name)).toEqual(['Abbey', 'Bonegrinder']);
   });
 
+  it('keeps spent beats too when asked', () => {
+    expect(unscheduled(index, activeSession(index, null), true).map((b) => b.name)).toEqual(['Abbey', 'Bonegrinder', 'Played']);
+  });
+
   it('marks a beat\'s notes and every note the session holds', () => {
     expect([...memberPaths(index.beats[0])]).toEqual(['NPCs/Ismark.md']);
     expect([...sessionNotePaths(index, activeSession(index, null))].sort()).toEqual(['NPCs/Ismark.md', 'NPCs/Madam Eva.md']);

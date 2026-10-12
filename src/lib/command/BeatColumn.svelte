@@ -1,10 +1,12 @@
 <script lang="ts">
   // The beat launcher (design §5.1): the active session's plan in order,
-  // then beats no plan holds yet. Clicking a beat selects it — its notes
-  // light up across the tracks — and a double-click opens it, as rows do in
-  // Legend Lore. Arming a beat (the record-arm
-  // ring, as on Legend Lore's collections) makes a click on a note put it in
-  // the beat or take it out.
+  // then beats no plan holds yet. It works as Legend Lore's collections
+  // panel does. Clicking a beat selects it — its notes light up across the
+  // tracks — and a double-click opens it, as rows do in Legend Lore. Arming
+  // a beat (the record-arm key at the row's end, a collection's transport)
+  // makes a click on a note put it in the beat or take it out. Spent beats
+  // outside the plan are put away until asked for, as archived collections
+  // are.
   import InlineName from './InlineName.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
@@ -14,6 +16,7 @@
   import type { BeatEntry } from './types';
 
   export let rows: PlanRow[];
+  /** Beats no plan of the session holds, spent ones included. */
   export let spare: BeatEntry[];
   export let sessionName: string | null;
   export let selectedPath: string | null;
@@ -37,10 +40,22 @@
   let renamingPath: string | null = null;
   let menu: OpenMenu | null = null;
 
+  // Legend Lore's "Show archived": local to the column, and only offered
+  // while there's something to show.
+  let showSpent = false;
+  $: spentCount = spare.filter((b) => b.spent).length;
+  $: if (!spentCount) showSpent = false;
+  $: shown = showSpent ? spare : spare.filter((b) => !b.spent);
+
   // Hover latched on pointerenter, as Legend Lore's rows (FileTree).
   let hovered: string | null = null;
   function leave(path: string) {
     if (hovered === path) hovered = null;
+  }
+
+  // The transport first, as a collection's menu has it.
+  function armItem(beat: BeatEntry): MenuItem {
+    return action(beat.path === armedPath ? 'Disarm' : 'Arm', () => onArm(beat));
   }
 
   function beatItems(beat: BeatEntry): MenuItem[] {
@@ -59,23 +74,29 @@
       ...(row.at < rows.length - 1 ? [action('Move down', () => onMove(row, row.at + 1))] : []),
       action(`Remove from ${sessionName}`, () => onRemove(row)),
     ];
-    const own = row.beat ? [divider, ...beatItems(row.beat)] : [divider, action('Write this beat', () => onWrite(row))];
-    menu = { x: e.clientX, y: e.clientY, items: [...order, ...own] };
+    const items = row.beat
+      ? [armItem(row.beat), divider, ...order, divider, ...beatItems(row.beat)]
+      : [...order, divider, action('Write this beat', () => onWrite(row))];
+    menu = { x: e.clientX, y: e.clientY, items };
   }
 
   function spareMenu(e: MouseEvent, beat: BeatEntry) {
     menu = {
       x: e.clientX,
       y: e.clientY,
-      items: [...(sessionName ? [action(`Add to ${sessionName}`, () => onAddToPlan(beat)), divider] : []), ...beatItems(beat)],
+      items: [
+        armItem(beat),
+        divider,
+        ...(sessionName ? [action(`Add to ${sessionName}`, () => onAddToPlan(beat)), divider] : []),
+        ...beatItems(beat),
+      ],
     };
   }
 </script>
 
 {#snippet beatRow(beat: BeatEntry, onMenu: (e: MouseEvent) => void)}
   {#if renamingPath === beat.path}
-    <div class="row-edit renaming">
-      <span class="arm-spacer"></span>
+    <div class="row-edit">
       <InlineName
         value={beat.name}
         rename
@@ -88,11 +109,12 @@
       />
     </div>
   {:else}
+    {@const armed = beat.path === armedPath}
     <div
       class="beat-row"
       class:selected={beat.path === selectedPath}
       class:open={beat.path === openPath}
-      class:armed={beat.path === armedPath}
+      class:armed
       class:spent={!!beat.spent}
       class:hovered={$hoverLive && hovered === beat.path}
       on:contextmenu|preventDefault={onMenu}
@@ -100,18 +122,6 @@
       on:pointerleave={() => leave(beat.path)}
       role="presentation"
     >
-      <button
-        type="button"
-        class="arm-btn"
-        class:armed={beat.path === armedPath}
-        aria-pressed={beat.path === armedPath}
-        title={beat.path === armedPath ? `Disarm ${beat.name} (Esc)` : `Arm ${beat.name}: click notes to put them in it`}
-        on:click={() => onArm(beat)}
-      >
-        <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true">
-          <path d={beat.path === armedPath ? CIRCLE : CIRCLE_RING} />
-        </svg>
-      </button>
       <button
         type="button"
         class="beat-name"
@@ -123,9 +133,22 @@
       </button>
       {#if beat.spent}
         <span class="spent-mark" aria-label="spent">✓</span>
-      {:else}
-        <span class="count">{beat.notes.length}</span>
       {/if}
+      <span class="tr" class:engaged={armed}>
+        <button
+          type="button"
+          class="arm-btn"
+          class:armed
+          aria-pressed={armed}
+          title={armed ? `Disarm ${beat.name} (Esc)` : `Arm ${beat.name}: click notes to put them in it`}
+          on:click={() => onArm(beat)}
+        >
+          <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true">
+            <path d={armed ? CIRCLE : CIRCLE_RING} />
+          </svg>
+        </button>
+      </span>
+      <span class="row-count">{beat.notes.length}</span>
     </div>
   {/if}
 {/snippet}
@@ -133,7 +156,16 @@
 <section class="beats" aria-label="Beats">
   <header class="nameplate">
     <span class="ledger-label title">beats</span>
-    <span class="count plan-count">{rows.length}</span>
+    {#if spentCount}
+      <button
+        type="button"
+        class="plate-btn"
+        aria-pressed={showSpent}
+        title={showSpent ? 'Put away spent beats no plan holds' : `Show ${spentCount} spent beat${spentCount === 1 ? '' : 's'} no plan holds`}
+        on:click={() => (showSpent = !showSpent)}
+      >{showSpent ? 'hide spent' : 'show spent'}</button>
+    {/if}
+    <span class="count">{rows.length}</span>
   </header>
 
   <div class="list">
@@ -152,16 +184,19 @@
           on:pointerleave={() => leave(row.link)}
           on:contextmenu|preventDefault={(e) => rowMenu(e, row)}
         >
-          <span class="arm-spacer"></span>
           <span class="beat-name">{row.link}</span>
         </button>
       {/if}
     {/each}
 
+    <!-- Legend Lore's ghost track: the next beat, waiting, drawn as a row in
+         outline. It sits after the plan, where a new beat lands. Naming
+         dresses it as the row it becomes; nothing exists until Enter. -->
     {#if creating}
-      <div class="row-edit">
+      <div class="beat-row ghost naming">
         <InlineName
-          placeholder="Beat name"
+          bare
+          placeholder="Beat name…"
           label="New beat"
           onCommit={(name) => {
             creating = false;
@@ -169,14 +204,25 @@
           }}
           onCancel={() => (creating = false)}
         />
+        <!-- A new beat lands armed: say so before it exists, in the column
+             its arm key will take. Not a control. -->
+        <span class="arm-btn armed promise" aria-hidden="true">
+          <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor"><path d={CIRCLE} /></svg>
+        </span>
+        <span class="count-slot" aria-hidden="true"></span>
+      </div>
+      <div class="ghost-keys micro-label" aria-hidden="true">
+        <span><kbd>↵</kbd> create</span><span><kbd>esc</kbd> back</span>
       </div>
     {:else}
-      <button type="button" class="ghost-row" on:click={() => (creating = true)}>+ beat</button>
+      <button type="button" class="beat-row ghost" title="New beat" on:click={() => (creating = true)}>
+        <span class="ghost-label">New beat</span>
+      </button>
     {/if}
 
-    {#if spare.length}
+    {#if shown.length}
       <div class="ledger-label spare-head">{sessionName ? 'not in this session' : 'beats'}</div>
-      {#each spare as beat (beat.path)}
+      {#each shown as beat (beat.path)}
         {@render beatRow(beat, (e) => spareMenu(e, beat))}
       {/each}
     {/if}
@@ -210,11 +256,8 @@
   }
 
   .title {
+    flex: 1;
     color: var(--text-secondary);
-  }
-
-  .plan-count {
-    margin-left: auto;
   }
 
   .list {
@@ -227,7 +270,7 @@
   .beat-row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
     width: 100%;
     padding: 0.1rem 0.35rem;
     border: none;
@@ -303,15 +346,26 @@
     text-underline-offset: 3px;
   }
 
-  .arm-btn,
-  .arm-spacer {
+  /* The arm key as a collection's transport (CollectionsPanel .tr): hidden
+     at rest, shown on the hovered or selected row, kept while armed. */
+  .tr {
+    display: inline-flex;
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+
+  .beat-row.hovered .tr,
+  .beat-row.selected .tr,
+  .tr.engaged {
+    opacity: 1;
   }
 
   /* Legend Lore's arm key: a ring in a well, purple and lit once armed. */
   .arm-btn {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -353,40 +407,88 @@
     color: var(--text-tertiary);
   }
 
-  .row-edit {
-    padding: 0.05rem 0;
-    font-size: 0.9rem;
-    line-height: 1.5;
+  /* Legend Lore's LED count readout (CollectionsPanel .row-count), so a
+     beat's size reads as a collection's. */
+  .row-count,
+  .count-slot {
+    flex-shrink: 0;
+    height: 18px;
+    min-width: 18px;
   }
 
-  /* A rename takes the name's place, as in Legend Lore: the arm key's
-     column stays, so the field starts where the name did. The left inset
-     counts the row's 2px rule. */
-  .row-edit.renaming {
+  .row-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.3rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  /* A rename takes the name's place, as in Legend Lore: the field starts
+     where the name did. The left inset counts the row's 2px rule. */
+  .row-edit {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding-left: calc(0.35rem + 2px);
-    padding-right: 0.35rem;
-  }
-
-  .ghost-row {
-    display: block;
-    width: 100%;
-    padding: 0.15rem 0.4rem 0.15rem calc(0.35rem + 18px + 0.4rem + 2px);
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-body);
+    padding: 0.05rem 0.35rem 0.05rem calc(0.35rem + 2px);
     font-size: 0.9rem;
     line-height: 1.5;
-    text-align: left;
+  }
+
+  /* Legend Lore's ghost track (CollectionsPanel .ghost): a row's geometry
+     in outline, an italic tertiary name. Hover is the rows' grey step. */
+  .ghost {
     color: var(--text-tertiary);
     cursor: pointer;
   }
 
-  .ghost-row:hover {
-    color: var(--text-primary);
+  .ghost:hover {
+    background: var(--bg-container);
+    color: var(--text-secondary);
+  }
+
+  .ghost-label {
+    flex: 1;
+    min-width: 0;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Naming in place: the slot already dresses as the row it will become —
+     the wash and purple rule, and the caret's ring. */
+  .ghost.naming {
+    cursor: default;
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
+    box-shadow: var(--ring-focus);
+  }
+
+  /* The arm the row will land with — purple ink, but no glow: a glow
+     reports a state you switched on, and this is only a promise. */
+  .arm-btn.promise {
+    cursor: default;
+    filter: none;
+  }
+
+  /* Key hints under the naming row, starting in the name's column. */
+  .ghost-keys {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.2rem 0.35rem 0.35rem calc(0.35rem + 2px);
+  }
+
+  .ghost-keys kbd {
+    font-family: var(--font-mono);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-secondary);
   }
 
   .spare-head {

@@ -13,6 +13,9 @@
   export let onCommit: (name: string) => void;
   export let onCancel: () => void;
   export let rename: boolean = false;
+  /** Naming inside a row that already dresses as what it will become
+   *  (Legend Lore's ghost track): no field of its own. */
+  export let bare: boolean = false;
 
   let input: HTMLInputElement;
   let done = false;
@@ -45,6 +48,7 @@
 <input
   class="inline-name"
   class:rename
+  class:bare
   bind:this={input}
   {value}
   {placeholder}
@@ -78,6 +82,12 @@
     line-height: normal;
     background: var(--bg-container);
     border: 1px solid var(--text-accent);
+    outline: none;
+  }
+
+  .inline-name.bare {
+    padding: 0;
+    background: transparent;
     outline: none;
   }
 
