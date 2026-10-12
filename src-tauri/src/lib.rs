@@ -663,6 +663,15 @@ pub fn run() {
             command::command_create_session,
             command::command_edit_plan,
             command::command_set_spent,
+            command::command_set_spend_on_launch,
+            command::command_get_board,
+            command::command_edit_board,
+            command::command_get_live,
+            command::command_launch,
+            command::command_set_live,
+            command::command_stop,
+            command::command_capture,
+            command::command_jot,
             command::command_trash
         ])
         .setup(|app| {

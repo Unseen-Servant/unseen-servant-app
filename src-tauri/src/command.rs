@@ -1,6 +1,6 @@
-//! Command — Tauri commands over the campaign vault the sidecar keeps
-//! (`sidecar/command/`), the relay that carries its change events to every
-//! window, and deletion through the OS trash (design doc §6.3).
+//! Command — Tauri commands over the campaign vault and the live set the
+//! sidecar keeps (`sidecar/command/`), the relay that carries their events
+//! to every window, and deletion through the OS trash (design doc §6.3).
 
 use reqwest::{RequestBuilder, StatusCode};
 use serde::de::DeserializeOwned;
@@ -16,6 +16,10 @@ use crate::sse::SseFrames;
 /// "anything may have changed — refetch everything".
 pub const VAULT_EVENT: &str = "command://vault";
 
+/// The live set changed: `{ type: "live", campaign, seq, beat, notes }`, a
+/// whole snapshot. `seq` grows with every change to that campaign's set.
+pub const LIVE_EVENT: &str = "command://live";
+
 /// Generous: a rename rewrites links across every note in the campaign.
 const TIMEOUT: Duration = Duration::from_secs(30);
 const RETRY_MIN: Duration = Duration::from_secs(1);
@@ -28,6 +32,9 @@ const RETRY_MAX: Duration = Duration::from_secs(10);
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CommandSettings {
     root: Option<String>,
+    /// Launching a beat marks it spent (design §4).
+    #[serde(default)]
+    spend_on_launch: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -56,12 +63,24 @@ pub struct BeatEntry {
     notes: Vec<LinkRef>,
 }
 
+/// A line of a session's log: what happened (`launch`, `spent`, `unspent`,
+/// `captured`, or `jot` for anything else), when, and the note it names.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LogEntry {
+    time: Option<String>,
+    kind: String,
+    link: Option<String>,
+    path: Option<String>,
+    text: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SessionEntry {
     name: String,
     path: String,
     date: Option<String>,
     beats: Vec<LinkRef>,
+    log: Vec<LogEntry>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -111,6 +130,22 @@ pub struct Moved {
 pub enum SaveOutcome {
     Saved { hash: String },
     Conflict { hash: String },
+}
+
+/// What's live in one campaign: the beat it was launched from and the notes
+/// in play.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LiveSet {
+    campaign: String,
+    seq: u64,
+    beat: Option<String>,
+    notes: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Captured {
+    path: String,
+    live: LiveSet,
 }
 
 #[derive(Deserialize)]
@@ -194,6 +229,16 @@ fn save_outcome(status: StatusCode, body: &str) -> Result<SaveOutcome, String> {
 #[tauri::command]
 pub async fn command_get_settings() -> Result<CommandSettings, String> {
     answer(client().get(api("/settings"))).await
+}
+
+#[tauri::command]
+pub async fn command_set_spend_on_launch(enabled: bool) -> Result<CommandSettings, String> {
+    answer(
+        client()
+            .put(api("/settings"))
+            .json(&serde_json::json!({ "spend_on_launch": enabled })),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -439,21 +484,131 @@ pub async fn command_edit_plan(
 }
 
 /// Mark a note spent (today) or unspent. Returns the spent date, if any.
+/// Play passes its session, so the change is logged there.
 #[tauri::command]
 pub async fn command_set_spent(
     campaign: String,
     path: String,
     spent: bool,
+    session: Option<String>,
 ) -> Result<Option<String>, String> {
     #[derive(Deserialize)]
     struct Spent {
         spent: Option<String>,
     }
     answer::<Spent>(client().post(api("/spent")).json(&serde_json::json!({
-        "campaign": campaign, "path": path, "spent": spent,
+        "campaign": campaign, "path": path, "spent": spent, "session": session,
     })))
     .await
     .map(|s| s.spent)
+}
+
+// -- play: the board, the live set, the log --------------------------------
+
+/// A session's board: JSON Canvas `nodes` and `edges` exactly as on disk,
+/// plus `notes`, the note each card shows. Kept as JSON on the way through,
+/// so fields Command doesn't know (Obsidian's, a later spec's) reach the
+/// frontend untouched.
+#[tauri::command]
+pub async fn command_get_board(
+    campaign: String,
+    session: String,
+) -> Result<serde_json::Value, String> {
+    answer(client().get(api_query(
+        "/board",
+        &[("campaign", &campaign), ("session", &session)],
+    )?))
+    .await
+}
+
+/// Apply card operations (place, frame, connect, remove) to a session's
+/// board. Returns the board after.
+#[tauri::command]
+pub async fn command_edit_board(
+    campaign: String,
+    session: String,
+    ops: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    answer(client().post(api("/board")).json(&serde_json::json!({
+        "campaign": campaign, "session": session, "ops": ops,
+    })))
+    .await
+}
+
+#[tauri::command]
+pub async fn command_get_live(campaign: String) -> Result<LiveSet, String> {
+    answer(client().get(api_query("/live", &[("campaign", &campaign)])?)).await
+}
+
+/// Launch a beat: its notes become the live set, logged in `session`.
+#[tauri::command]
+pub async fn command_launch(
+    campaign: String,
+    beat: String,
+    session: Option<String>,
+) -> Result<LiveSet, String> {
+    answer(client().post(api("/live/launch")).json(&serde_json::json!({
+        "campaign": campaign, "beat": beat, "session": session,
+    })))
+    .await
+}
+
+/// Put one note in the live set or take it out.
+#[tauri::command]
+pub async fn command_set_live(
+    campaign: String,
+    note: String,
+    live: bool,
+) -> Result<LiveSet, String> {
+    answer(client().post(api("/live/note")).json(&serde_json::json!({
+        "campaign": campaign, "note": note, "live": live,
+    })))
+    .await
+}
+
+#[tauri::command]
+pub async fn command_stop(campaign: String) -> Result<LiveSet, String> {
+    answer(
+        client()
+            .post(api("/live/stop"))
+            .json(&serde_json::json!({ "campaign": campaign })),
+    )
+    .await
+}
+
+/// Keep the live set as a new beat in `session`'s plan.
+#[tauri::command]
+pub async fn command_capture(
+    campaign: String,
+    session: String,
+    name: String,
+) -> Result<Captured, String> {
+    answer(
+        client()
+            .post(api("/live/capture"))
+            .json(&serde_json::json!({
+                "campaign": campaign, "session": session, "name": name,
+            })),
+    )
+    .await
+}
+
+/// Append a timestamped line to the session's log. Returns the line written.
+#[tauri::command]
+pub async fn command_jot(
+    campaign: String,
+    session: String,
+    text: String,
+) -> Result<String, String> {
+    #[derive(Deserialize)]
+    struct Line {
+        line: String,
+    }
+    answer::<Line>(client().post(api("/log")).json(&serde_json::json!({
+        "campaign": campaign, "session": session, "text": text,
+    })))
+    .await
+    .map(|l| l.line)
 }
 
 /// Move a campaign (no `path`), or a note or folder inside one, to the OS
@@ -511,8 +666,14 @@ async fn relay(app: &AppHandle) -> Result<(), String> {
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("stream error: {}", e))?;
         for event in frames.push(&chunk) {
-            if event["type"] == "vault" {
-                let _ = app.emit(VAULT_EVENT, &event);
+            match event["type"].as_str() {
+                Some("vault") => {
+                    let _ = app.emit(VAULT_EVENT, &event);
+                }
+                Some("live") => {
+                    let _ = app.emit(LIVE_EVENT, &event);
+                }
+                _ => {}
             }
         }
     }
@@ -575,10 +736,29 @@ mod tests {
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,
                        "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
-                          "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}]}],
+                          "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}],
+                          "log": [{"time": "19:42", "kind": "launch", "link": "Ambush",
+                                   "path": "Beats/Ambush.md", "text": "▶ [[Ambush]]"},
+                                  {"time": null, "kind": "jot", "link": null, "path": null,
+                                   "text": "later"}]}],
         });
         let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
         assert_eq!(serde_json::to_value(index).unwrap(), sidecar);
+    }
+
+    #[test]
+    fn settings_and_live_sets_keep_their_fields_on_the_way_through() {
+        let settings = serde_json::json!({ "root": "/campaigns", "spend_on_launch": true });
+        let parsed: CommandSettings = serde_json::from_value(settings.clone()).unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap(), settings);
+
+        let captured = serde_json::json!({
+            "path": "Beats/Ireena flees.md",
+            "live": {"campaign": "Strahd", "seq": 4, "beat": "Beats/Ireena flees.md",
+                     "notes": ["NPCs/Ireena.md"]},
+        });
+        let parsed: Captured = serde_json::from_value(captured.clone()).unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap(), captured);
     }
 
     #[test]
