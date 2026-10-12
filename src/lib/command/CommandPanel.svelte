@@ -446,17 +446,17 @@
     });
   }
 
+  /** A new beat lands armed and selected, as a new collection does, and
+   *  opens nothing: a double-click opens it. */
   function landBeat(path: string) {
     armedBeat = selected = path;
-    freshOpen = true;
-    return buffer.open(path);
   }
 
   function createBeat(name: string, notes: string[] = []) {
     run(async () => {
       const path = await commandApi.createBeat(campaign!, name, notes, session?.path ?? null);
       await refreshIndex();
-      await landBeat(path);
+      landBeat(path);
     });
   }
 
@@ -465,7 +465,7 @@
     run(async () => {
       const path = await commandApi.createBeat(campaign!, row.link, [], null);
       await refreshIndex();
-      await landBeat(path);
+      landBeat(path);
     });
   }
 
