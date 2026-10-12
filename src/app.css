@@ -188,8 +188,11 @@ html, body {
 
 /* --- Scrollbar --- */
 
+/* Height is a horizontal bar's thickness: without it WebKit draws those at
+   its own, thicker default. */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
