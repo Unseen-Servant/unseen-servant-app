@@ -466,11 +466,12 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  /* Square, as the collection rows: every list row's fill and ring end
+     on a straight edge. */
   .row-container {
     display: flex;
     align-items: center;
     padding: 0 0.4rem;
-    border-radius: var(--radius-sm);
     transition: background var(--transition-fast);
   }
   .row-container.hovered {
@@ -528,7 +529,6 @@
     cursor: pointer;
     background: none;
     border: none;
-    border-radius: var(--radius-sm);
     flex: 1;
     text-align: left;
     font-size: 0.9rem;

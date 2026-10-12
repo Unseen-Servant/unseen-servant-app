@@ -327,8 +327,8 @@
     width: 100%;
     padding: 0.15rem 0.4rem;
     background: none;
+    /* Square, as every list row: a radius bends the open rule's ends. */
     border: none;
-    border-radius: var(--radius-sm);
     font-family: var(--font-body);
     font-size: 0.9rem;
     line-height: 1.5;

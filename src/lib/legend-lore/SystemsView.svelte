@@ -1092,7 +1092,8 @@
     gap: 0.4rem;
     padding: 0.25rem calc(0.75rem + var(--count-w) + 0.25rem) 0.25rem calc(1.2rem + 0.3px);
     margin: 0 0.25rem;
-    border-radius: var(--radius-sm);
+    /* Square, as the collection rows: every list row's fill and ring end
+       on a straight edge. */
     cursor: pointer;
     transition: background var(--transition-fast);
     -webkit-user-select: none;
