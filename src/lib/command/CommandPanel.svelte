@@ -9,6 +9,7 @@
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
+  import LatchKey from '../ui/LatchKey.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { chordHint } from '../shell/keybindings';
@@ -18,6 +19,7 @@
   import InlineName from './InlineName.svelte';
   import NoteEditor from './NoteEditor.svelte';
   import PlayView from './PlayView.svelte';
+  import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, linkableNames, type Column } from './columns';
@@ -53,6 +55,8 @@
   /** The open campaign's live set (design §6.2), newest by `seq`. */
   let live: LiveSet | null = null;
   let play: PlayView | undefined;
+  /** The shelf sidebar in Prep (design §3.6), open until the GM hides it. */
+  let shelfOpen = true;
 
   /** The beat whose notes are lit; the armed one, if any, is also selected. */
   let selectedBeat: string | null = null;
@@ -208,6 +212,12 @@
       mode = mode === 'prep' ? 'play' : 'prep';
       return;
     }
+    // ⌘B: the shelf, as it is Legend Lore's collections sidebar.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'b' && index && mode === 'prep') {
+      e.preventDefault();
+      shelfOpen = !shelfOpen;
+      return;
+    }
     if (e.key === 'Escape' && armedBeat) armedBeat = null;
   }
 
@@ -317,6 +327,16 @@
   }
 
   /** Spending from Play is logged in the session; from Prep it isn't. */
+  /** Another campaign's note, copied onto this shelf — and into the armed
+   *  beat, if there is one, as a note started then would be. */
+  function copyNote(fromCampaign: string, note: NoteEntry) {
+    run(async () => {
+      const path = await commandApi.copyNote(campaign!, fromCampaign, note.path);
+      if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
+      await refreshIndex();
+    });
+  }
+
   function setSpent(note: Named, spent: boolean) {
     const logIn = mode === 'play' ? (session?.path ?? null) : null;
     run(async () => {
@@ -603,6 +623,21 @@
       <span class="bar-title">Command</span>
     {/if}
     <span class="spacer"></span>
+    {#if index && mode === 'prep'}
+      <div class="panel-keys">
+        <LatchKey
+          open={shelfOpen}
+          title={(shelfOpen ? 'Hide the shelf' : 'Show the shelf') + chordHint('sidebar.toggle')}
+          label="Toggle the shelf"
+          onClick={() => (shelfOpen = !shelfOpen)}
+        >
+          <!-- Font Awesome "box-archive" icon (src/lib/ui/icons/box-archive-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor">
+            <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
+          </svg>
+        </LatchKey>
+      </div>
+    {/if}
     {#if index}
       <!-- A picker, not a mode — one view is always on — so the current
            segment sits raised, as on Legend Lore's view switch. -->
@@ -670,6 +705,27 @@
             </div>
           {/if}
         {:else}
+        {#if shelfOpen && campaign}
+          <ShelfSidebar
+            {campaign}
+            {campaigns}
+            {index}
+            openPath={bufState.path}
+            {members}
+            {inSession}
+            armed={!!armedBeat}
+            ambiguous={(name) => isAmbiguous(index!, name)}
+            onOpen={(note) => openPath(note.path)}
+            onToggleMember={toggleMember}
+            onCreate={(name) => createNote('Shelf', name)}
+            onRename={renameNote}
+            onSpent={setSpent}
+            onMove={moveNote}
+            onReveal={(note) => reveal(note.path)}
+            onTrash={(note) => trashNote(note)}
+            onCopy={copyNote}
+          />
+        {/if}
         <div class="grid-pane">
           <TrackGrid
             {cols}
@@ -974,6 +1030,12 @@
      says so before the click does. */
   .workspace.arming .grid-pane {
     cursor: copy;
+  }
+
+  /* Legend Lore's panel keys (Header .panel-keys): latches side by side. */
+  .panel-keys {
+    display: flex;
+    gap: 0.3rem;
   }
 
   /* Prep ⇄ Play: the picker recipe of Legend Lore's view switch and the

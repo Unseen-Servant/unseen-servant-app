@@ -51,6 +51,9 @@ export const commandApi = {
     invoke<Moved>('command_rename_note', { campaign, path, newName }),
   moveNote: (campaign: string, path: string, folder: string) =>
     invoke<Moved>('command_move_note', { campaign, path, folder }),
+  /** Another campaign's note, copied onto this one's shelf. */
+  copyNote: (campaign: string, fromCampaign: string, path: string) =>
+    invoke<string>('command_copy_note', { campaign, fromCampaign, path }),
   createBeat: (campaign: string, name: string, notes: string[], session: string | null) =>
     invoke<string>('command_create_beat', { campaign, name, notes, session }),
   setMember: (campaign: string, beat: string, note: string, member: boolean) =>

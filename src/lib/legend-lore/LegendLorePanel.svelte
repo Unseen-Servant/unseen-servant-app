@@ -2740,14 +2740,14 @@
       });
   }
 
-  async function handleSendToCommand(track: string) {
+  async function handleSendToCommand(track: string | null) {
     const result = contextMenu?.result;
     contextMenu = null;
     if (!result) return;
     try {
       const sent = await sendToCommand(result, track);
       const name = sent.path.split('/').pop()?.replace(/\.md$/, '') ?? sent.path;
-      jobNotification.show({ type: 'success', message: `Sent to Command: ${name} in ${sent.campaign} › ${track}`, duration: 4000 });
+      jobNotification.show({ type: 'success', message: `Sent to Command: ${name} in ${sent.campaign} › ${track ?? 'Shelf'}`, duration: 4000 });
     } catch (e) {
       jobNotification.show({ type: 'error', message: `Couldn't send to Command: ${e}`, duration: 5000 });
     }

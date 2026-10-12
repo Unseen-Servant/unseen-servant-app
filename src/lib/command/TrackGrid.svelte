@@ -50,7 +50,10 @@
       items: [
         action('Rename', () => (renamingPath = note.path)),
         action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
-        ...(others.length ? [divider, heading('move to'), ...others.map((t) => action(t, () => onMoveNote(note, t)))] : []),
+        divider,
+        heading('move to'),
+        ...others.map((t) => action(t, () => onMoveNote(note, t))),
+        action('Shelf', () => onMoveNote(note, 'Shelf')),
         divider,
         action('Show in Finder', () => onRevealNote(note)),
         action('Move to Trash', () => onTrashNote(note), true),

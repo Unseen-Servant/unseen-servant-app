@@ -62,7 +62,8 @@
   // campaign open there and its tracks), 'loading' while Rust is asked.
   // Null on a file row, which has no Send to Command.
   export let sendTargets: SendTargets | 'loading' | null = null;
-  export let onSendToCommand: (track: string) => void = () => {};
+  // null: onto the campaign's shelf (Command design §3.6).
+  export let onSendToCommand: (track: string | null) => void = () => {};
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
@@ -415,6 +416,11 @@
             <span class="submenu-note">Open a campaign in Command first</span>
           {:else}
             <span class="submenu-note micro-label" title={sendTargets.campaign}>{sendTargets.campaign}</span>
+            <!-- The shelf first: where a clipping goes until it has a track. -->
+            <button class="menu-row" data-mi="item" role="menuitem" on:click={() => onSendToCommand(null)}>
+              <span class="submenu-name">Shelf</span>
+            </button>
+            {#if sendTargets.tracks.length}<hr class="menu-divider" />{/if}
             {#each sendTargets.tracks as track (track)}
               <button class="menu-row" data-mi="item" role="menuitem" on:click={() => onSendToCommand(track)}>
                 <span class="submenu-name" title={track}>{track}</span>

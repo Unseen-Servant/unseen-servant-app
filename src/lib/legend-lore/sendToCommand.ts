@@ -34,6 +34,7 @@ export function sentNote(result: SearchResultItem) {
   };
 }
 
-export function sendToCommand(result: SearchResultItem, track: string): Promise<Sent> {
+/** Keep the hit in `track`, or on the campaign's shelf when it's null. */
+export function sendToCommand(result: SearchResultItem, track: string | null): Promise<Sent> {
   return invoke<Sent>('command_send', { track, ...sentNote(result) });
 }
