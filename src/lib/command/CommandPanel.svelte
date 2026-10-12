@@ -10,6 +10,7 @@
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
+  import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { chordHint } from '../shell/keybindings';
@@ -44,7 +45,9 @@
   let index: CampaignIndex | null = null;
   let error: string | null = null;
   let menu: OpenMenu | null = null;
-  /** The campaign key is the name field: [name] or Rename. */
+  /** The switcher, while it is the open menu: its key stays sunk. */
+  let switcher: OpenMenu | null = null;
+  /** The campaign key is the name field: the pen or Rename. */
   let renaming = false;
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
@@ -83,6 +86,7 @@
   // Named by Command and not yet by the GM: the sidecar's rule
   // (vault.is_untitled). Command opens on one, and leaving it blank removes it.
   $: untitled = !!campaign && /^Untitled(?: [1-9][0-9]*)?$/.test(campaign);
+  $: switcherOpen = !!menu && menu === switcher;
   $: cols = index ? columns(index) : ([] as Column[]);
   $: nameSet = new Set((index?.notes ?? []).map((n) => n.name.toLowerCase()));
   $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
@@ -566,8 +570,10 @@
   /** The switcher, as Obsidian's for vaults: every campaign, the open one
    *  lit, and New campaign at the bottom. */
   function campaignMenu(e: MouseEvent) {
-    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    menu = {
+    // Hung off the well, not the half: the menu lines up with the keycap's
+    // outer edge.
+    const box = (e.currentTarget as HTMLElement).parentElement!.getBoundingClientRect();
+    menu = switcher = {
       x: box.left,
       y: box.bottom + 4,
       items: [
@@ -620,21 +626,39 @@
         />
       </div>
     {:else}
-      <!-- Click: the switcher. Right-click: this campaign's own menu. -->
-      <button
-        type="button"
-        class="campaign-key"
-        class:untitled
-        class:none={!campaign}
-        title="Campaigns"
-        on:click={campaignMenu}
-        on:contextmenu|preventDefault={manageMenu}
-      >
-        {campaign ?? 'no campaign'}<span class="drop" aria-hidden="true">▾</span>
-      </button>
-      {#if untitled}
-        <ActionButton label="name" title="Name this campaign" onClick={() => (renaming = true)} />
-      {/if}
+      <!-- One keycap in a well, split in two: the switcher (click; right-click
+           for this campaign's own menu) and the pen that names it. -->
+      <div class="campaign-well">
+        <button
+          type="button"
+          class="campaign-key"
+          class:untitled
+          class:none={!campaign}
+          class:open={switcherOpen}
+          title="Campaigns"
+          on:click={campaignMenu}
+          on:contextmenu|preventDefault={manageMenu}
+        >
+          <span class="campaign-name">{campaign ?? 'no campaign'}</span>
+          <svg class="drop-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true">
+            <path d={CARET_RIGHT} />
+          </svg>
+        </button>
+        {#if campaign}
+          <button
+            type="button"
+            class="campaign-edit"
+            title={untitled ? 'Name this campaign' : 'Rename this campaign'}
+            aria-label={untitled ? 'Name this campaign' : 'Rename this campaign'}
+            on:click={() => (renaming = true)}
+          >
+            <!-- Font Awesome "pen-to-square" icon (src/lib/ui/icons/pen-to-square-solid-full.svg) -->
+            <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+              <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
+            </svg>
+          </button>
+        {/if}
+      </div>
       {#if campaign}
         <span class="bar-sep" aria-hidden="true">·</span>
         {#if session}
@@ -663,20 +687,38 @@
       </div>
     {/if}
     {#if index}
-      <!-- A picker, not a mode — one view is always on — so the current
-           segment sits raised, as on Legend Lore's view switch. -->
-      <nav class="view-seg" aria-label="Command view">
-        {#each [['prep', 'Prep'], ['play', 'Play']] as [id, label] (id)}
-          <button
-            type="button"
-            class="seg-btn"
-            class:current={mode === id}
-            aria-pressed={mode === id}
-            title={`${label}${chordHint('view.toggle')}`}
-            on:click={() => (mode = id === 'play' ? 'play' : 'prep')}
-          >{label}</button>
-        {/each}
-      </nav>
+      <!-- View switch — Legend Lore's (Header .view-switch): a picker, not a
+           mode, so the current segment sits on a raised fill instead of
+           lighting purple. Both glyphs are drawn with viewBox="64 64 512 512",
+           the 640 box cropped, so they fill the segment as Legend Lore's
+           folder-tree and layer-group do. -->
+      <div class="view-switch" role="group" aria-label="Command view">
+        <button
+          class="view-segment"
+          class:current={mode === 'prep'}
+          on:click={() => (mode = 'prep')}
+          title={'Prep' + chordHint('view.toggle')}
+          aria-label="Prep"
+          aria-pressed={mode === 'prep'}
+        >
+          <!-- Font Awesome "table-columns" icon (src/lib/ui/icons/table-columns-solid-full.svg) -->
+          <svg viewBox="64 64 512 512" fill="currentColor" class="toggle-icon">
+            <path d="M96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM160 224L160 480L288 480L288 224L160 224zM480 224L352 224L352 480L480 480L480 224z"/>
+          </svg>
+        </button>
+        <button
+          class="view-segment"
+          class:current={mode === 'play'}
+          on:click={() => (mode = 'play')}
+          title={'Play' + chordHint('view.toggle')}
+          aria-label="Play"
+          aria-pressed={mode === 'play'}
+        >
+          <svg viewBox="64 64 512 512" fill="currentColor" class="toggle-icon">
+            <path d={PLAY} />
+          </svg>
+        </button>
+      </div>
     {/if}
     {@render windowKey?.()}
   </header>
@@ -861,14 +903,102 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  /* The campaign key: a keycap in a well, LatchKey's cut, split by a 1px
+     groove into the switcher and the pen. Both halves sit on the raised
+     fill; hover lifts one by a grey step, and the switcher sinks to the
+     well floor while its menu is open. */
+  .campaign-well {
+    flex-shrink: 0;
+    display: flex;
+    gap: 1px;
+    padding: 2px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-well);
+  }
+
+  .campaign-key,
+  .campaign-edit {
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding: 0;
+    background: var(--bg-header);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    /* A right-click would otherwise select the word under it. */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   .campaign-key {
+    gap: 0.5rem;
+    min-width: 9rem;
+    max-width: 16rem;
+    padding: 0 0.5rem 0 0.55rem;
     font-family: var(--font-heading);
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     color: var(--text-primary);
   }
 
-  /* Not named yet. Italic says so without a badge; [name] beside it is the
-     way out. */
+  /* Squared where the groove parts it from the pen. */
+  .campaign-key:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .campaign-edit {
+    justify-content: center;
+    width: 26px;
+    color: var(--text-tertiary);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .campaign-edit svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .campaign-key:hover,
+  .campaign-edit:hover {
+    background: var(--bg-focused);
+    color: var(--text-primary);
+  }
+
+  .campaign-key.open {
+    background: var(--bg-app);
+  }
+
+  .campaign-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  /* Font Awesome caret-right turned down: always a drop, never a
+     disclosure, so it doesn't take app.css's .caret. */
+  .drop-caret {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    transform: rotate(90deg);
+    color: var(--text-tertiary);
+    transition: color var(--transition-fast);
+  }
+
+  .campaign-key:hover .drop-caret,
+  .campaign-key.open .drop-caret {
+    color: var(--text-primary);
+  }
+
+  /* Not named yet. Italic says so without a badge; the pen beside it is
+     the way out. */
   .campaign-key.untitled,
   .campaign-key.none {
     font-style: italic;
@@ -882,7 +1012,6 @@
     color: var(--text-tertiary);
   }
 
-  .campaign-key,
   .session-key {
     display: flex;
     align-items: baseline;
@@ -893,12 +1022,8 @@
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background var(--transition-fast), color var(--transition-fast);
-    /* A right-click would otherwise select the word under it. */
     -webkit-user-select: none;
     user-select: none;
-  }
-
-  .session-key {
     font-family: var(--font-body);
     font-size: 0.95rem;
     color: var(--text-secondary);
@@ -908,13 +1033,13 @@
     color: var(--text-tertiary);
   }
 
-  .campaign-key:hover,
   .session-key:hover {
     background: var(--bg-focused);
     color: var(--text-primary);
   }
 
   .campaign-key:active,
+  .campaign-edit:active,
   .session-key:active {
     transform: scale(0.97);
   }
@@ -988,10 +1113,9 @@
     gap: 0.3rem;
   }
 
-  /* Prep ⇄ Play: the picker recipe of Legend Lore's view switch and the
-     settings rail (SettingsModal .seg) — a well, the current segment raised,
-     never purple. */
-  .view-seg {
+  /* Prep ⇄ Play: Legend Lore's view switch (Header .view-switch), rule for
+     rule — two icon segments in a darker well, the current one raised. */
+  .view-switch {
     display: flex;
     gap: 2px;
     padding: 2px;
@@ -1001,34 +1125,34 @@
     flex-shrink: 0;
   }
 
-  .seg-btn {
-    display: inline-flex;
+  .view-segment {
+    display: flex;
     align-items: center;
-    height: 20px;
-    padding: 0.1rem 0.55rem;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-heading);
-    font-size: 0.72rem;
-    letter-spacing: 0.03em;
+    border-radius: var(--radius-md);
     color: var(--text-tertiary);
     cursor: pointer;
-    transition: color var(--transition-fast), background var(--transition-fast);
+    padding: 0;
+    transition: all var(--transition-fast);
   }
 
-  .seg-btn:hover:not(.current) {
+  .view-segment:hover {
     color: var(--text-primary);
   }
 
-  .seg-btn.current {
+  .view-segment.current {
     background: var(--bg-header);
     color: var(--text-primary);
   }
 
-  .seg-btn:focus-visible {
-    outline: 1px solid var(--text-accent);
-    outline-offset: 1px;
+  .toggle-icon {
+    width: 14px;
+    height: 14px;
+    display: block;
   }
 
   /* The inspector reads on vellum, as Legend Lore's does. */
