@@ -6,6 +6,7 @@
   // whose notes copy onto this shelf: reuse between campaigns is a copy.
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
+  import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
   import { action, divider, heading, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
@@ -22,6 +23,9 @@
   export let armed: boolean;
   export let ambiguous: (name: string) => boolean;
   export let onOpen: (note: NoteEntry) => void;
+  /** The note last clicked: Legend Lore's focused row. */
+  export let selectedPath: string | null;
+  export let onSelect: (note: NoteEntry) => void;
   export let onToggleMember: (note: NoteEntry) => void;
   export let onCreate: (name: string) => void;
   export let onRename: (note: NoteEntry, name: string) => void;
@@ -39,6 +43,12 @@
   let creating = false;
   let renamingPath: string | null = null;
   let menu: OpenMenu | null = null;
+
+  // Hover latched on pointerenter, as Legend Lore's rows (FileTree).
+  let hovered: string | null = null;
+  function leave(path: string) {
+    if (hovered === path) hovered = null;
+  }
 
   $: shelf = index.notes.filter(onShelf).sort(byName);
   $: loose = index.notes.filter((n) => n.track === null).sort(byName);
@@ -124,6 +134,8 @@
       type="button"
       class="note-row"
       class:open={note.path === openPath}
+      class:selected={note.path === selectedPath}
+      class:hovered={$hoverLive && hovered === note.path}
       class:ambiguous={ambiguous(note.name)}
       class:member={members.has(note.path)}
       class:in-session={inSession.has(note.path)}
@@ -131,8 +143,13 @@
       class:arming={armed}
       aria-pressed={armed ? members.has(note.path) : undefined}
       title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
-      on:click={() => (armed ? onToggleMember(note) : onOpen(note))}
-      on:dblclick={() => (renamingPath = note.path)}
+      on:click={() => {
+        onSelect(note);
+        if (armed) onToggleMember(note);
+      }}
+      on:dblclick={() => onOpen(note)}
+      on:pointerenter={() => (hovered = note.path)}
+      on:pointerleave={() => leave(note.path)}
       on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
     >
       <span class="slot" aria-hidden="true"></span>
@@ -350,7 +367,7 @@
     color: var(--text-accent);
   }
 
-  .note-row.arming:hover:not(.member) .slot {
+  .note-row.arming.hovered:not(.member) .slot {
     border-color: var(--text-accent);
   }
 
@@ -359,8 +376,8 @@
     opacity: var(--opacity-out-of-scope);
   }
 
-  .note-row.spent:hover .label,
-  .note-row.spent:hover .slot {
+  .note-row.spent.hovered .label,
+  .note-row.spent.hovered .slot {
     opacity: var(--opacity-out-of-scope-hover);
   }
 
@@ -370,18 +387,27 @@
     color: var(--text-tertiary);
   }
 
-  .note-row:hover {
-    background: var(--bg-focused);
+  /* Legend Lore's row states (FileTree, CollectionsPanel .row-container):
+     hover fills a grey step, latched on pointerenter and painted only while
+     the pointer drives ($hoverLive), so a closing menu doesn't light the
+     row under a still pointer; the selected row rings. Rows take no press
+     tick there. */
+  .note-row.hovered {
+    background: var(--bg-container);
   }
 
-  .note-row:active {
-    transform: scale(0.97);
+  .note-row.selected {
+    box-shadow: var(--ring-focus);
   }
 
   .note-row.open {
     background: color-mix(in srgb, var(--text-accent) 10%, transparent);
     box-shadow: inset 2px 0 0 var(--text-accent);
     color: var(--text-accent);
+  }
+
+  .note-row.open.selected {
+    box-shadow: var(--ring-focus), inset 2px 0 0 var(--text-accent);
   }
 
   .note-row.ambiguous {

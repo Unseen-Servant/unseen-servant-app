@@ -1,10 +1,12 @@
 <script lang="ts">
   // The beat launcher (design §5.1): the active session's plan in order,
   // then beats no plan holds yet. Clicking a beat selects it — its notes
-  // light up across the tracks — and opens it. Arming a beat (the record-arm
+  // light up across the tracks — and a double-click opens it, as rows do in
+  // Legend Lore. Arming a beat (the record-arm
   // ring, as on Legend Lore's collections) makes a click on a note put it in
   // the beat or take it out.
   import InlineName from './InlineName.svelte';
+  import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
   import { CIRCLE, CIRCLE_RING } from '../ui/iconPaths';
   import { action, divider, heading, type MenuItem, type OpenMenu } from './menu';
@@ -16,7 +18,10 @@
   export let sessionName: string | null;
   export let selectedPath: string | null;
   export let armedPath: string | null;
+  /** The note in the editor, a beat when one is open. */
+  export let openPath: string | null;
   export let onSelect: (beat: BeatEntry) => void;
+  export let onOpen: (beat: BeatEntry) => void;
   export let onArm: (beat: BeatEntry) => void;
   export let onCreate: (name: string) => void;
   export let onWrite: (row: PlanRow) => void;
@@ -31,6 +36,12 @@
   let creating = false;
   let renamingPath: string | null = null;
   let menu: OpenMenu | null = null;
+
+  // Hover latched on pointerenter, as Legend Lore's rows (FileTree).
+  let hovered: string | null = null;
+  function leave(path: string) {
+    if (hovered === path) hovered = null;
+  }
 
   function beatItems(beat: BeatEntry): MenuItem[] {
     return [
@@ -80,9 +91,13 @@
     <div
       class="beat-row"
       class:selected={beat.path === selectedPath}
+      class:open={beat.path === openPath}
       class:armed={beat.path === armedPath}
       class:spent={!!beat.spent}
+      class:hovered={$hoverLive && hovered === beat.path}
       on:contextmenu|preventDefault={onMenu}
+      on:pointerenter={() => (hovered = beat.path)}
+      on:pointerleave={() => leave(beat.path)}
       role="presentation"
     >
       <button
@@ -102,7 +117,7 @@
         class="beat-name"
         title={beat.spent ? `${beat.name} — spent ${beat.spent}` : beat.name}
         on:click={() => onSelect(beat)}
-        on:dblclick={() => (renamingPath = beat.path)}
+        on:dblclick={() => onOpen(beat)}
       >
         {beat.name}
       </button>
@@ -130,8 +145,11 @@
         <button
           type="button"
           class="beat-row missing"
+          class:hovered={$hoverLive && hovered === row.link}
           title={`No beat is named “${row.link}” yet — click to write it`}
           on:click={() => onWrite(row)}
+          on:pointerenter={() => (hovered = row.link)}
+          on:pointerleave={() => leave(row.link)}
           on:contextmenu|preventDefault={(e) => rowMenu(e, row)}
         >
           <span class="arm-spacer"></span>
@@ -223,13 +241,20 @@
     transition: background var(--transition-fast);
   }
 
-  .beat-row:hover {
-    background: var(--bg-focused);
+  /* Legend Lore's row states, as on the note rows: a latched grey-step
+     hover, and a ring on the selected beat, whose notes are lit across the
+     tracks. */
+  .beat-row.hovered {
+    background: var(--bg-container);
   }
 
-  /* Selected: its notes are lit across the tracks. Content on show, so
-     parchment, the same wash and rule as the note open in the inspector. */
   .beat-row.selected {
+    box-shadow: var(--ring-focus);
+  }
+
+  /* Open in the inspector: content on show, so parchment, the same wash
+     and rule as a note open there. */
+  .beat-row.open {
     background: color-mix(in srgb, var(--text-accent) 10%, transparent);
     border-left-color: var(--text-accent);
   }
@@ -245,7 +270,7 @@
     opacity: var(--opacity-out-of-scope);
   }
 
-  .beat-row.spent:hover .beat-name {
+  .beat-row.spent.hovered .beat-name {
     opacity: var(--opacity-out-of-scope-hover);
   }
 

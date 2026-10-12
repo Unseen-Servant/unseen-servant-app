@@ -71,6 +71,9 @@
   /** The beat whose notes are lit; the armed one, if any, is also selected. */
   let selectedBeat: string | null = null;
   let armedBeat: string | null = null;
+  /** The note last clicked in the grid or on the shelf, as Legend Lore's
+   *  focused row; a double-click opens it. */
+  let selectedNote: string | null = null;
 
   let editor: NoteEditor | undefined;
   let bufState: BufferState = { path: null, status: 'empty', error: null };
@@ -276,6 +279,7 @@
       // A note started while a beat is armed lands in it.
       if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
       await refreshIndex();
+      selectedNote = path;
       freshOpen = true;
       await buffer.open(path);
       editor?.focus();
@@ -311,6 +315,7 @@
       // index holds it: before that, the guard on a beat that left clears it.
       const wasSelected = selectedBeat === note.path;
       const wasArmed = armedBeat === note.path;
+      const wasSelectedNote = selectedNote === note.path;
       const isOpen = note.path === bufState.path;
       if (isOpen) await buffer.flush();
       const moved = await commandApi.renameNote(campaign!, note.path, name);
@@ -319,6 +324,7 @@
       await refreshIndex();
       if (wasSelected) selectedBeat = moved.path;
       if (wasArmed) armedBeat = moved.path;
+      if (wasSelectedNote) selectedNote = moved.path;
     });
   }
 
@@ -328,6 +334,7 @@
       if (isOpen) await buffer.flush();
       const moved = await commandApi.moveNote(campaign!, note.path, track);
       if (isOpen) await buffer.retarget(moved.path);
+      if (selectedNote === note.path) selectedNote = moved.path;
       await refreshIndex();
     });
   }
@@ -373,7 +380,6 @@
   function selectBeat(beat: BeatEntry) {
     selectedBeat = beat.path;
     if (armedBeat !== beat.path) armedBeat = null;
-    openPath(beat.path);
   }
 
   function armBeat(beat: BeatEntry) {
@@ -799,6 +805,8 @@
             {campaigns}
             {index}
             openPath={bufState.path}
+            selectedPath={selectedNote}
+            onSelect={(note) => (selectedNote = note.path)}
             {members}
             {inSession}
             armed={!!armedBeat}
@@ -818,6 +826,8 @@
           <TrackGrid
             {cols}
             openPath={bufState.path}
+            selectedPath={selectedNote}
+            onSelect={(note) => (selectedNote = note.path)}
             {members}
             {inSession}
             armed={!!armedBeat}
@@ -843,7 +853,9 @@
           sessionName={session?.name ?? null}
           selectedPath={selectedBeat}
           armedPath={armedBeat}
+          openPath={bufState.path}
           onSelect={selectBeat}
+          onOpen={(beat) => openPath(beat.path)}
           onArm={armBeat}
           onCreate={createBeat}
           onWrite={writeBeat}
