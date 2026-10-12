@@ -558,7 +558,10 @@ async def _context() -> dict:
 async def _campaign_index(campaign: str | None) -> tuple[dict | None, dict, str | None]:
     """The campaign to act on — ``campaign``, else the one open in the app —
     its index, and the app's context; or the message saying why not."""
-    ctx = await _context()
+    reply = await sidecar.get("/api/command/context")
+    if isinstance(reply, str) and not campaign:
+        return None, {}, reply  # the app isn't answering: say that, not "nothing open"
+    ctx = reply if isinstance(reply, dict) else {}
     name = campaign or ctx.get("campaign")
     if not name:
         return None, ctx, _NO_CAMPAIGN

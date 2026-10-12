@@ -131,3 +131,18 @@ def test_play_from_mcp_live_set_and_spend(strahd, app):
     index = app.get("/api/command/campaign", params={"name": "Strahd"}).json()
     assert [(e["kind"], e["link"]) for e in index["sessions"][0]["log"]] == [("spent", "Ismark")]
     assert run(mcp_server.spend("Ismark", spent=False)) == "Ismark is unspent, logged in Session 1."
+
+
+def test_with_the_app_closed_the_tools_say_so(monkeypatch):
+    def refuse(request):
+        raise httpx.ConnectError("connection refused", request=request)
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        mcp_server.httpx, "AsyncClient",
+        lambda **kw: real_client(transport=httpx.MockTransport(refuse), **kw),
+    )
+    args = argparse.Namespace(sidecar_url="http://sidecar.test", data_dir=None)
+    monkeypatch.setattr(mcp_server, "sidecar", mcp_server.SidecarClient(args))
+    assert run(mcp_server.current_session()) == mcp_server._SIDECAR_DOWN_HINT
+    assert run(mcp_server.read_note("Ismark", campaign="Strahd")) == mcp_server._SIDECAR_DOWN_HINT
