@@ -6,8 +6,9 @@ use reqwest::{RequestBuilder, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
+use crate::app_context::AppContext;
 use crate::sidecar_url;
 use crate::sse::SseFrames;
 
@@ -45,6 +46,9 @@ pub struct NoteEntry {
     group: Option<String>,
     /// The date it was spent, as written; None while unspent.
     spent: Option<String>,
+    /// Where it came from: a PDF page's file URL (Send to Command).
+    #[serde(default)]
+    source: Option<String>,
 }
 
 /// A link from a beat or a session's plan: the name it gives, and the note
@@ -140,6 +144,20 @@ pub struct LiveSet {
     seq: u64,
     beat: Option<String>,
     notes: Vec<String>,
+}
+
+/// Where Legend Lore can send a hit: the open campaign's tracks.
+#[derive(Serialize, Debug)]
+pub struct SendTargets {
+    campaign: Option<String>,
+    tracks: Vec<String>,
+}
+
+/// A hit kept as a note: the campaign it went to and the note's path.
+#[derive(Serialize, Debug)]
+pub struct Sent {
+    campaign: String,
+    path: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -611,6 +629,75 @@ pub async fn command_jot(
     .map(|l| l.line)
 }
 
+// -- cross-tool (design §8) -------------------------------------------------
+
+/// Tell the sidecar which campaign and session are open, so MCP acts on them
+/// with no window open (design §6.2). Fire and forget: while the sidecar is
+/// down nothing is lost, since the event relay pushes again on reconnecting.
+pub fn push_context<T: Serialize>(snapshot: &T) {
+    let Ok(body) = serde_json::to_value(snapshot) else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        let _ = client()
+            .put(api("/context"))
+            .json(&body)
+            .timeout(TIMEOUT)
+            .send()
+            .await;
+    });
+}
+
+/// The tracks of the campaign open in Command, for Legend Lore's "Send to
+/// Command" menu. No campaign open, no tracks.
+#[tauri::command]
+pub async fn command_send_targets(
+    state: tauri::State<'_, AppContext>,
+) -> Result<SendTargets, String> {
+    #[derive(Deserialize)]
+    struct Tracks {
+        tracks: Vec<String>,
+    }
+    let Some(campaign) = state.campaign() else {
+        return Ok(SendTargets {
+            campaign: None,
+            tracks: Vec::new(),
+        });
+    };
+    let found: Tracks =
+        answer(client().get(api_query("/tracks", &[("campaign", &campaign)])?)).await?;
+    Ok(SendTargets {
+        campaign: Some(campaign),
+        tracks: found.tracks,
+    })
+}
+
+/// Keep a Legend Lore hit as a note in a track of the open campaign. The
+/// one crossing between the tools' windows (architecture D4): Legend Lore
+/// asks Rust, and Command hears of the new note from the vault watcher.
+#[tauri::command]
+pub async fn command_send(
+    state: tauri::State<'_, AppContext>,
+    track: String,
+    name: String,
+    text: String,
+    source: String,
+    cite: String,
+) -> Result<Sent, String> {
+    let campaign = state
+        .campaign()
+        .ok_or_else(|| "Open a campaign in Command first".to_string())?;
+    let sent: AtPath = answer(client().post(api("/send")).json(&serde_json::json!({
+        "campaign": campaign, "track": track, "name": name,
+        "text": text, "source": source, "cite": cite,
+    })))
+    .await?;
+    Ok(Sent {
+        campaign,
+        path: sent.path,
+    })
+}
+
 /// Move a campaign (no `path`), or a note or folder inside one, to the OS
 /// trash. The sidecar vouches for the path first, with the same checks as
 /// every other Command route; the watcher reports the deletion.
@@ -661,6 +748,8 @@ async fn relay(app: &AppHandle) -> Result<(), String> {
     if !response.status().is_success() {
         return Err(format!("the sidecar answered {}", response.status()));
     }
+    // A (re)started sidecar knows nothing of what's open: tell it.
+    push_context(&app.state::<AppContext>().snapshot());
     let mut stream = response.bytes_stream();
     let mut frames = SseFrames::default();
     while let Some(chunk) = stream.next().await {
@@ -732,7 +821,8 @@ mod tests {
         // doesn't name would silently vanish before the frontend sees it.
         let sidecar = serde_json::json!({
             "name": "Strahd", "tracks": ["NPCs"], "ambiguous": [],
-            "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18"}],
+            "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18",
+                       "source": "file:///b.pdf#page=3"}],
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,
                        "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",

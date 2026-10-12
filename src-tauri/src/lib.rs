@@ -672,6 +672,8 @@ pub fn run() {
             command::command_stop,
             command::command_capture,
             command::command_jot,
+            command::command_send_targets,
+            command::command_send,
             command::command_trash
         ])
         .setup(|app| {

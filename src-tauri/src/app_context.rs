@@ -3,7 +3,8 @@
 //! Each window is its own JS context, so Rust is the source of truth. A
 //! window pulls the snapshot with `get_app_context` when it mounts and follows
 //! `app-context://changed` after that; the setters broadcast to every window,
-//! the caller included.
+//! the caller included, and to the sidecar, so Command's MCP tools act on
+//! what's open with no window needed (`command::push_context`).
 
 use serde::Serialize;
 use std::sync::{Mutex, PoisonError};
@@ -29,7 +30,7 @@ fn normalize(name: Option<String>) -> Option<String> {
 }
 
 impl AppContext {
-    fn snapshot(&self) -> AppContextSnapshot {
+    pub(crate) fn snapshot(&self) -> AppContextSnapshot {
         self.0
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -39,6 +40,11 @@ impl AppContext {
     /// Switch campaigns. A session belongs to its campaign, so a different
     /// campaign clears it. `None` when nothing changed, so there is nothing
     /// to emit.
+    /// The open campaign, for commands that act on it.
+    pub(crate) fn campaign(&self) -> Option<String> {
+        self.snapshot().campaign
+    }
+
     fn set_campaign(&self, campaign: Option<String>) -> Option<AppContextSnapshot> {
         let campaign = normalize(campaign);
         let mut snap = self.0.lock().unwrap_or_else(PoisonError::into_inner);
@@ -66,6 +72,7 @@ impl AppContext {
 fn broadcast(app: &AppHandle, changed: Option<AppContextSnapshot>) {
     if let Some(snap) = changed {
         let _ = app.emit(CHANGED_EVENT, &snap);
+        crate::command::push_context(&snap);
     }
 }
 
