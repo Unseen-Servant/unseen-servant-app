@@ -148,7 +148,7 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 
 ### 3.7 Opening a campaign
 
-*Decided and built on 2026-10-12.* Command opens on a blank **Untitled** campaign, as Live opens on an empty set. The campaign key in Command's bar is a switcher, like Obsidian's for vaults. It's drawn as one keycap in a well (`LatchKey`'s cut), split by a groove into the switcher and a pen-to-square key that names the campaign. This replaces the campaign list that filled the body when nothing was open.
+*Decided and built on 2026-10-12.* Command opens on a blank **Untitled** campaign, as Live opens on an empty set. The campaign key in Command's bar is a switcher, like Obsidian's for vaults. It's drawn as one keycap in a well (`LatchKey`'s cut), split by a groove into the switcher and a pen-to-square key that names the campaign. The session key beside it is cut the same, and its pen opens the session's note. This replaces the campaign list that filled the body when nothing was open.
 
 - **Untitled is a real folder**, made at launch in the root with the default tracks. Every sidecar route needs the campaign folder to exist, so a campaign kept only in memory would need a special case in each, and in Send to Command and MCP too.
 - **The name marks it:** `Untitled`, or `Untitled 2` and on (`vault.is_untitled`). The key shows it in italic. The pen turns the key into the inline name field, for any campaign, and Enter renames the folder.
