@@ -75,7 +75,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
       Fire Drake.md                      gathered, not on a track yet (§3.6)
 ```
 
-- **Root.** Chosen in settings and persisted by the sidecar (§6.1), so the watcher and MCP know it with no window open. Every non-dot folder in it is a campaign; a folder created in Finder is a campaign.
+- **Root.** Chosen in settings and persisted by the sidecar (§6.1), so the watcher and MCP know it with no window open. Until the GM chooses one, it's `~/Unseen Servant` (§3.7). Every non-dot folder in it is a campaign; a folder created in Finder is a campaign.
 - **Tracks.** Every non-dot folder in a campaign except the reserved `Beats/`, `Sessions/` and `Shelf/`. A new campaign gets PCs, NPCs, Locations, Secrets, Monsters and Treasures plus the three reserved folders. Adding a track is making a folder, in Command or anywhere else. Notes anywhere under a track folder belong to it; subfolders show as groups within the column.
 - **Loose notes** directly in a campaign folder are notes without a track: linkable and editable, not drawn in the grid. The shelf sidebar lists them under the shelf (§3.6).
 - **`.unseen/command.json`** holds only presentation (track order, a pigment per track). It travels with the campaign and stays hidden in Finder and Obsidian (a dot-folder, the `.obsidian/` precedent). It never holds membership, so drift is harmless: a track it doesn't know gets defaults, and a stale entry is ignored.
@@ -145,6 +145,19 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 - **The sidebar** is 11rem wide, so with it open the six default tracks and the launcher still fit at 1280px. It's open until hidden, by a latch in the bar beside the Prep/Play picker (Legend Lore's `LatchKey`, the box-archive glyph) or ⌘B, which Legend Lore's collections sidebar also uses.
 - **Its rows** are the grid's, with the same marks. Their menu files a note on any track; the grid's menu moves a note to the shelf.
 - **Copying.** A copied note keeps its name, so a name the campaign already has is refused and not renumbered: two notes of one name would make its links ambiguous. Shelf notes count as cards in Play and as notes for MCP, and `create_note` takes `"Shelf"`.
+
+### 3.7 Opening a campaign
+
+*Decided and built on 2026-10-12.* Command opens on a blank **Untitled** campaign, as Live opens on an empty set. The campaign key in Command's bar is a switcher, like Obsidian's for vaults. This replaces the campaign list that filled the body when nothing was open.
+
+- **Untitled is a real folder**, made at launch in the root with the default tracks. Every sidecar route needs the campaign folder to exist, so a campaign kept only in memory would need a special case in each, and in Send to Command and MCP too.
+- **The name marks it:** `Untitled`, or `Untitled 2` and on (`vault.is_untitled`). The key shows it in italic, with `[name]` beside it. `[name]` turns the key into the inline name field, and Enter renames the folder.
+- **Leaving a blank Untitled removes it.** Switching away, *New campaign*, choosing another root, or quitting does it. Blank means no files besides Finder's `.DS_Store` and `.unseen/command.json`. Removal unlinks only those and deletes only empty folders, so a note that lands meanwhile stops it rather than going with it. An Untitled with anything in it stays, as an ordinary campaign that happens to be called Untitled.
+- **Launch reuses a blank Untitled** that a crash or a failed discard left behind. Otherwise it makes the first free name.
+- **The switcher** lists every campaign in the root, with the open one lit (a menu pip), then *New campaign*, which opens a fresh Untitled, the same as launch. **Right-click** on the key manages the open campaign (Rename, Show in Finder, Move to Trash), as right-click manages a track or a note. Moving a campaign to the Trash opens a fresh Untitled, so Command is never left on nothing.
+- **The root defaults to `~/Unseen Servant`**, made on first launch, so launch never stops to ask. Settings → Command changes it: Command closes the open campaign (a blank Untitled goes) and opens a fresh Untitled in the new folder.
+
+*Rejected:* a campaign list in the body at launch (two ways in for one job, and a screen that wasn't the console); bracketed `[open]` `[new]` actions with nothing open; a type-to-filter name field; a File menu in the macOS menu bar, which could still come later. All are in the brainstorm artifact: https://claude.ai/artifact/4mr8d5i4rSxEHwujZ6faaB.
 
 ---
 
@@ -270,9 +283,10 @@ The active campaign and session stay owned by Rust (`app_context.rs`, unchanged)
 
 - `CommandPanel.svelte` replaces the placeholder: the Prep/Play switch, taking `active` and `windowKey` per PANELS.md.
 - The live set is a `rustMirror` (`command://live` plus a pull command); `vault` events refetch what they name. *As built:* not a `rustMirror`, which mirrors one global snapshot with no arguments, and live sets are per campaign. `CommandPanel` pulls the open campaign's set (`command_get_live`) on entering it and on a refresh, and keeps a `command://live` snapshot when it's that campaign's and its `seq` is newer.
-- *As built, confirmed on 2026-10-11:* the campaign and session switchers sit in Command's own bar, not in shell chrome. The tab strip exists only in the main window, so a shell picker would leave a popped-out Command unable to switch. The campaign name opens a menu: other campaigns, new, rename, reveal, close, change folder, trash. The TEMP picker in `PanelHost.svelte` is gone; the active campaign itself still lives in `app_context.rs`.
+- *As built, confirmed on 2026-10-11:* the campaign and session switchers sit in Command's own bar, not in shell chrome. The tab strip exists only in the main window, so a shell picker would leave a popped-out Command unable to switch. The campaign name opens the switcher, and right-click opens its own menu (§3.7). The TEMP picker in `PanelHost.svelte` is gone; the active campaign itself still lives in `app_context.rs`.
+- *As built, 2026-10-12 (§3.7):* Rust opens Untitled at boot, before any window asks what's open. Every campaign switch goes through `switch_campaign_with`, which holds an async lock across the switch and the discard of the campaign left behind. Without the lock, a *New campaign* right after leaving a blank Untitled could be handed that same folder just before the discard removes it. The discard also runs on `RunEvent::Exit`, before the sidecar stops.
 - `<ConfirmDialog />` moved from Legend Lore's panel to the two window hosts (`PanelHost`, `StandaloneFrame`), one per window, so a popped-out Command can ask.
-- The campaigns folder is chosen from Command's empty state and its campaign menu (`command_choose_root`, the native picker). A Command pane in `SettingsModal` waits for phase 3's *spend beats on launch*.
+- The campaigns folder is chosen in Settings → Command (`command_choose_root`, the native picker). Until then it's the default (§3.7).
 
 ---
 
@@ -337,6 +351,7 @@ Settled on 2026-10-11, before phase 3:
 7. **Play is a board** (2026-10-12): one per session, in JSON Canvas (§5.2). The GM moves, resizes and connects cards, Miro-style.
 8. **Connections are lines** for now (§5.2). Giving them meaning in Play comes later.
 9. **The campaign is the unit, and gathered material waits on its shelf** (2026-10-12, §3.6). Reuse across campaigns is copying; there's no shared library. The name is *Shelf*, because "library" is Legend Lore's. Send to Command defaults to the shelf. Beats on the shelf are parked.
+10. **Opening a campaign** (2026-10-12, §3.7): launch opens a blank Untitled, and the campaign key is an Obsidian-style switcher with *New campaign* at the bottom. The root defaults to `~/Unseen Servant`, `[name]` names Untitled, and *New campaign* opens a fresh Untitled rather than asking for a name first.
 
 Open:
 
