@@ -125,7 +125,7 @@ def test_placing_and_connecting_writes_obsidians_layout(camp):
         '\t\t{"id":"b2","type":"file","file":"Strahd/NPCs/Ireena.md","x":320,"y":-40,"width":260,"height":180}\n'
         "\t],\n"
         '\t"edges":[\n'
-        '\t\t{"id":"e1","fromNode":"a1","fromSide":"right","toNode":"b2","toSide":"left"}\n'
+        '\t\t{"id":"e1","fromNode":"a1","fromSide":"right","toNode":"b2","toSide":"left","toEnd":"none"}\n'
         "\t]\n"
         "}"
     )
@@ -169,7 +169,9 @@ def test_placing_a_note_already_on_the_board_frames_its_card(camp):
     ismark = next(n for n in view["nodes"] if n["id"] == "8132d4d894c80022")
     assert (ismark["x"], ismark["y"]) == (5, 6)
     assert len(view["nodes"]) == 3
-    assert view["edges"][-1] == {"id": "e9", "fromNode": "8132d4d894c80022", "toNode": "754a8ef995f366bc"}
+    assert view["edges"][-1] == {
+        "id": "e9", "fromNode": "8132d4d894c80022", "toNode": "754a8ef995f366bc", "toEnd": "none",
+    }
 
 
 def test_an_edit_changes_only_the_line_it_touches(camp):

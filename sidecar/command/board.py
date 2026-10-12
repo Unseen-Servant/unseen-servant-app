@@ -116,8 +116,8 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
       on the board. A note already there is framed instead, and ``id``
       means that card for the rest of the batch.
     - ``frame`` {id, x, y, width, height}: move or resize a card.
-    - ``connect`` {id, source, target, fromSide?, toSide?}: a line between
-      two cards, unless one already joins them.
+    - ``connect`` {id, source, target, fromSide?, toSide?}: a line (no
+      arrowhead) between two cards, unless one already joins them.
     - ``remove`` {id}: a card (with its lines) or a line.
 
     An operation naming a card or line that's no longer there (removed in
@@ -172,6 +172,9 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
             edge["toNode"] = b["id"]
             if op.get("toSide") in _SIDES:
                 edge["toSide"] = op["toSide"]
+            # A line, not an arrow: JSON Canvas puts an arrowhead on the
+            # target end unless told otherwise (design §5.2).
+            edge["toEnd"] = "none"
             edges.append(edge)
         elif kind == "remove":
             gone = alias.get(_id(op), _id(op))
