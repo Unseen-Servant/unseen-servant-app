@@ -924,8 +924,10 @@
     gap: 0.5rem;
     height: var(--header-height);
     /* Legend Lore's header inset (Header .header), so the wells at either
-       end sit where its keys do. */
-    padding: 0 0.5rem;
+       end sit where its keys do. Its header has no bottom rule; the 1px on
+       top gives back what this one's takes, so the keys centre at the same
+       height and don't jump between tabs. */
+    padding: 1px 0.5rem 0;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
   }
