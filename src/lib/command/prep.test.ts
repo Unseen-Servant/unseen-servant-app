@@ -18,12 +18,12 @@ const index: CampaignIndex = {
     { name: 'Abbey', path: 'Beats/Abbey.md', spent: null, notes: [] },
   ],
   sessions: [
-    { name: 'Session 12', path: 'Sessions/Session 12.md', date: '2026-10-11', beats: [{ link: 'Played', path: 'Beats/Played.md' }] },
+    { name: 'Session 12', path: 'Sessions/Session 12.md', date: '2026-10-11', beats: [{ link: 'Played', path: 'Beats/Played.md' }], log: [] },
     { name: 'Session 13', path: 'Sessions/Session 13.md', date: '2026-10-18', beats: [
       { link: 'Ambush', path: 'Beats/Ambush.md' },
       { link: 'Not written yet', path: null },
       { link: 'Tser Pool', path: 'Beats/Tser Pool.md' },
-    ] },
+    ], log: [] },
   ],
 };
 

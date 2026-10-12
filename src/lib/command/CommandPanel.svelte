@@ -1,26 +1,30 @@
 <script lang="ts">
   // Command (docs/roadmap/2026-10-11-command-design.md). Prep: campaigns as
-  // folders, the grid of tracks, the beat launcher for the active session,
-  // and the note editor. Everything shown is re-read from the sidecar; file
-  // state lives in NoteBuffer, which owns the save rules.
+  // folders, the grid of tracks, the beat launcher for the active session.
+  // Play: the session's board and its arrangement (PlayView). Tab switches
+  // between them; the note editor serves both. Everything shown is re-read
+  // from the sidecar; file state lives in NoteBuffer, which owns the save
+  // rules.
   import { onDestroy, onMount, type Snippet } from 'svelte';
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
   import { menuSlotHeld } from '../shell/menuSlot';
+  import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
   import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
   import NoteEditor from './NoteEditor.svelte';
+  import PlayView from './PlayView.svelte';
   import TrackGrid from './TrackGrid.svelte';
-  import { commandApi, onVaultChange, type PlanEdit, type PlanOp } from './api';
+  import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, linkableNames, type Column } from './columns';
   import { action, divider, heading, type OpenMenu } from './menu';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
-  import type { BeatEntry, CampaignIndex, CommandSettings, NoteEntry, VaultEvent } from './types';
+  import type { BeatEntry, CampaignIndex, CommandSettings, LiveSet, NoteEntry, VaultEvent } from './types';
 
   // True while the panel is visible: window-level keys do nothing otherwise
   // (PANELS.md).
@@ -41,6 +45,14 @@
   let naming: 'campaign' | 'rename-campaign' | null = null;
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
+  let unlistenLive: Promise<UnlistenFn> | null = null;
+
+  /** Which view this panel shows. Per window: Prep on the laptop and Play
+   *  on the second screen is two windows. */
+  let mode: 'prep' | 'play' = 'prep';
+  /** The open campaign's live set (design §6.2), newest by `seq`. */
+  let live: LiveSet | null = null;
+  let play: PlayView | undefined;
 
   /** The beat whose notes are lit; the armed one, if any, is also selected. */
   let selectedBeat: string | null = null;
@@ -101,7 +113,22 @@
     await buffer.close();
     campaign = null;
     index = null;
+    live = null;
     selectedBeat = armedBeat = null;
+  }
+
+  /** A live set snapshot, from an answer or the event relay: kept if it's
+   *  this campaign's and newer than the one held. */
+  function applyLive(next: LiveSet) {
+    if (next.campaign !== campaign) return;
+    if (live && live.campaign === next.campaign && next.seq <= live.seq) return;
+    live = next;
+  }
+
+  async function loadLive() {
+    if (!campaign) return;
+    live = null;
+    applyLive(await commandApi.getLive(campaign));
   }
 
   /** Point the workstation's session at one of this campaign's: the one
@@ -118,6 +145,7 @@
     if (name && campaigns.includes(name)) {
       index = await commandApi.getCampaign(name);
       campaign = name;
+      await loadLive();
       await settleSession();
     }
   }
@@ -140,6 +168,7 @@
       index = await commandApi.getCampaign(campaign);
       editor?.refreshLinks();
       await buffer.diskChanged();
+      await loadLive();
       await settleSession();
     }
     await enterCampaign($appContext.campaign);
@@ -157,6 +186,7 @@
     }
     if (event.campaign !== campaign) return;
     if (bufState.path && event.paths.includes(bufState.path)) void buffer.diskChanged();
+    play?.diskChanged(event.paths);
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => run(refreshIndex), 120);
   }
@@ -168,20 +198,29 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (!active || e.key !== 'Escape' || !armedBeat || menuSlotHeld()) return;
+    if (!active || menu || menuSlotHeld()) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('input, textarea, .cm-editor')) return;
-    armedBeat = null;
+    if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    // Tab: Prep ⇄ Play, Live's key for its two views, as Legend Lore's
+    // tree ⇄ systems. ⇧Tab too: with two views, direction means nothing.
+    if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && index) {
+      e.preventDefault();
+      mode = mode === 'prep' ? 'play' : 'prep';
+      return;
+    }
+    if (e.key === 'Escape' && armedBeat) armedBeat = null;
   }
 
   onMount(() => {
     unlisten = onVaultChange(onVault);
+    unlistenLive = onLiveChange(applyLive);
     run(loadRoot).then(() => (mounted = true));
   });
 
   onDestroy(() => {
     if (refreshTimer) clearTimeout(refreshTimer);
     void unlisten?.then((stop) => stop());
+    void unlistenLive?.then((stop) => stop());
     void buffer.close();
   });
 
@@ -277,10 +316,12 @@
     });
   }
 
+  /** Spending from Play is logged in the session; from Prep it isn't. */
   function setSpent(note: Named, spent: boolean) {
+    const logIn = mode === 'play' ? (session?.path ?? null) : null;
     run(async () => {
       await settle(note.path);
-      await commandApi.setSpent(campaign!, note.path, spent);
+      await commandApi.setSpent(campaign!, note.path, spent, logIn);
       await refreshIndex();
     });
   }
@@ -368,13 +409,15 @@
           { label: 'Session', value: target.name },
           { label: 'Beats', value: String(target.beats.length), to: 'kept', unchanged: true },
         ],
-        message: 'The session note goes; its beats stay in Beats/.',
+        message: 'The session note and its board go; its beats stay in Beats/.',
         confirmLabel: 'Move to Trash',
         danger: true,
       });
       if (!confirmed) return;
       if (bufState.path === target.path) await buffer.close();
       await commandApi.trash(campaign!, target.path);
+      // Its board goes with it; a session never arranged has none.
+      await commandApi.trash(campaign!, target.path.replace(/\.md$/i, '.canvas')).catch(() => {});
       await setSession(null);
       await refreshIndex();
     });
@@ -560,6 +603,22 @@
       <span class="bar-title">Command</span>
     {/if}
     <span class="spacer"></span>
+    {#if index}
+      <!-- A picker, not a mode — one view is always on — so the current
+           segment sits raised, as on Legend Lore's view switch. -->
+      <nav class="view-seg" aria-label="Command view">
+        {#each [['prep', 'Prep'], ['play', 'Play']] as [id, label] (id)}
+          <button
+            type="button"
+            class="seg-btn"
+            class:current={mode === id}
+            aria-pressed={mode === id}
+            title={`${label}${chordHint('view.toggle')}`}
+            on:click={() => (mode = id === 'play' ? 'play' : 'prep')}
+          >{label}</button>
+        {/each}
+      </nav>
+    {/if}
     {@render windowKey?.()}
   </header>
 
@@ -588,7 +647,29 @@
         </p>
       </div>
     {:else}
-      <div class="prep" class:arming={!!armedBeat}>
+      <div class="workspace" class:arming={mode === 'prep' && !!armedBeat}>
+        {#if mode === 'play'}
+          {#if session && campaign}
+            <PlayView
+              bind:this={play}
+              {active}
+              {campaign}
+              {index}
+              {session}
+              {live}
+              {run}
+              onLive={applyLive}
+              onEdit={openPath}
+              onFollow={followLink}
+              onSpent={setSpent}
+            />
+          {:else}
+            <div class="empty">
+              <p class="lede">Play runs a session: its board, what's live, and the log.</p>
+              <ActionButton label="new session" onClick={newSession} />
+            </div>
+          {/if}
+        {:else}
         <div class="grid-pane">
           <TrackGrid
             {cols}
@@ -630,6 +711,7 @@
           onReveal={(beat) => reveal(beat.path)}
           onTrash={(beat) => trashNote(beat, 'Beat')}
         />
+        {/if}
 
         <!-- Kept mounted while closed, so a note opening has an editor to
              land in; closed, it gives the grid its width back. -->
@@ -870,9 +952,13 @@
     font-size: 0.75rem;
   }
 
-  .prep {
+  .workspace {
     height: 100%;
     display: flex;
+  }
+
+  .workspace > .empty {
+    flex: 1;
   }
 
   .grid-pane {
@@ -882,8 +968,51 @@
 
   /* While a beat is armed, a click on a note edits the beat: the cursor
      says so before the click does. */
-  .prep.arming .grid-pane {
+  .workspace.arming .grid-pane {
     cursor: copy;
+  }
+
+  /* Prep ⇄ Play: the picker recipe of Legend Lore's view switch and the
+     settings rail (SettingsModal .seg) — a well, the current segment raised,
+     never purple. */
+  .view-seg {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-well);
+    flex-shrink: 0;
+  }
+
+  .seg-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0.1rem 0.55rem;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .seg-btn:hover:not(.current) {
+    color: var(--text-primary);
+  }
+
+  .seg-btn.current {
+    background: var(--bg-header);
+    color: var(--text-primary);
+  }
+
+  .seg-btn:focus-visible {
+    outline: 1px solid var(--text-accent);
+    outline-offset: 1px;
   }
 
   /* The inspector reads on vellum, as Legend Lore's does. */

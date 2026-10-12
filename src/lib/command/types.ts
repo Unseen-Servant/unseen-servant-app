@@ -26,12 +26,26 @@ export interface BeatEntry {
   notes: LinkRef[];
 }
 
+/** A line of a session's `## Log`. Command's own lines say what happened;
+ *  anything else the GM wrote there is a jot. */
+export interface LogEntry {
+  /** "19:42"; null for a line without one. */
+  time: string | null;
+  kind: 'launch' | 'spent' | 'unspent' | 'captured' | 'jot';
+  /** The note the line names, for every kind but a jot. */
+  link: string | null;
+  path: string | null;
+  /** The line after its time. */
+  text: string;
+}
+
 export interface SessionEntry {
   name: string;
   path: string;
   date: string | null;
   /** The plan, in order. */
   beats: LinkRef[];
+  log: LogEntry[];
 }
 
 export interface CampaignIndex {
@@ -63,6 +77,8 @@ export type SaveOutcome = { status: 'saved'; hash: string } | { status: 'conflic
 
 export interface CommandSettings {
   root: string | null;
+  /** Launching a beat marks it spent. */
+  spend_on_launch: boolean;
 }
 
 export interface Moved {
@@ -81,3 +97,61 @@ export interface VaultEvent {
   campaign: string | null;
   paths: string[];
 }
+
+/** What's live in one campaign (`command://live` carries the same). */
+export interface LiveSet {
+  campaign: string;
+  /** Grows with every change to this campaign's set. */
+  seq: number;
+  /** The beat the set was launched from. */
+  beat: string | null;
+  notes: string[];
+}
+
+export interface Captured {
+  path: string;
+  live: LiveSet;
+}
+
+export type Side = 'top' | 'right' | 'bottom' | 'left';
+
+/** A JSON Canvas node as on disk. Fields Command doesn't use pass through. */
+export interface CanvasNode {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  file?: string;
+  text?: string;
+  label?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
+export interface CanvasEdge {
+  id: string;
+  fromNode: string;
+  toNode: string;
+  fromSide?: Side;
+  toSide?: Side;
+  label?: string;
+  [key: string]: unknown;
+}
+
+/** A session's board: the canvas, and the note each card shows by id. */
+export interface BoardView {
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+  notes: Record<string, string>;
+}
+
+type Frame = { x: number; y: number; width: number; height: number };
+
+/** A change to a board, applied by the sidecar to the file on disk. */
+export type BoardOp =
+  | ({ op: 'place'; id: string; path: string } & Frame)
+  | ({ op: 'frame'; id: string } & Frame)
+  | { op: 'connect'; id: string; source: string; target: string; fromSide?: Side; toSide?: Side }
+  | { op: 'remove'; id: string };

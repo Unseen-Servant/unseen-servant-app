@@ -4,8 +4,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
+  BoardOp,
+  BoardView,
   CampaignIndex,
+  Captured,
   CommandSettings,
+  LiveSet,
   Moved,
   NewSession,
   Note,
@@ -62,11 +66,30 @@ export const commandApi = {
       to: edit.to ?? null,
       expect: edit.expect ?? null,
     }),
-  setSpent: (campaign: string, path: string, spent: boolean) =>
-    invoke<string | null>('command_set_spent', { campaign, path, spent }),
+  /** From Play, pass the session: the change is logged there. */
+  setSpent: (campaign: string, path: string, spent: boolean, session: string | null = null) =>
+    invoke<string | null>('command_set_spent', { campaign, path, spent, session }),
+  setSpendOnLaunch: (enabled: boolean) => invoke<CommandSettings>('command_set_spend_on_launch', { enabled }),
+  getBoard: (campaign: string, session: string) => invoke<BoardView>('command_get_board', { campaign, session }),
+  editBoard: (campaign: string, session: string, ops: BoardOp[]) =>
+    invoke<BoardView>('command_edit_board', { campaign, session, ops }),
+  getLive: (campaign: string) => invoke<LiveSet>('command_get_live', { campaign }),
+  launch: (campaign: string, beat: string, session: string | null) =>
+    invoke<LiveSet>('command_launch', { campaign, beat, session }),
+  setLive: (campaign: string, note: string, live: boolean) =>
+    invoke<LiveSet>('command_set_live', { campaign, note, live }),
+  stop: (campaign: string) => invoke<LiveSet>('command_stop', { campaign }),
+  capture: (campaign: string, session: string, name: string) =>
+    invoke<Captured>('command_capture', { campaign, session, name }),
+  jot: (campaign: string, session: string, text: string) => invoke<string>('command_jot', { campaign, session, text }),
   /** A campaign (no path), or a note or folder inside one, to the OS trash. */
   trash: (campaign: string, path: string | null) => invoke<void>('command_trash', { campaign, path }),
 };
+
+/** Follow every campaign's live set, relayed by Rust as whole snapshots. */
+export function onLiveChange(handler: (live: LiveSet) => void): Promise<UnlistenFn> {
+  return listen<LiveSet>('command://live', (e) => handler(e.payload));
+}
 
 /** Follow the campaign folder's change events, relayed by Rust. */
 export function onVaultChange(handler: (event: VaultEvent) => void): Promise<UnlistenFn> {
