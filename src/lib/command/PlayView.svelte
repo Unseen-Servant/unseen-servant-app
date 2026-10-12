@@ -5,6 +5,7 @@
   // in the campaign to play. The board's file and the log are the only
   // things written — what's live is the sidecar's.
   import { tick } from 'svelte';
+  import { openUrl } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import { menuSlotHeld } from '../shell/menuSlot';
   import Arrangement from './Arrangement.svelte';
@@ -154,6 +155,7 @@
         track: note?.track ?? null,
         live: !!card.path && lit.has(card.path),
         spent: note?.spent ?? null,
+        source: note?.source ?? null,
         body: card.path ? (bodies.get(card.path) ?? null) : null,
       };
     };
@@ -258,6 +260,8 @@
         action(playing ? 'Take out of play' : 'Play', () => setLive(note.path, !playing)),
         action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
       );
+      const source = note.source;
+      if (source) items.push(action('Open source', () => void openUrl(source).catch(() => {})));
     }
     if (card.placed && removable(card)) {
       if (items.length) items.push(divider);

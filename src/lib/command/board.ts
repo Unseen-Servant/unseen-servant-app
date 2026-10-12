@@ -163,6 +163,8 @@ export interface CardData extends Record<string, unknown> {
   track: string | null;
   live: boolean;
   spent: string | null;
+  /** The PDF page it came from (Send to Command), which its key opens. */
+  source: string | null;
   /** The Markdown to show; null while it loads. */
   body: string | null;
 }

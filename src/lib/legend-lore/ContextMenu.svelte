@@ -8,6 +8,9 @@
   import { CARET_RIGHT, GEM } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemTagRows from './SystemTagRows.svelte';
+  import type { SendTargets } from './sendToCommand';
+
+  type Submenu = 'collection' | 'tag' | 'command';
 
   export let x: number;
   export let y: number;
@@ -55,10 +58,15 @@
   export let onAddToNewCollection: () => void = () => {};
   export let onRemoveFromCollection: (name: string) => void = () => {};
   export let onToggleHidden: () => void = () => {};
+  // A search hit rather than a file row: where Command can keep it (the
+  // campaign open there and its tracks), 'loading' while Rust is asked.
+  // Null on a file row, which has no Send to Command.
+  export let sendTargets: SendTargets | 'loading' | null = null;
+  export let onSendToCommand: (track: string) => void = () => {};
   export let onClose: () => void = () => {};
 
   let menuEl: HTMLDivElement;
-  let openSubmenu: 'collection' | 'tag' | null = initialSubmenu;
+  let openSubmenu: Submenu | null = initialSubmenu;
   // -1 means "no cursor yet" — stays that way until the pointer lands on a
   // row or the keyboard moves.
   // First ↑/↓ promotes to 0 (Math.max(0, -1 ± 1) clamps to 0). When the
@@ -203,7 +211,7 @@
       focusedIdx = idx;
       focusedSubmenuIdx = null;
       openSubmenu = row.dataset.mi === 'submenu-trigger'
-        ? (row.dataset.submenu as 'collection' | 'tag')
+        ? (row.dataset.submenu as Submenu)
         : null;
     }
     refreshItemsAndFocus();
@@ -236,7 +244,7 @@
     }
     if (isRight && !inSub) {
       const item = mainItems[focusedIdx];
-      const which = item?.dataset.submenu as 'collection' | 'tag' | undefined;
+      const which = item?.dataset.submenu as Submenu | undefined;
       if (item?.dataset.mi === 'submenu-trigger' && which) {
         event.preventDefault();
         openSubmenu = which;
@@ -261,7 +269,7 @@
       const hit = mk ? mainItems.find((el) => el.dataset.chord === mk) : undefined;
       if (hit) {
         event.preventDefault();
-        const sub = hit.dataset.submenu as 'collection' | 'tag' | undefined;
+        const sub = hit.dataset.submenu as Submenu | undefined;
         if (hit.dataset.mi === 'submenu-trigger' && sub) {
           // The ArrowRight path gets this for free — the user had already
           // navigated onto the row. A chord jumps straight here, so resolve
@@ -382,6 +390,40 @@
       Get info
       <span class="menu-chord" class:bare={isBareKeyChord('info.show')} aria-hidden="true">{chord('info.show')}</span>
     </button>
+  {/if}
+  <!-- The hit, kept in Command: a crossing to the other tool, so it sits
+       apart from what this menu does to the file. -->
+  {#if sendTargets !== null}
+    <hr class="menu-divider" />
+    <div
+      class="menu-row submenu-trigger"
+      class:open={openSubmenu === 'command'}
+      data-mi="submenu-trigger"
+      data-submenu="command"
+      role="menuitem"
+      tabindex="-1"
+      aria-haspopup="menu"
+      aria-expanded={openSubmenu === 'command'}
+    >
+      <span>Send to Command</span>
+      <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
+      {#if openSubmenu === 'command'}
+        <div class="submenu" role="menu">
+          {#if sendTargets === 'loading'}
+            <span class="submenu-note">…</span>
+          {:else if !sendTargets.campaign}
+            <span class="submenu-note">Open a campaign in Command first</span>
+          {:else}
+            <span class="submenu-note micro-label" title={sendTargets.campaign}>{sendTargets.campaign}</span>
+            {#each sendTargets.tracks as track (track)}
+              <button class="menu-row" data-mi="item" role="menuitem" on:click={() => onSendToCommand(track)}>
+                <span class="submenu-name" title={track}>{track}</span>
+              </button>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+    </div>
   {/if}
   {#if canScope}
     <hr class="menu-divider" />
@@ -556,6 +598,18 @@
   /* Collection names are user-written and uncapped — they ellipsize against
      --menu-max-width rather than stretching the menu, and carry a title so
      the full name stays recoverable. */
+  /* A line in a submenu that isn't a choice: the campaign the tracks
+     belong to, or why there are none. */
+  .submenu-note {
+    display: block;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .submenu-name {
     min-width: 0;
     overflow: hidden;

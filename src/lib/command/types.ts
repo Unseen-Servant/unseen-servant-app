@@ -10,6 +10,8 @@ export interface NoteEntry {
   group: string | null;
   /** The date it was spent, as written; null while unspent. */
   spent: string | null;
+  /** Where it came from: a PDF page's file URL (Send to Command). */
+  source: string | null;
 }
 
 /** A link in a beat or a plan: the name it gives and the note it resolves

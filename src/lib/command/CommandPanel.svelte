@@ -7,7 +7,7 @@
   // rules.
   import { onDestroy, onMount, type Snippet } from 'svelte';
   import type { UnlistenFn } from '@tauri-apps/api/event';
-  import { revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
   import { menuSlotHeld } from '../shell/menuSlot';
@@ -723,6 +723,10 @@
                 <span class="crumb">{[openEntry.track, openEntry.group].filter(Boolean).join(' › ')}</span>
               {/if}
               <span class="save-state">{STATUS_TEXT[bufState.status] ?? ''}</span>
+              {#if openEntry?.source}
+                {@const source = openEntry.source}
+                <ActionButton label="source" title="Open the book this came from, at its page" onClick={() => void openUrl(source).catch((e) => (error = String(e)))} />
+              {/if}
               {#if openEntry}
                 {@const note = openEntry}
                 <label class="spent-toggle" title={note.spent ? `Spent ${note.spent}` : 'Mark spent'}>

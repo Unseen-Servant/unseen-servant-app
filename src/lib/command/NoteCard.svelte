@@ -7,7 +7,7 @@
   import { gfmPlugin } from 'svelte-exmarkdown/gfm';
   import { Handle, NodeResizer, Position } from '@xyflow/svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { PLAY } from '../ui/iconPaths';
+  import { BOOK, PLAY } from '../ui/iconPaths';
   import { getContext } from 'svelte';
   import { CARD_ACTIONS, NOTE_HREF, linkify, type CardActions, type CardData } from './board';
 
@@ -74,6 +74,20 @@
     {/if}
     <span class="card-name" {title}>{title}</span>
     {#if data.track}<span class="card-track">{data.track}</span>{/if}
+    {#if data.source}
+      {@const source = data.source}
+      <!-- Sent from Legend Lore: open the book at its page, as Legend Lore
+           opens a hit. -->
+      <button
+        type="button"
+        class="source-key nodrag"
+        title="Open the source at its page"
+        aria-label="Open the source"
+        on:click|stopPropagation={() => void openUrl(source).catch(() => {})}
+      >
+        <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={BOOK} /></svg>
+      </button>
+    {/if}
     {#if !missing}
       <input
         type="checkbox"
@@ -201,6 +215,32 @@
     border-color: var(--text-active);
     background: color-mix(in srgb, var(--text-active) 15%, transparent);
     filter: var(--glow-active);
+  }
+
+  .source-key {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+
+  .source-key svg {
+    width: 11px;
+    height: 11px;
+    display: block;
+  }
+
+  .source-key:hover {
+    color: var(--text-accent);
+  }
+
+  .source-key:active {
+    transform: scale(0.97);
   }
 
   .card-body {

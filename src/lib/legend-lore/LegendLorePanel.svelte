@@ -5,6 +5,7 @@
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { pdfFileUrl } from './pdfUrl';
+  import { sendTargets, sendToCommand, type SendTargets } from './sendToCommand';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from './types';
   import { decideSyncAction } from './syncPolicy';
@@ -188,6 +189,9 @@
     isIndexed: boolean;
     initialSubmenu: 'collection' | null;
     hideState: { directlyHidden: boolean; inheritedHidden: boolean };
+    /** Set when the menu is a search hit's: it can go to Command. */
+    result?: SearchResultItem;
+    sendTargets?: SendTargets | 'loading';
   } | null = null;
   let renamingFilePath: string | null = null;
   let statsModalPath: string | null = null;
@@ -2725,6 +2729,28 @@
 
   function handleResultContextMenu(event: MouseEvent, result: SearchResultItem) {
     handleContextMenu(event, resultToFileItem(result));
+    if (!contextMenu) return;
+    contextMenu = { ...contextMenu, result, sendTargets: 'loading' };
+    sendTargets()
+      .then((targets) => {
+        if (contextMenu?.result === result) contextMenu = { ...contextMenu, sendTargets: targets };
+      })
+      .catch(() => {
+        if (contextMenu?.result === result) contextMenu = { ...contextMenu, sendTargets: { campaign: null, tracks: [] } };
+      });
+  }
+
+  async function handleSendToCommand(track: string) {
+    const result = contextMenu?.result;
+    contextMenu = null;
+    if (!result) return;
+    try {
+      const sent = await sendToCommand(result, track);
+      const name = sent.path.split('/').pop()?.replace(/\.md$/, '') ?? sent.path;
+      jobNotification.show({ type: 'success', message: `Sent to Command: ${name} in ${sent.campaign} › ${track}`, duration: 4000 });
+    } catch (e) {
+      jobNotification.show({ type: 'error', message: `Couldn't send to Command: ${e}`, duration: 5000 });
+    }
   }
 
   // ⌘O on a collections-panel child row.
@@ -4045,6 +4071,8 @@
       directlyHidden={contextMenu.hideState.directlyHidden}
       inheritedHidden={contextMenu.hideState.inheritedHidden}
       onToggleHidden={handleContextToggleHidden}
+      sendTargets={contextMenu.result ? (contextMenu.sendTargets ?? 'loading') : null}
+      onSendToCommand={handleSendToCommand}
       canRename={!searchViewOpen}
       onClose={() => { contextMenu = null; }}
     />

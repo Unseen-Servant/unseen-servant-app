@@ -7,7 +7,7 @@ const note = (path: string): NoteEntry => {
   const parts = path.split('/');
   const name = parts[parts.length - 1].replace(/\.md$/, '');
   const folders = parts.slice(0, -1);
-  return { name, path, track: folders[0] ?? null, group: folders.slice(1).join('/') || null, spent: null };
+  return { name, path, track: folders[0] ?? null, group: folders.slice(1).join('/') || null, spent: null, source: null };
 };
 
 const index: CampaignIndex = {
