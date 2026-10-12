@@ -648,7 +648,7 @@ pub fn run() {
             command::command_set_root,
             command::command_choose_root,
             command::command_list_campaigns,
-            command::command_create_campaign,
+            command::command_open_untitled,
             command::command_rename_campaign,
             command::command_get_campaign,
             command::command_create_track,
@@ -810,6 +810,12 @@ pub fn run() {
                     }
                 }
                 tauri::RunEvent::Exit => {
+                    // A blank Untitled goes with the app, as it does when the
+                    // GM switches away from it. Before the sidecar stops.
+                    if let Some(campaign) = app_handle.state::<app_context::AppContext>().campaign()
+                    {
+                        tauri::async_runtime::block_on(command::discard_if_blank(&campaign));
+                    }
                     let state = app_handle.state::<SidecarState>();
                     stop_sidecar(state.inner());
                     println!("Sidecar stopped.");

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::app_context::AppContext;
+use crate::app_context::{switch_campaign_with, AppContext};
 use crate::sidecar_url;
 use crate::sse::SseFrames;
 
@@ -23,6 +23,8 @@ pub const LIVE_EVENT: &str = "command://live";
 
 /// Generous: a rename rewrites links across every note in the campaign.
 const TIMEOUT: Duration = Duration::from_secs(30);
+/// Short: quitting waits on it, and a blank folder is all a timeout costs.
+const DISCARD_TIMEOUT: Duration = Duration::from_secs(2);
 const RETRY_MIN: Duration = Duration::from_secs(1);
 const RETRY_MAX: Duration = Duration::from_secs(10);
 
@@ -271,6 +273,10 @@ pub async fn command_set_root(root: Option<String>) -> Result<CommandSettings, S
 
 /// Ask for the campaigns folder with the native picker and make it the
 /// root. `None` when the GM cancels.
+///
+/// The open campaign lives in the old folder, so it's closed first (and
+/// discarded if it's a blank Untitled) while that folder still holds it.
+/// The new folder opens on a fresh Untitled, as launch does.
 #[tauri::command]
 pub async fn command_choose_root(app: AppHandle) -> Result<Option<CommandSettings>, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -280,10 +286,13 @@ pub async fn command_choose_root(app: AppHandle) -> Result<Option<CommandSetting
         .file()
         .set_title("Choose the folder your campaigns live in")
         .blocking_pick_folder();
-    match picked {
-        Some(path) => command_set_root(Some(path.to_string())).await.map(Some),
-        None => Ok(None),
-    }
+    let Some(path) = picked else {
+        return Ok(None);
+    };
+    switch_campaign_with(&app, || async { Ok(None) }).await?;
+    let changed = command_set_root(Some(path.to_string())).await;
+    open_untitled(&app).await?;
+    changed.map(Some)
 }
 
 #[tauri::command]
@@ -297,15 +306,36 @@ pub async fn command_list_campaigns() -> Result<Vec<String>, String> {
         .map(|c| c.campaigns)
 }
 
+// -- the untitled campaign --------------------------------------------------
+
+/// Open a blank untitled campaign in every window (the sidecar reuses one
+/// a crash left behind) and return its name. With no campaigns folder
+/// chosen yet, the sidecar sets the default one first.
+pub(crate) async fn open_untitled(app: &AppHandle) -> Result<String, String> {
+    let opened = switch_campaign_with(app, || async {
+        let named: Named = answer(client().post(api("/untitled"))).await?;
+        Ok(Some(named.name))
+    })
+    .await?;
+    Ok(opened.unwrap_or_default())
+}
+
+/// Have the sidecar remove `campaign` if it's an untitled campaign left
+/// blank. Quiet when that fails: the blank folder left behind is the one
+/// the next launch reuses.
+pub(crate) async fn discard_if_blank(campaign: &str) {
+    let _ = client()
+        .post(api("/campaigns/discard"))
+        .json(&serde_json::json!({ "name": campaign }))
+        .timeout(DISCARD_TIMEOUT)
+        .send()
+        .await;
+}
+
+/// New campaign: a fresh Untitled, as at launch.
 #[tauri::command]
-pub async fn command_create_campaign(name: String) -> Result<String, String> {
-    answer::<Named>(
-        client()
-            .post(api("/campaigns"))
-            .json(&serde_json::json!({ "name": name })),
-    )
-    .await
-    .map(|n| n.name)
+pub async fn command_open_untitled(app: AppHandle) -> Result<String, String> {
+    open_untitled(&app).await
 }
 
 #[tauri::command]

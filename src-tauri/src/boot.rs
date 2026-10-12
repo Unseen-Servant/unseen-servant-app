@@ -173,6 +173,11 @@ fn run(app: &AppHandle, spawned: Result<(), String>, app_data_dir: &Path) {
     let up = settle_sidecar(app, spawned, app_data_dir, &set);
     if up {
         crate::command::start_event_relay(app.clone());
+        // Command opens on a blank Untitled, as Live opens on an empty set,
+        // before any window asks what's open.
+        if let Err(e) = tauri::async_runtime::block_on(crate::command::open_untitled(app)) {
+            eprintln!("Command couldn't open an untitled campaign: {}", e);
+        }
     }
 
     // The tool window loads behind the splash from here on. Its first calls

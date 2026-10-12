@@ -8,7 +8,8 @@
 
 use serde::Serialize;
 use std::sync::{Mutex, PoisonError};
-use tauri::{AppHandle, Emitter};
+use tauri::async_runtime::Mutex as AsyncMutex;
+use tauri::{AppHandle, Emitter, Manager};
 
 pub const CHANGED_EVENT: &str = "app-context://changed";
 
@@ -22,7 +23,21 @@ pub struct AppContextSnapshot {
 }
 
 #[derive(Default)]
-pub struct AppContext(Mutex<AppContextSnapshot>);
+pub struct AppContext {
+    snap: Mutex<AppContextSnapshot>,
+    /// Held across a whole campaign change, the discard of the campaign left
+    /// behind included (`command::discard_if_blank`): otherwise a New campaign
+    /// right after leaving a blank Untitled could be handed that same folder
+    /// just before the discard removes it.
+    switching: AsyncMutex<()>,
+}
+
+/// What a campaign switch changed: the snapshot to broadcast, and the
+/// campaign left behind, if there was one.
+pub(crate) struct Switched {
+    snap: AppContextSnapshot,
+    left: Option<String>,
+}
 
 /// A blank name is no name: the picker's "none" may arrive as "".
 fn normalize(name: Option<String>) -> Option<String> {
@@ -31,35 +46,38 @@ fn normalize(name: Option<String>) -> Option<String> {
 
 impl AppContext {
     pub(crate) fn snapshot(&self) -> AppContextSnapshot {
-        self.0
+        self.snap
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
 
-    /// Switch campaigns. A session belongs to its campaign, so a different
-    /// campaign clears it. `None` when nothing changed, so there is nothing
-    /// to emit.
     /// The open campaign, for commands that act on it.
     pub(crate) fn campaign(&self) -> Option<String> {
         self.snapshot().campaign
     }
 
-    fn set_campaign(&self, campaign: Option<String>) -> Option<AppContextSnapshot> {
+    /// Switch campaigns. A session belongs to its campaign, so a different
+    /// campaign clears it. `None` when nothing changed, so there is nothing
+    /// to emit.
+    fn set_campaign(&self, campaign: Option<String>) -> Option<Switched> {
         let campaign = normalize(campaign);
-        let mut snap = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut snap = self.snap.lock().unwrap_or_else(PoisonError::into_inner);
         if snap.campaign == campaign {
             return None;
         }
-        snap.campaign = campaign;
+        let left = std::mem::replace(&mut snap.campaign, campaign);
         snap.session = None;
         snap.seq += 1;
-        Some(snap.clone())
+        Some(Switched {
+            snap: snap.clone(),
+            left,
+        })
     }
 
     fn set_session(&self, session: Option<String>) -> Option<AppContextSnapshot> {
         let session = normalize(session);
-        let mut snap = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut snap = self.snap.lock().unwrap_or_else(PoisonError::into_inner);
         if snap.session == session {
             return None;
         }
@@ -81,13 +99,35 @@ pub fn get_app_context(state: tauri::State<AppContext>) -> AppContextSnapshot {
     state.snapshot()
 }
 
+/// Make `campaign` the open one in every window, then discard the campaign
+/// left behind if it was an untitled one the GM left blank. With `then`, the
+/// campaign to switch to is worked out under the same lock (the sidecar's
+/// fresh Untitled, say), so nothing can switch in between.
+pub(crate) async fn switch_campaign_with<F, Fut>(
+    app: &AppHandle,
+    then: F,
+) -> Result<Option<String>, String>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<Option<String>, String>>,
+{
+    let state = app.state::<AppContext>();
+    let _one_at_a_time = state.switching.lock().await;
+    let campaign = then().await?;
+    if let Some(switched) = state.set_campaign(campaign.clone()) {
+        broadcast(app, Some(switched.snap));
+        if let Some(left) = switched.left {
+            crate::command::discard_if_blank(&left).await;
+        }
+    }
+    Ok(campaign)
+}
+
 #[tauri::command]
-pub fn set_active_campaign(
-    app: AppHandle,
-    state: tauri::State<AppContext>,
-    campaign: Option<String>,
-) {
-    broadcast(&app, state.set_campaign(campaign));
+pub async fn set_active_campaign(app: AppHandle, campaign: Option<String>) -> Result<(), String> {
+    switch_campaign_with(&app, || async { Ok(campaign) })
+        .await
+        .map(|_| ())
 }
 
 #[tauri::command]
@@ -118,11 +158,11 @@ mod tests {
     #[test]
     fn set_campaign_reports_only_changes_and_bumps_seq() {
         let ctx = AppContext::default();
-        let first = ctx.set_campaign(some("Curse of Strahd")).unwrap();
+        let first = ctx.set_campaign(some("Curse of Strahd")).unwrap().snap;
         assert_eq!(first.seq, 1);
         assert_eq!(first.campaign.as_deref(), Some("Curse of Strahd"));
         assert!(ctx.set_campaign(some("Curse of Strahd")).is_none());
-        let second = ctx.set_campaign(some("Into the Odd")).unwrap();
+        let second = ctx.set_campaign(some("Into the Odd")).unwrap().snap;
         assert_eq!(second.seq, 2);
         assert_eq!(ctx.snapshot(), second);
     }
@@ -143,7 +183,7 @@ mod tests {
         let ctx = AppContext::default();
         ctx.set_campaign(some("Curse of Strahd"));
         ctx.set_session(some("Session 12"));
-        let snap = ctx.set_campaign(some("Into the Odd")).unwrap();
+        let snap = ctx.set_campaign(some("Into the Odd")).unwrap().snap;
         assert_eq!(snap.session, None);
     }
 
@@ -161,7 +201,7 @@ mod tests {
         let ctx = AppContext::default();
         ctx.set_campaign(some("Curse of Strahd"));
         ctx.set_session(some("Session 12"));
-        let snap = ctx.set_campaign(None).unwrap();
+        let snap = ctx.set_campaign(None).unwrap().snap;
         assert_eq!((snap.campaign, snap.session), (None, None));
     }
 
@@ -171,7 +211,7 @@ mod tests {
         assert!(ctx.set_campaign(some("   ")).is_none());
         assert!(ctx.set_session(some("")).is_none());
         ctx.set_campaign(some("Curse of Strahd"));
-        let snap = ctx.set_campaign(some("")).unwrap();
+        let snap = ctx.set_campaign(some("")).unwrap().snap;
         assert_eq!(snap.campaign, None);
     }
 
@@ -182,6 +222,18 @@ mod tests {
         assert_eq!(
             (snap.campaign, snap.session.as_deref()),
             (None, Some("One-shot"))
+        );
+    }
+
+    #[test]
+    fn a_switch_reports_the_campaign_left() {
+        let ctx = AppContext::default();
+        assert_eq!(ctx.set_campaign(some("Untitled")).unwrap().left, None);
+        let switched = ctx.set_campaign(some("Curse of Strahd")).unwrap();
+        assert_eq!(switched.left.as_deref(), Some("Untitled"));
+        assert_eq!(
+            ctx.set_campaign(None).unwrap().left.as_deref(),
+            Some("Curse of Strahd")
         );
     }
 }
