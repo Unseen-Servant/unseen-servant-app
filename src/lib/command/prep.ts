@@ -23,7 +23,7 @@ export function planRows(index: CampaignIndex, session: SessionEntry | null): Pl
   return session.beats.map((ref, at) => ({ at, link: ref.link, beat: (ref.path && beats.get(ref.path)) || null }));
 }
 
-/** Beats in no plan of this session and not yet played — potential scenes. */
+/** Beats in no plan of this session and not yet spent — potential scenes. */
 export function unscheduled(index: CampaignIndex, session: SessionEntry | null): BeatEntry[] {
   const planned = new Set((session?.beats ?? []).map((r) => r.path).filter(Boolean));
   return index.beats

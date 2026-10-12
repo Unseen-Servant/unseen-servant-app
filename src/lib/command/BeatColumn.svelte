@@ -35,7 +35,7 @@
   function beatItems(beat: BeatEntry): MenuItem[] {
     return [
       action('Rename', () => (renamingPath = beat.path)),
-      action(beat.spent ? 'Mark unplayed' : 'Mark played', () => onSpent(beat, !beat.spent)),
+      action(beat.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(beat, !beat.spent)),
       divider,
       action('Show in Finder', () => onReveal(beat)),
       action('Move to Trash', () => onTrash(beat), true),
@@ -79,7 +79,7 @@
       class="beat-row"
       class:selected={beat.path === selectedPath}
       class:armed={beat.path === armedPath}
-      class:played={!!beat.spent}
+      class:spent={!!beat.spent}
       on:contextmenu|preventDefault={onMenu}
       role="presentation"
     >
@@ -98,14 +98,14 @@
       <button
         type="button"
         class="beat-name"
-        title={beat.spent ? `${beat.name} — played ${beat.spent}` : beat.name}
+        title={beat.spent ? `${beat.name} — spent ${beat.spent}` : beat.name}
         on:click={() => onSelect(beat)}
         on:dblclick={() => (renamingPath = beat.path)}
       >
         {beat.name}
       </button>
       {#if beat.spent}
-        <span class="played-mark" aria-label="played">✓</span>
+        <span class="spent-mark" aria-label="spent">✓</span>
       {:else}
         <span class="count">{beat.notes.length}</span>
       {/if}
@@ -239,11 +239,11 @@
     border-left-color: var(--text-active);
   }
 
-  .beat-row.played .beat-name {
+  .beat-row.spent .beat-name {
     opacity: var(--opacity-out-of-scope);
   }
 
-  .beat-row.played:hover .beat-name {
+  .beat-row.spent:hover .beat-name {
     opacity: var(--opacity-out-of-scope-hover);
   }
 
@@ -318,7 +318,7 @@
   }
 
   .count,
-  .played-mark {
+  .spent-mark {
     flex-shrink: 0;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
