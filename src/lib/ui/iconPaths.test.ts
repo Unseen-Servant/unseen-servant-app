@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { BOOK, CARET_RIGHT, CIRCLE, CIRCLE_RING, FOLDER, FOLDER_OPEN, GEM, GEM_OUTLINE, SHIELD } from './iconPaths';
+import { BOOK, CARET_RIGHT, CIRCLE, CIRCLE_RING, FOLDER, FOLDER_OPEN, GEM, GEM_OUTLINE, PLAY, SHIELD } from './iconPaths';
 
 function vendoredPath(file: string): string {
   const svg = readFileSync(new URL(`./icons/${file}`, import.meta.url), 'utf8');
@@ -39,6 +39,9 @@ describe('vendored sources', () => {
   it('folder-open matches its vendored file', () => {
     expect(FOLDER_OPEN).toBe(vendoredPath('folder-open-solid-full.svg'));
   });
+  it('play matches its vendored file', () => {
+    expect(PLAY).toBe(vendoredPath('play-solid-full.svg'));
+  });
 });
 
 describe('shared glyphs', () => {
@@ -54,6 +57,7 @@ describe('shared glyphs', () => {
       FOLDER_OPEN,
       GEM,
       GEM_OUTLINE,
+      PLAY,
       SHIELD,
     };
     const offenders = svelteFiles(src).flatMap((file) => {

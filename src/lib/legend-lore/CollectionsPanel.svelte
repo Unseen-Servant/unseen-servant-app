@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, GEM } from '../ui/iconPaths';
+  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, GEM, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import { PIGMENTS } from './palette';
@@ -856,8 +856,7 @@
                   {#if playing}
                     <span class="stop-mark" aria-hidden="true"></span>
                   {:else}
-                    <!-- Font Awesome "play" icon (src/lib/ui/icons/play-solid-full.svg) -->
-                    <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z"/></svg>
+                    <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY}/></svg>
                   {/if}
                 </button>
               {/if}

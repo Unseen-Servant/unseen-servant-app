@@ -50,6 +50,14 @@ export const CIRCLE_RING =
   'M528 320C528 205.1 434.9 112 320 112C205.1 112 112 205.1 112 320C112 434.9 205.1 528 320 528C434.9 528 528 434.9 528 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z';
 
 /**
+ * Font Awesome "play". The transport's launch key: a collection playing in
+ * Legend Lore, a note or beat launched in Command. viewBox="0 0 640 640".
+ * Source: ./icons/play-solid-full.svg
+ */
+export const PLAY =
+  'M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z';
+
+/**
  * Gem, hollow — always stroked, never filled (stroke-width 2.2). Font Awesome
  * "gem" (regular) traced along the centre of its bands, so it takes a stroke
  * and a dash. A collection's gem is stroked in its pigment; one without a
