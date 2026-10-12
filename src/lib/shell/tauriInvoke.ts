@@ -42,7 +42,7 @@ export interface InvokeMismatch {
  * Parameters Tauri injects itself — they never appear in the JS payload.
  * Matched on the type, since the parameter name is the author's choice.
  */
-const INJECTED_PARAM = /\b(AppHandle|State\s*<|WebviewWindow|Window|Runtime)\b/;
+const INJECTED_PARAM = /\b(?:AppHandle|WebviewWindow|Window|Runtime)\b|\bState\s*</;
 
 function snakeToCamel(name: string): string {
   return name.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
