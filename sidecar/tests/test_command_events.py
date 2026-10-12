@@ -128,3 +128,20 @@ async def test_no_folder_set_waits_quietly_until_one_is(campaign):
     event = await until(events, lambda e: "NPCs/Ireena.md" in e["paths"])
     assert event["campaign"] == "Strahd"
     await events.aclose()
+
+
+async def test_a_published_event_reaches_every_listener_from_any_thread(campaign):
+    watcher = VaultWatcher(lambda: campaign.parent)
+    first, second = watcher.listen(), watcher.listen()
+    await next_event(first)
+    await next_event(second)
+    event = {"type": "live", "campaign": "Strahd", "seq": 1, "beat": None, "notes": []}
+    await asyncio.to_thread(watcher.publish, event)
+    assert await until(first, lambda e: e["type"] == "live") == event
+    assert await until(second, lambda e: e["type"] == "live") == event
+    await first.aclose()
+    await second.aclose()
+
+
+def test_publishing_with_nobody_listening_does_nothing():
+    VaultWatcher(lambda: None).publish({"type": "live"})

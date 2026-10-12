@@ -17,6 +17,8 @@ SETTINGS_VERSION = 1
 
 class CommandSettings(BaseModel):
     root: str | None = None
+    # Launching a beat marks it spent (design §4); off, spending is by hand.
+    spend_on_launch: bool = False
 
 
 def load_settings(data_dir: Path | None) -> CommandSettings:

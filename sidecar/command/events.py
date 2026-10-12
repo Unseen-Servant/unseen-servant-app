@@ -1,4 +1,5 @@
-"""Change notifications for the campaign folder (design §6.1).
+"""Change notifications for the campaign folder (design §6.1), and for the
+live set, which no file holds (``publish``).
 
 One watcher runs while anyone is listening — in the app that is Rust's
 relay, connected for the app's lifetime — and fans each batch of changes
@@ -93,6 +94,14 @@ class VaultWatcher:
             if not self._listeners and self._task is not None:
                 self._task.cancel()
                 self._task = None
+
+    def publish(self, event: dict) -> None:
+        """Send ``event`` to every listener — the live set changing, which
+        no file records. Safe from any thread; nobody listening, nothing
+        to do."""
+        loop = self._loop
+        if loop is not None and self._listeners and not loop.is_closed():
+            loop.call_soon_threadsafe(self._fanout, event)
 
     def _fanout(self, event: dict) -> None:
         for queue in self._listeners:

@@ -19,6 +19,8 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
+from . import canvas
+
 DEFAULT_TRACKS = ("PCs", "NPCs", "Locations", "Secrets", "Monsters", "Treasures")
 RESERVED = ("Beats", "Sessions")
 PRESENTATION_DIR = ".unseen"
@@ -130,14 +132,23 @@ class NoteEntry:
     group: str | None  # folders below the track, e.g. "Vallaki"
 
 
-def _walk_notes(campaign: Path):
-    """Every note file under ``campaign``, skipping hidden files and folders.
-    Symlinked folders are not followed."""
+def _walk(campaign: Path, keep):
+    """Every file under ``campaign`` whose name ``keep`` accepts, skipping
+    hidden folders. Symlinked folders are not followed."""
     for dirpath, dirnames, filenames in os.walk(campaign):
         dirnames[:] = sorted(d for d in dirnames if not _hidden(d))
         for filename in sorted(filenames):
-            if _is_note_file(filename):
+            if keep(filename):
                 yield Path(dirpath) / filename
+
+
+def _walk_notes(campaign: Path):
+    """Every note file under ``campaign``, skipping hidden files and folders."""
+    return _walk(campaign, _is_note_file)
+
+
+def _is_canvas_file(name: str) -> bool:
+    return not _hidden(name) and name.lower().endswith(".canvas")
 
 
 def _entry(campaign: Path, path: Path) -> NoteEntry:
@@ -410,7 +421,9 @@ def rewrite_links(text: str, moves: list[tuple[Parts, Parts]]) -> str:
 
 
 def _rewrite_campaign(campaign: Path, moves: list[tuple[Parts, Parts]]) -> list[str]:
-    """Apply ``moves`` to every note in ``campaign``; the paths it changed."""
+    """Apply ``moves`` to every note and every canvas in ``campaign``; the
+    paths it changed. A canvas names notes by path (design §3.5), which
+    ``_retarget`` rewrites like a link spelled as a path."""
     changed = []
     for path in _walk_notes(campaign):
         data = path.read_bytes()
@@ -421,6 +434,15 @@ def _rewrite_campaign(campaign: Path, moves: list[tuple[Parts, Parts]]) -> list[
         new = rewrite_links(text, moves)
         if new != text:
             atomic_write(path, new.encode("utf-8"))
+            changed.append(_rel(campaign, path))
+    for path in _walk(campaign, _is_canvas_file):
+        try:
+            text = path.read_bytes().decode("utf-8")
+            board = canvas.parse(text)
+        except ValueError:  # not UTF-8, or not a canvas: leave it be
+            continue
+        if canvas.rewrite(board, lambda f: _retarget(f, moves), lambda t: rewrite_links(t, moves)):
+            atomic_write(path, canvas.dump(board, text.endswith("\n")).encode("utf-8"))
             changed.append(_rel(campaign, path))
     return changed
 

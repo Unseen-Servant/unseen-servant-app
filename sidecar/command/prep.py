@@ -12,8 +12,8 @@ import re
 from datetime import date
 from pathlib import Path, PurePosixPath
 
+from . import board, log, vault
 from . import frontmatter as fm
-from . import vault
 
 BEATS, SESSIONS = vault.RESERVED
 
@@ -36,28 +36,33 @@ def _stem(rel: str) -> str:
 
 
 def index(campaign: Path) -> dict:
-    """The campaign as Prep draws it: the vault scan, each note's spent mark,
-    beats with their notes and sessions with their plans — every link
-    resolved to a note's path, or None when no single note answers to it."""
+    """The campaign as Prep and Play draw it: the vault scan, each note's
+    spent mark, beats with their notes, sessions with their plans and logs
+    — every link resolved to a note's path, or None when no single note
+    answers to it."""
     base = vault.scan(campaign)
 
-    def meta(rel: str) -> dict:
+    def text(rel: str) -> str:
         # One unreadable note (not UTF-8) mustn't hide the campaign.
         try:
-            return fm.load_lenient(vault.read_text(campaign / rel))
+            return vault.read_text(campaign / rel)
         except vault.Invalid:
-            return {}
+            return ""
 
-    metas = {n["path"]: meta(n["path"]) for n in base["notes"]}
+    texts = {n["path"]: text(n["path"]) for n in base["notes"]}
+    metas = {rel: fm.load_lenient(t) for rel, t in texts.items()}
     by_name: dict[str, list[str]] = {}
     for n in base["notes"]:
         by_name.setdefault(n["name"].casefold(), []).append(n["path"])
         n["spent"] = fm.spent_value(metas[n["path"]].get("spent"))
 
+    def resolve(name: str) -> str | None:
+        paths = by_name.get(name.casefold(), [])
+        return paths[0] if len(paths) == 1 else None
+
     def ref(entry) -> dict:
         target = fm.link_target(entry)
-        paths = by_name.get(target.casefold(), [])
-        return {"link": target, "path": paths[0] if len(paths) == 1 else None}
+        return {"link": target, "path": resolve(target)}
 
     base["beats"] = [
         {
@@ -75,6 +80,10 @@ def index(campaign: Path) -> dict:
             "path": n["path"],
             "date": fm.date_value(metas[n["path"]].get("date")),
             "beats": [ref(e) for e in fm.as_list(metas[n["path"]].get("beats"))],
+            "log": [
+                {**entry, "path": resolve(entry["link"]) if entry["link"] else None}
+                for entry in log.parse(texts[n["path"]])
+            ],
         }
         for n in base["notes"]
         if _in(n, SESSIONS)
@@ -109,7 +118,7 @@ def _reserved_folder(campaign: Path, name: str) -> str:
     return name
 
 
-def _require_in(campaign: Path, rel: str, folder: str) -> str:
+def require_in(campaign: Path, rel: str, folder: str) -> str:
     vault.note_path(campaign, rel)
     if PurePosixPath(rel).parts[0].casefold() != folder.casefold():
         raise vault.Invalid(f"{rel!r} isn't in {folder}/")
@@ -123,7 +132,7 @@ def _targets(entries) -> list[str]:
 def set_member(campaign: Path, beat: str, note: str, member: bool) -> list[str]:
     """Add the note at ``note`` to the beat's notes, or take it out — every
     entry naming it, whatever its spelling (alias, path, case)."""
-    _require_in(campaign, beat, BEATS)
+    require_in(campaign, beat, BEATS)
     name = _stem(str(vault.note_path(campaign, note).relative_to(campaign)))
 
     def compute(current):
@@ -150,8 +159,9 @@ def create_beat(campaign: Path, name: str, notes: list[str] = (), session: str |
 
 def create_session(campaign: Path) -> dict:
     """The next session (design §4): `Session N`, dated today, its plan
-    starting with the previous session's beats that haven't been played.
-    The previous session is the latest by date."""
+    starting with the previous session's beats that aren't spent, and its
+    board with the previous board's cards that aren't. The previous
+    session is the latest by date."""
     current = index(campaign)
     numbers = [int(m.group()) for s in current["sessions"] if (m := re.search(r"\d+", s["name"]))]
     n = max(numbers, default=0) + 1
@@ -162,13 +172,15 @@ def create_session(campaign: Path) -> dict:
 
     spent = {x["path"] for x in current["notes"] if x["spent"]}
     previous = current["sessions"][-1] if current["sessions"] else None
-    # An entry naming no note can't have been played, so it carries too.
+    # An entry naming no note can't have been spent, so it carries too.
     carried = [r["link"] for r in previous["beats"] if r["path"] not in spent] if previous else []
 
     rel = vault.create_note(campaign, _reserved_folder(campaign, SESSIONS), name)
     text = fm.set_key("", "date", today())
     text = fm.set_key(text, "beats", [f"[[{link}]]" for link in carried])
     vault.atomic_write(campaign / rel, text.encode("utf-8"))
+    if previous:
+        board.carry(campaign, previous["path"], rel, spent)
     return {"path": rel, "name": name, "carried": carried}
 
 
@@ -186,8 +198,8 @@ def edit_plan(
     end), ``remove`` the entry ``at``, or ``move`` it ``to``. Removing and
     moving name the entry they expect at ``at`` and are refused when the
     plan on disk no longer has it there."""
-    _require_in(campaign, session, SESSIONS)
-    name = _require_in(campaign, beat, BEATS) if op == "add" and beat else None
+    require_in(campaign, session, SESSIONS)
+    name = require_in(campaign, beat, BEATS) if op == "add" and beat else None
 
     def compute(current):
         entries = [fm.entry_text(e) for e in fm.as_list(current)]
@@ -221,9 +233,12 @@ def edit_plan(
 def set_spent(campaign: Path, rel: str, spent: bool) -> str | None:
     """Mark the note spent today, or unspent. A note already spent keeps
     the date it was spent."""
-    path = vault.note_path(campaign, rel)
-    current = fm.load(vault.read_text(path)).get("spent")
-    if spent and fm.spent_value(current):
-        return fm.spent_value(current)
+    current = spent_of(campaign, rel)
+    if spent and current:
+        return current
     value = _update(campaign, rel, "spent", lambda _: today() if spent else None)
     return fm.spent_value(value)
+
+
+def spent_of(campaign: Path, rel: str) -> str | None:
+    return fm.spent_value(fm.load(vault.read_text(vault.note_path(campaign, rel))).get("spent"))
