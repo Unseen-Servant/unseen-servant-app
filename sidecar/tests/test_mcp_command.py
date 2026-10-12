@@ -121,6 +121,7 @@ def test_create_note_only_in_a_track(strahd):
     assert run(mcp_server.create_note("NPCs", "Doru", "Turned by [[Strahd]].")) == "Created NPCs/Doru.md in Strahd."
     assert (strahd / "Strahd" / "NPCs" / "Doru.md").read_text() == "Turned by [[Strahd]]."
     assert run(mcp_server.create_note("Beats", "Raid")).startswith('Strahd has no track named "Beats"')
+    assert run(mcp_server.create_note("Shelf", "Rumour", "The baron is ill.")) == "Created Shelf/Rumour.md in Strahd."
 
 
 def test_play_from_mcp_live_set_and_spend(strahd, app):

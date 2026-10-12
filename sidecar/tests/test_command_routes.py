@@ -294,3 +294,20 @@ def test_tracks_find_and_send_over_http(cmd):
         "campaign": "Strahd", "track": "Beats", "name": "x", "text": "", "source": "file:///b.pdf",
     })
     assert bad.status_code == 404
+
+
+def test_the_shelf_over_http(cmd, campaign_root):
+    import shutil
+    shutil.rmtree(campaign_root / "Strahd" / "Shelf")  # a campaign made by hand has none
+    made = cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "Shelf", "name": "Idea"}).json()
+    assert made == {"path": "Shelf/Idea.md"}
+    sent = cmd.post("/api/command/send", json={
+        "campaign": "Strahd", "name": "Fire Drake", "text": "Breathes fire.", "source": "file:///b.pdf#page=3",
+    }).json()
+    assert sent == {"path": "Shelf/Fire Drake.md"}
+    cmd.post("/api/command/campaigns", json={"name": "Tomb"})
+    copied = cmd.post("/api/command/notes/copy", json={"campaign": "Tomb", "from_campaign": "Strahd", "path": "Shelf/Idea.md"})
+    assert copied.json() == {"path": "Shelf/Idea.md"}
+    assert cmd.post("/api/command/notes/copy", json={
+        "campaign": "Tomb", "from_campaign": "Strahd", "path": "Shelf/Idea.md",
+    }).status_code == 409

@@ -149,6 +149,12 @@ class Jot(BaseModel):
     text: str
 
 
+class CopyIn(BaseModel):
+    campaign: str
+    from_campaign: str
+    path: str
+
+
 class Context(BaseModel):
     """The workstation's active campaign and session, pushed by Rust
     (``app_context.rs``) so MCP can answer with no window open."""
@@ -159,7 +165,8 @@ class Context(BaseModel):
 
 class Send(BaseModel):
     campaign: str
-    track: str
+    # None: onto the campaign's shelf (design §3.6).
+    track: str | None = None
     name: str
     text: str
     source: str
@@ -318,8 +325,18 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.post("/notes")
     def create_note(body: NoteCreate):
+        camp = campaign_path(body.campaign)
         with write_lock:
-            return {"path": vault.create_note(campaign_path(body.campaign), body.folder, body.name, body.content)}
+            # The shelf is made on first use: a campaign started by hand has none.
+            folder = prep.reserved_folder(camp, prep.SHELF) if body.folder.casefold() == prep.SHELF.casefold() else body.folder
+            return {"path": vault.create_note(camp, folder, body.name, body.content)}
+
+    @router.post("/notes/copy")
+    def copy_note(body: CopyIn):
+        """Another campaign's note, copied onto this one's shelf."""
+        with write_lock:
+            path = prep.copy_in(campaign_path(body.campaign), campaign_path(body.from_campaign), body.path)
+        return {"path": path}
 
     @router.get("/find")
     def find(campaign: str, query: str, track: str | None = None):

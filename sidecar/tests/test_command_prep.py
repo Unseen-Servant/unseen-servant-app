@@ -219,3 +219,31 @@ def test_a_hit_goes_only_to_a_track(camp):
         prep.receive(camp, "Beats", "X", "text", SOURCE, "")
     with pytest.raises(vault.NotFound):
         prep.receive(camp, "Nowhere", "X", "text", SOURCE, "")
+
+
+# ---------------------------------------------------------------------------
+# The shelf (design §3.6)
+# ---------------------------------------------------------------------------
+
+def test_a_hit_sent_without_a_track_lands_on_the_shelf(camp):
+    path = prep.receive(camp, None, "Fire Drake", "Breathes fire.", SOURCE, "Monsters, p.3")
+    assert path == "Shelf/Fire Drake.md"
+    index = prep.index(camp)
+    assert "Shelf" not in index["tracks"]
+    assert next(n for n in index["notes"] if n["path"] == path)["track"] == "Shelf"
+
+
+def test_copying_from_another_campaign_leaves_the_spent_mark_behind(camp, tmp_path):
+    other = tmp_path / "Tomb"
+    write(other / "NPCs" / "Merchant.md", "---\nrole: trader\nspent: 2026-09-01\n---\nSells [[Rope]].\n")
+    write(other / "Beats" / "Market.md", "")
+    path = prep.copy_in(camp, other, "NPCs/Merchant.md")
+    assert path == "Shelf/Merchant.md"
+    assert (camp / path).read_text() == "---\nrole: trader\n---\nSells [[Rope]].\n"
+    assert (other / "NPCs" / "Merchant.md").read_text().count("spent") == 1
+    with pytest.raises(Conflict):
+        prep.copy_in(camp, other, "NPCs/Merchant.md")
+    with pytest.raises(Invalid):
+        prep.copy_in(camp, other, "Beats/Market.md")
+    with pytest.raises(Invalid):
+        prep.copy_in(camp, camp, "NPCs/Ismark.md")

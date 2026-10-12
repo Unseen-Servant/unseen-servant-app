@@ -15,7 +15,7 @@ from pathlib import Path, PurePosixPath
 from . import board, log, vault
 from . import frontmatter as fm
 
-BEATS, SESSIONS = vault.RESERVED
+BEATS, SESSIONS, SHELF = vault.RESERVED
 
 
 def today() -> date:
@@ -110,7 +110,7 @@ def _update(campaign: Path, rel: str, key: str, compute):
     return value
 
 
-def _reserved_folder(campaign: Path, name: str) -> str:
+def reserved_folder(campaign: Path, name: str) -> str:
     """The reserved folder's name as it is on disk, made if it's missing (a
     campaign started by hand has no Beats/ or Sessions/)."""
     for p in campaign.iterdir():
@@ -151,7 +151,7 @@ def create_beat(campaign: Path, name: str, notes: list[str] = (), session: str |
     """A new note in Beats/, holding ``notes`` (paths) if any, and added to
     the end of ``session``'s plan if one is given."""
     members = [_stem(str(vault.note_path(campaign, n).relative_to(campaign))) for n in notes]
-    rel = vault.create_note(campaign, _reserved_folder(campaign, BEATS), name)
+    rel = vault.create_note(campaign, reserved_folder(campaign, BEATS), name)
     if members:
         _update(campaign, rel, "notes", lambda _: [f"[[{m}]]" for m in members])
     if session:
@@ -177,7 +177,7 @@ def create_session(campaign: Path) -> dict:
     # An entry naming no note can't have been spent, so it carries too.
     carried = [r["link"] for r in previous["beats"] if r["path"] not in spent] if previous else []
 
-    rel = vault.create_note(campaign, _reserved_folder(campaign, SESSIONS), name)
+    rel = vault.create_note(campaign, reserved_folder(campaign, SESSIONS), name)
     text = fm.set_key("", "date", today())
     text = fm.set_key(text, "beats", [f"[[{link}]]" for link in carried])
     vault.atomic_write(campaign / rel, text.encode("utf-8"))
@@ -247,16 +247,36 @@ def spent_of(campaign: Path, rel: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Material sent from Legend Lore (design §8)
+# Gathering: the shelf, material sent from Legend Lore (design §3.6, §8)
 # ---------------------------------------------------------------------------
 
-def receive(campaign: Path, track: str, name: str, text: str, source: str, cite: str) -> str:
-    """A new note in ``track`` holding ``text``, with ``source`` (where it
-    came from: a PDF page's file URL) in its frontmatter and a link back
-    under the text. Named after ``name``, made free if it's taken."""
-    if track not in vault.track_order(campaign):
+def receive(campaign: Path, track: str | None, name: str, text: str, source: str, cite: str) -> str:
+    """A new note in ``track`` — on the shelf when there's none — holding
+    ``text``, with ``source`` (where it came from: a PDF page's file URL)
+    in its frontmatter and a link back under the text. Named after
+    ``name``, made free if it's taken."""
+    if track is None:
+        track = reserved_folder(campaign, SHELF)
+    elif track not in vault.track_order(campaign):
         raise vault.NotFound(f"No track named {track!r}")
     link = source.replace("(", "%28").replace(")", "%29")
     body = text.strip()
     content = fm.set_key("", "source", source) + (f"{body}\n\n" if body else "") + f"[{cite.strip() or 'Source'}]({link})\n"
     return vault.create_note(campaign, track, vault.free_name(campaign, name), content)
+
+
+def copy_in(campaign: Path, source: Path, rel: str) -> str:
+    """Copy the note at ``rel`` in another campaign (``source``) onto this
+    campaign's shelf. The copy is this campaign's own: it keeps the text
+    and the frontmatter, but not the other table's ``spent`` mark."""
+    if source.resolve() == campaign.resolve():
+        raise vault.Invalid("That note is already in this campaign")
+    path = vault.note_path(source, rel)
+    if PurePosixPath(rel).parts[0].casefold() in {BEATS.casefold(), SESSIONS.casefold()}:
+        raise vault.Invalid("Beats and sessions belong to their campaign; copy their notes instead")
+    text = vault.read_text(path)
+    try:
+        text = fm.set_key(text, "spent", None)
+    except fm.FrontmatterError:
+        pass  # a block that doesn't parse holds no spent mark Command could read
+    return vault.create_note(campaign, reserved_folder(campaign, SHELF), _stem(rel), text)

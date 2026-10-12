@@ -22,7 +22,8 @@ from pathlib import Path, PurePosixPath
 from . import canvas
 
 DEFAULT_TRACKS = ("PCs", "NPCs", "Locations", "Secrets", "Monsters", "Treasures")
-RESERVED = ("Beats", "Sessions")
+# Beats, sessions, and the shelf of gathered material (design §3.6).
+RESERVED = ("Beats", "Sessions", "Shelf")
 PRESENTATION_DIR = ".unseen"
 PRESENTATION_FILE = "command.json"
 

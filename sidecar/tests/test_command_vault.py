@@ -300,3 +300,11 @@ def test_find_notes_puts_names_before_text_and_quotes_the_text(camp):
     assert found[3]["snippet"] == "Sister of [[Ismark]]."
     assert [n["name"] for n in vault.find_notes(camp, "ISMARK", track="Locations")] == ["Village of Barovia"]
     assert vault.find_notes(camp, "  ") == []
+
+
+def test_the_shelf_is_reserved(root, camp):
+    with pytest.raises(Invalid):
+        vault.create_track(camp, "shelf")
+    vault.create_campaign(root, "Tomb")
+    assert (root / "Tomb" / "Shelf").is_dir()
+    assert "Shelf" not in vault.track_order(root / "Tomb")

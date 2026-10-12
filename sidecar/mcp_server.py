@@ -228,15 +228,17 @@ mcp = MCPServer(
         "- Use get_pages() to read a specific page range straight from a PDF "
         "(e.g. a table of contents or a map) when search doesn't surface it.\n\n"
         "You also have the GM's campaign notes via Command: Markdown notes in "
-        "tracks (NPCs, Locations, Secrets, …), beats (scenes, each a set of "
-        "notes) and sessions (a plan of beats and a log of play). Tools act on "
-        "the campaign open in the app unless you pass campaign=.\n"
+        "tracks (NPCs, Locations, Secrets, …), a shelf of gathered material not "
+        "filed on a track yet, beats (scenes, each a set of notes) and sessions "
+        "(a plan of beats and a log of play). Tools act on the campaign open in "
+        "the app unless you pass campaign=.\n"
         "- Call current_session() to see what's planned and what has happened, "
         "and live_set() for what's in play at the table right now.\n"
         "- Read notes with read_note() and find them with find_notes() before "
         "describing them — never invent what a note says.\n"
-        "- create_note() writes new material into a track; add_to_live_set() "
-        "and spend() follow the table during play."
+        "- create_note() writes new material into a track, or onto the shelf "
+        "when it isn't clear where it belongs; add_to_live_set() and spend() "
+        "follow the table during play."
     ),
 )
 
@@ -755,10 +757,11 @@ async def find_notes(query: str, campaign: str | None = None, track: str | None 
 
 @mcp.tool()
 async def create_note(track: str, name: str, content: str = "", campaign: str | None = None) -> str:
-    """Write a new note into one of the campaign's tracks.
+    """Write a new note into one of the campaign's tracks, or onto its shelf.
 
     Args:
-        track: The track (folder) it belongs to, e.g. "NPCs" or "Secrets".
+        track: The track (folder) it belongs to, e.g. "NPCs" or "Secrets";
+               "Shelf" for material not filed on a track yet.
         name: The note's name, which links reach it by; unique in the campaign.
         content: Its Markdown text. Link other notes as [[Name]].
         campaign: A campaign name; defaults to the one open in the app.
@@ -766,8 +769,11 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
     index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    if track not in index["tracks"]:
-        return f'{index["name"]} has no track named "{track}". Its tracks: {", ".join(index["tracks"])}.'
+    if track not in index["tracks"] and track.casefold() != "shelf":
+        return (
+            f'{index["name"]} has no track named "{track}". '
+            f'Its tracks: {", ".join(index["tracks"])}, or "Shelf".'
+        )
     made = await sidecar.post("/api/command/notes", {
         "campaign": index["name"], "folder": track, "name": name, "content": content,
     })
