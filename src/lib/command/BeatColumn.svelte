@@ -47,6 +47,8 @@
   export let onTrash: (beat: BeatEntry) => void;
   /** A note dropped on a beat joins it. */
   export let onDropNote: (beat: BeatEntry, path: string) => void;
+  /** The beats on show outside the plan, in the order they were dragged. */
+  export let onReorder: (names: string[]) => void;
 
   let creating = false;
   let renamingPath: string | null = null;
@@ -69,9 +71,11 @@
   //
   // Two drags reach the column, told apart by their private types (a
   // dragover can read nothing else). Its own beats: dropped between plan
-  // rows they move within the plan or join it, and dropped on the spare
-  // beats they leave it. Notes from the grid or the shelf: dropped on a beat
-  // they join it, and on the ghost row they start a new one.
+  // rows they move within the plan or join it there; dropped between the
+  // spare beats they move there, leaving the plan if they came from it, an
+  // order the campaign keeps; dropped on a group's title they join that
+  // group, the plan at its end or the beats not in this session. Notes from the grid or the shelf: dropped on a
+  // beat they join it, and on the ghost row they start a new one.
   const BEAT_MIME = 'application/x-command-beat';
   const isBeatDrag = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === BEAT_MIME);
 
@@ -79,8 +83,11 @@
   let dragging: PlanRow | BeatEntry | null = null;
   /** Where a beat drop lands: before plan row `dropSlot`, or after the last. */
   let dropSlot: number | null = null;
-  /** A plan entry over the spare beats: the drop takes it out of the plan. */
-  let dropOut = false;
+  /** The group title a beat is over: the drop moves it into that group. */
+  let dropOn: 'plan' | 'spare' | null = null;
+  /** Where a beat dragged among the spare beats lands: before spare row
+   *  `dropSpare`, or after the last. */
+  let dropSpare: number | null = null;
   /** The beat a note drop would join. */
   let dropInto: string | null = null;
   /** A note over the ghost row: the drop starts a beat with it. */
@@ -92,7 +99,8 @@
 
   function clearDrop() {
     dropSlot = null;
-    dropOut = false;
+    dropOn = null;
+    dropSpare = null;
     dropInto = null;
     incoming = null;
   }
@@ -142,12 +150,28 @@
     incoming = draggedNote();
   }
 
-  function overSpare(e: DragEvent) {
-    if (!draggingEntry || !isBeatDrag(e)) return;
+  /** A beat over a group's title, lit as a beat is under a note: a spare
+   *  beat over the session's joins the end of the plan, as the menu's Add
+   *  does, and a plan entry over "not in this session" leaves the plan. A
+   *  title takes nothing from its own group. */
+  function overHead(e: DragEvent, group: 'plan' | 'spare') {
+    if (!dragging || !isBeatDrag(e) || ('at' in dragging) !== (group === 'spare')) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     clearDrop();
-    dropOut = true;
+    dropOn = group;
+  }
+
+  /** A beat over spare row `i` points between rows, as in the plan: a
+   *  spare beat moves there, and a plan entry leaves the plan and lands
+   *  there. The beats outside a plan keep the order the GM drags them into. */
+  function overSpareSlot(e: DragEvent, i: number) {
+    if (!dragging || !isBeatDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    clearDrop();
+    dropSpare = e.clientY >= box.top + box.height / 2 ? i + 1 : i;
   }
 
   function dropBeat(e: DragEvent) {
@@ -155,15 +179,34 @@
     e.preventDefault();
     const drag = dragging;
     const slot = dropSlot;
-    const out = dropOut;
+    const on = dropOn;
+    const spareAt = dropSpare;
     endBeatDrag();
     if ('at' in drag) {
-      if (out) onRemove(drag);
-      else if (slot !== null) {
+      if (on === 'spare') onRemove(drag);
+      else if (spareAt !== null) {
+        onRemove(drag);
+        // A plan entry naming no beat yet has nothing to place.
+        if (drag.beat) {
+          const names = shown.map((b) => b.name);
+          names.splice(spareAt, 0, drag.beat.name);
+          onReorder(names);
+        }
+      } else if (slot !== null) {
         const to = planMoveTo(drag.at, slot);
         if (to !== null) onMove(drag, to);
       }
-    } else if (slot !== null) onAddToPlan(drag, slot);
+    } else if (on === 'plan') onAddToPlan(drag);
+    else if (slot !== null) onAddToPlan(drag, slot);
+    else if (spareAt !== null) {
+      const from = shown.indexOf(drag);
+      const to = from < 0 ? null : planMoveTo(from, spareAt);
+      if (to !== null) {
+        const names = shown.map((b) => b.name);
+        names.splice(to, 0, ...names.splice(from, 1));
+        onReorder(names);
+      }
+    }
     return true;
   }
 
@@ -266,24 +309,26 @@
       class:spent={!!beat.spent}
       class:hovered={$hoverLive && hovered === beat.path}
       class:dragging={dragging !== null && dragging === (row ?? beat)}
-      class:drop-before={row !== null && dropSlot === row.at}
+      class:drop-before={row ? dropSlot === row.at : dropSpare !== null && shown[dropSpare] === beat}
+      class:drop-after={!row && dropSpare === shown.length && shown[shown.length - 1] === beat}
       class:drop-into={dropInto === beat.path}
-      draggable={!!sessionName}
+      draggable="true"
       on:dragstart={(e) => startBeatDrag(e, row ?? beat, beat.name)}
       on:dragend={endBeatDrag}
       on:dragover={(e) => {
         if (row) overSlot(e, row.at);
+        else overSpareSlot(e, shown.indexOf(beat));
         overBeat(e, beat);
       }}
       on:drop={(e) => {
-        if (!(row && dropBeat(e))) dropNote(e, beat);
+        if (!dropBeat(e)) dropNote(e, beat);
       }}
       on:contextmenu|preventDefault={onMenu}
       on:pointerenter={() => (hovered = beat.path)}
       on:pointerleave={() => leave(beat.path)}
       role="presentation"
     >
-      <span class="grip" class:filled={!!sessionName} aria-hidden="true">{sessionName ? '⠿' : ''}</span>
+      <span class="grip filled" aria-hidden="true">⠿</span>
       <button
         type="button"
         class="beat-name"
@@ -347,7 +392,13 @@
     <!-- Without a session there's one group, all the beats, and the plate
          already names it. -->
     {#if sessionName}
-      <div class="group-head">
+      <div
+        class="group-head"
+        class:drop-into={dropOn === 'plan'}
+        role="presentation"
+        on:dragover={(e) => overHead(e, 'plan')}
+        on:drop={dropBeat}
+      >
         <span class="ledger-label">{sessionName}</span>
         <span class="count">{rows.length}</span>
       </div>
@@ -442,20 +493,24 @@
       {/if}
     {/if}
 
-    <!-- While a plan entry is dragged the spare beats are a target even when
-         there are none to show: a drop there takes it out of the plan. -->
+    <!-- While a plan entry is dragged, this title shows even with no spare
+         beats under it: dropped on it, the entry leaves the plan. -->
     {#if shown.length || draggingEntry}
-      <div class="spare" class:drop-out={dropOut} role="presentation" on:dragover={overSpare} on:drop={dropBeat}>
-        {#if sessionName}
-          <div class="group-head spare-head">
-            <span class="ledger-label">not in this session</span>
-            <span class="count">{shown.length}</span>
-          </div>
-        {/if}
-        {#each shown as beat (beat.path)}
-          {@render beatRow(beat, null, (e) => spareMenu(e, beat))}
-        {/each}
-      </div>
+      {#if sessionName}
+        <div
+          class="group-head spare-head"
+          class:drop-into={dropOn === 'spare'}
+          role="presentation"
+          on:dragover={(e) => overHead(e, 'spare')}
+          on:drop={dropBeat}
+        >
+          <span class="ledger-label">not in this session</span>
+          <span class="count">{shown.length}</span>
+        </div>
+      {/if}
+      {#each shown as beat (beat.path)}
+        {@render beatRow(beat, null, (e) => spareMenu(e, beat))}
+      {/each}
     {/if}
   </div>
 </section>
@@ -504,8 +559,9 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 0.4rem;
-    margin: 0.35rem 0 0.2rem;
-    padding: 0 calc(0.35rem + 0.3rem) 0 calc(0.35rem + 3px);
+    margin: 0.2rem 0 0.05rem;
+    /* Room inside for the drop outline when a beat is dragged over it. */
+    padding: 0.15rem calc(0.35rem + 0.3rem) 0.15rem calc(0.35rem + 3px);
   }
 
   .group-head .ledger-label {
@@ -594,7 +650,7 @@
 
   /* Legend Lore's drag grip (CollectionsPanel .grip), fading in on the
      hovered row. Every row keeps its slot, the ghost's too, so names start
-     in one column; it's filled where the row can be dragged into a plan. */
+     in one column; it's filled on every beat, as each one reorders. */
   .grip {
     width: 0.55rem;
     flex-shrink: 0;
@@ -789,7 +845,7 @@
   }
 
   .spare-head {
-    margin-top: 1rem;
+    margin-top: 0.85rem;
   }
 
   .empty-hint {
@@ -797,8 +853,9 @@
   }
 
   /* Under a drag, as Legend Lore's collections panel: the dragged row fades,
-     an accent rule marks where a beat would land, and the dashed parchment
-     "could become a member" outline marks what a drop would join. */
+     an accent rule marks where a beat would land in the plan, and the
+     dashed parchment "could become a member" outline marks what a drop
+     would join: a beat under a note, a group's title under a beat. */
   .beat-row.dragging {
     opacity: 0.4;
   }
@@ -807,15 +864,15 @@
     box-shadow: inset 0 2px 0 var(--text-accent);
   }
 
+  .beat-row.drop-after {
+    box-shadow: inset 0 -2px 0 var(--text-accent);
+  }
+
   .beat-row.drop-into,
-  .spare.drop-out {
+  .group-head.drop-into {
     outline: var(--outline-drop);
     outline-offset: -1px;
     background: var(--bg-container);
-  }
-
-  .spare {
-    border-radius: var(--radius-sm);
   }
 
   /* The ghost under a note drag says what it will make. */

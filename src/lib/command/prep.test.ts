@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeSession, memberPaths, planMoveTo, planRows, sessionNotePaths, unscheduled } from './prep';
+import { activeSession, beatOrder, memberPaths, planMoveTo, planRows, sessionNotePaths, unscheduled } from './prep';
 import type { CampaignIndex } from './types';
 
 const index: CampaignIndex = {
@@ -44,8 +44,12 @@ describe('prep', () => {
     ]);
   });
 
-  it('lists unplanned, unplayed beats as potential scenes', () => {
-    expect(unscheduled(index, activeSession(index, null)).map((b) => b.name)).toEqual(['Abbey', 'Bonegrinder']);
+  it('lists unplanned, unplayed beats as potential scenes, in the campaign\'s order', () => {
+    expect(unscheduled(index, activeSession(index, null)).map((b) => b.name)).toEqual(['Bonegrinder', 'Abbey']);
+  });
+
+  it('saves the dragged beats first, every other beat after in its place', () => {
+    expect(beatOrder(index, ['Abbey', 'Bonegrinder'])).toEqual(['Abbey', 'Bonegrinder', 'Ambush', 'Tser Pool', 'Played']);
   });
 
   it('turns a drop between plan rows into the position to move to', () => {
@@ -58,7 +62,7 @@ describe('prep', () => {
   });
 
   it('keeps spent beats too when asked', () => {
-    expect(unscheduled(index, activeSession(index, null), true).map((b) => b.name)).toEqual(['Abbey', 'Bonegrinder', 'Played']);
+    expect(unscheduled(index, activeSession(index, null), true).map((b) => b.name)).toEqual(['Played', 'Bonegrinder', 'Abbey']);
   });
 
   it('marks a beat\'s notes and every note the session holds', () => {

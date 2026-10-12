@@ -23,13 +23,21 @@ export function planRows(index: CampaignIndex, session: SessionEntry | null): Pl
   return session.beats.map((ref, at) => ({ at, link: ref.link, beat: (ref.path && beats.get(ref.path)) || null }));
 }
 
-/** Beats in no plan of this session and not yet spent — potential scenes.
- *  `withSpent` keeps the spent ones too, for the column to show on request. */
+/** Beats in no plan of this session and not yet spent — potential scenes —
+ *  in the campaign's beat order (the order the GM dragged them, then by
+ *  name, as the index lists them). `withSpent` keeps the spent ones too, for
+ *  the column to show on request. */
 export function unscheduled(index: CampaignIndex, session: SessionEntry | null, withSpent = false): BeatEntry[] {
   const planned = new Set((session?.beats ?? []).map((r) => r.path).filter(Boolean));
-  return index.beats
-    .filter((b) => !planned.has(b.path) && (withSpent || !b.spent))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+  return index.beats.filter((b) => !planned.has(b.path) && (withSpent || !b.spent));
+}
+
+/** The campaign's beat order after the beats on show outside the plan were
+ *  dragged into `visible`: those first, then every other beat in its current
+ *  place, as Legend Lore keeps the collections a view hides. */
+export function beatOrder(index: CampaignIndex, visible: string[]): string[] {
+  const shown = new Set(visible);
+  return [...visible, ...index.beats.map((b) => b.name).filter((n) => !shown.has(n))];
 }
 
 /** Where a plan entry dragged from `from` lands when dropped at `slot`, an

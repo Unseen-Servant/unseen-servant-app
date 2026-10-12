@@ -76,6 +76,9 @@ def index(campaign: Path) -> dict:
         for n in base["notes"]
         if _in(n, BEATS)
     ]
+    # The order the GM gave the beats (vault.beat_order), then by name.
+    saved = {name.casefold(): i for i, name in enumerate(vault.beat_order(campaign))}
+    base["beats"].sort(key=lambda b: (saved.get(b["name"].casefold(), len(saved)), _natural(b["name"])))
     sessions = [
         {
             "name": n["name"],

@@ -60,6 +60,11 @@ def test_index_resolves_beat_members_however_they_are_spelled(camp):
     ]
 
 
+def test_index_lists_beats_in_the_saved_order_then_by_name(camp):
+    vault.save_beat_order(camp, ["Tser Pool", "Gone"])
+    assert [b["name"] for b in prep.index(camp)["beats"]] == ["Tser Pool", "Ambush", "Played"]
+
+
 def test_index_orders_sessions_by_date_then_number(camp):
     session(camp, "Session 10", "2026-10-11", [])
     session(camp, "Session 9", "2026-10-04", [])

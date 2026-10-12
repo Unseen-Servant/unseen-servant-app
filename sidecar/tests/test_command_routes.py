@@ -136,6 +136,16 @@ def test_prep_round_trip_over_http(cmd, campaign_root, monkeypatch):
     assert stale.status_code == 409
 
 
+def test_beat_order_over_http(cmd):
+    for name in ("Ambush", "Tser Pool"):
+        cmd.post("/api/command/beats", json={"campaign": "Strahd", "name": name})
+    assert cmd.put("/api/command/beats/order", json={
+        "campaign": "Strahd", "order": ["Tser Pool", "Ambush"],
+    }).json() == {"order": ["Tser Pool", "Ambush"]}
+    index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert [b["name"] for b in index["beats"]] == ["Tser Pool", "Ambush"]
+
+
 # ---------------------------------------------------------------------------
 # Play: the board, the live set, the log
 # ---------------------------------------------------------------------------

@@ -2,8 +2,9 @@
 
 The folders are the only source of truth (design §3). Every call reads the
 disk; nothing here remembers which note belongs where. The one file Command
-keeps beside the notes, ``.unseen/command.json``, holds track order — a
-presentation choice — so a stale entry is ignored and never loses a note.
+keeps beside the notes, ``.unseen/command.json``, holds track order and the
+order of beats outside a plan — presentation choices — so a stale entry is
+ignored and never loses a note.
 
 Paths crossing this module's boundary are campaign-relative POSIX strings
 (``NPCs/Ismark.md``); campaigns are addressed by folder name.
@@ -181,19 +182,44 @@ def _presentation_path(campaign: Path) -> Path:
     return campaign / PRESENTATION_DIR / PRESENTATION_FILE
 
 
-def _saved_order(campaign: Path) -> list[str]:
+def _presentation(campaign: Path) -> dict:
     try:
         raw = json.loads(_presentation_path(campaign).read_text(encoding="utf-8"))
-        tracks = raw.get("tracks", [])
-        return [t for t in tracks if isinstance(t, str)]
-    except (OSError, ValueError, AttributeError):
-        return []
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _saved_list(campaign: Path, key: str) -> list[str]:
+    items = _presentation(campaign).get(key, [])
+    return [t for t in items if isinstance(t, str)] if isinstance(items, list) else []
+
+
+def _save_list(campaign: Path, key: str, items: list[str]) -> None:
+    """Write one list, keeping whatever else the file holds."""
+    path = _presentation_path(campaign)
+    path.parent.mkdir(exist_ok=True)
+    data = {**_presentation(campaign), "version": 1, key: items}
+    atomic_write(path, json.dumps(data, indent=2).encode())
+
+
+def _saved_order(campaign: Path) -> list[str]:
+    return _saved_list(campaign, "tracks")
 
 
 def _save_order(campaign: Path, order: list[str]) -> None:
-    path = _presentation_path(campaign)
-    path.parent.mkdir(exist_ok=True)
-    atomic_write(path, json.dumps({"version": 1, "tracks": order}, indent=2).encode())
+    _save_list(campaign, "tracks", order)
+
+
+def beat_order(campaign: Path) -> list[str]:
+    """The beat names the GM ordered, as saved. Beats it doesn't name follow
+    them by name (prep.index); names with no beat are ignored."""
+    return _saved_list(campaign, "beats")
+
+
+def save_beat_order(campaign: Path, names: list[str]) -> list[str]:
+    _save_list(campaign, "beats", names)
+    return names
 
 
 def track_order(campaign: Path) -> list[str]:
@@ -608,6 +634,10 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
         raise Conflict(f"A note named {new_name!r} already exists in this campaign")
     dst = src.with_name(f"{new_name}.md")
     moves = _relocate(campaign, src, dst)
+    # A renamed beat keeps its place in the beats' order.
+    beats = beat_order(campaign)
+    if any(_same_name(b, old_name) for b in beats):
+        _save_list(campaign, "beats", [new_name if _same_name(b, old_name) else b for b in beats])
     return _rel(campaign, dst), _rewrite_campaign(campaign, moves)
 
 

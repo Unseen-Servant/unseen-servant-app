@@ -90,6 +90,11 @@ class BeatCreate(BaseModel):
     session: str | None = None
 
 
+class BeatOrder(BaseModel):
+    campaign: str
+    order: list[str]
+
+
 class Membership(BaseModel):
     campaign: str
     beat: str
@@ -410,6 +415,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         with write_lock:
             path = prep.create_beat(campaign_path(body.campaign), body.name, body.notes, body.session)
         return {"path": path}
+
+    @router.put("/beats/order")
+    def order_beats(body: BeatOrder):
+        """The order of the beats, as the GM drags those outside a plan
+        (design §5.1), kept with the campaign's presentation."""
+        with write_lock:
+            return {"order": vault.save_beat_order(campaign_path(body.campaign), body.order)}
 
     @router.post("/beats/members")
     def set_member(body: Membership):

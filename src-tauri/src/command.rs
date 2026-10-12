@@ -467,6 +467,26 @@ pub async fn command_create_beat(
     .map(|p| p.path)
 }
 
+/// Save the order of the campaign's beats, by name, as the GM drags those
+/// outside a plan. Returns the order saved.
+#[tauri::command]
+pub async fn command_order_beats(
+    campaign: String,
+    order: Vec<String>,
+) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct Order {
+        order: Vec<String>,
+    }
+    answer::<Order>(
+        client()
+            .put(api("/beats/order"))
+            .json(&serde_json::json!({ "campaign": campaign, "order": order })),
+    )
+    .await
+    .map(|o| o.order)
+}
+
 /// Put a note in a beat or take it out. Returns the beat's notes after.
 #[tauri::command]
 pub async fn command_set_member(

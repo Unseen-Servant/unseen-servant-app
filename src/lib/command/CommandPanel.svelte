@@ -26,7 +26,7 @@
   import { columns, isAmbiguous, linkableNames, type Column } from './columns';
   import { action, choice, divider, heading, type MenuItem, type OpenMenu } from './menu';
   import { NoteBuffer, type BufferState } from './noteBuffer';
-  import { activeSession, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
+  import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
   import type { BeatEntry, CampaignIndex, CommandSettings, LiveSet, NoteEntry, VaultEvent } from './types';
 
   // True while the panel is visible: window-level keys do nothing otherwise
@@ -435,6 +435,19 @@
 
   function stopLive() {
     run(async () => applyLive(await commandApi.stop(campaign!)));
+  }
+
+  /** The beats outside the plan, dragged into a new order. The list takes
+   *  it at once, then the campaign keeps it (.unseen/command.json). */
+  function orderBeats(visible: string[]) {
+    if (!index) return;
+    const order = beatOrder(index, visible);
+    const rank = new Map(order.map((name, i) => [name, i]));
+    index = { ...index, beats: [...index.beats].sort((a, b) => (rank.get(a.name) ?? 0) - (rank.get(b.name) ?? 0)) };
+    run(async () => {
+      await commandApi.orderBeats(campaign!, order);
+      await refreshIndex();
+    });
   }
 
   /** A note dropped on a beat joins it, as a book dropped on a collection. */
@@ -934,6 +947,7 @@
             onReveal={(beat) => reveal(beat.path)}
             onTrash={(beat) => trashNote(beat, 'Beat')}
             onDropNote={addToBeat}
+            onReorder={orderBeats}
           />
         {/if}
         {/if}

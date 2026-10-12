@@ -115,6 +115,16 @@ def test_track_order_survives_a_corrupt_presentation_file(camp):
     assert vault.track_order(camp) == ["Locations", "NPCs"]
 
 
+def test_saving_the_beat_order_keeps_the_track_order(camp):
+    write(camp / ".unseen" / "command.json", json.dumps({"version": 1, "tracks": ["NPCs", "Locations"]}))
+    vault.save_beat_order(camp, ["Ambush"])
+    assert vault.track_order(camp) == ["NPCs", "Locations"]
+    assert vault.beat_order(camp) == ["Ambush"]
+    assert json.loads((camp / ".unseen" / "command.json").read_text()) == {
+        "version": 1, "tracks": ["NPCs", "Locations"], "beats": ["Ambush"],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Reading and saving
 # ---------------------------------------------------------------------------
@@ -256,6 +266,13 @@ def test_move_note_leaves_name_links_alone(camp):
     assert path == "Locations/Ismark.md"
     assert rewritten == ["Locations/Church.md"]
     assert (camp / "Locations" / "Church.md").read_text() == "[[Ismark]] [[Locations/Ismark]]"
+
+
+def test_rename_note_keeps_a_beat_in_its_place(camp):
+    write(camp / "Beats" / "Tser Pool.md", "")
+    vault.save_beat_order(camp, ["Tser Pool", "Ambush"])
+    vault.rename_note(camp, "Beats/Ambush.md", "Road ambush")
+    assert vault.beat_order(camp) == ["Tser Pool", "Road ambush"]
 
 
 def test_rename_track_keeps_its_place_and_rewrites_path_links(camp):

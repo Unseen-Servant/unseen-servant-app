@@ -57,6 +57,8 @@ export const commandApi = {
     invoke<string>('command_copy_note', { campaign, fromCampaign, path }),
   createBeat: (campaign: string, name: string, notes: string[], session: string | null) =>
     invoke<string>('command_create_beat', { campaign, name, notes, session }),
+  /** The campaign's beats by name, in the order the GM dragged them. */
+  orderBeats: (campaign: string, order: string[]) => invoke<string[]>('command_order_beats', { campaign, order }),
   setMember: (campaign: string, beat: string, note: string, member: boolean) =>
     invoke<string[]>('command_set_member', { campaign, beat, note, member }),
   createSession: (campaign: string) => invoke<NewSession>('command_create_session', { campaign }),

@@ -662,6 +662,7 @@ pub fn run() {
             command::command_move_note,
             command::command_create_beat,
             command::command_set_member,
+            command::command_order_beats,
             command::command_create_session,
             command::command_edit_plan,
             command::command_set_spent,
