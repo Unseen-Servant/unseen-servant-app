@@ -13,6 +13,7 @@
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
   import { action, divider, heading, type OpenMenu } from './menu';
+  import { endNoteDrag, startNoteDrag } from './noteDrag';
   import type { Column } from './columns';
   import type { NoteEntry } from './types';
 
@@ -140,6 +141,7 @@
               <button
                 type="button"
                 class="note-row"
+                data-row
                 class:open={note.path === openPath}
                 class:selected={note.path === selectedPath}
                 class:hovered={$hoverLive && hovered === note.path}
@@ -155,6 +157,13 @@
                   : note.spent
                     ? `${note.name} — spent ${note.spent}`
                     : note.name}
+                draggable="true"
+                on:dragstart={(e) => startNoteDrag(e, note)}
+                on:dragend={() => {
+                  endNoteDrag();
+                  // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
+                  hovered = null;
+                }}
                 on:click={() => {
                   onSelect(note);
                   if (armed) onToggleMember(note);

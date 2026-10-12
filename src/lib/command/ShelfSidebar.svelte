@@ -8,6 +8,7 @@
   import InlineName from './InlineName.svelte';
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
+  import { endNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, heading, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
 
@@ -133,6 +134,7 @@
     <button
       type="button"
       class="note-row"
+      data-row
       class:open={note.path === openPath}
       class:selected={note.path === selectedPath}
       class:hovered={$hoverLive && hovered === note.path}
@@ -143,6 +145,13 @@
       class:arming={armed}
       aria-pressed={armed ? members.has(note.path) : undefined}
       title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
+      draggable="true"
+      on:dragstart={(e) => startNoteDrag(e, note)}
+      on:dragend={() => {
+        endNoteDrag();
+        // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
+        hovered = null;
+      }}
       on:click={() => {
         onSelect(note);
         if (armed) onToggleMember(note);

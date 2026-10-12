@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeSession, memberPaths, planRows, sessionNotePaths, unscheduled } from './prep';
+import { activeSession, memberPaths, planMoveTo, planRows, sessionNotePaths, unscheduled } from './prep';
 import type { CampaignIndex } from './types';
 
 const index: CampaignIndex = {
@@ -46,6 +46,15 @@ describe('prep', () => {
 
   it('lists unplanned, unplayed beats as potential scenes', () => {
     expect(unscheduled(index, activeSession(index, null)).map((b) => b.name)).toEqual(['Abbey', 'Bonegrinder']);
+  });
+
+  it('turns a drop between plan rows into the position to move to', () => {
+    // Plan [A, B, C]; slots 0–3 sit before A, B, C and after C.
+    expect(planMoveTo(0, 2)).toBe(1); // A between B and C
+    expect(planMoveTo(0, 3)).toBe(2); // A to the end
+    expect(planMoveTo(2, 0)).toBe(0); // C to the top
+    expect(planMoveTo(1, 1)).toBeNull(); // B dropped just above itself
+    expect(planMoveTo(1, 2)).toBeNull(); // or just below
   });
 
   it('keeps spent beats too when asked', () => {

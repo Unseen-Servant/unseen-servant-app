@@ -32,6 +32,14 @@ export function unscheduled(index: CampaignIndex, session: SessionEntry | null, 
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
 }
 
+/** Where a plan entry dragged from `from` lands when dropped at `slot`, an
+ *  insertion point between rows (0 to the plan's length): the position to
+ *  move it to, or null when the drop leaves it where it was. */
+export function planMoveTo(from: number, slot: number): number | null {
+  const to = slot > from ? slot - 1 : slot;
+  return to === from ? null : to;
+}
+
 export function memberPaths(beat: BeatEntry | null): Set<string> {
   return new Set((beat?.notes ?? []).map((r) => r.path).filter((p): p is string => p !== null));
 }

@@ -67,13 +67,15 @@
   let play: PlayView | undefined;
   /** The shelf sidebar in Prep (design §3.6), open until the GM hides it. */
   let shelfOpen = true;
+  /** The beat column in Prep, the same. */
+  let beatsOpen = true;
 
-  /** The beat whose notes are lit; the armed one, if any, is also selected. */
-  let selectedBeat: string | null = null;
+  /** The one row selected, a note's or a beat's, as Legend Lore's focused
+   *  row: a double-click opens it, and a selected beat lights its notes. */
+  let selected: string | null = null;
+  /** The beat a click on a note puts it in or takes it out of. Its notes
+   *  stay lit while it's armed, whatever is selected. */
   let armedBeat: string | null = null;
-  /** The note last clicked in the grid or on the shelf, as Legend Lore's
-   *  focused row; a double-click opens it. */
-  let selectedNote: string | null = null;
 
   let editor: NoteEditor | undefined;
   let bufState: BufferState = { path: null, status: 'empty', error: null };
@@ -105,10 +107,11 @@
   $: rows = index ? planRows(index, session) : [];
   $: spare = index ? unscheduled(index, session, true) : [];
   $: beatAt = (path: string | null) => index?.beats.find((b) => b.path === path) ?? null;
-  $: members = memberPaths(beatAt(selectedBeat));
+  $: members = memberPaths(beatAt(armedBeat ?? selected));
   $: inSession = index ? sessionNotePaths(index, session) : new Set<string>();
-  // A beat that left (renamed, trashed) can't stay selected or armed.
-  $: if (index && selectedBeat && !beatAt(selectedBeat)) selectedBeat = null;
+  // A note or beat that left (renamed, moved, trashed) can't stay selected,
+  // nor a beat armed.
+  $: if (index && selected && !beatAt(selected) && !index.notes.some((n) => n.path === selected)) selected = null;
   $: if (index && armedBeat && !beatAt(armedBeat)) armedBeat = null;
 
   // -- running things -----------------------------------------------------
@@ -137,7 +140,7 @@
     campaign = null;
     index = null;
     live = null;
-    selectedBeat = armedBeat = null;
+    selected = armedBeat = null;
   }
 
   /** A live set snapshot, from an answer or the event relay: kept if it's
@@ -237,7 +240,12 @@
       shelfOpen = !shelfOpen;
       return;
     }
-    if (e.key === 'Escape' && armedBeat) armedBeat = null;
+    // Esc undoes the louder thing first, as in Legend Lore: the arm, then
+    // the selection.
+    if (e.key === 'Escape') {
+      if (armedBeat) armedBeat = null;
+      else selected = null;
+    }
   }
 
   onMount(() => {
@@ -279,7 +287,7 @@
       // A note started while a beat is armed lands in it.
       if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
       await refreshIndex();
-      selectedNote = path;
+      selected = path;
       freshOpen = true;
       await buffer.open(path);
       editor?.focus();
@@ -311,31 +319,30 @@
   function renameNote(note: Named, name: string) {
     const isSession = note.path === session?.path;
     run(async () => {
-      // A selected or armed beat is pointed at its new path only once the
-      // index holds it: before that, the guard on a beat that left clears it.
-      const wasSelected = selectedBeat === note.path;
+      // A selected row or armed beat is pointed at its new path only once
+      // the index holds it: before that, the guard on one that left clears it.
+      const wasSelected = selected === note.path;
       const wasArmed = armedBeat === note.path;
-      const wasSelectedNote = selectedNote === note.path;
       const isOpen = note.path === bufState.path;
       if (isOpen) await buffer.flush();
       const moved = await commandApi.renameNote(campaign!, note.path, name);
       if (isOpen) await buffer.retarget(moved.path);
       if (isSession) await setSession(stem(moved.path));
       await refreshIndex();
-      if (wasSelected) selectedBeat = moved.path;
+      if (wasSelected) selected = moved.path;
       if (wasArmed) armedBeat = moved.path;
-      if (wasSelectedNote) selectedNote = moved.path;
     });
   }
 
   function moveNote(note: NoteEntry, track: string) {
     run(async () => {
       const isOpen = note.path === bufState.path;
+      const wasSelected = selected === note.path;
       if (isOpen) await buffer.flush();
       const moved = await commandApi.moveNote(campaign!, note.path, track);
       if (isOpen) await buffer.retarget(moved.path);
-      if (selectedNote === note.path) selectedNote = moved.path;
       await refreshIndex();
+      if (wasSelected) selected = moved.path;
     });
   }
 
@@ -377,8 +384,27 @@
 
   // -- beats --------------------------------------------------------------
 
+  /** A click in Prep on anything but a row — empty space, a plate, a ghost
+   *  row — drops the selection, as in Legend Lore's panels. Not in a field,
+   *  a menu, or the editor, where the open note is worked on. */
+  function releaseSelection(e: MouseEvent) {
+    if (mode !== 'prep') return;
+    if ((e.target as HTMLElement | null)?.closest('[data-row], input, [role="menu"], .inspector')) return;
+    selected = null;
+  }
+
+  /** Hiding the beat column disarms, as closing Legend Lore's collections
+   *  panel does: a click on a note mustn't file into a beat out of sight.
+   *  A selected beat lets go too, or its notes would stay lit unexplained. */
+  function toggleBeats() {
+    beatsOpen = !beatsOpen;
+    if (beatsOpen) return;
+    armedBeat = null;
+    if (beatAt(selected)) selected = null;
+  }
+
   function selectBeat(beat: BeatEntry) {
-    selectedBeat = beat.path;
+    selected = beat.path;
     if (armedBeat !== beat.path) armedBeat = null;
   }
 
@@ -387,8 +413,8 @@
       armedBeat = null;
       return;
     }
-    armedBeat = selectedBeat = beat.path;
-    openPath(beat.path);
+    // Arming selects, as in Legend Lore; the editor waits for a double-click.
+    armedBeat = selected = beat.path;
   }
 
   function toggleMember(note: NoteEntry) {
@@ -401,15 +427,34 @@
     });
   }
 
+  /** Launching from Prep isn't logged in the session, as spending from
+   *  Prep isn't; Play logs both. */
+  function launchBeat(beat: BeatEntry) {
+    run(async () => applyLive(await commandApi.launch(campaign!, beat.path, null)));
+  }
+
+  function stopLive() {
+    run(async () => applyLive(await commandApi.stop(campaign!)));
+  }
+
+  /** A note dropped on a beat joins it, as a book dropped on a collection. */
+  function addToBeat(beat: BeatEntry, path: string) {
+    run(async () => {
+      await settle(beat.path);
+      await commandApi.setMember(campaign!, beat.path, path, true);
+      await refreshIndex();
+    });
+  }
+
   function landBeat(path: string) {
-    armedBeat = selectedBeat = path;
+    armedBeat = selected = path;
     freshOpen = true;
     return buffer.open(path);
   }
 
-  function createBeat(name: string) {
+  function createBeat(name: string, notes: string[] = []) {
     run(async () => {
-      const path = await commandApi.createBeat(campaign!, name, [], session?.path ?? null);
+      const path = await commandApi.createBeat(campaign!, name, notes, session?.path ?? null);
       await refreshIndex();
       await landBeat(path);
     });
@@ -768,6 +813,25 @@
           </svg>
         </button>
       </div>
+      <!-- The beat column's key, on the side the column opens: between the
+           view switch and the window's key. Prep's, so dimmed and inert in
+           Play, as the shelf's. Its lamp answers for the beats as Legend
+           Lore's collections lamp answers for the mix: lit while a beat is
+           armed or live, so a hidden column still says so. -->
+      <div class="panel-keys" class:dimmed={mode === 'play'} inert={mode === 'play'}>
+        <LatchKey
+          open={beatsOpen}
+          lit={!!armedBeat || !!live?.beat}
+          title={beatsOpen ? 'Hide the beats' : 'Show the beats'}
+          label="Toggle the beats"
+          onClick={toggleBeats}
+        >
+          <!-- Font Awesome "list-ol" icon (src/lib/ui/icons/list-ol-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor">
+            <path d="M64 136C64 122.8 74.7 112 88 112L136 112C149.3 112 160 122.7 160 136L160 240L184 240C197.3 240 208 250.7 208 264C208 277.3 197.3 288 184 288L88 288C74.7 288 64 277.3 64 264C64 250.7 74.7 240 88 240L112 240L112 160L88 160C74.7 160 64 149.3 64 136zM94.4 365.2C105.8 356.6 119.7 352 134 352L138.9 352C172.6 352 200 379.4 200 413.1C200 432.7 190.6 451 174.8 462.5L150.8 480L184 480C197.3 480 208 490.7 208 504C208 517.3 197.3 528 184 528L93.3 528C77.1 528 64 514.9 64 498.7C64 489.3 68.5 480.5 76.1 475L146.6 423.7C150 421.2 152 417.3 152 413.1C152 405.9 146.1 400 138.9 400L134 400C130.1 400 126.3 401.3 123.2 403.6L102.4 419.2C91.8 427.2 76.8 425 68.8 414.4C60.8 403.8 63 388.8 73.6 380.8L94.4 365.2zM288 128L544 128C561.7 128 576 142.3 576 160C576 177.7 561.7 192 544 192L288 192C270.3 192 256 177.7 256 160C256 142.3 270.3 128 288 128zM288 288L544 288C561.7 288 576 302.3 576 320C576 337.7 561.7 352 544 352L288 352C270.3 352 256 337.7 256 320C256 302.3 270.3 288 288 288zM288 448L544 448C561.7 448 576 462.3 576 480C576 497.7 561.7 512 544 512L288 512C270.3 512 256 497.7 256 480C256 462.3 270.3 448 288 448z"/>
+          </svg>
+        </LatchKey>
+      </div>
     {/if}
     {@render windowKey?.()}
   </header>
@@ -776,7 +840,7 @@
     {#if !index}
       <div class="empty"></div>
     {:else}
-      <div class="workspace" class:arming={mode === 'prep' && !!armedBeat}>
+      <div class="workspace" class:arming={mode === 'prep' && !!armedBeat} role="presentation" on:mousedown={releaseSelection}>
         {#if mode === 'play'}
           {#if session && campaign}
             <PlayView
@@ -805,8 +869,8 @@
             {campaigns}
             {index}
             openPath={bufState.path}
-            selectedPath={selectedNote}
-            onSelect={(note) => (selectedNote = note.path)}
+            selectedPath={selected}
+            onSelect={(note) => (selected = note.path)}
             {members}
             {inSession}
             armed={!!armedBeat}
@@ -826,8 +890,8 @@
           <TrackGrid
             {cols}
             openPath={bufState.path}
-            selectedPath={selectedNote}
-            onSelect={(note) => (selectedNote = note.path)}
+            selectedPath={selected}
+            onSelect={(note) => (selected = note.path)}
             {members}
             {inSession}
             armed={!!armedBeat}
@@ -847,26 +911,31 @@
           />
         </div>
 
-        <BeatColumn
-          {rows}
-          {spare}
-          sessionName={session?.name ?? null}
-          selectedPath={selectedBeat}
-          armedPath={armedBeat}
-          openPath={bufState.path}
-          onSelect={selectBeat}
-          onOpen={(beat) => openPath(beat.path)}
-          onArm={armBeat}
-          onCreate={createBeat}
-          onWrite={writeBeat}
-          onAddToPlan={(beat) => editPlan('add', { beat: beat.path })}
-          onMove={(row, to) => editPlan('move', { at: row.at, to, expect: row.link })}
-          onRemove={(row) => editPlan('remove', { at: row.at, expect: row.link })}
-          onRename={renameNote}
-          onSpent={setSpent}
-          onReveal={(beat) => reveal(beat.path)}
-          onTrash={(beat) => trashNote(beat, 'Beat')}
-        />
+        {#if beatsOpen}
+          <BeatColumn
+            {rows}
+            {spare}
+            sessionName={session?.name ?? null}
+            selectedPath={selected}
+            armedPath={armedBeat}
+            onSelect={selectBeat}
+            onOpen={(beat) => openPath(beat.path)}
+            onArm={armBeat}
+            liveBeat={live?.beat ?? null}
+            onLaunch={launchBeat}
+            onStop={stopLive}
+            onCreate={createBeat}
+            onWrite={writeBeat}
+            onAddToPlan={(beat, to) => editPlan('add', { beat: beat.path, to })}
+            onMove={(row, to) => editPlan('move', { at: row.at, to, expect: row.link })}
+            onRemove={(row) => editPlan('remove', { at: row.at, expect: row.link })}
+            onRename={renameNote}
+            onSpent={setSpent}
+            onReveal={(beat) => reveal(beat.path)}
+            onTrash={(beat) => trashNote(beat, 'Beat')}
+            onDropNote={addToBeat}
+          />
+        {/if}
         {/if}
 
         <!-- Kept mounted while closed, so a note opening has an editor to

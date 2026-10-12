@@ -159,8 +159,8 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.1rem 0.35rem;
-    border-left: 2px solid transparent;
-    border-radius: var(--radius-sm);
+    /* Square, as Legend Lore's collection rows: a radius bends the rule. */
+    border-left: 3px solid transparent;
     font-size: 0.9rem;
     line-height: 1.5;
   }
@@ -169,10 +169,12 @@
     background: var(--bg-focused);
   }
 
-  /* The beat the live set came from: content on show, in parchment. */
+  /* The beat the live set came from: a playing collection's parchment wash
+     and purple rule (CollectionsPanel .row-container.playing), as Prep's
+     beat column marks it. */
   .beat-row.playing {
-    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
-    border-left-color: var(--text-accent);
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
   }
 
   .beat-row.spent .beat-name {
