@@ -2,6 +2,7 @@
   // Command's pane in Settings: where the campaigns live, and whether
   // launching a beat spends it (design §4). The sidecar keeps both.
   import { onMount } from 'svelte';
+  import ActionButton from '../ui/ActionButton.svelte';
   import { commandApi } from './api';
   import type { CommandSettings } from './types';
 
@@ -26,6 +27,17 @@
       settings = await commandApi.setSpendOnLaunch(enabled);
     } catch (e) {
       settings = previous;
+      saveError = String(e);
+    }
+  }
+
+  /** Command closes the open campaign and opens a fresh Untitled in the
+   *  folder chosen (command_choose_root). */
+  async function chooseRoot() {
+    saveError = null;
+    try {
+      settings = (await commandApi.chooseRoot()) ?? settings;
+    } catch (e) {
       saveError = String(e);
     }
   }
@@ -58,16 +70,16 @@
           <option value="off">Off</option>
         </select>
       </div>
-      {#if saveError}<p class="field-desc error-text">{saveError}</p>{/if}
-
       <div class="setting-row">
         <div class="setting-row-head">
           <div class="setting-row-title">Campaigns folder</div>
           <div class="setting-row-desc path" title={settings.root ?? ''}>
-            {settings.root ?? 'Not chosen yet — choose it from Command.'}
+            {settings.root ?? 'Not set yet'}
           </div>
         </div>
+        <ActionButton label="change" title="Choose another campaigns folder" onClick={chooseRoot} />
       </div>
+      {#if saveError}<p class="field-desc error-text">{saveError}</p>{/if}
     {:else}
       <p class="field-desc">Loading…</p>
     {/if}

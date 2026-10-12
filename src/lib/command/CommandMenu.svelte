@@ -16,6 +16,10 @@
   let pos = { x, y };
   let measured = false;
 
+  // In a menu with choice rows, every row keeps the pip's width, so the
+  // labels line up.
+  $: lamps = items.some((item) => item.kind === 'action' && item.lamp !== undefined);
+
   function close() {
     releaseMenuSlot(close);
     onClose();
@@ -63,9 +67,17 @@
       <div class="menu-heading ledger-label">{item.label}</div>
     {:else}
       {@const run = item.action}
-      <button type="button" class="menu-row" class:danger={item.danger} role="menuitem" on:click={() => pick(run)}>
-        {item.label}
-      </button>
+      {#if item.lamp !== undefined}
+        <button type="button" class="menu-row" role="menuitemradio" aria-checked={item.lamp} on:click={() => pick(run)}>
+          <span class="menu-pip" class:on={item.lamp} aria-hidden="true"></span>
+          <span class="menu-label">{item.label}</span>
+        </button>
+      {:else}
+        <button type="button" class="menu-row" class:danger={item.danger} role="menuitem" on:click={() => pick(run)}>
+          {#if lamps}<span class="menu-pip" aria-hidden="true"></span>{/if}
+          <span class="menu-label">{item.label}</span>
+        </button>
+      {/if}
     {/if}
   {/each}
 </div>
@@ -96,6 +108,11 @@
 
   .menu-row {
     white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .menu-label {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }

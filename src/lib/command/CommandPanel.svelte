@@ -23,7 +23,7 @@
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, linkableNames, type Column } from './columns';
-  import { action, divider, heading, type OpenMenu } from './menu';
+  import { action, choice, divider, heading, type OpenMenu } from './menu';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
   import type { BeatEntry, CampaignIndex, CommandSettings, LiveSet, NoteEntry, VaultEvent } from './types';
@@ -44,7 +44,8 @@
   let index: CampaignIndex | null = null;
   let error: string | null = null;
   let menu: OpenMenu | null = null;
-  let naming: 'campaign' | 'rename-campaign' | null = null;
+  /** The campaign key is the name field: [name] or Rename. */
+  let renaming = false;
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
   let unlistenLive: Promise<UnlistenFn> | null = null;
@@ -79,6 +80,9 @@
     },
   );
 
+  // Named by Command and not yet by the GM: the sidecar's rule
+  // (vault.is_untitled). Command opens on one, and leaving it blank removes it.
+  $: untitled = !!campaign && /^Untitled(?: [1-9][0-9]*)?$/.test(campaign);
   $: cols = index ? columns(index) : ([] as Column[]);
   $: nameSet = new Set((index?.notes ?? []).map((n) => n.name.toLowerCase()));
   $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
@@ -507,25 +511,16 @@
 
   // -- campaigns ----------------------------------------------------------
 
-  function chooseRoot() {
-    run(async () => {
-      const chosen = await commandApi.chooseRoot();
-      if (!chosen) return;
-      await leaveCampaign();
-      await loadRoot();
-      await enterCampaign($appContext.campaign);
-    });
-  }
-
-  function openCampaign(name: string | null) {
+  function openCampaign(name: string) {
     run(() => setCampaign(name));
   }
 
-  function createCampaign(name: string) {
+  /** New campaign: a fresh Untitled, as at launch. Rust opens it in every
+   *  window; the list has to know it before this panel follows. */
+  function newCampaign() {
     run(async () => {
-      const created = await commandApi.createCampaign(name);
+      await commandApi.openUntitled();
       campaigns = await commandApi.listCampaigns();
-      await setCampaign(created);
     });
   }
 
@@ -533,10 +528,16 @@
     run(async () => {
       const old = campaign!;
       await leaveCampaign();
-      const renamed = await commandApi.renameCampaign(old, name);
-      campaigns = await commandApi.listCampaigns();
-      await setCampaign(renamed.name);
-      await enterCampaign(renamed.name);
+      try {
+        const renamed = await commandApi.renameCampaign(old, name);
+        campaigns = await commandApi.listCampaigns();
+        await setCampaign(renamed.name);
+        await enterCampaign(renamed.name);
+      } catch (e) {
+        // Refused (the name is taken, say): back to the campaign as it was.
+        await enterCampaign(old);
+        throw e;
+      }
     });
   }
 
@@ -556,25 +557,38 @@
       if (!confirmed) return;
       await leaveCampaign();
       await commandApi.trash(name, null);
-      await setCampaign(null);
+      // Command is never left on nothing: a fresh Untitled, as at launch.
+      await commandApi.openUntitled();
       await loadRoot();
     });
   }
 
+  /** The switcher, as Obsidian's for vaults: every campaign, the open one
+   *  lit, and New campaign at the bottom. */
   function campaignMenu(e: MouseEvent) {
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const others = campaigns.filter((c) => c !== campaign);
     menu = {
       x: box.left,
       y: box.bottom + 4,
       items: [
-        ...(others.length ? [heading('campaigns'), ...others.map((c) => action(c, () => openCampaign(c))), divider] : []),
-        action('New campaign', () => (naming = 'campaign')),
-        action('Rename', () => (naming = 'rename-campaign')),
+        ...campaigns.map((c) => choice(c, c === campaign, () => openCampaign(c))),
+        ...(campaigns.length ? [divider] : []),
+        action('New campaign', newCampaign),
+      ],
+    };
+  }
+
+  /** Right-click: what acts on the open campaign, as right-click manages a
+   *  track or a note. */
+  function manageMenu(e: MouseEvent) {
+    if (!campaign) return;
+    menu = {
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        action('Rename', () => (renaming = true)),
         action('Show in Finder', () => reveal()),
-        action('Close campaign', () => openCampaign(null)),
         divider,
-        action('Change campaigns folder', chooseRoot),
         action('Move to Trash', trashCampaign, true),
       ],
     };
@@ -592,35 +606,45 @@
 
 <section class="command">
   <header class="bar">
-    {#if naming}
+    {#if renaming && campaign}
       <div class="bar-name">
         <InlineName
-          value={naming === 'rename-campaign' ? (campaign ?? '') : ''}
+          value={untitled ? '' : campaign}
           placeholder="Campaign name"
-          label={naming === 'campaign' ? 'New campaign' : 'Rename campaign'}
+          label={untitled ? 'Name campaign' : 'Rename campaign'}
           onCommit={(name) => {
-            const mode = naming;
-            naming = null;
-            if (mode === 'campaign') createCampaign(name);
-            else renameCampaign(name);
+            renaming = false;
+            renameCampaign(name);
           }}
-          onCancel={() => (naming = null)}
+          onCancel={() => (renaming = false)}
         />
       </div>
-    {:else if campaign}
-      <button type="button" class="campaign-key" title="Campaigns" on:click={campaignMenu}>
-        {campaign}<span class="drop" aria-hidden="true">▾</span>
-      </button>
-      <span class="bar-sep" aria-hidden="true">·</span>
-      {#if session}
-        <button type="button" class="session-key" title="Sessions" on:click={sessionMenu}>
-          {session.name}{#if session.date}<span class="session-date">{session.date}</span>{/if}<span class="drop" aria-hidden="true">▾</span>
-        </button>
-      {:else}
-        <button type="button" class="session-key ghost" on:click={newSession}>+ session</button>
-      {/if}
     {:else}
-      <span class="bar-title">Command</span>
+      <!-- Click: the switcher. Right-click: this campaign's own menu. -->
+      <button
+        type="button"
+        class="campaign-key"
+        class:untitled
+        class:none={!campaign}
+        title="Campaigns"
+        on:click={campaignMenu}
+        on:contextmenu|preventDefault={manageMenu}
+      >
+        {campaign ?? 'no campaign'}<span class="drop" aria-hidden="true">▾</span>
+      </button>
+      {#if untitled}
+        <ActionButton label="name" title="Name this campaign" onClick={() => (renaming = true)} />
+      {/if}
+      {#if campaign}
+        <span class="bar-sep" aria-hidden="true">·</span>
+        {#if session}
+          <button type="button" class="session-key" title="Sessions" on:click={sessionMenu}>
+            {session.name}{#if session.date}<span class="session-date">{session.date}</span>{/if}<span class="drop" aria-hidden="true">▾</span>
+          </button>
+        {:else}
+          <button type="button" class="session-key ghost" on:click={newSession}>+ session</button>
+        {/if}
+      {/if}
     {/if}
     <span class="spacer"></span>
     {#if index && mode === 'prep'}
@@ -658,29 +682,8 @@
   </header>
 
   <div class="body">
-    {#if settings === null}
+    {#if !index}
       <div class="empty"></div>
-    {:else if !settings.root}
-      <div class="empty">
-        <p class="lede">Command keeps each campaign as a folder of Markdown notes — yours, readable in any editor.</p>
-        <ActionButton label="choose campaigns folder" onClick={chooseRoot} />
-      </div>
-    {:else if !index}
-      <div class="empty">
-        <div class="campaign-list">
-          <div class="ledger-label list-head">campaigns</div>
-          {#each campaigns as name (name)}
-            <button type="button" class="campaign-row" on:click={() => openCampaign(name)}>{name}</button>
-          {/each}
-          {#if naming === null}
-            <button type="button" class="campaign-row ghost" on:click={() => (naming = 'campaign')}>+ campaign</button>
-          {/if}
-        </div>
-        <p class="root">
-          <span class="root-path" title={settings.root}>{settings.root}</span>
-          <ActionButton label="change" title="Change campaigns folder" onClick={chooseRoot} />
-        </p>
-      </div>
     {:else}
       <div class="workspace" class:arming={mode === 'prep' && !!armedBeat}>
         {#if mode === 'play'}
@@ -858,15 +861,21 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  .bar-title,
   .campaign-key {
     font-family: var(--font-heading);
     font-size: 1.05rem;
     color: var(--text-primary);
   }
 
-  .bar-title {
-    color: var(--text-secondary);
+  /* Not named yet. Italic says so without a badge; [name] beside it is the
+     way out. */
+  .campaign-key.untitled,
+  .campaign-key.none {
+    font-style: italic;
+  }
+
+  .campaign-key.none {
+    color: var(--text-tertiary);
   }
 
   .bar-sep {
@@ -884,6 +893,9 @@
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background var(--transition-fast), color var(--transition-fast);
+    /* A right-click would otherwise select the word under it. */
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .session-key {
@@ -948,68 +960,6 @@
     max-width: 28rem;
     text-align: center;
     color: var(--text-secondary);
-  }
-
-  .campaign-list {
-    display: flex;
-    flex-direction: column;
-    width: 18rem;
-    max-height: 60vh;
-    overflow-y: auto;
-  }
-
-  .list-head {
-    padding: 0 0.5rem 0.35rem;
-  }
-
-  .campaign-row {
-    padding: 0.25rem 0.5rem;
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-heading);
-    font-size: 1.05rem;
-    text-align: left;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-  }
-
-  .campaign-row:hover {
-    background: var(--bg-focused);
-  }
-
-  .campaign-row:active {
-    transform: scale(0.97);
-  }
-
-  .campaign-row.ghost {
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    color: var(--text-tertiary);
-  }
-
-  .campaign-row.ghost:hover {
-    color: var(--text-primary);
-  }
-
-  .root {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    margin: 0;
-    max-width: 32rem;
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
-  }
-
-  .root-path {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
   }
 
   .workspace {

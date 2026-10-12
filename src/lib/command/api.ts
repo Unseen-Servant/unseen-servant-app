@@ -35,7 +35,8 @@ export const commandApi = {
   getSettings: () => invoke<CommandSettings>('command_get_settings'),
   chooseRoot: () => invoke<MaybeSettings>('command_choose_root'),
   listCampaigns: () => invoke<string[]>('command_list_campaigns'),
-  createCampaign: (name: string) => invoke<string>('command_create_campaign', { name }),
+  /** New campaign: a fresh Untitled, opened in every window. Returns its name. */
+  openUntitled: () => invoke<string>('command_open_untitled'),
   renameCampaign: (name: string, newName: string) =>
     invoke<Renamed>('command_rename_campaign', { name, newName }),
   getCampaign: (name: string) => invoke<CampaignIndex>('command_get_campaign', { name }),
