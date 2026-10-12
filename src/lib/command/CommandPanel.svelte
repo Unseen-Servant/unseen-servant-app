@@ -1025,6 +1025,7 @@
   .campaign-key {
     min-width: 9rem;
     font-family: var(--font-heading);
+    font-size: 0.875rem;
     color: var(--text-primary);
   }
 
