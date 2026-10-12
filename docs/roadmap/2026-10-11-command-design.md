@@ -1,7 +1,7 @@
 # Command — design
 
 **Date:** 2026-10-11
-**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11 (§9); where the build departed from this doc, the text below says so.
+**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11, phase 3 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
 **Objective:** specify Command, the workstation's second tool (architecture doc §6 Step 4), before any code: what the vault looks like on disk, how sessions work, what Prep and Play show, and where each piece lives across the three layers.
 
 ---
@@ -192,6 +192,13 @@ Further rules:
 - **The arrangement** runs down one side: the session's plan with spent beats ticked, log entries interleaved at the times they happened, and captured beats inserted where they happened. It is the session as played, and the recap for next time.
 - **Launching what isn't on the board.** Typing outside the editor opens a find line on the board, listing the campaign's matching notes. Launching one puts it on the board, auto-placed. This replaces the compact grid planned before the board, since the board already holds the session's notes.
 - **A jot line** appends a timestamped line to the log.
+- *As built (phase 3):*
+  - **Layout.** The arrangement is a 14rem column on the left: the plan, each beat with its play key and the times the log says it was launched; then the log, newest at the bottom; then the jot line. The board fills the rest, and the note editor opens on the right as in Prep.
+  - **Transport strip.** It floats over the board's top edge: an amber lamp, the beat the live set came from (or "improvised"), the count, then `[frame]`, `[capture]` and `[stop]`.
+  - **Cards.** Each card's play key is Legend Lore's transport key, so it lights purple while the note plays, and the card itself takes the parchment rule and glow. Double-click or the card's menu opens the note in the editor, and its links open the note they name.
+  - **Gestures.** Moving, resizing, connecting and deleting (Delete or Backspace, lines always, cards only when nothing would put them back) go out as board operations, drawn at once. The board opens framed on the live cards. A card whose note is gone shows dashed.
+  - **Canvas extras.** Obsidian's text, link and group nodes render and can be moved. Arrowheads on Obsidian-made edges aren't drawn: Svelte Flow names markers after their colour, and a token colour (`var(…)`) inside `url(#…)` isn't safe in WebKit. Lines are lines for now.
+  - **Attribution.** Svelte Flow's credit stays in the corner, quiet: its authors ask that only subscribers hide it.
 
 ### 5.3 Launching
 
@@ -214,8 +221,8 @@ Nothing new beyond the grid cell. Each meaning maps to an existing token or idio
 | Meaning | Treatment |
 |---|---|
 | Track identity | *open until Play is on screen (§10).* Tracks are plain nameplates. In Legend Lore a pigment gem marks a curated set, which here is a beat rather than a track. If tracks take a pigment, it is a strip on the nameplate |
-| Note in the live set | brass glow, `--glow-accent` — content armed |
-| Play view on | purple latch in the existing view-switch well — a mode switched on |
+| Note in the live set | parchment rule and `--glow-accent` on the card; its play key lit purple, as Legend Lore's transport |
+| Prep / Play | a picker in Command's bar, Legend Lore's view-switch recipe: the current segment raised, never purple (one view is always on) |
 | Armed beat | Legend Lore's arm glyph in `--text-active` |
 | Spent | `--opacity-out-of-scope` plus a check; hover restores |
 | Unresolved link, missing note | dashed parchment, `--outline-drop` |
@@ -251,7 +258,7 @@ The active campaign and session stay owned by Rust (`app_context.rs`, unchanged)
 ### 6.4 Frontend — `src/lib/command/`
 
 - `CommandPanel.svelte` replaces the placeholder: the Prep/Play switch, taking `active` and `windowKey` per PANELS.md.
-- The live set is a `rustMirror` (`command://live` plus a pull command); `vault` events refetch what they name.
+- The live set is a `rustMirror` (`command://live` plus a pull command); `vault` events refetch what they name. *As built:* not a `rustMirror`, which mirrors one global snapshot with no arguments, and live sets are per campaign. `CommandPanel` pulls the open campaign's set (`command_get_live`) on entering it and on a refresh, and keeps a `command://live` snapshot when it's that campaign's and its `seq` is newer.
 - *As built, confirmed on 2026-10-11:* the campaign and session switchers sit in Command's own bar, not in shell chrome. The tab strip exists only in the main window, so a shell picker would leave a popped-out Command unable to switch. The campaign name opens a menu: other campaigns, new, rename, reveal, close, change folder, trash. The TEMP picker in `PanelHost.svelte` is gone; the active campaign itself still lives in `app_context.rs`.
 - `<ConfirmDialog />` moved from Legend Lore's panel to the two window hosts (`PanelHost`, `StandaloneFrame`), one per window, so a popped-out Command can ask.
 - The campaigns folder is chosen from Command's empty state and its campaign menu (`command_choose_root`, the native picker). A Command pane in `SettingsModal` waits for phase 3's *spend beats on launch*.
@@ -285,7 +292,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 | 0 | Dev data | `~/Unseen Servant` cleared of the Electron app's `Campaigns/` and `Library/` (moved aside, not deleted) | the root holds only campaigns — **done 2026-10-11**: moved to `~/Unseen Servant (Electron)/`, Misty Vale copied back as the dev fixture |
 | 1 | Vault — **done 2026-10-11** | settings, scan and index, watcher, writer, event relay; the campaign picker; the Prep grid of tracks; the editor; create, rename, move and delete for notes, tracks and campaigns | pytest: scan, link resolution, rename rewriting, byte-preserving round trip, 409 on a stale hash. By hand, with the root open in Obsidian: an edit on either side shows up on the other; a rename in Command updates the links Obsidian shows |
 | 2 | Beats and sessions — **done 2026-10-11** | `Beats/`, the launcher column, arming and membership, sessions, plan order, `[new session]` carry-forward, spent | pytest: carry-forward rules; `notes`, `beats` and `spent` round trips |
-| 3 | Play | the session board (read and write JSON Canvas, path rewriting, carry-forward; Svelte Flow surface with move, resize, connect, auto-place), live state and its persistence, launch, stop, capture, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian; a board arranged in Command opens in Obsidian Canvas, and one written by Obsidian round-trips byte for byte |
+| 3 | Play — **done 2026-10-12** | the session board (read and write JSON Canvas, path rewriting, carry-forward; Svelte Flow surface with move, resize, connect, auto-place), live state and its persistence, launch, stop, capture, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian; a board arranged in Command opens in Obsidian Canvas, and one written by Obsidian round-trips byte for byte |
 | 3b | Images | `![[map.png]]` embeds on cards: the asset protocol scoped at runtime to the campaigns folder, embeds resolved by name. The CSP already allows `asset:` images | a map embedded in a note shows on its card |
 | 4 | Cross-tool | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
 | 5 | Library | `Library/` reserved, campaign-first resolution, the Library's grid and its group in campaign columns, *Copy to campaign*, renames across campaigns (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
