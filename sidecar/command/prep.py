@@ -55,6 +55,8 @@ def index(campaign: Path) -> dict:
     for n in base["notes"]:
         by_name.setdefault(n["name"].casefold(), []).append(n["path"])
         n["spent"] = fm.spent_value(metas[n["path"]].get("spent"))
+        source = metas[n["path"]].get("source")
+        n["source"] = source if isinstance(source, str) and source.strip() else None
 
     def resolve(name: str) -> str | None:
         paths = by_name.get(name.casefold(), [])
@@ -242,3 +244,19 @@ def set_spent(campaign: Path, rel: str, spent: bool) -> str | None:
 
 def spent_of(campaign: Path, rel: str) -> str | None:
     return fm.spent_value(fm.load(vault.read_text(vault.note_path(campaign, rel))).get("spent"))
+
+
+# ---------------------------------------------------------------------------
+# Material sent from Legend Lore (design §8)
+# ---------------------------------------------------------------------------
+
+def receive(campaign: Path, track: str, name: str, text: str, source: str, cite: str) -> str:
+    """A new note in ``track`` holding ``text``, with ``source`` (where it
+    came from: a PDF page's file URL) in its frontmatter and a link back
+    under the text. Named after ``name``, made free if it's taken."""
+    if track not in vault.track_order(campaign):
+        raise vault.NotFound(f"No track named {track!r}")
+    link = source.replace("(", "%28").replace(")", "%29")
+    body = text.strip()
+    content = fm.set_key("", "source", source) + (f"{body}\n\n" if body else "") + f"[{cite.strip() or 'Source'}]({link})\n"
+    return vault.create_note(campaign, track, vault.free_name(campaign, name), content)

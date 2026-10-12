@@ -52,6 +52,7 @@ class NoteCreate(BaseModel):
     campaign: str
     folder: str
     name: str
+    content: str = ""
 
 
 class NoteSave(BaseModel):
@@ -148,6 +149,23 @@ class Jot(BaseModel):
     text: str
 
 
+class Context(BaseModel):
+    """The workstation's active campaign and session, pushed by Rust
+    (``app_context.rs``) so MCP can answer with no window open."""
+    seq: int = 0
+    campaign: str | None = None
+    session: str | None = None
+
+
+class Send(BaseModel):
+    campaign: str
+    track: str
+    name: str
+    text: str
+    source: str
+    cite: str = ""
+
+
 def _live_event(snapshot: dict) -> dict:
     return {"type": "live", **snapshot}
 
@@ -158,6 +176,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     state = {"settings": load_settings(data_dir)}
     watcher = VaultWatcher(lambda: Path(r) if (r := state["settings"].root) else None)
     live = LiveSets(data_dir)
+    context = {"current": Context(seq=-1)}
 
     def announce(snapshot: dict | None) -> None:
         if snapshot is not None:
@@ -209,6 +228,20 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             watcher.root_changed()
         return settings.model_dump()
 
+    # -- the workstation's context (design §6.2) ----------------------------
+
+    @router.get("/context")
+    def get_context():
+        current = context["current"]
+        return {"campaign": current.campaign, "session": current.session}
+
+    @router.put("/context")
+    def put_context(body: Context):
+        # Pushes can cross on the way; the newer one wins.
+        if body.seq >= context["current"].seq:
+            context["current"] = body
+        return get_context()
+
     # -- change events -----------------------------------------------------
 
     @router.get("/events")
@@ -247,6 +280,10 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     # -- tracks ------------------------------------------------------------
 
+    @router.get("/tracks")
+    def get_tracks(campaign: str):
+        return {"tracks": vault.track_order(campaign_path(campaign))}
+
     @router.post("/tracks")
     def create_track(body: TrackCreate):
         with write_lock:
@@ -282,7 +319,20 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     @router.post("/notes")
     def create_note(body: NoteCreate):
         with write_lock:
-            return {"path": vault.create_note(campaign_path(body.campaign), body.folder, body.name)}
+            return {"path": vault.create_note(campaign_path(body.campaign), body.folder, body.name, body.content)}
+
+    @router.get("/find")
+    def find(campaign: str, query: str, track: str | None = None):
+        return {"notes": vault.find_notes(campaign_path(campaign), query, track)}
+
+    @router.post("/send")
+    def send(body: Send):
+        """A Legend Lore hit, kept as a note in a track (design §8)."""
+        with write_lock:
+            path = prep.receive(
+                campaign_path(body.campaign), body.track, body.name, body.text, body.source, body.cite,
+            )
+        return {"path": path}
 
     @router.post("/notes/rename")
     def rename_note(body: NoteRename):

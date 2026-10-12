@@ -275,3 +275,28 @@ def test_rename_campaign_rewrites_only_links_that_spell_it(root, camp):
     assert rewritten == ["Overview.md"]
     assert (root / "Barovia" / "Overview.md").read_text() == "[[Barovia/NPCs/Ismark]] [[NPCs/Ismark]] [[Ismark]]"
     assert vault.list_campaigns(root) == ["Barovia"]
+
+
+# ---------------------------------------------------------------------------
+# Notes made with content, free names, finding notes (design §8)
+# ---------------------------------------------------------------------------
+
+def test_a_note_can_start_with_content(camp):
+    path = vault.create_note(camp, "NPCs", "Doru", "Ismark's friend.\n")
+    assert (camp / path).read_text() == "Ismark's friend.\n"
+
+
+def test_free_name_cleans_a_heading_and_steps_past_a_clash(camp):
+    assert vault.free_name(camp, "  **Fire / Drake**: notes ") == "Fire Drake notes"
+    assert vault.free_name(camp, "Ismark") == "Ismark 2"
+    vault.create_note(camp, "NPCs", "Ismark 2")
+    assert vault.free_name(camp, "ismark") == "ismark 3"
+    assert vault.free_name(camp, "#[]") == "Untitled"
+
+
+def test_find_notes_puts_names_before_text_and_quotes_the_text(camp):
+    found = vault.find_notes(camp, "ismark")
+    assert [n["name"] for n in found] == ["Ismark", "Ambush", "Village of Barovia", "Ireena"]
+    assert found[3]["snippet"] == "Sister of [[Ismark]]."
+    assert [n["name"] for n in vault.find_notes(camp, "ISMARK", track="Locations")] == ["Village of Barovia"]
+    assert vault.find_notes(camp, "  ") == []

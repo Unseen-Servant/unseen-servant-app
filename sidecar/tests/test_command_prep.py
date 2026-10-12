@@ -192,3 +192,30 @@ def test_renaming_a_beat_rewrites_session_plans(camp):
     assert prep.index(camp)["sessions"][0]["beats"] == [
         {"link": "Ambush on the road", "path": "Beats/Ambush on the road.md"},
     ]
+
+
+# ---------------------------------------------------------------------------
+# Material sent from Legend Lore (design §8)
+# ---------------------------------------------------------------------------
+
+SOURCE = "file:///Books/Curse%20of%20Strahd%20(5e).pdf#page=42"
+
+
+def test_a_hit_arrives_as_a_note_with_its_source(camp):
+    path = prep.receive(camp, "NPCs", "Ismark", "Tall and tired.\n", SOURCE, "Curse of Strahd (5e), p.40")
+    assert path == "NPCs/Ismark 2.md"
+    assert (camp / path).read_text() == (
+        f'---\nsource: "{SOURCE}"\n---\n'
+        "Tall and tired.\n\n"
+        "[Curse of Strahd (5e), p.40](file:///Books/Curse%20of%20Strahd%20%285e%29.pdf#page=42)\n"
+    )
+    notes = {n["path"]: n for n in prep.index(camp)["notes"]}
+    assert notes[path]["source"] == SOURCE
+    assert notes["NPCs/Ismark.md"]["source"] is None
+
+
+def test_a_hit_goes_only_to_a_track(camp):
+    with pytest.raises(vault.NotFound):
+        prep.receive(camp, "Beats", "X", "text", SOURCE, "")
+    with pytest.raises(vault.NotFound):
+        prep.receive(camp, "Nowhere", "X", "text", SOURCE, "")

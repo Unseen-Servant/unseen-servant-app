@@ -297,15 +297,57 @@ def _folder(campaign: Path, folder: str) -> Path:
     return path
 
 
-def create_note(campaign: Path, folder: str, name: str) -> str:
+def create_note(campaign: Path, folder: str, name: str, content: str = "") -> str:
     name = validate_name(name)
     parent = _folder(campaign, folder)
     if name.casefold() in _names_in_use(campaign):
         raise Conflict(f"A note named {name!r} already exists in this campaign")
     path = parent / f"{name}.md"
-    with open(path, "xb"):
-        pass
+    with open(path, "xb") as f:
+        f.write(content.encode("utf-8"))
     return _rel(campaign, path)
+
+
+def free_name(campaign: Path, wanted: str) -> str:
+    """``wanted`` made into a name Command may create, and one no note in
+    the campaign has yet: characters a note name can't hold become spaces,
+    and a clash takes the next number ("Fire Drake 2")."""
+    name = re.sub(r"\s+", " ", "".join(" " if c in _FORBIDDEN or ord(c) < 32 else c for c in wanted))
+    name = name.strip().strip(".").strip()[:120].strip() or "Untitled"
+    taken = _names_in_use(campaign)
+    candidate, n = name, 1
+    while candidate.casefold() in taken:
+        n += 1
+        candidate = f"{name} {n}"
+    return candidate
+
+
+def find_notes(campaign: Path, query: str, track: str | None = None, limit: int = 20) -> list[dict]:
+    """Notes whose name or text holds ``query`` (case-insensitive): names
+    first, each with a line of context from the text."""
+    q = query.strip().casefold()
+    if not q:
+        return []
+    named, inside = [], []
+    for path in _walk_notes(campaign):
+        entry = _entry(campaign, path)
+        if track and (entry.track or "").casefold() != track.casefold():
+            continue
+        try:
+            text = path.read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            text = ""
+        at = text.casefold().find(q)
+        snippet = ""
+        if at >= 0:
+            start = max(0, at - 60)
+            snippet = " ".join(text[start:at + len(q) + 80].split())
+        hit = {**asdict(entry), "snippet": snippet}
+        if q in entry.name.casefold():
+            named.append(hit)
+        elif at >= 0:
+            inside.append(hit)
+    return (named + inside)[:limit]
 
 
 def create_campaign(root: Path, name: str) -> str:

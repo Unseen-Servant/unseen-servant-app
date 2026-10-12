@@ -261,3 +261,36 @@ def test_renaming_a_live_note_keeps_it_live(table):
     assert (live["beat"], live["notes"]) == ("Beats/Raid.md", ["Folk/Isaac.md"])
     table.post("/api/command/campaigns/rename", json={"name": "Strahd", "new_name": "Barovia"})
     assert table.get("/api/command/live", params={"campaign": "Barovia"}).json()["notes"] == ["Folk/Isaac.md"]
+
+
+# ---------------------------------------------------------------------------
+# Cross-tool: the workstation's context, tracks, finding, sending (design §8)
+# ---------------------------------------------------------------------------
+
+def test_the_context_keeps_the_newest_push(cmd):
+    assert cmd.get("/api/command/context").json() == {"campaign": None, "session": None}
+    cmd.put("/api/command/context", json={"seq": 2, "campaign": "Strahd", "session": "Session 1"})
+    cmd.put("/api/command/context", json={"seq": 1, "campaign": "Old", "session": None})
+    assert cmd.get("/api/command/context").json() == {"campaign": "Strahd", "session": "Session 1"}
+    assert cmd.put("/api/command/context", json={"seq": 2, "campaign": "Strahd", "session": None}).json() == {
+        "campaign": "Strahd", "session": None,
+    }
+
+
+def test_tracks_find_and_send_over_http(cmd):
+    assert cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()["tracks"][:2] == ["PCs", "NPCs"]
+    made = cmd.post("/api/command/notes", json={
+        "campaign": "Strahd", "folder": "NPCs", "name": "Ismark", "content": "Brother of Ireena.\n",
+    }).json()
+    found = cmd.get("/api/command/find", params={"campaign": "Strahd", "query": "ireena"}).json()["notes"]
+    assert [(n["path"], n["snippet"]) for n in found] == [(made["path"], "Brother of Ireena.")]
+
+    sent = cmd.post("/api/command/send", json={
+        "campaign": "Strahd", "track": "Monsters", "name": "Fire Drake: lair",
+        "text": "Breathes fire.", "source": "file:///b.pdf#page=3", "cite": "Monsters, p.3",
+    }).json()
+    assert sent == {"path": "Monsters/Fire Drake lair.md"}
+    bad = cmd.post("/api/command/send", json={
+        "campaign": "Strahd", "track": "Beats", "name": "x", "text": "", "source": "file:///b.pdf",
+    })
+    assert bad.status_code == 404
