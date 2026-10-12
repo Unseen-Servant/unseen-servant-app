@@ -299,8 +299,11 @@ def test_tracks_find_and_send_over_http(cmd):
 def test_the_shelf_over_http(cmd, campaign_root):
     import shutil
     shutil.rmtree(campaign_root / "Strahd" / "Shelf")  # a campaign made by hand has none
-    made = cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "Shelf", "name": "Idea"}).json()
-    assert made == {"path": "Shelf/Idea.md"}
+    cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Idea"})
+    moved = cmd.post("/api/command/notes/move", json={"campaign": "Strahd", "path": "NPCs/Idea.md", "folder": "Shelf"})
+    assert moved.json()["path"] == "Shelf/Idea.md"
+    made = cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "shelf", "name": "Hunch"}).json()
+    assert made == {"path": "Shelf/Hunch.md"}
     sent = cmd.post("/api/command/send", json={
         "campaign": "Strahd", "name": "Fire Drake", "text": "Breathes fire.", "source": "file:///b.pdf#page=3",
     }).json()

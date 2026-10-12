@@ -208,6 +208,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     def campaign_path(name: str) -> Path:
         return vault.campaign_dir(root(), name)
 
+    def shelf_or(campaign: Path, folder: str) -> str:
+        """``folder``, or the shelf as it is on disk — made on first use,
+        since a campaign started by hand has none."""
+        if folder.casefold() == prep.SHELF.casefold():
+            return prep.reserved_folder(campaign, prep.SHELF)
+        return folder
+
     # -- settings ----------------------------------------------------------
 
     @router.get("/settings")
@@ -327,9 +334,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     def create_note(body: NoteCreate):
         camp = campaign_path(body.campaign)
         with write_lock:
-            # The shelf is made on first use: a campaign started by hand has none.
-            folder = prep.reserved_folder(camp, prep.SHELF) if body.folder.casefold() == prep.SHELF.casefold() else body.folder
-            return {"path": vault.create_note(camp, folder, body.name, body.content)}
+            return {"path": vault.create_note(camp, shelf_or(camp, body.folder), body.name, body.content)}
 
     @router.post("/notes/copy")
     def copy_note(body: CopyIn):
@@ -363,8 +368,9 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.post("/notes/move")
     def move_note(body: NoteMove):
+        camp = campaign_path(body.campaign)
         with write_lock:
-            path, rewritten = vault.move_note(campaign_path(body.campaign), body.path, body.folder)
+            path, rewritten = vault.move_note(camp, body.path, shelf_or(camp, body.folder))
             moved = live.remap(body.campaign, lambda p: path if p == body.path else p)
         announce(moved)
         return {"path": path, "rewritten": rewritten}
