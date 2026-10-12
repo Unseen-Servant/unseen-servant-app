@@ -1,7 +1,7 @@
 # Command — design
 
 **Date:** 2026-10-11
-**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11, phase 3 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
+**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11, phases 3 and 4 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
 **Objective:** specify Command, the workstation's second tool (architecture doc §6 Step 4), before any code: what the vault looks like on disk, how sessions work, what Prep and Play show, and where each piece lives across the three layers.
 
 ---
@@ -100,6 +100,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
 | `beats` | session | ordered list of links: the session's plan |
 | `date` | session | the session's date; sessions are ordered by it (ties by name) |
 | `spent` | any note | the date it was spent; absent means unspent |
+| `source` | a note sent from Legend Lore | the PDF page it came from, as a `file://` URL with `#page=N` (§8) |
 
 ```yaml
 ---
@@ -281,6 +282,20 @@ Play renders notes with `svelte-exmarkdown` (already a dependency) plus a wikili
 - **MCP tools** in `mcp_server.py`, over the Command routes (D5). A starting list: campaigns, current session (plan and log), live set (with note bodies), read note, find notes, create a note in a track, add to the live set, spend. The Servant gets exactly these.
 - **Send to Command** from a Legend Lore hit creates a note in a chosen track: in the active campaign, or from phase 5 in the Library. The note holds the quoted text and a `source` pointing at the PDF and page; in Play, its card opens Legend Lore at that page. Routed through Rust (D4: no drag and drop across windows).
 
+*As built (phase 4, 2026-10-12):*
+
+- **The active campaign reaches the sidecar.** Rust pushes `{seq, campaign, session}` to `PUT /command/context` on every change (`app_context.rs`) and whenever the event relay connects, since a restarted sidecar knows nothing. The newest `seq` wins. MCP tools act on that campaign unless given `campaign=`, and on its open session, else the latest.
+- **The tools** are `list_campaigns`, `current_session` (plan with each beat's notes, what's live, the log), `live_set` (each live note's full text), `read_note` and `find_notes` (by name or text), `create_note` (into a track only), `add_to_live_set` and `spend` (logged in the open session).
+  - Notes are named as a wikilink names them. An ambiguous name asks for the path.
+  - With the app closed, they say so instead of "nothing open".
+  - The server introduces itself as *Unseen Servant* now that it serves both tools. The Claude Desktop config key is unchanged, so no migration is needed.
+  - A real stdio MCP client lists all fourteen tools.
+- **Send to Command** is a submenu on a search hit's menu (beside *Collection*), listing the open campaign's tracks. With no campaign open, it says so.
+  - Legend Lore calls `command_send_targets` and `command_send` in Rust and nothing else of Command.
+  - The note is named after the section's heading, with characters a name can't hold dropped and a clash numbered. It holds the section's text, then a link back citing book and printed pages.
+  - Its `source` is the PDF page's `file://` URL: clickable in Obsidian, and machine-specific, like the library it points into.
+- **Opening the source.** "Opens Legend Lore at that page" became opening the PDF at that page in the system viewer, which is what Legend Lore does with a hit, since Legend Lore has no viewer of its own. It's reachable from a book key on the card, *Open source* in the card's menu, and `[source]` in the editor's head (in Prep too).
+
 ---
 
 ## 9. Phases
@@ -294,7 +309,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 | 2 | Beats and sessions — **done 2026-10-11** | `Beats/`, the launcher column, arming and membership, sessions, plan order, `[new session]` carry-forward, spent | pytest: carry-forward rules; `notes`, `beats` and `spent` round trips |
 | 3 | Play — **done 2026-10-12** | the session board (read and write JSON Canvas, path rewriting, carry-forward; Svelte Flow surface with move, resize, connect, auto-place), live state and its persistence, launch, stop, capture, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian; a board arranged in Command opens in Obsidian Canvas, and one written by Obsidian round-trips byte for byte |
 | 3b | Images | `![[map.png]]` embeds on cards: the asset protocol scoped at runtime to the campaigns folder, embeds resolved by name. The CSP already allows `asset:` images | a map embedded in a note shows on its card |
-| 4 | Cross-tool | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
+| 4 | Cross-tool — **done 2026-10-12** | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
 | 5 | Library | `Library/` reserved, campaign-first resolution, the Library's grid and its group in campaign columns, *Copy to campaign*, renames across campaigns (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
 
 ---
