@@ -50,6 +50,8 @@
   let switcherFor: 'campaign' | 'session' | null = null;
   /** The campaign key is the name field: the pen or Rename. */
   let renaming = false;
+  /** The session key is the name field: its menu's Rename. */
+  let renamingSession = false;
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
   let unlistenLive: Promise<UnlistenFn> | null = null;
@@ -428,6 +430,22 @@
     });
   }
 
+  /** The session's note takes the new name, and its board follows it
+   *  (board.follow_rename). The workstation holds the session by name, so
+   *  it's pointed at the new one too, or the index would fall back to the
+   *  latest session. */
+  function renameSession(name: string) {
+    const target = session!;
+    run(async () => {
+      const isOpen = target.path === bufState.path;
+      if (isOpen) await buffer.flush();
+      const moved = await commandApi.renameNote(campaign!, target.path, name);
+      if (isOpen) await buffer.retarget(moved.path);
+      await setSession(moved.path.split('/').pop()!.replace(/\.md$/i, ''));
+      await refreshIndex();
+    });
+  }
+
   function trashSession() {
     const target = session;
     if (!target) return;
@@ -462,6 +480,7 @@
       ...(session
         ? [
             action('Edit session note', () => openPath(session!.path)),
+            action('Rename', () => (renamingSession = true)),
             action('Show in Finder', () => reveal(session!.path)),
             divider,
             action('Move to Trash', trashSession, true),
@@ -685,7 +704,20 @@
           </button>
         {/if}
       </div>
-      {#if campaign}
+      {#if renamingSession && session}
+        <div class="bar-name">
+          <InlineName
+            value={session.name}
+            placeholder="Session name"
+            label="Rename session"
+            onCommit={(name) => {
+              renamingSession = false;
+              renameSession(name);
+            }}
+            onCancel={() => (renamingSession = false)}
+          />
+        </div>
+      {:else if campaign}
         <div class="cap-well">
           {#if session}
             {@const current = session}
