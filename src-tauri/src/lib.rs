@@ -10,6 +10,7 @@ use tauri::{Emitter, Manager};
 mod app_context;
 mod boot;
 mod command;
+mod file_menu;
 mod legend_lore;
 mod panels;
 mod sse;
@@ -601,6 +602,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .on_menu_event(|app, event| file_menu::on_event(app, event.id().as_ref()))
         .invoke_handler(tauri::generate_handler![
             legend_lore::select_folder,
             legend_lore::list_files,
@@ -692,6 +694,11 @@ pub fn run() {
             app.manage(boot::BootState::new());
             app.manage(app_context::AppContext::default());
             app.manage(panels::PoppedPanels::default());
+            // Losing the File menu is no reason not to start: log it.
+            #[cfg(target_os = "macos")]
+            if let Err(e) = file_menu::install(app.handle()) {
+                eprintln!("Could not build the File menu: {}", e);
+            }
 
             // The splash draws its own rounded corners on a transparent window.
             // macOS shapes the shadow to them; Windows would frame the square

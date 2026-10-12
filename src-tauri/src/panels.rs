@@ -14,6 +14,8 @@ use std::sync::{Mutex, PoisonError};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub const CHANGED_EVENT: &str = "panels://changed";
+/// To the main window: select this panel's tab (`show_panel`).
+pub const SHOW_EVENT: &str = "panels://show";
 const LABEL_PREFIX: &str = "panel-";
 
 struct PanelSpec {
@@ -156,6 +158,18 @@ pub fn dock_panel(app: AppHandle, id: String) -> Result<(), String> {
     }
     crate::show_tool_window(&app);
     Ok(())
+}
+
+/// Bring a panel to the GM: its own window when it's out, else the main
+/// window with the panel's tab selected (PanelHost follows `SHOW_EVENT`).
+pub fn show_panel(app: &AppHandle, id: &str) {
+    if let Some(window) = app.get_webview_window(&label_of(id)) {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return;
+    }
+    crate::show_tool_window(app);
+    let _ = app.emit_to("main", SHOW_EVENT, id);
 }
 
 /// Called for every destroyed window; docks the panel if it was a pop-out.

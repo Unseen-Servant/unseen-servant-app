@@ -34,7 +34,7 @@ const RETRY_MAX: Duration = Duration::from_secs(10);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CommandSettings {
-    root: Option<String>,
+    pub(crate) root: Option<String>,
     /// Launching a beat marks it spent (design §4).
     #[serde(default)]
     spend_on_launch: bool,
@@ -804,6 +804,10 @@ async fn relay(app: &AppHandle) -> Result<(), String> {
             match event["type"].as_str() {
                 Some("vault") => {
                     let _ = app.emit(VAULT_EVENT, &event);
+                    // No campaign named: the list itself may have changed.
+                    if event["campaign"].is_null() {
+                        crate::file_menu::spawn_refresh(app);
+                    }
                 }
                 Some("live") => {
                     let _ = app.emit(LIVE_EVENT, &event);

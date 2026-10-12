@@ -116,6 +116,7 @@ where
     let campaign = then().await?;
     if let Some(switched) = state.set_campaign(campaign.clone()) {
         broadcast(app, Some(switched.snap));
+        crate::file_menu::spawn_refresh(app);
         if let Some(left) = switched.left {
             crate::command::discard_if_blank(&left).await;
         }
