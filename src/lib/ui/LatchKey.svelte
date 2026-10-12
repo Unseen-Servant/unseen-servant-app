@@ -4,7 +4,9 @@
   // (a view, not a mode). The LED under the icon is the only purple.
   export let open: boolean = false;
   export let lit: boolean = false;
-  // A key with nothing to report goes without the lamp (Command's shelf).
+  // A key with nothing to report has its lamp removed (Command's shelf): the
+  // slot keeps its place, so the icon sits where every latch's does, but
+  // nothing is fitted in it.
   export let lamp: boolean = true;
   export let title: string;
   export let label: string;
@@ -21,7 +23,7 @@
     aria-pressed={open}
   >
     <slot />
-    {#if lamp}<span class="lamp" class:lit aria-hidden="true"></span>{/if}
+    <span class="lamp" class:lit class:removed={!lamp} aria-hidden="true"></span>
   </button>
 </div>
 
@@ -81,5 +83,15 @@
   .key.open .lamp.lit {
     background: var(--text-active);
     filter: var(--glow-active);
+  }
+  /* Removed: an empty socket. The slot's ring stays, so the key still reads
+     as one that has a lamp, but the key's own surface shows through where
+     the lamp would be — it doesn't apply here. */
+  .key .lamp.removed {
+    background: transparent;
+    outline: 1px solid var(--border-subtle);
+  }
+  .key.open .lamp.removed {
+    outline-color: var(--bg-app);
   }
 </style>
