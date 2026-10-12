@@ -15,6 +15,12 @@ SETTINGS_FILENAME = "command_settings.json"
 SETTINGS_VERSION = 1
 
 
+def default_root() -> Path:
+    """Where campaigns go until the GM picks a folder: Command opens on a
+    campaign at launch, so it can't wait to be told."""
+    return Path.home() / "Unseen Servant"
+
+
 class CommandSettings(BaseModel):
     root: str | None = None
     # Launching a beat marks it spent (design §4); off, spending is by hand.

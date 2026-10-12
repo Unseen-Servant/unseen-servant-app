@@ -308,3 +308,67 @@ def test_the_shelf_is_reserved(root, camp):
     vault.create_campaign(root, "Tomb")
     assert (root / "Tomb" / "Shelf").is_dir()
     assert "Shelf" not in vault.track_order(root / "Tomb")
+
+
+# ---------------------------------------------------------------------------
+# The untitled campaign
+# ---------------------------------------------------------------------------
+
+def test_untitled_names_are_the_ones_command_gives():
+    assert vault.is_untitled("Untitled") and vault.is_untitled("Untitled 12")
+    for name in ("untitled", "Untitled 0", "Untitled 2a", "Untitled Tomb", "My Untitled"):
+        assert not vault.is_untitled(name)
+
+
+def test_open_untitled_makes_one_then_reuses_it_while_blank(root):
+    assert vault.open_untitled(root) == "Untitled"
+    assert vault.track_order(root / "Untitled") == list(vault.DEFAULT_TRACKS)
+    (root / "Untitled" / "NPCs" / ".DS_Store").write_bytes(b"")
+    assert vault.open_untitled(root) == "Untitled"
+
+
+def test_open_untitled_passes_over_one_in_use_and_a_file_in_the_way(root):
+    vault.open_untitled(root)
+    write(root / "Untitled" / "NPCs" / "Ismark.md", "")
+    (root / "Untitled 2").write_text("a file, not a campaign")
+    assert vault.open_untitled(root) == "Untitled 3"
+
+
+def test_open_untitled_reuses_the_lowest_blank_one(root):
+    for name in ("Untitled", "Untitled 2", "Untitled 10"):
+        vault.create_campaign(root, name)
+    write(root / "Untitled" / "Beats" / "Ambush.md", "")
+    assert vault.open_untitled(root) == "Untitled 2"
+
+
+def test_blank_means_nothing_the_gm_made(root):
+    vault.open_untitled(root)
+    camp = root / "Untitled"
+    assert vault.is_blank(camp)
+    vault.create_track(camp, "Factions")  # a folder, and the order file
+    assert vault.is_blank(camp)
+    write(camp / ".obsidian" / "app.json", "{}")
+    assert not vault.is_blank(camp)
+
+
+def test_a_symlink_is_not_blank(root, tmp_path):
+    vault.open_untitled(root)
+    (tmp_path / "elsewhere").mkdir()
+    (root / "Untitled" / "Linked").symlink_to(tmp_path / "elsewhere", target_is_directory=True)
+    assert not vault.is_blank(root / "Untitled")
+
+
+def test_discard_removes_a_blank_untitled_and_nothing_else(root):
+    vault.open_untitled(root)
+    (root / "Untitled" / "PCs" / ".DS_Store").write_bytes(b"")
+    assert vault.discard_if_blank(root, "Untitled")
+    assert not (root / "Untitled").exists()
+    assert not vault.discard_if_blank(root, "Untitled")  # already gone
+
+    vault.create_campaign(root, "Tomb")  # named, and just as empty
+    assert not vault.discard_if_blank(root, "Tomb")
+    vault.open_untitled(root)
+    write(root / "Untitled" / "Shelf" / "Hunch.md", "")
+    assert not vault.discard_if_blank(root, "Untitled")
+    assert (root / "Untitled" / "Shelf" / "Hunch.md").exists()
+    assert sorted(vault.list_campaigns(root)) == ["Tomb", "Untitled"]

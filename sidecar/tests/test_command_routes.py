@@ -314,3 +314,22 @@ def test_the_shelf_over_http(cmd, campaign_root):
     assert cmd.post("/api/command/notes/copy", json={
         "campaign": "Tomb", "from_campaign": "Strahd", "path": "Shelf/Idea.md",
     }).status_code == 409
+
+
+def test_untitled_takes_the_default_folder_when_none_is_set(bare_client, tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    assert bare_client.post("/api/command/untitled").json() == {"name": "Untitled"}
+    root = home / "Unseen Servant"
+    assert (root / "Untitled" / "NPCs").is_dir()
+    assert bare_client.get("/api/command/settings").json()["root"] == str(root)
+    assert load_settings(tmp_path).root == str(root)
+
+
+def test_untitled_and_discard_over_http(cmd, campaign_root):
+    assert cmd.post("/api/command/untitled").json() == {"name": "Untitled"}
+    assert cmd.post("/api/command/untitled").json() == {"name": "Untitled"}
+    assert cmd.post("/api/command/campaigns/discard", json={"name": "Strahd"}).json() == {"removed": False}
+    assert cmd.post("/api/command/campaigns/discard", json={"name": "Untitled"}).json() == {"removed": True}
+    assert cmd.get("/api/command/campaigns").json() == {"campaigns": ["Strahd"]}

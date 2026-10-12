@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from . import board, log, prep, vault
 from .events import VaultWatcher
 from .live import LiveSets
-from .settings import load_settings, save_settings
+from .settings import default_root, load_settings, save_settings
 
 
 class SettingsUpdate(BaseModel):
@@ -35,6 +35,10 @@ class CampaignCreate(BaseModel):
 class CampaignRename(BaseModel):
     name: str
     new_name: str
+
+
+class CampaignName(BaseModel):
+    name: str
 
 
 class TrackCreate(BaseModel):
@@ -278,6 +282,30 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     def create_campaign(body: CampaignCreate):
         with write_lock:
             return {"name": vault.create_campaign(root(), body.name)}
+
+    @router.post("/untitled")
+    def open_untitled():
+        """A blank untitled campaign to open (``vault.open_untitled``). With no
+        campaign folder chosen yet, the default one becomes it."""
+        with write_lock:
+            before = state["settings"]
+            if not before.root:
+                path = default_root()
+                path.mkdir(parents=True, exist_ok=True)
+                settings = before.model_copy(update={"root": str(path)})
+                save_settings(data_dir, settings)
+                state["settings"] = settings
+            name = vault.open_untitled(root())
+        if state["settings"].root != before.root:
+            watcher.root_changed()
+        return {"name": name}
+
+    @router.post("/campaigns/discard")
+    def discard_campaign(body: CampaignName):
+        """Remove ``name`` if it's an untitled campaign left blank. Rust asks
+        whenever the GM leaves a campaign, and on quitting."""
+        with write_lock:
+            return {"removed": vault.discard_if_blank(root(), body.name)}
 
     @router.post("/campaigns/rename")
     def rename_campaign(body: CampaignRename):

@@ -363,6 +363,86 @@ def create_campaign(root: Path, name: str) -> str:
     return name
 
 
+# -- the untitled campaign ---------------------------------------------------
+# Command opens on a blank campaign named Untitled, as Live opens on an empty
+# set. It is a real folder from the start, so every route works on it; the
+# name is what marks it, and leaving it blank removes it again.
+
+UNTITLED = "Untitled"
+_UNTITLED = re.compile(r"Untitled(?: ([1-9][0-9]*))?")
+# Finder's file, which appears in any folder it has shown.
+_FINDER_FILE = ".DS_Store"
+
+
+def is_untitled(name: str) -> bool:
+    """``Untitled``, or ``Untitled 2`` and on: the names Command gives."""
+    return _UNTITLED.fullmatch(name) is not None
+
+
+def _untitled_number(name: str) -> int:
+    match = _UNTITLED.fullmatch(name)
+    return int(match.group(1) or 1) if match else 0
+
+
+def _litter(campaign: Path, path: Path) -> bool:
+    """A file that doesn't make a campaign the GM's: Finder's, or Command's
+    own track order."""
+    return path.name == _FINDER_FILE or path == _presentation_path(campaign)
+
+
+def is_blank(campaign: Path) -> bool:
+    """Nothing the GM made: only folders and litter. A symlink counts as
+    something, since removal won't follow it."""
+    for dirpath, dirnames, filenames in os.walk(campaign):
+        here = Path(dirpath)
+        if any((here / d).is_symlink() for d in dirnames):
+            return False
+        if not all(_litter(campaign, here / f) for f in filenames):
+            return False
+    return True
+
+
+def open_untitled(root: Path) -> str:
+    """A blank untitled campaign to open: the first one already there (a
+    crash can leave one), else a new one under the first free name."""
+    untitled = sorted((c for c in list_campaigns(root) if is_untitled(c)), key=_untitled_number)
+    for name in untitled:
+        if is_blank(root / name):
+            return name
+    number = 1
+    while True:
+        name = UNTITLED if number == 1 else f"{UNTITLED} {number}"
+        # A file blocks the name as well as a campaign does: mkdir would fail.
+        if not any(p.name.casefold() == name.casefold() for p in root.iterdir()):
+            return create_campaign(root, name)
+        number += 1
+
+
+def discard_if_blank(root: Path, name: str) -> bool:
+    """Remove an untitled campaign the GM left blank. A named campaign stays
+    however empty, and so does anything with a note in it. Only litter is
+    unlinked and only empty folders removed, so a note that lands while this
+    runs stops it rather than going with it."""
+    if not is_untitled(name):
+        return False
+    try:
+        campaign = campaign_dir(root, name)
+    except VaultError:
+        return False
+    if not is_blank(campaign):
+        return False
+    try:
+        for dirpath, _dirnames, filenames in os.walk(campaign, topdown=False):
+            here = Path(dirpath)
+            for f in filenames:
+                if _litter(campaign, here / f):
+                    (here / f).unlink()
+            here.rmdir()
+    except OSError:
+        return False
+    return True
+
+
 def create_track(campaign: Path, name: str) -> str:
     name = validate_name(name)
     if _is_reserved(name):
