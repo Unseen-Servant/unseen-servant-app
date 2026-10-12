@@ -38,6 +38,9 @@
   /** What a rename, move, spend or trash needs of a note or a beat. */
   type Named = { name: string; path: string };
 
+  /** A note's name: its file's, without folders or `.md`. */
+  const stem = (path: string) => path.split('/').pop()!.replace(/\.md$/i, '');
+
   let settings: CommandSettings | null = null;
   let campaigns: string[] = [];
   /** The open campaign: `index` and the buffer both belong to it. */
@@ -50,8 +53,8 @@
   let switcherFor: 'campaign' | 'session' | null = null;
   /** The campaign key is the name field: the pen or Rename. */
   let renaming = false;
-  /** The session key is the name field: its menu's Rename. */
-  let renamingSession = false;
+  /** The open note's title is its name field. */
+  let renamingOpen = false;
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
   let unlistenLive: Promise<UnlistenFn> | null = null;
@@ -93,6 +96,8 @@
   $: cols = index ? columns(index) : ([] as Column[]);
   $: nameSet = new Set((index?.notes ?? []).map((n) => n.name.toLowerCase()));
   $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
+  $: openName = openEntry?.name ?? (bufState.path ? stem(bufState.path) : '');
+  $: renamable = bufState.status !== 'conflict' && bufState.status !== 'unreadable';
   $: session = index ? activeSession(index, $appContext.session) : null;
   $: rows = index ? planRows(index, session) : [];
   $: spare = index ? unscheduled(index, session) : [];
@@ -295,19 +300,25 @@
     });
   }
 
-  function retargetSelection(from: string, to: string) {
-    if (selectedBeat === from) selectedBeat = to;
-    if (armedBeat === from) armedBeat = to;
-  }
-
+  /** Any note: a track's, the shelf's, a beat, a session. The sidecar
+   *  rewrites links to it and moves a session's board along. The workstation
+   *  holds the active session by name, so renaming that one points it at the
+   *  new name, or the index would fall back to the latest session. */
   function renameNote(note: Named, name: string) {
+    const isSession = note.path === session?.path;
     run(async () => {
+      // A selected or armed beat is pointed at its new path only once the
+      // index holds it: before that, the guard on a beat that left clears it.
+      const wasSelected = selectedBeat === note.path;
+      const wasArmed = armedBeat === note.path;
       const isOpen = note.path === bufState.path;
       if (isOpen) await buffer.flush();
       const moved = await commandApi.renameNote(campaign!, note.path, name);
-      retargetSelection(note.path, moved.path);
       if (isOpen) await buffer.retarget(moved.path);
+      if (isSession) await setSession(stem(moved.path));
       await refreshIndex();
+      if (wasSelected) selectedBeat = moved.path;
+      if (wasArmed) armedBeat = moved.path;
     });
   }
 
@@ -430,22 +441,6 @@
     });
   }
 
-  /** The session's note takes the new name, and its board follows it
-   *  (board.follow_rename). The workstation holds the session by name, so
-   *  it's pointed at the new one too, or the index would fall back to the
-   *  latest session. */
-  function renameSession(name: string) {
-    const target = session!;
-    run(async () => {
-      const isOpen = target.path === bufState.path;
-      if (isOpen) await buffer.flush();
-      const moved = await commandApi.renameNote(campaign!, target.path, name);
-      if (isOpen) await buffer.retarget(moved.path);
-      await setSession(moved.path.split('/').pop()!.replace(/\.md$/i, ''));
-      await refreshIndex();
-    });
-  }
-
   function trashSession() {
     const target = session;
     if (!target) return;
@@ -480,7 +475,6 @@
       ...(session
         ? [
             action('Edit session note', () => openPath(session!.path)),
-            action('Rename', () => (renamingSession = true)),
             action('Show in Finder', () => reveal(session!.path)),
             divider,
             action('Move to Trash', trashSession, true),
@@ -704,20 +698,7 @@
           </button>
         {/if}
       </div>
-      {#if renamingSession && session}
-        <div class="bar-name">
-          <InlineName
-            value={session.name}
-            placeholder="Session name"
-            label="Rename session"
-            onCommit={(name) => {
-              renamingSession = false;
-              renameSession(name);
-            }}
-            onCancel={() => (renamingSession = false)}
-          />
-        </div>
-      {:else if campaign}
+      {#if campaign}
         <div class="cap-well">
           {#if session}
             {@const current = session}
@@ -880,7 +861,32 @@
         <aside class="inspector" class:closed={bufState.status === 'empty'}>
           {#if bufState.status !== 'empty'}
             <div class="inspector-head">
-              <span class="note-name">{openEntry?.name ?? bufState.path?.split('/').pop()?.replace(/\.md$/, '')}</span>
+              <!-- The title is the note's name field, as Obsidian's inline title:
+                   any note renames here, a beat or a session included. Not
+                   while the disk and the editor disagree. -->
+              {#if renamingOpen && bufState.path}
+                {@const path = bufState.path}
+                <div class="note-name-field">
+                  <InlineName
+                    value={openName}
+                    placeholder="Note name"
+                    label="Rename note"
+                    onCommit={(name) => {
+                      renamingOpen = false;
+                      renameNote({ name: openName, path }, name);
+                    }}
+                    onCancel={() => (renamingOpen = false)}
+                  />
+                </div>
+              {:else}
+                <button
+                  type="button"
+                  class="note-name"
+                  title="Rename"
+                  disabled={!renamable}
+                  on:click={() => (renamingOpen = true)}
+                >{openName}</button>
+              {/if}
               {#if openEntry?.track}
                 <span class="crumb">{[openEntry.track, openEntry.group].filter(Boolean).join(' › ')}</span>
               {/if}
@@ -1227,13 +1233,42 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  /* The pad and its negative margin let the hover fill reach past the
+     letters while the name stays put. */
   .note-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-left: -0.3rem;
+    padding: 0 0.3rem;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
     font-family: var(--font-heading);
     font-size: 1.1rem;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: text;
+    transition: background var(--transition-fast);
+  }
+
+  .note-name:hover:not(:disabled) {
+    background: var(--bg-focused);
+  }
+
+  .note-name:disabled {
+    cursor: default;
+  }
+
+  /* Pulled left by the field's own padding, so the name's text doesn't move
+     when the title becomes the field. */
+  .note-name-field {
+    flex: 1;
+    min-width: 0;
+    max-width: 22rem;
+    margin-left: -0.35rem;
+    font-size: 1rem;
   }
 
   .crumb {
