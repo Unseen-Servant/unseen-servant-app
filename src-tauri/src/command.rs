@@ -380,6 +380,26 @@ pub async fn command_rename_track(
     .await
 }
 
+/// Save the order of the campaign's tracks, by name, as the GM drags their
+/// columns. Returns the tracks in their order after.
+#[tauri::command]
+pub async fn command_order_tracks(
+    campaign: String,
+    order: Vec<String>,
+) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct Tracks {
+        tracks: Vec<String>,
+    }
+    answer::<Tracks>(
+        client()
+            .put(api("/tracks/order"))
+            .json(&serde_json::json!({ "campaign": campaign, "order": order })),
+    )
+    .await
+    .map(|t| t.tracks)
+}
+
 #[tauri::command]
 pub async fn command_read_note(campaign: String, path: String) -> Result<Note, String> {
     answer(client().get(api_query(

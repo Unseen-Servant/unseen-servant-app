@@ -115,6 +115,12 @@ def test_track_order_survives_a_corrupt_presentation_file(camp):
     assert vault.track_order(camp) == ["Locations", "NPCs"]
 
 
+def test_saving_the_track_order_answers_with_the_tracks_on_disk(camp):
+    write(camp / ".unseen" / "command.json", json.dumps({"version": 1, "beats": ["Ambush"]}))
+    assert vault.save_track_order(camp, ["Locations", "Gone"]) == ["Locations", "NPCs"]
+    assert vault.beat_order(camp) == ["Ambush"]
+
+
 def test_saving_the_beat_order_keeps_the_track_order(camp):
     write(camp / ".unseen" / "command.json", json.dumps({"version": 1, "tracks": ["NPCs", "Locations"]}))
     vault.save_beat_order(camp, ["Ambush"])

@@ -22,7 +22,10 @@ from pathlib import Path, PurePosixPath
 
 from . import canvas
 
-DEFAULT_TRACKS = ("PCs", "NPCs", "Locations", "Secrets", "Monsters", "Treasures")
+# In the order a GM thinks through prep (the Lazy DM's checklist): the
+# characters, what they could learn, where, from whom, what stands in the
+# way, and what they win. Strong start and scenes are beats.
+DEFAULT_TRACKS = ("PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures")
 # Beats, sessions, and the shelf of gathered material (design §3.6).
 RESERVED = ("Beats", "Sessions", "Shelf")
 PRESENTATION_DIR = ".unseen"
@@ -220,6 +223,13 @@ def beat_order(campaign: Path) -> list[str]:
 def save_beat_order(campaign: Path, names: list[str]) -> list[str]:
     _save_list(campaign, "beats", names)
     return names
+
+
+def save_track_order(campaign: Path, names: list[str]) -> list[str]:
+    """The track order the GM dragged into. Names with no track folder are
+    dropped; tracks it doesn't name follow (``track_order``)."""
+    _save_order(campaign, names)
+    return track_order(campaign)
 
 
 def track_order(campaign: Path) -> list[str]:

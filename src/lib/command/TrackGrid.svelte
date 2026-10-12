@@ -4,7 +4,9 @@
   // and a double-click opens it; while a beat is armed, the click also puts
   // it in the beat or takes it out. Right-click for rename, spent, move and
   // trash. The ghost rows at the foot of each column and the
-  // end of the grid name a new note or track in place.
+  // end of the grid name a new note or track in place. A column's nameplate
+  // drags to reorder the tracks and renames on a double-click, as a
+  // collection's row does in Legend Lore.
   //
   // Each row's slot reads the session at a glance: a parchment dot for a
   // note in the selected beat, a ring for one some other planned beat holds.
@@ -41,6 +43,8 @@
   export let onRenameTrack: (track: string, name: string) => void;
   export let onTrashTrack: (column: Column) => void;
   export let onRevealTrack: (track: string) => void;
+  /** The tracks by name, in the order they were dragged into. */
+  export let onReorderTracks: (order: string[]) => void;
 
   let creatingIn: string | null = null;
   let creatingTrack = false;
@@ -73,6 +77,61 @@
     };
   }
 
+  // -- dragging a column, as Legend Lore's collections reorder ------------
+  //
+  // Only the nameplate starts it; rows drag notes. Over a column, the
+  // pointer's half picks the side the track lands on; over + track, the end.
+  const TRACK_MIME = 'application/x-command-track';
+  const isTrackDrag = (e: DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === TRACK_MIME);
+
+  let draggingTrack: string | null = null;
+  /** Where the dragged track lands: before column `dropAt`, or after the last. */
+  let dropAt: number | null = null;
+  let hoveredTrack: string | null = null;
+
+  function startTrackDrag(e: DragEvent, track: string) {
+    draggingTrack = track;
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(TRACK_MIME, track);
+  }
+
+  // A drag delivers no pointerleave: unlatch, as Legend Lore's panel does.
+  function endTrackDrag() {
+    draggingTrack = null;
+    dropAt = null;
+    hoveredTrack = null;
+  }
+
+  function overColumn(e: DragEvent, i: number) {
+    if (!draggingTrack || !isTrackDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (i === cols.length) {
+      dropAt = i;
+      return;
+    }
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    dropAt = e.clientX >= box.left + box.width / 2 ? i + 1 : i;
+  }
+
+  function dropTrack(e: DragEvent) {
+    if (!draggingTrack || !isTrackDrag(e) || dropAt === null) return;
+    e.preventDefault();
+    const order = cols.map((c) => c.track);
+    const from = order.indexOf(draggingTrack);
+    const to = dropAt > from ? dropAt - 1 : dropAt;
+    endTrackDrag();
+    if (from < 0 || to === from) return;
+    order.splice(to, 0, ...order.splice(from, 1));
+    onReorderTracks(order);
+  }
+
+  function leaveGrid(e: DragEvent) {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) dropAt = null;
+  }
+
   function trackMenu(e: MouseEvent, column: Column) {
     menu = {
       x: e.clientX,
@@ -88,10 +147,30 @@
   }
 </script>
 
-<div class="grid">
-  {#each cols as column (column.track)}
-    <section class="column" aria-label={column.track}>
-      <header class="nameplate">
+<div class="grid" role="presentation" on:dragleave={leaveGrid}>
+  {#each cols as column, i (column.track)}
+    <section
+      class="column"
+      class:dragging={draggingTrack === column.track}
+      class:drop-before={dropAt === i}
+      class:drop-after={dropAt === cols.length && i === cols.length - 1}
+      aria-label={column.track}
+      on:dragover={(e) => overColumn(e, i)}
+      on:drop={dropTrack}
+    >
+      <header
+        class="nameplate"
+        class:hovered={$hoverLive && hoveredTrack === column.track}
+        draggable={renamingTrack !== column.track}
+        on:dragstart={(e) => startTrackDrag(e, column.track)}
+        on:dragend={endTrackDrag}
+        on:pointerenter={() => (hoveredTrack = column.track)}
+        on:pointerleave={() => {
+          if (hoveredTrack === column.track) hoveredTrack = null;
+        }}
+        role="presentation"
+      >
+        <span class="grip" aria-hidden="true">⠿</span>
         {#if renamingTrack === column.track}
           <InlineName
             value={column.track}
@@ -107,8 +186,8 @@
           <button
             type="button"
             class="track-name ledger-label"
-            title={`${column.track} — rename, reveal or trash`}
-            on:click={(e) => trackMenu(e, column)}
+            title={`${column.track} — drag to reorder, double-click to rename`}
+            on:dblclick={() => (renamingTrack = column.track)}
             on:contextmenu|preventDefault={(e) => trackMenu(e, column)}
           >
             {column.track}
@@ -200,7 +279,7 @@
     </section>
   {/each}
 
-  <section class="column ghost-column" aria-label="New track">
+  <section class="column ghost-column" aria-label="New track" on:dragover={(e) => overColumn(e, cols.length)} on:drop={dropTrack}>
     <header class="nameplate">
       {#if creatingTrack}
         <InlineName
@@ -232,13 +311,15 @@
     overflow-y: hidden;
   }
 
-  /* Tracks are one width, as on a console: long names ellipsize rather
-     than widening their column (min-width: 0 overrides the flex item's
-     min-content floor, which nowrap rows would otherwise set). */
+  /* Tracks are one width, as on a console, whether the shelf is open or
+     not: the grid scrolls rather than squeezing or stretching them. Long
+     names ellipsize rather than widening their column (min-width: 0
+     overrides the flex item's min-content floor, which nowrap rows would
+     otherwise set). */
   .column {
-    flex: 1 0 8.5rem;
+    position: relative;
+    flex: 0 0 10rem;
     min-width: 0;
-    max-width: 16rem;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -248,6 +329,32 @@
   .ghost-column {
     flex: 0 0 5.5rem;
     border-right: none;
+  }
+
+  /* Legend Lore's drop line (CollectionsPanel .drop-before), turned on its
+     side: 2px of parchment on the edge the track lands at. Drawn over the
+     nameplate's plate, which an inset shadow would sit under. */
+  .column.dragging {
+    opacity: 0.4;
+  }
+
+  .column.drop-before::after,
+  .column.drop-after::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--text-accent);
+    pointer-events: none;
+  }
+
+  .column.drop-before::after {
+    left: 0;
+  }
+
+  .column.drop-after::after {
+    right: 0;
   }
 
   /* The module nameplate: flat container plate, ledger-label voice.
@@ -264,6 +371,23 @@
     padding: 0.4rem 0.6rem 0.3rem;
     background: var(--bg-container);
     border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* Legend Lore's drag grip (CollectionsPanel .grip), fading in on the
+     hovered plate. Its slot stays, so names don't move under the pointer. */
+  .grip {
+    width: 0.55rem;
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    font-size: 0.7rem;
+    letter-spacing: -0.05em;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    cursor: grab;
+  }
+
+  .nameplate.hovered .grip {
+    opacity: 1;
   }
 
   .track-name {

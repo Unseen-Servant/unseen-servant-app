@@ -55,7 +55,7 @@ def test_settings_change_only_the_fields_sent(bare_client, campaign_root, tmp_pa
 def test_campaign_round_trip(cmd, campaign_root):
     assert cmd.get("/api/command/campaigns").json() == {"campaigns": ["Strahd"]}
     index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
-    assert index["tracks"] == ["PCs", "NPCs", "Locations", "Secrets", "Monsters", "Treasures"]
+    assert index["tracks"] == ["PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures"]
     assert index["notes"] == []
     assert cmd.post("/api/command/campaigns", json={"name": "strahd"}).status_code == 409
     assert cmd.get("/api/command/campaign", params={"name": "Nope"}).status_code == 404
@@ -144,6 +144,14 @@ def test_beat_order_over_http(cmd):
     }).json() == {"order": ["Tser Pool", "Ambush"]}
     index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
     assert [b["name"] for b in index["beats"]] == ["Tser Pool", "Ambush"]
+
+
+def test_track_order_over_http(cmd):
+    assert cmd.put("/api/command/tracks/order", json={
+        "campaign": "Strahd", "order": ["Monsters", "PCs"],
+    }).json()["tracks"] == ["Monsters", "PCs", "Locations", "NPCs", "Secrets", "Traps", "Treasures"]
+    index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert index["tracks"][:2] == ["Monsters", "PCs"]
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +296,7 @@ def test_the_context_keeps_the_newest_push(cmd):
 
 
 def test_tracks_find_and_send_over_http(cmd):
-    assert cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()["tracks"][:2] == ["PCs", "NPCs"]
+    assert cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()["tracks"][:2] == ["PCs", "Secrets"]
     made = cmd.post("/api/command/notes", json={
         "campaign": "Strahd", "folder": "NPCs", "name": "Ismark", "content": "Brother of Ireena.\n",
     }).json()

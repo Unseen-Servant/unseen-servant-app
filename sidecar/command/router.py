@@ -52,6 +52,11 @@ class TrackRename(BaseModel):
     new_name: str
 
 
+class TrackOrder(BaseModel):
+    campaign: str
+    order: list[str]
+
+
 class NoteCreate(BaseModel):
     campaign: str
     folder: str
@@ -348,6 +353,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             )
         announce(moved)
         return {"name": new_name, "rewritten": rewritten}
+
+    @router.put("/tracks/order")
+    def order_tracks(body: TrackOrder):
+        """The order of the tracks, as the GM drags their columns (design
+        §5.1), kept with the campaign's presentation."""
+        with write_lock:
+            return {"tracks": vault.save_track_order(campaign_path(body.campaign), body.order)}
 
     # -- notes -------------------------------------------------------------
 

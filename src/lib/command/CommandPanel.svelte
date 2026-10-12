@@ -567,6 +567,17 @@
     });
   }
 
+  /** The tracks, dragged into a new order. The grid takes it at once, then
+   *  the campaign keeps it (.unseen/command.json). */
+  function orderTracks(order: string[]) {
+    if (!index) return;
+    index = { ...index, tracks: order };
+    run(async () => {
+      await commandApi.orderTracks(campaign!, order);
+      await refreshIndex();
+    });
+  }
+
   function trashTrack(column: Column) {
     run(async () => {
       const confirmed = await confirmPrompt.request({
@@ -920,6 +931,7 @@
             onCreateTrack={createTrack}
             onRenameTrack={renameTrack}
             onTrashTrack={trashTrack}
+            onReorderTracks={orderTracks}
             onRevealTrack={(track) => reveal(track)}
           />
         </div>

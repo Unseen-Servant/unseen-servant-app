@@ -236,8 +236,8 @@
 {/if}
 
 <style>
-  /* Narrow enough that, open, the six default tracks and the launcher
-     still fit at 1280px with the editor closed. */
+  /* Narrow, so it covers few tracks: they keep their width when it opens,
+     and the grid scrolls. */
   .shelf {
     flex: 0 0 11rem;
     min-width: 0;
