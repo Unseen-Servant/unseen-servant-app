@@ -194,7 +194,8 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    border-left: 1px solid var(--border-subtle);
+    /* The shelf's seam on the grid's other side: Legend Lore's dock edge. */
+    border-left: 4px solid var(--border-subtle);
   }
 
   .nameplate {

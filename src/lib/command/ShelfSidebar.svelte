@@ -235,7 +235,9 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    border-right: 1px solid var(--border-subtle);
+    /* Legend Lore's dock seam (.left-dock): the sidebar's plates and the
+       grid's sit side by side in one grey, so a hairline isn't enough. */
+    border-right: 4px solid var(--border-subtle);
   }
 
   /* The grid's nameplate (TrackGrid), so the sidebar reads as one more
