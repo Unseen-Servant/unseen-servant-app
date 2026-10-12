@@ -68,6 +68,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
       Ambush on the road.md              a beat
     Sessions/
       Session 13.md                      a session
+      Session 13.canvas                  its board (§5.2), JSON Canvas
   Library/                               shared across campaigns (§3.6, phase 5)
     NPCs/ Monsters/ …                    tracks, as in a campaign
 ```
@@ -116,6 +117,9 @@ A note's track is the folder it lives in, so a beat carries no per-track keys an
 3. **Optimistic.** Every save carries the path and the content hash it was loaded from. If the file changed on disk since, the sidecar refuses (409) rather than overwriting, and the editor shows the conflict (§7).
 4. **Deletes go to the OS trash**, through the `trash` crate Legend Lore already uses — never an unlink.
 5. **Play state is not written.** The live set, the armed beat and launches live in the sidecar (§6.2). Only spends, the log and captured beats reach disk.
+6. **Boards keep Obsidian's shape.** A session's board (§5.2) is written in Obsidian's own canvas layout: tab-indented, one node per line. Every node, edge and field Command didn't touch is kept, so a board Obsidian wrote comes back byte for byte.
+   - A card names its note by path from the root, as Obsidian does with the root as its vault. A campaign-relative path (a vault opened on the campaign folder) also resolves.
+   - Command's renames and moves rewrite these paths in every `.canvas` in the campaign, as they rewrite links.
 
 ### 3.6 The Library
 
@@ -153,7 +157,7 @@ Prep notes, reminders…
 
 **Lifecycle**
 
-1. **`[new session]`** creates `Sessions/Session N.md` — N one more than the highest number in an existing session's name; renameable afterwards — with `date` set to today, and makes it the active session (`src-tauri/src/app_context.rs`). Its plan starts with the previous session's planned beats that aren't spent, in their order. The previous session is the latest by `date`.
+1. **`[new session]`** creates `Sessions/Session N.md` — N one more than the highest number in an existing session's name; renameable afterwards — with `date` set to today, and makes it the active session (`src-tauri/src/app_context.rs`). Its plan starts with the previous session's planned beats that aren't spent, in their order. The previous session is the latest by `date`. Its board starts as a copy of the previous board, without the cards of spent notes and their connections. Renaming a session renames its board, and trashing a session trashes its board.
 2. **Prep** edits the plan (add, remove, reorder beats) and the beats themselves. Beats in no plan stay in `Beats/` as potential scenes and can be pulled into one.
 3. **Play** appends to the log as things happen: a beat launched (`▶`), a note spent or un-spent, an improvised beat captured, a one-line jot.
 4. **There is no end-of-session state.** A session with a log has been played. The live set persists until something else is launched, so a session that stops on a cliffhanger resumes there.
@@ -179,10 +183,14 @@ Further rules:
 
 ### 5.2 Play
 
-- **The live set** fills the centre: its notes rendered read-only as cards on the vellum surface, grouped and ordered by track. Each card has a spend check.
+- **The board** fills the centre. There is one per session, `Sessions/Session 13.canvas`, in JSON Canvas 1.0, so Obsidian Canvas opens it. It holds the session's notes (the union of its planned beats' notes) plus anything launched, as cards the GM moves, resizes and connects.
+  - *Decided on 2026-10-12: one board per session, not a canvas per beat.* Launching lights cards where they are, as Live's Session View lights clips, instead of swapping the whole surface. A note in three beats is one card. Beats keep owning their notes, so the board holds only placement, size and connections, and can't disagree with a beat about membership.
+- **Cards** render their note read-only on the vellum surface, and a card's size decides how much of the note shows. Each card has a spend check. A note never placed is auto-placed by track beside what the GM arranged, so a board nobody touched still reads; moving the card places it.
+- **Connections** are lines between cards. They mean nothing to Command yet. *Decided on 2026-10-12. What following one could do, like Live's follow actions, comes later.*
+- **At the table the board needs no handling.** Launching frames the live cards. Dragging and connecting are allowed but never required; arranging happens before the session, in Play with nothing launched.
 - **Editing in Play.** Cards are read-only. A card's `[edit]` opens its note in the same right-hand editor as in Prep, closed until asked for, for a quick change mid-session such as Ismark turning hostile.
 - **The arrangement** runs down one side: the session's plan with spent beats ticked, log entries interleaved at the times they happened, and captured beats inserted where they happened. It is the session as played, and the recap for next time.
-- **The compact grid** stays on screen, holding only the session's notes (the union of its planned beats' notes) plus anything launched. Typing widens it to the whole campaign, filtering the grid in place as Legend Lore's @-pick does rather than opening a popover.
+- **Launching what isn't on the board.** Typing outside the editor opens a find line on the board, listing the campaign's matching notes. Launching one puts it on the board, auto-placed. This replaces the compact grid planned before the board, since the board already holds the session's notes.
 - **A jot line** appends a timestamped line to the log.
 
 ### 5.3 Launching
@@ -277,7 +285,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 | 0 | Dev data | `~/Unseen Servant` cleared of the Electron app's `Campaigns/` and `Library/` (moved aside, not deleted) | the root holds only campaigns — **done 2026-10-11**: moved to `~/Unseen Servant (Electron)/`, Misty Vale copied back as the dev fixture |
 | 1 | Vault — **done 2026-10-11** | settings, scan and index, watcher, writer, event relay; the campaign picker; the Prep grid of tracks; the editor; create, rename, move and delete for notes, tracks and campaigns | pytest: scan, link resolution, rename rewriting, byte-preserving round trip, 409 on a stale hash. By hand, with the root open in Obsidian: an edit on either side shows up on the other; a rename in Command updates the links Obsidian shows |
 | 2 | Beats and sessions — **done 2026-10-11** | `Beats/`, the launcher column, arming and membership, sessions, plan order, `[new session]` carry-forward, spent | pytest: carry-forward rules; `notes`, `beats` and `spent` round trips |
-| 3 | Play | live state and its persistence, launch, stop, capture, live-set cards, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian |
+| 3 | Play | the session board (read and write JSON Canvas, path rewriting, carry-forward; Svelte Flow surface with move, resize, connect, auto-place), live state and its persistence, launch, stop, capture, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian; a board arranged in Command opens in Obsidian Canvas, and one written by Obsidian round-trips byte for byte |
 | 3b | Images | `![[map.png]]` embeds on cards: the asset protocol scoped at runtime to the campaigns folder, embeds resolved by name. The CSP already allows `asset:` images | a map embedded in a note shows on its card |
 | 4 | Cross-tool | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
 | 5 | Library | `Library/` reserved, campaign-first resolution, the Library's grid and its group in campaign columns, *Copy to campaign*, renames across campaigns (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
@@ -294,6 +302,8 @@ Settled on 2026-10-11, before phase 3:
 4. **Wording:** "spent" everywhere, beats included: one word for one key.
 5. **Prep and Play:** one panel, and Tab switches between them (§5.3). Two panels only if play at the table asks for them.
 6. **Switchers:** the campaign and session switchers stay in Command's bar (§6.4).
+7. **Play is a board** (2026-10-12): one per session, in JSON Canvas (§5.2). The GM moves, resizes and connects cards, Miro-style.
+8. **Connections are lines** for now (§5.2). Giving them meaning in Play comes later.
 
 Open:
 
