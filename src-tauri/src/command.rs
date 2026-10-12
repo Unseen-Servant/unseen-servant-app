@@ -672,13 +672,14 @@ pub async fn command_send_targets(
     })
 }
 
-/// Keep a Legend Lore hit as a note in a track of the open campaign. The
-/// one crossing between the tools' windows (architecture D4): Legend Lore
-/// asks Rust, and Command hears of the new note from the vault watcher.
+/// Keep a Legend Lore hit as a note in the open campaign: in `track`, or
+/// on its shelf when there's none. The one crossing between the tools'
+/// windows (architecture D4): Legend Lore asks Rust, and Command hears of
+/// the new note from the vault watcher.
 #[tauri::command]
 pub async fn command_send(
     state: tauri::State<'_, AppContext>,
-    track: String,
+    track: Option<String>,
     name: String,
     text: String,
     source: String,
@@ -696,6 +697,21 @@ pub async fn command_send(
         campaign,
         path: sent.path,
     })
+}
+
+/// Copy another campaign's note onto this campaign's shelf. Returns the
+/// copy's path.
+#[tauri::command]
+pub async fn command_copy_note(
+    campaign: String,
+    from_campaign: String,
+    path: String,
+) -> Result<String, String> {
+    answer::<AtPath>(client().post(api("/notes/copy")).json(&serde_json::json!({
+        "campaign": campaign, "from_campaign": from_campaign, "path": path,
+    })))
+    .await
+    .map(|p| p.path)
 }
 
 /// Move a campaign (no `path`), or a note or folder inside one, to the OS
