@@ -630,6 +630,7 @@
       <div class="panel-keys" class:dimmed={mode === 'play'} inert={mode === 'play'}>
         <LatchKey
           open={shelfOpen}
+          lamp={false}
           title={(shelfOpen ? 'Hide the shelf' : 'Show the shelf') + chordHint('sidebar.toggle')}
           label="Toggle the shelf"
           onClick={() => (shelfOpen = !shelfOpen)}

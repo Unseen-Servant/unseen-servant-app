@@ -4,6 +4,8 @@
   // (a view, not a mode). The LED under the icon is the only purple.
   export let open: boolean = false;
   export let lit: boolean = false;
+  // A key with nothing to report goes without the lamp (Command's shelf).
+  export let lamp: boolean = true;
   export let title: string;
   export let label: string;
   export let onClick: () => void;
@@ -19,7 +21,7 @@
     aria-pressed={open}
   >
     <slot />
-    <span class="lamp" class:lit aria-hidden="true"></span>
+    {#if lamp}<span class="lamp" class:lit aria-hidden="true"></span>{/if}
   </button>
 </div>
 
