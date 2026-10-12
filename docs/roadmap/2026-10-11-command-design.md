@@ -13,6 +13,7 @@
 - **References are `[[wikilinks]]` by note name**, in frontmatter lists Command owns: a beat lists its notes, a session lists its beats. Nothing stores ids, paths or copies.
 - **Play state never touches notes.** What's live is sidecar state; only story facts are written: a note marked spent, the session log, a captured beat.
 - **Spent replaces carry-forward for notes.** Any note can be spent (secret revealed, treasure given, beat played, NPC dead); an unspent note is simply still bright next session. Only a session's plan carries forward: a new session starts with the previous one's unspent beats.
+- **The campaign is the unit**, as a project folder is Live's: everything a campaign uses lives in its folder, so the folder is complete on its own. Gathered material waits on the campaign's shelf (§3.6); reuse across campaigns is copying from another campaign.
 - **Same app, same look.** A panel per `src/lib/shell/PANELS.md`; vault I/O and state in `sidecar/command/` (architecture D2, §4 Q4); one sidecar event stream relayed by Rust to every window; Legend Lore's vocabulary (arm, play, pigments, lamps, dim) means the same thing here.
 
 ---
@@ -46,6 +47,7 @@ Two implementations of this tool exist: `~/code/unseen-app-desktop` (Electron + 
 | Playing clips | Live set | sidecar state, never in notes |
 | Recording into the Arrangement | Log | the `## Log` section of the session note |
 | Session View / Arrangement View | Prep / Play | — |
+| Browser: Current Project | Shelf | `Shelf/` in the campaign |
 
 The views are renamed because "session" already means the game session. Live's mapping is also inverted relative to the table: Live's Session View is its improvisation surface, and at the table improvising happens during Play. So Play carries a compact launch grid as well as the arrangement.
 
@@ -69,13 +71,13 @@ One structural break from Live: a Live scene is a row with one clip per track, b
     Sessions/
       Session 13.md                      a session
       Session 13.canvas                  its board (§5.2), JSON Canvas
-  Library/                               shared across campaigns (§3.6, phase 5)
-    NPCs/ Monsters/ …                    tracks, as in a campaign
+    Shelf/
+      Fire Drake.md                      gathered, not on a track yet (§3.6)
 ```
 
-- **Root.** Chosen in settings and persisted by the sidecar (§6.1), so the watcher and MCP know it with no window open. Every non-dot folder in it except `Library/` is a campaign; a folder created in Finder is a campaign.
-- **Tracks.** Every non-dot folder in a campaign except the reserved `Beats/` and `Sessions/`. A new campaign gets PCs, NPCs, Locations, Secrets, Monsters and Treasures plus the two reserved folders. Adding a track is making a folder, in Command or anywhere else. Notes anywhere under a track folder belong to it; subfolders show as groups within the column.
-- **Loose notes** directly in a campaign folder are notes without a track: linkable and editable, not drawn in the grid.
+- **Root.** Chosen in settings and persisted by the sidecar (§6.1), so the watcher and MCP know it with no window open. Every non-dot folder in it is a campaign; a folder created in Finder is a campaign.
+- **Tracks.** Every non-dot folder in a campaign except the reserved `Beats/`, `Sessions/` and `Shelf/`. A new campaign gets PCs, NPCs, Locations, Secrets, Monsters and Treasures plus the three reserved folders. Adding a track is making a folder, in Command or anywhere else. Notes anywhere under a track folder belong to it; subfolders show as groups within the column.
+- **Loose notes** directly in a campaign folder are notes without a track: linkable and editable, not drawn in the grid. The shelf sidebar lists them under the shelf (§3.6).
 - **`.unseen/command.json`** holds only presentation (track order, a pigment per track). It travels with the campaign and stays hidden in Finder and Obsidian (a dot-folder, the `.obsidian/` precedent). It never holds membership, so drift is harmless: a track it doesn't know gets defaults, and a stale entry is ignored.
 
 **Rejected:** a `campaign.toml` or `.unseen` state file holding categories and beats (both earlier apps, §1); track order in a campaign note's frontmatter (nested maps render badly in Obsidian's Properties, and order isn't content); a folder per session holding its beats (carrying a beat forward would move files, where with `Beats/` it is a list edit — §4).
@@ -122,19 +124,21 @@ A note's track is the folder it lives in, so a beat carries no per-track keys an
    - A card names its note by path from the root, as Obsidian does with the root as its vault. A campaign-relative path (a vault opened on the campaign folder) also resolves.
    - Command's renames and moves rewrite these paths in every `.canvas` in the campaign, as they rewrite links.
 
-### 3.6 The Library
+### 3.6 The Shelf
 
-*The folder was decided on 2026-10-11. The rules below are proposed and will be confirmed when phase 5 starts.*
+*Decided on 2026-10-12, replacing the shared Library proposed on 2026-10-11.*
 
-Material the GM reuses across campaigns lives once, in `<root>/Library/`, instead of being copied into each campaign: a recurring NPC, a homebrew monster, house rules. The Electron app's Library held SRD reference copied into campaigns. Legend Lore covers rules reference now, so this Library holds the GM's own material.
+The campaign is the unit. Everything a campaign uses lives in its folder, so a campaign folder is complete on its own, like a Live project after *Collect All and Save*. The one exception is a sent note's `source`, which points at a PDF in the GM's Legend Lore library.
 
-- **Layout.** The name `Library/` is reserved. It is never a campaign, and no campaign can take the name. It holds tracks the way a campaign does, but no `Beats/` or `Sessions/`, because those belong to a campaign.
-- **Links.** A campaign's `[[Name]]` resolves to the campaign's own note first, then to the Library's. So adding a note to the Library never changes what an existing link opens.
-  - A campaign adapts a shared note by copying it in, with *Copy to campaign*. Its links then open the copy, and other campaigns keep the original.
-  - Obsidian treats the root as one vault and has its own rule for duplicate names, so in Obsidian a shadowed name can open the other note.
-- **Renames.** Renaming a Library note rewrites links in the Library and in every campaign that doesn't have its own note of that name.
-- **Not spendable.** `spent` is a fact about one campaign's table, so Command never writes it to a Library note. To spend one, copy it into the campaign first. Launching a Library note is fine, because the live set isn't written to notes.
-- **On screen.** The Library opens from the campaign menu as its own grid of tracks, with no launcher. In a campaign's grid, each column ends with a collapsed `library` group holding the Library notes of the same track, so arming works on them as on any note. The exact form will be decided in the app.
+- **The shelf is the campaign's bin.** `<Campaign>/Shelf/` is reserved like `Beats/` and `Sessions/`. It holds material gathered but not filed on a track yet: Legend Lore clippings, ideas, homebrew drafts. In Live's terms it's the browser's *Current Project*, not the *User Library*.
+- **Shelf notes are campaign notes.** They can be linked, their names are unique in the campaign, and a beat or the board uses them as they are. Filing one on a track is a move, not a copy. Within one campaign nothing is copied, because every beat links the same note.
+- **Send to Command lands on the shelf by default** (§8), so a clipping doesn't need a track while the GM is researching. The tracks stay offered for when the GM already knows.
+- **Reuse is copying from another campaign.** The sidebar browses another campaign's shelf and tracks, and copies a note onto this campaign's shelf. The copy is this campaign's own: spendable, editable at the table, never linked back. Its `spent` mark is left behind, since that was the other table's. A GM who wants a common stock makes a campaign for it ("Homebrew") and copies from there.
+- **On screen** it's a sidebar in Prep, at the left of the grid, toggled like Legend Lore's collections sidebar (⌘B). It shows this campaign's shelf, then its loose notes, and a picker browses another campaign. With a beat armed, a click on a shelf note adds it to the beat, as in the grid.
+
+*Rejected:* a shared `Library/` at the root that campaigns link into, resolving a campaign's own note first. One note shared by every table means an edit at one table changes the others, `spent` can't live on it, and links need resolution order, overriding and renames across campaigns. It would also have been a second "library" beside Legend Lore's.
+
+*Parked:* beats on the shelf, so a reusable encounter would copy with its notes.
 
 ---
 
@@ -280,7 +284,7 @@ Play renders notes with `svelte-exmarkdown` (already a dependency) plus a wikili
 ## 8. Cross-tool (phase 4)
 
 - **MCP tools** in `mcp_server.py`, over the Command routes (D5). A starting list: campaigns, current session (plan and log), live set (with note bodies), read note, find notes, create a note in a track, add to the live set, spend. The Servant gets exactly these.
-- **Send to Command** from a Legend Lore hit creates a note in a chosen track: in the active campaign, or from phase 5 in the Library. The note holds the quoted text and a `source` pointing at the PDF and page; in Play, its card opens Legend Lore at that page. Routed through Rust (D4: no drag and drop across windows).
+- **Send to Command** from a Legend Lore hit creates a note in a chosen track of the active campaign, or from phase 5 on its shelf (the default). The note holds the quoted text and a `source` pointing at the PDF and page; in Play, its card opens Legend Lore at that page. Routed through Rust (D4: no drag and drop across windows).
 
 *As built (phase 4, 2026-10-12):*
 
@@ -310,7 +314,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 | 3 | Play — **done 2026-10-12** | the session board (read and write JSON Canvas, path rewriting, carry-forward; Svelte Flow surface with move, resize, connect, auto-place), live state and its persistence, launch, stop, capture, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian; a board arranged in Command opens in Obsidian Canvas, and one written by Obsidian round-trips byte for byte |
 | 3b | Images | `![[map.png]]` embeds on cards: the asset protocol scoped at runtime to the campaigns folder, embeds resolved by name. The CSP already allows `asset:` images | a map embedded in a note shows on its card |
 | 4 | Cross-tool — **done 2026-10-12** | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
-| 5 | Library | `Library/` reserved, campaign-first resolution, the Library's grid and its group in campaign columns, *Copy to campaign*, renames across campaigns (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
+| 5 | Shelf | `Shelf/` reserved; the shelf sidebar in Prep (this campaign's shelf and loose notes, another campaign to copy from), filing to a track and back, Send to Command defaulting to the shelf, MCP reaching it (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
 
 ---
 
@@ -318,7 +322,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 
 Settled on 2026-10-11, before phase 3:
 
-1. **Library:** a shared `Library/` folder at the root (§3.6). The alternatives were templates per track (still under not doing, §11) and treating Legend Lore as the library; Legend Lore stays the rules reference.
+1. **Library:** settled as a shared `Library/` at the root on 2026-10-11, then replaced on 2026-10-12 by each campaign's shelf (item 9).
 2. **Editor placement:** the right-hand inspector, closable (§5.1). Play opens a note in the same place for a quick edit, and cards stay read-only (§5.2).
 3. **Images in Play:** a follow-up once the core Play loop works (phase 3b, §9), not part of phase 3.
 4. **Wording:** "spent" everywhere, beats included: one word for one key.
@@ -326,11 +330,11 @@ Settled on 2026-10-11, before phase 3:
 6. **Switchers:** the campaign and session switchers stay in Command's bar (§6.4).
 7. **Play is a board** (2026-10-12): one per session, in JSON Canvas (§5.2). The GM moves, resizes and connects cards, Miro-style.
 8. **Connections are lines** for now (§5.2). Giving them meaning in Play comes later.
+9. **The campaign is the unit, and gathered material waits on its shelf** (2026-10-12, §3.6). Reuse across campaigns is copying; there's no shared library. The name is *Shelf*, because "library" is Legend Lore's. Send to Command defaults to the shelf. Beats on the shelf are parked.
 
 Open:
 
 1. **Track identity** (§5.4): whether tracks take a pigment, kept in `.unseen/command.json`. This will be decided once Play is on screen, by whether a beat's cards need telling apart by track at a glance.
-2. **The Library's rules** (§3.6): proposed, to be confirmed when phase 5 starts.
 
 ---
 
@@ -338,6 +342,7 @@ Open:
 
 - Templates per track, initiative or HP tracking, a player-facing display, AI features inside Command (the Servant reaches Command through MCP).
 - Importing the Electron app's `.unseen` beats.
+- A library shared by campaigns (§3.6): reuse is copying from another campaign.
 - An Obsidian plugin: Obsidian is a peer editor of the same files, nothing more.
 
 ---
