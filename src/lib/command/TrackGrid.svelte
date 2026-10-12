@@ -250,11 +250,15 @@
     border-right: none;
   }
 
-  /* The module nameplate: flat container plate, ledger-label voice. */
+  /* The module nameplate: flat container plate, ledger-label voice.
+     Centred, not baseline-aligned, as Legend Lore's panel head: the
+     min-height sets the plate and the name sits in its middle whatever
+     shares it. On the baseline, a count's taller line pushed the name
+     down, so a plate without one (+ track, the beats) sat higher. */
   .nameplate {
     flex-shrink: 0;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.4rem;
     min-height: 1.9rem;
     padding: 0.4rem 0.6rem 0.3rem;
