@@ -157,7 +157,9 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 - **The switcher** lists every campaign in the root, with the open one lit (a menu pip), then *New campaign*, which opens a fresh Untitled, the same as launch. **Right-click** on the key manages the open campaign (Rename, Show in Finder, Move to Trash), as right-click manages a track or a note. Moving a campaign to the Trash opens a fresh Untitled, so Command is never left on nothing.
 - **The root defaults to `~/Unseen Servant`**, made on first launch, so launch never stops to ask. Settings → Command changes it: Command closes the open campaign (a blank Untitled goes) and opens a fresh Untitled in the new folder.
 
-*Rejected:* a campaign list in the body at launch (two ways in for one job, and a screen that wasn't the console); bracketed `[open]` `[new]` actions with nothing open; a type-to-filter name field; a File menu in the macOS menu bar, which could still come later. All are in the brainstorm artifact: https://claude.ai/artifact/4mr8d5i4rSxEHwujZ6faaB.
+- **The macOS File menu** offers the same: *New Campaign* (⇧⌘N, because ⌘N is Legend Lore's new collection and a menu shortcut takes the key from every window), *Open Campaign ▸* with the open one ticked, *Show Campaigns Folder* and *Change Campaigns Folder…*, above File's own *Close Window* (`file_menu.rs`, built on Tauri's default menu). New and Open bring Command forward: its own window if it's popped out, otherwise its tab. It's macOS only, because elsewhere an app menu is a bar inside every window.
+
+*Rejected:* a campaign list in the body at launch (two ways in for one job, and a screen that wasn't the console); bracketed `[open]` `[new]` actions with nothing open; a type-to-filter name field. All are in the brainstorm artifact: https://claude.ai/artifact/4mr8d5i4rSxEHwujZ6faaB.
 
 ---
 
