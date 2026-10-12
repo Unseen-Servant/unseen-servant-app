@@ -1,7 +1,7 @@
 # Command — design
 
 **Date:** 2026-10-11
-**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11, phases 3 and 4 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
+**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11, phases 3–5 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
 **Objective:** specify Command, the workstation's second tool (architecture doc §6 Step 4), before any code: what the vault looks like on disk, how sessions work, what Prep and Play show, and where each piece lives across the three layers.
 
 ---
@@ -139,6 +139,12 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 *Rejected:* a shared `Library/` at the root that campaigns link into, resolving a campaign's own note first. One note shared by every table means an edit at one table changes the others, `spent` can't live on it, and links need resolution order, overriding and renames across campaigns. It would also have been a second "library" beside Legend Lore's.
 
 *Parked:* beats on the shelf, so a reusable encounter would copy with its notes.
+
+*As built (phase 5):*
+- **On disk.** `Shelf/` is made with each new campaign, and on first use in one started by hand: creating, sending or moving a note there makes it.
+- **The sidebar** is 11rem wide, so with it open the six default tracks and the launcher still fit at 1280px. It's open until hidden, by a latch in the bar beside the Prep/Play picker (Legend Lore's `LatchKey`, the box-archive glyph) or ⌘B, which Legend Lore's collections sidebar also uses.
+- **Its rows** are the grid's, with the same marks. Their menu files a note on any track; the grid's menu moves a note to the shelf.
+- **Copying.** A copied note keeps its name, so a name the campaign already has is refused and not renumbered: two notes of one name would make its links ambiguous. Shelf notes count as cards in Play and as notes for MCP, and `create_note` takes `"Shelf"`.
 
 ---
 
@@ -314,7 +320,7 @@ All on the `workstation` integration branch; Command ships when `workstation` is
 | 3 | Play — **done 2026-10-12** | the session board (read and write JSON Canvas, path rewriting, carry-forward; Svelte Flow surface with move, resize, connect, auto-place), live state and its persistence, launch, stop, capture, editing from a card, the arrangement, the log, jots, Tab between Prep and Play, *spend beats on launch* and the Command pane in settings | kill the app mid-session, relaunch, and the live set is back; the log reads correctly in Obsidian; a board arranged in Command opens in Obsidian Canvas, and one written by Obsidian round-trips byte for byte |
 | 3b | Images | `![[map.png]]` embeds on cards: the asset protocol scoped at runtime to the campaigns folder, embeds resolved by name. The CSP already allows `asset:` images | a map embedded in a note shows on its card |
 | 4 | Cross-tool — **done 2026-10-12** | MCP tools, Send to Command, opening Legend Lore from a card | architecture Step 4: an MCP client lists Command's tools beside Legend Lore's; Send to Command round-trips a search hit |
-| 5 | Shelf | `Shelf/` reserved; the shelf sidebar in Prep (this campaign's shelf and loose notes, another campaign to copy from), filing to a track and back, Send to Command defaulting to the shelf, MCP reaching it (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
+| 5 | Shelf — **done 2026-10-12** | `Shelf/` reserved; the shelf sidebar in Prep (this campaign's shelf and loose notes, another campaign to copy from), filing to a track and back, Send to Command defaulting to the shelf, MCP reaching it (§3.6) | pytest: resolution order and shadowing, a Library rename rewriting every campaign, `spent` refused on a Library note |
 
 ---
 

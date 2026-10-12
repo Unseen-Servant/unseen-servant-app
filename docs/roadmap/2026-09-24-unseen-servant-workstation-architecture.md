@@ -246,7 +246,7 @@ Lift Ollama status, sidecar health and sync/reindex progress to Rust source of t
 
 Greenfield (§4 Q5). Second window; Svelte UI over Tauri proxy commands; state and vault I/O in `sidecar/command/` (§4 Q4, D6); its MCP tools registered in `mcp_server.py`. Design: [2026-10-11-command-design.md](2026-10-11-command-design.md). **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
 
-**Command phases 0–4 built 2026-10-12 on `workstation`** (vault, beats and sessions, Play, cross-tool), unpushed. A stdio MCP client lists Command's eight tools beside Legend Lore's six. Send to Command is tested in parts (the hit's note, the sidecar's write, the menu) but not yet end to end in the running app. Images on cards (3b) and the Library (5) remain.
+**Command phases 0–5 built 2026-10-12 on `workstation`** (vault, beats and sessions, Play, cross-tool, each campaign's shelf), unpushed. A stdio MCP client lists Command's eight tools beside Legend Lore's six. Send to Command is tested in parts (the hit's note, the sidecar's write, the menu) but not yet end to end in the running app. Images on cards (3b) remain; the shared Library became a per-campaign shelf.
 
 ### Step 5 — Servant
 
