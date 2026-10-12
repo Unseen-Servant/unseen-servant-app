@@ -923,7 +923,9 @@
     align-items: center;
     gap: 0.5rem;
     height: var(--header-height);
-    padding: 0 0.75rem;
+    /* Legend Lore's header inset (Header .header), so the wells at either
+       end sit where its keys do. */
+    padding: 0 0.5rem;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
   }
