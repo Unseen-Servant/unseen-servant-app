@@ -148,10 +148,10 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 
 ### 3.7 Opening a campaign
 
-*Decided and built on 2026-10-12.* Command opens on a blank **Untitled** campaign, as Live opens on an empty set. The campaign key in Command's bar is a switcher, like Obsidian's for vaults. This replaces the campaign list that filled the body when nothing was open.
+*Decided and built on 2026-10-12.* Command opens on a blank **Untitled** campaign, as Live opens on an empty set. The campaign key in Command's bar is a switcher, like Obsidian's for vaults. It's drawn as one keycap in a well (`LatchKey`'s cut), split by a groove into the switcher and a pen-to-square key that names the campaign. This replaces the campaign list that filled the body when nothing was open.
 
 - **Untitled is a real folder**, made at launch in the root with the default tracks. Every sidecar route needs the campaign folder to exist, so a campaign kept only in memory would need a special case in each, and in Send to Command and MCP too.
-- **The name marks it:** `Untitled`, or `Untitled 2` and on (`vault.is_untitled`). The key shows it in italic, with `[name]` beside it. `[name]` turns the key into the inline name field, and Enter renames the folder.
+- **The name marks it:** `Untitled`, or `Untitled 2` and on (`vault.is_untitled`). The key shows it in italic. The pen turns the key into the inline name field, for any campaign, and Enter renames the folder.
 - **Leaving a blank Untitled removes it.** Switching away, *New campaign*, choosing another root, or quitting does it. Blank means no files besides Finder's `.DS_Store` and `.unseen/command.json`. Removal unlinks only those and deletes only empty folders, so a note that lands meanwhile stops it rather than going with it. An Untitled with anything in it stays, as an ordinary campaign that happens to be called Untitled.
 - **Launch reuses a blank Untitled** that a crash or a failed discard left behind. Otherwise it makes the first free name.
 - **The switcher** lists every campaign in the root, with the open one lit (a menu pip), then *New campaign*, which opens a fresh Untitled, the same as launch. **Right-click** on the key manages the open campaign (Rename, Show in Finder, Move to Trash), as right-click manages a track or a note. Moving a campaign to the Trash opens a fresh Untitled, so Command is never left on nothing.
@@ -248,7 +248,7 @@ Nothing new beyond the grid cell. Each meaning maps to an existing token or idio
 |---|---|
 | Track identity | *open until Play is on screen (§10).* Tracks are plain nameplates. In Legend Lore a pigment gem marks a curated set, which here is a beat rather than a track. If tracks take a pigment, it is a strip on the nameplate |
 | Note in the live set | parchment rule and `--glow-accent` on the card; its play key lit purple, as Legend Lore's transport |
-| Prep / Play | a picker in Command's bar, Legend Lore's view-switch recipe: the current segment raised, never purple (one view is always on) |
+| Prep / Play | a picker in Command's bar, Legend Lore's view switch rule for rule: table-columns and play glyphs, the current segment raised, never purple (one view is always on) |
 | Armed beat | Legend Lore's arm glyph in `--text-active` |
 | Spent | `--opacity-out-of-scope` plus a check; hover restores |
 | Unresolved link, missing note | dashed parchment, `--outline-drop` |
@@ -353,7 +353,7 @@ Settled on 2026-10-11, before phase 3:
 7. **Play is a board** (2026-10-12): one per session, in JSON Canvas (§5.2). The GM moves, resizes and connects cards, Miro-style.
 8. **Connections are lines** for now (§5.2). Giving them meaning in Play comes later.
 9. **The campaign is the unit, and gathered material waits on its shelf** (2026-10-12, §3.6). Reuse across campaigns is copying; there's no shared library. The name is *Shelf*, because "library" is Legend Lore's. Send to Command defaults to the shelf. Beats on the shelf are parked.
-10. **Opening a campaign** (2026-10-12, §3.7): launch opens a blank Untitled, and the campaign key is an Obsidian-style switcher with *New campaign* at the bottom. The root defaults to `~/Unseen Servant`, `[name]` names Untitled, and *New campaign* opens a fresh Untitled rather than asking for a name first.
+10. **Opening a campaign** (2026-10-12, §3.7): launch opens a blank Untitled, and the campaign key is an Obsidian-style switcher with *New campaign* at the bottom. The root defaults to `~/Unseen Servant`, the key's pen names Untitled, and *New campaign* opens a fresh Untitled rather than asking for a name first.
 
 Open:
 
