@@ -142,7 +142,7 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 
 *As built (phase 5):*
 - **On disk.** `Shelf/` is made with each new campaign, and on first use in one started by hand: creating, sending or moving a note there makes it.
-- **The sidebar** is 11rem wide, so with it open the six default tracks and the launcher still fit at 1280px. It's open until hidden, by a latch in the bar beside the Prep/Play picker (Legend Lore's `LatchKey`, the box-archive glyph) or ⌘B, which Legend Lore's collections sidebar also uses.
+- **The sidebar** is 11rem wide, so with it open the six default tracks and the launcher still fit at 1280px. It's open until hidden, by a latch at the left of the bar, where Legend Lore's panel keys sit (its `LatchKey`, the box-archive glyph; dimmed and inert in Play, so nothing beside it moves) or ⌘B, which Legend Lore's collections sidebar also uses.
 - **Its rows** are the grid's, with the same marks. Their menu files a note on any track; the grid's menu moves a note to the shelf.
 - **Copying.** A copied note keeps its name, so a name the campaign already has is refused and not renumbered: two notes of one name would make its links ambiguous. Shelf notes count as cards in Play and as notes for MCP, and `create_note` takes `"Shelf"`.
 

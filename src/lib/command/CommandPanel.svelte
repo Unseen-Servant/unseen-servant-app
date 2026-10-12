@@ -623,6 +623,24 @@
 
 <section class="command">
   <header class="bar">
+    {#if index}
+      <!-- Leftmost, where Legend Lore's panel keys sit. The shelf is Prep's,
+           so in Play the key stays put, dimmed and inert, and the switchers
+           beside it don't move when Tab flips the view. -->
+      <div class="panel-keys" class:dimmed={mode === 'play'} inert={mode === 'play'}>
+        <LatchKey
+          open={shelfOpen}
+          title={(shelfOpen ? 'Hide the shelf' : 'Show the shelf') + chordHint('sidebar.toggle')}
+          label="Toggle the shelf"
+          onClick={() => (shelfOpen = !shelfOpen)}
+        >
+          <!-- Font Awesome "box-archive" icon (src/lib/ui/icons/box-archive-solid-full.svg) -->
+          <svg viewBox="0 0 640 640" fill="currentColor">
+            <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
+          </svg>
+        </LatchKey>
+      </div>
+    {/if}
     {#if renaming && campaign}
       <div class="bar-name">
         <InlineName
@@ -696,21 +714,6 @@
       {/if}
     {/if}
     <span class="spacer"></span>
-    {#if index && mode === 'prep'}
-      <div class="panel-keys">
-        <LatchKey
-          open={shelfOpen}
-          title={(shelfOpen ? 'Hide the shelf' : 'Show the shelf') + chordHint('sidebar.toggle')}
-          label="Toggle the shelf"
-          onClick={() => (shelfOpen = !shelfOpen)}
-        >
-          <!-- Font Awesome "box-archive" icon (src/lib/ui/icons/box-archive-solid-full.svg) -->
-          <svg viewBox="0 0 640 640" fill="currentColor">
-            <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
-          </svg>
-        </LatchKey>
-      </div>
-    {/if}
     {#if index}
       <!-- View switch — Legend Lore's (Header .view-switch): a picker, not a
            mode, so the current segment sits on a raised fill instead of
@@ -1119,6 +1122,10 @@
   .panel-keys {
     display: flex;
     gap: 0.3rem;
+  }
+
+  .panel-keys.dimmed {
+    opacity: var(--opacity-out-of-scope);
   }
 
   /* Prep ⇄ Play: Legend Lore's view switch (Header .view-switch), rule for
