@@ -11,6 +11,7 @@
   // Each row's slot reads the session at a glance: a parchment dot for a
   // note in the selected beat, a ring for one some other planned beat holds.
   // A spent note dims and carries a check.
+  import { onDestroy } from 'svelte';
   import InlineName from './InlineName.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
@@ -80,7 +81,7 @@
   // -- dragging a column, as Legend Lore's collections reorder ------------
   //
   // Only the nameplate starts it; rows drag notes. Over a column, the
-  // pointer's half picks the side the track lands on; over + track, the end.
+  // pointer's half picks the side the track lands on; past the last, the end.
   const TRACK_MIME = 'application/x-command-track';
   const isTrackDrag = (e: DragEvent) =>
     Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === TRACK_MIME);
@@ -102,34 +103,87 @@
     draggingTrack = null;
     dropAt = null;
     hoveredTrack = null;
+    stopScrolling();
   }
 
-  function overColumn(e: DragEvent, i: number) {
+  // The webview doesn't scroll the grid under a drag, so the grid does: a
+  // track held near either edge scrolls it that way, faster the nearer the
+  // edge, until the pointer moves off, the drag ends or there's no more.
+  const EDGE = 48;
+  const MAX_STEP = 12;
+  let gridEl: HTMLDivElement;
+  let pointerX: number | null = null;
+  let scrolling = 0;
+
+  function edgeStep(): number {
+    if (pointerX === null) return 0;
+    const box = gridEl.getBoundingClientRect();
+    const near = (gap: number) => Math.max(1, Math.round(MAX_STEP * (1 - Math.max(gap, 0) / EDGE)));
+    if (pointerX - box.left < EDGE) return -near(pointerX - box.left);
+    if (box.right - pointerX < EDGE) return near(box.right - pointerX);
+    return 0;
+  }
+
+  function scrollStep() {
+    const step = edgeStep();
+    const before = gridEl.scrollLeft;
+    if (step !== 0) gridEl.scrollLeft += step;
+    const moved = gridEl.scrollLeft !== before;
+    // The columns moved under a still pointer: the drop line follows.
+    if (moved && pointerX !== null) dropAt = slotAt(pointerX);
+    scrolling = moved ? requestAnimationFrame(scrollStep) : 0;
+  }
+
+  function stopScrolling() {
+    pointerX = null;
+    cancelAnimationFrame(scrolling);
+    scrolling = 0;
+  }
+
+  onDestroy(stopScrolling);
+
+  /** Where a track dropped at `x` lands: before the column under it, or
+   *  after it past its middle; past the last track, at the end. */
+  function slotAt(x: number): number {
+    const columns = Array.from(gridEl.children);
+    for (let i = 0; i < cols.length; i++) {
+      const box = columns[i].getBoundingClientRect();
+      if (x < box.right) return x >= box.left + box.width / 2 ? i + 1 : i;
+    }
+    return cols.length;
+  }
+
+  function overGrid(e: DragEvent) {
     if (!draggingTrack || !isTrackDrag(e)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    if (i === cols.length) {
-      dropAt = i;
-      return;
-    }
-    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    dropAt = e.clientX >= box.left + box.width / 2 ? i + 1 : i;
+    pointerX = e.clientX;
+    dropAt = slotAt(e.clientX);
+    if (!scrolling) scrolling = requestAnimationFrame(scrollStep);
   }
 
   function dropTrack(e: DragEvent) {
-    if (!draggingTrack || !isTrackDrag(e) || dropAt === null) return;
+    if (!draggingTrack || !isTrackDrag(e)) return;
     e.preventDefault();
     const order = cols.map((c) => c.track);
     const from = order.indexOf(draggingTrack);
-    const to = dropAt > from ? dropAt - 1 : dropAt;
+    const at = slotAt(e.clientX);
+    const to = at > from ? at - 1 : at;
     endTrackDrag();
     if (from < 0 || to === from) return;
     order.splice(to, 0, ...order.splice(from, 1));
     onReorderTracks(order);
   }
 
+  // WebKit sends a dragleave between the grid's own elements, at times
+  // with no relatedTarget, so leaving is judged by where the pointer is.
   function leaveGrid(e: DragEvent) {
-    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) dropAt = null;
+    const box = gridEl.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x > box.left && x < box.right && y > box.top && y < box.bottom) return;
+    dropAt = null;
+    stopScrolling();
   }
 
   function trackMenu(e: MouseEvent, column: Column) {
@@ -147,7 +201,15 @@
   }
 </script>
 
-<div class="grid" role="presentation" on:dragleave={leaveGrid}>
+<div
+  class="grid"
+  role="presentation"
+  bind:this={gridEl}
+  on:dragenter={overGrid}
+  on:dragover={overGrid}
+  on:dragleave={leaveGrid}
+  on:drop={dropTrack}
+>
   {#each cols as column, i (column.track)}
     <section
       class="column"
@@ -155,8 +217,6 @@
       class:drop-before={dropAt === i}
       class:drop-after={dropAt === cols.length && i === cols.length - 1}
       aria-label={column.track}
-      on:dragover={(e) => overColumn(e, i)}
-      on:drop={dropTrack}
     >
       <header
         class="nameplate"
@@ -279,7 +339,7 @@
     </section>
   {/each}
 
-  <section class="column ghost-column" aria-label="New track" on:dragover={(e) => overColumn(e, cols.length)} on:drop={dropTrack}>
+  <section class="column ghost-column" aria-label="New track">
     <header class="nameplate">
       {#if creatingTrack}
         <InlineName
