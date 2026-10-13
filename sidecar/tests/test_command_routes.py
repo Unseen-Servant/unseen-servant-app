@@ -136,6 +136,16 @@ def test_prep_round_trip_over_http(cmd, campaign_root, monkeypatch):
     assert stale.status_code == 409
 
 
+def test_note_order_over_http(cmd):
+    for name in ("Ireena", "Ismark"):
+        cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": name})
+    assert cmd.put("/api/command/notes/order", json={
+        "campaign": "Strahd", "folder": "NPCs", "order": ["Ismark", "Ireena"],
+    }).json() == {"order": ["Ismark", "Ireena"]}
+    index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert index["note_order"] == {"NPCs": ["Ismark", "Ireena"]}
+
+
 def test_beat_order_over_http(cmd):
     for name in ("Ambush", "Tser Pool"):
         cmd.post("/api/command/beats", json={"campaign": "Strahd", "name": name})

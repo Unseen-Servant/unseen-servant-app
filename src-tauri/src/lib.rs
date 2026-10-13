@@ -656,6 +656,7 @@ pub fn run() {
             command::command_create_track,
             command::command_rename_track,
             command::command_order_tracks,
+            command::command_order_notes,
             command::command_read_note,
             command::command_save_note,
             command::command_create_note,

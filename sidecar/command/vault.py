@@ -2,9 +2,9 @@
 
 The folders are the only source of truth (design §3). Every call reads the
 disk; nothing here remembers which note belongs where. The one file Command
-keeps beside the notes, ``.unseen/command.json``, holds track order and the
-order of beats outside a plan — presentation choices — so a stale entry is
-ignored and never loses a note.
+keeps beside the notes, ``.unseen/command.json``, holds the order of the
+tracks, of each folder's notes and of the beats outside a plan —
+presentation choices — so a stale entry is ignored and never loses a note.
 
 Paths crossing this module's boundary are campaign-relative POSIX strings
 (``NPCs/Ismark.md``); campaigns are addressed by folder name.
@@ -198,8 +198,8 @@ def _saved_list(campaign: Path, key: str) -> list[str]:
     return [t for t in items if isinstance(t, str)] if isinstance(items, list) else []
 
 
-def _save_list(campaign: Path, key: str, items: list[str]) -> None:
-    """Write one list, keeping whatever else the file holds."""
+def _save_list(campaign: Path, key: str, items: list[str] | dict[str, list[str]]) -> None:
+    """Write one entry, keeping whatever else the file holds."""
     path = _presentation_path(campaign)
     path.parent.mkdir(exist_ok=True)
     data = {**_presentation(campaign), "version": 1, key: items}
@@ -222,6 +222,27 @@ def beat_order(campaign: Path) -> list[str]:
 
 def save_beat_order(campaign: Path, names: list[str]) -> list[str]:
     _save_list(campaign, "beats", names)
+    return names
+
+
+def note_order(campaign: Path) -> dict[str, list[str]]:
+    """The note names the GM ordered, by folder (``NPCs``, ``NPCs/Vallaki``),
+    as saved. Notes a folder's list doesn't name follow them by name (the
+    grid sorts); names with no note are ignored."""
+    raw = _presentation(campaign).get("notes", {})
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        folder: [n for n in names if isinstance(n, str)]
+        for folder, names in raw.items()
+        if isinstance(names, list)
+    }
+
+
+def save_note_order(campaign: Path, folder: str, names: list[str]) -> list[str]:
+    """One folder's notes in the order the GM dragged them; other folders'
+    orders are kept."""
+    _save_list(campaign, "notes", {**note_order(campaign), folder: names})
     return names
 
 
@@ -252,6 +273,7 @@ def scan(campaign: Path) -> dict:
         "name": campaign.name,
         "tracks": track_order(campaign),
         "notes": [asdict(n) for n in notes],
+        "note_order": note_order(campaign),
         "ambiguous": sorted(k for k, count in seen.items() if count > 1),
     }
 
@@ -644,6 +666,11 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
         raise Conflict(f"A note named {new_name!r} already exists in this campaign")
     dst = src.with_name(f"{new_name}.md")
     moves = _relocate(campaign, src, dst)
+    # A renamed note keeps its place among its folder's notes.
+    folder = str(PurePosixPath(_rel(campaign, dst)).parent)
+    names = note_order(campaign).get(folder, [])
+    if any(_same_name(n, old_name) for n in names):
+        save_note_order(campaign, folder, [new_name if _same_name(n, old_name) else n for n in names])
     # A renamed beat keeps its place in the beats' order.
     beats = beat_order(campaign)
     if any(_same_name(b, old_name) for b in beats):
@@ -677,8 +704,17 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
     if not _same_name(new_name, name) and new_name.casefold() in taken:
         raise Conflict(f"A folder named {new_name!r} already exists in this campaign")
     order = [new_name if t == name else t for t in track_order(campaign)]
+
+    def renamed(folder: str) -> str:
+        head, sep, rest = folder.partition("/")
+        return new_name + sep + rest if head == name else folder
+
+    notes = note_order(campaign)
     moves = _relocate(campaign, campaign / name, campaign / new_name)
     _save_order(campaign, order)
+    # Its notes keep their order, a subfolder's too.
+    if any(renamed(f) != f for f in notes):
+        _save_list(campaign, "notes", {renamed(f): names for f, names in notes.items()})
     return _rewrite_campaign(campaign, moves)
 
 

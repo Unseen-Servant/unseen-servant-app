@@ -5,6 +5,7 @@ import type { CampaignIndex } from './types';
 const index: CampaignIndex = {
   name: 'Strahd',
   tracks: ['NPCs'],
+  note_order: {},
   ambiguous: [],
   notes: [],
   beats: [

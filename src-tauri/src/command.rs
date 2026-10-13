@@ -94,6 +94,8 @@ pub struct CampaignIndex {
     name: String,
     tracks: Vec<String>,
     notes: Vec<NoteEntry>,
+    /// Note names by folder, in the order the GM dragged them.
+    note_order: std::collections::BTreeMap<String, Vec<String>>,
     ambiguous: Vec<String>,
     beats: Vec<BeatEntry>,
     sessions: Vec<SessionEntry>,
@@ -398,6 +400,27 @@ pub async fn command_order_tracks(
     )
     .await
     .map(|t| t.tracks)
+}
+
+/// Save the order of a folder's notes, by name, as the GM drags them in
+/// their column. Returns the order saved.
+#[tauri::command]
+pub async fn command_order_notes(
+    campaign: String,
+    folder: String,
+    order: Vec<String>,
+) -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct Order {
+        order: Vec<String>,
+    }
+    answer::<Order>(
+        client()
+            .put(api("/notes/order"))
+            .json(&serde_json::json!({ "campaign": campaign, "folder": folder, "order": order })),
+    )
+    .await
+    .map(|o| o.order)
 }
 
 #[tauri::command]
@@ -913,6 +936,7 @@ mod tests {
             "name": "Strahd", "tracks": ["NPCs"], "ambiguous": [],
             "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18",
                        "source": "file:///b.pdf#page=3"}],
+            "note_order": {"NPCs": ["Ismark", "Ireena"]},
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,
                        "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",

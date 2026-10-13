@@ -24,6 +24,7 @@ const index: CampaignIndex = {
     'NPCs/Session 10.md',
     'NPCs/Session 9.md',
   ].map(note),
+  note_order: {},
   ambiguous: ['doru'],
   beats: [],
   sessions: [],
@@ -45,6 +46,16 @@ describe('columns', () => {
       [null, ['ireena', 'Ismark', 'Session 9', 'Session 10']],
       ['Barovia', ['Doru']],
       ['Vallaki', ['Lady Wachter']],
+    ]);
+  });
+
+  it('puts the notes a folder\'s saved order names first, in it, the rest after by name', () => {
+    const ordered = { ...index, note_order: { NPCs: ['Session 10', 'ismark', 'Gone'], 'NPCs/Vallaki': [] } };
+    const npcs = columns(ordered)[1];
+    expect(npcs.groups.map((g) => [g.folder, g.notes.map((n) => n.name)])).toEqual([
+      ['NPCs', ['Session 10', 'Ismark', 'ireena', 'Session 9']],
+      ['NPCs/Barovia', ['Doru']],
+      ['NPCs/Vallaki', ['Lady Wachter']],
     ]);
   });
 

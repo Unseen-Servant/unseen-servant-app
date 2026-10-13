@@ -6,7 +6,8 @@
   // trash. The ghost rows at the foot of each column and the
   // end of the grid name a new note or track in place. A column's nameplate
   // drags to reorder the tracks and renames on a double-click, as a
-  // collection's row does in Legend Lore.
+  // collection's row does in Legend Lore; a note's row drags among its
+  // group's rows to reorder them, or onto another column to move there.
   //
   // Each row's slot reads the session at a glance: a parchment dot for a
   // note in the selected beat, a ring for one some other planned beat holds.
@@ -17,7 +18,8 @@
   import CommandMenu from './CommandMenu.svelte';
   import { action, divider, heading, type OpenMenu } from './menu';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
-  import type { Column } from './columns';
+  import { planMoveTo } from './prep';
+  import type { Column, NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
   export let cols: Column[];
@@ -46,6 +48,8 @@
   export let onRevealTrack: (track: string) => void;
   /** The tracks by name, in the order they were dragged into. */
   export let onReorderTracks: (order: string[]) => void;
+  /** A folder's notes by name, in the order they were dragged into. */
+  export let onReorderNotes: (folder: string, names: string[]) => void;
 
   let creatingIn: string | null = null;
   let creatingTrack = false;
@@ -84,7 +88,9 @@
   // read nothing else). A track, from its nameplate, reorders as Legend
   // Lore's collections do: over a column, the pointer's half picks the side
   // it lands on; past the last, the end. A note, from a row here or on the
-  // shelf, moves to the track whose column it's dropped on.
+  // shelf, moves to the track whose column it's dropped on. Among its own
+  // group's rows a note reorders them the same way, the pointer's half of
+  // a row picking the side, an order the campaign keeps.
   const TRACK_MIME = 'application/x-command-track';
   const isTrackDrag = (e: DragEvent) =>
     Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === TRACK_MIME);
@@ -95,6 +101,17 @@
   /** The track a dragged note would move to. */
   let noteInto: string | null = null;
   let hoveredTrack: string | null = null;
+
+  /** Where a note dragged among its own group's rows lands: before row
+   *  `at`, or after the last. */
+  interface NoteSlot {
+    note: NoteEntry;
+    group: NoteGroup;
+    at: number;
+  }
+  let noteSlot: NoteSlot | null = null;
+  $: lineBefore = noteSlot && noteSlot.at < noteSlot.group.notes.length ? noteSlot.group.notes[noteSlot.at].path : null;
+  $: lineAfter = noteSlot && noteSlot.at === noteSlot.group.notes.length ? noteSlot.group.notes[noteSlot.at - 1].path : null;
 
   function startTrackDrag(e: DragEvent, track: string) {
     draggingTrack = track;
@@ -109,6 +126,7 @@
     draggingTrack = null;
     dropAt = null;
     noteInto = null;
+    noteSlot = null;
     hoveredTrack = null;
     stopScrolling();
   }
@@ -116,37 +134,47 @@
   // The webview doesn't scroll the grid under a drag, so the grid does: a
   // track or note held near either edge scrolls it that way, faster the
   // nearer the edge, until the pointer moves off, the drag ends or there's
-  // no more.
+  // no more. A note over its own track's column scrolls that column the
+  // same way, by its top and bottom, to reach the rows it can land among.
   const EDGE = 48;
   const MAX_STEP = 12;
   let gridEl: HTMLDivElement;
   let pointerX: number | null = null;
+  let pointerY: number | null = null;
   let scrolling = 0;
 
-  function edgeStep(): number {
-    if (pointerX === null) return 0;
-    const box = gridEl.getBoundingClientRect();
+  /** The scroll a pointer at `at` asks of a box from `start` to `end`. */
+  function edgeStep(at: number, start: number, end: number): number {
     const near = (gap: number) => Math.max(1, Math.round(MAX_STEP * (1 - Math.max(gap, 0) / EDGE)));
-    if (pointerX - box.left < EDGE) return -near(pointerX - box.left);
-    if (box.right - pointerX < EDGE) return near(box.right - pointerX);
+    if (at - start < EDGE) return -near(at - start);
+    if (end - at < EDGE) return near(end - at);
     return 0;
   }
 
   function scrollStep() {
-    const step = edgeStep();
-    const before = gridEl.scrollLeft;
-    if (step !== 0) gridEl.scrollLeft += step;
-    const moved = gridEl.scrollLeft !== before;
-    // The columns moved under a still pointer: what's lit follows.
-    if (moved && pointerX !== null) {
-      if (draggingTrack) dropAt = slotAt(pointerX);
-      else noteInto = noteTarget(draggedNote(), pointerX);
+    let moved = false;
+    if (pointerX !== null && pointerY !== null) {
+      const grid = gridEl.getBoundingClientRect();
+      const left = gridEl.scrollLeft;
+      const step = edgeStep(pointerX, grid.left, grid.right);
+      if (step !== 0) gridEl.scrollLeft += step;
+      const list = ownList(pointerX);
+      const top = list?.scrollTop;
+      if (list) {
+        const box = list.getBoundingClientRect();
+        const down = edgeStep(pointerY, box.top, box.bottom);
+        if (down !== 0) list.scrollTop += down;
+      }
+      moved = gridEl.scrollLeft !== left || list?.scrollTop !== top;
+      // The rows moved under a still pointer: what's lit follows.
+      if (moved) aim(pointerX, pointerY);
     }
     scrolling = moved ? requestAnimationFrame(scrollStep) : 0;
   }
 
   function stopScrolling() {
     pointerX = null;
+    pointerY = null;
     cancelAnimationFrame(scrolling);
     scrolling = 0;
   }
@@ -178,15 +206,53 @@
     return note && track !== note.track ? track : null;
   }
 
+  const listOf = (i: number) => gridEl.children[i]?.querySelector<HTMLElement>('.notes') ?? null;
+
+  /** The list of rows under `x`, while a note is dragged over its own
+   *  track's column. */
+  function ownList(x: number): HTMLElement | null {
+    const note = draggingTrack ? null : draggedNote();
+    const i = columnAt(x);
+    return note && cols[i]?.track === note.track ? listOf(i) : null;
+  }
+
+  /** Where a note dropped at (x, y) lands among its own group's rows:
+   *  before the row under it or, past that row's middle, after it. Away
+   *  from those rows, nowhere. */
+  function noteSlotAt(note: NoteEntry | null, x: number, y: number): NoteSlot | null {
+    const i = columnAt(x);
+    const group = note && cols[i]?.track === note.track ? cols[i].groups.find((g) => g.group === note.group) : null;
+    const list = listOf(i);
+    if (!note || !group || !list) return null;
+    // Rows scrolled out of the list still have boxes, under the nameplate.
+    const shown = list.getBoundingClientRect();
+    if (y < shown.top || y >= shown.bottom) return null;
+    const rows = group.notes.map((n) => list.querySelector(`[data-path="${CSS.escape(n.path)}"]`));
+    if (rows.some((r) => !r)) return null;
+    const boxes = rows.map((r) => r!.getBoundingClientRect());
+    if (y < boxes[0].top || y >= boxes[boxes.length - 1].bottom) return null;
+    const at = boxes.findIndex((b) => y < b.top + b.height / 2);
+    return { note, group, at: at < 0 ? boxes.length : at };
+  }
+
+  /** Light what a drop at (x, y) would do. */
+  function aim(x: number, y: number) {
+    if (draggingTrack) dropAt = slotAt(x);
+    else {
+      const note = draggedNote();
+      noteInto = noteTarget(note, x);
+      noteSlot = noteSlotAt(note, x, y);
+    }
+  }
+
   function overGrid(e: DragEvent) {
     const track = !!draggingTrack && isTrackDrag(e);
-    const note = isNoteDrag(e) ? draggedNote() : null;
-    if (!track && !note) return;
+    if (!track && !(isNoteDrag(e) && draggedNote())) return;
     pointerX = e.clientX;
+    pointerY = e.clientY;
     if (!scrolling) scrolling = requestAnimationFrame(scrollStep);
-    if (track) dropAt = slotAt(e.clientX);
-    else noteInto = noteTarget(note, e.clientX);
-    if (!track && noteInto === null) return;
+    aim(e.clientX, e.clientY);
+    if (!track && noteInto === null && noteSlot === null) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
   }
@@ -195,6 +261,7 @@
     const dragged = draggingTrack;
     const note = isNoteDrag(e) ? draggedNote() : null;
     const into = noteTarget(note, e.clientX);
+    const slot = noteSlotAt(note, e.clientX, e.clientY);
     const at = slotAt(e.clientX);
     endDrag();
     if (dragged && isTrackDrag(e)) {
@@ -208,6 +275,15 @@
     } else if (note && into !== null) {
       e.preventDefault();
       onMoveNote(note, into);
+    } else if (slot) {
+      e.preventDefault();
+      const notes = slot.group.notes;
+      const from = notes.findIndex((n) => n.path === slot.note.path);
+      const to = from < 0 ? null : planMoveTo(from, slot.at);
+      if (to === null) return;
+      const names = notes.map((n) => n.name);
+      names.splice(to, 0, ...names.splice(from, 1));
+      onReorderNotes(slot.group.folder, names);
     }
   }
 
@@ -220,6 +296,7 @@
     if (x > box.left && x < box.right && y > box.top && y < box.bottom) return;
     dropAt = null;
     noteInto = null;
+    noteSlot = null;
     stopScrolling();
   }
 
@@ -267,7 +344,7 @@
         }}
         role="presentation"
       >
-        <span class="grip" aria-hidden="true">⠿</span>
+        <span class="grip filled" aria-hidden="true">⠿</span>
         {#if renamingTrack === column.track}
           <InlineName
             value={column.track}
@@ -301,6 +378,7 @@
           {#each group.notes as note (note.path)}
             {#if renamingPath === note.path}
               <div class="row-edit renaming" class:grouped={group.group !== null}>
+                <span class="grip" aria-hidden="true"></span>
                 <span class="slot" aria-hidden="true"></span>
                 <InlineName
                   value={note.name}
@@ -318,6 +396,7 @@
                 type="button"
                 class="note-row"
                 data-row
+                data-path={note.path}
                 class:open={note.path === openPath}
                 class:selected={note.path === selectedPath}
                 class:hovered={$hoverLive && hovered === note.path}
@@ -327,6 +406,9 @@
                 class:in-session={inSession.has(note.path)}
                 class:spent={!!note.spent}
                 class:arming={armed}
+                class:dragging={noteSlot?.note.path === note.path}
+                class:drop-before={lineBefore === note.path}
+                class:drop-after={lineAfter === note.path}
                 aria-pressed={armed ? members.has(note.path) : undefined}
                 title={ambiguous(note.name)
                   ? `Another note is also named “${note.name}”, so links to it are ambiguous`
@@ -349,6 +431,7 @@
                 on:pointerleave={() => leave(note.path)}
                 on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
               >
+                <span class="grip filled" aria-hidden="true">⠿</span>
                 <span class="slot" aria-hidden="true"></span>
                 <span class="label">{note.name}</span>
                 {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
@@ -481,7 +564,9 @@
   }
 
   /* Legend Lore's drag grip (CollectionsPanel .grip), fading in on the
-     hovered plate. Its slot stays, so names don't move under the pointer. */
+     hovered plate or row. Its slot stays, so names don't move under the
+     pointer; a renaming row keeps it empty, so the field starts where the
+     name did, and only a filled one offers the grab. */
   .grip {
     width: 0.55rem;
     flex-shrink: 0;
@@ -490,10 +575,14 @@
     letter-spacing: -0.05em;
     opacity: 0;
     transition: opacity var(--transition-fast);
+  }
+
+  .grip.filled {
     cursor: grab;
   }
 
-  .nameplate.hovered .grip {
+  .nameplate.hovered .grip,
+  .note-row.hovered .grip {
     opacity: 1;
   }
 
@@ -560,6 +649,7 @@
   }
 
   .note-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -647,6 +737,44 @@
 
   .note-row.open.selected {
     box-shadow: var(--ring-focus), inset 2px 0 0 var(--text-accent);
+  }
+
+  /* Legend Lore's drop line (CollectionsPanel .drop-before) between a
+     group's rows: 2px of parchment on the edge the note lands at, the
+     dragged row faded. Drawn over the row, as the columns' line is, so an
+     open row's rule stays; as there, where the line is the row's shadow,
+     it takes a selected row's ring's place. */
+  .note-row.dragging {
+    opacity: 0.4;
+  }
+
+  .note-row.drop-before::after,
+  .note-row.drop-after::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--text-accent);
+    pointer-events: none;
+  }
+
+  .note-row.drop-before::after {
+    top: 0;
+  }
+
+  .note-row.drop-after::after {
+    bottom: 0;
+  }
+
+  .note-row.selected.drop-before,
+  .note-row.selected.drop-after {
+    box-shadow: none;
+  }
+
+  .note-row.open.selected.drop-before,
+  .note-row.open.selected.drop-after {
+    box-shadow: inset 2px 0 0 var(--text-accent);
   }
 
   .note-row.ambiguous {

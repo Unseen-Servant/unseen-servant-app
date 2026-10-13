@@ -57,6 +57,12 @@ class TrackOrder(BaseModel):
     order: list[str]
 
 
+class NoteOrder(BaseModel):
+    campaign: str
+    folder: str
+    order: list[str]
+
+
 class NoteCreate(BaseModel):
     campaign: str
     folder: str
@@ -362,6 +368,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             return {"tracks": vault.save_track_order(campaign_path(body.campaign), body.order)}
 
     # -- notes -------------------------------------------------------------
+
+    @router.put("/notes/order")
+    def order_notes(body: NoteOrder):
+        """The order of a folder's notes, as the GM drags their rows (design
+        §5.1), kept with the campaign's presentation."""
+        with write_lock:
+            return {"order": vault.save_note_order(campaign_path(body.campaign), body.folder, body.order)}
 
     @router.get("/note")
     def get_note(campaign: str, path: str):

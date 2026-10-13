@@ -45,6 +45,9 @@ export const commandApi = {
     invoke<Renamed>('command_rename_track', { campaign, name, newName }),
   /** The campaign's tracks by name, in the order the GM dragged them. */
   orderTracks: (campaign: string, order: string[]) => invoke<string[]>('command_order_tracks', { campaign, order }),
+  /** A folder's notes by name, in the order the GM dragged them. */
+  orderNotes: (campaign: string, folder: string, order: string[]) =>
+    invoke<string[]>('command_order_notes', { campaign, folder, order }),
   readNote: (campaign: string, path: string) => invoke<Note>('command_read_note', { campaign, path }),
   saveNote: (campaign: string, path: string, content: string, baseHash: string) =>
     invoke<SaveOutcome>('command_save_note', { campaign, path, content, baseHash }),

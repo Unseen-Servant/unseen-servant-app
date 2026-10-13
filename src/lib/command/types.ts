@@ -55,6 +55,9 @@ export interface CampaignIndex {
   /** Track folders in display order (Beats and Sessions excluded). */
   tracks: string[];
   notes: NoteEntry[];
+  /** Note names by folder ("NPCs", "NPCs/Vallaki"), in the order the GM
+   *  dragged them; the folder's other notes follow by name. */
+  note_order: Record<string, string[]>;
   /** Case-folded names more than one note answers to. */
   ambiguous: string[];
   beats: BeatEntry[];

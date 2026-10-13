@@ -131,6 +131,21 @@ def test_saving_the_beat_order_keeps_the_track_order(camp):
     }
 
 
+def test_saving_a_folders_note_order_keeps_the_rest(camp):
+    write(camp / ".unseen" / "command.json", json.dumps({"version": 1, "tracks": ["NPCs"], "notes": {"Locations": ["Church"]}}))
+    assert vault.save_note_order(camp, "NPCs", ["Ismark", "Ireena"]) == ["Ismark", "Ireena"]
+    assert vault.note_order(camp) == {"Locations": ["Church"], "NPCs": ["Ismark", "Ireena"]}
+    assert vault.track_order(camp)[0] == "NPCs"
+    assert vault.scan(camp)["note_order"] == {"Locations": ["Church"], "NPCs": ["Ismark", "Ireena"]}
+
+
+def test_note_order_ignores_what_it_cant_read(camp):
+    write(camp / ".unseen" / "command.json", json.dumps({"notes": {"NPCs": ["Ismark", 3], "Locations": "Church"}}))
+    assert vault.note_order(camp) == {"NPCs": ["Ismark"]}
+    write(camp / ".unseen" / "command.json", json.dumps({"notes": ["Ismark"]}))
+    assert vault.note_order(camp) == {}
+
+
 # ---------------------------------------------------------------------------
 # Reading and saving
 # ---------------------------------------------------------------------------
@@ -279,6 +294,24 @@ def test_rename_note_keeps_a_beat_in_its_place(camp):
     vault.save_beat_order(camp, ["Tser Pool", "Ambush"])
     vault.rename_note(camp, "Beats/Ambush.md", "Road ambush")
     assert vault.beat_order(camp) == ["Tser Pool", "Road ambush"]
+
+
+def test_rename_note_keeps_its_place_among_its_folders_notes(camp):
+    vault.save_note_order(camp, "NPCs", ["Ismark", "Ireena"])
+    vault.rename_note(camp, "NPCs/Ismark.md", "Ismark the Lesser")
+    assert vault.note_order(camp) == {"NPCs": ["Ismark the Lesser", "Ireena"]}
+
+
+def test_rename_track_keeps_the_order_of_its_notes(camp):
+    vault.save_note_order(camp, "NPCs", ["Ismark", "Ireena"])
+    vault.save_note_order(camp, "NPCs/Vallaki", ["Lady Wachter"])
+    vault.save_note_order(camp, "NPCs Extra", ["Doru"])
+    vault.rename_track(camp, "NPCs", "Characters")
+    assert vault.note_order(camp) == {
+        "Characters": ["Ismark", "Ireena"],
+        "Characters/Vallaki": ["Lady Wachter"],
+        "NPCs Extra": ["Doru"],
+    }
 
 
 def test_rename_track_keeps_its_place_and_rewrites_path_links(camp):

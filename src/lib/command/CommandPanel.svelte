@@ -578,6 +578,18 @@
     });
   }
 
+  /** A folder's notes, dragged into a new order in their column. The
+   *  column takes it at once, then the campaign keeps it
+   *  (.unseen/command.json). */
+  function orderNotes(folder: string, names: string[]) {
+    if (!index) return;
+    index = { ...index, note_order: { ...index.note_order, [folder]: names } };
+    run(async () => {
+      await commandApi.orderNotes(campaign!, folder, names);
+      await refreshIndex();
+    });
+  }
+
   function trashTrack(column: Column) {
     run(async () => {
       const confirmed = await confirmPrompt.request({
@@ -932,6 +944,7 @@
             onRenameTrack={renameTrack}
             onTrashTrack={trashTrack}
             onReorderTracks={orderTracks}
+            onReorderNotes={orderNotes}
             onRevealTrack={(track) => reveal(track)}
           />
         </div>

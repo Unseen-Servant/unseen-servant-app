@@ -11,6 +11,7 @@ const index: CampaignIndex = {
   name: 'Strahd',
   tracks: ['PCs', 'NPCs', 'Locations'],
   notes: ['NPCs/Ismark.md', 'NPCs/Ireena.md', 'Locations/Tser Pool.md', 'Overview.md', 'PCs/Bo.md'].map(note),
+  note_order: {},
   ambiguous: [],
   beats: [],
   sessions: [],
