@@ -619,8 +619,9 @@
   }
 
   /* While a beat is lit, a track holding its notes counts those in place
-     of all its own: the beat's count badge (BeatColumn .row-count) on the
-     active colour, so a plate says where to look, below the fold too. */
+     of all its own: the lit beat's count badge (BeatColumn .row-count.lit),
+     parchment as its notes' squares, so a plate says where to look, below
+     the fold too. */
   .count.in-beat {
     display: inline-flex;
     align-items: center;
@@ -629,8 +630,8 @@
     min-width: 18px;
     padding: 0 0.3rem;
     border-radius: var(--radius-sm);
-    background: var(--bg-active);
-    color: var(--text-primary);
+    background: color-mix(in srgb, var(--text-accent) 18%, transparent);
+    color: var(--text-accent);
     font-size: 0.65rem;
     font-weight: 700;
     line-height: 1;
