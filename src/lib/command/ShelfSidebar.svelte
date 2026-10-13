@@ -9,6 +9,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
   import { endNoteDrag, startNoteDrag } from './noteDrag';
+  import { SQUARE, SQUARE_OUTLINE } from '../ui/iconPaths';
   import { action, divider, heading, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
 
@@ -161,7 +162,9 @@
       on:pointerleave={() => leave(note.path)}
       on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
     >
-      <span class="slot" aria-hidden="true"></span>
+      <svg class="slot" viewBox="96 96 448 448" fill="currentColor" aria-hidden="true">
+        <path d={members.has(note.path) ? SQUARE : SQUARE_OUTLINE} />
+      </svg>
       <span class="label">{note.name}</span>
       {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
     </button>
@@ -361,21 +364,20 @@
     text-overflow: ellipsis;
   }
 
+  /* The grid's clip slot (TrackGrid .slot), Ableton's square. */
   .slot {
     flex-shrink: 0;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    border: 1px solid transparent;
+    width: 0.45rem;
+    height: 0.45rem;
+    color: transparent;
   }
 
   .note-row.in-session .slot {
-    border-color: var(--text-tertiary);
+    color: var(--text-tertiary);
   }
 
   .note-row.member .slot {
-    background: var(--text-accent);
-    border-color: var(--text-accent);
+    color: var(--text-accent);
   }
 
   .note-row.member .label {
@@ -383,7 +385,7 @@
   }
 
   .note-row.arming.hovered:not(.member) .slot {
-    border-color: var(--text-accent);
+    color: var(--text-accent);
   }
 
   .note-row.spent .label,

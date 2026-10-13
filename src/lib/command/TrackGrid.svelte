@@ -9,8 +9,9 @@
   // collection's row does in Legend Lore; a note's row drags between rows
   // to reorder its group or to move there, or onto another column.
   //
-  // Each row's slot reads the session at a glance: a parchment dot for a
-  // note in the selected beat, a ring for one some other planned beat holds.
+  // Each row's slot, Ableton's square, reads the session at a glance:
+  // filled parchment for a note in the selected beat, an outline for one
+  // some other planned beat holds.
   // A spent note dims and carries a check.
   import { onDestroy } from 'svelte';
   import InlineName from './InlineName.svelte';
@@ -19,6 +20,7 @@
   import { action, divider, heading, type OpenMenu } from './menu';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
+  import { SQUARE, SQUARE_OUTLINE } from '../ui/iconPaths';
   import type { Column, NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
@@ -432,7 +434,9 @@
                 on:pointerleave={() => leave(note.path)}
                 on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
               >
-                <span class="slot" aria-hidden="true"></span>
+                <svg class="slot" viewBox="96 96 448 448" fill="currentColor" aria-hidden="true">
+                  <path d={members.has(note.path) ? SQUARE : SQUARE_OUTLINE} />
+                </svg>
                 <span class="label">{note.name}</span>
                 {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
               </button>
@@ -565,9 +569,13 @@
 
   /* The track's place in the order, as a mixer numbers its channels:
      moving a track renumbers the plates. The count's voice, at the plate's
-     other end. */
+     other end. Its column is the rows' slots' (.slot): a two-digit number
+     spills evenly either side, so the name stays put. */
   .track-number {
     flex-shrink: 0;
+    width: 0.45rem;
+    display: flex;
+    justify-content: center;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     color: var(--text-tertiary);
@@ -635,18 +643,22 @@
     user-select: none;
   }
 
+  /* Rows line up with their plate: 0.25rem of list padding and 0.35rem
+     here are the plate's 0.6rem inset, so the slot sits under the track's
+     number, and the plate's 0.4rem gap puts each note's name under the
+     track's. */
   .note-row {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding-left: 0.25rem;
+    gap: 0.4rem;
+    padding-left: 0.35rem;
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
 
   .note-row.grouped {
-    padding-left: 0.75rem;
+    padding-left: 0.85rem;
   }
 
   .label {
@@ -656,24 +668,22 @@
     text-overflow: ellipsis;
   }
 
-  /* The clip slot: empty, a ring (the session holds this note), or a
-     parchment dot (the selected beat does). Content, not a mode: no glow —
-     the lit lamp belongs to Play's live set. */
+  /* The clip slot, Ableton's square: empty, an outline (the session holds
+     this note), or filled parchment (the selected beat does). Content, not
+     a mode: no glow — the lit lamp belongs to Play's live set. */
   .slot {
     flex-shrink: 0;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    border: 1px solid transparent;
+    width: 0.45rem;
+    height: 0.45rem;
+    color: transparent;
   }
 
   .note-row.in-session .slot {
-    border-color: var(--text-tertiary);
+    color: var(--text-tertiary);
   }
 
   .note-row.member .slot {
-    background: var(--text-accent);
-    border-color: var(--text-accent);
+    color: var(--text-accent);
   }
 
   .note-row.member .label {
@@ -682,7 +692,7 @@
 
   /* Armed: every slot offers itself, so the click's meaning shows. */
   .note-row.arming.hovered:not(.member) .slot {
-    border-color: var(--text-accent);
+    color: var(--text-accent);
   }
 
   .note-row.spent .label,
@@ -781,13 +791,13 @@
   .row-edit.renaming {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding-left: 0.25rem;
+    gap: 0.4rem;
+    padding-left: 0.35rem;
     padding-right: 0.4rem;
   }
 
   .row-edit.renaming.grouped {
-    padding-left: 0.75rem;
+    padding-left: 0.85rem;
   }
 
   .ghost-row {

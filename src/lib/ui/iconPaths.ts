@@ -50,6 +50,20 @@ export const CIRCLE_RING =
   'M528 320C528 205.1 434.9 112 320 112C205.1 112 112 205.1 112 320C112 434.9 205.1 528 320 528C434.9 528 528 434.9 528 320zM64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320z';
 
 /**
+ * Font Awesome "square" (solid) and "square" (regular, an outline). A note's
+ * clip slot in Command, as Ableton's: the outline while a planned beat holds
+ * the note, filled while the selected beat does. Drawn with
+ * viewBox="96 96 448 448" — the vendored 640 box cropped to the square, so
+ * the rendered size is the glyph's size.
+ * Sources: ./icons/square-solid-full.svg, ./icons/square-regular-full.svg
+ */
+export const SQUARE =
+  'M160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160C96 124.7 124.7 96 160 96z';
+
+export const SQUARE_OUTLINE =
+  'M480 144C488.8 144 496 151.2 496 160L496 480C496 488.8 488.8 496 480 496L160 496C151.2 496 144 488.8 144 480L144 160C144 151.2 151.2 144 160 144L480 144zM160 96C124.7 96 96 124.7 96 160L96 480C96 515.3 124.7 544 160 544L480 544C515.3 544 544 515.3 544 480L544 160C544 124.7 515.3 96 480 96L160 96z';
+
+/**
  * Font Awesome "play". The transport's launch key: a collection playing in
  * Legend Lore, a note or beat launched in Command. viewBox="0 0 640 640".
  * Source: ./icons/play-solid-full.svg
