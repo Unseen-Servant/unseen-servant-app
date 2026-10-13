@@ -581,9 +581,9 @@
   }
 
   /* The track's place in the order, as a mixer numbers its channels:
-     moving a track renumbers the plates. The count's voice, at the plate's
-     other end. Its column is the rows' slots' (.slot): a two-digit number
-     spills evenly either side, so the name stays put. */
+     moving a track renumbers the plates. Small grey figures, quieter than
+     the count's badge. Its column is the rows' slots' (.slot): a two-digit
+     number spills evenly either side, so the name stays put. */
   .track-number {
     flex-shrink: 0;
     width: 0.55rem;
@@ -611,18 +611,11 @@
     color: var(--text-primary);
   }
 
+  /* The track's count of notes: a beat's count badge (BeatColumn
+     .row-count), Legend Lore's LED readout. */
   .count {
     margin-left: auto;
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-tertiary);
-  }
-
-  /* While a beat is lit, a track holding its notes counts those in place
-     of all its own: the lit beat's count badge (BeatColumn .row-count.lit),
-     parchment as its notes' squares, so a plate says where to look, below
-     the fold too. */
-  .count.in-beat {
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -630,11 +623,21 @@
     min-width: 18px;
     padding: 0 0.3rem;
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--text-accent) 18%, transparent);
-    color: var(--text-accent);
+    background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+    color: var(--text-secondary);
     font-size: 0.65rem;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
     line-height: 1;
+  }
+
+  /* While a beat is lit, a track holding its notes counts those in place
+     of all its own: the lit beat's count badge (BeatColumn .row-count.lit),
+     parchment as its notes' squares, so a plate says where to look, below
+     the fold too. */
+  .count.in-beat {
+    background: color-mix(in srgb, var(--text-accent) 18%, transparent);
+    color: var(--text-accent);
   }
 
   .notes {

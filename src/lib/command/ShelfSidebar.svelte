@@ -298,11 +298,23 @@
     color: var(--text-tertiary);
   }
 
+  /* The shelf's count of notes: the tracks' count badge (TrackGrid .count). */
   .count {
     margin-left: auto;
-    font-size: 0.75rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 0.3rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--text-tertiary);
+    line-height: 1;
   }
 
   .list {
