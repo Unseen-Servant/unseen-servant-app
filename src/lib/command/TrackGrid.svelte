@@ -381,11 +381,10 @@
           </button>
           {@const lit = inBeat.get(column.track) ?? 0}
           {#if lit}
-            <span class="in-beat" title={`${lit} in ${litBeatName}`}>
-              <span class="in-beat-mark" aria-hidden="true"></span>{lit}
-            </span>
+            <span class="count in-beat" title={`${lit} of ${column.count} in ${litBeatName}`}>{lit}</span>
+          {:else}
+            <span class="count">{column.count}</span>
           {/if}
-          <span class="count">{column.count}</span>
         {/if}
       </header>
 
@@ -619,28 +618,22 @@
     color: var(--text-tertiary);
   }
 
-  /* While a beat is lit, how many of the track's notes it holds, beside
-     the track's own count: the rows' filled square in small, so a plate
-     says where to look, below the fold too. */
-  .in-beat {
-    margin-left: auto;
+  /* While a beat is lit, a track holding its notes counts those in place
+     of all its own: the beat's count badge (BeatColumn .row-count) on the
+     active colour, so a plate says where to look, below the fold too. */
+  .count.in-beat {
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-accent);
-  }
-
-  .in-beat + .count {
-    margin-left: 0;
-  }
-
-  .in-beat-mark {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: var(--radius-cell);
-    background: var(--text-accent);
+    justify-content: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 0.3rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-active);
+    color: var(--text-primary);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
   }
 
   .notes {
