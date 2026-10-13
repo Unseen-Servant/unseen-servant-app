@@ -1,20 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  BOOK,
-  CARET_RIGHT,
-  CIRCLE,
-  CIRCLE_RING,
-  FOLDER,
-  FOLDER_OPEN,
-  GEM,
-  GEM_OUTLINE,
-  PLAY,
-  SHIELD,
-  SQUARE,
-  SQUARE_OUTLINE,
-} from './iconPaths';
+import { BOOK, CARET_RIGHT, CIRCLE, CIRCLE_RING, FOLDER, FOLDER_OPEN, GEM, GEM_OUTLINE, PLAY, SHIELD } from './iconPaths';
 
 function vendoredPath(file: string): string {
   const svg = readFileSync(new URL(`./icons/${file}`, import.meta.url), 'utf8');
@@ -55,12 +42,6 @@ describe('vendored sources', () => {
   it('play matches its vendored file', () => {
     expect(PLAY).toBe(vendoredPath('play-solid-full.svg'));
   });
-  it('square matches its vendored file', () => {
-    expect(SQUARE).toBe(vendoredPath('square-solid-full.svg'));
-  });
-  it('square outline matches its vendored file', () => {
-    expect(SQUARE_OUTLINE).toBe(vendoredPath('square-regular-full.svg'));
-  });
 });
 
 describe('shared glyphs', () => {
@@ -78,8 +59,6 @@ describe('shared glyphs', () => {
       GEM_OUTLINE,
       PLAY,
       SHIELD,
-      SQUARE,
-      SQUARE_OUTLINE,
     };
     const offenders = svelteFiles(src).flatMap((file) => {
       const text = readFileSync(file, 'utf8');

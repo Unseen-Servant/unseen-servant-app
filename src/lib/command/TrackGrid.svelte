@@ -20,7 +20,6 @@
   import { action, divider, heading, type OpenMenu } from './menu';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
-  import { SQUARE, SQUARE_OUTLINE } from '../ui/iconPaths';
   import type { Column, NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
@@ -434,9 +433,7 @@
                 on:pointerleave={() => leave(note.path)}
                 on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
               >
-                <svg class="slot" viewBox="96 96 448 448" fill="currentColor" aria-hidden="true">
-                  <path d={members.has(note.path) ? SQUARE : SQUARE_OUTLINE} />
-                </svg>
+                <span class="slot" aria-hidden="true"></span>
                 <span class="label">{note.name}</span>
                 {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
               </button>
@@ -670,20 +667,26 @@
 
   /* The clip slot, Ableton's square: empty, an outline (the session holds
      this note), or filled parchment (the selected beat does). Content, not
-     a mode: no glow — the lit lamp belongs to Play's live set. */
+     a mode: no glow — the lit lamp belongs to Play's live set. Font
+     Awesome's square (ui/icons/square-*.svg) drawn as a box: its outline is
+     under a pixel at this size, and an SVG path isn't snapped to the pixel
+     grid, so two of its edges smeared; a border is snapped. */
   .slot {
     flex-shrink: 0;
+    box-sizing: border-box;
     width: 0.55rem;
     height: 0.55rem;
-    color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-cell);
   }
 
   .note-row.in-session .slot {
-    color: var(--text-tertiary);
+    border-color: var(--text-tertiary);
   }
 
   .note-row.member .slot {
-    color: var(--text-accent);
+    background: var(--text-accent);
+    border-color: var(--text-accent);
   }
 
   .note-row.member .label {
@@ -692,7 +695,7 @@
 
   /* Armed: every slot offers itself, so the click's meaning shows. */
   .note-row.arming.hovered:not(.member) .slot {
-    color: var(--text-accent);
+    border-color: var(--text-accent);
   }
 
   .note-row.spent .label,
