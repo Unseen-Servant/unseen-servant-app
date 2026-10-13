@@ -573,7 +573,7 @@
      spills evenly either side, so the name stays put. */
   .track-number {
     flex-shrink: 0;
-    width: 0.45rem;
+    width: 0.55rem;
     display: flex;
     justify-content: center;
     font-size: 0.75rem;
@@ -673,8 +673,8 @@
      a mode: no glow — the lit lamp belongs to Play's live set. */
   .slot {
     flex-shrink: 0;
-    width: 0.45rem;
-    height: 0.45rem;
+    width: 0.55rem;
+    height: 0.55rem;
     color: transparent;
   }
 

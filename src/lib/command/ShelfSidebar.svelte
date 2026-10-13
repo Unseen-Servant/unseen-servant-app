@@ -367,8 +367,8 @@
   /* The grid's clip slot (TrackGrid .slot), Ableton's square. */
   .slot {
     flex-shrink: 0;
-    width: 0.45rem;
-    height: 0.45rem;
+    width: 0.55rem;
+    height: 0.55rem;
     color: transparent;
   }
 
