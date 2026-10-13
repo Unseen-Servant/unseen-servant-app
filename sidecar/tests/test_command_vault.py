@@ -289,6 +289,11 @@ def test_move_note_leaves_name_links_alone(camp):
     assert (camp / "Locations" / "Church.md").read_text() == "[[Ismark]] [[Locations/Ismark]]"
 
 
+def test_move_note_into_and_out_of_a_tracks_subfolder(camp):
+    assert vault.move_note(camp, "NPCs/Ismark.md", "NPCs/Vallaki")[0] == "NPCs/Vallaki/Ismark.md"
+    assert vault.move_note(camp, "NPCs/Vallaki/Lady Wachter.md", "NPCs")[0] == "NPCs/Lady Wachter.md"
+
+
 def test_rename_note_keeps_a_beat_in_its_place(camp):
     write(camp / "Beats" / "Tser Pool.md", "")
     vault.save_beat_order(camp, ["Tser Pool", "Ambush"])

@@ -6,8 +6,8 @@
   // trash. The ghost rows at the foot of each column and the
   // end of the grid name a new note or track in place. A column's nameplate
   // drags to reorder the tracks and renames on a double-click, as a
-  // collection's row does in Legend Lore; a note's row drags among its
-  // group's rows to reorder them, or onto another column to move there.
+  // collection's row does in Legend Lore; a note's row drags between rows
+  // to reorder its group or to move there, or onto another column.
   //
   // Each row's slot reads the session at a glance: a parchment dot for a
   // note in the selected beat, a ring for one some other planned beat holds.
@@ -39,7 +39,9 @@
   export let onSelect: (note: NoteEntry) => void;
   export let onCreateNote: (track: string, name: string) => void;
   export let onRenameNote: (note: NoteEntry, name: string) => void;
-  export let onMoveNote: (note: NoteEntry, track: string) => void;
+  /** Move a note to a track or a group's folder; dropped between rows
+   *  there, `order` is that folder's notes by name, with it in place. */
+  export let onMoveNote: (note: NoteEntry, folder: string, order?: string[]) => void;
   export let onTrashNote: (note: NoteEntry) => void;
   export let onRevealNote: (note: NoteEntry) => void;
   export let onCreateTrack: (name: string) => void;
@@ -88,9 +90,11 @@
   // read nothing else). A track, from its nameplate, reorders as Legend
   // Lore's collections do: over a column, the pointer's half picks the side
   // it lands on; past the last, the end. A note, from a row here or on the
-  // shelf, moves to the track whose column it's dropped on. Among its own
-  // group's rows a note reorders them the same way, the pointer's half of
-  // a row picking the side, an order the campaign keeps.
+  // shelf, lands between rows the same way, the pointer's half of a row
+  // picking the side: among its own group's it reorders them, among any
+  // other group's, in this column or another, it moves to that folder in
+  // that place, an order the campaign keeps. Dropped elsewhere on another
+  // track's column, it moves to that track.
   const TRACK_MIME = 'application/x-command-track';
   const isTrackDrag = (e: DragEvent) =>
     Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === TRACK_MIME);
@@ -102,8 +106,8 @@
   let noteInto: string | null = null;
   let hoveredTrack: string | null = null;
 
-  /** Where a note dragged among its own group's rows lands: before row
-   *  `at`, or after the last. */
+  /** Where a note dragged among a group's rows lands: before row `at`, or
+   *  after the last. */
   interface NoteSlot {
     note: NoteEntry;
     group: NoteGroup;
@@ -134,8 +138,8 @@
   // The webview doesn't scroll the grid under a drag, so the grid does: a
   // track or note held near either edge scrolls it that way, faster the
   // nearer the edge, until the pointer moves off, the drag ends or there's
-  // no more. A note over its own track's column scrolls that column the
-  // same way, by its top and bottom, to reach the rows it can land among.
+  // no more. A note over a column scrolls that column the same way, by its
+  // top and bottom, to reach the rows it can land among.
   const EDGE = 48;
   const MAX_STEP = 12;
   let gridEl: HTMLDivElement;
@@ -158,7 +162,7 @@
       const left = gridEl.scrollLeft;
       const step = edgeStep(pointerX, grid.left, grid.right);
       if (step !== 0) gridEl.scrollLeft += step;
-      const list = ownList(pointerX);
+      const list = draggingTrack ? null : listOf(columnAt(pointerX));
       const top = list?.scrollTop;
       if (list) {
         const box = list.getBoundingClientRect();
@@ -206,42 +210,43 @@
     return note && track !== note.track ? track : null;
   }
 
+  /** The rows' list of column `i`; none past the last track. */
   const listOf = (i: number) => gridEl.children[i]?.querySelector<HTMLElement>('.notes') ?? null;
 
-  /** The list of rows under `x`, while a note is dragged over its own
-   *  track's column. */
-  function ownList(x: number): HTMLElement | null {
-    const note = draggingTrack ? null : draggedNote();
-    const i = columnAt(x);
-    return note && cols[i]?.track === note.track ? listOf(i) : null;
-  }
-
-  /** Where a note dropped at (x, y) lands among its own group's rows:
-   *  before the row under it or, past that row's middle, after it. Away
-   *  from those rows, nowhere. */
+  /** Where a note dropped at (x, y) lands among the rows of the group
+   *  under it: before the row under it or, past that row's middle, after
+   *  it. Away from a group's rows, nowhere. */
   function noteSlotAt(note: NoteEntry | null, x: number, y: number): NoteSlot | null {
     const i = columnAt(x);
-    const group = note && cols[i]?.track === note.track ? cols[i].groups.find((g) => g.group === note.group) : null;
     const list = listOf(i);
-    if (!note || !group || !list) return null;
+    if (!note || !list) return null;
     // Rows scrolled out of the list still have boxes, under the nameplate.
     const shown = list.getBoundingClientRect();
     if (y < shown.top || y >= shown.bottom) return null;
-    const rows = group.notes.map((n) => list.querySelector(`[data-path="${CSS.escape(n.path)}"]`));
-    if (rows.some((r) => !r)) return null;
-    const boxes = rows.map((r) => r!.getBoundingClientRect());
-    if (y < boxes[0].top || y >= boxes[boxes.length - 1].bottom) return null;
-    const at = boxes.findIndex((b) => y < b.top + b.height / 2);
-    return { note, group, at: at < 0 ? boxes.length : at };
+    const boxes = new Map(
+      Array.from(list.querySelectorAll<HTMLElement>('[data-path]'), (r) => [r.dataset.path, r.getBoundingClientRect()]),
+    );
+    for (const group of cols[i].groups) {
+      const rows = group.notes.map((n) => boxes.get(n.path));
+      // A row being renamed has no box: its group takes no drop.
+      if (rows.some((r) => !r)) continue;
+      const first = rows[0]!;
+      const last = rows[rows.length - 1]!;
+      if (y < first.top || y >= last.bottom) continue;
+      const at = rows.findIndex((b) => y < b!.top + b!.height / 2);
+      return { note, group, at: at < 0 ? rows.length : at };
+    }
+    return null;
   }
 
-  /** Light what a drop at (x, y) would do. */
+  /** Light what a drop at (x, y) would do: between rows, the line; on the
+   *  rest of another track's column, the column. */
   function aim(x: number, y: number) {
     if (draggingTrack) dropAt = slotAt(x);
     else {
       const note = draggedNote();
-      noteInto = noteTarget(note, x);
       noteSlot = noteSlotAt(note, x, y);
+      noteInto = noteSlot ? null : noteTarget(note, x);
     }
   }
 
@@ -260,8 +265,8 @@
   function dropOnGrid(e: DragEvent) {
     const dragged = draggingTrack;
     const note = isNoteDrag(e) ? draggedNote() : null;
-    const into = noteTarget(note, e.clientX);
     const slot = noteSlotAt(note, e.clientX, e.clientY);
+    const into = slot ? null : noteTarget(note, e.clientX);
     const at = slotAt(e.clientX);
     endDrag();
     if (dragged && isTrackDrag(e)) {
@@ -272,18 +277,23 @@
       if (from < 0 || to === from) return;
       order.splice(to, 0, ...order.splice(from, 1));
       onReorderTracks(order);
-    } else if (note && into !== null) {
-      e.preventDefault();
-      onMoveNote(note, into);
     } else if (slot) {
       e.preventDefault();
       const notes = slot.group.notes;
-      const from = notes.findIndex((n) => n.path === slot.note.path);
-      const to = from < 0 ? null : planMoveTo(from, slot.at);
-      if (to === null) return;
       const names = notes.map((n) => n.name);
+      const from = notes.findIndex((n) => n.path === slot.note.path);
+      if (from < 0) {
+        names.splice(slot.at, 0, slot.note.name);
+        onMoveNote(slot.note, slot.group.folder, names);
+        return;
+      }
+      const to = planMoveTo(from, slot.at);
+      if (to === null) return;
       names.splice(to, 0, ...names.splice(from, 1));
       onReorderNotes(slot.group.folder, names);
+    } else if (note && into !== null) {
+      e.preventDefault();
+      onMoveNote(note, into);
     }
   }
 

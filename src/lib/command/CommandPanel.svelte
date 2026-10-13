@@ -334,12 +334,16 @@
     });
   }
 
-  function moveNote(note: NoteEntry, track: string) {
+  /** A note moved to a track or a group's folder. Dropped between rows
+   *  there, `order` is that folder's notes with it in place, saved first so
+   *  the move's refresh already shows it there. */
+  function moveNote(note: NoteEntry, folder: string, order?: string[]) {
     run(async () => {
       const isOpen = note.path === bufState.path;
       const wasSelected = selected === note.path;
       if (isOpen) await buffer.flush();
-      const moved = await commandApi.moveNote(campaign!, note.path, track);
+      if (order) await commandApi.orderNotes(campaign!, folder, order);
+      const moved = await commandApi.moveNote(campaign!, note.path, folder);
       if (isOpen) await buffer.retarget(moved.path);
       await refreshIndex();
       if (wasSelected) selected = moved.path;
