@@ -346,6 +346,7 @@
         on:dragstart={(e) => startTrackDrag(e, column.track)}
         role="presentation"
       >
+        <span class="track-number" aria-hidden="true">{i + 1}</span>
         {#if renamingTrack === column.track}
           <InlineName
             value={column.track}
@@ -560,6 +561,16 @@
     padding: 0.4rem 0.6rem 0.3rem;
     background: var(--bg-container);
     border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* The track's place in the order, as a mixer numbers its channels:
+     moving a track renumbers the plates. The count's voice, at the plate's
+     other end. */
+  .track-number {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-tertiary);
   }
 
   .track-name {
