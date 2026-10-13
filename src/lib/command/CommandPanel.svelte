@@ -113,6 +113,10 @@
   $: beatAt = (path: string | null) => index?.beats.find((b) => b.path === path) ?? null;
   $: members = memberPaths(beatAt(armedBeat ?? litBeat));
   $: inSession = index ? sessionNotePaths(index, session) : new Set<string>();
+  /** The live set while a beat is launched, or anything is: Prep dims the
+   *  rest, as Legend Lore's tree does while a collection plays. Null while
+   *  nothing is. */
+  $: liveNotes = live && (live.beat || live.notes.length) ? new Set(live.notes) : null;
   // A note or beat that left (renamed, moved, trashed) can't stay selected,
   // nor a beat armed.
   $: if (index && selected && !beatAt(selected) && !index.notes.some((n) => n.path === selected)) selected = null;
@@ -925,6 +929,7 @@
             onSelect={(note) => (selected = note.path)}
             {members}
             {inSession}
+            {liveNotes}
             armed={!!armedBeat}
             ambiguous={(name) => isAmbiguous(index!, name)}
             onOpen={(note) => openPath(note.path)}
@@ -947,6 +952,7 @@
             {members}
             litBeatName={beatAt(armedBeat ?? litBeat)?.name ?? null}
             {inSession}
+            {liveNotes}
             armed={!!armedBeat}
             ambiguous={(name) => isAmbiguous(index!, name)}
             onOpen={(note) => openPath(note.path)}
