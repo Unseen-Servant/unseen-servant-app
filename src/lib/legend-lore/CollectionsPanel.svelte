@@ -795,14 +795,6 @@
           on:dblclick={() => { if (!isRenamingRow) startRename(col.name); }}
           on:contextmenu={(e) => openContextMenu(e, col.name)}
         >
-          <!-- The slot is reserved under every sort so the caret keeps its
-               column when the sort changes; only custom order fills it. -->
-          <span
-            class="grip"
-            class:filled={sortKey === 'custom'}
-            title={sortKey === 'custom' ? 'Drag to reorder' : undefined}
-            aria-hidden="true"
-          >{sortKey === 'custom' ? '⠿' : ''}</span>
           {#if col.color}
             <!-- Pigment gem — this is where the color↔collection
                  mapping is taught; the same gem reappears in scope
@@ -933,7 +925,6 @@
        so Esc costs nothing. -->
   {#if creating !== null}
     <div class="row-container ghost naming">
-      <span class="grip" aria-hidden="true"></span>
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
         <path d={GEM}/>
       </svg>
@@ -966,7 +957,6 @@
       title={`New collection${chordHint('collections.new')} — or drop books here`}
       aria-keyshortcuts={keyShortcut('collections.new') || undefined}
     >
-      <span class="grip" aria-hidden="true"></span>
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
         <path d={GEM}/>
       </svg>
@@ -1195,11 +1185,12 @@
     align-items: center;
     gap: 0.3rem;
     /* Right gutter matches the filter panel's rows so the two panels'
-       count readouts share a column down the dock. On the left, 0.25rem +
-       the grip (0.55rem) + the gap (0.3rem) is the filter row's 1.1rem
-       inset, so the gem lands in the same column as the filter panel's
-       shields, with the grip in front of it. */
-    padding: 0.22rem 0.75rem 0.22rem 0.25rem;
+       count readouts share a column down the dock. On the left, the
+       filter row's 1.1rem inset, so the gem lands in the same column as
+       the filter panel's shields. Rows carry no drag grip, as a Mac
+       list's don't: under custom order a row drags, and the drag shows
+       itself. */
+    padding: 0.22rem 0.75rem 0.22rem 1.1rem;
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
     border-left: 3px solid transparent;
     cursor: pointer;
@@ -1224,10 +1215,8 @@
   }
   /* While any collection plays, stopped rows dim to 45% (out of scope),
      never hidden. Hover restores legibility, mirroring the tree's muted
-     rows. The transport stays full-strength — it's the way back in.
-     The grip is excluded at rest so dimming doesn't override its
-     hidden-until-hover opacity; the hover rule below still dims it. */
-  .row-container.dimmed > :not(.tr):not(.grip) {
+     rows. The transport stays full-strength — it's the way back in. */
+  .row-container.dimmed > :not(.tr) {
     opacity: var(--opacity-out-of-scope);
   }
   .row-container.dimmed.hovered > :not(.tr) {
@@ -1251,34 +1240,13 @@
     box-shadow: inset 0 -2px 0 var(--text-accent);
   }
 
-  /* Drag grip — fades in at the row's left edge on hover, custom order
-     only. The slot itself is always in the markup, empty under the other
-     sorts, so switching sort doesn't shift the caret's column. */
-  .grip {
-    width: 0.55rem;
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
-    letter-spacing: -0.05em;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-  }
-  /* Only the filled slot offers the grab — an empty spacer must not. */
-  .grip.filled {
-    cursor: grab;
-  }
-  .row-container.hovered .grip {
-    opacity: 1;
-  }
-
   /* The filter panel's shield size, so the two icon columns match. */
   .bkm {
     width: 0.8rem;
     height: 0.8rem;
     flex-shrink: 0;
     /* Tops the row's 0.3rem gap up to the filter rows' 0.45rem, so names
-       start in one column down the dock. The gap itself stays 0.3rem: the
-       grip-to-gem inset above depends on it. */
+       start in one column down the dock. */
     margin-right: 0.15rem;
   }
 

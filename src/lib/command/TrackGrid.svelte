@@ -354,7 +354,7 @@
         }}
         role="presentation"
       >
-        <span class="grip filled" aria-hidden="true">⠿</span>
+        <span class="grip" aria-hidden="true">⠿</span>
         {#if renamingTrack === column.track}
           <InlineName
             value={column.track}
@@ -388,7 +388,6 @@
           {#each group.notes as note (note.path)}
             {#if renamingPath === note.path}
               <div class="row-edit renaming" class:grouped={group.group !== null}>
-                <span class="grip" aria-hidden="true"></span>
                 <span class="slot" aria-hidden="true"></span>
                 <InlineName
                   value={note.name}
@@ -441,7 +440,6 @@
                 on:pointerleave={() => leave(note.path)}
                 on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
               >
-                <span class="grip filled" aria-hidden="true">⠿</span>
                 <span class="slot" aria-hidden="true"></span>
                 <span class="label">{note.name}</span>
                 {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
@@ -573,10 +571,10 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* Legend Lore's drag grip (CollectionsPanel .grip), fading in on the
-     hovered plate or row. Its slot stays, so names don't move under the
-     pointer; a renaming row keeps it empty, so the field starts where the
-     name did, and only a filled one offers the grab. */
+  /* The drag grip, fading in on the hovered plate. Rows go without one, as
+     a Mac list's do, and their drag shows itself; a column's header isn't
+     expected to drag, so it says so. Its slot stays, so the name doesn't
+     move under the pointer. */
   .grip {
     width: 0.55rem;
     flex-shrink: 0;
@@ -585,14 +583,10 @@
     letter-spacing: -0.05em;
     opacity: 0;
     transition: opacity var(--transition-fast);
-  }
-
-  .grip.filled {
     cursor: grab;
   }
 
-  .nameplate.hovered .grip,
-  .note-row.hovered .grip {
+  .nameplate.hovered .grip {
     opacity: 1;
   }
 

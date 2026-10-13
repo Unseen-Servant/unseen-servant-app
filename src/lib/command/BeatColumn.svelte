@@ -343,7 +343,6 @@
       on:pointerleave={() => leave(beat.path)}
       role="presentation"
     >
-      <span class="grip filled" aria-hidden="true">⠿</span>
       <button
         type="button"
         class="beat-name"
@@ -456,7 +455,6 @@
             on:pointerleave={() => leave(row.link)}
             on:contextmenu|preventDefault={(e) => rowMenu(e, row)}
           >
-            <span class="grip filled" aria-hidden="true">⠿</span>
             <span class="beat-name">{row.link}</span>
           </button>
         {/if}
@@ -468,7 +466,6 @@
            note dropped on it starts the beat with that note. -->
       {#if creating}
         <div class="beat-row ghost naming">
-          <span class="grip" aria-hidden="true"></span>
           <InlineName
             bare
             placeholder={seed ? `Beat with ${seed.name}…` : 'Beat name…'}
@@ -511,7 +508,6 @@
           on:dragover={overGhost}
           on:drop={dropOnGhost}
         >
-          <span class="grip" aria-hidden="true"></span>
           <!-- Under a drag, say what the drop will make. One label throughout:
                swapping the element under the pointer mid-drag detaches the
                drag's target, and WebKit then refuses the drop. -->
@@ -544,7 +540,7 @@
 {/if}
 
 <style>
-  /* Room for a name beside the grip, the transport and the count. With the
+  /* Room for a name beside the transport and the count. With the
      shelf open at 1280px, the grid scrolls to reach its + track column. */
   .beats {
     flex: 0 0 15rem;
@@ -710,27 +706,6 @@
     user-select: none;
   }
 
-  /* Legend Lore's drag grip (CollectionsPanel .grip), fading in on the
-     hovered row. Every row keeps its slot, the ghost's too, so names start
-     in one column; it's filled on every beat, as each one reorders. */
-  .grip {
-    width: 0.55rem;
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
-    letter-spacing: -0.05em;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-  }
-
-  .grip.filled {
-    cursor: grab;
-  }
-
-  .beat-row.hovered .grip {
-    opacity: 1;
-  }
-
   .beat-row.missing {
     cursor: pointer;
   }
@@ -846,11 +821,11 @@
   }
 
   /* A rename takes the name's place, as in Legend Lore: the field starts
-     where the name did, past the row's 3px rule and the grip's slot. */
+     where the name did, past the row's 3px rule. */
   .row-edit {
     display: flex;
     align-items: center;
-    padding: 0.05rem 0.35rem 0.05rem calc(0.35rem + 3px + 0.55rem + 0.3rem);
+    padding: 0.05rem 0.35rem 0.05rem calc(0.35rem + 3px);
     font-size: 0.9rem;
     line-height: 1.5;
   }
@@ -896,7 +871,7 @@
   .ghost-keys {
     display: flex;
     gap: 0.75rem;
-    padding: 0.2rem 0.35rem 0.35rem calc(0.35rem + 3px + 0.55rem + 0.3rem);
+    padding: 0.2rem 0.35rem 0.35rem calc(0.35rem + 3px);
   }
 
   .ghost-keys kbd {
@@ -911,7 +886,7 @@
   }
 
   .empty-hint {
-    padding: 0.3rem 0.35rem 0.5rem calc(0.35rem + 3px + 0.55rem + 0.3rem);
+    padding: 0.3rem 0.35rem 0.5rem calc(0.35rem + 3px);
   }
 
   /* Under a drag, as Legend Lore's collections panel: the dragged row fades,
