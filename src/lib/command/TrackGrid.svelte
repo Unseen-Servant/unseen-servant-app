@@ -104,7 +104,6 @@
   let dropAt: number | null = null;
   /** The track a dragged note would move to. */
   let noteInto: string | null = null;
-  let hoveredTrack: string | null = null;
 
   /** Where a note dragged among a group's rows lands: before row `at`, or
    *  after the last. */
@@ -124,14 +123,12 @@
     e.dataTransfer.setData(TRACK_MIME, track);
   }
 
-  // Any drag's end, the shelf's too, reaches the window. A drag delivers no
-  // pointerleave: unlatch, as Legend Lore's panel does.
+  // Any drag's end, the shelf's too, reaches the window.
   function endDrag() {
     draggingTrack = null;
     dropAt = null;
     noteInto = null;
     noteSlot = null;
-    hoveredTrack = null;
     stopScrolling();
   }
 
@@ -345,16 +342,10 @@
     >
       <header
         class="nameplate"
-        class:hovered={$hoverLive && hoveredTrack === column.track}
         draggable={renamingTrack !== column.track}
         on:dragstart={(e) => startTrackDrag(e, column.track)}
-        on:pointerenter={() => (hoveredTrack = column.track)}
-        on:pointerleave={() => {
-          if (hoveredTrack === column.track) hoveredTrack = null;
-        }}
         role="presentation"
       >
-        <span class="grip" aria-hidden="true">⠿</span>
         {#if renamingTrack === column.track}
           <InlineName
             value={column.track}
@@ -569,25 +560,6 @@
     padding: 0.4rem 0.6rem 0.3rem;
     background: var(--bg-container);
     border-bottom: 1px solid var(--border-subtle);
-  }
-
-  /* The drag grip, fading in on the hovered plate. Rows go without one, as
-     a Mac list's do, and their drag shows itself; a column's header isn't
-     expected to drag, so it says so. Its slot stays, so the name doesn't
-     move under the pointer. */
-  .grip {
-    width: 0.55rem;
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
-    letter-spacing: -0.05em;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-    cursor: grab;
-  }
-
-  .nameplate.hovered .grip {
-    opacity: 1;
   }
 
   .track-name {
