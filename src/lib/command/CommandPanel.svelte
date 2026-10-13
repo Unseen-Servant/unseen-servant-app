@@ -71,10 +71,14 @@
   let beatsOpen = true;
 
   /** The one row selected, a note's or a beat's, as Legend Lore's focused
-   *  row: a double-click opens it, and a selected beat lights its notes. */
+   *  row: a double-click opens it. */
   let selected: string | null = null;
+  /** The beat whose notes are lit across the tracks: the last one clicked,
+   *  until another is, it's clicked again, or Esc. Selecting or opening a
+   *  note leaves it lit, so a beat's notes can be read one by one. */
+  let litBeat: string | null = null;
   /** The beat a click on a note puts it in or takes it out of. Its notes
-   *  stay lit while it's armed, whatever is selected. */
+   *  stay lit while it's armed, whatever else is. */
   let armedBeat: string | null = null;
 
   let editor: NoteEditor | undefined;
@@ -107,12 +111,13 @@
   $: rows = index ? planRows(index, session) : [];
   $: spare = index ? unscheduled(index, session, true) : [];
   $: beatAt = (path: string | null) => index?.beats.find((b) => b.path === path) ?? null;
-  $: members = memberPaths(beatAt(armedBeat ?? selected));
+  $: members = memberPaths(beatAt(armedBeat ?? litBeat));
   $: inSession = index ? sessionNotePaths(index, session) : new Set<string>();
   // A note or beat that left (renamed, moved, trashed) can't stay selected,
   // nor a beat armed.
   $: if (index && selected && !beatAt(selected) && !index.notes.some((n) => n.path === selected)) selected = null;
   $: if (index && armedBeat && !beatAt(armedBeat)) armedBeat = null;
+  $: if (index && litBeat && !beatAt(litBeat)) litBeat = null;
 
   // -- running things -----------------------------------------------------
 
@@ -140,7 +145,7 @@
     campaign = null;
     index = null;
     live = null;
-    selected = armedBeat = null;
+    selected = armedBeat = litBeat = null;
   }
 
   /** A live set snapshot, from an answer or the event relay: kept if it's
@@ -241,9 +246,10 @@
       return;
     }
     // Esc undoes the louder thing first, as in Legend Lore: the arm, then
-    // the selection.
+    // the lit beat, then the selection.
     if (e.key === 'Escape') {
       if (armedBeat) armedBeat = null;
+      else if (litBeat) litBeat = null;
       else selected = null;
     }
   }
@@ -322,6 +328,7 @@
       // A selected row or armed beat is pointed at its new path only once
       // the index holds it: before that, the guard on one that left clears it.
       const wasSelected = selected === note.path;
+      const wasLit = litBeat === note.path;
       const wasArmed = armedBeat === note.path;
       const isOpen = note.path === bufState.path;
       if (isOpen) await buffer.flush();
@@ -330,6 +337,7 @@
       if (isSession) await setSession(stem(moved.path));
       await refreshIndex();
       if (wasSelected) selected = moved.path;
+      if (wasLit) litBeat = moved.path;
       if (wasArmed) armedBeat = moved.path;
     });
   }
@@ -399,16 +407,19 @@
 
   /** Hiding the beat column disarms, as closing Legend Lore's collections
    *  panel does: a click on a note mustn't file into a beat out of sight.
-   *  A selected beat lets go too, or its notes would stay lit unexplained. */
+   *  The lit beat lets go too, or its notes would stay lit unexplained. */
   function toggleBeats() {
     beatsOpen = !beatsOpen;
     if (beatsOpen) return;
-    armedBeat = null;
+    armedBeat = litBeat = null;
     if (beatAt(selected)) selected = null;
   }
 
+  /** A click on a beat selects it and lights its notes; on the beat
+   *  already lit, it puts them out. */
   function selectBeat(beat: BeatEntry) {
     selected = beat.path;
+    litBeat = litBeat === beat.path ? null : beat.path;
     if (armedBeat !== beat.path) armedBeat = null;
   }
 
@@ -417,8 +428,9 @@
       armedBeat = null;
       return;
     }
-    // Arming selects, as in Legend Lore; the editor waits for a double-click.
-    armedBeat = selected = beat.path;
+    // Arming selects and lights, as in Legend Lore; the editor waits for a
+    // double-click.
+    armedBeat = selected = litBeat = beat.path;
   }
 
   function toggleMember(note: NoteEntry) {
@@ -466,7 +478,7 @@
   /** A new beat lands armed and selected, as a new collection does, and
    *  opens nothing: a double-click opens it. */
   function landBeat(path: string) {
-    armedBeat = selected = path;
+    armedBeat = selected = litBeat = path;
   }
 
   function createBeat(name: string, notes: string[] = []) {
@@ -933,6 +945,7 @@
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
             {members}
+            litBeatName={beatAt(armedBeat ?? litBeat)?.name ?? null}
             {inSession}
             armed={!!armedBeat}
             ambiguous={(name) => isAmbiguous(index!, name)}
@@ -960,6 +973,7 @@
             sessionName={session?.name ?? null}
             selectedPath={selected}
             armedPath={armedBeat}
+            litPath={armedBeat ?? litBeat}
             onSelect={selectBeat}
             onOpen={(beat) => openPath(beat.path)}
             onArm={armBeat}

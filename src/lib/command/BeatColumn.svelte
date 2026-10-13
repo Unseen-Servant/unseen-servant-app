@@ -26,6 +26,9 @@
   export let sessionName: string | null;
   export let selectedPath: string | null;
   export let armedPath: string | null;
+  /** The beat whose notes are lit in the tracks: its count turns parchment. */
+  export let litPath: string | null;
+  /** A click: the beat lights, or puts its notes out if it was lit. */
   export let onSelect: (beat: BeatEntry) => void;
   export let onOpen: (beat: BeatEntry) => void;
   export let onArm: (beat: BeatEntry) => void;
@@ -347,7 +350,11 @@
         type="button"
         class="beat-name"
         title={beat.spent ? `${beat.name} — spent ${beat.spent}` : beat.name}
-        on:click={() => onSelect(beat)}
+        on:click={(e) => {
+          // Only a double-click's first click: the second mustn't put out
+          // what the first lit on the way into the editor.
+          if (e.detail <= 1) onSelect(beat);
+        }}
         on:dblclick={() => onOpen(beat)}
       >
         {beat.name}
@@ -383,7 +390,7 @@
           {/if}
         </button>
       </span>
-      <span class="row-count">{beat.notes.length}</span>
+      <span class="row-count" class:lit={beat.path === litPath}>{beat.notes.length}</span>
     </div>
   {/if}
 {/snippet}
@@ -818,6 +825,13 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
+  }
+
+  /* The lit beat's count, in the parchment of its notes' squares across
+     the tracks: which beat lights them, at a glance. */
+  .row-count.lit {
+    background: color-mix(in srgb, var(--text-accent) 18%, transparent);
+    color: var(--text-accent);
   }
 
   /* A rename takes the name's place, as in Legend Lore: the field starts

@@ -25,8 +25,10 @@
 
   export let cols: Column[];
   export let openPath: string | null;
-  /** Notes in the selected beat. */
+  /** Notes in the lit beat. */
   export let members: Set<string>;
+  /** The lit beat, by name, for the plates' readout. */
+  export let litBeatName: string | null;
   /** Notes some beat of the session's plan holds. */
   export let inSession: Set<string>;
   /** A beat is armed: a click also toggles membership. */
@@ -53,6 +55,11 @@
   export let onReorderTracks: (order: string[]) => void;
   /** A folder's notes by name, in the order they were dragged into. */
   export let onReorderNotes: (folder: string, names: string[]) => void;
+
+  /** How many of each track's notes the lit beat holds, for its plate. */
+  $: inBeat = new Map(
+    cols.map((c) => [c.track, c.groups.reduce((n, g) => n + g.notes.filter((x) => members.has(x.path)).length, 0)]),
+  );
 
   let creatingIn: string | null = null;
   let creatingTrack = false;
@@ -369,6 +376,12 @@
           >
             {column.track}
           </button>
+          {@const lit = inBeat.get(column.track) ?? 0}
+          {#if lit}
+            <span class="in-beat" title={`${lit} in ${litBeatName}`}>
+              <span class="in-beat-mark" aria-hidden="true"></span>{lit}
+            </span>
+          {/if}
           <span class="count">{column.count}</span>
         {/if}
       </header>
@@ -600,6 +613,30 @@
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     color: var(--text-tertiary);
+  }
+
+  /* While a beat is lit, how many of the track's notes it holds, beside
+     the track's own count: the rows' filled square in small, so a plate
+     says where to look, below the fold too. */
+  .in-beat {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-accent);
+  }
+
+  .in-beat + .count {
+    margin-left: 0;
+  }
+
+  .in-beat-mark {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: var(--radius-cell);
+    background: var(--text-accent);
   }
 
   .notes {
