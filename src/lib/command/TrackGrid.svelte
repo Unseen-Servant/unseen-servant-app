@@ -357,28 +357,32 @@
         on:dragstart={(e) => startTrackDrag(e, column.track)}
         role="presentation"
       >
-        <span class="track-number" aria-hidden="true">{i + 1}</span>
-        {#if renamingTrack === column.track}
-          <InlineName
-            value={column.track}
-            rename
-            label="Rename track"
-            onCommit={(name) => {
-              renamingTrack = null;
-              onRenameTrack(column.track, name);
-            }}
-            onCancel={() => (renamingTrack = null)}
-          />
-        {:else}
-          <button
-            type="button"
-            class="track-name ledger-label"
-            title={`${column.track} — drag to reorder, double-click to rename`}
-            on:dblclick={() => (renamingTrack = column.track)}
-            on:contextmenu|preventDefault={(e) => trackMenu(e, column)}
-          >
-            {column.track}
-          </button>
+        <span class="plate-name">
+          <span class="track-number" aria-hidden="true">{i + 1}</span>
+          {#if renamingTrack === column.track}
+            <InlineName
+              value={column.track}
+              rename
+              label="Rename track"
+              onCommit={(name) => {
+                renamingTrack = null;
+                onRenameTrack(column.track, name);
+              }}
+              onCancel={() => (renamingTrack = null)}
+            />
+          {:else}
+            <button
+              type="button"
+              class="track-name ledger-label"
+              title={`${column.track} — drag to reorder, double-click to rename`}
+              on:dblclick={() => (renamingTrack = column.track)}
+              on:contextmenu|preventDefault={(e) => trackMenu(e, column)}
+            >
+              {column.track}
+            </button>
+          {/if}
+        </span>
+        {#if renamingTrack !== column.track}
           {@const lit = inBeat.get(column.track) ?? 0}
           {#if lit}
             <span class="count in-beat" title={`${lit} of ${column.count} in ${litBeatName}`}>{lit}</span>
@@ -584,9 +588,22 @@
      moving a track renumbers the plates. Small grey figures, quieter than
      the count's badge. Its column is the rows' slots' (.slot): a two-digit
      number spills evenly either side, so the name stays put. */
+  /* The number and the track's name on one baseline: centred apart, the
+     Crimson figures and the Almendra label sat a pixel apart. The number
+     adds no height (line-height: 0), so the pair is as tall as the name
+     alone and the name sits where every plate's does. */
+  .plate-name {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+
   .track-number {
     flex-shrink: 0;
     width: 0.55rem;
+    line-height: 0;
     display: flex;
     justify-content: center;
     font-size: 0.75rem;
