@@ -16,7 +16,7 @@
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
   import { action, divider, heading, type OpenMenu } from './menu';
-  import { endNoteDrag, startNoteDrag } from './noteDrag';
+  import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import type { Column } from './columns';
   import type { NoteEntry } from './types';
 
@@ -78,10 +78,13 @@
     };
   }
 
-  // -- dragging a column, as Legend Lore's collections reorder ------------
+  // -- dragging onto the grid ---------------------------------------------
   //
-  // Only the nameplate starts it; rows drag notes. Over a column, the
-  // pointer's half picks the side the track lands on; past the last, the end.
+  // Two drags reach it, told apart by their private types (a dragover can
+  // read nothing else). A track, from its nameplate, reorders as Legend
+  // Lore's collections do: over a column, the pointer's half picks the side
+  // it lands on; past the last, the end. A note, from a row here or on the
+  // shelf, moves to the track whose column it's dropped on.
   const TRACK_MIME = 'application/x-command-track';
   const isTrackDrag = (e: DragEvent) =>
     Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === TRACK_MIME);
@@ -89,6 +92,8 @@
   let draggingTrack: string | null = null;
   /** Where the dragged track lands: before column `dropAt`, or after the last. */
   let dropAt: number | null = null;
+  /** The track a dragged note would move to. */
+  let noteInto: string | null = null;
   let hoveredTrack: string | null = null;
 
   function startTrackDrag(e: DragEvent, track: string) {
@@ -98,17 +103,20 @@
     e.dataTransfer.setData(TRACK_MIME, track);
   }
 
-  // A drag delivers no pointerleave: unlatch, as Legend Lore's panel does.
-  function endTrackDrag() {
+  // Any drag's end, the shelf's too, reaches the window. A drag delivers no
+  // pointerleave: unlatch, as Legend Lore's panel does.
+  function endDrag() {
     draggingTrack = null;
     dropAt = null;
+    noteInto = null;
     hoveredTrack = null;
     stopScrolling();
   }
 
   // The webview doesn't scroll the grid under a drag, so the grid does: a
-  // track held near either edge scrolls it that way, faster the nearer the
-  // edge, until the pointer moves off, the drag ends or there's no more.
+  // track or note held near either edge scrolls it that way, faster the
+  // nearer the edge, until the pointer moves off, the drag ends or there's
+  // no more.
   const EDGE = 48;
   const MAX_STEP = 12;
   let gridEl: HTMLDivElement;
@@ -129,8 +137,11 @@
     const before = gridEl.scrollLeft;
     if (step !== 0) gridEl.scrollLeft += step;
     const moved = gridEl.scrollLeft !== before;
-    // The columns moved under a still pointer: the drop line follows.
-    if (moved && pointerX !== null) dropAt = slotAt(pointerX);
+    // The columns moved under a still pointer: what's lit follows.
+    if (moved && pointerX !== null) {
+      if (draggingTrack) dropAt = slotAt(pointerX);
+      else noteInto = noteTarget(draggedNote(), pointerX);
+    }
     scrolling = moved ? requestAnimationFrame(scrollStep) : 0;
   }
 
@@ -142,37 +153,62 @@
 
   onDestroy(stopScrolling);
 
-  /** Where a track dropped at `x` lands: before the column under it, or
-   *  after it past its middle; past the last track, at the end. */
-  function slotAt(x: number): number {
+  /** The column under `x`, by index; past the last track, `cols.length`. */
+  function columnAt(x: number): number {
     const columns = Array.from(gridEl.children);
     for (let i = 0; i < cols.length; i++) {
-      const box = columns[i].getBoundingClientRect();
-      if (x < box.right) return x >= box.left + box.width / 2 ? i + 1 : i;
+      if (x < columns[i].getBoundingClientRect().right) return i;
     }
     return cols.length;
   }
 
-  function overGrid(e: DragEvent) {
-    if (!draggingTrack || !isTrackDrag(e)) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    pointerX = e.clientX;
-    dropAt = slotAt(e.clientX);
-    if (!scrolling) scrolling = requestAnimationFrame(scrollStep);
+  /** Where a track dropped at `x` lands: before the column under it, or
+   *  after it past its middle; past the last track, at the end. */
+  function slotAt(x: number): number {
+    const i = columnAt(x);
+    if (i === cols.length) return i;
+    const box = gridEl.children[i].getBoundingClientRect();
+    return x >= box.left + box.width / 2 ? i + 1 : i;
   }
 
-  function dropTrack(e: DragEvent) {
-    if (!draggingTrack || !isTrackDrag(e)) return;
+  /** The track a note dropped at `x` moves to: the column's under it, if
+   *  that's not where the note already is. */
+  function noteTarget(note: NoteEntry | null, x: number): string | null {
+    const track = cols[columnAt(x)]?.track ?? null;
+    return note && track !== note.track ? track : null;
+  }
+
+  function overGrid(e: DragEvent) {
+    const track = !!draggingTrack && isTrackDrag(e);
+    const note = isNoteDrag(e) ? draggedNote() : null;
+    if (!track && !note) return;
+    pointerX = e.clientX;
+    if (!scrolling) scrolling = requestAnimationFrame(scrollStep);
+    if (track) dropAt = slotAt(e.clientX);
+    else noteInto = noteTarget(note, e.clientX);
+    if (!track && noteInto === null) return;
     e.preventDefault();
-    const order = cols.map((c) => c.track);
-    const from = order.indexOf(draggingTrack);
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  }
+
+  function dropOnGrid(e: DragEvent) {
+    const dragged = draggingTrack;
+    const note = isNoteDrag(e) ? draggedNote() : null;
+    const into = noteTarget(note, e.clientX);
     const at = slotAt(e.clientX);
-    const to = at > from ? at - 1 : at;
-    endTrackDrag();
-    if (from < 0 || to === from) return;
-    order.splice(to, 0, ...order.splice(from, 1));
-    onReorderTracks(order);
+    endDrag();
+    if (dragged && isTrackDrag(e)) {
+      e.preventDefault();
+      const order = cols.map((c) => c.track);
+      const from = order.indexOf(dragged);
+      const to = at > from ? at - 1 : at;
+      if (from < 0 || to === from) return;
+      order.splice(to, 0, ...order.splice(from, 1));
+      onReorderTracks(order);
+    } else if (note && into !== null) {
+      e.preventDefault();
+      onMoveNote(note, into);
+    }
   }
 
   // WebKit sends a dragleave between the grid's own elements, at times
@@ -183,6 +219,7 @@
     const y = e.clientY;
     if (x > box.left && x < box.right && y > box.top && y < box.bottom) return;
     dropAt = null;
+    noteInto = null;
     stopScrolling();
   }
 
@@ -208,7 +245,7 @@
   on:dragenter={overGrid}
   on:dragover={overGrid}
   on:dragleave={leaveGrid}
-  on:drop={dropTrack}
+  on:drop={dropOnGrid}
 >
   {#each cols as column, i (column.track)}
     <section
@@ -216,6 +253,7 @@
       class:dragging={draggingTrack === column.track}
       class:drop-before={dropAt === i}
       class:drop-after={dropAt === cols.length && i === cols.length - 1}
+      class:drop-into={noteInto === column.track}
       aria-label={column.track}
     >
       <header
@@ -223,7 +261,6 @@
         class:hovered={$hoverLive && hoveredTrack === column.track}
         draggable={renamingTrack !== column.track}
         on:dragstart={(e) => startTrackDrag(e, column.track)}
-        on:dragend={endTrackDrag}
         on:pointerenter={() => (hoveredTrack = column.track)}
         on:pointerleave={() => {
           if (hoveredTrack === column.track) hoveredTrack = null;
@@ -358,6 +395,8 @@
   </section>
 </div>
 
+<svelte:window on:dragend={endDrag} />
+
 {#if menu}
   <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
 {/if}
@@ -411,6 +450,14 @@
 
   .column.drop-before::after {
     left: 0;
+  }
+
+  /* A note over a column it would move to: the beat column's drop target
+     (BeatColumn .drop-into), Legend Lore's collection under a dragged book. */
+  .column.drop-into {
+    outline: var(--outline-drop);
+    outline-offset: -1px;
+    background: var(--bg-container);
   }
 
   .column.drop-after::after {
