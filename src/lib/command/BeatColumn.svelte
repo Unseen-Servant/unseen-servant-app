@@ -362,6 +362,8 @@
       {#if beat.spent}
         <span class="spent-mark" aria-label="spent">✓</span>
       {/if}
+      <!-- The keys take a double-click's first click only: its second would
+           undo the first, so a launch stopped at once and played nothing. -->
       <span class="tr" class:engaged={armed || playing}>
         <button
           type="button"
@@ -369,7 +371,7 @@
           class:armed
           aria-pressed={armed}
           title={armed ? `Disarm ${beat.name} (Esc)` : `Arm ${beat.name}: click notes to put them in it`}
-          on:click={() => onArm(beat)}
+          on:click={(e) => e.detail <= 1 && onArm(beat)}
         >
           <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true">
             <path d={armed ? CIRCLE : CIRCLE_RING} />
@@ -381,7 +383,7 @@
           class:playing
           aria-pressed={playing}
           title={playing ? `Stop ${beat.name}` : `Launch ${beat.name}: its notes go live`}
-          on:click={() => (playing ? onStop() : onLaunch(beat))}
+          on:click={(e) => e.detail <= 1 && (playing ? onStop() : onLaunch(beat))}
         >
           {#if playing}
             <span class="stop-mark" aria-hidden="true"></span>
