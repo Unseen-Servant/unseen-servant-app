@@ -866,7 +866,7 @@
             title="Sessions"
             on:click={sessionMenu}
           >
-            <span class="key-name">{current.name}{#if current.date}<span class="session-date">{current.date}</span>{/if}</span>
+            <span class="key-name">{current.name}</span>
             {@render dropCaret()}
           </button>
         {:else}
@@ -1196,7 +1196,11 @@
     border: none;
     /* The body's corners, inside its rim. */
     border-radius: calc(var(--radius-well) - 1px);
+    /* Both keys in one voice, dim until used, as the tab strip above:
+       body face, secondary ink, primary under the pointer or open. */
+    font-family: var(--font-body);
     font-size: 0.95rem;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
     /* A right-click would otherwise select the word under it. */
@@ -1231,9 +1235,6 @@
 
   .campaign-key {
     min-width: 9rem;
-    font-family: var(--font-heading);
-    font-size: 0.875rem;
-    color: var(--text-primary);
   }
 
   /* Not named yet. Italic says so without a badge; Name campaign, in its
@@ -1247,20 +1248,7 @@
     color: var(--text-tertiary);
   }
 
-  /* One voice below the campaign: body face, secondary ink. */
-  .session-key {
-    font-family: var(--font-body);
-    color: var(--text-secondary);
-  }
-
   .session-key.ghost {
-    color: var(--text-tertiary);
-  }
-
-  .session-date {
-    margin-left: 0.4rem;
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
     color: var(--text-tertiary);
   }
 
@@ -1273,6 +1261,7 @@
 
   .key-face.open {
     background: var(--bg-app);
+    color: var(--text-primary);
   }
 
   /* The campaign key's face while it's renamed: its inset and face,
@@ -1283,8 +1272,8 @@
     align-items: center;
     min-width: 9rem;
     padding: 0 0.5rem 0 0.55rem;
-    font-family: var(--font-heading);
-    font-size: 0.875rem;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
   }
 
   /* Legend Lore's path mark (InspectorPlate .sep), in its ink; the bar's
