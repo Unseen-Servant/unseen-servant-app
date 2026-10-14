@@ -252,7 +252,7 @@ Nothing new beyond the grid cell. Each meaning maps to an existing token or idio
 
 | Meaning | Treatment |
 |---|---|
-| Track identity | a pigment from Legend Lore's palette, chosen from the track's menu (2026-10-14): a 3px strip along the nameplate's top, never glowing. A track without one is a plain nameplate |
+| Track identity | a pigment from Legend Lore's palette, chosen from the track's menu (2026-10-14): it fills the nameplate, the name in ink as Legend Lore's selected index cell, never glowing. A track without one is a plain nameplate |
 | Note in the live set | parchment rule and `--glow-accent` on the card; its play key lit purple, as Legend Lore's transport |
 | Prep / Play | a picker in Command's bar, Legend Lore's view switch rule for rule: table-columns and play glyphs, the current segment raised, never purple (one view is always on) |
 | Armed beat | Legend Lore's arm glyph in `--text-active` |
@@ -360,7 +360,7 @@ Settled on 2026-10-11, before phase 3:
 8. **Connections are lines** for now (§5.2). Giving them meaning in Play comes later.
 9. **The campaign is the unit, and gathered material waits on its shelf** (2026-10-12, §3.6). Reuse across campaigns is copying; there's no shared library. The name is *Shelf*, because "library" is Legend Lore's. Send to Command defaults to the shelf. Beats on the shelf are parked.
 10. **Opening a campaign** (2026-10-12, §3.7): launch opens a blank Untitled, and the campaign key is an Obsidian-style switcher with *New campaign* at the bottom. The root defaults to `~/Unseen Servant`, the key's pen names Untitled, and *New campaign* opens a fresh Untitled rather than asking for a name first.
-11. **Track identity** (2026-10-14, §5.4): tracks take a pigment from Legend Lore's palette, kept in `.unseen/command.json` and following renames, shown as a strip on the nameplate.
+11. **Track identity** (2026-10-14, §5.4): tracks take a pigment from Legend Lore's palette, kept in `.unseen/command.json` and following renames, filling the nameplate.
 
 Open:
 

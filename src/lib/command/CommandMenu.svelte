@@ -116,12 +116,13 @@
     overflow: hidden;
   }
 
-  /* A pigment as the strip it puts on a nameplate (TrackGrid .nameplate),
-     at a row's scale. */
+  /* A pigment as the plate it fills (TrackGrid .nameplate), at a row's
+     scale. */
   .menu-swatch {
     flex-shrink: 0;
     width: 0.8rem;
-    height: 3px;
+    height: 0.55rem;
+    border-radius: var(--radius-sm);
   }
 
   .menu-label {

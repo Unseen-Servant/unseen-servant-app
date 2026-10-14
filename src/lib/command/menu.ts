@@ -4,7 +4,7 @@ export type MenuItem =
   // `lamp`: a choice row whose pip says whether it's the one in effect.
   // `chord`: the binding (keybindings.ts) whose key does the same on the
   // selected row, shown as its hint. `swatch`: a pigment the row names,
-  // drawn as the strip it gives a track's nameplate.
+  // drawn as a chip of the plate it fills.
   | { kind: 'action'; label: string; danger?: boolean; lamp?: boolean; chord?: string; swatch?: string; action: () => void }
   | { kind: 'heading'; label: string }
   | { kind: 'divider' };

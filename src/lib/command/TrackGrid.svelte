@@ -381,6 +381,13 @@
         style:--pigment={pigments[column.track]}
         draggable={renamingTrack !== column.track}
         on:dragstart={(e) => startTrackDrag(e, column.track)}
+        on:contextmenu={(e) => {
+          // The whole plate is the track's; while it's renamed, the field
+          // keeps its own menu.
+          if (renamingTrack === column.track) return;
+          e.preventDefault();
+          trackMenu(e, column);
+        }}
         role="presentation"
       >
         <span class="plate-name">
@@ -402,7 +409,6 @@
               class="track-name ledger-label"
               title={`${column.track} — drag to reorder, double-click to rename`}
               on:dblclick={() => (renamingTrack = column.track)}
-              on:contextmenu|preventDefault={(e) => trackMenu(e, column)}
             >
               {column.track}
             </button>
@@ -617,11 +623,32 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* A track's pigment: a strip along the plate's top, as a mixer colours
-     a channel's scribble strip. Inset, so a plate with one stands as tall
-     as a plate without. Never glows: it names the track, it isn't lit. */
+  /* A track's pigment fills its plate, as a mixer colours a channel's
+     scribble strip, in ink: Legend Lore's selected index cell
+     (SearchResults .index-cell), which the palette's lightness is set
+     for. Never glows: it names the track, it isn't lit. */
   .nameplate.pigmented {
-    box-shadow: inset 0 3px 0 var(--pigment);
+    background: var(--pigment);
+  }
+
+  .nameplate.pigmented .track-name,
+  .nameplate.pigmented .count {
+    color: var(--text-inverse);
+  }
+
+  .nameplate.pigmented .track-number {
+    color: color-mix(in srgb, var(--text-inverse) 70%, transparent);
+  }
+
+  .nameplate.pigmented .count {
+    background: color-mix(in srgb, var(--text-inverse) 18%, transparent);
+  }
+
+  /* Parchment on a pigment is lost: the lit count turns over, parchment
+     on ink, so it still says where the beat's notes are. */
+  .nameplate.pigmented .count.in-beat {
+    background: var(--text-inverse);
+    color: var(--text-accent);
   }
 
   /* The track's place in the order, as a mixer numbers its channels:
