@@ -543,13 +543,40 @@ def _fold(parts) -> tuple[str, ...]:
     return tuple(p.casefold() for p in parts)
 
 
-def _retarget(target: str, moves: list[tuple[Parts, Parts]]) -> str | None:
+def _answers(parts: Parts, location: Parts) -> bool:
+    """Whether a link spelled ``parts`` names the note at ``location``: its
+    name, a path suffix of it, or its whole path under a higher vault root."""
+    n = min(len(parts), len(location))
+    return _fold(parts[-n:]) == _fold(location[-n:]) and (n == len(parts) or n == len(location))
+
+
+def _stayed(campaign: Path, moves: list[tuple[Parts, Parts]]) -> dict[str, list[Parts]]:
+    """The campaign's notes that didn't move, by folded name, for
+    ``_retarget`` to tell a link only a moved note answered to."""
+    moved = {_fold(new) for _, new in moves}
+    stayed: dict[str, list[Parts]] = {}
+    for path in _walk_notes(campaign):
+        location = _vault_parts(campaign, _rel(campaign, path))
+        if _fold(location) not in moved:
+            stayed.setdefault(location[-1].casefold(), []).append(location)
+    return stayed
+
+
+def _retarget(
+    target: str,
+    moves: list[tuple[Parts, Parts]],
+    stayed: dict[str, list[Parts]] | None = None,
+) -> str | None:
     """The new spelling of ``target`` if it pointed at a moved note, else None.
 
     A link names a note by its name (``Ismark``) or by a path suffix of any
     length (``NPCs/Ismark``, ``Curse of Strahd/NPCs/Ismark`` — Obsidian
     writes paths relative to wherever the vault is rooted). The rewrite keeps
     the link's shape: a name stays a name, an n-part path stays n parts.
+
+    A link more than one note answers to — a moved one and one in ``stayed``,
+    or two moved ones — is ambiguous (``scan``), so it points at neither and
+    is left as it is: it may be meant for the other.
     """
     stripped = target.strip()
     has_ext = stripped.lower().endswith(".md")
@@ -557,19 +584,19 @@ def _retarget(target: str, moves: list[tuple[Parts, Parts]]) -> str | None:
     parts = tuple(p for p in bare.split("/") if p)
     if not parts:
         return None
+    hits = [(old, new) for old, new in moves if _answers(parts, old)]
+    if len(hits) != 1:
+        return None
+    if any(_answers(parts, other) for other in (stayed or {}).get(parts[-1].casefold(), [])):
+        return None
+    old, new = hits[0]
     n = len(parts)
-    for old, new in moves:
-        if n <= len(old):
-            if _fold(parts) != _fold(old[-n:]):
-                continue
-            rewritten = new[-n:] if n <= len(new) else new
-        else:
-            if _fold(parts[-len(old):]) != _fold(old):
-                continue
-            rewritten = parts[: n - len(old)] + new
-        result = "/".join(rewritten) + (".md" if has_ext else "")
-        return None if result == stripped else result
-    return None
+    if n <= len(old):
+        rewritten = new[-n:] if n <= len(new) else new
+    else:
+        rewritten = parts[: n - len(old)] + new
+    result = "/".join(rewritten) + (".md" if has_ext else "")
+    return None if result == stripped else result
 
 
 def _inside_single_quotes(text: str, pos: int) -> bool:
@@ -577,11 +604,16 @@ def _inside_single_quotes(text: str, pos: int) -> bool:
     return text.count("'", line_start, pos) % 2 == 1
 
 
-def rewrite_links(text: str, moves: list[tuple[Parts, Parts]]) -> str:
+def rewrite_links(
+    text: str,
+    moves: list[tuple[Parts, Parts]],
+    stayed: dict[str, list[Parts]] | None = None,
+) -> str:
     """``text`` with every wikilink to a moved note pointing at its new place.
 
     ``moves`` pairs old and new locations as path parts without ``.md``,
-    relative to the vault root. Everything outside a link's target —
+    relative to the vault root; ``stayed`` holds the notes that didn't move
+    (``_stayed``), whose links stay theirs. Everything outside a link's target —
     heading, alias, the ``!`` of an embed, the rest of the file — is kept
     byte for byte.
     """
@@ -590,7 +622,7 @@ def rewrite_links(text: str, moves: list[tuple[Parts, Parts]]) -> str:
 
     def replace(m: re.Match) -> str:
         target, rest = _split_link(m.group(1))
-        new = _retarget(target, moves)
+        new = _retarget(target, moves, stayed)
         if new is None:
             return m.group(0)
         # A single-quoted YAML scalar escapes ' by doubling it.
@@ -605,6 +637,7 @@ def _rewrite_campaign(campaign: Path, moves: list[tuple[Parts, Parts]]) -> list[
     """Apply ``moves`` to every note and every canvas in ``campaign``; the
     paths it changed. A canvas names notes by path (design §3.5), which
     ``_retarget`` rewrites like a link spelled as a path."""
+    stayed = _stayed(campaign, moves)
     changed = []
     for path in _walk_notes(campaign):
         data = path.read_bytes()
@@ -612,7 +645,7 @@ def _rewrite_campaign(campaign: Path, moves: list[tuple[Parts, Parts]]) -> list[
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             continue
-        new = rewrite_links(text, moves)
+        new = rewrite_links(text, moves, stayed)
         if new != text:
             atomic_write(path, new.encode("utf-8"))
             changed.append(_rel(campaign, path))
@@ -622,7 +655,7 @@ def _rewrite_campaign(campaign: Path, moves: list[tuple[Parts, Parts]]) -> list[
             board = canvas.parse(text)
         except ValueError:  # not UTF-8, or not a canvas: leave it be
             continue
-        if canvas.rewrite(board, lambda f: _retarget(f, moves), lambda t: rewrite_links(t, moves)):
+        if canvas.rewrite(board, lambda f: _retarget(f, moves, stayed), lambda t: rewrite_links(t, moves, stayed)):
             atomic_write(path, canvas.dump(board, text.endswith("\n")).encode("utf-8"))
             changed.append(_rel(campaign, path))
     return changed

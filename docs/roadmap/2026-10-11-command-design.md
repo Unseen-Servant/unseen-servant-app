@@ -92,7 +92,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
 
 - References are wikilinks: `[[Name]]`, with optional `|alias` and `#heading`; `[[Folder/Name]]` is accepted. Resolution is by name within the campaign.
 - An unresolved link is drawn in dashed parchment, the app's "prospective, not yet real" idiom (`--outline-drop`), and offers to create the note.
-- Renaming a note in Command rewrites every link to it across the campaign — frontmatter lists and bodies — keeping alias and heading. Moving a note to another track changes no link. A rename in Finder breaks links, which show as unresolved; Obsidian's renames update links when its *Automatically update internal links* option is on.
+- Renaming a note in Command rewrites every link to it across the campaign — frontmatter lists and bodies — keeping alias and heading. A link another note also answers to (two notes named alike, the second made outside Command) is ambiguous and points at neither, so a rename leaves it as it is: renaming one Ismark doesn't claim the bare `[[Ismark]]` links that may be meant for the other, while `[[NPCs/Ismark]]` follows (2026-10-14). Moving a note to another track changes no link. A rename in Finder breaks links, which show as unresolved; Obsidian's renames update links when its *Automatically update internal links* option is on.
 
 ### 3.4 Frontmatter Command owns
 

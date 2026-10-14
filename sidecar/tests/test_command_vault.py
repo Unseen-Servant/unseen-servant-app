@@ -273,6 +273,30 @@ def test_rename_note_rewrites_links_and_nothing_else(camp):
     assert (camp / "Locations" / "Village of Barovia.md").read_text().startswith("[[Ismark Kolyanovich|the burgomaster's son]]")
 
 
+def test_rename_note_leaves_links_another_note_also_answers_to(camp):
+    # Two Ismarks, the second made outside Command: a bare [[Ismark]] is
+    # ambiguous (scan flags it), so it may be meant for either, and renaming
+    # one must not claim it. A link only the renamed note answers to follows.
+    write(camp / "Locations" / "Ismark.md", "An inn.\n")
+    write(camp / "Overview.md", "[[Ismark]] [[NPCs/Ismark]] [[Locations/Ismark]]")
+    _, rewritten = vault.rename_note(camp, "NPCs/Ismark.md", "Ismark Kolyanovich")
+
+    assert rewritten == ["Overview.md"]
+    assert (camp / "Overview.md").read_text() == "[[Ismark]] [[NPCs/Ismark Kolyanovich]] [[Locations/Ismark]]"
+    assert "[[Ismark]]" in (camp / "NPCs" / "Ireena.md").read_text()
+    assert (camp / "Beats" / "Ambush.md").read_text() == '---\nnotes: ["[[Ismark]]", "[[Wolves]]"]\n---\n'
+
+
+def test_move_note_leaves_a_path_link_another_note_also_answers_to(camp):
+    write(camp / "Locations" / "Vallaki" / "Lady Wachter.md", "")
+    write(camp / "Overview.md", "[[Vallaki/Lady Wachter]] [[NPCs/Vallaki/Lady Wachter]]")
+    _, rewritten = vault.move_note(camp, "NPCs/Vallaki/Lady Wachter.md", "NPCs")
+
+    assert rewritten == ["Overview.md"]
+    # The path link keeps its three parts, so it now spells the campaign.
+    assert (camp / "Overview.md").read_text() == "[[Vallaki/Lady Wachter]] [[Curse of Strahd/NPCs/Lady Wachter]]"
+
+
 def test_rename_note_refuses_a_clash_but_allows_a_case_change(camp):
     with pytest.raises(Conflict):
         vault.rename_note(camp, "NPCs/Ismark.md", "IREENA")
