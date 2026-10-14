@@ -852,6 +852,10 @@
       {/if}
     </div>
     {#if campaign}
+      <!-- The session is the campaign's: Legend Lore's path mark between
+           them, printed on the bar as a faceplate prints its signal flow,
+           not a key. -->
+      <span class="bar-sep" aria-hidden="true">›</span>
       <div class="key-body">
         {#if session}
           {@const current = session}
@@ -1281,6 +1285,15 @@
     padding: 0 0.5rem 0 0.55rem;
     font-family: var(--font-heading);
     font-size: 0.875rem;
+  }
+
+  /* Legend Lore's path mark (InspectorPlate .sep), in its ink; the bar's
+     gap spaces it. */
+  .bar-sep {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .spacer {
