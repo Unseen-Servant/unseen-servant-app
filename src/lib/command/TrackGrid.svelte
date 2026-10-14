@@ -631,8 +631,7 @@
     background: var(--pigment);
   }
 
-  .nameplate.pigmented .track-name,
-  .nameplate.pigmented .count {
+  .nameplate.pigmented .track-name {
     color: var(--text-inverse);
   }
 
@@ -640,15 +639,14 @@
     color: color-mix(in srgb, var(--text-inverse) 70%, transparent);
   }
 
+  /* The count keeps its badge whatever the plate: its wash mixed onto the
+     plain plate's grey, so the pigment doesn't show through. */
   .nameplate.pigmented .count {
-    background: color-mix(in srgb, var(--text-inverse) 18%, transparent);
+    background: color-mix(in srgb, var(--text-tertiary) 18%, var(--bg-container));
   }
 
-  /* Parchment on a pigment is lost: the lit count turns over, parchment
-     on ink, so it still says where the beat's notes are. */
   .nameplate.pigmented .count.in-beat {
-    background: var(--text-inverse);
-    color: var(--text-accent);
+    background: color-mix(in srgb, var(--text-accent) 18%, var(--bg-container));
   }
 
   /* The track's place in the order, as a mixer numbers its channels:
