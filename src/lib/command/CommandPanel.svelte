@@ -52,14 +52,14 @@
   /** A switcher's menu, and whose: its key stays sunk while it is open. */
   let switcher: OpenMenu | null = null;
   let switcherFor: 'campaign' | 'session' | null = null;
-  /** The campaign key is the name field: the pen or Rename. */
+  /** The campaign key is the name field: Rename, from either of its menus. */
   let renaming = false;
-  /** The campaign's well, measured as a rename starts so the field takes
-   *  just its width and the session's key doesn't move. */
-  let campaignWell: HTMLDivElement | null = null;
+  /** The campaign key's body, measured as a rename starts so the field
+   *  takes just its key's width and the session's key doesn't move. */
+  let campaignBody: HTMLDivElement | null = null;
   let renameWidth = 0;
   function startRenaming() {
-    renameWidth = campaignWell?.clientWidth ?? 0;
+    renameWidth = campaignBody?.clientWidth ?? 0;
     renaming = true;
   }
   /** The open note's title is its name field. */
@@ -734,17 +734,26 @@
   }
 
   /** The switcher, as Obsidian's for vaults: every campaign, the open one
-   *  lit, and New campaign at the bottom. */
+   *  lit. Then, as the session's menu, New campaign and what acts on the
+   *  open one, Move to Trash under a rule. */
   function campaignMenu(e: MouseEvent) {
     dropMenu(e, 'campaign', [
       ...campaigns.map((c) => choice(c, c === campaign, () => openCampaign(c))),
       ...(campaigns.length ? [divider] : []),
       action('New campaign', newCampaign),
+      ...(campaign
+        ? [
+            action(untitled ? 'Name campaign' : 'Rename campaign', startRenaming),
+            action('Show in Finder', () => reveal()),
+            divider,
+            action('Move to Trash', trashCampaign, true),
+          ]
+        : []),
     ]);
   }
 
-  /** Open a switcher's menu. It hangs off the well, not the half clicked,
-   *  so it lines up with the keycap's outer edge. */
+  /** Open a switcher's menu. It hangs off the key's body, not the face
+   *  clicked inside it, so it lines up with the key's outer edge. */
   function dropMenu(e: MouseEvent, key: 'campaign' | 'session', items: MenuItem[]) {
     const box = (e.currentTarget as HTMLElement).parentElement!.getBoundingClientRect();
     menu = switcher = { x: box.left, y: box.bottom + 4, items };
@@ -784,13 +793,6 @@
   </svg>
 {/snippet}
 
-{#snippet pen()}
-  <!-- Font Awesome "pen-to-square" icon (src/lib/ui/icons/pen-to-square-solid-full.svg) -->
-  <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-    <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z"/>
-  </svg>
-{/snippet}
-
 <section class="command">
   <header class="bar">
     {#if index}
@@ -812,15 +814,15 @@
         </LatchKey>
       </div>
     {/if}
-    <!-- The campaign and the session, each one keycap in a well, split in
-         two: the switcher (right-click on the campaign's for its own menu)
-         and the pen — naming the campaign, opening the session's note. -->
-    <div class="cap-well" bind:this={campaignWell}>
-      <!-- Renamed in the keycap's place, face and width: the session's key
+    <!-- The campaign and the session, each one raised key that opens its
+         switcher; what acts on the open one is in that menu (and, for the
+         campaign, on right-click too). -->
+    <div class="key-body" bind:this={campaignBody}>
+      <!-- Renamed in the key's place, face and width: the session's key
            stays put. Not gated on the campaign: a rename leaves it while
            the folder moves, and the field stays to show a refusal. -->
       {#if renaming}
-        <span class="cap-field" style:width={renameWidth ? `${renameWidth - 4}px` : null}>
+        <span class="key-field" style:width={renameWidth ? `${renameWidth}px` : null}>
           <RenameField
             value={untitled || !campaign ? '' : campaign}
             placeholder="Campaign name"
@@ -836,7 +838,7 @@
       {:else}
         <button
           type="button"
-          class="cap-key campaign-key"
+          class="key-face campaign-key"
           class:untitled
           class:none={!campaign}
           class:open={sunk === 'campaign'}
@@ -844,47 +846,27 @@
           on:click={campaignMenu}
           on:contextmenu|preventDefault={manageMenu}
         >
-          <span class="cap-name">{campaign ?? 'no campaign'}</span>
+          <span class="key-name">{campaign ?? 'no campaign'}</span>
           {@render dropCaret()}
         </button>
-        {#if campaign}
-          <button
-            type="button"
-            class="cap-pen"
-            title={untitled ? 'Name this campaign' : 'Rename this campaign'}
-            aria-label={untitled ? 'Name this campaign' : 'Rename this campaign'}
-            on:click={startRenaming}
-          >
-            {@render pen()}
-          </button>
-        {/if}
       {/if}
     </div>
     {#if campaign}
-      <div class="cap-well">
+      <div class="key-body">
         {#if session}
           {@const current = session}
           <button
             type="button"
-            class="cap-key session-key"
+            class="key-face session-key"
             class:open={sunk === 'session'}
             title="Sessions"
             on:click={sessionMenu}
           >
-            <span class="cap-name">{current.name}{#if current.date}<span class="session-date">{current.date}</span>{/if}</span>
+            <span class="key-name">{current.name}{#if current.date}<span class="session-date">{current.date}</span>{/if}</span>
             {@render dropCaret()}
           </button>
-          <button
-            type="button"
-            class="cap-pen"
-            title="Edit the session note"
-            aria-label="Edit the session note"
-            on:click={() => openPath(current.path)}
-          >
-            {@render pen()}
-          </button>
         {:else}
-          <button type="button" class="cap-key session-key ghost" on:click={newSession}>+ session</button>
+          <button type="button" class="key-face session-key ghost" on:click={newSession}>+ session</button>
         {/if}
       </div>
     {/if}
@@ -1179,29 +1161,38 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* The campaign and session keys: each a keycap in a well, LatchKey's
-     cut, split by a 1px groove into the switcher and the pen. Both halves
-     sit on the raised fill; hover lifts one by a grey step, and a switcher
-     sinks to the well floor while its menu is open. */
-  .cap-well {
+  /* The campaign and session keys: each one key standing proud of the
+     bar, on the wells' footprint (28px and their corners), so it shares one
+     outline with every well here, raised where they're sunk. The face fills
+     the body; hover fills it with the rim's grey, and a switcher sinks to
+     the app floor while its menu is open. */
+  .key-body {
     flex-shrink: 0;
     display: flex;
-    gap: 1px;
-    padding: 2px;
-    background: var(--bg-app);
-    border: 1px solid var(--border-subtle);
+    height: 28px;
+    background: var(--bg-focused);
+    border: 1px solid var(--bg-category);
+    border-bottom-color: var(--bg-app);
     border-radius: var(--radius-well);
+    transition: transform var(--transition-fast);
   }
 
-  .cap-key,
-  .cap-pen {
+  /* The press tick takes the whole key, not the face inside it. */
+  .key-body:has(> .key-face:active) {
+    transform: scale(0.97);
+  }
+
+  .key-face {
     display: flex;
     align-items: center;
-    height: 22px;
-    padding: 0;
-    background: var(--bg-header);
+    gap: 0.5rem;
+    max-width: 16rem;
+    padding: 0 0.5rem 0 0.55rem;
+    background: transparent;
     border: none;
-    border-radius: var(--radius-md);
+    /* The body's corners, inside its rim. */
+    border-radius: calc(var(--radius-well) - 1px);
+    font-size: 0.95rem;
     cursor: pointer;
     transition: all var(--transition-fast);
     /* A right-click would otherwise select the word under it. */
@@ -1209,38 +1200,7 @@
     user-select: none;
   }
 
-  .cap-key {
-    gap: 0.5rem;
-    max-width: 16rem;
-    padding: 0 0.5rem 0 0.55rem;
-    font-size: 0.95rem;
-  }
-
-  /* Squared where the groove parts it from the pen. */
-  .cap-key:not(:last-child) {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-
-  .cap-pen {
-    justify-content: center;
-    width: 26px;
-    color: var(--text-tertiary);
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-  }
-
-  .cap-pen svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .cap-key:active,
-  .cap-pen:active {
-    transform: scale(0.97);
-  }
-
-  .cap-name {
+  .key-name {
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -1260,8 +1220,8 @@
     transition: color var(--transition-fast);
   }
 
-  .cap-key:hover .drop-caret,
-  .cap-key.open .drop-caret {
+  .key-face:hover .drop-caret,
+  .key-face.open .drop-caret {
     color: var(--text-primary);
   }
 
@@ -1272,8 +1232,8 @@
     color: var(--text-primary);
   }
 
-  /* Not named yet. Italic says so without a badge; the pen beside it is
-     the way out. */
+  /* Not named yet. Italic says so without a badge; Name campaign, in its
+     menu, is the way out. */
   .campaign-key.untitled,
   .campaign-key.none {
     font-style: italic;
@@ -1300,26 +1260,24 @@
     color: var(--text-tertiary);
   }
 
-  /* Late, so hover brightens every cap, the dim ones included — and an
+  /* Late, so hover brightens every key, the dim ones included — and an
      open switcher stays sunk under the pointer. */
-  .cap-key:hover,
-  .cap-pen:hover {
-    background: var(--bg-focused);
+  .key-face:hover {
+    background: var(--bg-category);
     color: var(--text-primary);
   }
 
-  .cap-key.open {
+  .key-face.open {
     background: var(--bg-app);
   }
 
-  /* The campaign keycap's place while it's renamed: its height, inset and
-     face, upright even for an Untitled one, so the name is typed where it
-     was read. */
-  .cap-field {
+  /* The campaign key's face while it's renamed: its inset and face,
+     upright even for an Untitled one, so the name is typed where it was
+     read. */
+  .key-field {
     display: flex;
     align-items: center;
     min-width: 9rem;
-    height: 22px;
     padding: 0 0.5rem 0 0.55rem;
     font-family: var(--font-heading);
     font-size: 0.875rem;
