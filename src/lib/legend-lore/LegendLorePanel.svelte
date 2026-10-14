@@ -2995,6 +2995,10 @@
       }
       renamingFilePath = null;
       if (selectedFolder) await loadFiles(selectedFolder);
+      // The sidecar moved the path in every collection holding it: reload,
+      // or the book's gems vanish and the next membership write sends the
+      // old path back.
+      await loadCollections();
       refreshIndexStatus();
     } catch (e) {
       console.error('Rename failed', { oldPath, newName, isDir, error: e });
