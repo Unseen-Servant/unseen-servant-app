@@ -16,7 +16,7 @@
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
   import { CARET_RIGHT, CIRCLE, CIRCLE_RING, PLAY } from '../ui/iconPaths';
-  import { action, divider, heading, type MenuItem, type OpenMenu } from './menu';
+  import { action, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { draggedNote, isNoteDrag } from './noteDrag';
   import { planMoveTo, type PlanRow } from './prep';
   import type { BeatEntry, NoteEntry } from './types';
@@ -31,6 +31,9 @@
   export let litPath: string | null;
   /** A click: the beat lights, or puts its notes out if it was lit. */
   export let onSelect: (beat: BeatEntry) => void;
+  /** A right-click: the beat is selected, as Legend Lore's right-click
+   *  focuses a collection, and its notes stay as they are. */
+  export let onFocus: (beat: BeatEntry) => void;
   export let onOpen: (beat: BeatEntry) => void;
   export let onArm: (beat: BeatEntry) => void;
   /** The beat the live set was launched from. */
@@ -268,15 +271,22 @@
 
   function beatItems(beat: BeatEntry): MenuItem[] {
     return [
-      action('Rename', () => (renamingPath = beat.path)),
       action(beat.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(beat, !beat.spent)),
       divider,
+      keyed('Rename', 'command.rename', () => (renamingPath = beat.path)),
       action('Show in Finder', () => onReveal(beat)),
       action('Move to Trash', () => onTrash(beat), true),
     ];
   }
 
+  /** R on the selected beat: renamed in its row, if the column shows it. */
+  export function rename(path: string) {
+    const planned = planOpen && rows.some((r) => r.beat?.path === path);
+    if (planned || (spareOpen && shown.some((b) => b.path === path))) renamingPath = path;
+  }
+
   function rowMenu(e: MouseEvent, row: PlanRow) {
+    if (row.beat) onFocus(row.beat);
     const order: MenuItem[] = [
       ...(row.at > 0 ? [action('Move up', () => onMove(row, row.at - 1))] : []),
       ...(row.at < rows.length - 1 ? [action('Move down', () => onMove(row, row.at + 1))] : []),
@@ -289,6 +299,7 @@
   }
 
   function spareMenu(e: MouseEvent, beat: BeatEntry) {
+    onFocus(beat);
     menu = {
       x: e.clientX,
       y: e.clientY,

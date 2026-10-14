@@ -18,7 +18,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
-  import { action, divider, heading, type OpenMenu } from './menu';
+  import { action, divider, heading, keyed, type OpenMenu } from './menu';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import type { Column, NoteGroup } from './columns';
@@ -78,19 +78,27 @@
     if (hovered === path) hovered = null;
   }
 
+  /** R on the selected note: renamed in its row, if it's one of the grid's. */
+  export function rename(path: string) {
+    if (cols.some((c) => c.groups.some((g) => g.notes.some((n) => n.path === path)))) renamingPath = path;
+  }
+
+  // A right-click selects the row, as it focuses one in Legend Lore, so the
+  // menu's keys act on what it opened on.
   function noteMenu(e: MouseEvent, note: NoteEntry) {
+    onSelect(note);
     const others = cols.map((c) => c.track).filter((t) => t !== note.track);
     menu = {
       x: e.clientX,
       y: e.clientY,
       items: [
-        action('Rename', () => (renamingPath = note.path)),
         action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
         divider,
         heading('move to'),
         ...others.map((t) => action(t, () => onMoveNote(note, t))),
         action('Shelf', () => onMoveNote(note, 'Shelf')),
         divider,
+        keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
         action('Show in Finder', () => onRevealNote(note)),
         action('Move to Trash', () => onTrashNote(note), true),
       ],
@@ -326,8 +334,8 @@
       y: e.clientY,
       items: [
         action('New note', () => (creatingIn = column.track)),
-        action('Rename', () => (renamingTrack = column.track)),
         divider,
+        action('Rename', () => (renamingTrack = column.track)),
         action('Show in Finder', () => onRevealTrack(column.track)),
         action('Move to Trash', () => onTrashTrack(column), true),
       ],

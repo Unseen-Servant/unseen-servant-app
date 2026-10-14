@@ -10,7 +10,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
   import { endNoteDrag, startNoteDrag } from './noteDrag';
-  import { action, divider, heading, type OpenMenu } from './menu';
+  import { action, divider, heading, keyed, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
 
   export let campaign: string;
@@ -103,16 +103,23 @@
     };
   }
 
+  /** R on the selected note: renamed in its row, if the shelf is showing it. */
+  export function rename(path: string) {
+    if (!source && [...shelf, ...loose].some((n) => n.path === path)) renamingPath = path;
+  }
+
+  // A right-click selects the row, as the grid's does.
   function noteMenu(e: MouseEvent, note: NoteEntry) {
+    onSelect(note);
     menu = {
       x: e.clientX,
       y: e.clientY,
       items: [
-        action('Rename', () => (renamingPath = note.path)),
         action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
         ...(index.tracks.length ? [divider, heading('file on'), ...index.tracks.map((t) => action(t, () => onMove(note, t)))] : []),
         ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
         divider,
+        keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
         action('Show in Finder', () => onReveal(note)),
         action('Move to Trash', () => onTrash(note), true),
       ],

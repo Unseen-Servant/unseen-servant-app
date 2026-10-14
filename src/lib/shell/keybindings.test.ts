@@ -208,10 +208,11 @@ describe('keyShortcut', () => {
 
   test('a binding with no accelerator has no shortcut to assert', () => {
     // collections.* chords are shown as hints but are not live in that menu,
-    // and Reveal's ⌥⌘R carries a modifier eventMatchKey rejects — none of them
-    // may claim aria-keyshortcuts.
+    // nor is Command's R in its menus, and Reveal's ⌥⌘R carries a modifier
+    // eventMatchKey rejects — none of them may claim aria-keyshortcuts.
     expect(keyShortcut('tree.openExternal')).toBe('');
     expect(keyShortcut('collections.rename')).toBe('');
+    expect(keyShortcut('command.rename')).toBe('');
     expect(keyShortcut('collections.archive')).toBe('');
     expect(keyShortcut('nope.missing')).toBe('');
   });
@@ -253,6 +254,7 @@ describe('isBareKeyChord', () => {
       'tree.mute', 'tree.hide', 'tree.addToCollection', 'tree.delete',
       'collections.rename', 'collections.arm', 'collections.archive',
       'collections.play', 'collections.mute', 'collections.delete',
+      'command.rename',
     ];
     for (const id of rendered) {
       const entry = KEYBINDINGS.find((k) => k.id === id)!;

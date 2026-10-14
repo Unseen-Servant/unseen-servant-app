@@ -14,6 +14,7 @@ export type KeyScope =
   | 'searchInput'
   | 'searchResults'
   | 'filterPanel'
+  | 'command'
   | 'contextMenu'
   | 'modal';
 
@@ -149,6 +150,11 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / stop soloing focused channel', scope: 'filterPanel', switch: true },
   { id: 'filterPanel.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterPanel', switch: true },
   { id: 'filterPanel.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / leave the panel', scope: 'filterPanel' },
+
+  // Command, in Prep (on the selected row). No `match`: Command's menus show
+  // the hint without taking the key, as the collections menu does, and 'r'
+  // is tree.rename's.
+  { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

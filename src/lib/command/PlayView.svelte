@@ -216,7 +216,9 @@
 
   function onKeydown(e: KeyboardEvent) {
     if (!active || finding !== null || menu || capturing || menuSlotHeld()) return;
-    if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1 || e.key === ' ') return;
+    // A dialog's keys are its own (CommandPanel); ? opens the shortcut sheet.
+    if (document.querySelector('dialog[open]')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1 || e.key === ' ' || e.key === '?') return;
     const target = e.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
     e.preventDefault();

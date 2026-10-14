@@ -3,6 +3,7 @@
   // (.menu-row / .menu-divider in app.css): measured before it shows,
   // clamped to the window, and holding the one menu slot while open.
   import { onDestroy, onMount, tick } from 'svelte';
+  import { chord, isBareKeyChord } from '../shell/keybindings';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
   import type { MenuItem } from './menu';
@@ -76,6 +77,9 @@
         <button type="button" class="menu-row" class:danger={item.danger} role="menuitem" on:click={() => pick(run)}>
           {#if lamps}<span class="menu-pip" aria-hidden="true"></span>{/if}
           <span class="menu-label">{item.label}</span>
+          {#if item.chord}
+            <span class="menu-chord" class:bare={isBareKeyChord(item.chord)} aria-hidden="true">{chord(item.chord)}</span>
+          {/if}
         </button>
       {/if}
     {/if}

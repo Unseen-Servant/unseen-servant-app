@@ -16,6 +16,7 @@
     'searchInput',
     'searchResults',
     'filterPanel',
+    'command',
     'contextMenu',
   ];
 
@@ -27,6 +28,7 @@
     searchInput: 'Search input',
     searchResults: 'Search results',
     filterPanel: 'Filters panel',
+    command: 'Command',
     contextMenu: 'Context menu',
     modal: 'Modal',
   };

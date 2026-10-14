@@ -13,6 +13,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
+  import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
@@ -90,6 +91,12 @@
   let armedBeat: string | null = null;
 
   let editor: NoteEditor | undefined;
+  /** The lists a selected row is in, for R. */
+  let grid: TrackGrid | undefined;
+  let shelf: ShelfSidebar | undefined;
+  let beats: BeatColumn | undefined;
+  /** The shortcut sheet, Legend Lore's. */
+  let showHelp = false;
   let bufState: BufferState = { path: null, status: 'empty', error: null };
   // A note just opened takes the caret to the top; a reload keeps it.
   let freshOpen = false;
@@ -257,8 +264,19 @@
 
   function onKeydown(e: KeyboardEvent) {
     if (!active || menu || menuSlotHeld()) return;
+    // An open dialog's keys still bubble here past the inert page; they're
+    // the dialog's, as in Legend Lore.
+    if (document.querySelector('dialog[open]')) return;
     const target = e.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    // ? or ⌘/: the shortcut sheet, as in Legend Lore. Not from the editor,
+    // where ⌘/ is CodeMirror's comment.
+    const mod = e.metaKey || e.ctrlKey;
+    if ((e.key === '?' && !mod && !e.altKey) || (mod && !e.altKey && e.key === '/')) {
+      e.preventDefault();
+      showHelp = true;
+      return;
+    }
     // Tab: Prep ⇄ Play, Live's key for its two views, as Legend Lore's
     // tree ⇄ systems. ⇧Tab too: with two views, direction means nothing.
     if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && index) {
@@ -270,6 +288,15 @@
     if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'b' && index && mode === 'prep') {
       e.preventDefault();
       shelfOpen = !shelfOpen;
+      return;
+    }
+    // R: the selected row is renamed where it stands, as Legend Lore's R
+    // renames the focused one. Kept from the field it opens, or the R types
+    // over the name.
+    if (e.key.toLowerCase() === 'r' && !mod && !e.altKey && !e.shiftKey && !e.isComposing && selected && mode === 'prep') {
+      e.preventDefault();
+      if (e.repeat) return;
+      for (const list of [grid, shelf, beats]) list?.rename(selected);
       return;
     }
     // Esc undoes the louder thing first, as in Legend Lore: the arm, then
@@ -947,6 +974,7 @@
         {:else}
         {#if shelfOpen && campaign}
           <ShelfSidebar
+            bind:this={shelf}
             {campaign}
             {campaigns}
             {index}
@@ -971,6 +999,7 @@
         {/if}
         <div class="grid-pane">
           <TrackGrid
+            bind:this={grid}
             {cols}
             openPath={bufState.path}
             selectedPath={selected}
@@ -1000,6 +1029,7 @@
 
         {#if beatsOpen}
           <BeatColumn
+            bind:this={beats}
             {rows}
             {spare}
             sessionName={session?.name ?? null}
@@ -1007,6 +1037,7 @@
             armedPath={armedBeat}
             litPath={armedBeat ?? litBeat}
             onSelect={selectBeat}
+            onFocus={(beat) => (selected = beat.path)}
             onOpen={(beat) => openPath(beat.path)}
             onArm={armBeat}
             liveBeat={live?.beat ?? null}
@@ -1121,6 +1152,8 @@
 {#if menu}
   <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
 {/if}
+
+<KeyboardHelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
 
 <style>
   .command {
