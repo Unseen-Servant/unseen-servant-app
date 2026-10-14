@@ -25,7 +25,7 @@ export const editorTheme = EditorView.theme(
     },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-accent)' },
     '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
-      { backgroundColor: 'color-mix(in srgb, var(--text-accent) 22%, transparent)' },
+      { backgroundColor: 'var(--bg-text-selection)' },
     // Syntax colouring (a YAML string, say) can nest inside the link mark;
     // the link's colour still wins.
     '.cm-wikilink, .cm-wikilink span': { color: 'var(--text-accent)' },

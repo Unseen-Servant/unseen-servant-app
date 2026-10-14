@@ -104,6 +104,10 @@
      can't be mistaken for purple-armed or the engaged wash. Drawn as an
      outline so it composes over --ring-focus rather than replacing it. */
   --outline-drop: 1px dashed var(--text-accent);
+  /* Selected text, in a field or the note editor: a parchment wash, so a
+     highlight is content (brass) rather than the system's blue, the one
+     hue the app doesn't otherwise use. */
+  --bg-text-selection: color-mix(in srgb, var(--text-accent) 22%, transparent);
 
   /* Corner radii */
   --radius-cell: 1px; /* LED gauge cells */
@@ -224,6 +228,12 @@ button {
 
 input {
   font-family: inherit;
+  /* The note editor's caret (editorTheme.ts), in every field. */
+  caret-color: var(--text-accent);
+}
+
+::selection {
+  background: var(--bg-text-selection);
 }
 
 /* --- Action buttons --- */
