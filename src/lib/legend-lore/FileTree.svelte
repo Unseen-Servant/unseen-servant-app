@@ -12,6 +12,7 @@
   import { BOOK, CARET_RIGHT, GEM } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { markName } from './nameFilter';
+  import { renameTarget } from './renameTarget';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -249,8 +250,9 @@
   function handleRenameKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') {
       const input = event.currentTarget as HTMLInputElement;
-      const ext = item.is_dir ? '' : (item.name.match(/\.[^.]+$/)?.[0] ?? '');
-      onRenameSubmit(item.path, input.value + ext, item.is_dir);
+      const target = renameTarget(item.name, input.value, item.is_dir);
+      if (target === null) onRenameCancel();
+      else onRenameSubmit(item.path, target, item.is_dir);
     } else if (event.key === 'Escape') {
       // The global Escape ladder owns cancel (it nulls renamingFilePath
       // and returns before the focus-clear branch). What it doesn't

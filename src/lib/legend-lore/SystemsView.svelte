@@ -15,6 +15,7 @@
   import { BOOK, CARET_RIGHT, GEM, SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { markName, markPath, nameMatches, pathMatches } from './nameFilter';
+  import { renameTarget } from './renameTarget';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -628,8 +629,9 @@
   function handleRenameKeydown(event: KeyboardEvent, entry: FileStatusEntry) {
     if (event.key === 'Enter') {
       const input = event.currentTarget as HTMLInputElement;
-      const ext = entry.filename.match(/\.[^.]+$/)?.[0] ?? '';
-      onRenameSubmit(entry.path, input.value + ext, false);
+      const target = renameTarget(entry.filename, input.value, false);
+      if (target === null) onRenameCancel();
+      else onRenameSubmit(entry.path, target, false);
     } else if (event.key === 'Escape') {
       // See FileTree.handleRenameKeydown for why two rAF rounds: WebKit
       // fires a delayed scroll reset ~2 frames after the input unmounts,
