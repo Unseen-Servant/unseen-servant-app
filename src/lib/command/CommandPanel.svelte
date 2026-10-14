@@ -54,12 +54,12 @@
   let switcherFor: 'campaign' | 'session' | null = null;
   /** The campaign key is the name field: Rename, from either of its menus. */
   let renaming = false;
-  /** The campaign key's body, measured as a rename starts so the field
-   *  takes just its key's width and the session's key doesn't move. */
-  let campaignBody: HTMLDivElement | null = null;
+  /** The campaign key, measured as a rename starts so the field takes
+   *  just its width and the session's key doesn't move. */
+  let campaignFace: HTMLButtonElement | null = null;
   let renameWidth = 0;
   function startRenaming() {
-    renameWidth = campaignBody?.clientWidth ?? 0;
+    renameWidth = campaignFace?.offsetWidth ?? 0;
     renaming = true;
   }
   /** The open note's title is its name field. */
@@ -826,10 +826,10 @@
         </LatchKey>
       </div>
     {/if}
-    <!-- The campaign and the session, each one raised key that opens its
-         switcher; what acts on the open one is in that menu (and, for the
-         campaign, on right-click too). -->
-    <div class="key-body" bind:this={campaignBody}>
+    <!-- The campaign and the session, each a key in its own well that opens
+         its switcher; what acts on the open one is in that menu (and, for
+         the campaign, on right-click too). -->
+    <div class="key-body">
       <!-- Renamed in the key's place, face and width: the session's key
            stays put. Not gated on the campaign: a rename leaves it while
            the folder moves, and the field stays to show a refusal. -->
@@ -849,6 +849,7 @@
         </span>
       {:else}
         <button
+          bind:this={campaignFace}
           type="button"
           class="key-face campaign-key"
           class:untitled
@@ -881,8 +882,8 @@
             <span class="key-name">{current.name}</span>
             {@render dropCaret()}
           </button>
-          <!-- The key's other half starts the next session from the bar; the
-               menu keeps New session too. -->
+          <!-- The well's second key starts the next session from the bar;
+               the menu keeps New session too. -->
           <button type="button" class="key-face key-add" title="New session" aria-label="New session" on:click={newSession}>
             <!-- Font Awesome "plus" icon (src/lib/ui/icons/plus-solid-full.svg) -->
             <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
@@ -1187,26 +1188,20 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* The campaign and session keys: each one key standing proud of the
-     bar, on the wells' footprint (28px and their corners), so it shares one
-     outline with every well here, raised where they're sunk. The face fills
-     the body; hover fills it with the rim's grey, and a switcher sinks to
-     the app floor while its menu is open. The session's body holds a second
-     face, New session, across a groove. */
+  /* The campaign and session keys, each in a latch's well (LatchKey
+     .key-well), so they share one outline and floor with every well here.
+     A name is its switcher's pick, so it sits on the raised fill as the
+     current view segment and tab do, and sinks to the floor while its menu
+     is open. Hover lightens the ink only, as on a latch. The session's well
+     holds a second key, New session. */
   .key-body {
     flex-shrink: 0;
     display: flex;
-    height: 28px;
-    background: var(--bg-focused);
-    border: 1px solid var(--bg-category);
-    border-bottom-color: var(--bg-app);
+    gap: 2px;
+    padding: 2px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-well);
-    transition: transform var(--transition-fast);
-  }
-
-  /* The press tick takes the whole key, not the face inside it. */
-  .key-body:has(> .key-face:active) {
-    transform: scale(0.97);
   }
 
   .key-face {
@@ -1214,11 +1209,11 @@
     align-items: center;
     gap: 0.5rem;
     max-width: 16rem;
+    height: 22px;
     padding: 0 0.5rem 0 0.55rem;
-    background: transparent;
+    background: var(--bg-header);
     border: none;
-    /* The body's corners, inside its rim. */
-    border-radius: calc(var(--radius-well) - 1px);
+    border-radius: var(--radius-md);
     /* Both keys in one voice, the body face. The name is what's in
        effect, so it's lit as the current tab and view segment are: primary
        ink, while what's off (+ session, no campaign) stays tertiary. */
@@ -1232,6 +1227,10 @@
     user-select: none;
   }
 
+  .key-face:active {
+    transform: scale(0.97);
+  }
+
   .key-name {
     flex: 1;
     min-width: 0;
@@ -1241,29 +1240,20 @@
     text-align: left;
   }
 
-  /* New session, the session body's second half, across a groove in the
-     body's lower-edge dark (B's --bg-header groove all but vanished on the
-     raised fill). An action, so it's off-ink until the pointer's on it, as
-     a latch's glyph is. */
+  /* New session, the session well's second key: a latch's width, 2px from
+     the switcher as Prep is from Play. An action, so it sits on the floor
+     in off-ink until the pointer's on it, as a latch's glyph does. */
   .key-add {
     justify-content: center;
     width: 26px;
     padding: 0;
-    border-left: 1px solid var(--bg-app);
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
+    background: transparent;
     color: var(--text-tertiary);
   }
 
   .key-add svg {
     width: 12px;
     height: 12px;
-  }
-
-  /* Squared where the groove parts it from New session. */
-  .key-face:not(:last-child) {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
   }
 
   /* Font Awesome caret-right turned down: always a drop, never a
@@ -1293,32 +1283,31 @@
     font-style: italic;
   }
 
-  .campaign-key.none {
-    color: var(--text-tertiary);
-  }
-
+  /* Nothing picked: no campaign, or a campaign with no session yet. Off,
+     so on the floor in tertiary ink. */
+  .campaign-key.none,
   .session-key.ghost {
+    background: transparent;
     color: var(--text-tertiary);
   }
 
-  /* Late, so hover brightens every key, the dim ones included — and an
-     open switcher stays sunk under the pointer. */
+  /* Late, so hover brightens every key's ink, the dim ones included. */
   .key-face:hover {
-    background: var(--bg-category);
     color: var(--text-primary);
   }
 
   .key-face.open {
-    background: var(--bg-app);
+    background: transparent;
     color: var(--text-primary);
   }
 
-  /* The campaign key's face while it's renamed: its inset and face,
-     upright even for an Untitled one, so the name is typed where it was
-     read. */
+  /* The campaign key's face while it's renamed: its height, inset and
+     face, upright even for an Untitled one, so the name is typed where it
+     was read. */
   .key-field {
     display: flex;
     align-items: center;
+    height: 22px;
     min-width: 9rem;
     padding: 0 0.5rem 0 0.55rem;
     font-family: var(--font-body);
