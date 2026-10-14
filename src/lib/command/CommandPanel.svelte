@@ -1276,11 +1276,12 @@
     font-size: 0.95rem;
   }
 
-  /* Legend Lore's path mark (InspectorPlate .sep), in its ink; the bar's
-     gap spaces it. */
+  /* Legend Lore's path mark (InspectorPlate .sep), in the keys' resting
+     ink rather than its tertiary, so the line reads as one; the bar's gap
+     spaces it. */
   .bar-sep {
     flex-shrink: 0;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     -webkit-user-select: none;
     user-select: none;
   }
