@@ -345,6 +345,7 @@
   on:drop={dropOnGrid}
 >
   {#each cols as column, i (column.track)}
+    {@const lit = inBeat.get(column.track) ?? 0}
     <section
       class="column"
       class:dragging={draggingTrack === column.track}
@@ -384,13 +385,10 @@
             </button>
           {/if}
         </span>
-        {#if renamingTrack !== column.track}
-          {@const lit = inBeat.get(column.track) ?? 0}
-          {#if lit}
-            <span class="count in-beat" title={`${lit} of ${column.count} in ${litBeatName}`}>{lit}</span>
-          {:else}
-            <span class="count">{column.count}</span>
-          {/if}
+        {#if lit}
+          <span class="count in-beat" title={`${lit} of ${column.count} in ${litBeatName}`}>{lit}</span>
+        {:else}
+          <span class="count">{column.count}</span>
         {/if}
       </header>
 
@@ -400,9 +398,52 @@
             <div class="group-label" title={group.group}>{group.group}</div>
           {/if}
           {#each group.notes as note (note.path)}
-            {#if renamingPath === note.path}
-              <div class="row-edit renaming" class:grouped={group.group !== null}>
-                <span class="slot" aria-hidden="true"></span>
+            {@const renaming = renamingPath === note.path}
+            <button
+              type="button"
+              class="note-row"
+              data-row
+              data-path={note.path}
+              class:open={note.path === openPath}
+              class:selected={note.path === selectedPath}
+              class:hovered={$hoverLive && hovered === note.path}
+              class:grouped={group.group !== null}
+              class:ambiguous={ambiguous(note.name)}
+              class:member={members.has(note.path)}
+              class:in-session={inSession.has(note.path)}
+              class:spent={!!note.spent}
+              class:out-of-scope={liveNotes !== null && !liveNotes.has(note.path)}
+              class:arming={armed}
+              class:dragging={noteSlot?.note.path === note.path}
+              class:drop-before={lineBefore === note.path}
+              class:drop-after={lineAfter === note.path}
+              aria-pressed={armed ? members.has(note.path) : undefined}
+              title={ambiguous(note.name)
+                ? `Another note is also named “${note.name}”, so links to it are ambiguous`
+                : note.spent
+                  ? `${note.name} — spent ${note.spent}`
+                  : note.name}
+              draggable={!renaming}
+              on:dragstart={(e) => startNoteDrag(e, note)}
+              on:dragend={() => {
+                endNoteDrag();
+                // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
+                hovered = null;
+              }}
+              on:click={() => {
+                onSelect(note);
+                if (armed) onToggleMember(note);
+              }}
+              on:dblclick={() => onOpen(note)}
+              on:pointerenter={() => (hovered = note.path)}
+              on:pointerleave={() => leave(note.path)}
+              on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
+            >
+              <span class="slot" aria-hidden="true"></span>
+              <!-- A rename takes the name's place, as in Legend Lore's
+                   tree: the row keeps its lamp, rule and marks. A
+                   draggable row would kill selecting text in the field. -->
+              {#if renaming}
                 <RenameField
                   value={note.name}
                   label="Rename note"
@@ -413,53 +454,11 @@
                   }}
                   onCancel={() => (renamingPath = null)}
                 />
-              </div>
-            {:else}
-              <button
-                type="button"
-                class="note-row"
-                data-row
-                data-path={note.path}
-                class:open={note.path === openPath}
-                class:selected={note.path === selectedPath}
-                class:hovered={$hoverLive && hovered === note.path}
-                class:grouped={group.group !== null}
-                class:ambiguous={ambiguous(note.name)}
-                class:member={members.has(note.path)}
-                class:in-session={inSession.has(note.path)}
-                class:spent={!!note.spent}
-                class:out-of-scope={liveNotes !== null && !liveNotes.has(note.path)}
-                class:arming={armed}
-                class:dragging={noteSlot?.note.path === note.path}
-                class:drop-before={lineBefore === note.path}
-                class:drop-after={lineAfter === note.path}
-                aria-pressed={armed ? members.has(note.path) : undefined}
-                title={ambiguous(note.name)
-                  ? `Another note is also named “${note.name}”, so links to it are ambiguous`
-                  : note.spent
-                    ? `${note.name} — spent ${note.spent}`
-                    : note.name}
-                draggable="true"
-                on:dragstart={(e) => startNoteDrag(e, note)}
-                on:dragend={() => {
-                  endNoteDrag();
-                  // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
-                  hovered = null;
-                }}
-                on:click={() => {
-                  onSelect(note);
-                  if (armed) onToggleMember(note);
-                }}
-                on:dblclick={() => onOpen(note)}
-                on:pointerenter={() => (hovered = note.path)}
-                on:pointerleave={() => leave(note.path)}
-                on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
-              >
-                <span class="slot" aria-hidden="true"></span>
+              {:else}
                 <span class="label">{note.name}</span>
-                {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
-              </button>
-            {/if}
+              {/if}
+              {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
+            </button>
           {/each}
         {/each}
 
@@ -637,6 +636,15 @@
 
   .track-name:hover {
     color: var(--text-primary);
+  }
+
+  /* Renaming, the name keeps the plate's face, size and tracking, but in
+     the case it's spelled in: a case-only rename has to be seen. */
+  .plate-name :global(.rename-field) {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
   }
 
   /* The track's count of notes: a beat's count badge (BeatColumn
@@ -880,20 +888,14 @@
     line-height: 1.5;
   }
 
-  /* A rename takes the name's place, as in Legend Lore: the row's slot
-     keeps its column, so the field starts where the name did. A new
-     note's name starts there too. */
-  .row-edit.renaming,
+  /* A new note's name starts where a note's name does, the slot keeping
+     its column. */
   .row-edit.naming {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     padding-left: 0.35rem;
     padding-right: 0.4rem;
-  }
-
-  .row-edit.renaming.grouped {
-    padding-left: 0.85rem;
   }
 
   /* The new note's field is a note row's height on its own (the row's

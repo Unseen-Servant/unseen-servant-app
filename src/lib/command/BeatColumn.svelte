@@ -304,8 +304,41 @@
 
 <!-- `row` is the plan entry the beat stands in, null for a spare beat. -->
 {#snippet beatRow(beat: BeatEntry, row: PlanRow | null, onMenu: (e: MouseEvent) => void)}
-  {#if renamingPath === beat.path}
-    <div class="row-edit">
+  {@const armed = beat.path === armedPath}
+  {@const playing = beat.path === liveBeat}
+  {@const renaming = renamingPath === beat.path}
+  <div
+    class="beat-row"
+    data-row
+    class:selected={beat.path === selectedPath}
+    class:live={playing}
+    class:armed
+    class:spent={!!beat.spent}
+    class:hovered={$hoverLive && hovered === beat.path}
+    class:dragging={dragging !== null && dragging === (row ?? beat)}
+    class:drop-before={row ? dropSlot === row.at : dropSpare !== null && shown[dropSpare] === beat}
+    class:drop-after={!row && dropSpare === shown.length && shown[shown.length - 1] === beat}
+    class:drop-into={dropInto === beat.path}
+    draggable={!renaming}
+    on:dragstart={(e) => startBeatDrag(e, row ?? beat, beat.name)}
+    on:dragend={endBeatDrag}
+    on:dragover={(e) => {
+      if (row) overSlot(e, row.at);
+      else overSpareSlot(e, shown.indexOf(beat));
+      overBeat(e, beat);
+    }}
+    on:drop={(e) => {
+      if (!dropBeat(e)) dropNote(e, beat);
+    }}
+    on:contextmenu|preventDefault={onMenu}
+    on:pointerenter={() => (hovered = beat.path)}
+    on:pointerleave={() => leave(beat.path)}
+    role="presentation"
+  >
+    <!-- A rename takes the name's place, as in Legend Lore's collections:
+         the row keeps its rule, mark and count, and only the keys step
+         aside. A draggable row would kill selecting text in the field. -->
+    {#if renaming}
       <RenameField
         value={beat.name}
         label="Rename beat"
@@ -316,38 +349,7 @@
         }}
         onCancel={() => (renamingPath = null)}
       />
-    </div>
-  {:else}
-    {@const armed = beat.path === armedPath}
-    {@const playing = beat.path === liveBeat}
-    <div
-      class="beat-row"
-      data-row
-      class:selected={beat.path === selectedPath}
-      class:live={playing}
-      class:armed
-      class:spent={!!beat.spent}
-      class:hovered={$hoverLive && hovered === beat.path}
-      class:dragging={dragging !== null && dragging === (row ?? beat)}
-      class:drop-before={row ? dropSlot === row.at : dropSpare !== null && shown[dropSpare] === beat}
-      class:drop-after={!row && dropSpare === shown.length && shown[shown.length - 1] === beat}
-      class:drop-into={dropInto === beat.path}
-      draggable="true"
-      on:dragstart={(e) => startBeatDrag(e, row ?? beat, beat.name)}
-      on:dragend={endBeatDrag}
-      on:dragover={(e) => {
-        if (row) overSlot(e, row.at);
-        else overSpareSlot(e, shown.indexOf(beat));
-        overBeat(e, beat);
-      }}
-      on:drop={(e) => {
-        if (!dropBeat(e)) dropNote(e, beat);
-      }}
-      on:contextmenu|preventDefault={onMenu}
-      on:pointerenter={() => (hovered = beat.path)}
-      on:pointerleave={() => leave(beat.path)}
-      role="presentation"
-    >
+    {:else}
       <button
         type="button"
         class="beat-name"
@@ -361,11 +363,13 @@
       >
         {beat.name}
       </button>
-      {#if beat.spent}
-        <span class="spent-mark" aria-label="spent">✓</span>
-      {/if}
-      <!-- The keys take a double-click's first click only: its second would
-           undo the first, so a launch stopped at once and played nothing. -->
+    {/if}
+    {#if beat.spent}
+      <span class="spent-mark" aria-label="spent">✓</span>
+    {/if}
+    <!-- The keys take a double-click's first click only: its second would
+         undo the first, so a launch stopped at once and played nothing. -->
+    {#if !renaming}
       <span class="tr" class:engaged={armed || playing}>
         <button
           type="button"
@@ -394,9 +398,9 @@
           {/if}
         </button>
       </span>
-      <span class="row-count" class:lit={beat.path === litPath}>{beat.notes.length}</span>
-    </div>
-  {/if}
+    {/if}
+    <span class="row-count" class:lit={beat.path === litPath}>{beat.notes.length}</span>
+  </div>
 {/snippet}
 
 <!-- A group's title: the fold toggle, and a drop target for beats from the
@@ -836,16 +840,6 @@
   .row-count.lit {
     background: color-mix(in srgb, var(--text-accent) 18%, transparent);
     color: var(--text-accent);
-  }
-
-  /* A rename takes the name's place, as in Legend Lore: the field starts
-     where the name did, past the row's 3px rule. */
-  .row-edit {
-    display: flex;
-    align-items: center;
-    padding: 0.05rem 0.35rem 0.05rem calc(0.35rem + 3px);
-    font-size: 0.9rem;
-    line-height: 1.5;
   }
 
   /* Legend Lore's ghost track (CollectionsPanel .ghost): a row's geometry

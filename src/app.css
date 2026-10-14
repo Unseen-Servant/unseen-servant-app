@@ -99,6 +99,9 @@
      no room for that rule's 2px offset. A ring rather than a fill so it
      composes over the engaged wash instead of competing with it. */
   --ring-focus: inset 0 0 0 1px var(--text-accent);
+  /* A rename field's ring once the name is refused: the focus ring with
+     danger's hue swapped in. */
+  --ring-refused: inset 0 0 0 1px var(--text-danger);
   /* Drop target under a drag. Dashed parchment is already the app's
      "prospective, not yet real" idiom (+ New collection, + tag), and it
      can't be mistaken for purple-armed or the engaged wash. Drawn as an
@@ -447,6 +450,39 @@ button:focus-visible .folder-opened {
 }
 
 /* --- Form Controls --- */
+
+/* The rename field (ui/RenameField), in the name's place and its type: it
+   takes the font around it, and a list whose name is set apart from the
+   row (a plate's ledger label, a collection's name) gives it that type.
+   Its padding is taken back by the same negative margin, so the text sits
+   where the name did and the row keeps its height; the edge is the focus
+   ring, drawn inside, on the container ground. Here rather than in the
+   component so a list's own rule wins over it plainly. */
+.rename-field {
+  flex: 1;
+  width: calc(100% + 0.6rem);
+  min-width: 0;
+  margin: -0.1rem -0.3rem;
+  padding: 0.1rem 0.3rem;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--text-primary);
+  background: var(--bg-container);
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--ring-focus);
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.rename-field.refused {
+  box-shadow: var(--ring-refused);
+}
+
+.rename-field::placeholder {
+  color: var(--text-tertiary);
+}
 
 /* Themed checkbox matching the file-tree look (parchment border, accent fill,
    dark checkmark). Replace the native checkbox by adding this class. */

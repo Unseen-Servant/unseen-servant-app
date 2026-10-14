@@ -1259,7 +1259,6 @@
   }
   /* The rename field takes the name's place and size. */
   .row-container :global(.rename-field) {
-    flex: 1;
     font-size: 0.9rem;
   }
 

@@ -121,9 +121,41 @@
 </script>
 
 {#snippet row(note: NoteEntry)}
-  {#if renamingPath === note.path}
-    <div class="row-edit renaming">
-      <span class="slot" aria-hidden="true"></span>
+  {@const renaming = renamingPath === note.path}
+  <button
+    type="button"
+    class="note-row"
+    data-row
+    class:open={note.path === openPath}
+    class:selected={note.path === selectedPath}
+    class:hovered={$hoverLive && hovered === note.path}
+    class:ambiguous={ambiguous(note.name)}
+    class:member={members.has(note.path)}
+    class:in-session={inSession.has(note.path)}
+    class:spent={!!note.spent}
+    class:out-of-scope={liveNotes !== null && !liveNotes.has(note.path)}
+    class:arming={armed}
+    aria-pressed={armed ? members.has(note.path) : undefined}
+    title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
+    draggable={!renaming}
+    on:dragstart={(e) => startNoteDrag(e, note)}
+    on:dragend={() => {
+      endNoteDrag();
+      // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
+      hovered = null;
+    }}
+    on:click={() => {
+      onSelect(note);
+      if (armed) onToggleMember(note);
+    }}
+    on:dblclick={() => onOpen(note)}
+    on:pointerenter={() => (hovered = note.path)}
+    on:pointerleave={() => leave(note.path)}
+    on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
+  >
+    <span class="slot" aria-hidden="true"></span>
+    <!-- As the grid's: a rename takes the name's place in the row. -->
+    {#if renaming}
       <RenameField
         value={note.name}
         label="Rename note"
@@ -134,44 +166,11 @@
         }}
         onCancel={() => (renamingPath = null)}
       />
-    </div>
-  {:else}
-    <button
-      type="button"
-      class="note-row"
-      data-row
-      class:open={note.path === openPath}
-      class:selected={note.path === selectedPath}
-      class:hovered={$hoverLive && hovered === note.path}
-      class:ambiguous={ambiguous(note.name)}
-      class:member={members.has(note.path)}
-      class:in-session={inSession.has(note.path)}
-      class:spent={!!note.spent}
-      class:out-of-scope={liveNotes !== null && !liveNotes.has(note.path)}
-      class:arming={armed}
-      aria-pressed={armed ? members.has(note.path) : undefined}
-      title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
-      draggable="true"
-      on:dragstart={(e) => startNoteDrag(e, note)}
-      on:dragend={() => {
-        endNoteDrag();
-        // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
-        hovered = null;
-      }}
-      on:click={() => {
-        onSelect(note);
-        if (armed) onToggleMember(note);
-      }}
-      on:dblclick={() => onOpen(note)}
-      on:pointerenter={() => (hovered = note.path)}
-      on:pointerleave={() => leave(note.path)}
-      on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
-    >
-      <span class="slot" aria-hidden="true"></span>
+    {:else}
       <span class="label">{note.name}</span>
-      {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
-    </button>
-  {/if}
+    {/if}
+    {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
+  </button>
 {/snippet}
 
 <aside class="shelf" aria-label="Shelf">
@@ -504,10 +503,8 @@
     line-height: 1.5;
   }
 
-  /* A rename takes the name's place, as in Legend Lore: the row's slot
-     keeps its column, so the field starts where the name did. A new
-     note's name starts there too. */
-  .row-edit.renaming,
+  /* A new note's name starts where a note's name does, the slot keeping
+     its column. */
   .row-edit.naming {
     display: flex;
     align-items: center;

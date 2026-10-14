@@ -1130,7 +1130,6 @@
   }
   /* The rename field takes the file name's place and size. */
   .file :global(.rename-field) {
-    flex: 1;
     font-size: 0.9rem;
   }
   .file-sep {

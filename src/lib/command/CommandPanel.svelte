@@ -53,6 +53,14 @@
   let switcherFor: 'campaign' | 'session' | null = null;
   /** The campaign key is the name field: the pen or Rename. */
   let renaming = false;
+  /** The campaign's well, measured as a rename starts so the field takes
+   *  just its width and the session's key doesn't move. */
+  let campaignWell: HTMLDivElement | null = null;
+  let renameWidth = 0;
+  function startRenaming() {
+    renameWidth = campaignWell?.clientWidth ?? 0;
+    renaming = true;
+  }
   /** The open note's title is its name field. */
   let renamingOpen = false;
   let mounted = false;
@@ -724,7 +732,7 @@
       x: e.clientX,
       y: e.clientY,
       items: [
-        action('Rename', () => (renaming = true)),
+        action('Rename', startRenaming),
         action('Show in Finder', () => reveal()),
         divider,
         action('Move to Trash', trashCampaign, true),
@@ -777,27 +785,28 @@
         </LatchKey>
       </div>
     {/if}
-    <!-- Not gated on the campaign: a rename leaves it while the folder
-         moves, and the field stays to show a refusal. -->
-    {#if renaming}
-      <div class="bar-name">
-        <RenameField
-          value={untitled || !campaign ? '' : campaign}
-          placeholder="Campaign name"
-          label={untitled ? 'Name campaign' : 'Rename campaign'}
-          onCommit={async (name) => {
-            const refusal = await renameCampaign(name);
-            if (!refusal) renaming = false;
-            return refusal;
-          }}
-          onCancel={() => (renaming = false)}
-        />
-      </div>
-    {:else}
-      <!-- The campaign and the session, each one keycap in a well, split in
-           two: the switcher (right-click on the campaign's for its own menu)
-           and the pen — naming the campaign, opening the session's note. -->
-      <div class="cap-well">
+    <!-- The campaign and the session, each one keycap in a well, split in
+         two: the switcher (right-click on the campaign's for its own menu)
+         and the pen — naming the campaign, opening the session's note. -->
+    <div class="cap-well" bind:this={campaignWell}>
+      <!-- Renamed in the keycap's place, face and width: the session's key
+           stays put. Not gated on the campaign: a rename leaves it while
+           the folder moves, and the field stays to show a refusal. -->
+      {#if renaming}
+        <span class="cap-field" style:width={renameWidth ? `${renameWidth - 4}px` : null}>
+          <RenameField
+            value={untitled || !campaign ? '' : campaign}
+            placeholder="Campaign name"
+            label={untitled ? 'Name campaign' : 'Rename campaign'}
+            onCommit={async (name) => {
+              const refusal = await renameCampaign(name);
+              if (!refusal) renaming = false;
+              return refusal;
+            }}
+            onCancel={() => (renaming = false)}
+          />
+        </span>
+      {:else}
         <button
           type="button"
           class="cap-key campaign-key"
@@ -817,40 +826,40 @@
             class="cap-pen"
             title={untitled ? 'Name this campaign' : 'Rename this campaign'}
             aria-label={untitled ? 'Name this campaign' : 'Rename this campaign'}
-            on:click={() => (renaming = true)}
+            on:click={startRenaming}
           >
             {@render pen()}
           </button>
         {/if}
-      </div>
-      {#if campaign}
-        <div class="cap-well">
-          {#if session}
-            {@const current = session}
-            <button
-              type="button"
-              class="cap-key session-key"
-              class:open={sunk === 'session'}
-              title="Sessions"
-              on:click={sessionMenu}
-            >
-              <span class="cap-name">{current.name}{#if current.date}<span class="session-date">{current.date}</span>{/if}</span>
-              {@render dropCaret()}
-            </button>
-            <button
-              type="button"
-              class="cap-pen"
-              title="Edit the session note"
-              aria-label="Edit the session note"
-              on:click={() => openPath(current.path)}
-            >
-              {@render pen()}
-            </button>
-          {:else}
-            <button type="button" class="cap-key session-key ghost" on:click={newSession}>+ session</button>
-          {/if}
-        </div>
       {/if}
+    </div>
+    {#if campaign}
+      <div class="cap-well">
+        {#if session}
+          {@const current = session}
+          <button
+            type="button"
+            class="cap-key session-key"
+            class:open={sunk === 'session'}
+            title="Sessions"
+            on:click={sessionMenu}
+          >
+            <span class="cap-name">{current.name}{#if current.date}<span class="session-date">{current.date}</span>{/if}</span>
+            {@render dropCaret()}
+          </button>
+          <button
+            type="button"
+            class="cap-pen"
+            title="Edit the session note"
+            aria-label="Edit the session note"
+            on:click={() => openPath(current.path)}
+          >
+            {@render pen()}
+          </button>
+        {:else}
+          <button type="button" class="cap-key session-key ghost" on:click={newSession}>+ session</button>
+        {/if}
+      </div>
     {/if}
     <span class="spacer"></span>
     {#if index}
@@ -1270,9 +1279,17 @@
     background: var(--bg-app);
   }
 
-  .bar-name {
-    width: 16rem;
-    font-size: 0.95rem;
+  /* The campaign keycap's place while it's renamed: its height, inset and
+     face, upright even for an Untitled one, so the name is typed where it
+     was read. */
+  .cap-field {
+    display: flex;
+    align-items: center;
+    min-width: 9rem;
+    height: 22px;
+    padding: 0 0.5rem 0 0.55rem;
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
   }
 
   .spacer {
@@ -1424,12 +1441,14 @@
     cursor: default;
   }
 
-  /* As a Legend Lore rename: the field starts where the name did. */
+  /* As a Legend Lore rename: the field starts where the name did, in the
+     title's face and size. */
   .note-name-field {
     flex: 1;
     min-width: 0;
     max-width: 22rem;
-    font-size: 1rem;
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
   }
 
   .crumb {

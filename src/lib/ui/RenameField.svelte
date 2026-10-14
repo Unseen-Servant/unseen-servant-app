@@ -127,32 +127,7 @@
 {/if}
 
 <style>
-  /* Legend Lore's rename field: a solid parchment edge on the container
-     ground. Danger is a hue swap of that edge. */
-  .rename-field {
-    width: 100%;
-    min-width: 0;
-    padding: 0.1rem 0.3rem;
-    font-family: var(--font-body);
-    font-size: inherit;
-    line-height: normal;
-    color: var(--text-primary);
-    background: var(--bg-container);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    outline: none;
-    user-select: text;
-    -webkit-user-select: text;
-  }
-
-  .rename-field.refused {
-    border-color: var(--text-danger);
-  }
-
-  .rename-field::placeholder {
-    color: var(--text-tertiary);
-  }
-
+  /* The field's own look is app.css's .rename-field. */
   .refusal {
     position: fixed;
     z-index: 200;
