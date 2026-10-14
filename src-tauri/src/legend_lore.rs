@@ -1116,6 +1116,31 @@ fn validate_rename_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether renaming `old` to `new_path` would land on another entry. On a
+/// case-insensitive volume (macOS's default) a change of case alone makes
+/// the new spelling "exist" because it is the source itself; the folder's
+/// own listing tells that apart from a second entry spelled that way, which
+/// only a case-sensitive volume can hold.
+fn rename_target_taken(old: &Path, new_path: &Path) -> bool {
+    if !new_path.exists() {
+        return false;
+    }
+    let (Some(old_name), Some(new_name), Some(parent)) =
+        (old.file_name(), new_path.file_name(), new_path.parent())
+    else {
+        return true;
+    };
+    if old_name.to_string_lossy().to_lowercase() != new_name.to_string_lossy().to_lowercase() {
+        return true;
+    }
+    match fs::read_dir(parent) {
+        Ok(entries) => entries
+            .flatten()
+            .any(|e| e.file_name() == new_name && e.file_name() != old_name),
+        Err(_) => true,
+    }
+}
+
 #[tauri::command]
 pub async fn rename_file(old_path: String, new_name: String) -> Result<String, String> {
     validate_rename_name(&new_name)?;
@@ -1131,7 +1156,7 @@ pub async fn rename_file(old_path: String, new_name: String) -> Result<String, S
     if new_path.parent() != Some(parent) {
         return Err("Name escapes parent directory".to_string());
     }
-    if new_path.exists() {
+    if rename_target_taken(old, &new_path) {
         return Err(format!("A file named '{}' already exists", new_name));
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
@@ -1189,7 +1214,7 @@ pub async fn rename_folder(old_path: String, new_name: String) -> Result<String,
     if new_path.parent() != Some(parent) {
         return Err("Name escapes parent directory".to_string());
     }
-    if new_path.exists() {
+    if rename_target_taken(old, &new_path) {
         return Err(format!("A folder named '{}' already exists", new_name));
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
@@ -1424,6 +1449,57 @@ mod tests {
         assert!(!msg.starts_with("sync-busy:"), "{msg}");
         assert!(msg.contains("500"), "{msg}");
         assert!(msg.contains("No data directory configured"), "{msg}");
+    }
+
+    #[test]
+    fn rename_target_is_free_under_a_new_name() {
+        let dir = scratch_dir("rename-free");
+        fs::write(dir.join("a.pdf"), b"").unwrap();
+        assert!(!rename_target_taken(&dir.join("a.pdf"), &dir.join("b.pdf")));
+    }
+
+    #[test]
+    fn rename_target_is_taken_by_another_entry() {
+        let dir = scratch_dir("rename-taken");
+        fs::write(dir.join("a.pdf"), b"").unwrap();
+        fs::write(dir.join("b.pdf"), b"").unwrap();
+        assert!(rename_target_taken(&dir.join("a.pdf"), &dir.join("b.pdf")));
+        fs::create_dir(dir.join("Modules")).unwrap();
+        fs::create_dir(dir.join("Adventures")).unwrap();
+        assert!(rename_target_taken(
+            &dir.join("Modules"),
+            &dir.join("Adventures")
+        ));
+    }
+
+    #[test]
+    fn a_change_of_case_alone_renames_the_entry_itself() {
+        let dir = scratch_dir("rename-case");
+        fs::write(dir.join("players handbook.pdf"), b"").unwrap();
+        let old = dir.join("players handbook.pdf");
+        let new = dir.join("Players Handbook.pdf");
+        // On a case-insensitive volume the new spelling "exists": it's the
+        // source itself, so it isn't taken.
+        assert!(!rename_target_taken(&old, &new));
+        fs::rename(&old, &new).unwrap();
+        let names: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["Players Handbook.pdf"]);
+    }
+
+    #[test]
+    fn a_change_of_case_onto_another_file_is_taken_where_case_matters() {
+        let dir = scratch_dir("rename-case-other");
+        fs::write(dir.join("a.pdf"), b"").unwrap();
+        fs::write(dir.join("A.pdf"), b"").unwrap();
+        // Only a case-sensitive volume holds both; on the others the second
+        // write landed on the first and there's nothing else to clobber.
+        if fs::read_dir(&dir).unwrap().count() == 2 {
+            assert!(rename_target_taken(&dir.join("a.pdf"), &dir.join("A.pdf")));
+        }
     }
 
     #[test]
