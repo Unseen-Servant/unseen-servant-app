@@ -4,6 +4,7 @@ import {
   childNavKey,
   computeCollectionNav,
   parseNavKey,
+  renameNavKey,
   stepNavKey,
 } from './collectionsNav';
 
@@ -80,5 +81,22 @@ describe('stepNavKey', () => {
 
   test('an empty list yields nothing', () => {
     expect(stepNavKey([], 'anything', 1)).toBeNull();
+  });
+});
+
+describe('renameNavKey', () => {
+  test("a renamed collection's head row and its file rows follow the new name", () => {
+    expect(renameNavKey('Monsters', 'Monsters', 'Bestiary')).toBe('Bestiary');
+    expect(renameNavKey(childNavKey('Monsters', '/lib/mm.pdf'), 'Monsters', 'Bestiary')).toBe(
+      childNavKey('Bestiary', '/lib/mm.pdf'),
+    );
+  });
+
+  test('keys on other collections, or none, are left as they are', () => {
+    expect(renameNavKey('Monsters II', 'Monsters', 'Bestiary')).toBe('Monsters II');
+    expect(renameNavKey(childNavKey('House rules', '/lib/Monsters'), 'Monsters', 'Bestiary')).toBe(
+      childNavKey('House rules', '/lib/Monsters'),
+    );
+    expect(renameNavKey(null, 'Monsters', 'Bestiary')).toBeNull();
   });
 });

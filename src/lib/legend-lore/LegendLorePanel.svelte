@@ -46,6 +46,7 @@
   } from './collectionMembership';
   import { buildRibbonIndex, firstColorByPath } from './collectionRibbons';
   import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
+  import { renameNavKey } from './collectionsNav';
   import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
@@ -3504,8 +3505,10 @@
 
   // Inline rename of an existing collection (R / double-click on the
   // panel row). Collisions surface as a notification; the row snaps back.
-  async function renameCollection(name: string, newName: string) {
-    if (newName === name) return;
+  // Resolves whether the rename took, so the panel can carry the row's
+  // expansion over.
+  async function renameCollection(name: string, newName: string): Promise<boolean> {
+    if (newName === name) return false;
     // Land any armed writes under the old name — after the rename they
     // would 404.
     if (armedCollection === name) await armCommitter.flush();
@@ -3523,6 +3526,10 @@
         const { [name]: _gone, ...rest } = collections;
         collections = { ...rest, [newName]: { ...renamed, name: newName } };
       }
+      // The keyboard's place follows too, in the same tick: a ring on a
+      // name the map no longer carries is a ring on nothing.
+      focusedCollectionName = renameNavKey(focusedCollectionName, name, newName);
+      lastFocusedCollectionName = renameNavKey(lastFocusedCollectionName, name, newName);
       // The arm follows the rename, like the transport state below.
       if (armedCollection === name) armedCollection = newName;
       // Migrate any playing state keyed by the old name so an armed
@@ -3550,12 +3557,14 @@
       });
       await loadCollections();
       if (committedQuery) runSearch(committedQuery);
+      return true;
     } catch (e) {
       jobNotification.show({
         type: 'error',
         message: `Rename failed: ${String(e)}`,
         duration: 5000,
       });
+      return false;
     }
   }
 

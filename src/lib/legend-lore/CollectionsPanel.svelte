@@ -62,7 +62,8 @@
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
-  export let onRename: (name: string, newName: string) => void = () => {};
+  /** Resolves whether the rename took. */
+  export let onRename: (name: string, newName: string) => Promise<boolean> = async () => false;
   export let onSetColor: (name: string, color: string | null) => void = () => {};
   export let onTogglePlay: (name: string) => void = () => {};
   export let onSetSortKey: (key: 'custom' | 'name' | 'size' | 'created') => void = () => {};
@@ -140,8 +141,23 @@
   function commitRename() {
     if (renamingName === null) return;
     const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== renamingName) onRename(renamingName, trimmed);
+    if (trimmed && trimmed !== renamingName) carryExpansion(renamingName, trimmed);
     renamingName = null;
+  }
+
+  // An open collection stays open under its new name. The row remounts
+  // under that name as soon as the rename lands, before onRename resolves,
+  // so the new name is opened up front and the loser dropped after.
+  async function carryExpansion(from: string, to: string) {
+    const open = expandedNames.has(from) && !expandedNames.has(to);
+    if (open) {
+      expandedNames.add(to);
+      expandedNames = expandedNames;
+    }
+    const took = await onRename(from, to);
+    if (!open) return;
+    expandedNames.delete(took ? from : to);
+    expandedNames = expandedNames;
   }
 
   function handleRenameKeydown(e: KeyboardEvent) {
