@@ -58,6 +58,9 @@ export interface CampaignIndex {
   /** Note names by folder ("NPCs", "NPCs/Vallaki"), in the order the GM
    *  dragged them; the folder's other notes follow by name. */
   note_order: Record<string, string[]>;
+  /** Each track's pigment, a hex from Legend Lore's palette (palette.ts);
+   *  a track it doesn't name has none. */
+  pigments: Record<string, string>;
   /** Case-folded names more than one note answers to. */
   ambiguous: string[];
   beats: BeatEntry[];

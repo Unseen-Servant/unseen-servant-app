@@ -96,6 +96,8 @@ pub struct CampaignIndex {
     notes: Vec<NoteEntry>,
     /// Note names by folder, in the order the GM dragged them.
     note_order: std::collections::BTreeMap<String, Vec<String>>,
+    /// Each track's pigment, a hex from Legend Lore's palette.
+    pigments: std::collections::BTreeMap<String, String>,
     ambiguous: Vec<String>,
     beats: Vec<BeatEntry>,
     sessions: Vec<SessionEntry>,
@@ -400,6 +402,26 @@ pub async fn command_order_tracks(
     )
     .await
     .map(|t| t.tracks)
+}
+
+/// Give a track a pigment, or none. Returns every track's pigment after.
+#[tauri::command]
+pub async fn command_pigment_track(
+    campaign: String,
+    track: String,
+    pigment: Option<String>,
+) -> Result<std::collections::BTreeMap<String, String>, String> {
+    #[derive(Deserialize)]
+    struct Pigments {
+        pigments: std::collections::BTreeMap<String, String>,
+    }
+    answer::<Pigments>(
+        client()
+            .put(api("/tracks/pigment"))
+            .json(&serde_json::json!({ "campaign": campaign, "track": track, "pigment": pigment })),
+    )
+    .await
+    .map(|p| p.pigments)
 }
 
 /// Save the order of a folder's notes, by name, as the GM drags them in
@@ -937,6 +959,7 @@ mod tests {
             "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18",
                        "source": "file:///b.pdf#page=3"}],
             "note_order": {"NPCs": ["Ismark", "Ireena"]},
+            "pigments": {"NPCs": "#d07c87"},
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,
                        "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",

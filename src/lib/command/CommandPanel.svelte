@@ -648,6 +648,18 @@
     });
   }
 
+  /** A track's pigment, or none. The plate takes it at once, then the
+   *  campaign keeps it (.unseen/command.json). */
+  function pigmentTrack(track: string, pigment: string | null) {
+    if (!index) return;
+    const { [track]: _, ...others } = index.pigments;
+    index = { ...index, pigments: pigment ? { ...others, [track]: pigment } : others };
+    run(async () => {
+      await commandApi.pigmentTrack(campaign!, track, pigment);
+      await refreshIndex();
+    });
+  }
+
   /** A folder's notes, dragged into a new order in their column. The
    *  column takes it at once, then the campaign keeps it
    *  (.unseen/command.json). */
@@ -995,6 +1007,7 @@
           <TrackGrid
             bind:this={grid}
             {cols}
+            pigments={index.pigments}
             openPath={bufState.path}
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
@@ -1016,6 +1029,7 @@
             onRenameTrack={renameTrack}
             onTrashTrack={trashTrack}
             onReorderTracks={orderTracks}
+            onPigmentTrack={pigmentTrack}
             onReorderNotes={orderNotes}
             onRevealTrack={(track) => reveal(track)}
           />

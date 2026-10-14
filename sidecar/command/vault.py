@@ -198,7 +198,7 @@ def _saved_list(campaign: Path, key: str) -> list[str]:
     return [t for t in items if isinstance(t, str)] if isinstance(items, list) else []
 
 
-def _save_list(campaign: Path, key: str, items: list[str] | dict[str, list[str]]) -> None:
+def _save_list(campaign: Path, key: str, items: list[str] | dict[str, list[str]] | dict[str, str]) -> None:
     """Write one entry, keeping whatever else the file holds."""
     path = _presentation_path(campaign)
     path.parent.mkdir(exist_ok=True)
@@ -253,6 +253,32 @@ def save_track_order(campaign: Path, names: list[str]) -> list[str]:
     return track_order(campaign)
 
 
+_PIGMENT = re.compile(r"#[0-9a-f]{6}")
+
+
+def track_pigments(campaign: Path) -> dict[str, str]:
+    """The pigment the GM gave each track, as saved: a hex from Legend
+    Lore's palette (palette.ts). Names with no track are ignored."""
+    raw = _presentation(campaign).get("pigments", {})
+    if not isinstance(raw, dict):
+        return {}
+    return {t: hex for t, hex in raw.items() if isinstance(hex, str) and _PIGMENT.fullmatch(hex)}
+
+
+def save_track_pigment(campaign: Path, track: str, pigment: str | None) -> dict[str, str]:
+    """Give ``track`` a pigment, or take it away with None; other tracks'
+    are kept."""
+    if track not in _track_folders(campaign):
+        raise NotFound(f"No track named {track!r}")
+    if pigment is not None and not _PIGMENT.fullmatch(pigment):
+        raise Invalid(f"Not a pigment: {pigment!r}")
+    pigments = {t: hex for t, hex in track_pigments(campaign).items() if t != track}
+    if pigment is not None:
+        pigments[track] = pigment
+    _save_list(campaign, "pigments", pigments)
+    return pigments
+
+
 def track_order(campaign: Path) -> list[str]:
     """Tracks in display order: the saved order for tracks it knows, then any
     other track folder alphabetically. Saved names with no folder drop out."""
@@ -274,6 +300,7 @@ def scan(campaign: Path) -> dict:
         "tracks": track_order(campaign),
         "notes": [asdict(n) for n in notes],
         "note_order": note_order(campaign),
+        "pigments": track_pigments(campaign),
         "ambiguous": sorted(k for k, count in seen.items() if count > 1),
     }
 
@@ -743,11 +770,15 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
         return new_name + sep + rest if head == name else folder
 
     notes = note_order(campaign)
+    pigments = track_pigments(campaign)
     moves = _relocate(campaign, campaign / name, campaign / new_name)
     _save_order(campaign, order)
     # Its notes keep their order, a subfolder's too.
     if any(renamed(f) != f for f in notes):
         _save_list(campaign, "notes", {renamed(f): names for f, names in notes.items()})
+    # And it keeps its pigment.
+    if name in pigments:
+        _save_list(campaign, "pigments", {new_name if t == name else t: hex for t, hex in pigments.items()})
     return _rewrite_campaign(campaign, moves)
 
 

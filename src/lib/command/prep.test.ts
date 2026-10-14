@@ -6,6 +6,7 @@ const index: CampaignIndex = {
   name: 'Strahd',
   tracks: ['NPCs'],
   note_order: {},
+  pigments: {},
   ambiguous: [],
   notes: [],
   beats: [

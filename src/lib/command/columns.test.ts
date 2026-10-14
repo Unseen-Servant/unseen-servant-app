@@ -25,6 +25,7 @@ const index: CampaignIndex = {
     'NPCs/Session 9.md',
   ].map(note),
   note_order: {},
+  pigments: {},
   ambiguous: ['doru'],
   beats: [],
   sessions: [],

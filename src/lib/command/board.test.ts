@@ -12,6 +12,7 @@ const index: CampaignIndex = {
   tracks: ['PCs', 'NPCs', 'Locations'],
   notes: ['NPCs/Ismark.md', 'NPCs/Ireena.md', 'Locations/Tser Pool.md', 'Overview.md', 'PCs/Bo.md'].map(note),
   note_order: {},
+  pigments: {},
   ambiguous: [],
   beats: [],
   sessions: [],

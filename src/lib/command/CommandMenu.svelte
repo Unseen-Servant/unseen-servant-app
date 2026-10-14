@@ -71,6 +71,7 @@
       {#if item.lamp !== undefined}
         <button type="button" class="menu-row" role="menuitemradio" aria-checked={item.lamp} on:click={() => pick(run)}>
           <span class="menu-pip" class:on={item.lamp} aria-hidden="true"></span>
+          {#if item.swatch}<span class="menu-swatch" style:background={item.swatch} aria-hidden="true"></span>{/if}
           <span class="menu-label">{item.label}</span>
         </button>
       {:else}
@@ -113,6 +114,14 @@
   .menu-row {
     white-space: nowrap;
     overflow: hidden;
+  }
+
+  /* A pigment as the strip it puts on a nameplate (TrackGrid .nameplate),
+     at a row's scale. */
+  .menu-swatch {
+    flex-shrink: 0;
+    width: 0.8rem;
+    height: 3px;
   }
 
   .menu-label {

@@ -164,6 +164,20 @@ def test_track_order_over_http(cmd):
     assert index["tracks"][:2] == ["Monsters", "PCs"]
 
 
+def test_track_pigment_over_http(cmd):
+    assert cmd.put("/api/command/tracks/pigment", json={
+        "campaign": "Strahd", "track": "NPCs", "pigment": "#4e9766",
+    }).json() == {"pigments": {"NPCs": "#4e9766"}}
+    index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert index["pigments"] == {"NPCs": "#4e9766"}
+    assert cmd.put("/api/command/tracks/pigment", json={
+        "campaign": "Strahd", "track": "NPCs", "pigment": None,
+    }).json() == {"pigments": {}}
+    assert cmd.put("/api/command/tracks/pigment", json={
+        "campaign": "Strahd", "track": "Gone", "pigment": "#4e9766",
+    }).status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # Play: the board, the live set, the log
 # ---------------------------------------------------------------------------

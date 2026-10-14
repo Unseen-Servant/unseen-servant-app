@@ -343,6 +343,33 @@ def test_rename_track_keeps_the_order_of_its_notes(camp):
     }
 
 
+def test_a_track_takes_a_pigment_and_gives_it_back(camp):
+    vault.save_track_order(camp, ["NPCs", "Locations"])
+    assert vault.save_track_pigment(camp, "NPCs", "#d07c87") == {"NPCs": "#d07c87"}
+    assert vault.save_track_pigment(camp, "Locations", "#6b9ad0") == {"NPCs": "#d07c87", "Locations": "#6b9ad0"}
+    assert vault.save_track_pigment(camp, "NPCs", None) == {"Locations": "#6b9ad0"}
+    assert vault.scan(camp)["pigments"] == {"Locations": "#6b9ad0"}
+    assert vault.track_order(camp) == ["NPCs", "Locations"]
+    with pytest.raises(NotFound):
+        vault.save_track_pigment(camp, "Gone", "#d07c87")
+    with pytest.raises(Invalid):
+        vault.save_track_pigment(camp, "NPCs", "red")
+
+
+def test_track_pigments_ignore_what_isnt_one(camp):
+    write(camp / ".unseen" / "command.json", json.dumps({"pigments": {"NPCs": "#d07c87", "Locations": "red", "Monsters": 3}}))
+    assert vault.track_pigments(camp) == {"NPCs": "#d07c87"}
+    write(camp / ".unseen" / "command.json", json.dumps({"pigments": ["NPCs"]}))
+    assert vault.track_pigments(camp) == {}
+
+
+def test_rename_track_keeps_its_pigment(camp):
+    vault.save_track_pigment(camp, "NPCs", "#d07c87")
+    vault.save_track_pigment(camp, "Locations", "#6b9ad0")
+    vault.rename_track(camp, "NPCs", "Characters")
+    assert vault.track_pigments(camp) == {"Characters": "#d07c87", "Locations": "#6b9ad0"}
+
+
 def test_rename_track_keeps_its_place_and_rewrites_path_links(camp):
     write(camp / ".unseen" / "command.json", json.dumps({"tracks": ["NPCs", "Locations"]}))
     write(camp / "Overview.md", "[[NPCs/Vallaki/Lady Wachter]] [[Ireena]]")

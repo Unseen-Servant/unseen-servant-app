@@ -18,13 +18,16 @@
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
-  import { action, divider, heading, keyed, type OpenMenu } from './menu';
+  import { action, choice, divider, heading, keyed, type OpenMenu } from './menu';
+  import { PIGMENTS } from '../legend-lore/palette';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import type { Column, NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
   export let cols: Column[];
+  /** Each track's pigment, by name. */
+  export let pigments: Record<string, string>;
   export let openPath: string | null;
   /** Notes in the lit beat. */
   export let members: Set<string>;
@@ -58,6 +61,7 @@
   export let onRevealTrack: (track: string) => void;
   /** The tracks by name, in the order they were dragged into. */
   export let onReorderTracks: (order: string[]) => void;
+  export let onPigmentTrack: (track: string, pigment: string | null) => void;
   /** A folder's notes by name, in the order they were dragged into. */
   export let onReorderNotes: (folder: string, names: string[]) => void;
 
@@ -337,6 +341,15 @@
         divider,
         action('Rename', () => (renamingTrack = column.track)),
         action('Show in Finder', () => onRevealTrack(column.track)),
+        divider,
+        // Legend Lore's palette, as a collection's gem takes it.
+        heading('pigment'),
+        ...PIGMENTS.map((p) =>
+          choice(p.name, pigments[column.track] === p.hex, () => onPigmentTrack(column.track, p.hex), p.hex),
+        ),
+        // None keeps a swatch's room, so its name lines up with theirs.
+        choice('None', !pigments[column.track], () => onPigmentTrack(column.track, null), 'transparent'),
+        divider,
         action('Move to Trash', () => onTrashTrack(column), true),
       ],
     };
@@ -364,6 +377,8 @@
     >
       <header
         class="nameplate"
+        class:pigmented={!!pigments[column.track]}
+        style:--pigment={pigments[column.track]}
         draggable={renamingTrack !== column.track}
         on:dragstart={(e) => startTrackDrag(e, column.track)}
         role="presentation"
@@ -600,6 +615,13 @@
     padding: 0.4rem 0.6rem 0.3rem;
     background: var(--bg-container);
     border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* A track's pigment: a strip along the plate's top, as a mixer colours
+     a channel's scribble strip. Inset, so a plate with one stands as tall
+     as a plate without. Never glows: it names the track, it isn't lit. */
+  .nameplate.pigmented {
+    box-shadow: inset 0 3px 0 var(--pigment);
   }
 
   /* The track's place in the order, as a mixer numbers its channels:

@@ -57,6 +57,12 @@ class TrackOrder(BaseModel):
     order: list[str]
 
 
+class TrackPigment(BaseModel):
+    campaign: str
+    track: str
+    pigment: str | None
+
+
 class NoteOrder(BaseModel):
     campaign: str
     folder: str
@@ -366,6 +372,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         §5.1), kept with the campaign's presentation."""
         with write_lock:
             return {"tracks": vault.save_track_order(campaign_path(body.campaign), body.order)}
+
+    @router.put("/tracks/pigment")
+    def pigment_track(body: TrackPigment):
+        """A track's pigment from Legend Lore's palette, or none, kept with
+        the campaign's presentation."""
+        with write_lock:
+            return {"pigments": vault.save_track_pigment(campaign_path(body.campaign), body.track, body.pigment)}
 
     # -- notes -------------------------------------------------------------
 

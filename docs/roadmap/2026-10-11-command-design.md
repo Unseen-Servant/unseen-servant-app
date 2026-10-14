@@ -1,7 +1,7 @@
 # Command — design
 
 **Date:** 2026-10-11
-**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10) — all but track identity, which waits for Play on screen. Phases 0–2 done 2026-10-11, phases 3–5 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
+**Status:** the model, the vault layout and session management were agreed in conversation on 2026-10-11, and the open questions were settled the same day before phase 3 (§10); track identity followed on 2026-10-14. Phases 0–2 done 2026-10-11, phases 3–5 on 2026-10-12 (§9); where the build departed from this doc, the text below says so.
 **Objective:** specify Command, the workstation's second tool (architecture doc §6 Step 4), before any code: what the vault looks like on disk, how sessions work, what Prep and Play show, and where each piece lives across the three layers.
 
 ---
@@ -252,7 +252,7 @@ Nothing new beyond the grid cell. Each meaning maps to an existing token or idio
 
 | Meaning | Treatment |
 |---|---|
-| Track identity | *open until Play is on screen (§10).* Tracks are plain nameplates. In Legend Lore a pigment gem marks a curated set, which here is a beat rather than a track. If tracks take a pigment, it is a strip on the nameplate |
+| Track identity | a pigment from Legend Lore's palette, chosen from the track's menu (2026-10-14): a 3px strip along the nameplate's top, never glowing. A track without one is a plain nameplate |
 | Note in the live set | parchment rule and `--glow-accent` on the card; its play key lit purple, as Legend Lore's transport |
 | Prep / Play | a picker in Command's bar, Legend Lore's view switch rule for rule: table-columns and play glyphs, the current segment raised, never purple (one view is always on) |
 | Armed beat | Legend Lore's arm glyph in `--text-active` |
@@ -360,11 +360,11 @@ Settled on 2026-10-11, before phase 3:
 8. **Connections are lines** for now (§5.2). Giving them meaning in Play comes later.
 9. **The campaign is the unit, and gathered material waits on its shelf** (2026-10-12, §3.6). Reuse across campaigns is copying; there's no shared library. The name is *Shelf*, because "library" is Legend Lore's. Send to Command defaults to the shelf. Beats on the shelf are parked.
 10. **Opening a campaign** (2026-10-12, §3.7): launch opens a blank Untitled, and the campaign key is an Obsidian-style switcher with *New campaign* at the bottom. The root defaults to `~/Unseen Servant`, the key's pen names Untitled, and *New campaign* opens a fresh Untitled rather than asking for a name first.
+11. **Track identity** (2026-10-14, §5.4): tracks take a pigment from Legend Lore's palette, kept in `.unseen/command.json` and following renames, shown as a strip on the nameplate.
 
 Open:
 
-1. **Track identity** (§5.4): whether tracks take a pigment, kept in `.unseen/command.json`. This will be decided once Play is on screen, by whether a beat's cards need telling apart by track at a glance.
-2. **Beat identity** (2026-10-12): whether beats take a pigment, as collections do, so a note's row shows the planned beats that hold it in place of today's outlined square. Deferred to its own pass, with where the pigment is kept (presentation, so `.unseen/command.json`, following renames). Beats need a glyph of their own for it, not Legend Lore's gem.
+1. **Beat identity** (2026-10-12): whether beats take a pigment, as collections do, so a note's row shows the planned beats that hold it in place of today's outlined square. Deferred to its own pass, with where the pigment is kept (presentation, so `.unseen/command.json`, following renames). Beats need a glyph of their own for it, not Legend Lore's gem.
 
 ---
 
