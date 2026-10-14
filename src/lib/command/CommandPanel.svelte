@@ -869,6 +869,15 @@
             <span class="key-name">{current.name}</span>
             {@render dropCaret()}
           </button>
+          <!-- The key's other half starts the next session from the bar; the
+               menu keeps New session too. -->
+          <button type="button" class="key-face key-add" title="New session" aria-label="New session" on:click={newSession}>
+            <!-- Font Awesome "plus" icon (src/lib/ui/icons/plus-solid.svg), its
+                 448×512 box framed in 640 as the "-full" icons are -->
+            <svg viewBox="-96 -64 640 640" fill="currentColor" aria-hidden="true">
+              <path d="M256 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 160-160 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l160 0 0 160c0 17.7 14.3 32 32 32s32-14.3 32-32l0-160 160 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-160 0 0-160z" />
+            </svg>
+          </button>
         {:else}
           <button type="button" class="key-face session-key ghost" on:click={newSession}>+ session</button>
         {/if}
@@ -1169,7 +1178,8 @@
      bar, on the wells' footprint (28px and their corners), so it shares one
      outline with every well here, raised where they're sunk. The face fills
      the body; hover fills it with the rim's grey, and a switcher sinks to
-     the app floor while its menu is open. */
+     the app floor while its menu is open. The session's body holds a second
+     face, New session, across a groove. */
   .key-body {
     flex-shrink: 0;
     display: flex;
@@ -1216,6 +1226,31 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
+  }
+
+  /* New session, the session body's second half, across a groove in the
+     body's lower-edge dark (B's --bg-header groove all but vanished on the
+     raised fill). An action, so it's off-ink until the pointer's on it, as
+     a latch's glyph is. */
+  .key-add {
+    justify-content: center;
+    width: 26px;
+    padding: 0;
+    border-left: 1px solid var(--bg-app);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    color: var(--text-tertiary);
+  }
+
+  .key-add svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Squared where the groove parts it from New session. */
+  .key-face:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
   }
 
   /* Font Awesome caret-right turned down: always a drop, never a
