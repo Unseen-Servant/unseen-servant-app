@@ -13,6 +13,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { markName } from './nameFilter';
   import { renameTarget } from './renameTarget';
+  import RenameField from '../ui/RenameField.svelte';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
 
@@ -33,7 +34,9 @@
 
   // Inline rename props
   export let renamingFilePath: string | null = null;
-  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => void = () => {};
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => Promise<string | null> =
+    async () => null;
   export let onRenameCancel: () => void = () => {};
 
   // Expand state (lifted to page level)
@@ -247,38 +250,13 @@
     }
   }
 
-  function handleRenameKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      const input = event.currentTarget as HTMLInputElement;
-      const target = renameTarget(item.name, input.value, item.is_dir);
-      if (target === null) onRenameCancel();
-      else onRenameSubmit(item.path, target, item.is_dir);
-    } else if (event.key === 'Escape') {
-      // The global Escape ladder owns cancel (it nulls renamingFilePath
-      // and returns before the focus-clear branch). What it doesn't
-      // address is WebKit's delayed scroll reset: ~2 frames after the
-      // rename input is removed, the engine fires a scroll event that
-      // nudges scrollTop (likely its "scroll on focus removal"
-      // heuristic). A single rAF restore runs before that fires and is
-      // futile; restoring across frame 1 AND frame 2 wins.
-      const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
-      if (scroller) {
-        const saved = scroller.scrollTop;
-        const restore = () => { scroller.scrollTop = saved; };
-        requestAnimationFrame(restore);
-        requestAnimationFrame(() => requestAnimationFrame(restore));
-      }
-    }
-  }
-
-  function autofocus(node: HTMLInputElement) {
-    // preventScroll: true so mounting the rename input doesn't nudge the
-    // .file-tree-area scrollTop. R is only ever pressed on a focused row,
-    // which is by construction visible — focus() doesn't need to scroll
-    // anything into view, and letting it do so means Esc-cancel restores
-    // to the post-nudge position, which the user reads as "drift."
-    node.focus({ preventScroll: true });
-    node.select();
+  // The field shows a file's name without its extension; renameTarget puts
+  // it back, and finds nothing to do for an extension alone.
+  function commitRename(typed: string): Promise<string | null> | null {
+    const target = renameTarget(item.name, typed, item.is_dir);
+    if (target !== null) return onRenameSubmit(item.path, target, item.is_dir);
+    onRenameCancel();
+    return null;
   }
 
 </script>
@@ -342,19 +320,14 @@
         </span>
       {/if}
       {#if isRenaming}
-        <!-- The field sits inside the row's button: clicks in it are
-             editing, not the row's. A double-click selects a word rather
-             than opening the book, a click doesn't fold the folder, and a
-             right-click doesn't open the row's menu. -->
-        <input
-          class="rename-input"
+        <!-- Inside the row's button: the field keeps its own clicks, so a
+             click doesn't fold the folder nor a right-click open the row's
+             menu. -->
+        <RenameField
           value={item.is_dir ? item.name : item.name.replace(/\.[^.]+$/, '')}
-          on:keydown={handleRenameKeydown}
-          on:blur={onRenameCancel}
-          on:click|stopPropagation
-          on:dblclick|stopPropagation
-          on:mousedown|stopPropagation
-          use:autofocus
+          label={`Rename ${item.name}`}
+          onCommit={commitRename}
+          onCancel={onRenameCancel}
         />
       {:else}
         <span class="name">{#each markName(item.name, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
@@ -597,17 +570,6 @@
   /* What the / filter matched — the same mark the search rows use. */
   .hit {
     color: var(--text-accent);
-  }
-  .rename-input {
-    background: var(--bg-container);
-    color: var(--text-primary);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    padding: 0.1rem 0.3rem;
-    font-size: 0.9rem;
-    font-family: var(--font-body);
-    outline: none;
-    width: 100%;
   }
   .badge-wrapper {
     position: relative;

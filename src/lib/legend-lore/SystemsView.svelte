@@ -16,6 +16,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { markName, markPath, nameMatches, pathMatches } from './nameFilter';
   import { renameTarget } from './renameTarget';
+  import RenameField from '../ui/RenameField.svelte';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -129,7 +130,9 @@
   // occurrence so a multi-tagged file doesn't grow editors in every
   // group it appears under.
   export let renamingFilePath: string | null = null;
-  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => void = () => {};
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => Promise<string | null> =
+    async () => null;
   export let onRenameCancel: () => void = () => {};
 
   // Whether the parent's context menu is open. Used to yield Esc handling
@@ -619,38 +622,13 @@
     return v?.entry ? entryToFileItem(v.entry) : null;
   }
 
-  // Inline rename helpers. Enter commits with the extension preserved,
-  // blur cancels. The page's global Escape ladder owns cancel (it nulls
-  // renamingFilePath and returns before the focus-clear branch). On Esc
-  // we additionally snap the scroll container back to its pre-unmount
-  // scrollTop via a microtask — when Svelte unmounts the input, WebKit
-  // reassigns DOM focus and resets the parent container's scrollTop,
-  // bouncing the user back to the top.
-  function handleRenameKeydown(event: KeyboardEvent, entry: FileStatusEntry) {
-    if (event.key === 'Enter') {
-      const input = event.currentTarget as HTMLInputElement;
-      const target = renameTarget(entry.filename, input.value, false);
-      if (target === null) onRenameCancel();
-      else onRenameSubmit(entry.path, target, false);
-    } else if (event.key === 'Escape') {
-      // See FileTree.handleRenameKeydown for why two rAF rounds: WebKit
-      // fires a delayed scroll reset ~2 frames after the input unmounts,
-      // and a single rAF runs too early to overwrite it.
-      const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
-      if (scroller) {
-        const saved = scroller.scrollTop;
-        const restore = () => { scroller.scrollTop = saved; };
-        requestAnimationFrame(restore);
-        requestAnimationFrame(() => requestAnimationFrame(restore));
-      }
-    }
-  }
-  function autofocus(node: HTMLInputElement) {
-    // preventScroll mirrors FileTree's autofocus — R is pressed on a
-    // focused (visible) row, so focus()'s default scroll-into-view is
-    // both unnecessary and the source of drift on Esc-cancel.
-    node.focus({ preventScroll: true });
-    node.select();
+  // As the tree's: the field shows the name without its extension, and
+  // renameTarget puts it back.
+  function commitRename(entry: FileStatusEntry, typed: string): Promise<string | null> | null {
+    const target = renameTarget(entry.filename, typed, false);
+    if (target !== null) return onRenameSubmit(entry.path, target, false);
+    onRenameCancel();
+    return null;
   }
 
   // The Cmd+Alt+→ jump: passing a path restores that entry when it's still
@@ -800,15 +778,11 @@
                   </svg>
                 </span>
                 {#if renamingFilePath === entry.path && isFocused(entry, group.tag)}
-                  <input
-                    class="rename-input"
+                  <RenameField
                     value={entry.filename.replace(/\.[^.]+$/, '')}
-                    on:click|stopPropagation
-                    on:dblclick|stopPropagation
-                    on:mousedown|stopPropagation
-                    on:keydown={(e) => handleRenameKeydown(e, entry)}
-                    on:blur={onRenameCancel}
-                    use:autofocus
+                    label={`Rename ${entry.filename}`}
+                    onCommit={(typed) => commitRename(entry, typed)}
+                    onCancel={onRenameCancel}
                   />
                 {:else}
                   <span class="file-name">{#each markName(entry.filename, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
@@ -1154,17 +1128,10 @@
   .file:not(:has(.file-path)) .file-name {
     flex: 1 1 auto;
   }
-  .rename-input {
+  /* The rename field takes the file name's place and size. */
+  .file :global(.rename-field) {
     flex: 1;
-    min-width: 0;
-    background: var(--bg-container);
-    color: var(--text-primary);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    padding: 0.1rem 0.3rem;
     font-size: 0.9rem;
-    font-family: var(--font-body);
-    outline: none;
   }
   .file-sep {
     color: var(--text-tertiary);

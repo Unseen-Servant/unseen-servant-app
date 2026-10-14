@@ -984,6 +984,15 @@ pub async fn create_collection(
     Ok(result)
 }
 
+/// A refusal from the sidecar in its own words: FastAPI's `detail` when the
+/// body carries one, the status and body otherwise.
+fn sidecar_refusal(status: reqwest::StatusCode, body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("detail")?.as_str().map(str::to_string))
+        .unwrap_or_else(|| format!("Sidecar error ({}): {}", status, body))
+}
+
 /// The sidecar URL for one collection. Its name is the GM's own text, so it
 /// goes in percent-encoded as a single path segment: a `?`, `#`, `%` or `/`
 /// would otherwise end the path or split it.
@@ -1058,10 +1067,12 @@ pub async fn rename_collection(
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
+    // The rename field shows a refusal under itself, so it's the sidecar's
+    // sentence, not the HTTP exchange.
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(format!("Sidecar error ({}): {}", status, body));
+        return Err(sidecar_refusal(status, &body));
     }
 
     let result: CollectionMutationResult = response
@@ -1466,6 +1477,21 @@ mod tests {
         assert!(!msg.starts_with("sync-busy:"), "{msg}");
         assert!(msg.contains("500"), "{msg}");
         assert!(msg.contains("No data directory configured"), "{msg}");
+    }
+
+    #[test]
+    fn a_sidecar_refusal_reads_in_its_own_words() {
+        assert_eq!(
+            sidecar_refusal(
+                reqwest::StatusCode::CONFLICT,
+                r#"{"detail":"Collection already exists: Monsters"}"#
+            ),
+            "Collection already exists: Monsters"
+        );
+        assert_eq!(
+            sidecar_refusal(reqwest::StatusCode::INTERNAL_SERVER_ERROR, "boom"),
+            "Sidecar error (500 Internal Server Error): boom"
+        );
     }
 
     #[test]

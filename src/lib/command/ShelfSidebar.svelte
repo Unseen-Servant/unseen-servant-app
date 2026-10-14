@@ -6,6 +6,7 @@
   // whose notes copy onto this shelf: reuse between campaigns is a copy.
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
+  import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
   import { endNoteDrag, startNoteDrag } from './noteDrag';
@@ -32,7 +33,8 @@
   export let onSelect: (note: NoteEntry) => void;
   export let onToggleMember: (note: NoteEntry) => void;
   export let onCreate: (name: string) => void;
-  export let onRename: (note: NoteEntry, name: string) => void;
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRename: (note: NoteEntry, name: string) => Promise<string | null>;
   export let onSpent: (note: NoteEntry, spent: boolean) => void;
   export let onMove: (note: NoteEntry, track: string) => void;
   export let onReveal: (note: NoteEntry) => void;
@@ -122,13 +124,13 @@
   {#if renamingPath === note.path}
     <div class="row-edit renaming">
       <span class="slot" aria-hidden="true"></span>
-      <InlineName
+      <RenameField
         value={note.name}
-        rename
         label="Rename note"
-        onCommit={(name) => {
-          renamingPath = null;
-          onRename(note, name);
+        onCommit={async (name) => {
+          const refusal = await onRename(note, name);
+          if (!refusal) renamingPath = null;
+          return refusal;
         }}
         onCancel={() => (renamingPath = null)}
       />

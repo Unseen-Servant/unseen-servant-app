@@ -15,6 +15,7 @@
   // A spent note dims and carries a check.
   import { onDestroy } from 'svelte';
   import InlineName from './InlineName.svelte';
+  import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
   import { action, divider, heading, type OpenMenu } from './menu';
@@ -44,14 +45,15 @@
   export let selectedPath: string | null;
   export let onSelect: (note: NoteEntry) => void;
   export let onCreateNote: (track: string, name: string) => void;
-  export let onRenameNote: (note: NoteEntry, name: string) => void;
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRenameNote: (note: NoteEntry, name: string) => Promise<string | null>;
   /** Move a note to a track or a group's folder; dropped between rows
    *  there, `order` is that folder's notes by name, with it in place. */
   export let onMoveNote: (note: NoteEntry, folder: string, order?: string[]) => void;
   export let onTrashNote: (note: NoteEntry) => void;
   export let onRevealNote: (note: NoteEntry) => void;
   export let onCreateTrack: (name: string) => void;
-  export let onRenameTrack: (track: string, name: string) => void;
+  export let onRenameTrack: (track: string, name: string) => Promise<string | null>;
   export let onTrashTrack: (column: Column) => void;
   export let onRevealTrack: (track: string) => void;
   /** The tracks by name, in the order they were dragged into. */
@@ -360,13 +362,13 @@
         <span class="plate-name">
           <span class="track-number" aria-hidden="true">{i + 1}</span>
           {#if renamingTrack === column.track}
-            <InlineName
+            <RenameField
               value={column.track}
-              rename
               label="Rename track"
-              onCommit={(name) => {
-                renamingTrack = null;
-                onRenameTrack(column.track, name);
+              onCommit={async (name) => {
+                const refusal = await onRenameTrack(column.track, name);
+                if (!refusal) renamingTrack = null;
+                return refusal;
               }}
               onCancel={() => (renamingTrack = null)}
             />
@@ -401,13 +403,13 @@
             {#if renamingPath === note.path}
               <div class="row-edit renaming" class:grouped={group.group !== null}>
                 <span class="slot" aria-hidden="true"></span>
-                <InlineName
+                <RenameField
                   value={note.name}
-                  rename
                   label="Rename note"
-                  onCommit={(name) => {
-                    renamingPath = null;
-                    onRenameNote(note, name);
+                  onCommit={async (name) => {
+                    const refusal = await onRenameNote(note, name);
+                    if (!refusal) renamingPath = null;
+                    return refusal;
                   }}
                   onCancel={() => (renamingPath = null)}
                 />

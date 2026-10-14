@@ -10,6 +10,7 @@
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
+  import RenameField from '../ui/RenameField.svelte';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
   import { menuSlotHeld } from '../shell/menuSlot';
@@ -17,7 +18,6 @@
   import { appContext, setCampaign, setSession } from '../shell/shellState';
   import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
-  import InlineName from './InlineName.svelte';
   import NoteEditor from './NoteEditor.svelte';
   import PlayView from './PlayView.svelte';
   import ShelfSidebar from './ShelfSidebar.svelte';
@@ -137,6 +137,21 @@
       }
     });
     return queue;
+  }
+
+  /** As run, for a rename field, which shows a refusal itself: resolves its
+   *  reason, or null when the job went through, and leaves the error line
+   *  alone. */
+  function attempt(job: () => Promise<void>): Promise<string | null> {
+    let refusal: string | null = null;
+    queue = queue.then(async () => {
+      try {
+        await job();
+      } catch (e) {
+        refusal = String(e);
+      }
+    });
+    return queue.then(() => refusal);
   }
 
   async function loadRoot() {
@@ -326,9 +341,9 @@
    *  rewrites links to it and moves a session's board along. The workstation
    *  holds the active session by name, so renaming that one points it at the
    *  new name, or the index would fall back to the latest session. */
-  function renameNote(note: Named, name: string) {
+  function renameNote(note: Named, name: string): Promise<string | null> {
     const isSession = note.path === session?.path;
-    run(async () => {
+    return attempt(async () => {
       // A selected row or armed beat is pointed at its new path only once
       // the index holds it: before that, the guard on one that left clears it.
       const wasSelected = selected === note.path;
@@ -576,8 +591,8 @@
     });
   }
 
-  function renameTrack(track: string, name: string) {
-    run(async () => {
+  function renameTrack(track: string, name: string): Promise<string | null> {
+    return attempt(async () => {
       const open = bufState.path;
       const inside = open !== null && open.startsWith(`${track}/`);
       if (inside) await buffer.flush();
@@ -644,8 +659,8 @@
     });
   }
 
-  function renameCampaign(name: string) {
-    run(async () => {
+  function renameCampaign(name: string): Promise<string | null> {
+    return attempt(async () => {
       const old = campaign!;
       await leaveCampaign();
       try {
@@ -762,16 +777,18 @@
         </LatchKey>
       </div>
     {/if}
-    {#if renaming && campaign}
+    <!-- Not gated on the campaign: a rename leaves it while the folder
+         moves, and the field stays to show a refusal. -->
+    {#if renaming}
       <div class="bar-name">
-        <InlineName
-          value={untitled ? '' : campaign}
+        <RenameField
+          value={untitled || !campaign ? '' : campaign}
           placeholder="Campaign name"
-          rename
           label={untitled ? 'Name campaign' : 'Rename campaign'}
-          onCommit={(name) => {
-            renaming = false;
-            renameCampaign(name);
+          onCommit={async (name) => {
+            const refusal = await renameCampaign(name);
+            if (!refusal) renaming = false;
+            return refusal;
           }}
           onCancel={() => (renaming = false)}
         />
@@ -1012,14 +1029,14 @@
               {#if renamingOpen && bufState.path}
                 {@const path = bufState.path}
                 <div class="note-name-field">
-                  <InlineName
+                  <RenameField
                     value={openName}
                     placeholder="Note name"
-                    rename
                     label="Rename note"
-                    onCommit={(name) => {
-                      renamingOpen = false;
-                      renameNote({ name: openName, path }, name);
+                    onCommit={async (name) => {
+                      const refusal = await renameNote({ name: openName, path }, name);
+                      if (!refusal) renamingOpen = false;
+                      return refusal;
                     }}
                     onCancel={() => (renamingOpen = false)}
                   />

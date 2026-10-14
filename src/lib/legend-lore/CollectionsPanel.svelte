@@ -3,6 +3,7 @@
   import { CARET_RIGHT, CIRCLE, CIRCLE_RING, GEM, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
+  import RenameField from '../ui/RenameField.svelte';
   import { PIGMENTS } from './palette';
   import { flushSync, onDestroy, tick } from 'svelte';
   import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut, slotChord } from '../shell/keybindings';
@@ -62,8 +63,8 @@
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
-  /** Resolves whether the rename took. */
-  export let onRename: (name: string, newName: string) => Promise<boolean> = async () => false;
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRename: (name: string, newName: string) => Promise<string | null> = async () => null;
   export let onSetColor: (name: string, color: string | null) => void = () => {};
   export let onTogglePlay: (name: string) => void = () => {};
   export let onSetSortKey: (key: 'custom' | 'name' | 'size' | 'created') => void = () => {};
@@ -131,44 +132,27 @@
   // this only ever renames something that already exists.
   // ------------------------------------------------------------------
   let renamingName: string | null = null;
-  let renameValue = '';
 
   function startRename(name: string) {
     renamingName = name;
-    renameValue = name;
-  }
-
-  function commitRename() {
-    if (renamingName === null) return;
-    const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== renamingName) carryExpansion(renamingName, trimmed);
-    renamingName = null;
   }
 
   // An open collection stays open under its new name. The row remounts
   // under that name as soon as the rename lands, before onRename resolves,
   // so the new name is opened up front and the loser dropped after.
-  async function carryExpansion(from: string, to: string) {
+  async function commitRename(from: string, to: string): Promise<string | null> {
     const open = expandedNames.has(from) && !expandedNames.has(to);
     if (open) {
       expandedNames.add(to);
       expandedNames = expandedNames;
     }
-    const took = await onRename(from, to);
-    if (!open) return;
-    expandedNames.delete(took ? from : to);
-    expandedNames = expandedNames;
-  }
-
-  function handleRenameKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitRename();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      renamingName = null;
+    const refusal = await onRename(from, to);
+    if (open) {
+      expandedNames.delete(refusal ? to : from);
+      expandedNames = expandedNames;
     }
+    if (!refusal) renamingName = null;
+    return refusal;
   }
 
   // ------------------------------------------------------------------
@@ -825,13 +809,11 @@
             </svg>
           {/if}
           {#if isRenamingRow}
-            <input
-              class="rename-input"
-              bind:value={renameValue}
-              on:keydown={handleRenameKeydown}
-              on:blur={commitRename}
-              on:click|stopPropagation
-              use:autofocusInput
+            <RenameField
+              value={col.name}
+              label={`Rename ${col.name}`}
+              onCommit={(name) => commitRename(col.name, name)}
+              onCancel={() => (renamingName = null)}
             />
           {:else}
             <span class="row-name">{col.name}</span>
@@ -1275,19 +1257,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .rename-input {
+  /* The rename field takes the name's place and size. */
+  .row-container :global(.rename-field) {
     flex: 1;
-    min-width: 0;
-    -webkit-user-select: text;
-    user-select: text;
-    background: var(--bg-container);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-family: var(--font-body);
     font-size: 0.9rem;
-    padding: 0.05rem 0.3rem;
-    outline: none;
   }
 
   /* LED count readout — the filter panel's channel count, same box, so a

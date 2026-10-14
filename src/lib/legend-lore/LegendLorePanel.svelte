@@ -2955,7 +2955,9 @@
     return { result: updated, changed };
   }
 
-  async function handleRenameSubmit(oldPath: string, newName: string, isDir: boolean = false) {
+  // Resolves the reason a rename was refused, which the field shows and
+  // stays open for, or null once it took.
+  async function handleRenameSubmit(oldPath: string, newName: string, isDir: boolean = false): Promise<string | null> {
     try {
       let newPath: string;
       if (isDir) {
@@ -2994,13 +2996,16 @@
         persistScopeConsole();
         if (committedQuery) runSearch(committedQuery);
       }
-      renamingFilePath = null;
+      // The field holds the new name until the tree has it, so the old
+      // one never flashes back.
       if (selectedFolder) await loadFiles(selectedFolder);
+      renamingFilePath = null;
       // The sidecar moved the path in every collection holding it: reload,
       // or the book's gems vanish and the next membership write sends the
       // old path back.
       await loadCollections();
       refreshIndexStatus();
+      return null;
     } catch (e) {
       console.error('Rename failed', { oldPath, newName, isDir, error: e });
       // "File not found" / "Folder not found" almost always means the
@@ -3010,11 +3015,9 @@
       // surfacing the raw rust error.
       const msg = String(e);
       const isMissing = msg === 'File not found' || msg === 'Folder not found';
-      const message = isMissing
+      return isMissing
         ? `${msg} — the ${isDir ? 'folder' : 'file'} may have been moved or renamed outside the app. Press ${chord('sync.run')} to refresh and try again.`
-        : `Rename failed: ${msg}`;
-      jobNotification.show({ type: 'error', message, duration: 8000 });
-      renamingFilePath = null;
+        : msg;
     }
   }
 
@@ -3504,11 +3507,10 @@
   }
 
   // Inline rename of an existing collection (R / double-click on the
-  // panel row). Collisions surface as a notification; the row snaps back.
-  // Resolves whether the rename took, so the panel can carry the row's
-  // expansion over.
-  async function renameCollection(name: string, newName: string): Promise<boolean> {
-    if (newName === name) return false;
+  // panel row). Resolves the reason it was refused, which the field shows
+  // and stays open for, or null once it took.
+  async function renameCollection(name: string, newName: string): Promise<string | null> {
+    if (newName === name) return null;
     // Land any armed writes under the old name — after the rename they
     // would 404.
     if (armedCollection === name) await armCommitter.flush();
@@ -3550,21 +3552,11 @@
         collectionsCustomOrder = collectionsCustomOrder.map((n) => (n === name ? newName : n));
         persistCollectionsSort();
       }
-      jobNotification.show({
-        type: 'success',
-        message: `Renamed to "${newName}"`,
-        duration: 4000,
-      });
       await loadCollections();
       if (committedQuery) runSearch(committedQuery);
-      return true;
+      return null;
     } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Rename failed: ${String(e)}`,
-        duration: 5000,
-      });
-      return false;
+      return String(e);
     }
   }
 

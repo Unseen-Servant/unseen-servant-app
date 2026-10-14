@@ -12,6 +12,7 @@
   // Spent beats outside the plan are put away until asked for, as archived
   // collections are.
   import InlineName from './InlineName.svelte';
+  import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
   import { CARET_RIGHT, CIRCLE, CIRCLE_RING, PLAY } from '../ui/iconPaths';
@@ -44,7 +45,8 @@
   export let onAddToPlan: (beat: BeatEntry, to?: number) => void;
   export let onMove: (row: PlanRow, to: number) => void;
   export let onRemove: (row: PlanRow) => void;
-  export let onRename: (beat: BeatEntry, name: string) => void;
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRename: (beat: BeatEntry, name: string) => Promise<string | null>;
   export let onSpent: (beat: BeatEntry, spent: boolean) => void;
   export let onReveal: (beat: BeatEntry) => void;
   export let onTrash: (beat: BeatEntry) => void;
@@ -304,13 +306,13 @@
 {#snippet beatRow(beat: BeatEntry, row: PlanRow | null, onMenu: (e: MouseEvent) => void)}
   {#if renamingPath === beat.path}
     <div class="row-edit">
-      <InlineName
+      <RenameField
         value={beat.name}
-        rename
         label="Rename beat"
-        onCommit={(name) => {
-          renamingPath = null;
-          onRename(beat, name);
+        onCommit={async (name) => {
+          const refusal = await onRename(beat, name);
+          if (!refusal) renamingPath = null;
+          return refusal;
         }}
         onCancel={() => (renamingPath = null)}
       />
