@@ -802,6 +802,7 @@
                     class="rename-input"
                     value={entry.filename.replace(/\.[^.]+$/, '')}
                     on:click|stopPropagation
+                    on:dblclick|stopPropagation
                     on:mousedown|stopPropagation
                     on:keydown={(e) => handleRenameKeydown(e, entry)}
                     on:blur={onRenameCancel}

@@ -340,11 +340,18 @@
         </span>
       {/if}
       {#if isRenaming}
+        <!-- The field sits inside the row's button: clicks in it are
+             editing, not the row's. A double-click selects a word rather
+             than opening the book, a click doesn't fold the folder, and a
+             right-click doesn't open the row's menu. -->
         <input
           class="rename-input"
           value={item.is_dir ? item.name : item.name.replace(/\.[^.]+$/, '')}
           on:keydown={handleRenameKeydown}
           on:blur={onRenameCancel}
+          on:click|stopPropagation
+          on:dblclick|stopPropagation
+          on:mousedown|stopPropagation
           use:autofocus
         />
       {:else}
