@@ -984,6 +984,23 @@ pub async fn create_collection(
     Ok(result)
 }
 
+/// The sidecar URL for one collection. Its name is the GM's own text, so it
+/// goes in percent-encoded as a single path segment: a `?`, `#`, `%` or `/`
+/// would otherwise end the path or split it.
+fn collection_url(base: &str, name: &str, action: Option<&str>) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(base).map_err(|e| e.to_string())?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| format!("Not a base URL: {}", base))?;
+        segments.pop_if_empty().extend(["api", "collections", name]);
+        if let Some(action) = action {
+            segments.push(action);
+        }
+    }
+    Ok(url)
+}
+
 #[tauri::command]
 pub async fn update_collection(
     name: String,
@@ -1008,7 +1025,7 @@ pub async fn update_collection(
     }
 
     let response = client
-        .put(format!("{}/api/collections/{}", sidecar_url(), name))
+        .put(collection_url(&sidecar_url(), &name, None)?)
         .json(&body)
         .send()
         .await
@@ -1035,7 +1052,7 @@ pub async fn rename_collection(
 ) -> Result<CollectionMutationResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/collections/{}/rename", sidecar_url(), name))
+        .post(collection_url(&sidecar_url(), &name, Some("rename"))?)
         .json(&serde_json::json!({ "new_name": new_name }))
         .send()
         .await
@@ -1059,7 +1076,7 @@ pub async fn rename_collection(
 pub async fn delete_collection(name: String) -> Result<CollectionDeleteResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .delete(format!("{}/api/collections/{}", sidecar_url(), name))
+        .delete(collection_url(&sidecar_url(), &name, None)?)
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -1449,6 +1466,21 @@ mod tests {
         assert!(!msg.starts_with("sync-busy:"), "{msg}");
         assert!(msg.contains("500"), "{msg}");
         assert!(msg.contains("No data directory configured"), "{msg}");
+    }
+
+    #[test]
+    fn a_collection_url_keeps_the_name_to_one_path_segment() {
+        let base = "http://127.0.0.1:8420";
+        assert_eq!(
+            collection_url(base, "Monsters", None).unwrap().as_str(),
+            "http://127.0.0.1:8420/api/collections/Monsters"
+        );
+        assert_eq!(
+            collection_url(base, "Act 1/Prep? #50%", Some("rename"))
+                .unwrap()
+                .as_str(),
+            "http://127.0.0.1:8420/api/collections/Act%201%2FPrep%3F%20%2350%25/rename"
+        );
     }
 
     #[test]

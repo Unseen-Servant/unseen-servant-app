@@ -456,6 +456,21 @@ def test_rename_collection_empty_name_returns_400(client):
     assert resp.status_code == 400
 
 
+def test_a_name_with_url_characters_is_addressable(client):
+    """A collection's name is the GM's own text. With a `/`, `?`, `#` or `%`
+    in it, it arrives percent-encoded as one path segment, and every route
+    by name still finds it."""
+    client.post("/api/collections", json={"name": "Act 1/Prep? #50%", "file_paths": ["/a.pdf"]})
+    encoded = "/api/collections/Act%201%2FPrep%3F%20%2350%25"
+
+    assert client.put(encoded, json={"description": "d"}).status_code == 200
+    resp = client.post(f"{encoded}/rename", json={"new_name": "Act 2/Prep"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "Act 2/Prep"
+    assert client.delete("/api/collections/Act%202%2FPrep").status_code == 200
+    assert client.get("/api/collections").json()["count"] == 0
+
+
 def test_rename_collection_persists_to_disk(test_store, test_embed_fn, tmp_path):
     """Renamed collections survive a server restart."""
     from server import create_app

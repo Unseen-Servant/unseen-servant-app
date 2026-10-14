@@ -1229,7 +1229,9 @@ def build_router(
         save_collections(data_dir, store)
         return {"name": request.name, "file_count": len(request.file_paths)}
 
-    @router.put("/api/collections/{name}")
+    # A collection's name is the GM's own text and may hold a `/`: the
+    # server decodes `%2F` before routing, so `:path` lets it through.
+    @router.put("/api/collections/{name:path}")
     async def update_collection(name: str, request: UpdateCollectionRequest):
         """Update a collection. All fields optional — only provided fields change."""
         if not data_dir:
@@ -1261,7 +1263,7 @@ def build_router(
         save_collections(data_dir, store)
         return {"name": name, "file_count": len(coll.file_paths)}
 
-    @router.delete("/api/collections/{name}")
+    @router.delete("/api/collections/{name:path}")
     async def delete_collection(name: str):
         """Delete a collection."""
         if not data_dir:
@@ -1275,7 +1277,7 @@ def build_router(
         save_collections(data_dir, store)
         return {"message": f"Deleted collection: {name}"}
 
-    @router.post("/api/collections/{name}/rename")
+    @router.post("/api/collections/{name:path}/rename")
     async def rename_collection(name: str, request: RenameCollectionRequest):
         """Atomically rename a collection.
 
