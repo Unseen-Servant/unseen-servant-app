@@ -1196,11 +1196,12 @@
     border: none;
     /* The body's corners, inside its rim. */
     border-radius: calc(var(--radius-well) - 1px);
-    /* Both keys in one voice, dim until used, as the tab strip above:
-       body face, secondary ink, primary under the pointer or open. */
+    /* Both keys in one voice, the body face. The name is what's in
+       effect, so it's lit as the current tab and view segment are: primary
+       ink, while what's off (+ session, no campaign) stays tertiary. */
     font-family: var(--font-body);
     font-size: 0.95rem;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all var(--transition-fast);
     /* A right-click would otherwise select the word under it. */
@@ -1276,9 +1277,9 @@
     font-size: 0.95rem;
   }
 
-  /* Legend Lore's path mark (InspectorPlate .sep), in the keys' resting
-     ink rather than its tertiary, so the line reads as one; the bar's gap
-     spaces it. */
+  /* Legend Lore's path mark (InspectorPlate .sep), printed on the panel
+     rather than lit: secondary ink, a step above its tertiary so it sits
+     with the names; the bar's gap spaces it. */
   .bar-sep {
     flex-shrink: 0;
     color: var(--text-secondary);
