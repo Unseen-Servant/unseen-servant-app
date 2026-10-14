@@ -191,7 +191,8 @@
         {/if}
       {/each}
       {#if creating}
-        <div class="row-edit">
+        <div class="row-edit naming">
+          <span class="slot" aria-hidden="true"></span>
           <InlineName
             placeholder="Name"
             label="New note on the shelf"
@@ -203,7 +204,9 @@
           />
         </div>
       {:else}
-        <button type="button" class="ghost-row" on:click={() => (creating = true)}>+ note</button>
+        <button type="button" class="ghost-row" title="New note" aria-label="New note on the shelf" on:click={() => (creating = true)}>
+          <span class="slot" aria-hidden="true"></span>
+        </button>
       {/if}
 
       {#if loose.length}
@@ -377,23 +380,22 @@
     text-overflow: ellipsis;
   }
 
-  /* The grid's clip slot (TrackGrid .slot), Ableton's square. */
+  /* The grid's clip slot (TrackGrid .slot), Ableton's square lit as a
+     splash lamp. */
   .slot {
     flex-shrink: 0;
-    box-sizing: border-box;
     width: 0.55rem;
     height: 0.55rem;
-    border: 1px solid transparent;
     border-radius: var(--radius-cell);
+    background: var(--bg-category);
   }
 
   .note-row.in-session .slot {
-    border-color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--text-accent) 45%, var(--bg-category));
   }
 
   .note-row.member .slot {
     background: var(--text-accent);
-    border-color: var(--text-accent);
   }
 
   .note-row.member .label {
@@ -401,7 +403,21 @@
   }
 
   .note-row.arming.hovered:not(.member) .slot {
-    border-color: var(--text-accent);
+    background: var(--text-accent);
+    animation: slot-blink 0.5s steps(1, end) infinite;
+  }
+
+  @keyframes slot-blink {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .note-row.arming.hovered:not(.member) .slot {
+      animation: none;
+      opacity: 0.55;
+    }
   }
 
   .note-row.spent .label,
@@ -487,8 +503,10 @@
   }
 
   /* A rename takes the name's place, as in Legend Lore: the row's slot
-     keeps its column, so the field starts where the name did. */
-  .row-edit.renaming {
+     keeps its column, so the field starts where the name did. A new
+     note's name starts there too. */
+  .row-edit.renaming,
+  .row-edit.naming {
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -496,11 +514,34 @@
     padding-right: 0.4rem;
   }
 
+  /* As the grid's (TrackGrid .row-edit.naming): the field is a note row's
+     height on its own. */
+  .row-edit.naming {
+    padding-block: 0;
+  }
+
+  /* The grid's empty row (TrackGrid .ghost-row): a nameless note row whose
+     lamp shows dark under the pointer, a line of unseen type tall. */
   .ghost-row {
-    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding-left: 0.25rem;
+  }
+
+  .ghost-row::after {
+    content: '\200b';
+  }
+
+  .ghost-row .slot {
+    background: none;
   }
 
   .ghost-row:hover {
-    color: var(--text-primary);
+    background: var(--bg-container);
+  }
+
+  .ghost-row:hover .slot {
+    background: var(--bg-category);
   }
 </style>

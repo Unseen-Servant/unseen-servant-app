@@ -3,15 +3,15 @@
   // subfolders as groups. A click selects a note, as a row in Legend Lore,
   // and a double-click opens it; while a beat is armed, the click also puts
   // it in the beat or takes it out. Right-click for rename, spent, move and
-  // trash. The ghost rows at the foot of each column and the
+  // trash. The empty row at the foot of each column and the ghost at the
   // end of the grid name a new note or track in place. A column's nameplate
   // drags to reorder the tracks and renames on a double-click, as a
   // collection's row does in Legend Lore; a note's row drags between rows
   // to reorder its group or to move there, or onto another column.
   //
-  // Each row's slot, Ableton's square, reads the session at a glance:
-  // filled parchment for a note in the selected beat, an outline for one
-  // some other planned beat holds.
+  // Each row's slot, Ableton's square lit as a splash lamp, reads the
+  // session at a glance: lit parchment for a note in the selected beat,
+  // half-lit for one some other planned beat holds, dark otherwise.
   // A spent note dims and carries a check.
   import { onDestroy } from 'svelte';
   import InlineName from './InlineName.svelte';
@@ -462,7 +462,8 @@
         {/each}
 
         {#if creatingIn === column.track}
-          <div class="row-edit">
+          <div class="row-edit naming">
+            <span class="slot" aria-hidden="true"></span>
             <InlineName
               placeholder="Name"
               label={`New note in ${column.track}`}
@@ -474,7 +475,15 @@
             />
           </div>
         {:else}
-          <button type="button" class="ghost-row" on:click={() => (creatingIn = column.track)}>+ note</button>
+          <button
+            type="button"
+            class="ghost-row"
+            title="New note"
+            aria-label={`New note in ${column.track}`}
+            on:click={() => (creatingIn = column.track)}
+          >
+            <span class="slot" aria-hidden="true"></span>
+          </button>
         {/if}
       </div>
     </section>
@@ -720,37 +729,50 @@
     text-overflow: ellipsis;
   }
 
-  /* The clip slot, Ableton's square: empty, an outline (the session holds
-     this note), or filled parchment (the selected beat does). Content, not
-     a mode: no glow — the lit lamp belongs to Play's live set. Font
-     Awesome's square (ui/icons/square-*.svg) drawn as a box: its outline is
-     under a pixel at this size, and an SVG path isn't snapped to the pixel
-     grid, so two of its edges smeared; a border is snapped. */
+  /* The clip slot, Ableton's square, as one of the splash's lamps
+     (LaunchSplash .led): a flat cell, dark until something holds the note,
+     half-lit when some planned beat does, lit parchment when the selected
+     beat does. Content, not a mode: no glow — the glowing lamp belongs to
+     Play's live set. A box, not Font Awesome's square: an SVG path isn't
+     snapped to the pixel grid, so its edges smeared at this size. */
   .slot {
     flex-shrink: 0;
-    box-sizing: border-box;
     width: 0.55rem;
     height: 0.55rem;
-    border: 1px solid transparent;
     border-radius: var(--radius-cell);
+    background: var(--bg-category);
   }
 
   .note-row.in-session .slot {
-    border-color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--text-accent) 45%, var(--bg-category));
   }
 
   .note-row.member .slot {
     background: var(--text-accent);
-    border-color: var(--text-accent);
   }
 
   .note-row.member .label {
     color: var(--text-accent);
   }
 
-  /* Armed: every slot offers itself, so the click's meaning shows. */
+  /* Armed: the slot under the pointer blinks lit, as a splash lamp does
+     while its step runs, so the click's meaning shows. */
   .note-row.arming.hovered:not(.member) .slot {
-    border-color: var(--text-accent);
+    background: var(--text-accent);
+    animation: slot-blink 0.5s steps(1, end) infinite;
+  }
+
+  @keyframes slot-blink {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .note-row.arming.hovered:not(.member) .slot {
+      animation: none;
+      opacity: 0.55;
+    }
   }
 
   .note-row.spent .label,
@@ -857,8 +879,10 @@
   }
 
   /* A rename takes the name's place, as in Legend Lore: the row's slot
-     keeps its column, so the field starts where the name did. */
-  .row-edit.renaming {
+     keeps its column, so the field starts where the name did. A new
+     note's name starts there too. */
+  .row-edit.renaming,
+  .row-edit.naming {
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -870,11 +894,40 @@
     padding-left: 0.85rem;
   }
 
-  .ghost-row {
-    color: var(--text-tertiary);
+  /* The new note's field is a note row's height on its own (the row's
+     padding, the same line), so the row takes no padding of its own. */
+  .row-edit.naming {
+    padding-block: 0;
   }
 
-  .ghost-row:hover,
+  /* The empty row under a track's notes, where a new one lands: a note
+     row with no name. Hover is the rows' grey step, and its lamp shows
+     dark, as the row it would become. */
+  .ghost-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-left: 0.35rem;
+  }
+
+  /* An unseen line of type, so the row is a note row's height to the
+     pixel: a min-height rounds differently from a line box. */
+  .ghost-row::after {
+    content: '\200b';
+  }
+
+  .ghost-row .slot {
+    background: none;
+  }
+
+  .ghost-row:hover {
+    background: var(--bg-container);
+  }
+
+  .ghost-row:hover .slot {
+    background: var(--bg-category);
+  }
+
   .ghost-track:hover {
     color: var(--text-primary);
   }
