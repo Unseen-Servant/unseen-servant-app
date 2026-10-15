@@ -196,6 +196,7 @@ def test_create_campaign_lays_out_default_tracks(root):
     assert vault.create_campaign(root, " Into the Odd ") == "Into the Odd"
     camp = root / "Into the Odd"
     assert vault.track_order(camp) == list(vault.DEFAULT_TRACKS)
+    assert vault.track_pigments(camp) == vault.DEFAULT_PIGMENTS
     assert (camp / "Beats").is_dir() and (camp / "Sessions").is_dir()
     with pytest.raises(Conflict):
         vault.create_campaign(root, "into the odd")

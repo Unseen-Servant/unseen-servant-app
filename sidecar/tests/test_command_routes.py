@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from command.settings import load_settings
+from command.vault import DEFAULT_PIGMENTS
 from server import create_app
 
 
@@ -167,12 +168,13 @@ def test_track_order_over_http(cmd):
 def test_track_pigment_over_http(cmd):
     assert cmd.put("/api/command/tracks/pigment", json={
         "campaign": "Strahd", "track": "NPCs", "pigment": "#4e9766",
-    }).json() == {"pigments": {"NPCs": "#4e9766"}}
+    }).json() == {"pigments": {**DEFAULT_PIGMENTS, "NPCs": "#4e9766"}}
     index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
-    assert index["pigments"] == {"NPCs": "#4e9766"}
+    assert index["pigments"] == {**DEFAULT_PIGMENTS, "NPCs": "#4e9766"}
+    others = {t: hex for t, hex in DEFAULT_PIGMENTS.items() if t != "NPCs"}
     assert cmd.put("/api/command/tracks/pigment", json={
         "campaign": "Strahd", "track": "NPCs", "pigment": None,
-    }).json() == {"pigments": {}}
+    }).json() == {"pigments": others}
     assert cmd.put("/api/command/tracks/pigment", json={
         "campaign": "Strahd", "track": "Gone", "pigment": "#4e9766",
     }).status_code == 404
