@@ -1067,7 +1067,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.25rem) 0.25rem calc(1.2rem + 0.3px);
+    padding: 0.15rem calc(0.75rem + var(--count-w) + 0.25rem) 0.15rem calc(1.2rem + 0.3px);
     margin: 0 0.25rem;
     /* Square, as the collection rows: every list row's fill and ring end
        on a straight edge. */

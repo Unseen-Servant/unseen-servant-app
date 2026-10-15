@@ -1084,7 +1084,7 @@
        taller line box off-centre. */
     align-items: center;
     gap: 0.5rem;
-    padding: 0.3rem 0.75rem;
+    padding: 0.15rem 0.75rem;
     margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
@@ -1188,14 +1188,15 @@
        the filter panel's shields. Rows carry no drag grip, as a Mac
        list's don't: under custom order a row drags, and the drag shows
        itself. */
-    padding: 0.22rem 0.75rem 0.22rem 1.1rem;
+    padding: 0.15rem 0.75rem 0.15rem 1.1rem;
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
     border-left: 3px solid transparent;
     cursor: pointer;
     transition: background var(--transition-fast);
     /* Shared with the filter panel's rows: above both panels' natural
-       content height, so one number pins both to the same rhythm. */
-    min-height: 30px;
+       content height, so one number pins both to the same rhythm: a
+       list row's (the tree's, Command's notes'). */
+    min-height: 1.65rem;
   }
   .row-container.hovered {
     background: var(--bg-container);
@@ -1359,7 +1360,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.18rem 0.75rem 0.18rem 0.75rem;
+    padding: 0.15rem 0.75rem 0.15rem 0.75rem;
     border-left: 3px solid transparent;
     font-size: 0.9rem;
     color: var(--text-primary);

@@ -507,7 +507,7 @@
   .row {
     display: flex;
     align-items: center;
-    padding: 0.25rem;
+    padding: 0.15rem 0.25rem;
     cursor: pointer;
     background: none;
     border: none;

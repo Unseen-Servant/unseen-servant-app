@@ -774,8 +774,10 @@ dialog[open]::backdrop {
   /* One height for every plate, so the scope bar's lines up with the
      Collections plate across the dock seam. Their content (a title row, or
      the scope bar's chip row) fits inside it; a floor, not a cap, so a
-     scope bar whose chips wrap still grows. */
-  min-height: 1.875rem;
+     scope bar whose chips wrap still grows. A list row's height (the
+     tree's, the collections', Command's notes'), so a plate heads its
+     rows rather than standing over them. */
+  min-height: 1.65rem;
   background: var(--bg-container);
 }
 /* A plate names its module in the rail voice the modals use: .ledger-label

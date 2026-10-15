@@ -604,7 +604,7 @@
        taller line box off-centre. */
     align-items: center;
     gap: 0.5rem;
-    padding: 0.3rem 0.75rem;
+    padding: 0.15rem 0.75rem;
     margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
@@ -681,9 +681,9 @@
     /* Vertical padding and type size match the collections panel's rows, so
        names read the same down the dock and the natural height stays under
        the shared min-height. */
-    padding: 0.22rem 0.75rem 0.22rem 1.1rem;
+    padding: 0.15rem 0.75rem 0.15rem 1.1rem;
     /* Matches the collections panel's rows — see the note there. */
-    min-height: 30px;
+    min-height: 1.65rem;
     font-size: 0.9rem;
     color: var(--text-primary);
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
