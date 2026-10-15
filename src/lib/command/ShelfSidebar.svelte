@@ -443,12 +443,31 @@
   }
 
   .note-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.35rem;
     padding-left: 0.25rem;
     color: var(--text-primary);
     transition: background var(--transition-fast);
+  }
+
+  /* Ruled rows, a ledger's lines: a hairline under each note, the
+     grid's (TrackGrid), in the column's own divider grey. Drawn over the row's foot rather than as a
+     border, so a row keeps the 1.65rem every row in the app has. The
+     empty row under the notes is ruled too, the ledger's next line, and
+     so is the field a new note is named in. */
+  .note-row::before,
+  .ghost-row::before,
+  .row-edit.naming::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-subtle);
+    pointer-events: none;
   }
 
   .label {
@@ -571,6 +590,7 @@
   /* A new note's name starts where a note's name does, the slot keeping
      its column. */
   .row-edit.naming {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -585,8 +605,9 @@
   }
 
   /* The grid's empty row (TrackGrid .ghost-row): a nameless note row whose
-     lamp shows dark under the pointer, a line of unseen type tall. */
+     lamp shows dark at all times, a line of unseen type tall. */
   .ghost-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -597,15 +618,7 @@
     content: '\200b';
   }
 
-  .ghost-row .slot {
-    background: none;
-  }
-
   .ghost-row:hover {
     background: var(--bg-container);
-  }
-
-  .ghost-row:hover .slot {
-    background: var(--bg-category);
   }
 </style>

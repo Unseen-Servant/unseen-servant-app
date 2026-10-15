@@ -912,6 +912,24 @@
     padding-left: 0.85rem;
   }
 
+  /* Ruled rows, a ledger's lines: a hairline under each note, the
+     column's own divider grey. Drawn over the row's foot rather than as a
+     border, so a row keeps the 1.65rem every row in the app has. The
+     empty row under the notes is ruled too, the ledger's next line, and
+     so is the field a new note is named in. */
+  .note-row::before,
+  .ghost-row::before,
+  .row-edit.naming::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-subtle);
+    pointer-events: none;
+  }
+
   .label {
     flex: 1;
     min-width: 0;
@@ -1059,6 +1077,7 @@
   /* A new note's name starts where a note's name does, the slot keeping
      its column. */
   .row-edit.naming {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -1073,9 +1092,10 @@
   }
 
   /* The empty row under a track's notes, where a new one lands: a note
-     row with no name. Hover is the rows' grey step, and its lamp shows
-     dark, as the row it would become. */
+     row with no name, its lamp dark as the row it would become, there
+     at all times. Hover is the rows' grey step. */
   .ghost-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -1088,16 +1108,8 @@
     content: '\200b';
   }
 
-  .ghost-row .slot {
-    background: none;
-  }
-
   .ghost-row:hover {
     background: var(--bg-container);
-  }
-
-  .ghost-row:hover .slot {
-    background: var(--bg-category);
   }
 
   .ghost-track:hover {
