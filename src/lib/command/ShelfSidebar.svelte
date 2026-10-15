@@ -10,7 +10,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
   import { endNoteDrag, startNoteDrag } from './noteDrag';
-  import { action, divider, heading, keyed, submenu, type OpenMenu } from './menu';
+  import { action, divider, keyed, submenu, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
 
   export let campaign: string;
@@ -98,7 +98,7 @@
       y: box.bottom + 4,
       items: [
         action(`${campaign}'s shelf`, () => (source = null)),
-        ...(others.length ? [divider, heading('copy from'), ...others.map((c) => action(c, () => (source = c)))] : []),
+        ...(others.length ? [divider, submenu('Copy from', others.map((c) => action(c, () => (source = c))))] : []),
       ],
     };
   }
@@ -121,7 +121,7 @@
         ...(index.tracks.length || note.track === null
           ? [
               divider,
-              submenu('File on', [
+              submenu('Move to', [
                 ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
                 ...index.tracks.map((t) => action(t, () => onMove(note, t))),
               ]),
