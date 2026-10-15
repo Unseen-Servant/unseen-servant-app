@@ -460,9 +460,10 @@ def create_campaign(root: Path, name: str) -> str:
 
 
 # -- the untitled campaign ---------------------------------------------------
-# Command opens on a blank campaign named Untitled, as Live opens on an empty
-# set. It is a real folder from the start, so every route works on it; the
-# name is what marks it, and leaving it blank removes it again.
+# With no campaign to reopen, Command opens on a blank campaign named
+# Untitled, as Live opens on an empty set. It is a real folder from the start,
+# so every route works on it; the name is what marks it, and leaving it blank
+# removes it again.
 
 UNTITLED = "Untitled"
 _UNTITLED = re.compile(r"Untitled(?: ([1-9][0-9]*))?")

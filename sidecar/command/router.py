@@ -216,6 +216,16 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         if snapshot is not None:
             watcher.publish(_live_event(snapshot))
 
+    def remember(campaign: str | None) -> None:
+        """Keep the open campaign for the next launch to reopen. No campaign
+        is only ever on the way between two, so it isn't kept."""
+        with write_lock:
+            before = state["settings"]
+            if campaign and campaign != before.last_campaign:
+                settings = before.model_copy(update={"last_campaign": campaign})
+                save_settings(data_dir, settings)
+                state["settings"] = settings
+
     @app.exception_handler(vault.VaultError)
     async def vault_error(_request: Request, exc: vault.VaultError):
         body = {"detail": str(exc)}
@@ -281,6 +291,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         # Pushes can cross on the way; the newer one wins.
         if body.seq >= context["current"].seq:
             context["current"] = body
+            remember(body.campaign)
         return get_context()
 
     # -- change events -----------------------------------------------------
@@ -322,6 +333,16 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         if state["settings"].root != before.root:
             watcher.root_changed()
         return {"name": name}
+
+    @router.post("/reopen")
+    def reopen():
+        """The campaign to open at launch: the one open when the app last
+        quit, if it's still in the folder (a blank Untitled went with the
+        app), else a blank Untitled."""
+        last = state["settings"].last_campaign
+        if last and last in vault.list_campaigns(root()):
+            return {"name": last}
+        return open_untitled()
 
     @router.post("/campaigns/discard")
     def discard_campaign(body: CampaignName):

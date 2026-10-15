@@ -30,14 +30,16 @@ def cmd(bare_client, campaign_root):
 
 
 def test_nothing_works_until_a_campaign_folder_is_set(bare_client):
-    assert bare_client.get("/api/command/settings").json() == {"root": None, "spend_on_launch": False}
+    assert bare_client.get("/api/command/settings").json() == {
+        "root": None, "spend_on_launch": False, "last_campaign": None,
+    }
     assert bare_client.get("/api/command/campaigns").status_code == 409
 
 
 def test_settings_refuse_a_missing_folder_and_persist(bare_client, campaign_root, tmp_path):
     assert bare_client.put("/api/command/settings", json={"root": str(tmp_path / "nope")}).status_code == 422
     assert bare_client.put("/api/command/settings", json={"root": str(campaign_root)}).json() == {
-        "root": str(campaign_root), "spend_on_launch": False,
+        "root": str(campaign_root), "spend_on_launch": False, "last_campaign": None,
     }
     assert load_settings(tmp_path).root == str(campaign_root)
 
@@ -45,10 +47,10 @@ def test_settings_refuse_a_missing_folder_and_persist(bare_client, campaign_root
 def test_settings_change_only_the_fields_sent(bare_client, campaign_root, tmp_path):
     bare_client.put("/api/command/settings", json={"root": str(campaign_root)})
     assert bare_client.put("/api/command/settings", json={"spend_on_launch": True}).json() == {
-        "root": str(campaign_root), "spend_on_launch": True,
+        "root": str(campaign_root), "spend_on_launch": True, "last_campaign": None,
     }
     assert bare_client.put("/api/command/settings", json={"root": None}).json() == {
-        "root": None, "spend_on_launch": True,
+        "root": None, "spend_on_launch": True, "last_campaign": None,
     }
     assert load_settings(tmp_path).spend_on_launch is True
 
@@ -386,3 +388,15 @@ def test_untitled_and_discard_over_http(cmd, campaign_root):
     assert cmd.post("/api/command/campaigns/discard", json={"name": "Strahd"}).json() == {"removed": False}
     assert cmd.post("/api/command/campaigns/discard", json={"name": "Untitled"}).json() == {"removed": True}
     assert cmd.get("/api/command/campaigns").json() == {"campaigns": ["Strahd"]}
+
+
+def test_launch_reopens_the_last_campaign_open(cmd, campaign_root, tmp_path):
+    assert cmd.post("/api/command/reopen").json() == {"name": "Untitled"}
+    cmd.put("/api/command/context", json={"seq": 1, "campaign": "Strahd", "session": None})
+    cmd.put("/api/command/context", json={"seq": 2, "campaign": None, "session": None})
+    assert load_settings(tmp_path).last_campaign == "Strahd"
+    assert cmd.post("/api/command/reopen").json() == {"name": "Strahd"}
+
+    # Gone since (a blank Untitled goes with the app): a blank Untitled.
+    (campaign_root / "Strahd").rename(campaign_root / "Barovia")
+    assert cmd.post("/api/command/reopen").json() == {"name": "Untitled"}

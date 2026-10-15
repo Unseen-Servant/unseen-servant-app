@@ -704,8 +704,8 @@
     run(() => setCampaign(name));
   }
 
-  /** New campaign: a fresh Untitled, as at launch. Rust opens it in every
-   *  window; the list has to know it before this panel follows. */
+  /** New campaign: a fresh Untitled, as on a first launch. Rust opens it
+   *  in every window; the list has to know it before this panel follows. */
   function newCampaign() {
     run(async () => {
       await commandApi.openUntitled();
@@ -746,7 +746,7 @@
       if (!confirmed) return;
       await leaveCampaign();
       await commandApi.trash(name, null);
-      // Command is never left on nothing: a fresh Untitled, as at launch.
+      // Command is never left on nothing: a fresh Untitled, as on a first launch.
       await commandApi.openUntitled();
       await loadRoot();
     });

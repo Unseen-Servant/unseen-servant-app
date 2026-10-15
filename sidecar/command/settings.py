@@ -25,6 +25,8 @@ class CommandSettings(BaseModel):
     root: str | None = None
     # Launching a beat marks it spent (design §4); off, spending is by hand.
     spend_on_launch: bool = False
+    # The campaign open when the app last quit, which launch reopens.
+    last_campaign: str | None = None
 
 
 def load_settings(data_dir: Path | None) -> CommandSettings:

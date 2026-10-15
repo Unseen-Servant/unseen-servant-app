@@ -280,7 +280,7 @@ pub async fn command_set_root(root: Option<String>) -> Result<CommandSettings, S
 ///
 /// The open campaign lives in the old folder, so it's closed first (and
 /// discarded if it's a blank Untitled) while that folder still holds it.
-/// The new folder opens on a fresh Untitled, as launch does.
+/// The new folder opens on a fresh Untitled, as a first launch does.
 #[tauri::command]
 pub async fn command_choose_root(app: AppHandle) -> Result<Option<CommandSettings>, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -316,8 +316,18 @@ pub async fn command_list_campaigns() -> Result<Vec<String>, String> {
 /// a crash left behind) and return its name. With no campaigns folder
 /// chosen yet, the sidecar sets the default one first.
 pub(crate) async fn open_untitled(app: &AppHandle) -> Result<String, String> {
+    open_from(app, "/untitled").await
+}
+
+/// Launch: open the campaign open when the app last quit, or a blank
+/// Untitled if it's gone, as `open_untitled`.
+pub(crate) async fn reopen(app: &AppHandle) -> Result<String, String> {
+    open_from(app, "/reopen").await
+}
+
+async fn open_from(app: &AppHandle, path: &str) -> Result<String, String> {
     let opened = switch_campaign_with(app, || async {
-        let named: Named = answer(client().post(api("/untitled"))).await?;
+        let named: Named = answer(client().post(api(path))).await?;
         Ok(Some(named.name))
     })
     .await?;
@@ -336,7 +346,7 @@ pub(crate) async fn discard_if_blank(campaign: &str) {
         .await;
 }
 
-/// New campaign: a fresh Untitled, as at launch.
+/// New campaign: a fresh Untitled, as on a first launch.
 #[tauri::command]
 pub async fn command_open_untitled(app: AppHandle) -> Result<String, String> {
     open_untitled(&app).await
