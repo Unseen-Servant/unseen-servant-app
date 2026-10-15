@@ -285,6 +285,7 @@
     log={session.log}
     liveBeat={live?.beat ?? null}
     onLaunch={launch}
+    onStop={stop}
     onShow={(beat) => frameNotes(memberPaths(beat))}
     onEdit={(beat) => onEdit(beat.path)}
     onJot={jot}

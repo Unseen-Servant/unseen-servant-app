@@ -63,10 +63,12 @@ class LiveSets:
 
     def set(self, campaign: str, beat: str | None, notes: list[str]) -> dict:
         """Make ``notes`` the live set, launched from ``beat``. Each change
-        takes the next ``seq``, so a reader can tell a newer snapshot."""
+        takes the next ``seq``, so a reader can tell a newer snapshot. A set
+        with no notes has no beat: nothing is live (design §5.1)."""
         with self._lock:
             seq = self._sets.get(campaign, {}).get("seq", 0) + 1
-            self._sets[campaign] = {"seq": seq, "beat": beat, "notes": list(dict.fromkeys(notes))}
+            notes = list(dict.fromkeys(notes))
+            self._sets[campaign] = {"seq": seq, "beat": beat if notes else None, "notes": notes}
             self._save()
             return self.get(campaign)
 
@@ -76,6 +78,17 @@ class LiveSets:
         current = self.get(campaign)
         beat = move(current["beat"]) if current["beat"] else None
         notes = [move(n) for n in current["notes"]]
+        if beat == current["beat"] and notes == current["notes"]:
+            return None
+        return self.set(campaign, beat, notes)
+
+    def prune(self, campaign: str, exists: Callable[[str], bool]) -> dict | None:
+        """Let go of a beat or notes that are gone: trashed in Command, or
+        deleted in Finder or Obsidian. Returns the new snapshot, or None if
+        everything live is still there."""
+        current = self.get(campaign)
+        beat = current["beat"] if current["beat"] and exists(current["beat"]) else None
+        notes = [n for n in current["notes"] if exists(n)]
         if beat == current["beat"] and notes == current["notes"]:
             return None
         return self.set(campaign, beat, notes)

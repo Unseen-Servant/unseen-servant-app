@@ -307,6 +307,15 @@ def test_renaming_a_live_note_keeps_it_live(table):
     assert table.get("/api/command/live", params={"campaign": "Barovia"}).json()["notes"] == ["Folk/Isaac.md"]
 
 
+def test_a_trashed_beat_or_note_leaves_the_live_set(table, campaign_root):
+    table.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"})
+    table.post("/api/command/live/note", json={"campaign": "Strahd", "note": "NPCs/Ireena.md", "live": True})
+    (campaign_root / "Strahd" / "Beats" / "Ambush.md").unlink()
+    (campaign_root / "Strahd" / "NPCs" / "Ismark.md").unlink()
+    live = table.get("/api/command/live", params={"campaign": "Strahd"}).json()
+    assert (live["beat"], live["notes"]) == (None, ["NPCs/Ireena.md"])
+
+
 # ---------------------------------------------------------------------------
 # Cross-tool: the workstation's context, tracks, finding, sending (design §8)
 # ---------------------------------------------------------------------------

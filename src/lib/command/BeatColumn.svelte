@@ -1,44 +1,41 @@
 <script lang="ts">
-  // The beat launcher (design §5.1): the active session's plan in order,
-  // then beats no plan holds yet. It works as Legend Lore's collections
-  // panel does. Clicking a beat selects it — its notes light up across the
-  // tracks — and a double-click opens it, as rows do in Legend Lore. Arming
-  // a beat (the record-arm key at the row's end, a collection's transport)
-  // makes a click on a note put it in the beat or take it out, and a note
-  // dragged onto a beat joins it. The play key beside it launches the beat,
-  // as a collection's plays, and the lit ■ stops what's live; the live beat
-  // wears the rule at its left edge, as a playing collection does. Two
-  // groups, each headed: the session's plan, then the beats not in it.
-  // Spent beats outside the plan are put away until asked for, as archived
-  // collections are.
+  // The beat column (design §5.1, beat states): the active session's plan
+  // in order, then the beats no plan holds, then the spent ones no plan
+  // holds, folded. It works as Legend Lore's collections panel does.
+  // Clicking a beat focuses it — its notes light up across the tracks —
+  // and a double-click opens it, as rows do in Legend Lore. Arming the
+  // focused beat (the record-arm key at the row's end, a collection's
+  // transport) makes a click on a note put it in the beat or take it out,
+  // and a note dragged onto a beat joins it. Prep doesn't launch: the live
+  // beat's key is the lit ■ that stops the set, and the only mark it wears.
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
-  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, PLAY } from '../ui/iconPaths';
+  import { CARET_RIGHT, CIRCLE, CIRCLE_RING } from '../ui/iconPaths';
   import { action, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { draggedNote, isNoteDrag } from './noteDrag';
-  import { planMoveTo, type PlanRow } from './prep';
+  import { memberPaths, planMoveTo, type PlanRow } from './prep';
   import type { BeatEntry, NoteEntry } from './types';
 
   export let rows: PlanRow[];
   /** Beats no plan of the session holds, spent ones included. */
   export let spare: BeatEntry[];
   export let sessionName: string | null;
-  export let selectedPath: string | null;
+  /** The focused beat: ringed, its notes lit in the tracks, its count in
+   *  parchment. */
+  export let focusedPath: string | null;
+  /** The focused beat, while it's armed. */
   export let armedPath: string | null;
-  /** The beat whose notes are lit in the tracks: its count turns parchment. */
-  export let litPath: string | null;
-  /** A click: the beat lights, or puts its notes out if it was lit. */
+  /** A click: the beat is focused, or let go if it was. */
   export let onSelect: (beat: BeatEntry) => void;
-  /** A right-click: the beat is selected, as Legend Lore's right-click
-   *  focuses a collection, and its notes stay as they are. */
+  /** A right-click: the beat is focused, as Legend Lore's right-click
+   *  focuses a collection, and stays so. */
   export let onFocus: (beat: BeatEntry) => void;
   export let onOpen: (beat: BeatEntry) => void;
   export let onArm: (beat: BeatEntry) => void;
-  /** The beat the live set was launched from. */
+  /** The beat the live set was launched from, while anything is live. */
   export let liveBeat: string | null;
-  export let onLaunch: (beat: BeatEntry) => void;
   /** Clears the live set. */
   export let onStop: () => void;
   /** A new beat, holding the note dropped to start it, if any. */
@@ -62,27 +59,30 @@
   let renamingPath: string | null = null;
   let menu: OpenMenu | null = null;
 
-  // Legend Lore's "Show archived": local to the column, and only offered
-  // while there's something to show.
-  let showSpent = false;
+  type Group = 'plan' | 'spare' | 'spent';
 
   // Groups folded shut, as Legend Lore's filter sections: for this sitting
-  // only. A folded group's title still owns up to an armed or live beat in
-  // it, with Legend Lore's section lamp. Without a session there are no
-  // titles, so nothing stays folded out of reach.
-  let folded = new Set<'plan' | 'spare'>();
-  function fold(group: 'plan' | 'spare') {
+  // only. The spent beats start folded, as archived collections are put
+  // away. A folded group's title still owns up to an armed or live beat in
+  // it, with Legend Lore's section lamp. Without a session the plan and
+  // spare groups have no titles, so neither stays folded out of reach.
+  let folded = new Set<Group>(['spent']);
+  function fold(group: Group) {
     if (folded.has(group)) folded.delete(group);
     else folded.add(group);
     folded = folded;
   }
   $: planOpen = !sessionName || !folded.has('plan');
   $: spareOpen = !sessionName || !folded.has('spare');
-  $: planLit = rows.some((r) => !!r.beat && (r.beat.path === armedPath || r.beat.path === liveBeat));
-  $: spentCount = spare.filter((b) => b.spent).length;
-  $: if (!spentCount) showSpent = false;
-  $: shown = showSpent ? spare : spare.filter((b) => !b.spent);
-  $: spareLit = shown.some((b) => b.path === armedPath || b.path === liveBeat);
+  $: spentOpen = !folded.has('spent');
+  /** The beats no plan holds and not spent, in the campaign's order: the
+   *  ones a drag reorders. */
+  $: shown = spare.filter((b) => !b.spent);
+  $: spent = spare.filter((b) => b.spent);
+  const engaged = (b: BeatEntry) => b.path === armedPath || b.path === liveBeat;
+  $: planLit = rows.some((r) => !!r.beat && engaged(r.beat));
+  $: spareLit = shown.some(engaged);
+  $: spentLit = spent.some(engaged);
 
   // Hover latched on pointerenter, as Legend Lore's rows (FileTree).
   let hovered: string | null = null;
@@ -187,9 +187,10 @@
 
   /** A beat over spare row `i` points between rows, as in the plan: a
    *  spare beat moves there, and a plan entry leaves the plan and lands
-   *  there. The beats outside a plan keep the order the GM drags them into. */
+   *  there. The beats outside a plan keep the order the GM drags them into.
+   *  A spent beat only goes back into the plan. */
   function overSpareSlot(e: DragEvent, i: number) {
-    if (!dragging || !isBeatDrag(e)) return;
+    if (!dragging || !isBeatDrag(e) || (!('at' in dragging) && dragging.spent)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -261,11 +262,12 @@
     if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) clearDrop();
   }
 
-  // The transport first, as a collection's menu has it.
+  // The transport first, as a collection's menu has it. Prep doesn't
+  // launch; the live beat can still be stopped.
   function transportItems(beat: BeatEntry): MenuItem[] {
     return [
       action(beat.path === armedPath ? 'Disarm' : 'Arm', () => onArm(beat)),
-      beat.path === liveBeat ? action('Stop', onStop) : action('Launch', () => onLaunch(beat)),
+      ...(beat.path === liveBeat ? [action('Stop', onStop)] : []),
     ];
   }
 
@@ -282,7 +284,8 @@
   /** R on the selected beat: renamed in its row, if the column shows it. */
   export function rename(path: string) {
     const planned = planOpen && rows.some((r) => r.beat?.path === path);
-    if (planned || (spareOpen && shown.some((b) => b.path === path))) renamingPath = path;
+    const unplanned = (spareOpen && shown.some((b) => b.path === path)) || (spentOpen && spent.some((b) => b.path === path));
+    if (planned || unplanned) renamingPath = path;
   }
 
   function rowMenu(e: MouseEvent, row: PlanRow) {
@@ -321,8 +324,7 @@
   <div
     class="beat-row"
     data-row
-    class:selected={beat.path === selectedPath}
-    class:live={playing}
+    class:focused={beat.path === focusedPath}
     class:armed
     class:spent={!!beat.spent}
     class:hovered={$hoverLive && hovered === beat.path}
@@ -335,7 +337,7 @@
     on:dragend={endBeatDrag}
     on:dragover={(e) => {
       if (row) overSlot(e, row.at);
-      else overSpareSlot(e, shown.indexOf(beat));
+      else if (!beat.spent) overSpareSlot(e, shown.indexOf(beat));
       overBeat(e, beat);
     }}
     on:drop={(e) => {
@@ -379,7 +381,7 @@
       <span class="spent-mark" aria-label="spent">✓</span>
     {/if}
     <!-- The keys take a double-click's first click only: its second would
-         undo the first, so a launch stopped at once and played nothing. -->
+         undo the first. -->
     {#if !renaming}
       <span class="tr" class:engaged={armed || playing}>
         <button
@@ -394,38 +396,40 @@
             <path d={armed ? CIRCLE : CIRCLE_RING} />
           </svg>
         </button>
-        <button
-          type="button"
-          class="tr-btn"
-          class:playing
-          aria-pressed={playing}
-          title={playing ? `Stop ${beat.name}` : `Launch ${beat.name}: its notes go live`}
-          on:click={(e) => e.detail <= 1 && (playing ? onStop() : onLaunch(beat))}
-        >
-          {#if playing}
+        <!-- Launching is Play's; the live beat's key stops it from here too.
+             Its slot is kept, so the arm key holds still. -->
+        {#if playing}
+          <button
+            type="button"
+            class="tr-btn playing"
+            aria-pressed="true"
+            title={`Stop ${beat.name}`}
+            on:click={(e) => e.detail <= 1 && onStop()}
+          >
             <span class="stop-mark" aria-hidden="true"></span>
-          {:else}
-            <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
-          {/if}
-        </button>
+          </button>
+        {:else}
+          <span class="key-slot" aria-hidden="true"></span>
+        {/if}
       </span>
     {/if}
-    <span class="row-count" class:lit={beat.path === litPath}>{beat.notes.length}</span>
+    <!-- The notes it lights, not its links: an unresolved one lights none. -->
+    <span class="row-count" class:lit={beat.path === focusedPath}>{memberPaths(beat).size}</span>
   </div>
 {/snippet}
 
 <!-- A group's title: the fold toggle, and a drop target for beats from the
      other group. -->
-{#snippet groupHead(group: 'plan' | 'spare', label: string, count: number, lit: boolean)}
+{#snippet groupHead(group: Group, label: string, count: number, lit: boolean)}
   {@const open = !folded.has(group)}
   <button
     type="button"
     class="group-head"
-    class:spare-head={group === 'spare'}
+    class:spare-head={group !== 'plan'}
     class:drop-into={dropOn === group}
     aria-expanded={open}
     on:click={() => fold(group)}
-    on:dragover={(e) => overHead(e, group)}
+    on:dragover={(e) => group !== 'spent' && overHead(e, group)}
     on:drop={dropBeat}
   >
     <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
@@ -440,15 +444,6 @@
 <section class="beats" aria-label="Beats">
   <header class="nameplate">
     <span class="ledger-label title">beats</span>
-    {#if spentCount}
-      <button
-        type="button"
-        class="plate-btn"
-        aria-pressed={showSpent}
-        title={showSpent ? 'Put away spent beats no plan holds' : `Show ${spentCount} spent beat${spentCount === 1 ? '' : 's'} no plan holds`}
-        on:click={() => (showSpent = !showSpent)}
-      >{showSpent ? 'hide spent' : 'show spent'}</button>
-    {/if}
   </header>
 
   <div class="list" role="presentation" on:dragover={overList} on:dragleave={leaveList}>
@@ -554,6 +549,17 @@
       {/if}
       {#if spareOpen}
         {#each shown as beat (beat.path)}
+          {@render beatRow(beat, null, (e) => spareMenu(e, beat))}
+        {/each}
+      {/if}
+    {/if}
+
+    <!-- Spent beats no plan holds: still here, folded until asked for, so
+         no beat ever leaves the column. -->
+    {#if spent.length}
+      {@render groupHead('spent', 'spent', spent.length, spentLit)}
+      {#if spentOpen}
+        {#each spent as beat (beat.path)}
           {@render beatRow(beat, null, (e) => spareMenu(e, beat))}
         {/each}
       {/if}
@@ -689,21 +695,14 @@
   }
 
   /* Legend Lore's row states, as on the note rows: a latched grey-step
-     hover, and a ring on the selected beat, whose notes are lit across the
+     hover, and a ring on the focused beat, whose notes are lit across the
      tracks. */
   .beat-row.hovered {
     background: var(--bg-container);
   }
 
-  .beat-row.selected {
+  .beat-row.focused {
     box-shadow: var(--ring-focus);
-  }
-
-  /* The live beat, the one launched: a playing collection's parchment
-     wash and purple rule, as Play's arrangement marks the same beat. */
-  .beat-row.live {
-    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
-    border-left-color: var(--text-active);
   }
 
   /* Armed: the row Legend Lore wears for the collection you're editing —
@@ -749,9 +748,9 @@
     text-underline-offset: 3px;
   }
 
-  /* The arm and play keys as a collection's transport (CollectionsPanel
-     .tr): hidden at rest, shown on the hovered or selected row, kept while
-     armed or live. */
+  /* The arm key and the live beat's stop as a collection's transport
+     (CollectionsPanel .tr): hidden at rest, shown on the hovered or focused
+     row, kept while armed or live. */
   .tr {
     display: inline-flex;
     gap: 0.25rem;
@@ -761,7 +760,7 @@
   }
 
   .beat-row.hovered .tr,
-  .beat-row.selected .tr,
+  .beat-row.focused .tr,
   .tr.engaged {
     opacity: 1;
   }

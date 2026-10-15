@@ -17,13 +17,10 @@
   export let campaigns: string[];
   export let index: CampaignIndex;
   export let openPath: string | null;
-  /** Notes in the selected beat. */
+  /** Notes in the focused beat. */
   export let members: Set<string>;
   /** Notes some beat of the session's plan holds. */
   export let inSession: Set<string>;
-  /** The live set, while there is one: notes outside it dim, as Legend
-   *  Lore's tree does while a collection plays. */
-  export let liveNotes: Set<string> | null;
   /** A beat is armed: a click toggles membership instead of opening. */
   export let armed: boolean;
   export let ambiguous: (name: string) => boolean;
@@ -149,7 +146,6 @@
     class:member={members.has(note.path)}
     class:in-session={inSession.has(note.path)}
     class:spent={!!note.spent}
-    class:out-of-scope={liveNotes !== null && !liveNotes.has(note.path)}
     class:arming={armed}
     aria-pressed={armed ? members.has(note.path) : undefined}
     title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
@@ -446,18 +442,6 @@
 
   .note-row.spent.hovered .label,
   .note-row.spent.hovered .slot {
-    opacity: var(--opacity-out-of-scope-hover);
-  }
-
-  /* Outside the live set while a beat is launched: Legend Lore's tree
-     while a collection plays (FileTree .out-of-scope). The row's parts dim,
-     not the row, so a spent note's own dim doesn't compound and the row's
-     ring and drop line stay whole; hover restores it. */
-  .note-row.out-of-scope > * {
-    opacity: var(--opacity-out-of-scope);
-  }
-
-  .note-row.out-of-scope.hovered > * {
     opacity: var(--opacity-out-of-scope-hover);
   }
 

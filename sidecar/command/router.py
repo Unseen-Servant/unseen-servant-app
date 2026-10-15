@@ -508,7 +508,12 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.get("/live")
     def get_live(campaign: str):
-        return live.get(campaign)
+        """What's live, less anything gone since (``LiveSets.prune``)."""
+        camp = campaign_path(campaign)
+        with write_lock:
+            pruned = live.prune(campaign, lambda p: (camp / p).is_file())
+        announce(pruned)
+        return pruned or live.get(campaign)
 
     @router.post("/live/launch")
     def launch(body: Launch):

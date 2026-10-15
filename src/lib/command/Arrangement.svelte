@@ -11,6 +11,8 @@
   /** The beat the live set was launched from. */
   export let liveBeat: string | null;
   export let onLaunch: (beat: BeatEntry) => void;
+  /** Clears the live set: the live beat's key, as in Prep. */
+  export let onStop: () => void;
   export let onShow: (beat: BeatEntry) => void;
   export let onEdit: (beat: BeatEntry) => void;
   export let onJot: (text: string) => void;
@@ -53,16 +55,22 @@
       {#if row.beat}
         {@const beat = row.beat}
         {@const playing = beat.path === liveBeat}
-        <div class="beat-row" class:playing class:spent={!!beat.spent}>
+        <div class="beat-row" class:spent={!!beat.spent}>
+          <!-- The live beat's key is the lit ■ that stops it, as in Prep:
+               launching it again would only log it twice. -->
           <button
             type="button"
             class="play-key"
             class:playing
             aria-pressed={playing}
-            title={`Launch ${beat.name}`}
-            on:click={() => onLaunch(beat)}
+            title={playing ? `Stop ${beat.name}` : `Launch ${beat.name}`}
+            on:click={() => (playing ? onStop() : onLaunch(beat))}
           >
-            <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
+            {#if playing}
+              <span class="stop-mark" aria-hidden="true"></span>
+            {:else}
+              <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
+            {/if}
           </button>
           <button
             type="button"
@@ -165,8 +173,6 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.15rem 0.35rem;
-    /* Square, as Legend Lore's collection rows: a radius bends the rule. */
-    border-left: 3px solid transparent;
     font-size: 0.9rem;
     line-height: 1.5;
   }
@@ -175,16 +181,13 @@
     background: var(--bg-focused);
   }
 
-  /* The beat the live set came from: a playing collection's parchment wash
-     and purple rule (CollectionsPanel .row-container.playing), as Prep's
-     beat column marks it. */
-  .beat-row.playing {
-    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
-    border-left-color: var(--text-active);
-  }
-
+  /* The live beat wears only its lit key (design §5.1, beat states). */
   .beat-row.spent .beat-name {
     opacity: var(--opacity-out-of-scope);
+  }
+
+  .beat-row.spent:hover .beat-name {
+    opacity: var(--opacity-out-of-scope-hover);
   }
 
   .beat-name {
@@ -251,6 +254,13 @@
     border-color: var(--text-active);
     background: color-mix(in srgb, var(--text-active) 15%, transparent);
     filter: var(--glow-active);
+  }
+
+  /* Prep's stop mark (BeatColumn .stop-mark). */
+  .stop-mark {
+    width: 6px;
+    height: 6px;
+    background: currentColor;
   }
 
   .times,

@@ -10,7 +10,7 @@
   // to reorder its group or to move there, or onto another column.
   //
   // Each row's slot, Ableton's square lit as a splash lamp, reads the
-  // session at a glance: lit parchment for a note in the selected beat,
+  // session at a glance: lit parchment for a note in the focused beat,
   // half-lit for one some other planned beat holds, dark otherwise.
   // A spent note dims and carries a check.
   import { onDestroy } from 'svelte';
@@ -29,15 +29,12 @@
   /** Each track's pigment, by name. */
   export let pigments: Record<string, string>;
   export let openPath: string | null;
-  /** Notes in the lit beat. */
+  /** Notes in the focused beat. */
   export let members: Set<string>;
-  /** The lit beat, by name, for the plates' readout. */
+  /** The focused beat, by name, for the plates' readout. */
   export let litBeatName: string | null;
   /** Notes some beat of the session's plan holds. */
   export let inSession: Set<string>;
-  /** The live set, while there is one: notes outside it dim, as Legend
-   *  Lore's tree does while a collection plays. */
-  export let liveNotes: Set<string> | null;
   /** A beat is armed: a click also toggles membership. */
   export let armed: boolean;
   export let onToggleMember: (note: NoteEntry) => void;
@@ -65,7 +62,7 @@
   /** A folder's notes by name, in the order they were dragged into. */
   export let onReorderNotes: (folder: string, names: string[]) => void;
 
-  /** How many of each track's notes the lit beat holds, for its plate. */
+  /** How many of each track's notes the focused beat holds, for its plate. */
   $: inBeat = new Map(
     cols.map((c) => [c.track, c.groups.reduce((n, g) => n + g.notes.filter((x) => members.has(x.path)).length, 0)]),
   );
@@ -446,7 +443,6 @@
               class:member={members.has(note.path)}
               class:in-session={inSession.has(note.path)}
               class:spent={!!note.spent}
-              class:out-of-scope={liveNotes !== null && !liveNotes.has(note.path)}
               class:arming={armed}
               class:dragging={noteSlot?.note.path === note.path}
               class:drop-before={lineBefore === note.path}
@@ -807,7 +803,7 @@
 
   /* The clip slot, Ableton's square, as one of the splash's lamps
      (LaunchSplash .led): a flat cell, dark until something holds the note,
-     half-lit when some planned beat does, lit parchment when the selected
+     half-lit when some planned beat does, lit parchment when the focused
      beat does. Content, not a mode: no glow — the glowing lamp belongs to
      Play's live set. A box, not Font Awesome's square: an SVG path isn't
      snapped to the pixel grid, so its edges smeared at this size. */
@@ -858,18 +854,6 @@
 
   .note-row.spent.hovered .label,
   .note-row.spent.hovered .slot {
-    opacity: var(--opacity-out-of-scope-hover);
-  }
-
-  /* Outside the live set while a beat is launched: Legend Lore's tree
-     while a collection plays (FileTree .out-of-scope). The row's parts dim,
-     not the row, so a spent note's own dim doesn't compound and the row's
-     ring and drop line stay whole; hover restores it. */
-  .note-row.out-of-scope > * {
-    opacity: var(--opacity-out-of-scope);
-  }
-
-  .note-row.out-of-scope.hovered > * {
     opacity: var(--opacity-out-of-scope-hover);
   }
 

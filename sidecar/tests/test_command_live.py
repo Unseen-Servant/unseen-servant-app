@@ -19,6 +19,23 @@ def test_each_change_takes_the_next_seq_and_survives_a_restart(tmp_path):
     assert LiveSets(tmp_path).set("Strahd", None, [])["seq"] == 3
 
 
+def test_a_set_with_no_notes_has_no_beat():
+    sets = LiveSets(None)
+    assert sets.set("Strahd", "Beats/Empty.md", [])["beat"] is None
+    sets.set("Strahd", "Beats/Ambush.md", ["NPCs/Ismark.md"])
+    assert sets.prune("Strahd", lambda p: p != "NPCs/Ismark.md") == {
+        "campaign": "Strahd", "seq": 3, "beat": None, "notes": [],
+    }
+
+
+def test_whatever_is_gone_leaves_the_live_set():
+    sets = LiveSets(None)
+    sets.set("Strahd", "Beats/Ambush.md", ["NPCs/Ismark.md", "NPCs/Ireena.md"])
+    assert sets.prune("Strahd", lambda p: True) is None
+    pruned = sets.prune("Strahd", lambda p: p not in ("Beats/Ambush.md", "NPCs/Ireena.md"))
+    assert (pruned["beat"], pruned["notes"]) == (None, ["NPCs/Ismark.md"])
+
+
 def test_a_corrupt_file_means_nothing_is_live(tmp_path):
     (tmp_path / LIVE_FILENAME).write_text("{ nope")
     assert LiveSets(tmp_path).get("Strahd")["notes"] == []
