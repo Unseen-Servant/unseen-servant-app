@@ -633,8 +633,11 @@
     background: var(--pigment);
   }
 
+  /* Bold, Almendra's own cut: ink on a pigment reads thinner than grey
+     on the plate. */
   .nameplate.pigmented .track-name {
     color: var(--text-inverse);
+    font-weight: 700;
   }
 
   .nameplate.pigmented .track-number {
