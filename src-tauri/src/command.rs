@@ -509,9 +509,10 @@ pub async fn command_move_note(
     campaign: String,
     path: String,
     folder: String,
+    order: Option<Vec<String>>,
 ) -> Result<Moved, String> {
     answer(client().post(api("/notes/move")).json(&serde_json::json!({
-        "campaign": campaign, "path": path, "folder": folder,
+        "campaign": campaign, "path": path, "folder": folder, "order": order,
     })))
     .await
 }

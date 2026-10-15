@@ -93,6 +93,7 @@ class NoteMove(BaseModel):
     campaign: str
     path: str
     folder: str
+    order: list[str] | None = None
 
 
 class Locate(BaseModel):
@@ -441,7 +442,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     def move_note(body: NoteMove):
         camp = campaign_path(body.campaign)
         with write_lock:
-            path, rewritten = vault.move_note(camp, body.path, shelf_or(camp, body.folder))
+            path, rewritten = vault.move_note(camp, body.path, shelf_or(camp, body.folder), body.order)
             moved = live.remap(body.campaign, lambda p: path if p == body.path else p)
         announce(moved)
         return {"path": path, "rewritten": rewritten}

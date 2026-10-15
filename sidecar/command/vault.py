@@ -749,7 +749,9 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
     return _rel(campaign, dst), _rewrite_campaign(campaign, moves)
 
 
-def move_note(campaign: Path, rel: str, folder: str) -> tuple[str, list[str]]:
+def move_note(campaign: Path, rel: str, folder: str, order: list[str] | None = None) -> tuple[str, list[str]]:
+    """Move a note into ``folder``, first among its notes, or in ``order``
+    (a drop between rows: the folder's notes with it in place)."""
     src = resolve(campaign, rel)
     if not src.is_file() or not _is_note_file(src.name):
         raise Invalid(f"Not a note: {rel!r}")
@@ -760,6 +762,17 @@ def move_note(campaign: Path, rel: str, folder: str) -> tuple[str, list[str]]:
     if dst.exists():
         raise Conflict(f"{_rel(campaign, dst)!r} already exists")
     moves = _relocate(campaign, src, dst)
+    # Wherever it came from and whatever its name, so a move always lands
+    # the same way. Its old folder forgets it.
+    name = _stem(src.name)
+    orders = note_order(campaign)
+    left, joined = _rel(campaign, src.parent), _rel(campaign, parent)
+    if left in orders:
+        orders[left] = [n for n in orders[left] if not _same_name(n, name)]
+    orders[joined] = order if order is not None else [
+        name, *(n for n in orders.get(joined, []) if not _same_name(n, name))
+    ]
+    _save_list(campaign, "notes", orders)
     return _rel(campaign, dst), _rewrite_campaign(campaign, moves)
 
 

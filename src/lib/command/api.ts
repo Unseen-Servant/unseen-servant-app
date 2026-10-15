@@ -58,8 +58,9 @@ export const commandApi = {
     invoke<string>('command_create_note', { campaign, folder, name }),
   renameNote: (campaign: string, path: string, newName: string) =>
     invoke<Moved>('command_rename_note', { campaign, path, newName }),
-  moveNote: (campaign: string, path: string, folder: string) =>
-    invoke<Moved>('command_move_note', { campaign, path, folder }),
+  /** Into `folder`, first among its notes, or in `order` when given. */
+  moveNote: (campaign: string, path: string, folder: string, order?: string[]) =>
+    invoke<Moved>('command_move_note', { campaign, path, folder, order: order ?? null }),
   /** Another campaign's note, copied onto this one's shelf. */
   copyNote: (campaign: string, fromCampaign: string, path: string) =>
     invoke<string>('command_copy_note', { campaign, fromCampaign, path }),

@@ -319,6 +319,26 @@ def test_move_note_into_and_out_of_a_tracks_subfolder(camp):
     assert vault.move_note(camp, "NPCs/Vallaki/Lady Wachter.md", "NPCs")[0] == "NPCs/Lady Wachter.md"
 
 
+def test_a_moved_note_heads_its_new_folder(camp):
+    write(camp / "Locations" / "Church.md", "")
+    write(camp / "Locations" / "Tser Pool.md", "")
+    vault.save_note_order(camp, "Locations", ["Tser Pool", "Village of Barovia"])
+    vault.move_note(camp, "NPCs/Ismark.md", "Locations")
+    assert vault.note_order(camp)["Locations"] == ["Ismark", "Tser Pool", "Village of Barovia"]
+    # Whatever its name, and whatever spot an earlier stay left it.
+    vault.move_note(camp, "NPCs/Ireena.md", "Locations")
+    vault.move_note(camp, "Locations/Ismark.md", "NPCs")
+    vault.move_note(camp, "NPCs/Ismark.md", "Locations")
+    assert vault.note_order(camp)["Locations"] == ["Ismark", "Ireena", "Tser Pool", "Village of Barovia"]
+    assert vault.note_order(camp)["NPCs"] == []
+
+
+def test_a_note_dropped_between_rows_lands_in_its_place(camp):
+    vault.save_note_order(camp, "Locations", ["Village of Barovia"])
+    vault.move_note(camp, "NPCs/Ismark.md", "Locations", ["Village of Barovia", "Ismark"])
+    assert vault.note_order(camp)["Locations"] == ["Village of Barovia", "Ismark"]
+
+
 def test_rename_note_keeps_a_beat_in_its_place(camp):
     write(camp / "Beats" / "Tser Pool.md", "")
     vault.save_beat_order(camp, ["Tser Pool", "Ambush"])
