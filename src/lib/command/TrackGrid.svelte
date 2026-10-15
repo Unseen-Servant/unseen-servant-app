@@ -582,18 +582,25 @@
     </section>
   {/each}
 
-  <section class="column ghost-column" aria-label="New track">
+  <!-- Naming a track, the ghost column dresses as the track it becomes, as
+       a new note's row does: a track's width, its number, its plate's
+       lettering, with no field of its own. -->
+  <section class="column ghost-column" class:naming={creatingTrack} aria-label="New track">
     <header class="nameplate">
       {#if creatingTrack}
-        <InlineName
-          placeholder="Track name"
-          label="New track"
-          onCommit={(name) => {
-            creatingTrack = false;
-            onCreateTrack(name);
-          }}
-          onCancel={() => (creatingTrack = false)}
-        />
+        <span class="plate-name">
+          <span class="track-number" aria-hidden="true">{cols.length + 1}</span>
+          <InlineName
+            bare
+            placeholder="Track name…"
+            label="New track"
+            onCommit={(name) => {
+              creatingTrack = false;
+              onCreateTrack(name);
+            }}
+            onCancel={() => (creatingTrack = false)}
+          />
+        </span>
       {:else}
         <button type="button" class="ghost-track ledger-label" on:click={() => (creatingTrack = true)}>+ track</button>
       {/if}
@@ -634,6 +641,11 @@
   .ghost-column {
     flex: 0 0 5.5rem;
     border-right: none;
+  }
+
+  .ghost-column.naming {
+    flex-basis: 10rem;
+    border-right: 1px solid var(--border-subtle);
   }
 
   /* Legend Lore's drop line (CollectionsPanel .drop-before), turned on its
@@ -764,11 +776,21 @@
 
   /* Renaming, the name keeps the plate's face, size and tracking, but in
      the case it's spelled in: a case-only rename has to be seen. */
-  .plate-name :global(.rename-field) {
+  .plate-name :global(.rename-field),
+  .plate-name :global(.inline-name) {
     font-family: var(--font-heading);
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     line-height: 1.2;
+  }
+
+  /* A new track's name in the plate's ink, as the names beside it. */
+  .plate-name :global(.inline-name) {
+    color: var(--text-secondary);
+  }
+
+  .plate-name :global(.inline-name::placeholder) {
+    font-style: italic;
   }
 
   /* The track's count of notes: a beat's count badge (BeatColumn
