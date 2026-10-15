@@ -3,11 +3,20 @@
 export type MenuItem =
   // `lamp`: a choice row whose pip says whether it's the one in effect.
   // `chord`: the binding (keybindings.ts) whose key does the same on the
-  // selected row, shown as its hint. `swatch`: a pigment the row names,
-  // drawn as a chip of the plate it fills.
-  | { kind: 'action'; label: string; danger?: boolean; lamp?: boolean; chord?: string; swatch?: string; action: () => void }
+  // selected row, shown as its hint.
+  | { kind: 'action'; label: string; danger?: boolean; lamp?: boolean; chord?: string; action: () => void }
   | { kind: 'heading'; label: string }
+  // `picks`: choices side by side in one row, each a swatch of the plate it
+  // fills (null for none), its name only a tooltip (app.css .menu-picks).
+  | { kind: 'picks'; label: string; picks: Pick[] }
   | { kind: 'divider' };
+
+export interface Pick {
+  label: string;
+  swatch: string | null;
+  on: boolean;
+  action: () => void;
+}
 
 export interface OpenMenu {
   x: number;
@@ -30,11 +39,11 @@ export const keyed = (label: string, chord: string, run: () => void): MenuItem =
   chord,
 });
 export const heading = (label: string): MenuItem => ({ kind: 'heading', label });
-export const choice = (label: string, on: boolean, run: () => void, swatch?: string): MenuItem => ({
+export const choice = (label: string, on: boolean, run: () => void): MenuItem => ({
   kind: 'action',
   label,
   action: run,
   lamp: on,
-  swatch,
 });
+export const picks = (label: string, picks: Pick[]): MenuItem => ({ kind: 'picks', label, picks });
 export const divider: MenuItem = { kind: 'divider' };

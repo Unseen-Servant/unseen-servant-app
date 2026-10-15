@@ -684,6 +684,43 @@ dialog[open]::backdrop {
   border-top: 1px solid var(--border-subtle);
 }
 
+/* Choices side by side in one row, between dividers: every pigment at once,
+   each drawn as what it colours (a collection's gem, a track's plate) and
+   named only in its tooltip. The lit pip under a pick is the one in effect;
+   the rest are dark.
+   The first glyph starts in the rows' label column. */
+.menu-picks {
+  display: flex;
+  gap: 0.1rem;
+  padding: 0.1rem calc(0.6rem - 0.25rem);
+}
+.menu-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.25rem 0.1rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.menu-pick:hover:not(.hover-dark *) {
+  background: var(--bg-focused);
+}
+.menu-pick:active {
+  transform: scale(0.97);
+}
+.menu-pick .menu-pip {
+  width: auto;
+}
+/* The other picks' lamps sit dark, as unlit LEDs: the app's floor, a step
+   under the menu. */
+.menu-pick .menu-pip:not(.on)::before {
+  background: var(--bg-app);
+}
+
 /* Menu selection lamp — reports which option is in effect on rows whose whole
    surface is the click target. Deliberately unlike .app-checkbox: 5px vs 14px
    and no border, because a panel LED has no bezel you press. Decorative;

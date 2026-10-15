@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, GEM, PLAY } from '../ui/iconPaths';
+  import { CIRCLE, CIRCLE_RING, GEM, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
   import RenameField from '../ui/RenameField.svelte';
@@ -372,12 +372,11 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): the transport first
-  // (Arm / Play / Mute), then the track's properties (Gem ▸ / Rename /
+  // (Arm / Play / Mute), then the track's properties (its gems / Rename /
   // Archive), then Delete. Same visual family as the file tree's
   // ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
-  let ctxPigmentOpen = false;
   let ctxPositioned = false;
 
   function openContextMenu(e: MouseEvent, name: string) {
@@ -391,7 +390,6 @@
       flushSync();
     }
     onFocusCollection(name);
-    ctxPigmentOpen = false;
     ctxPositioned = false;
     ctxMenu = { x: e.clientX, y: e.clientY, name };
     claimMenuSlot(closeContextMenu);
@@ -413,7 +411,6 @@
 
   function closeContextMenu() {
     ctxMenu = null;
-    ctxPigmentOpen = false;
     releaseMenuSlot(closeContextMenu);
   }
 
@@ -1002,53 +999,28 @@
       <span class="menu-chord" class:bare={isBareKeyChord('collections.mute')} aria-hidden="true">{chord('collections.mute')}</span>
     </button>
     <hr class="menu-divider" />
-    <div
-      class="context-item has-submenu"
-      class:open={ctxPigmentOpen}
-      on:mouseenter={() => { ctxPigmentOpen = true; }}
-      on:mouseleave={() => { ctxPigmentOpen = false; }}
-      on:click={() => { ctxPigmentOpen = !ctxPigmentOpen; }}
-      role="menuitem"
-      tabindex="-1"
-      aria-haspopup="menu"
-      aria-expanded={ctxPigmentOpen}
-    >
-      <!-- "Gem" names the glyph the user sees; the palette entries behind
-           it stay pigments in code. -->
-      <span>Gem</span>
-      <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
-      {#if ctxPigmentOpen}
-        <div class="submenu" role="menu">
-          {#each PIGMENTS as pig (pig.hex)}
-            <button
-              class="context-item"
-              role="menuitemradio"
-              aria-checked={col?.color === pig.hex}
-              on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
-            >
-              <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
-              <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                <path d={GEM}/>
-              </svg>
-              <span>{pig.name}</span>
-            </button>
-          {/each}
-          <hr class="menu-divider" />
-          <button
-            class="context-item"
-            role="menuitemradio"
-            aria-checked={!col?.color}
-            on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, null))}
-          >
-            <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
-            <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={GEM}/>
-            </svg>
-            <span>None</span>
-          </button>
-        </div>
-      {/if}
+    <!-- "Gem" names the glyph the user sees; the palette entries behind
+         it stay pigments in code. -->
+    <div class="menu-picks" role="group" aria-label="Gem">
+      {#each [...PIGMENTS, { name: 'None', hex: null }] as pig (pig.name)}
+        {@const on = pig.hex ? col?.color === pig.hex : !col?.color}
+        <button
+          class="menu-pick"
+          role="menuitemradio"
+          aria-checked={on}
+          aria-label={pig.name}
+          title={pig.name}
+          on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
+        >
+          <!-- No pigment — outline gem in tertiary, same grammar as the chips -->
+          <svg class="pick-gem" style={`color: ${pig.hex ?? 'var(--text-tertiary)'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={GEM}/>
+          </svg>
+          <span class="menu-pip" class:on aria-hidden="true"></span>
+        </button>
+      {/each}
     </div>
+    <hr class="menu-divider" />
     <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
       Rename collection
       <span class="menu-chord" class:bare={isBareKeyChord('collections.rename')} aria-hidden="true">{chord('collections.rename')}</span>
@@ -1578,33 +1550,15 @@
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
-  .context-item:hover,
-  .context-item.open {
+  .context-item:hover {
     background: var(--bg-focused);
   }
   .context-item.danger {
     color: var(--text-danger);
   }
-  .has-submenu {
-    position: relative;
-  }
-  .submenu-caret {
-    margin-left: auto;
-    font-size: 0.7rem;
-    opacity: 0.6;
-  }
-  .submenu {
-    position: absolute;
-    left: 100%;
-    top: -0.15rem;
-    background: var(--bg-container);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-dropdown);
-    padding: 0.15rem 0;
-    min-width: var(--submenu-width);
-    max-width: var(--menu-max-width);
-    z-index: 2;
+  .pick-gem {
+    width: 1rem;
+    height: 1rem;
   }
 
   .empty {

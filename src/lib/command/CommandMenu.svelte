@@ -66,12 +66,21 @@
       <hr class="menu-divider" />
     {:else if item.kind === 'heading'}
       <div class="menu-heading ledger-label">{item.label}</div>
+    {:else if item.kind === 'picks'}
+      <div class="menu-picks" role="group" aria-label={item.label}>
+        {#each item.picks as p (p.label)}
+          {@const run = p.action}
+          <button type="button" class="menu-pick" role="menuitemradio" aria-checked={p.on} aria-label={p.label} title={p.label} on:click={() => pick(run)}>
+            <span class="menu-swatch" class:none={!p.swatch} style:background={p.swatch} aria-hidden="true"></span>
+            <span class="menu-pip" class:on={p.on} aria-hidden="true"></span>
+          </button>
+        {/each}
+      </div>
     {:else}
       {@const run = item.action}
       {#if item.lamp !== undefined}
         <button type="button" class="menu-row" role="menuitemradio" aria-checked={item.lamp} on:click={() => pick(run)}>
           <span class="menu-pip" class:on={item.lamp} aria-hidden="true"></span>
-          {#if item.swatch}<span class="menu-swatch" style:background={item.swatch} aria-hidden="true"></span>{/if}
           <span class="menu-label">{item.label}</span>
         </button>
       {:else}
@@ -116,13 +125,16 @@
     overflow: hidden;
   }
 
-  /* A pigment as the plate it fills (TrackGrid .nameplate), at a row's
-     scale. */
+  /* A pigment as the plate it fills (TrackGrid .nameplate), at a gem's
+     scale. None is the plate's outline, empty. */
   .menu-swatch {
-    flex-shrink: 0;
-    width: 0.8rem;
-    height: 0.55rem;
+    width: 1rem;
+    height: 0.7rem;
     border-radius: var(--radius-sm);
+  }
+
+  .menu-swatch.none {
+    box-shadow: inset 0 0 0 1px var(--text-tertiary);
   }
 
   .menu-label {

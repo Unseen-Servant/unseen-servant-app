@@ -18,7 +18,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
-  import { action, choice, divider, heading, keyed, type OpenMenu } from './menu';
+  import { action, divider, heading, keyed, picks, type OpenMenu } from './menu';
   import { PIGMENTS } from '../legend-lore/palette';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
@@ -343,12 +343,15 @@
         action('Show in Finder', () => onRevealTrack(column.track)),
         divider,
         // Legend Lore's palette, as a collection's gem takes it.
-        heading('pigment'),
-        ...PIGMENTS.map((p) =>
-          choice(p.name, pigments[column.track] === p.hex, () => onPigmentTrack(column.track, p.hex), p.hex),
-        ),
-        // None keeps a swatch's room, so its name lines up with theirs.
-        choice('None', !pigments[column.track], () => onPigmentTrack(column.track, null), 'transparent'),
+        picks('Pigment', [
+          ...PIGMENTS.map((p) => ({
+            label: p.name,
+            swatch: p.hex,
+            on: pigments[column.track] === p.hex,
+            action: () => onPigmentTrack(column.track, p.hex),
+          })),
+          { label: 'None', swatch: null, on: !pigments[column.track], action: () => onPigmentTrack(column.track, null) },
+        ]),
         divider,
         action('Move to Trash', () => onTrashTrack(column), true),
       ],
