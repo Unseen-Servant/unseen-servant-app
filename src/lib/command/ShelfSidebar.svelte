@@ -10,7 +10,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
   import { endNoteDrag, startNoteDrag } from './noteDrag';
-  import { action, divider, heading, keyed, type OpenMenu } from './menu';
+  import { action, divider, heading, keyed, submenu, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
 
   export let campaign: string;
@@ -116,8 +116,17 @@
       y: e.clientY,
       items: [
         action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
-        ...(index.tracks.length ? [divider, heading('file on'), ...index.tracks.map((t) => action(t, () => onMove(note, t)))] : []),
-        ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
+        // The grid's Move to flyout, in the columns' order: the shelf at the
+        // left, for a loose note, then the tracks.
+        ...(index.tracks.length || note.track === null
+          ? [
+              divider,
+              submenu('File on', [
+                ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
+                ...index.tracks.map((t) => action(t, () => onMove(note, t))),
+              ]),
+            ]
+          : []),
         divider,
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
         action('Show in Finder', () => onReveal(note)),
