@@ -5,7 +5,7 @@
   // between them; the note editor serves both. Everything shown is re-read
   // from the sidecar; file state lives in NoteBuffer, which owns the save
   // rules.
-  import { onDestroy, onMount, type Snippet } from 'svelte';
+  import { onDestroy, onMount, tick, type Snippet } from 'svelte';
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
@@ -20,6 +20,7 @@
   import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import NoteEditor from './NoteEditor.svelte';
+  import NoteReader from './NoteReader.svelte';
   import PlayView from './PlayView.svelte';
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
@@ -103,6 +104,13 @@
   // A note just opened takes the caret to the top; a reload keeps it.
   let freshOpen = false;
 
+  /** The open note read rendered rather than edited (⌘E, Obsidian's
+   *  reading view). It stays with the window as notes open, as a tab keeps
+   *  its mode in Obsidian. */
+  let reading = false;
+  /** The editor's text, for the reader: what's loaded, then every edit. */
+  let noteText = '';
+
   const buffer = new NoteBuffer(
     {
       read: (path) => commandApi.readNote(campaign!, path),
@@ -110,6 +118,7 @@
     },
     (state) => (bufState = state),
     (content) => {
+      noteText = content;
       editor?.setContent(content, !freshOpen);
       freshOpen = false;
     },
@@ -269,6 +278,14 @@
     // the dialog's, as in Legend Lore.
     if (document.querySelector('dialog[open]')) return;
     const target = e.target as HTMLElement | null;
+    // ⌘E: read the open note or edit it, as Obsidian's, from the editor
+    // too, but not while a name is typed.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'e' && bufState.status !== 'empty') {
+      if (target?.closest('input, textarea')) return;
+      e.preventDefault();
+      toggleReading();
+      return;
+    }
     if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
     // ? or ⌘/: the shortcut sheet, as in Legend Lore. Not from the editor,
     // where ⌘/ is CodeMirror's comment.
@@ -351,8 +368,17 @@
       selected = path;
       freshOpen = true;
       await buffer.open(path);
+      // A new note is empty: there's nothing to read yet.
+      reading = false;
+      await tick();
       editor?.focus();
     });
+  }
+
+  /** Back to editing puts the caret in the text, as Obsidian does. */
+  function toggleReading() {
+    reading = !reading;
+    if (!reading) void tick().then(() => editor?.focus());
   }
 
   function followLink(name: string) {
@@ -1132,6 +1158,14 @@
               {#if STATUS_TEXT[bufState.status]}
                 <span class="readout">{STATUS_TEXT[bufState.status]}</span>
               {/if}
+              <!-- Names what it switches to, as the plate's other actions
+                   name what they do. -->
+              <button
+                type="button"
+                class="plate-btn"
+                title={(reading ? 'Edit the note' : 'Read the note rendered') + chordHint('command.read')}
+                on:click={toggleReading}
+              >{reading ? 'edit' : 'read'}</button>
               {#if openEntry?.source}
                 {@const source = openEntry.source}
                 <button
@@ -1157,12 +1191,27 @@
               <div class="notice" role="alert"><span>Not saved: {bufState.error}</span></div>
             {/if}
           {/if}
-          <div class="editor-slot">
+          <!-- Reading hides the editor rather than unmounting it, so its
+               undo history and caret are there on the way back. -->
+          {#if reading && bufState.status !== 'empty'}
+            <div class="editor-slot">
+              <NoteReader
+                text={noteText}
+                resolves={(name) => nameSet.has(name.toLowerCase())}
+                onFollow={followLink}
+                onError={(message) => (error = message)}
+              />
+            </div>
+          {/if}
+          <div class="editor-slot" class:hidden={reading}>
             <NoteEditor
               bind:this={editor}
               names={() => (index ? linkableNames(index) : [])}
               resolves={(name) => nameSet.has(name.toLowerCase())}
-              onEdit={(content) => buffer.edit(content)}
+              onEdit={(content) => {
+                noteText = content;
+                buffer.edit(content);
+              }}
               onFollow={followLink}
               readOnly={bufState.status === 'empty' || bufState.status === 'unreadable'}
             />
@@ -1622,6 +1671,10 @@
   .editor-slot {
     flex: 1;
     min-height: 0;
+  }
+
+  .editor-slot.hidden {
+    display: none;
   }
 
   .error-line {

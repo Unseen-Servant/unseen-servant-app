@@ -155,6 +155,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // the hint without taking the key, as the collections menu does, and 'r'
   // is tree.rename's.
   { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
+  // In Prep and Play, from the editor too: Obsidian's reading-view key.
+  { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

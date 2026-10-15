@@ -64,10 +64,12 @@ export const editorTheme = EditorView.theme(
 );
 
 export const markdownHighlight = HighlightStyle.define([
+  // Each level carries the face: a tag takes only its most specific rule,
+  // so a level's size alone left its heading in the body serif.
   { tag: tags.heading, fontFamily: 'var(--font-heading)', fontWeight: '400' },
-  { tag: tags.heading1, fontSize: '1.45em' },
-  { tag: tags.heading2, fontSize: '1.25em' },
-  { tag: tags.heading3, fontSize: '1.1em' },
+  { tag: tags.heading1, fontFamily: 'var(--font-heading)', fontWeight: '400', fontSize: '1.45em' },
+  { tag: tags.heading2, fontFamily: 'var(--font-heading)', fontWeight: '400', fontSize: '1.25em' },
+  { tag: tags.heading3, fontFamily: 'var(--font-heading)', fontWeight: '400', fontSize: '1.1em' },
   { tag: tags.emphasis, fontStyle: 'italic' },
   { tag: tags.strong, fontWeight: '700' },
   { tag: tags.strikethrough, textDecoration: 'line-through' },

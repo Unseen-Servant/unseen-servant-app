@@ -217,6 +217,29 @@ export function linkify(md: string): string {
   });
 }
 
+/** The slice of a hast tree `rehypeMissingLinks` reads. */
+interface HastNode {
+  type: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+}
+
+/** A rehype plugin for `linkify`'s output: a link no note answers to gets
+ *  `.missing`, so a reader can dash it as the editor does. */
+export function rehypeMissingLinks(resolves: (name: string) => boolean) {
+  return (tree: HastNode) => {
+    const visit = (node: HastNode) => {
+      const href = node.tagName === 'a' ? node.properties?.href : undefined;
+      if (typeof href === 'string' && href.startsWith(NOTE_HREF)) {
+        if (!resolves(decodeURIComponent(href.slice(NOTE_HREF.length)))) node.properties!.className = ['missing'];
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
 /** `view` as it will read once the sidecar has applied `ops` — drawn at
  *  once, so a card doesn't spring back while the write is under way. The
  *  sidecar's answer replaces it. */

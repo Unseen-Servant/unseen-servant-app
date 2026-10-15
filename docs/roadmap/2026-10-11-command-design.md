@@ -311,6 +311,8 @@ CodeMirror 6 on the raw Markdown source. The spike validated it; the Electron ap
 
 Play renders notes with `svelte-exmarkdown` (already a dependency) plus a wikilink plugin; a link opens its note in Prep.
 
+*Reading mode, 2026-10-15:* the inspector reads a note rendered as well as editing its source, Obsidian's reading view: `[read]` on the plate, `[edit]` to go back, or ⌘E from anywhere in the panel, the editor included. Rendering is a board card's (`bodyOf`, `linkify`, GFM), so it never writes and the source stays the one thing edited; a link no note answers to is dashed, as in the editor, and a click on a link follows it there. It's set in the editor's face, size and inset, so a toggle changes the markup and not the page. The mode stays with the window as notes open, as a tab keeps Obsidian's; a new note opens to edit. The editor stays mounted while hidden, keeping its undo and caret. Headings in the editor are Almendra at every level now: a CodeMirror tag takes only its most specific rule, so each level's size had been dropping the face.
+
 ---
 
 ## 8. Cross-tool (phase 4)

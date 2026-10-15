@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, findNotes, frameOp, lines, linkify, type Card } from './board';
+import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, findNotes, frameOp, lines, linkify, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -118,6 +118,23 @@ describe('linkify', () => {
     expect(linkify('Ask [[Ismark]] or [[NPCs/Ireena.md|her]] about [[Tser Pool#Camp]]. ![[map.png]]')).toBe(
       `Ask [Ismark](${NOTE_HREF}Ismark) or [her](${NOTE_HREF}Ireena) about [Tser Pool#Camp](${NOTE_HREF}Tser%20Pool). ![[map.png]]`,
     );
+  });
+});
+
+describe('rehypeMissingLinks', () => {
+  const a = (href: string) => ({ type: 'element', tagName: 'a', properties: { href } as Record<string, unknown>, children: [] });
+
+  it('marks only the note links nothing answers to', () => {
+    const known = a(`${NOTE_HREF}Ismark`);
+    const gone = a(`${NOTE_HREF}Tser%20Pool`);
+    const web = a('https://example.com');
+    rehypeMissingLinks((name) => name === 'Ismark')({
+      type: 'root',
+      children: [{ type: 'element', tagName: 'p', properties: {}, children: [known, gone, web] }],
+    });
+    expect(known.properties.className).toBeUndefined();
+    expect(gone.properties.className).toEqual(['missing']);
+    expect(web.properties.className).toBeUndefined();
   });
 });
 
