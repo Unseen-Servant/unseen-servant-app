@@ -879,6 +879,10 @@
 
   /* Naming in place: the slot already dresses as the row it will become —
      the wash and purple rule, and the caret's ring. */
+  .ghost.naming :global(.inline-name::placeholder) {
+    font-style: italic;
+  }
+
   .ghost.naming {
     cursor: default;
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);

@@ -1462,8 +1462,11 @@
     padding: 0;
     outline: none;
   }
+  /* Italic, as the ghost's own label is, until a name is typed: every
+     naming row, here and in Command, waits in the same voice. */
   .new-coll-input::placeholder {
     color: var(--text-tertiary);
+    font-style: italic;
   }
   /* The arm the row will land with — purple ink, but no glow: a glow
      reports a state you switched on, and this one is only a promise until
