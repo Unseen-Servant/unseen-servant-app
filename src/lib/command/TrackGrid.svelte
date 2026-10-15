@@ -12,7 +12,8 @@
   // Each row's slot, Ableton's square lit as a splash lamp, reads the
   // session at a glance: lit parchment for a note in the focused beat,
   // half-lit for one some other planned beat holds, dark otherwise.
-  // A spent note dims and carries a check.
+  // A spent note dims, carries a check and leaves its group for the
+  // column's foot, where the track's spent notes fold away until asked for.
   import { onDestroy } from 'svelte';
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
@@ -23,7 +24,8 @@
   import { PIGMENTS } from '../legend-lore/palette';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
-  import type { Column, NoteGroup } from './columns';
+  import { CARET_RIGHT } from '../ui/iconPaths';
+  import { folderOrder, type Column, type NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
   export let cols: Column[];
@@ -82,7 +84,22 @@
 
   /** R on the selected note: renamed in its row, if it's one of the grid's. */
   export function rename(path: string) {
-    if (cols.some((c) => c.groups.some((g) => g.notes.some((n) => n.path === path)))) renamingPath = path;
+    const has = (c: Column) => c.groups.some((g) => g.notes.some((n) => n.path === path)) || c.spent.some((n) => n.path === path);
+    if (cols.some(has)) {
+      renamingPath = path;
+      // A spent note renames in its row, so its foot opens.
+      const column = cols.find((c) => c.spent.some((n) => n.path === path));
+      if (column && !openSpent.has(column.track)) toggleSpent(column.track);
+    }
+  }
+
+  // Each track's spent notes, at its foot: folded until asked for, for this
+  // sitting only, as the beat planner's spent group is.
+  let openSpent = new Set<string>();
+  function toggleSpent(track: string) {
+    if (openSpent.has(track)) openSpent.delete(track);
+    else openSpent.add(track);
+    openSpent = openSpent;
   }
 
   // A right-click selects the row, as it focuses one in Legend Lore, so the
@@ -248,7 +265,11 @@
     const boxes = new Map(
       Array.from(list.querySelectorAll<HTMLElement>('[data-path]'), (r) => [r.dataset.path, r.getBoundingClientRect()]),
     );
+    const folderOf = (n: NoteEntry) => (n.group === null ? n.track : `${n.track}/${n.group}`);
     for (const group of cols[i].groups) {
+      // A spent note keeps its place among the notes still to play; it has
+      // none to take there.
+      if (note.spent && folderOf(note) === group.folder) continue;
       const rows = group.notes.map((n) => boxes.get(n.path));
       // A row being renamed has no box: its group takes no drop.
       if (rows.some((r) => !r)) continue;
@@ -303,16 +324,17 @@
       e.preventDefault();
       const notes = slot.group.notes;
       const names = notes.map((n) => n.name);
+      const column = cols.find((c) => c.groups.includes(slot.group))!;
       const from = notes.findIndex((n) => n.path === slot.note.path);
       if (from < 0) {
         names.splice(slot.at, 0, slot.note.name);
-        onMoveNote(slot.note, slot.group.folder, names);
+        onMoveNote(slot.note, slot.group.folder, folderOrder(column, slot.group.folder, names));
         return;
       }
       const to = planMoveTo(from, slot.at);
       if (to === null) return;
       names.splice(to, 0, ...names.splice(from, 1));
-      onReorderNotes(slot.group.folder, names);
+      onReorderNotes(slot.group.folder, folderOrder(column, slot.group.folder, names));
     } else if (note && into !== null) {
       e.preventDefault();
       onMoveNote(note, into);
@@ -358,6 +380,70 @@
     };
   }
 </script>
+
+{#snippet noteRow(note: NoteEntry, grouped: boolean)}
+  {@const renaming = renamingPath === note.path}
+  <button
+    type="button"
+    class="note-row"
+    data-row
+    data-path={note.path}
+    class:open={note.path === openPath}
+    class:selected={note.path === selectedPath}
+    class:hovered={$hoverLive && hovered === note.path}
+    class:grouped={grouped}
+    class:ambiguous={ambiguous(note.name)}
+    class:member={members.has(note.path)}
+    class:in-session={inSession.has(note.path)}
+    class:spent={!!note.spent}
+    class:arming={armed}
+    class:dragging={noteSlot?.note.path === note.path}
+    class:drop-before={lineBefore === note.path}
+    class:drop-after={lineAfter === note.path}
+    aria-pressed={armed ? members.has(note.path) : undefined}
+    title={ambiguous(note.name)
+      ? `Another note is also named “${note.name}”, so links to it are ambiguous`
+      : note.spent
+        ? `${note.name} — spent ${note.spent}`
+        : note.name}
+    use:grab={!renaming}
+    on:dragstart={(e) => startNoteDrag(e, note)}
+    on:dragend={() => {
+      endNoteDrag();
+      // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
+      hovered = null;
+    }}
+    on:click={() => {
+      onSelect(note);
+      if (armed) onToggleMember(note);
+    }}
+    on:dblclick={() => onOpen(note)}
+    on:pointerenter={() => (hovered = note.path)}
+    on:pointerleave={() => leave(note.path)}
+    on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
+  >
+    <span class="slot" aria-hidden="true"></span>
+    <!-- A rename takes the name's place, as in Legend Lore's
+         tree: the row keeps its lamp, rule and marks. A
+         grabbing row would take the press meant for selecting
+         text in the field. -->
+    {#if renaming}
+      <RenameField
+        value={note.name}
+        label="Rename note"
+        onCommit={async (name) => {
+          const refusal = await onRenameNote(note, name);
+          if (!refusal) renamingPath = null;
+          return refusal;
+        }}
+        onCancel={() => (renamingPath = null)}
+      />
+    {:else}
+      <span class="label">{note.name}</span>
+    {/if}
+    {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
+  </button>
+{/snippet}
 
 <div
   class="grid"
@@ -430,67 +516,7 @@
             <div class="group-label" title={group.group}>{group.group}</div>
           {/if}
           {#each group.notes as note (note.path)}
-            {@const renaming = renamingPath === note.path}
-            <button
-              type="button"
-              class="note-row"
-              data-row
-              data-path={note.path}
-              class:open={note.path === openPath}
-              class:selected={note.path === selectedPath}
-              class:hovered={$hoverLive && hovered === note.path}
-              class:grouped={group.group !== null}
-              class:ambiguous={ambiguous(note.name)}
-              class:member={members.has(note.path)}
-              class:in-session={inSession.has(note.path)}
-              class:spent={!!note.spent}
-              class:arming={armed}
-              class:dragging={noteSlot?.note.path === note.path}
-              class:drop-before={lineBefore === note.path}
-              class:drop-after={lineAfter === note.path}
-              aria-pressed={armed ? members.has(note.path) : undefined}
-              title={ambiguous(note.name)
-                ? `Another note is also named “${note.name}”, so links to it are ambiguous`
-                : note.spent
-                  ? `${note.name} — spent ${note.spent}`
-                  : note.name}
-              use:grab={!renaming}
-              on:dragstart={(e) => startNoteDrag(e, note)}
-              on:dragend={() => {
-                endNoteDrag();
-                // A drag delivers no pointerleave: unlatch, as Legend Lore's rows do.
-                hovered = null;
-              }}
-              on:click={() => {
-                onSelect(note);
-                if (armed) onToggleMember(note);
-              }}
-              on:dblclick={() => onOpen(note)}
-              on:pointerenter={() => (hovered = note.path)}
-              on:pointerleave={() => leave(note.path)}
-              on:contextmenu|preventDefault={(e) => noteMenu(e, note)}
-            >
-              <span class="slot" aria-hidden="true"></span>
-              <!-- A rename takes the name's place, as in Legend Lore's
-                   tree: the row keeps its lamp, rule and marks. A
-                   grabbing row would take the press meant for selecting
-                   text in the field. -->
-              {#if renaming}
-                <RenameField
-                  value={note.name}
-                  label="Rename note"
-                  onCommit={async (name) => {
-                    const refusal = await onRenameNote(note, name);
-                    if (!refusal) renamingPath = null;
-                    return refusal;
-                  }}
-                  onCancel={() => (renamingPath = null)}
-                />
-              {:else}
-                <span class="label">{note.name}</span>
-              {/if}
-              {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
-            </button>
+            {@render noteRow(note, group.group !== null)}
           {/each}
         {/each}
 
@@ -519,6 +545,24 @@
           </button>
         {/if}
       </div>
+
+      {#if column.spent.length}
+        {@const open = openSpent.has(column.track)}
+        <div class="spent-dock" class:open>
+          <button type="button" class="spent-head" aria-expanded={open} on:click={() => toggleSpent(column.track)}>
+            <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+            <span class="ledger-label">spent</span>
+            <span class="spent-count">{column.spent.length}</span>
+          </button>
+          {#if open}
+            <div class="spent-notes">
+              {#each column.spent as note (note.path)}
+                {@render noteRow(note, false)}
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </section>
   {/each}
 
@@ -745,6 +789,75 @@
     min-height: 0;
     overflow-y: auto;
     padding: 0.25rem 0.25rem 1rem;
+  }
+
+  /* The track's spent notes, docked at its foot: the beat planner's spent
+     group (BeatColumn .group-head), ruled off the notes still to play as
+     the plate rules them off its name, its rows scrolling inside it. Open,
+     it takes up to half the column. */
+  .spent-dock {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: 50%;
+    padding: 0 0.25rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .spent-dock.open {
+    padding-bottom: 0.25rem;
+  }
+
+  /* A row's height and columns: the caret in the slot's, the label where
+     the note names start, the count where a row's check sits. */
+  .spent-head {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    min-height: 1.65rem;
+    padding: 0.15rem 0.4rem 0.15rem 0.35rem;
+    background: none;
+    border: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  /* The beat planner's caret, at its size, its box narrowed to the
+     slot's column. */
+  .spent-head .caret {
+    flex-shrink: 0;
+    width: 0.7rem;
+    height: 0.7rem;
+    margin: 0 -0.075rem;
+    color: var(--text-tertiary);
+  }
+
+  .spent-head .ledger-label {
+    flex: 1;
+    min-width: 0;
+    transition: color var(--transition-fast);
+  }
+
+  .spent-head:hover .ledger-label,
+  .spent-head:hover .caret {
+    color: var(--text-secondary);
+  }
+
+  /* The group's count (BeatColumn .count). */
+  .spent-count {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-tertiary);
+  }
+
+  .spent-notes {
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .group-label {

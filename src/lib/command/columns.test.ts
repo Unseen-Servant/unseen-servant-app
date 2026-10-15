@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columns, isAmbiguous, linkableNames } from './columns';
+import { columns, folderOrder, isAmbiguous, linkableNames } from './columns';
 import { insertion, openTarget } from './wikilinks';
 import type { CampaignIndex, NoteEntry } from './types';
 
@@ -58,6 +58,38 @@ describe('columns', () => {
       ['NPCs/Barovia', ['Doru']],
       ['NPCs/Vallaki', ['Lady Wachter']],
     ]);
+  });
+
+  it('moves spent notes out of their groups to the track\'s spent list, in grid order', () => {
+    const spent = (path: string) => (n: NoteEntry) => (n.path === path ? { ...n, spent: '2026-10-14' } : n);
+    const played = {
+      ...index,
+      notes: index.notes.map(spent('NPCs/Barovia/Doru.md')).map(spent('NPCs/Session 9.md')),
+    };
+    const npcs = columns(played)[1];
+    // Barovia held only Doru: a group with nothing left to play goes.
+    expect(npcs.groups.map((g) => [g.group, g.notes.map((n) => n.name)])).toEqual([
+      [null, ['ireena', 'Ismark', 'Session 10']],
+      ['Vallaki', ['Lady Wachter']],
+    ]);
+    expect(npcs.spent.map((n) => n.name)).toEqual(['Session 9', 'Doru']);
+    expect(npcs.count).toBe(6);
+  });
+
+  it('keeps a folder\'s spent notes in its saved order, after the ones dragged', () => {
+    const played = {
+      ...index,
+      notes: index.notes.map((n) => (n.name === 'Ismark' ? { ...n, spent: '2026-10-14' } : n)),
+      note_order: { NPCs: ['Ismark', 'Session 10', 'ireena'] },
+    };
+    const npcs = columns(played)[1];
+    expect(folderOrder(npcs, 'NPCs', ['ireena', 'Session 10', 'Session 9'])).toEqual([
+      'ireena',
+      'Session 10',
+      'Session 9',
+      'Ismark',
+    ]);
+    expect(folderOrder(npcs, 'NPCs/Vallaki', ['Lady Wachter'])).toEqual(['Lady Wachter']);
   });
 
   it('leaves Beats, Sessions and loose notes out of the grid but linkable', () => {
