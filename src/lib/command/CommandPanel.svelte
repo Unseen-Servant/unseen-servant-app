@@ -25,7 +25,7 @@
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
-  import { columns, isAmbiguous, linkableNames, type Column } from './columns';
+  import { columns, isAmbiguous, isNewRowKey, linkableNames, type Column } from './columns';
   import { action, choice, divider, heading, type MenuItem, type OpenMenu } from './menu';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
@@ -141,7 +141,7 @@
   $: inSession = index ? sessionNotePaths(index, session) : new Set<string>();
   // A note or beat that left (renamed, moved, trashed) can't stay selected,
   // nor a beat focused or armed.
-  $: if (index && selected && !beatAt(selected) && !index.notes.some((n) => n.path === selected)) selected = null;
+  $: if (index && selected && !isNewRowKey(selected) && !beatAt(selected) && !index.notes.some((n) => n.path === selected)) selected = null;
   $: if (index && focusedBeat && !beatAt(focusedBeat)) focusBeat(null);
 
   // -- running things -----------------------------------------------------
@@ -1021,6 +1021,7 @@
             openPath={bufState.path}
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
+            onSelectNew={(key) => (selected = key)}
             {members}
             {inSession}
             {armed}
@@ -1044,6 +1045,7 @@
             openPath={bufState.path}
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
+            onSelectNew={(key) => (selected = key)}
             {members}
             litBeatName={beatAt(focusedBeat)?.name ?? null}
             {inSession}

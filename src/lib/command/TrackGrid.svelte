@@ -25,7 +25,7 @@
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import { CARET_RIGHT } from '../ui/iconPaths';
-  import { folderOrder, type Column, type NoteGroup } from './columns';
+  import { folderOrder, newRowKey, type Column, type NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
   export let cols: Column[];
@@ -47,6 +47,8 @@
   /** The note last clicked: Legend Lore's focused row. */
   export let selectedPath: string | null;
   export let onSelect: (note: NoteEntry) => void;
+  /** Select a folder's empty row, by its key (columns.ts newRowKey). */
+  export let onSelectNew: (key: string) => void;
   export let onCreateNote: (track: string, name: string) => void;
   /** Resolves the reason a rename was refused, or null when it took. */
   export let onRenameNote: (note: NoteEntry, name: string) => Promise<string | null>;
@@ -82,8 +84,14 @@
     if (hovered === path) hovered = null;
   }
 
-  /** R on the selected note: renamed in its row, if it's one of the grid's. */
+  /** R on the selected note: renamed in its row, if it's one of the grid's;
+   *  on a selected empty row, the new note is named there. */
   export function rename(path: string) {
+    const named = cols.find((c) => newRowKey(c.track) === path);
+    if (named) {
+      creatingIn = named.track;
+      return;
+    }
     const has = (c: Column) => c.groups.some((g) => g.notes.some((n) => n.path === path)) || c.spent.some((n) => n.path === path);
     if (cols.some(has)) {
       renamingPath = path;
@@ -537,9 +545,12 @@
           <button
             type="button"
             class="ghost-row"
-            title="New note"
+            data-row
+            class:selected={selectedPath === newRowKey(column.track)}
+            title="New note — double-click to name it"
             aria-label={`New note in ${column.track}`}
-            on:click={() => (creatingIn = column.track)}
+            on:click={() => onSelectNew(newRowKey(column.track))}
+            on:dblclick={() => (creatingIn = column.track)}
           >
             <span class="slot" aria-hidden="true"></span>
           </button>
@@ -932,7 +943,8 @@
 
   /* The selected row's ring is drawn inside it, on the same last pixel:
      there the ring is the row's rule, or the rule would hide its foot. */
-  .note-row.selected::before {
+  .note-row.selected::before,
+  .ghost-row.selected::before {
     display: none;
   }
 
@@ -1014,7 +1026,8 @@
     background: var(--bg-container);
   }
 
-  .note-row.selected {
+  .note-row.selected,
+  .ghost-row.selected {
     box-shadow: var(--ring-focus);
   }
 

@@ -67,6 +67,11 @@ export function folderOrder(column: Column, folder: string, shown: string[]): st
   return [...shown, ...column.spent.filter((n) => folderOf(n) === folder).map((n) => n.name)];
 }
 
+/** The selection key of a folder's empty row, where a new note is named:
+ *  selected as a note is, by a click, though it's no note. */
+export const newRowKey = (folder: string) => `new:${folder}`;
+export const isNewRowKey = (key: string) => key.startsWith('new:');
+
 /** Every note name in the campaign, alphabetical, for `[[` completion. */
 export function linkableNames(index: CampaignIndex): string[] {
   return [...new Set(index.notes.map((n) => n.name))].sort(byName);

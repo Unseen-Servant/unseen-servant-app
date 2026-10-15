@@ -13,6 +13,7 @@
   import { commandApi } from './api';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
+  import { newRowKey } from './columns';
   import type { CampaignIndex, NoteEntry } from './types';
 
   export let campaign: string;
@@ -30,6 +31,8 @@
   /** The note last clicked: Legend Lore's focused row. */
   export let selectedPath: string | null;
   export let onSelect: (note: NoteEntry) => void;
+  /** Select the shelf's empty row, by its key (columns.ts newRowKey). */
+  export let onSelectNew: (key: string) => void;
   export let onToggleMember: (note: NoteEntry) => void;
   export let onCreate: (name: string) => void;
   /** Resolves the reason a rename was refused, or null when it took. */
@@ -41,6 +44,8 @@
   export let onCopy: (fromCampaign: string, note: NoteEntry) => void;
 
   const SHELF = 'shelf';
+  /** The shelf's folder, as notes are filed into it. */
+  const SHELF_FOLDER = 'Shelf';
   const byName = (a: NoteEntry, b: NoteEntry) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
   const onShelf = (n: NoteEntry) => n.track?.toLowerCase() === SHELF;
@@ -142,8 +147,13 @@
     dropInto = false;
   }
 
-  /** R on the selected note: renamed in its row, if the shelf is showing it. */
+  /** R on the selected note: renamed in its row, if the shelf is showing
+   *  it; on its selected empty row, the new note is named there. */
   export function rename(path: string) {
+    if (!source && path === newRowKey(SHELF_FOLDER)) {
+      creating = true;
+      return;
+    }
     if (!source && [...shelf, ...loose].some((n) => n.path === path)) renamingPath = path;
   }
 
@@ -268,7 +278,16 @@
           />
         </div>
       {:else}
-        <button type="button" class="ghost-row" title="New note" aria-label="New note on the shelf" on:click={() => (creating = true)}>
+        <button
+          type="button"
+          class="ghost-row"
+          data-row
+          class:selected={selectedPath === newRowKey(SHELF_FOLDER)}
+          title="New note — double-click to name it"
+          aria-label="New note on the shelf"
+          on:click={() => onSelectNew(newRowKey(SHELF_FOLDER))}
+          on:dblclick={() => (creating = true)}
+        >
           <span class="slot" aria-hidden="true"></span>
         </button>
       {/if}
@@ -472,7 +491,8 @@
 
   /* The selected row's ring is drawn inside it, on the same last pixel:
      there the ring is the row's rule, or the rule would hide its foot. */
-  .note-row.selected::before {
+  .note-row.selected::before,
+  .ghost-row.selected::before {
     display: none;
   }
 
@@ -548,7 +568,8 @@
     background: var(--bg-container);
   }
 
-  .note-row.selected {
+  .note-row.selected,
+  .ghost-row.selected {
     box-shadow: var(--ring-focus);
   }
 
