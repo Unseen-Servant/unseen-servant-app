@@ -384,6 +384,20 @@
          undo the first. -->
     {#if !renaming}
       <span class="tr" class:engaged={armed || playing}>
+        <!-- Launching is Play's; the live beat's key stops it from here too.
+             Before the arm key, so the arm key sits by the count on every
+             row and only the live one grows a key. -->
+        {#if playing}
+          <button
+            type="button"
+            class="tr-btn playing"
+            aria-pressed="true"
+            title={`Stop ${beat.name}`}
+            on:click={(e) => e.detail <= 1 && onStop()}
+          >
+            <span class="stop-mark" aria-hidden="true"></span>
+          </button>
+        {/if}
         <button
           type="button"
           class="tr-btn"
@@ -396,21 +410,6 @@
             <path d={armed ? CIRCLE : CIRCLE_RING} />
           </svg>
         </button>
-        <!-- Launching is Play's; the live beat's key stops it from here too.
-             Its slot is kept, so the arm key holds still. -->
-        {#if playing}
-          <button
-            type="button"
-            class="tr-btn playing"
-            aria-pressed="true"
-            title={`Stop ${beat.name}`}
-            on:click={(e) => e.detail <= 1 && onStop()}
-          >
-            <span class="stop-mark" aria-hidden="true"></span>
-          </button>
-        {:else}
-          <span class="key-slot" aria-hidden="true"></span>
-        {/if}
       </span>
     {/if}
     <!-- The notes it lights, not its links: an unresolved one lights none. -->
@@ -507,7 +506,6 @@
             <span class="tr-btn armed promise">
               <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor"><path d={CIRCLE} /></svg>
             </span>
-            <span class="key-slot"></span>
           </span>
           {#if seed}
             <span class="row-count">1</span>
@@ -830,8 +828,7 @@
   /* Legend Lore's LED count readout (CollectionsPanel .row-count), so a
      beat's size reads as a collection's. */
   .row-count,
-  .count-slot,
-  .key-slot {
+  .count-slot {
     flex-shrink: 0;
     height: 18px;
     min-width: 18px;
