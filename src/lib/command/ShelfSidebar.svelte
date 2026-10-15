@@ -470,6 +470,12 @@
     pointer-events: none;
   }
 
+  /* The selected row's ring is drawn inside it, on the same last pixel:
+     there the ring is the row's rule, or the rule would hide its foot. */
+  .note-row.selected::before {
+    display: none;
+  }
+
   .label {
     flex: 1;
     min-width: 0;
