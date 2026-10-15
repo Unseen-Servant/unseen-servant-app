@@ -1,7 +1,7 @@
 """Beats, sessions and spent notes (command/prep.py, design §4–§5.1).
 
 Membership and plans are frontmatter lists of links, spent is a date on
-the note; these pin how each is read back, changed, and carried forward.
+the note; these pin how each is read back and changed.
 """
 
 from datetime import date
@@ -116,23 +116,22 @@ def test_create_beat_makes_beats_folder_holds_notes_and_joins_the_plan(tmp_path)
 
 
 # ---------------------------------------------------------------------------
-# Sessions and carry-forward
+# Sessions
 # ---------------------------------------------------------------------------
 
 def test_first_session_starts_empty_and_dated_today(camp):
     made = prep.create_session(camp)
-    assert made == {"path": "Sessions/Session 1.md", "name": "Session 1", "carried": []}
+    assert made == {"path": "Sessions/Session 1.md", "name": "Session 1"}
     assert (camp / "Sessions" / "Session 1.md").read_text() == "---\ndate: 2026-10-18\nbeats: []\n---\n"
 
 
-def test_next_session_carries_unplayed_beats_in_order(camp):
+def test_next_session_plans_nothing(camp):
+    # The last session's unplayed beats wait outside the plan, not in it.
     session(camp, "Session 11", "2026-10-04", ["Ambush"])
     session(camp, "Session 12", "2026-10-11", ["Played", "Tser Pool", "Not written yet", "Ambush"])
     made = prep.create_session(camp)
     assert made["name"] == "Session 13"
-    # Played is spent; a link to no note can't have been played, so it stays.
-    assert made["carried"] == ["Tser Pool", "Not written yet", "Ambush"]
-    assert [r["link"] for r in prep.index(camp)["sessions"][-1]["beats"]] == ["Tser Pool", "Not written yet", "Ambush"]
+    assert prep.index(camp)["sessions"][-1]["beats"] == []
 
 
 def test_session_numbers_skip_names_already_taken(camp):

@@ -107,7 +107,6 @@ pub struct CampaignIndex {
 pub struct NewSession {
     path: String,
     name: String,
-    carried: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

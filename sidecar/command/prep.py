@@ -12,7 +12,7 @@ import re
 from datetime import date
 from pathlib import Path, PurePosixPath
 
-from . import board, log, vault
+from . import log, vault
 from . import frontmatter as fm
 
 BEATS, SESSIONS, SHELF = vault.RESERVED
@@ -163,10 +163,9 @@ def create_beat(campaign: Path, name: str, notes: list[str] = (), session: str |
 
 
 def create_session(campaign: Path) -> dict:
-    """The next session (design §4): `Session N`, dated today, its plan
-    starting with the previous session's beats that aren't spent, and its
-    board with the previous board's cards that aren't. The previous
-    session is the latest by date."""
+    """The next session (design §4): `Session N`, dated today, with nothing
+    planned and no board. The last session's unplayed beats wait outside
+    the plan, not in it."""
     current = index(campaign)
     numbers = [int(m.group()) for s in current["sessions"] if (m := re.search(r"\d+", s["name"]))]
     n = max(numbers, default=0) + 1
@@ -175,18 +174,11 @@ def create_session(campaign: Path) -> dict:
         n += 1
     name = f"Session {n}"
 
-    spent = {x["path"] for x in current["notes"] if x["spent"]}
-    previous = current["sessions"][-1] if current["sessions"] else None
-    # An entry naming no note can't have been spent, so it carries too.
-    carried = [r["link"] for r in previous["beats"] if r["path"] not in spent] if previous else []
-
     rel = vault.create_note(campaign, reserved_folder(campaign, SESSIONS), name)
     text = fm.set_key("", "date", today())
-    text = fm.set_key(text, "beats", [f"[[{link}]]" for link in carried])
+    text = fm.set_key(text, "beats", [])
     vault.atomic_write(campaign / rel, text.encode("utf-8"))
-    if previous:
-        board.carry(campaign, previous["path"], rel, spent)
-    return {"path": rel, "name": name, "carried": carried}
+    return {"path": rel, "name": name}
 
 
 def edit_plan(

@@ -238,7 +238,9 @@ def test_renames_and_moves_rewrite_cards(camp, tmp_path):
     ]
 
 
-def test_a_new_session_carries_the_board_without_spent_cards(camp, monkeypatch):
+def test_a_new_session_starts_without_a_board(camp, monkeypatch):
+    # Its plan starts empty, so the last board's cards would be notes no
+    # beat of it holds.
     monkeypatch.setattr(prep, "today", lambda: date(2026, 10, 18))
     write(camp / "Sessions" / "Session 1.canvas", canvas.dump({"nodes": [
         {"id": "a", "type": "file", "file": "Strahd/NPCs/Ismark.md"},
@@ -248,14 +250,6 @@ def test_a_new_session_carries_the_board_without_spent_cards(camp, monkeypatch):
         {"id": "e1", "fromNode": "a", "toNode": "r"},
         {"id": "e2", "fromNode": "a", "toNode": "t"},
     ]}))
-    created = prep.create_session(camp)
-    carried = canvas.parse(board_text(camp, created["path"]))
-    assert [n["id"] for n in carried["nodes"]] == ["a", "t"]
-    assert [e["id"] for e in carried["edges"]] == ["e2"]
-
-
-def test_a_new_session_after_one_without_a_board_has_none(camp, monkeypatch):
-    monkeypatch.setattr(prep, "today", lambda: date(2026, 10, 18))
     created = prep.create_session(camp)
     assert not (camp / created["path"]).with_suffix(".canvas").exists()
 

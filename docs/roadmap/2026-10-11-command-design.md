@@ -12,7 +12,7 @@
 - **The vault is folders of Markdown, and nothing else is truth.** A campaign is a folder in a user-chosen root, a track is a folder in the campaign, a note is any `.md` file in a track. Beats and sessions are notes too. Open the root in Obsidian and everything reads, links and edits.
 - **References are `[[wikilinks]]` by note name**, in frontmatter lists Command owns: a beat lists its notes, a session lists its beats. Nothing stores ids, paths or copies.
 - **Play state never touches notes.** What's live is sidecar state; only story facts are written: a note marked spent, the session log, a captured beat.
-- **Spent replaces carry-forward for notes.** Any note can be spent (secret revealed, treasure given, beat played, NPC dead); an unspent note is simply still bright next session. Only a session's plan carries forward: a new session starts with the previous one's unspent beats.
+- **Spent replaces carry-forward for notes.** Any note can be spent (secret revealed, treasure given, beat played, NPC dead); an unspent note is simply still bright next session. Nothing carries forward, plans included: a new session plans nothing, and the last one's unspent beats wait under *not in this session* (2026-10-15; it used to start with them).
 - **The campaign is the unit**, as a project folder is Live's: everything a campaign uses lives in its folder, so the folder is complete on its own. Gathered material waits on the campaign's shelf (§3.6); reuse across campaigns is copying from another campaign.
 - **Same app, same look.** A panel per `src/lib/shell/PANELS.md`; vault I/O and state in `sidecar/command/` (architecture D2, §4 Q4); one sidecar event stream relayed by Rust to every window; Legend Lore's vocabulary (arm, play, pigments, lamps, dim) means the same thing here.
 
@@ -184,7 +184,7 @@ Prep notes, reminders…
 
 **Lifecycle**
 
-1. **`[new session]`** creates `Sessions/Session N.md` — N one more than the highest number in an existing session's name; renameable afterwards — with `date` set to today, and makes it the active session (`src-tauri/src/app_context.rs`). Its plan starts with the previous session's planned beats that aren't spent, in their order. The previous session is the latest by `date`. Its board starts as a copy of the previous board, without the cards of spent notes and their connections. Renaming a session renames its board, and trashing a session trashes its board.
+1. **`[new session]`** creates `Sessions/Session N.md` — N one more than the highest number in an existing session's name; renameable afterwards — with `date` set to today, and makes it the active session (`src-tauri/src/app_context.rs`). It plans nothing, and has no board until the GM arranges one (2026-10-15): every beat starts out spent or not in this session, so a copied board's cards would be notes no beat of it holds. Until then its plan started with the previous session's unspent beats and its board as a copy of the previous one. Renaming a session renames its board, and trashing a session trashes its board.
 2. **Prep** edits the plan (add, remove, reorder beats) and the beats themselves. Beats in no plan stay in `Beats/` as potential scenes and can be pulled into one.
 3. **Play** appends to the log as things happen: a beat launched (`▶`), a note spent or un-spent, an improvised beat captured, a one-line jot.
 4. **There is no end-of-session state.** A session with a log has been played. The live set persists until something else is launched, so a session that stops on a cliffhanger resumes there.

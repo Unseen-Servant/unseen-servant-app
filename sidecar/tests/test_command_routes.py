@@ -114,7 +114,7 @@ def test_prep_round_trip_over_http(cmd, campaign_root, monkeypatch):
     monkeypatch.setattr(prep, "today", lambda: date(2026, 10, 18))
     cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Ismark"})
     made = cmd.post("/api/command/sessions", json={"campaign": "Strahd"}).json()
-    assert made == {"path": "Sessions/Session 1.md", "name": "Session 1", "carried": []}
+    assert made == {"path": "Sessions/Session 1.md", "name": "Session 1"}
 
     beat = cmd.post("/api/command/beats", json={
         "campaign": "Strahd", "name": "Ambush", "notes": ["NPCs/Ismark.md"], "session": made["path"],

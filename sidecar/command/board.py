@@ -197,27 +197,6 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
 # Following the session
 # ---------------------------------------------------------------------------
 
-def carry(campaign: Path, previous: str, session: str, spent: set[str]) -> bool:
-    """Start ``session``'s board as a copy of ``previous``'s, without the
-    cards of spent notes and their lines (design §4). False when there was
-    nothing to copy — no board, or one Command can't read."""
-    source = board_file(campaign, previous)
-    if not source.exists():
-        return False
-    try:
-        board, final_newline = _load(source)
-    except vault.Invalid:
-        return False
-    gone = {
-        n.get("id") for n in board["nodes"]
-        if n.get("type") == "file" and note_of(campaign, n.get("file")) in spent
-    }
-    board["nodes"] = [n for n in board["nodes"] if n.get("id") not in gone]
-    board["edges"] = [e for e in board["edges"] if not {e.get("fromNode"), e.get("toNode")} & gone]
-    vault.atomic_write(board_file(campaign, session), canvas.dump(board, final_newline).encode("utf-8"))
-    return True
-
-
 def follow_rename(campaign: Path, old: str, new: str) -> str | None:
     """After the session note ``old`` became ``new``, rename its board to
     match. Returns the board's new path, or None if nothing moved."""

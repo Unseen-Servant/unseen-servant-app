@@ -57,7 +57,7 @@
         <div class="setting-row-head">
           <div class="setting-row-title">Spend beats on launch</div>
           <div class="setting-row-desc">
-            Launching a beat marks it spent, so it isn't carried into the next session. Off, you tick
+            Launching a beat marks it spent, so later sessions find it among the spent beats, not those still to play. Off, you tick
             beats off by hand.
           </div>
         </div>

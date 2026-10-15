@@ -71,7 +71,6 @@ export interface CampaignIndex {
 export interface NewSession {
   path: string;
   name: string;
-  carried: string[];
 }
 
 export interface Note {
