@@ -20,7 +20,8 @@ export const editorTheme = EditorView.theme(
       lineHeight: '1.55',
     },
     '.cm-content': {
-      padding: '0.75rem 1rem 3rem',
+      // Left at the inspector plate's inset, so the path sits over the text.
+      padding: '0.75rem 1rem 3rem 1.1rem',
       caretColor: 'var(--text-accent)',
     },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-accent)' },

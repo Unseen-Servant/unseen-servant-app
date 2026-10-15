@@ -1074,55 +1074,74 @@
              land in; closed, it gives the grid its width back. -->
         <aside class="inspector" class:closed={bufState.status === 'empty'}>
           {#if bufState.status !== 'empty'}
-            <div class="inspector-head">
-              <!-- The title is the note's name field, as Obsidian's inline title:
-                   any note renames here, a beat or a session included. Not
-                   while the disk and the editor disagree. -->
-              {#if renamingOpen && bufState.path}
-                {@const path = bufState.path}
-                <div class="note-name-field">
-                  <RenameField
-                    value={openName}
-                    placeholder="Note name"
-                    label="Rename note"
-                    onCommit={async (name) => {
-                      const refusal = await renameNote({ name: openName, path }, name);
-                      if (!refusal) renamingOpen = false;
-                      return refusal;
-                    }}
-                    onCancel={() => (renamingOpen = false)}
-                  />
-                </div>
-              {:else}
-                <button
-                  type="button"
-                  class="note-name"
-                  title="Rename"
-                  disabled={!renamable}
-                  on:click={() => (renamingOpen = true)}
-                >{openName}</button>
+            <!-- Legend Lore's inspector plate (InspectorPlate), level with the
+                 track and beat plates across the seam: where the note lives
+                 (its track, the pigment standing where the system's shield
+                 does), the group › name path, and the plate's bracketed
+                 actions, so the text below gets the pane's height. Spent
+                 is a readout here; the rows' menus mark it. -->
+            <div class="inspector-plate nameplate">
+              <div class="line">
+                {#if openEntry?.track}
+                  {@const pigment = index?.pigments[openEntry.track]}
+                  <span class="source">
+                    {#if pigment}<span class="swatch" style:background={pigment} aria-hidden="true"></span>{/if}
+                    <span class="source-track">{openEntry.track}</span>
+                  </span>
+                  <span class="rule" aria-hidden="true"></span>
+                {/if}
+                <span class="path">
+                  {#if openEntry?.group}
+                    <span class="path-head">
+                      <span class="segment">{openEntry.group}</span>
+                      <span class="sep" aria-hidden="true">›</span>
+                    </span>
+                  {/if}
+                  <!-- The title is the note's name field, as Obsidian's inline
+                       title: any note renames here, a beat or a session
+                       included. Not while the disk and the editor disagree. -->
+                  {#if renamingOpen && bufState.path}
+                    {@const path = bufState.path}
+                    <span class="note-name-field">
+                      <RenameField
+                        value={openName}
+                        placeholder="Note name"
+                        label="Rename note"
+                        onCommit={async (name) => {
+                          const refusal = await renameNote({ name: openName, path }, name);
+                          if (!refusal) renamingOpen = false;
+                          return refusal;
+                        }}
+                        onCancel={() => (renamingOpen = false)}
+                      />
+                    </span>
+                  {:else}
+                    <button
+                      type="button"
+                      class="note-name"
+                      title="Rename"
+                      disabled={!renamable}
+                      on:click={() => (renamingOpen = true)}
+                    >{openName}</button>
+                  {/if}
+                </span>
+              </div>
+              {#if openEntry?.spent}
+                <span class="readout">spent {openEntry.spent}</span>
               {/if}
-              {#if openEntry?.track}
-                <span class="crumb">{[openEntry.track, openEntry.group].filter(Boolean).join(' › ')}</span>
+              {#if STATUS_TEXT[bufState.status]}
+                <span class="readout">{STATUS_TEXT[bufState.status]}</span>
               {/if}
-              <span class="save-state">{STATUS_TEXT[bufState.status] ?? ''}</span>
               {#if openEntry?.source}
                 {@const source = openEntry.source}
-                <ActionButton label="source" title="Open the book this came from, at its page" onClick={() => void openUrl(source).catch((e) => (error = String(e)))} />
+                <button
+                  type="button"
+                  class="plate-btn"
+                  title="Open the book this came from, at its page"
+                  on:click={() => void openUrl(source).catch((e) => (error = String(e)))}
+                >source</button>
               {/if}
-              {#if openEntry}
-                {@const note = openEntry}
-                <label class="spent-toggle" title={note.spent ? `Spent ${note.spent}` : 'Mark spent'}>
-                  <input
-                    type="checkbox"
-                    class="app-checkbox"
-                    checked={!!note.spent}
-                    on:change={(e) => setSpent(note, e.currentTarget.checked)}
-                  />
-                  spent
-                </label>
-              {/if}
-              <ActionButton label="close" title="Close the note" onClick={() => run(() => buffer.close())} />
+              <button type="button" class="plate-btn" title="Close the note" on:click={() => run(() => buffer.close())}>close</button>
             </div>
             {#if bufState.status === 'conflict'}
               <div class="notice" role="alert">
@@ -1439,29 +1458,119 @@
     display: none;
   }
 
-  .inspector-head {
+  /* InspectorPlate's, at the track plates' height and inset (TrackGrid
+     .nameplate) and ruled below as they are. Padded on the left to the
+     text's inset (editorTheme .cm-content), so the path starts over the
+     note it names. */
+  .inspector-plate {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.2rem 0.9rem 0.15rem 1.1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: var(--font-body);
+  }
+
+  /* One baseline for the track and the path, as InspectorPlate .line:
+     centring each in its own box lets Crimson and Almendra drift apart. */
+  .line {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: baseline;
     gap: 0.6rem;
-    padding: 0.55rem 0.75rem 0.4rem 1rem;
-    border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* The pad and its negative margin let the hover fill reach past the
-     letters while the name stays put. */
-  .note-name {
+  /* The track, in the row voice InspectorPlate gives the book and system. */
+  .source {
+    flex: 0 0 auto;
+    max-width: 10rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .source-track {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* The track's pigment, square as its plate (no glow: it names the
+     track, it isn't lit), where the system's shield stands in Legend Lore. */
+  .swatch {
+    flex-shrink: 0;
+    align-self: center;
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-cell);
+  }
+
+  /* The scope bar's master rule, between the track and the path. */
+  .rule {
+    flex-shrink: 0;
+    align-self: center;
+    width: 1px;
+    height: 12px;
+    background: var(--bg-category);
+  }
+
+  /* One line, and the name keeps its full width: only the group gives way
+     (InspectorPlate .path; no shrink ratios, WebKit doesn't honour them). */
+  .path {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    overflow: hidden;
     white-space: nowrap;
-    margin-left: -0.3rem;
-    padding: 0 0.3rem;
+  }
+
+  .path-head {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    overflow: hidden;
+    font-size: 0.75rem;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+  }
+
+  .segment {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sep {
+    flex-shrink: 0;
+    margin: 0 0.3rem;
+    color: var(--text-tertiary);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* The leaf, InspectorPlate's .title. The pad and its negative margin let
+     the hover fill reach past the letters while the name stays put. */
+  .note-name {
+    flex: 0 0 auto;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-left: -0.2rem;
+    padding: 0 0.2rem;
     background: none;
     border: none;
     border-radius: var(--radius-sm);
     font-family: var(--font-heading);
-    font-size: 1.1rem;
+    font-size: 0.8rem;
     color: var(--text-primary);
     text-align: left;
     cursor: text;
@@ -1483,30 +1592,19 @@
     min-width: 0;
     max-width: 22rem;
     font-family: var(--font-heading);
-    font-size: 1.1rem;
-  }
-
-  .crumb {
-    flex-shrink: 0;
     font-size: 0.8rem;
-    color: var(--text-tertiary);
   }
 
-  .save-state {
+  .readout {
     flex-shrink: 0;
-    margin-left: auto;
     font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
     color: var(--text-tertiary);
   }
 
-  .spent-toggle {
+  .inspector-plate .plate-btn {
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    cursor: pointer;
+    white-space: nowrap;
   }
 
   .notice {
@@ -1515,7 +1613,7 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.6rem;
-    padding: 0.4rem 1rem;
+    padding: 0.4rem 1.1rem;
     font-size: 0.85rem;
     color: var(--text-danger);
     border-bottom: 1px solid var(--border-subtle);
