@@ -876,6 +876,9 @@
        border stays full-bleed because this is padding, not margin. */
     padding-right: 1rem;
     border-bottom: 1px solid var(--border-subtle);
+    /* A list row's height, its rule included, as the plates and rows
+       around it (.nameplate). */
+    min-height: 1.65rem;
   }
   /* The untagged bucket is a bucket, not an identity: grey, never the
      parchment fallback that uncolored real systems get. */
