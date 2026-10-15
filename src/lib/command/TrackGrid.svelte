@@ -633,8 +633,8 @@
     background: var(--pigment);
   }
 
-  /* Bold, Almendra's own cut: ink on a pigment reads thinner than grey
-     on the plate. */
+  /* Bold, the faces' own cuts (Almendra, Crimson): ink on a pigment reads
+     thinner than grey on the plate. */
   .nameplate.pigmented .track-name {
     color: var(--text-inverse);
     font-weight: 700;
@@ -642,6 +642,7 @@
 
   .nameplate.pigmented .track-number {
     color: color-mix(in srgb, var(--text-inverse) 70%, transparent);
+    font-weight: 700;
   }
 
   /* The count keeps its badge whatever the plate: its wash mixed onto the
