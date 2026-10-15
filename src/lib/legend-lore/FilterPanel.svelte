@@ -628,9 +628,12 @@
     margin-top: 0.35rem;
     padding: 0.2rem 0.25rem 0.2rem calc(0.3rem + 3px);
   }
+  /* A list row's height (.row), centred in it, as the systems view's
+     group heads: a section head is a row you click. */
   .sect-toggle {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    min-height: 1.65rem;
     width: 100%;
     background: none;
     border: none;
@@ -667,8 +670,8 @@
   .sect-split .reset-link {
     margin-left: 0.4rem;
   }
-  /* The toggle aligns on baseline, which for an <svg> is its bottom edge;
-     centre it instead. The margin restores the old text arrow's gap. */
+  /* Centred with the label, as the toggle centres everything; the margin
+     restores the old text arrow's gap. */
   .sect-arrow {
     align-self: center;
     margin-right: 0.3rem;

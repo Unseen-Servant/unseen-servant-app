@@ -164,7 +164,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.1rem 0.35rem;
+    padding: 0.15rem 0.35rem;
     /* Square, as Legend Lore's collection rows: a radius bends the rule. */
     border-left: 3px solid transparent;
     font-size: 0.9rem;

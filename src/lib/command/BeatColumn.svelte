@@ -603,9 +603,12 @@
   /* A group's title, the fold toggle of Legend Lore's filter sections
      (FilterPanel .sect-toggle): the caret, what the group holds, and how
      many over the rows' counts. Hover is a step up the text ramp, as there. */
+  /* A note row's height, centred in it: a group head is a row you click,
+     as Legend Lore's section heads (FilterPanel .sect-toggle). */
   .group-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    min-height: 1.65rem;
     gap: 0.3rem;
     width: 100%;
     margin: 0.2rem 0 0.05rem;
@@ -631,8 +634,7 @@
     transition: color var(--transition-fast);
   }
 
-  /* The label's size; centred, since an <svg> sits on the baseline by its
-     bottom edge (FilterPanel .sect-arrow). */
+  /* The label's size, centred with it (FilterPanel .sect-arrow). */
   .group-head .caret {
     align-self: center;
     width: 0.7rem;
@@ -669,7 +671,7 @@
     align-items: center;
     gap: 0.3rem;
     width: 100%;
-    padding: 0.1rem 0.35rem;
+    padding: 0.15rem 0.35rem;
     border: none;
     /* Legend Lore's rule slot (CollectionsPanel .row-container), reserved so
        arming or launching doesn't shift the row. Square, as its rows are:
