@@ -546,23 +546,27 @@
         {/if}
       </div>
 
-      {#if column.spent.length}
-        {@const open = openSpent.has(column.track)}
-        <div class="spent-dock" class:open>
-          <button type="button" class="spent-head" aria-expanded={open} on:click={() => toggleSpent(column.track)}>
-            <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-            <span class="ledger-label">spent</span>
-            <span class="spent-count">{column.spent.length}</span>
-          </button>
-          {#if open}
-            <div class="spent-notes">
-              {#each column.spent as note (note.path)}
-                {@render noteRow(note, false)}
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
+      <!-- Every track has its foot, spent notes or none, so the columns
+           end alike. -->
+      <div class="spent-dock">
+        <button
+          type="button"
+          class="spent-head"
+          aria-expanded={openSpent.has(column.track)}
+          on:click={() => toggleSpent(column.track)}
+        >
+          <svg class="caret" class:open={openSpent.has(column.track)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+          <span class="ledger-label">spent</span>
+          <span class="spent-count">{column.spent.length}</span>
+        </button>
+        {#if openSpent.has(column.track) && column.spent.length}
+          <div class="spent-notes">
+            {#each column.spent as note (note.path)}
+              {@render noteRow(note, false)}
+            {/each}
+          </div>
+        {/if}
+      </div>
     </section>
   {/each}
 
@@ -805,10 +809,6 @@
     border-top: 1px solid var(--border-subtle);
   }
 
-  .spent-dock.open {
-    padding-bottom: 0.25rem;
-  }
-
   /* A row's height and columns: the caret in the slot's, the label where
      the note names start, the count where a row's check sits. */
   .spent-head {
@@ -858,6 +858,7 @@
   .spent-notes {
     min-height: 0;
     overflow-y: auto;
+    padding-bottom: 0.25rem;
   }
 
   .group-label {
