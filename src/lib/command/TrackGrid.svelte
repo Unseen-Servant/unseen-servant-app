@@ -94,7 +94,7 @@
   }
 
   // Each track's spent notes, at its foot: folded until asked for, for this
-  // sitting only, as the beat planner's spent group is.
+  // sitting only, as the session planner's spent group is.
   let openSpent = new Set<string>();
   function toggleSpent(track: string) {
     if (openSpent.has(track)) openSpent.delete(track);
@@ -797,7 +797,7 @@
     padding: 0 0.25rem 1rem;
   }
 
-  /* The track's spent notes, docked at its foot: the beat planner's spent
+  /* The track's spent notes, docked at its foot: the session planner's spent
      group (BeatColumn .group-head), ruled off the notes still to play as
      the plate rules them off its name, its rows scrolling inside it. Open,
      it takes up to half the column. */
@@ -828,7 +828,7 @@
     cursor: pointer;
   }
 
-  /* The beat planner's caret, at its size, its box narrowed to the
+  /* The session planner's caret, at its size, its box narrowed to the
      slot's column. */
   .spent-head .caret {
     flex-shrink: 0;

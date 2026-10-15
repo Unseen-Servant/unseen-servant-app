@@ -441,9 +441,9 @@
   </button>
 {/snippet}
 
-<section class="beats" aria-label="Beats">
+<section class="beats" aria-label="Session planner">
   <header class="nameplate">
-    <span class="ledger-label title">beat planner</span>
+    <span class="ledger-label title">session planner</span>
   </header>
 
   <div class="list" role="presentation" on:dragover={overList} on:dragleave={leaveList}>
