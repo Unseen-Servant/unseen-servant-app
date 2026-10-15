@@ -971,8 +971,8 @@
         <LatchKey
           open={beatsOpen}
           lit={armed || !!live?.beat}
-          title={beatsOpen ? 'Hide the beats' : 'Show the beats'}
-          label="Toggle the beats"
+          title={beatsOpen ? 'Hide the beat planner' : 'Show the beat planner'}
+          label="Toggle the beat planner"
           onClick={toggleBeats}
         >
           <!-- Font Awesome "list-ol" icon (src/lib/ui/icons/list-ol-solid-full.svg) -->

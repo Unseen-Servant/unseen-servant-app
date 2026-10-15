@@ -443,7 +443,7 @@
 
 <section class="beats" aria-label="Beats">
   <header class="nameplate">
-    <span class="ledger-label title">beats</span>
+    <span class="ledger-label title">beat planner</span>
   </header>
 
   <div class="list" role="presentation" on:dragover={overList} on:dragleave={leaveList}>
