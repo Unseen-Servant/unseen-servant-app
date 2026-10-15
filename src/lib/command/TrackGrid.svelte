@@ -18,7 +18,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
-  import { action, divider, heading, keyed, picks, type OpenMenu } from './menu';
+  import { action, divider, keyed, picks, submenu, type OpenMenu } from './menu';
   import { PIGMENTS } from '../legend-lore/palette';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
@@ -98,9 +98,11 @@
       items: [
         action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
         divider,
-        heading('move to'),
-        ...others.map((t) => action(t, () => onMoveNote(note, t))),
-        action('Shelf', () => onMoveNote(note, 'Shelf')),
+        // In the columns' order: the shelf at the left, then the tracks.
+        submenu('Move to', [
+          action('Shelf', () => onMoveNote(note, 'Shelf')),
+          ...others.map((t) => action(t, () => onMoveNote(note, t))),
+        ]),
         divider,
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
         action('Show in Finder', () => onRevealNote(note)),

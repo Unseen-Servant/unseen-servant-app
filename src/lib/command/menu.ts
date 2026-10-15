@@ -9,6 +9,9 @@ export type MenuItem =
   // `picks`: choices side by side in one row, each a swatch of the plate it
   // fills (null for none), its name only a tooltip (app.css .menu-picks).
   | { kind: 'picks'; label: string; picks: Pick[] }
+  // `submenu`: a row that opens its actions beside the menu, as Legend
+  // Lore's Send to Command does.
+  | { kind: 'submenu'; label: string; items: MenuItem[] }
   | { kind: 'divider' };
 
 export interface Pick {
@@ -46,4 +49,5 @@ export const choice = (label: string, on: boolean, run: () => void): MenuItem =>
   lamp: on,
 });
 export const picks = (label: string, picks: Pick[]): MenuItem => ({ kind: 'picks', label, picks });
+export const submenu = (label: string, items: MenuItem[]): MenuItem => ({ kind: 'submenu', label, items });
 export const divider: MenuItem = { kind: 'divider' };
