@@ -13,6 +13,7 @@
   import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from '../ui/menuGeometry';
+  import { grab } from '../ui/grab';
   import { orderCollections, transportNames } from './collectionOrder';
 
   export let collections: Record<string, CollectionInfo> = {};
@@ -774,7 +775,7 @@
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
           title={col.description || col.name}
           data-cp-row={col.name}
-          draggable={canDrag && !isRenamingRow}
+          use:grab={canDrag && !isRenamingRow}
           on:pointerenter={() => (hoveredRowName = col.name)}
           on:pointerleave={() => leaveRow(col.name)}
           on:dragstart={(e) => handleDragStart(e, col.name)}

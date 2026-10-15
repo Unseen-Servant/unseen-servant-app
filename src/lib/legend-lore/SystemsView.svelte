@@ -17,6 +17,7 @@
   import { markName, markPath, nameMatches, pathMatches } from './nameFilter';
   import { renameTarget } from './renameTarget';
   import RenameField from '../ui/RenameField.svelte';
+  import { grab } from '../ui/grab';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -28,7 +29,7 @@
 
   // Capture-phase press recording: the chips' bubble-phase
   // stopPropagation runs after this, so the row always sees the true
-  // press target. dragstart's own target is the draggable li (the
+  // press target. dragstart's own target is the grabbed li (the
   // drag source node per the HTML spec), never the pressed chip — the
   // guard has to remember the press instead.
   let pressedControl = false;
@@ -39,7 +40,7 @@
 
   function handleDragStart(event: DragEvent, entry: FileStatusEntry) {
     // No drag from the console switches or the curation checkbox — the
-    // tree gets this structurally (draggable sits on a sibling of its
+    // tree gets this structurally (the grab sits on a sibling of its
     // cluster); here the li itself is the drag source, so bail when the
     // press began on one.
     if (pressedControl) {
@@ -750,7 +751,7 @@
                 class:out-of-scope={rowOutOfScope && !groupDimmed && !rowHidden}
                 class:hovered={$hoverLive && hoveredRow === rowHoverKey(group.tag, entry.path)}
                 data-sv-row={entry.path}
-                draggable={renamingFilePath !== entry.path}
+                use:grab={renamingFilePath !== entry.path}
                 on:dragstart={(e) => handleDragStart(e, entry)}
                 on:dragend={() => { clearTreePathsPayload(); clearHover(); }}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}

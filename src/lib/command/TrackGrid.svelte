@@ -17,6 +17,7 @@
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
+  import { grab } from '../ui/grab';
   import CommandMenu from './CommandMenu.svelte';
   import { action, divider, keyed, picks, submenu, type OpenMenu } from './menu';
   import { PIGMENTS } from '../legend-lore/palette';
@@ -381,7 +382,7 @@
         class="nameplate"
         class:pigmented={!!pigments[column.track]}
         style:--pigment={pigments[column.track]}
-        draggable={renamingTrack !== column.track}
+        use:grab={renamingTrack !== column.track}
         on:dragstart={(e) => startTrackDrag(e, column.track)}
         on:contextmenu={(e) => {
           // The whole plate is the track's; while it's renamed, the field
@@ -453,7 +454,7 @@
                 : note.spent
                   ? `${note.name} — spent ${note.spent}`
                   : note.name}
-              draggable={!renaming}
+              use:grab={!renaming}
               on:dragstart={(e) => startNoteDrag(e, note)}
               on:dragend={() => {
                 endNoteDrag();
@@ -472,7 +473,8 @@
               <span class="slot" aria-hidden="true"></span>
               <!-- A rename takes the name's place, as in Legend Lore's
                    tree: the row keeps its lamp, rule and marks. A
-                   draggable row would kill selecting text in the field. -->
+                   grabbing row would take the press meant for selecting
+                   text in the field. -->
               {#if renaming}
                 <RenameField
                   value={note.name}

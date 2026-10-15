@@ -17,6 +17,7 @@
   import { draggedNote, isNoteDrag } from './noteDrag';
   import { memberPaths, planMoveTo, type PlanRow } from './prep';
   import type { BeatEntry, NoteEntry } from './types';
+  import { grab } from '../ui/grab';
 
   export let rows: PlanRow[];
   /** Beats no plan of the session holds, spent ones included. */
@@ -332,7 +333,7 @@
     class:drop-before={row ? dropSlot === row.at : dropSpare !== null && shown[dropSpare] === beat}
     class:drop-after={!row && dropSpare === shown.length && shown[shown.length - 1] === beat}
     class:drop-into={dropInto === beat.path}
-    draggable={!renaming}
+    use:grab={!renaming}
     on:dragstart={(e) => startBeatDrag(e, row ?? beat, beat.name)}
     on:dragend={endBeatDrag}
     on:dragover={(e) => {
@@ -350,7 +351,7 @@
   >
     <!-- A rename takes the name's place, as in Legend Lore's collections:
          the row keeps its rule, mark and count, and only the keys step
-         aside. A draggable row would kill selecting text in the field. -->
+         aside. A grabbing row would take the press meant for selecting text in the field. -->
     {#if renaming}
       <RenameField
         value={beat.name}
@@ -465,7 +466,7 @@
             class:dragging={dragging === row}
             class:drop-before={dropSlot === row.at}
             title={`No beat is named “${row.link}” yet — click to write it`}
-            draggable="true"
+            use:grab
             on:dragstart={(e) => startBeatDrag(e, row, row.link)}
             on:dragend={endBeatDrag}
             on:dragover={(e) => overSlot(e, row.at)}

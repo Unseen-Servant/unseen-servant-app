@@ -16,6 +16,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
+  import { grab } from '../ui/grab';
 
   export let item: FileItem;
   export let level: number = 0;
@@ -290,13 +291,13 @@
       aria-checked={boxMixed ? 'mixed' : boxOn}
     ></button>
 
-    <!-- Draggable on .row, not .row-container: the checkbox and the S/M
+    <!-- Grabbed by .row, not .row-container: the checkbox and the S/M
          buttons are siblings, so no drag can start from them. Never while
-         renaming — a draggable ancestor kills text selection inside a
-         descendant input in WebKit. -->
+         renaming — a grab would take the press meant for selecting text
+         in the field. -->
     <button
       class="row"
-      draggable={hasIndexedMaterial && !isRenaming}
+      use:grab={hasIndexedMaterial && !isRenaming}
       on:dragstart={handleDragStart}
       on:dragend={() => { clearTreePathsPayload(); hovered = false; }}
       on:click={handleRowClick}

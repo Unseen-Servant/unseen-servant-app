@@ -9,6 +9,7 @@
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
+  import { grab } from '../ui/grab';
   import { commandApi } from './api';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
@@ -190,7 +191,7 @@
     class:arming={armed}
     aria-pressed={armed ? members.has(note.path) : undefined}
     title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
-    draggable={!renaming}
+    use:grab={!renaming}
     on:dragstart={(e) => startNoteDrag(e, note)}
     on:dragend={() => {
       endNoteDrag();

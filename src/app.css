@@ -193,6 +193,15 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* A drag held by hand (ui/grab.ts): the closed hand wherever it goes, over
+   every row's own pointer, and no text caught up on the way. */
+html.grabbing,
+html.grabbing * {
+  cursor: grabbing !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* --- Scrollbar --- */
 
 /* Height is a horizontal bar's thickness: without it WebKit draws those at
