@@ -671,7 +671,9 @@
     align-items: center;
     gap: 0.3rem;
     width: 100%;
-    padding: 0.15rem 0.35rem;
+    /* The name starts under the group heads' label: their inset (3px -
+       0.1rem) plus the caret's box and gap (1rem), less the rule's 3px. */
+    padding: 0.15rem 0.35rem 0.15rem 0.9rem;
     border: none;
     /* Legend Lore's rule slot (CollectionsPanel .row-container), reserved so
        arming or launching doesn't shift the row. Square, as its rows are:
@@ -898,7 +900,7 @@
   .ghost-keys {
     display: flex;
     gap: 0.75rem;
-    padding: 0.2rem 0.35rem 0.35rem calc(0.35rem + 3px);
+    padding: 0.2rem 0.35rem 0.35rem calc(0.9rem + 3px);
   }
 
   .ghost-keys kbd {
@@ -913,7 +915,7 @@
   }
 
   .empty-hint {
-    padding: 0.3rem 0.35rem 0.5rem calc(0.35rem + 3px);
+    padding: 0.3rem 0.35rem 0.5rem calc(0.9rem + 3px);
   }
 
   /* Under a drag, as Legend Lore's collections panel: the dragged row fades,
