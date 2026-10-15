@@ -400,7 +400,9 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 0.25rem 0.25rem 1rem;
+    /* Flush under the plate, as the tracks' first notes are, so the
+       shelf's rows line up with theirs. */
+    padding: 0 0.25rem 1rem;
   }
 
   .section-head {

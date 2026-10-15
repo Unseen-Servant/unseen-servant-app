@@ -788,11 +788,13 @@
     color: var(--text-accent);
   }
 
+  /* The first note sits flush under the plate, as a ledger's first
+     line under its heading. */
   .notes {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 0.25rem 0.25rem 1rem;
+    padding: 0 0.25rem 1rem;
   }
 
   /* The track's spent notes, docked at its foot: the beat planner's spent
