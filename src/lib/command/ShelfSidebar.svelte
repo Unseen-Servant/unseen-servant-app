@@ -268,7 +268,8 @@
         <div class="row-edit naming">
           <span class="slot" aria-hidden="true"></span>
           <InlineName
-            placeholder="Name"
+            bare
+            placeholder="Note name…"
             label="New note on the shelf"
             onCommit={(name) => {
               creating = false;
@@ -625,10 +626,28 @@
     padding-right: 0.4rem;
   }
 
-  /* As the grid's (TrackGrid .row-edit.naming): the field is a note row's
-     height on its own. */
+  /* As the grid's (TrackGrid .row-edit.naming): a note row's padding
+     around the bare field's line, and dressed as the open note it
+     becomes. */
   .row-edit.naming {
-    padding-block: 0;
+    padding-block: 0.15rem;
+  }
+
+  .row-edit.naming {
+    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
+    box-shadow: var(--ring-focus), inset 2px 0 0 var(--text-accent);
+  }
+
+  .row-edit.naming::before {
+    display: none;
+  }
+
+  .row-edit.naming :global(.inline-name) {
+    color: var(--text-accent);
+  }
+
+  .row-edit.naming :global(.inline-name::placeholder) {
+    font-style: italic;
   }
 
   /* The grid's empty row (TrackGrid .ghost-row): a nameless note row whose

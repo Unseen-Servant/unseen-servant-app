@@ -532,7 +532,8 @@
           <div class="row-edit naming">
             <span class="slot" aria-hidden="true"></span>
             <InlineName
-              placeholder="Name"
+              bare
+              placeholder="Note name…"
               label={`New note in ${column.track}`}
               onCommit={(name) => {
                 creatingIn = null;
@@ -1104,10 +1105,32 @@
     padding-right: 0.4rem;
   }
 
-  /* The new note's field is a note row's height on its own (the row's
-     padding, the same line), so the row takes no padding of its own. */
+  /* A note row's padding around the bare field's line, so the row is a
+     note row's height. */
   .row-edit.naming {
-    padding-block: 0;
+    padding-block: 0.15rem;
+  }
+
+  /* Naming in place, as the session planner's new beat is: no field of
+     its own (InlineName bare), the row dressed as what it becomes. A new
+     note lands selected and open in the editor, so the row wears the open
+     row's wash, rule and ink inside the selected ring, the ring standing
+     in for its rule as on any selected row. */
+  .row-edit.naming {
+    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
+    box-shadow: var(--ring-focus), inset 2px 0 0 var(--text-accent);
+  }
+
+  .row-edit.naming::before {
+    display: none;
+  }
+
+  .row-edit.naming :global(.inline-name) {
+    color: var(--text-accent);
+  }
+
+  .row-edit.naming :global(.inline-name::placeholder) {
+    font-style: italic;
   }
 
   /* The empty row under a track's notes, where a new one lands: a note
