@@ -2,14 +2,15 @@
   // The shelf (design §3.6): what this campaign has gathered but not filed
   // on a track yet, then its loose notes. Its rows behave as the grid's: a
   // click opens a note, or with a beat armed puts it in the beat; the menu
-  // files it on a track. The picker browses another campaign instead,
+  // files it on a track. A note dragged off a track drops back on the shelf
+  // anywhere over it. The picker browses another campaign instead,
   // whose notes copy onto this shelf: reuse between campaigns is a copy.
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import { commandApi } from './api';
-  import { endNoteDrag, startNoteDrag } from './noteDrag';
+  import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
   import type { CampaignIndex, NoteEntry } from './types';
 
@@ -100,6 +101,46 @@
     };
   }
 
+  // -- dragging onto the shelf --------------------------------------------
+  //
+  // A note from a track, or a loose one, moves onto the shelf wherever it's
+  // dropped over it: the shelf sorts by name, so there's no place among its
+  // rows to pick. Not while browsing another campaign, whose notes copy.
+
+  let shelfEl: HTMLElement;
+  /** A note over the shelf would move onto it. */
+  let dropInto = false;
+
+  const target = (e: DragEvent): NoteEntry | null => {
+    const note = isNoteDrag(e) ? draggedNote() : null;
+    return note && !source && !onShelf(note) ? note : null;
+  };
+
+  function overShelf(e: DragEvent) {
+    dropInto = target(e) !== null;
+    if (!dropInto) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  }
+
+  function dropOnShelf(e: DragEvent) {
+    const note = target(e);
+    dropInto = false;
+    if (!note) return;
+    e.preventDefault();
+    onMove(note, 'Shelf');
+  }
+
+  // As the grid's (TrackGrid leaveGrid): WebKit sends a dragleave between
+  // the shelf's own elements, so leaving is judged by where the pointer is.
+  function leaveShelf(e: DragEvent) {
+    const box = shelfEl.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x > box.left && x < box.right && y > box.top && y < box.bottom) return;
+    dropInto = false;
+  }
+
   /** R on the selected note: renamed in its row, if the shelf is showing it. */
   export function rename(path: string) {
     if (!source && [...shelf, ...loose].some((n) => n.path === path)) renamingPath = path;
@@ -185,7 +226,16 @@
   </button>
 {/snippet}
 
-<aside class="shelf" aria-label="Shelf">
+<aside
+  class="shelf"
+  class:drop-into={dropInto}
+  aria-label="Shelf"
+  bind:this={shelfEl}
+  on:dragenter={overShelf}
+  on:dragover={overShelf}
+  on:dragleave={leaveShelf}
+  on:drop={dropOnShelf}
+>
   <header class="nameplate">
     <button type="button" class="source-key" title="This shelf, or another campaign to copy from" on:click={pickSource}>
       <span class="ledger-label">{source ? `from ${source}` : 'shelf'}</span>
@@ -251,6 +301,8 @@
   </div>
 </aside>
 
+<svelte:window on:dragend={() => (dropInto = false)} />
+
 {#if menu}
   <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
 {/if}
@@ -267,6 +319,14 @@
     /* Legend Lore's dock seam (.left-dock): the sidebar's plates and the
        grid's sit side by side in one grey, so a hairline isn't enough. */
     border-right: 4px solid var(--border-subtle);
+  }
+
+  /* A note over the shelf it would move onto: the grid's column under a
+     dragged note (TrackGrid .column.drop-into). */
+  .shelf.drop-into {
+    outline: var(--outline-drop);
+    outline-offset: -1px;
+    background: var(--bg-container);
   }
 
   /* The grid's nameplate (TrackGrid), so the sidebar reads as one more
