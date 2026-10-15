@@ -590,9 +590,8 @@
     min-height: 1.65rem;
     padding: 0.2rem 0.6rem 0.15rem;
     background: var(--bg-container);
-    /* Ruled in the panel's own ground, not the grid's grey: the plate
-       sits in the dock rather than on the console. */
-    border-top: 1px solid var(--bg-app);
+    /* Ruled below in the panel's own ground, not the grid's grey; flush
+       with the bar above, as the track plates are. */
     border-bottom: 1px solid var(--bg-app);
   }
 
