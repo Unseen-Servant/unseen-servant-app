@@ -26,15 +26,15 @@ from . import canvas
 # characters, what they could learn, where, from whom, what stands in the
 # way, and what they win. Strong start and scenes are beats.
 DEFAULT_TRACKS = ("PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures")
-# Each default track's pigment, from Legend Lore's palette (palette.ts).
+# Each default track's pigment, from Legend Lore's palette (palette.ts);
+# PCs stay plain.
 DEFAULT_PIGMENTS = {
-    "PCs": "#d07c87",  # Madder
-    "Secrets": "#abc279",  # Arsenic
-    "Locations": "#4e9766",  # Malachite
-    "NPCs": "#43a49f",  # Verdigris
-    "Monsters": "#6b9ad0",  # Woad
-    "Traps": "#dba2c3",  # Murex
-    "Treasures": "#d07c87",  # Madder
+    "Secrets": "#eb98a2",  # Madder
+    "Locations": "#c3638d",  # Kermes
+    "NPCs": "#8dceee",  # Azurite
+    "Monsters": "#f29349",  # Realgar
+    "Traps": "#e6c667",  # Ochre
+    "Treasures": "#c29ce9",  # Orchil
 }
 # Beats, sessions, and the shelf of gathered material (design §3.6).
 RESERVED = ("Beats", "Sessions", "Shelf")
