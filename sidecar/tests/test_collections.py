@@ -371,6 +371,8 @@ def test_retired_pigments_remap_on_load(test_store, test_embed_fn, tmp_path):
         "collections": {
             "Gilt": record("Gilt", "#9f8b3e"),
             "Ember": record("Ember", "#bb7b4e"),
+            "Arsenic": record("Arsenic", "#abc279"),
+            "Malachite": record("Malachite", "#4e9766"),
             "Custom": record("Custom", "#336699"),
             "Plain": record("Plain", None),
         },
@@ -381,8 +383,10 @@ def test_retired_pigments_remap_on_load(test_store, test_embed_fn, tmp_path):
     client = TestClient(app)
 
     cols = client.get("/api/collections").json()["collections"]
-    assert cols["Gilt"]["color"] == "#abc279"  # Arsenic
-    assert cols["Ember"]["color"] == "#d07c87"  # folds into Madder
+    assert cols["Gilt"]["color"] == "#e6c667"  # Ochre
+    assert cols["Ember"]["color"] == "#f29349"  # Realgar
+    assert cols["Arsenic"]["color"] == "#e6c667"  # Ochre
+    assert cols["Malachite"]["color"] == "#66965c"  # greens fold into Malachite
     assert cols["Custom"]["color"] == "#336699"
     assert cols["Plain"]["color"] is None
 
