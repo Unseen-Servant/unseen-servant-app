@@ -10,6 +10,7 @@
   import Arrangement from './Arrangement.svelte';
   import Board from './Board.svelte';
   import CommandMenu from './CommandMenu.svelte';
+  import { chordHint } from '../shell/keybindings';
   import { commandApi } from './api';
   import {
     applyOps,
@@ -292,7 +293,7 @@
     {/if}
 
     <!-- The jot bar, in the board's bottom corner: a line at the end of
-         the session note, which ⌘O opens. -->
+         the session note, which its key (and ⌘O) opens. -->
     <form class="jot-bar" on:submit|preventDefault={submitJot}>
       <input
         type="text"
@@ -302,6 +303,19 @@
         spellcheck="false"
         on:keydown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
       />
+      <button
+        type="button"
+        class="note-key"
+        title={'Open the session note' + chordHint('command.sessionNote')}
+        aria-label="Open the session note"
+        on:click={() => onEdit(session.path)}
+      >
+        <!-- Font Awesome "pen-to-square" icon (src/lib/ui/icons/pen-to-square-solid-full.svg):
+             the session menu's Edit session note. -->
+        <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+          <path d="M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z" />
+        </svg>
+      </button>
     </form>
   </div>
 </div>
@@ -357,23 +371,34 @@
     pointer-events: none;
   }
 
-  /* Wider than the session player, for a sentence. */
+  /* Wider than the session player, for a sentence. The field and its key
+     share one box, as Legend Lore's search bar and its trailing slot. */
   .jot-bar {
     position: absolute;
     left: 0.5rem;
     bottom: 0.5rem;
     z-index: 5;
-    width: 24rem;
+    width: 20rem;
     max-width: calc(100% - 1rem);
-  }
-
-  .jot-bar input {
-    width: 100%;
     box-sizing: border-box;
-    padding: 0.25rem 0.45rem;
+    display: flex;
+    align-items: center;
     background: var(--bg-container);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
+  }
+
+  .jot-bar:focus-within {
+    border-color: var(--text-accent);
+  }
+
+  .jot-bar input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.25rem 0.45rem;
+    background: transparent;
+    border: none;
+    outline: none;
     font-family: var(--font-body);
     font-size: 0.85rem;
     color: var(--text-primary);
@@ -385,8 +410,33 @@
     font-style: italic;
   }
 
-  .jot-bar input:focus {
+  /* Grey at rest, brighter on hover, never a glow. */
+  .note-key {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.45rem;
+    align-self: stretch;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+
+  .note-key:hover,
+  .note-key:focus-visible {
+    color: var(--text-primary);
     outline: none;
-    border-color: var(--text-accent);
+  }
+
+  .note-key:active {
+    transform: scale(0.97);
+  }
+
+  .note-key svg {
+    width: 12px;
+    height: 12px;
   }
 </style>
