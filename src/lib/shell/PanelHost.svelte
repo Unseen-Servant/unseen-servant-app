@@ -370,6 +370,7 @@
     background: var(--bg-app);
     border: 3px solid var(--bg-header);
     border-top: none;
+    border-radius: var(--radius-md);
   }
   .slot.shown {
     display: block;
