@@ -411,7 +411,7 @@
      longer text wraps and the bar grows (fitJot), then scrolls. */
   .jot-bar {
     flex: 0 1 auto;
-    width: 22rem;
+    width: 20rem;
     min-width: 0;
     min-height: 1.65rem;
     max-height: 9rem;
