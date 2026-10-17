@@ -379,6 +379,12 @@
     color: var(--text-primary);
   }
 
+  /* As Legend Lore's search bar. */
+  .jot-bar input::placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
   .jot-bar input:focus {
     outline: none;
     border-color: var(--text-accent);
