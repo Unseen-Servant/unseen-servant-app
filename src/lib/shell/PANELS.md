@@ -27,7 +27,9 @@ view's layout and locks are saved in the settings store (`rackViews`,
 onto, carried, or taken out by its key there.
 
 A tool's key lights its lamp while the tool is in the current view and sits
-raised while the tool has the keyboard. Each docked tool is mounted once and
+raised while the tool has the keyboard. Pressing the key of a tool in the
+view gives it the keyboard, as a click into it does; pressed again, the key
+takes it out. Each docked tool is mounted once and
 laid over its slot, so switching views moves it without remounting; a tool
 with no slot in the current view stays mounted, hidden. The Servant isn't in
 the rack until it's built.

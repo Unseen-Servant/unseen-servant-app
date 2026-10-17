@@ -98,11 +98,16 @@
     void save();
   }
 
-  // A tool's key: mounts it in this view, or takes it out — unless it's
-  // locked here.
+  // A tool's key: mounts it in this view, or gives it the keyboard as a
+  // click into it does; pressed again it takes the tool out — unless it's
+  // locked here. Under a filled tool, the press lets go of the fill. One in
+  // its own window can't take the keyboard here, so its press takes it out.
   function toggle(id: PanelId) {
     if (!present.includes(id)) {
       commit({ ...view, root: mount(view.root, id) });
+      focused = id;
+    } else if (focused !== id && !popped.has(id)) {
+      if (filling !== id) filling = null;
       focused = id;
     } else if (!view.locked.includes(id)) {
       commit({ ...view, root: without(view.root, id) });

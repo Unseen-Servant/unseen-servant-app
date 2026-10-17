@@ -1,12 +1,13 @@
 <script lang="ts">
   // The main window's bar: the rack's eight views, then one well per tool
-  // (PANELS.md). A tool's key mounts it in the current view or takes it
-  // out, and carries it into the rack by hand; its lamp is lit while the
-  // tool is in this view, and the raised fill marks the one that has the
-  // keyboard. The lock beside it holds the tool in this view: no pop-out,
-  // no resizing, no drops onto it. On macOS the bar is the window's title
-  // bar too: the title bar is an overlay (tauri.conf.json), the traffic
-  // lights sit at its left end, and its bare plate drags the window.
+  // (PANELS.md). A tool's key mounts it in the current view or gives it the
+  // keyboard, takes it out when pressed again, and carries it into the rack
+  // by hand; its lamp is lit while the tool is in this view, and the raised
+  // fill marks the one that has the keyboard. The lock beside it holds the
+  // tool in this view: no pop-out, no resizing, no drops onto it. On macOS
+  // the bar is the window's title bar too: the title bar is an overlay
+  // (tauri.conf.json), the traffic lights sit at its left end, and its bare
+  // plate drags the window.
   import { grab } from '../ui/grab';
   import { MARK, MARK_VIEWBOX } from '../ui/iconPaths';
   import { panelTitle, type PanelId } from './panels';
@@ -35,6 +36,7 @@
 
   function keyTitle(id: PanelId, title: string): string {
     if (!present.includes(id)) return `Mount ${title} in this view — or drag it where it should go`;
+    if (focused !== id && !popped.has(id)) return `Give ${title} the keyboard`;
     if (locked.includes(id)) return `${title} is locked in this view`;
     if (popped.has(id)) return `${title} is in its own window — press to take it out of this view`;
     return `Take ${title} out of this view — or drag it to move it`;
