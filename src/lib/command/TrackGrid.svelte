@@ -647,14 +647,14 @@
     border-right: 1px solid var(--border-subtle);
   }
 
+  /* Ruled on its right as the tracks are, so the grid ends on a line, not
+     in open floor, on a window wider than its tracks. */
   .ghost-column {
     flex: 0 0 5.5rem;
-    border-right: none;
   }
 
   .ghost-column.naming {
     flex-basis: 10rem;
-    border-right: 1px solid var(--border-subtle);
   }
 
   /* Legend Lore's drop line (CollectionsPanel .drop-before), turned on its
