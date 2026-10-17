@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-17
+
+**Unseen Servant is now a workstation with two tools.** Legend Lore is joined by Command, a session tool for running the table, and both live in one window, the rack. Your library, index and collections carry over as they are: nothing needs re-indexing.
+
+### Added
+
+- **Command, a session tool laid out like Ableton Live.** A campaign is a folder of Markdown notes. Tracks are kinds of material (PCs, Secrets, Locations, NPCs, Monsters, Traps and Treasures to start, all editable), notes are the material, beats are scenes that gather notes from any track, and a session plans beats and keeps a log. It's all plain files in `~/Unseen Servant` (change the folder under Settings → Command), so Obsidian opens, reads and edits the same campaign
+- **Prep** lays out a column per track beside the session planner. Arm a beat and click notes to put them in it, as you curate a collection; drag notes between tracks, beats into and out of the plan, and tracks into a new order. Each track can take a pigment. The inspector edits a note's Markdown with `[[` completion, or reads it rendered (`⌘E`)
+- **Play** runs the table on a board for each session, saved as a JSON Canvas that Obsidian Canvas opens: the session's notes as cards you place, size and connect. The session player over the board launches beats (`J`/`K` to step, `P` or `Space` to launch or stop), lighting their cards and framing them, and a jot bar writes to the session note (`⌘O` opens it). The expand key gives the board the whole rack
+- **Spent instead of carry-forward.** Mark any note or beat spent (`A`, or the box key on its row or card) when a secret is revealed, a treasure given or an NPC dies. Spent notes dim and fold into a container at the foot of their track; anything unspent is still there next session. A setting spends a beat when it launches (off by default)
+- **Each campaign has a shelf** (`⌘B`) for material gathered but not yet filed on a track, and notes can be copied onto it from another campaign
+- **Send to Command** from a search hit's menu puts the section's text in a note on the open campaign's shelf or one of its tracks, citing the book and printed page; the note's source key opens the PDF at that page
+- **Campaigns open like Live sets.** Command reopens the campaign you left, or starts on a blank *Untitled* that goes away if you leave it empty. The campaign key switches, renames and trashes campaigns, and on macOS the File menu has New Campaign (`⇧⌘N`) and Open Campaign
+- **Claude can follow the table.** The MCP server gains eight Command tools: list campaigns, read the current session and what's live, read and find notes, create a note, add to the live set and mark spent. The Claude Desktop entry stays as it is
+- **Pop a tool out into its own window** with the key beside its header (right of Legend Lore's search bar), and dock it back the same way
+
+### Changed
+
+- **One rack replaces the window.** The main window holds eight views, picked with `1`–`8` or the keys in its bar. Press a tool's key to add it to the view, carry the key onto a slot's edge to split it or onto its middle to swap, and drag the rails between tools to resize them. A view can lock its tools in place. On first launch Legend Lore has view 1 and Command view 2
+- **The rack bar is the title bar** on macOS, the traffic lights at its left and the Unseen Servant mark at its right, and the status bar under the rack serves every tool
+- **The window opens maximized** and no longer remembers its last size
+- **Nine pigments, a sword-and-sorcery cabinet**, for collections and tracks: Kermes, Madder, Realgar, Ochre, Malachite, Azurite, Lapis, Orchil and Murex. Existing collections move to their nearest successor on their own, and the pigment menu is one row of picks
+- **Every rename ends as Finder's does:** Enter or a click away keeps the new name, `Esc` backs out, and a name that can't be used keeps the field open with the reason. The name is typed where it was shown, in its own face and size
+- Selected text and the caret are parchment
+- Rows drag without a grip, carried by a closed hand and a faded copy of the row
+- Every list row and panel plate is one height across both tools, and list rows end square
+- Horizontal scrollbars are as thin as the vertical ones
+
+### Fixed
+
+- Clicks inside a rename field stay in the field
+- Renaming a book to nothing, or to its own name, leaves it as it was
+- A book or folder can be renamed by a change of case alone
+- A collection with `?`, `#`, `%` or `/` in its name can be renamed
+- A renamed book keeps its collection gems
+- A renamed collection keeps its ring and stays open
+
 ## [3.1.2] - 2026-10-03
 
 ### Changed
