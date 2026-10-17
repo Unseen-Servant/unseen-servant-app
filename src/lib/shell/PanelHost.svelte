@@ -360,15 +360,16 @@
     user-select: none;
   }
 
-  /* Each tool sits boxed: its header plate runs down both sides as a thin
-     edge, so neighbours read as separate units across the rail. */
+  /* Each tool sits boxed: its header plate runs down both sides and across
+     the foot as a thin edge, so neighbours read as separate units across
+     the rail. */
   .slot {
     position: absolute;
     display: none;
     overflow: hidden;
     background: var(--bg-app);
-    border-left: 2px solid var(--bg-header);
-    border-right: 2px solid var(--bg-header);
+    border: 3px solid var(--bg-header);
+    border-top: none;
   }
   .slot.shown {
     display: block;
