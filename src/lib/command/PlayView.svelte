@@ -20,7 +20,7 @@
     type CardActions,
     type CardData,
   } from './board';
-  import { action, divider, type MenuItem, type OpenMenu } from './menu';
+  import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
   import { memberPaths, planRows, sessionNotePaths } from './prep';
   import type { BeatEntry, BoardOp, BoardView, CampaignIndex, LiveSet, NoteEntry, SessionEntry } from './types';
 
@@ -214,7 +214,7 @@
       items.push(
         action('Edit note', () => onEdit(note.path)),
         action(playing ? 'Take out of play' : 'Play', () => setLive(note.path, !playing)),
-        action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
+        keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)),
       );
       const source = note.source;
       if (source) items.push(action('Open source', () => void openUrl(source).catch(() => {})));

@@ -155,6 +155,9 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // the hint without taking the key, as the collections menu does, and 'r'
   // is tree.rename's.
   { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
+  // In Prep and Play, on the row or card under the pointer, as Legend Lore's
+  // A shelves a collection. No `match`, as R.
+  { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer spent, or unspent', scope: 'command' },
   // In Prep and Play, from the editor too: Obsidian's reading-view key.
   { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
   // In Play, on the session player, as Legend Lore's collections take them.

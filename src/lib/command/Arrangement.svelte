@@ -11,6 +11,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { menuSlotHeld } from '../shell/menuSlot';
   import CommandMenu from './CommandMenu.svelte';
+  import SpendKey from './SpendKey.svelte';
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
   import { memberPaths, type PlanRow } from './prep';
   import type { BeatEntry } from './types';
@@ -96,7 +97,7 @@
       keyed(playing ? 'Stop' : 'Launch', 'command.play', () => toggle(beat)),
       action(playing ? 'Frame the live cards' : 'Frame its cards', () => onFrame(beat)),
       divider,
-      action(beat.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(beat, !beat.spent)),
+      keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
       action('Edit beat', () => onEdit(beat)),
     ];
     menu = { x: e.clientX, y: e.clientY, items };
@@ -122,6 +123,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <div
           class="beat-row"
+          data-path={beat.path}
           class:focused={beat.path === focused}
           class:playing
           class:spent={!!beat.spent}
@@ -134,7 +136,6 @@
           on:pointerleave={() => leave(beat.path)}
         >
           <span class="beat-name">{beat.name}</span>
-          {#if beat.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
           <!-- Legend Lore's transport: hidden at rest, shown on the hovered or
                focused row, kept while live. The keys take a double-click's
                first click only: its second would undo the first. -->
@@ -168,6 +169,12 @@
               </svg>
             </button>
           </span>
+          <!-- The spend key, last before the count: kept while spent, and
+               shown with the transport, the live beat's included, so its
+               keys don't step aside when the pointer comes. -->
+          {#if beat.spent || playing || ($hoverLive && hovered === beat.path) || beat.path === focused}
+            <SpendKey spent={beat.spent ?? null} name={beat.name} onToggle={() => onSpent(beat, !beat.spent)} />
+          {/if}
           <!-- The notes it lights, as Prep's count. -->
           <span class="row-count">{memberPaths(beat).size}</span>
         </div>
@@ -322,13 +329,6 @@
     text-decoration: underline dashed;
     text-decoration-color: var(--text-accent);
     text-underline-offset: 3px;
-  }
-
-  .spent-mark {
-    flex-shrink: 0;
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-tertiary);
   }
 
   /* A collection's transport (CollectionsPanel .tr): hidden at rest, shown

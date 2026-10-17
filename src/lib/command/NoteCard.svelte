@@ -8,6 +8,7 @@
   import { Handle, NodeResizer, Position } from '@xyflow/svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { BOOK, PLAY } from '../ui/iconPaths';
+  import SpendKey from './SpendKey.svelte';
   import { getContext } from 'svelte';
   import { CARD_ACTIONS, NOTE_HREF, linkify, type CardActions, type CardData } from './board';
 
@@ -50,6 +51,7 @@
 
 <article
   class="card"
+  data-path={missing ? null : card.path}
   class:live={data.live}
   class:spent={!!data.spent}
   class:missing
@@ -89,13 +91,7 @@
       </button>
     {/if}
     {#if !missing}
-      <input
-        type="checkbox"
-        class="app-checkbox nodrag"
-        checked={!!data.spent}
-        title={data.spent ? `Spent ${data.spent}` : 'Mark spent'}
-        on:change={(e) => actions.spend(card, e.currentTarget.checked)}
-      />
+      <SpendKey spent={data.spent} name={title} onToggle={() => actions.spend(card, !data.spent)} />
     {/if}
   </header>
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->

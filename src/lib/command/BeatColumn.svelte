@@ -12,6 +12,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { hoverLive } from '../ui/inputModality';
   import CommandMenu from './CommandMenu.svelte';
+  import SpendKey from './SpendKey.svelte';
   import { CARET_RIGHT, CIRCLE, CIRCLE_RING } from '../ui/iconPaths';
   import { action, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { draggedNote, isNoteDrag } from './noteDrag';
@@ -274,7 +275,7 @@
 
   function beatItems(beat: BeatEntry): MenuItem[] {
     return [
-      action(beat.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(beat, !beat.spent)),
+      keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
       divider,
       keyed('Rename', 'command.rename', () => (renamingPath = beat.path)),
       action('Show in Finder', () => onReveal(beat)),
@@ -325,6 +326,7 @@
   <div
     class="beat-row"
     data-row
+    data-path={beat.path}
     class:focused={beat.path === focusedPath}
     class:armed
     class:playing
@@ -379,9 +381,6 @@
         {beat.name}
       </button>
     {/if}
-    {#if beat.spent}
-      <span class="spent-mark" aria-label="spent">✓</span>
-    {/if}
     <!-- The keys take a double-click's first click only: its second would
          undo the first. -->
     {#if !renaming}
@@ -413,6 +412,13 @@
           </svg>
         </button>
       </span>
+    {/if}
+    <!-- The spend key, last before the count: kept while spent, through a
+         rename too, as the mark was; and shown with the transport, an
+         armed or live beat's included, so its keys don't step aside when
+         the pointer comes. -->
+    {#if beat.spent || (!renaming && (armed || playing || ($hoverLive && hovered === beat.path) || beat.path === focusedPath))}
+      <SpendKey spent={beat.spent ?? null} name={beat.name} onToggle={() => onSpent(beat, !beat.spent)} />
     {/if}
     <!-- The notes it lights, not its links: an unresolved one lights none. -->
     <span class="row-count" class:lit={beat.path === focusedPath}>{memberPaths(beat).size}</span>
@@ -827,8 +833,7 @@
     background: currentColor;
   }
 
-  .count,
-  .spent-mark {
+  .count {
     flex-shrink: 0;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;

@@ -28,6 +28,7 @@
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, type Column } from './columns';
   import { action, choice, divider, heading, type MenuItem, type OpenMenu } from './menu';
+  import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
   import type { BeatEntry, CampaignIndex, CommandSettings, LiveSet, NoteEntry, VaultEvent } from './types';
@@ -90,6 +91,13 @@
   /** The row clicked last, a note's or a beat's: what R renames. A note's
    *  wears Legend Lore's focus ring. */
   let selected: string | null = null;
+  /** The panel's element: A takes the row under the pointer inside it. */
+  let root: HTMLElement | undefined;
+  /** False from a spend by A until the pointer moves again. A key hands
+   *  hover to the keyboard before any handler sees it (inputModality), so
+   *  A can't ask $hoverLive itself. */
+  let pointed = true;
+  $: if ($hoverLive) pointed = true;
   /** The focused beat (design §5.1, beat states): ringed, its notes lit
    *  across the tracks, until it's clicked again, another is, or Esc.
    *  Selecting or opening a note leaves it, so its notes can be read one
@@ -324,6 +332,21 @@
       for (const list of [grid, shelf, beats]) list?.rename(selected);
       return;
     }
+    // A: the note or beat under the pointer, a row or a card, is spent or
+    // unspent, as Legend Lore's A shelves a collection. After one, the next
+    // waits for the pointer to move: a spent note leaves its rows, and the
+    // one sliding under the pointer isn't the one pointed at.
+    if (e.key.toLowerCase() === 'a' && !mod && !e.altKey && !e.shiftKey && !e.isComposing && index) {
+      const path = pathUnderPointer();
+      const note = index.notes.find((n) => n.path === path) ?? index.beats.find((b) => b.path === path);
+      if (note) {
+        e.preventDefault();
+        if (e.repeat || !pointed) return;
+        pointed = false;
+        setSpent(note, !note.spent);
+        return;
+      }
+    }
     // Esc undoes the louder thing first, as in Legend Lore: the arm, then
     // the focused beat, then the selection. Prep's: Play has no arm.
     if (e.key === 'Escape' && mode === 'prep') {
@@ -469,6 +492,14 @@
       if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
       await refreshIndex();
     });
+  }
+
+  /** The note or beat the row or card under the pointer stands for: its
+   *  data-path, inside this panel. */
+  function pathUnderPointer(): string | null {
+    const under = [...document.querySelectorAll(':hover')].pop();
+    const row = under?.closest<HTMLElement>('[data-path]');
+    return row && root?.contains(row) ? (row.dataset.path ?? null) : null;
   }
 
   function setSpent(note: Named, spent: boolean) {
@@ -845,7 +876,7 @@
   </svg>
 {/snippet}
 
-<section class="command">
+<section class="command" bind:this={root}>
   <header class="bar">
     {#if index}
       <!-- Leftmost, where Legend Lore's panel keys sit. The shelf is Prep's,
@@ -859,9 +890,10 @@
           label="Toggle the shelf"
           onClick={() => (shelfOpen = !shelfOpen)}
         >
-          <!-- Font Awesome "box-archive" icon (src/lib/ui/icons/box-archive-solid-full.svg) -->
+          <!-- Font Awesome "book-bookmark" icon (src/lib/ui/icons/book-bookmark-solid-full.svg):
+               the campaign's loose notes. The box is spent's (SpendKey). -->
           <svg viewBox="0 0 640 640" fill="currentColor">
-            <path d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"/>
+            <path d="M192 576L512 576C529.7 576 544 561.7 544 544C544 526.3 529.7 512 512 512L512 445.3C530.6 438.7 544 420.9 544 400L544 112C544 85.5 522.5 64 496 64L448 64L448 233.4C448 245.9 437.9 256 425.4 256C419.4 256 413.6 253.6 409.4 249.4L368 208L326.6 249.4C322.4 253.6 316.6 256 310.6 256C298.1 256 288 245.9 288 233.4L288 64L192 64C139 64 96 107 96 160L96 480C96 533 139 576 192 576zM160 480C160 462.3 174.3 448 192 448L448 448L448 512L192 512C174.3 512 160 497.7 160 480z" />
           </svg>
         </LatchKey>
       </div>

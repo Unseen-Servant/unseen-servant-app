@@ -8,6 +8,7 @@
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
+  import SpendKey from './SpendKey.svelte';
   import { hoverLive } from '../ui/inputModality';
   import { grab } from '../ui/grab';
   import { commandApi } from './api';
@@ -164,7 +165,7 @@
       x: e.clientX,
       y: e.clientY,
       items: [
-        action(note.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(note, !note.spent)),
+        keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)),
         // The grid's Move to flyout, in the columns' order: the shelf at the
         // left, for a loose note, then the tracks.
         ...(index.tracks.length || note.track === null
@@ -187,10 +188,14 @@
 
 {#snippet row(note: NoteEntry)}
   {@const renaming = renamingPath === note.path}
-  <button
-    type="button"
+  <!-- A div, as the grid's, so the spend key can be a button inside it. -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div
     class="note-row"
+    role="button"
+    tabindex="-1"
     data-row
+    data-path={note.path}
     class:open={note.path === openPath}
     class:selected={note.path === selectedPath}
     class:hovered={$hoverLive && hovered === note.path}
@@ -233,8 +238,12 @@
     {:else}
       <span class="label">{note.name}</span>
     {/if}
-    {#if note.spent}<span class="spent-mark" aria-label="spent">✓</span>{/if}
-  </button>
+    <!-- Spent, its key lit and kept through a rename; otherwise shown on
+         the hovered or selected row, as a collection's transport is. -->
+    {#if note.spent || (!renaming && (($hoverLive && hovered === note.path) || note.path === selectedPath))}
+      <SpendKey spent={note.spent ?? null} name={note.name} onToggle={() => onSpent(note, !note.spent)} />
+    {/if}
+  </div>
 {/snippet}
 
 <aside
@@ -552,12 +561,6 @@
   .note-row.spent.hovered .label,
   .note-row.spent.hovered .slot {
     opacity: var(--opacity-out-of-scope-hover);
-  }
-
-  .spent-mark {
-    flex-shrink: 0;
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
   }
 
   /* Legend Lore's row states (FileTree, CollectionsPanel .row-container):
