@@ -4,7 +4,9 @@
   // out, and carries it into the rack by hand; its lamp is lit while the
   // tool is in this view, and the raised fill marks the one that has the
   // keyboard. The lock beside it holds the tool in this view: no pop-out,
-  // no resizing, no drops onto it.
+  // no resizing, no drops onto it. On macOS the bar is the window's title
+  // bar too: the title bar is an overlay (tauri.conf.json), the traffic
+  // lights sit at its left end, and its bare plate drags the window.
   import { grab } from '../ui/grab';
   import { panelTitle, type PanelId } from './panels';
   import { RACK_TOOLS, toolsIn, type RackView } from './rack';
@@ -18,6 +20,9 @@
   export let onLock: (id: PanelId) => void;
   export let onCarry: (id: PanelId, data: DataTransfer) => void;
   export let onCarryEnd: () => void;
+
+  // Only macOS overlays its title bar; elsewhere the native one stays above.
+  const overlaid = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || '');
 
   $: present = toolsIn(views[current].root);
   $: locked = views[current].locked;
@@ -39,7 +44,7 @@
   }
 </script>
 
-<nav class="rack-bar" aria-label="Rack">
+<nav class="rack-bar" class:overlaid aria-label="Rack" data-tauri-drag-region>
   <!-- A picker, like the view switch: one view is always showing, so the
        current key sits raised rather than lit. An empty view's numeral
        steps down to the out-of-scope dim. -->
@@ -56,7 +61,7 @@
     {/each}
   </div>
 
-  <div class="tool-wells" role="group" aria-label="Tools">
+  <div class="tool-wells" role="group" aria-label="Tools" data-tauri-drag-region>
     {#each RACK_TOOLS as tool (tool.id)}
       {@const here = present.includes(tool.id)}
       {@const held = locked.includes(tool.id)}
@@ -108,8 +113,14 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.3rem 0.5rem;
+    height: var(--header-height);
+    padding: 0 0.5rem;
     background: var(--bg-header);
+  }
+  /* Room for the traffic lights, placed at x 16 (tauri.conf.json): three
+     buttons on a 20px pitch end near 70px. */
+  .rack-bar.overlaid {
+    padding-left: 84px;
   }
 
   /* Wells cut like Header's view switch. */
