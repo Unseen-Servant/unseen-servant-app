@@ -15,6 +15,9 @@
 
   let statusSlot: HTMLElement | null = null;
   let showHelp = false;
+  // The window is all the panel's already: filling it only sets the
+  // panel's header aside.
+  let filled = false;
 
   function showSettings() {
     openSettings().catch((err) => console.error('Failed to open settings:', err));
@@ -23,7 +26,7 @@
 
 <div class="frame">
   <div class="panel">
-    <PanelView {id} active {statusSlot}>
+    <PanelView {id} active {statusSlot} {filled} onFill={(on) => (filled = on)}>
       {#snippet windowKey()}<DockToggle {id} popped />{/snippet}
     </PanelView>
   </div>

@@ -42,6 +42,10 @@
   export let windowKey: Snippet | undefined = undefined;
   // The host's slot for this panel in its status bar (PANELS.md).
   export let statusSlot: HTMLElement | null = null;
+  // The host's whole space (PANELS.md), asked for by Play's expand key: the
+  // board takes it and the bar steps aside.
+  export let filled: boolean = false;
+  export let onFill: (on: boolean) => void = () => {};
 
   /** What a rename, move, spend or trash needs of a note or a beat. */
   type Named = { name: string; path: string };
@@ -153,6 +157,11 @@
   $: openName = openEntry?.name ?? (bufState.path ? stem(bufState.path) : '');
   $: renamable = bufState.status !== 'conflict' && bufState.status !== 'unreadable';
   $: session = index ? activeSession(index, $appContext.session) : null;
+  // Only the board fills: with the bar gone, nothing else could hand the
+  // space back, so Prep, or a Play with no board, lets go of it.
+  $: showsBoard = mode === 'play' && !!session && !!campaign;
+  $: expanded = filled && showsBoard;
+  $: if (filled && !showsBoard) onFill(false);
   $: rows = index ? planRows(index, session) : [];
   $: spare = index ? unscheduled(index, session, true) : [];
   $: beatAt = (path: string | null) => index?.beats.find((b) => b.path === path) ?? null;
@@ -901,7 +910,9 @@
 {/snippet}
 
 <section class="command" bind:this={root}>
-  <header class="bar">
+  <!-- Set aside, not unmounted, while the board fills the space: the keys
+       come back as they were. -->
+  <header class="bar" class:away={expanded}>
     {#if index}
       <!-- Leftmost, where Legend Lore's panel keys sit. The shelf is Prep's,
            so in Play the key stays put, dimmed and inert, and the switchers
@@ -1065,6 +1076,8 @@
               {run}
               bind:playerOpen
               {boardViews}
+              {expanded}
+              onExpand={onFill}
               onLive={applyLive}
               onEdit={openPath}
               onFollow={followLink}
@@ -1331,6 +1344,10 @@
     padding: 1px 0.5rem 0;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .bar.away {
+    display: none;
   }
 
   /* The campaign and session keys, each in a latch's well (LatchKey

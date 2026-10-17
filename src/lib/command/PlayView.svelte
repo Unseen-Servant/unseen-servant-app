@@ -10,6 +10,7 @@
   import Arrangement from './Arrangement.svelte';
   import Board from './Board.svelte';
   import CommandMenu from './CommandMenu.svelte';
+  import LatchKey from '../ui/LatchKey.svelte';
   import { chordHint } from '../shell/keybindings';
   import { commandApi } from './api';
   import {
@@ -45,6 +46,9 @@
   export let onSpent: (note: { name: string; path: string }, spent: boolean) => void;
   /** A line for the session note; resolves whether it was written. */
   export let onJot: (text: string) => Promise<boolean>;
+  /** The board fills the host's space, Command's bar set aside. */
+  export let expanded: boolean;
+  export let onExpand: (on: boolean) => void;
 
   // -- the board ----------------------------------------------------------
 
@@ -306,6 +310,25 @@
       />
     </div>
 
+    <!-- The expand key, in the board's top-right corner: latched and lit
+         while the board fills the view, and the way back from it. -->
+    <div class="expand">
+      <LatchKey
+        open={expanded}
+        lit={expanded}
+        title={expanded ? 'Back to the normal view' : 'Expand the board to fill the view'}
+        label={expanded ? 'Leave the expanded board' : 'Expand the board'}
+        onClick={() => onExpand(!expanded)}
+      >
+        <!-- Font Awesome "up-right-and-down-left-from-center" icon
+             (src/lib/ui/icons/up-right-and-down-left-from-center-solid-full.svg):
+             "expand" is the beat rows' frame key. -->
+        <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+          <path d="M408 64L552 64C565.3 64 576 74.7 576 88L576 232C576 241.7 570.2 250.5 561.2 254.2C552.2 257.9 541.9 255.9 535 249L496 210L409 297C399.6 306.4 384.4 306.4 375.1 297L343.1 265C333.7 255.6 333.7 240.4 343.1 231.1L430.1 144.1L391.1 105.1C384.2 98.2 382.2 87.9 385.9 78.9C389.6 69.9 398.3 64 408 64zM232 576L88 576C74.7 576 64 565.3 64 552L64 408C64 398.3 69.8 389.5 78.8 385.8C87.8 382.1 98.1 384.2 105 391L144 430L231 343C240.4 333.6 255.6 333.6 264.9 343L296.9 375C306.3 384.4 306.3 399.6 296.9 408.9L209.9 495.9L248.9 534.9C255.8 541.8 257.8 552.1 254.1 561.1C250.4 570.1 241.7 576 232 576z" />
+        </svg>
+      </LatchKey>
+    </div>
+
     <!-- The jot bar, in the board's bottom corner: a line at the end of
          the session note, which the key beside it (and ⌘O) opens. -->
     <div class="jot">
@@ -373,6 +396,14 @@
     max-height: calc(100% - 1rem);
     display: flex;
     flex-direction: column;
+  }
+
+  /* Level with the session player's plate across the board. */
+  .expand {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 5;
   }
 
   /* The bar and, beside it, the key that opens what it writes to, level

@@ -63,6 +63,14 @@ it's popped out.
   under the rack in the main window, at the window's foot when popped out.
   Wrap it in `.status-section`; the bar dresses `.rule`, `.stats` and
   `.icon-btn` inside it.
+- **`filled`** and **`onFill(on)`** — the panel asks for the whole of the
+  host's space, or gives it back; `filled` says whether it has it. In the
+  main window the tool covers the rack in every view that holds it, the
+  others mounted and hidden, until it lets go or the view's layout changes
+  (a tool's key, a carry, `panels://show` for another tool). In its own
+  window the space is the panel's already. A filled panel may set its header
+  aside, so it must keep its own way back on screen: Command's is Play's
+  expand key, and leaving Play lets go.
 
 ## What a panel may emit
 

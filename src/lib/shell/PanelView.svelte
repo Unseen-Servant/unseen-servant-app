@@ -15,12 +15,16 @@
   export let windowKey: Snippet;
   // The host's slot for the panel in its status bar, once it's drawn.
   export let statusSlot: HTMLElement | null = null;
+  // The whole of the host's space, given while `filled` once the panel asks
+  // with `onFill` (PANELS.md).
+  export let filled: boolean;
+  export let onFill: (on: boolean) => void;
 </script>
 
 {#if id === 'legend-lore'}
   <LegendLorePanel {active} {windowKey} {statusSlot} />
 {:else if id === 'command'}
-  <CommandPanel {active} {windowKey} {statusSlot} />
+  <CommandPanel {active} {windowKey} {statusSlot} {filled} {onFill} />
 {:else}
   <ServantPanel />
 {/if}

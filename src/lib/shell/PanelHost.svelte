@@ -49,13 +49,19 @@
   let statusSlots: Partial<Record<PanelId, HTMLElement>> = {};
   let showHelp = false;
 
+  // A tool that asked for the whole rack (Command's expanded board) covers
+  // it in every view that holds it; the rest stay mounted, hidden. Any change
+  // to the layout lets go of it.
+  let filling: PanelId | null = null;
+
   $: view = views[current];
   $: present = toolsIn(view.root);
   $: popped = new Set($poppedPanels.popped);
-  $: placed = layout(view.root, rackW, rackH, view.locked);
+  $: filled = filling && present.includes(filling) && !popped.has(filling) ? filling : null;
+  $: placed = layout(filled ? { kind: 'tool', id: filled } : view.root, rackW, rackH, view.locked);
   // The keyboard belongs to the tool last clicked into. When that one isn't
   // in the view, or is in its own window, the view's first tool takes it.
-  $: focusable = present.filter((id) => !popped.has(id));
+  $: focusable = filled ? [filled] : present.filter((id) => !popped.has(id));
   $: if (!focused || !focusable.includes(focused)) focused = focusable[0] ?? null;
 
   onMount(async () => {
@@ -81,6 +87,7 @@
   }
 
   function commit(next: RackView) {
+    if (next.root !== view.root) filling = null;
     views[current] = next;
     void save();
   }
@@ -115,6 +122,7 @@
   const unlistenShow = listen<string>('panels://show', (e) => {
     const id = e.payload;
     if (!isPanelId(id) || !RACK_TOOLS.some((t) => t.id === id)) return;
+    if (filling !== id) filling = null;
     if (!present.includes(id)) {
       const at = views.findIndex((v) => toolsIn(v.root).includes(id));
       if (at >= 0) switchTo(at);
@@ -184,7 +192,9 @@
   let carried: PanelId | null = null;
   let target: Landing | null = null;
 
+  // The whole rack comes back into sight, to be landed on.
   function carry(id: PanelId, data: DataTransfer) {
+    filling = null;
     carried = id;
     data.setData(CARRY, id);
   }
@@ -270,6 +280,7 @@
         <div
           class="slot"
           class:shown={!!r}
+          class:filled={filled === tool.id}
           style={r ? `left: ${r.x}px; top: ${r.y}px; width: ${r.w}px; height: ${r.h}px` : undefined}
           on:pointerdown|capture={() => (focused = tool.id)}
           role="presentation"
@@ -285,7 +296,13 @@
           {:else}
             <!-- Locked in this view, the pop-out key stays in place but out
                  of reach, as Command's Prep keys do in Play. -->
-            <PanelView id={tool.id} active={!!r && focused === tool.id} statusSlot={statusSlots[tool.id] ?? null}>
+            <PanelView
+              id={tool.id}
+              active={!!r && focused === tool.id}
+              statusSlot={statusSlots[tool.id] ?? null}
+              filled={filled === tool.id}
+              onFill={(on) => (filling = on ? tool.id : null)}
+            >
               {#snippet windowKey()}
                 <span class="window-key" class:locked inert={locked}><DockToggle id={tool.id} popped={false} /></span>
               {/snippet}
@@ -374,6 +391,11 @@
   }
   .slot.shown {
     display: block;
+  }
+  /* Covering the rack, the tool has set its header aside: the edge closes
+     over the top too. */
+  .slot.filled {
+    border-top: 3px solid var(--bg-header);
   }
 
   .window-key {
