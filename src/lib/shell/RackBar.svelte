@@ -46,10 +46,6 @@
 </script>
 
 <nav class="rack-bar" class:overlaid aria-label="Rack" data-tauri-drag-region>
-  <!-- The Unseen Servant mark. The pointer passes through it, so a press
-       on it drags the window as the bare plate does. -->
-  <svg class="mark" viewBox={MARK_VIEWBOX} aria-hidden="true"><path d={MARK} /></svg>
-
   <!-- A picker, like the view switch: one view is always showing, so the
        current key sits raised rather than lit. An empty view's numeral
        steps down to the out-of-scope dim. -->
@@ -109,6 +105,14 @@
       </div>
     {/each}
   </div>
+
+  <!-- The splash's mark and name, small, at the bar's far end. The pointer
+       passes through, so a press here drags the window as the bare plate
+       does. -->
+  <span class="brand">
+    <svg class="mark" viewBox={MARK_VIEWBOX} aria-hidden="true"><path d={MARK} /></svg>
+    <span class="wordmark">Unseen Servant</span>
+  </span>
 </nav>
 
 <style>
@@ -122,20 +126,35 @@
     padding: 0 0.5rem;
     background: var(--bg-header);
   }
-  /* Room for the traffic lights, then 12px before the mark. Placed at x 16
-     (tauri.conf.json), the buttons end near 76px: a 23.5px pitch and 15px
-     across, measured off a macOS 26 screenshot. */
+  /* Room for the traffic lights, then 12px before the view keys. Placed at
+     x 16 (tauri.conf.json), the buttons end near 76px: a 23.5px pitch and
+     15px across, measured off a macOS 26 screenshot. */
   .rack-bar.overlaid {
     padding-left: 88px;
   }
 
+  /* The splash's mark and wordmark, small and quiet: chrome, not content. */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    color: var(--text-tertiary);
+    pointer-events: none;
+  }
   /* Sized by height, the width following the mark's 685 × 960 ink. */
   .mark {
     flex-shrink: 0;
     width: 17px;
     height: 24px;
-    fill: var(--text-primary);
-    pointer-events: none;
+    fill: currentColor;
+  }
+  .wordmark {
+    font-family: var(--font-heading);
+    font-size: 0.9rem;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
   }
 
   /* Wells cut like Header's view switch. */
