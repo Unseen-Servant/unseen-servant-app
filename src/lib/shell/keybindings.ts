@@ -62,6 +62,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'focus.dockDown',        keys: { mac: '⌘⌥↓',  other: 'Ctrl+Alt+↓' },    label: 'Dock: Collections → Filters', scope: 'global' },
   { id: 'focus.dockUp',          keys: { mac: '⌘⌥↑',  other: 'Ctrl+Alt+↑' },    label: 'Dock: Filters → Collections', scope: 'global' },
   { id: 'view.toggle',           keys: { mac: 'Tab',  other: 'Tab' },           label: 'Switch views: tree ⇄ systems, Prep ⇄ Play', scope: 'global' },
+  { id: 'rack.view',             keys: { mac: '1–8',  other: '1–8' },           label: 'Bring up rack view N',        scope: 'global' },
   { id: 'collections.slot',      keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Play only collection N (again stops it)', scope: 'global' },
   { id: 'collections.slotMix',   keys: { mac: '⌘⇧1–9', other: 'Ctrl+Shift+1–9' }, label: 'Add collection N to the mix, or take it out', scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },

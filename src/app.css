@@ -65,6 +65,9 @@
      its old OKLCH lightness, with chroma 0.006 at hue 75 (toward the
      parchment), so every contrast pair moved by 0.05:1 at most. The text
      ramp below does the same at chroma 0.010. */
+  /* The rack's frame, showing as rails between mounted tools and under the
+     rack bar: one step of the ramp below the app ground (L 0.175). */
+  --bg-rack: #12100e;
   --bg-app: #1b1916;
   --bg-container: #252320;
   --bg-header: #302e2b;
