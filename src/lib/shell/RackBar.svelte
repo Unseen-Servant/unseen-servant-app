@@ -8,6 +8,7 @@
   // bar too: the title bar is an overlay (tauri.conf.json), the traffic
   // lights sit at its left end, and its bare plate drags the window.
   import { grab } from '../ui/grab';
+  import { MARK, MARK_VIEWBOX } from '../ui/iconPaths';
   import { panelTitle, type PanelId } from './panels';
   import { RACK_TOOLS, toolsIn, type RackView } from './rack';
 
@@ -45,6 +46,10 @@
 </script>
 
 <nav class="rack-bar" class:overlaid aria-label="Rack" data-tauri-drag-region>
+  <!-- The Unseen Servant mark. The pointer passes through it, so a press
+       on it drags the window as the bare plate does. -->
+  <svg class="mark" viewBox={MARK_VIEWBOX} aria-hidden="true"><path d={MARK} /></svg>
+
   <!-- A picker, like the view switch: one view is always showing, so the
        current key sits raised rather than lit. An empty view's numeral
        steps down to the out-of-scope dim. -->
@@ -123,6 +128,15 @@
     padding-left: 84px;
   }
 
+  /* Sized by height, the width following the mark's 685 × 960 ink. */
+  .mark {
+    flex-shrink: 0;
+    width: 17px;
+    height: 24px;
+    fill: var(--text-primary);
+    pointer-events: none;
+  }
+
   /* Wells cut like Header's view switch. */
   .view-keys,
   .tool-well {
@@ -155,12 +169,14 @@
     transform: scale(0.97);
   }
 
+  /* Crimson, not Almendra: Almendra's figures are old-style only, so 3, 4,
+     5 and 7 hang below the line. Crimson's sit level, one height. */
   .view-key {
     width: 22px;
-    font-family: var(--font-heading);
-    font-size: 0.9rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
     line-height: 1;
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
   }
   .view-key.empty {
     opacity: var(--opacity-out-of-scope);
