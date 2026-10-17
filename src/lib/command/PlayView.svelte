@@ -1,8 +1,9 @@
 <script lang="ts">
   // Play (design §5.2–§5.3): the arrangement down the left, the session's
   // board in the middle. Launching a beat makes its notes the live set and
-  // frames their cards; a card's key plays one note. The board's file and
-  // the log are the only things written — what's live is the sidecar's.
+  // frames their cards; a card's key plays one note. The board's file, the
+  // log and the jot bar's lines in the session note are the only things
+  // written — what's live is the sidecar's.
   import { tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import type { Viewport } from '@xyflow/svelte';
@@ -41,6 +42,8 @@
   export let boardViews: Map<string, Viewport>;
   /** A note or a beat marked spent, or not. */
   export let onSpent: (note: { name: string; path: string }, spent: boolean) => void;
+  /** A line for the session note; resolves whether it was written. */
+  export let onJot: (text: string) => Promise<boolean>;
 
   // -- the board ----------------------------------------------------------
 
@@ -230,6 +233,19 @@
   function lineMenu(id: string, e: MouseEvent) {
     menu = { x: e.clientX, y: e.clientY, items: [action('Remove line', () => apply([{ op: 'remove', id }]), true)] };
   }
+
+  // -- the jot bar --------------------------------------------------------
+
+  let jot = '';
+
+  /** Enter sends the line and clears the bar for the next; a refused line
+   *  comes back, unless something new was typed meanwhile. */
+  async function submitJot() {
+    const text = jot.trim();
+    if (!text) return;
+    jot = '';
+    if (!(await onJot(text)) && !jot) jot = text;
+  }
 </script>
 
 <div class="play">
@@ -274,6 +290,19 @@
     {#if view && !allCards.length}
       <span class="legend">Plan beats in Prep to put their notes here</span>
     {/if}
+
+    <!-- The jot bar, in the board's bottom corner: a line at the end of
+         the session note, which ⌘O opens. -->
+    <form class="jot-bar" on:submit|preventDefault={submitJot}>
+      <input
+        type="text"
+        bind:value={jot}
+        placeholder="jot in the session note…"
+        aria-label="Add a line to the session note"
+        spellcheck="false"
+        on:keydown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
+      />
+    </form>
   </div>
 </div>
 
@@ -316,15 +345,42 @@
     flex-direction: column;
   }
 
-  /* In the board's corner, under the cards. */
+  /* In the board's corner, under the cards, above the jot bar. */
   .legend {
     position: absolute;
     left: 0.75rem;
-    bottom: 0.6rem;
+    bottom: 2.6rem;
     z-index: 5;
     font-size: 0.8rem;
     font-style: italic;
     color: var(--text-tertiary);
     pointer-events: none;
+  }
+
+  /* Wider than the session player, for a sentence. */
+  .jot-bar {
+    position: absolute;
+    left: 0.5rem;
+    bottom: 0.5rem;
+    z-index: 5;
+    width: 24rem;
+    max-width: calc(100% - 1rem);
+  }
+
+  .jot-bar input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.25rem 0.45rem;
+    background: var(--bg-container);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+  }
+
+  .jot-bar input:focus {
+    outline: none;
+    border-color: var(--text-accent);
   }
 </style>

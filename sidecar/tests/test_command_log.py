@@ -81,3 +81,38 @@ def test_append_stamps_the_time_and_keeps_entries_on_one_line(tmp_path, monkeypa
     assert note.read_text() == "---\ndate: 2026-10-18\n---\n\n## Log\n- 09:05 the party left town\n"
     with pytest.raises(Invalid):
         log.append(camp, "Sessions/Session 1.md", " \n ")
+
+
+JOT = "- the party insulted the burgomaster"
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    ("", f"{JOT}\n"),
+    ("---\ndate: 2026-10-18\n---\n", f"---\ndate: 2026-10-18\n---\n\n{JOT}\n"),
+    ("Prep notes.", f"Prep notes.\n\n{JOT}\n"),
+    ("Prep notes.\n\n", f"Prep notes.\n\n{JOT}\n\n"),
+    ("- earlier\n", f"- earlier\n{JOT}\n"),
+])
+def test_a_jot_goes_at_the_end_of_the_text(text, expected):
+    assert log.add_jot(text, JOT) == expected
+
+
+def test_a_jot_goes_above_the_log():
+    assert log.add_jot("Prep.\n\n## Log\n- 19:42 ▶ [[Ambush]]\n", JOT) == (
+        f"Prep.\n\n{JOT}\n\n## Log\n- 19:42 ▶ [[Ambush]]\n"
+    )
+    assert log.add_jot("- earlier\n## Log\n", JOT) == f"- earlier\n{JOT}\n\n## Log\n"
+    assert log.add_jot("## Log\n", JOT) == f"{JOT}\n\n## Log\n"
+    assert log.add_jot("Prep.\r\n\r\n## Log\r\n", JOT) == f"Prep.\r\n\r\n{JOT}\r\n\r\n## Log\r\n"
+
+
+def test_jot_writes_one_line_without_a_time(tmp_path):
+    camp = tmp_path / "Strahd"
+    (camp / "Sessions").mkdir(parents=True)
+    note = camp / "Sessions" / "Session 1.md"
+    note.write_text("---\ndate: 2026-10-18\n---\n\n## Log\n- 19:42 ▶ [[Ambush]]\n")
+    assert log.jot(camp, "Sessions/Session 1.md", "  the party\nleft  town ") == "- the party left town"
+    assert note.read_text() == "---\ndate: 2026-10-18\n---\n\n- the party left town\n\n## Log\n- 19:42 ▶ [[Ambush]]\n"
+    assert [e["kind"] for e in log.parse(note.read_text())] == ["launch"]
+    with pytest.raises(Invalid):
+        log.jot(camp, "Sessions/Session 1.md", " \n ")

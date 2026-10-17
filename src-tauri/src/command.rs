@@ -713,6 +713,25 @@ pub async fn command_stop(campaign: String) -> Result<LiveSet, String> {
     .await
 }
 
+/// Add a line to the end of the session note's own text, above its log.
+/// Returns the line written.
+#[tauri::command]
+pub async fn command_jot(
+    campaign: String,
+    session: String,
+    text: String,
+) -> Result<String, String> {
+    #[derive(Deserialize)]
+    struct Line {
+        line: String,
+    }
+    answer::<Line>(client().post(api("/jot")).json(&serde_json::json!({
+        "campaign": campaign, "session": session, "text": text,
+    })))
+    .await
+    .map(|l| l.line)
+}
+
 // -- cross-tool (design §8) -------------------------------------------------
 
 /// Tell the sidecar which campaign and session are open, so MCP acts on them

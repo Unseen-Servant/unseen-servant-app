@@ -1,6 +1,7 @@
 """The session log (design §4): timestamped list items under the session
 note's ``## Log`` heading. Command only ever appends to it; the Play
-arrangement reads it back.
+arrangement reads it back. A jot from Play goes above it, in the note's
+own text.
 
     ## Log
     - 19:42 ▶ [[Ambush on the road]]
@@ -82,6 +83,38 @@ def append(campaign: Path, rel: str, entry: str) -> str:
     path = vault.note_path(campaign, rel)
     line = f"- {now():%H:%M} {entry}"
     vault.atomic_write(path, add_line(vault.read_text(path), line).encode("utf-8"))
+    return line
+
+
+def add_jot(text: str, line: str) -> str:
+    """``text`` with ``line`` after the last line of the note's own text:
+    above its last ``## Log`` section, or at the end. After anything but a
+    list item, a blank line first so the jot starts a list; a blank line
+    after it before the log. Nothing else in the text changes."""
+    nl = "\r\n" if "\r\n" in text else "\n"
+    lines = _lines(text)
+    found = _section(lines)
+    stop = found[0] if found else len(lines)
+    last = max((j for j in range(stop) if lines[j][0].strip()), default=None)
+    at = 0 if last is None else lines[last][1]
+    head = text[:at]
+    if head and not head.endswith("\n"):
+        head += nl
+    if last is not None and not _ITEM.match(lines[last][0].strip()):
+        head += nl
+    after = nl if found and (last is None or last + 1 == stop) else ""
+    return head + line + nl + after + text[at:]
+
+
+def jot(campaign: Path, rel: str, text: str) -> str:
+    """Add ``- text`` to the note at ``rel``, at the end of its own text
+    (not in the log). Returns the line written."""
+    text = " ".join(text.split())
+    if not text:
+        raise vault.Invalid("A jot can't be empty")
+    path = vault.note_path(campaign, rel)
+    line = f"- {text}"
+    vault.atomic_write(path, add_jot(vault.read_text(path), line).encode("utf-8"))
     return line
 
 

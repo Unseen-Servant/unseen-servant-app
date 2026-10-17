@@ -27,7 +27,7 @@
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, type Column } from './columns';
-  import { action, choice, divider, heading, type MenuItem, type OpenMenu } from './menu';
+  import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
@@ -301,6 +301,13 @@
       toggleReading();
       return;
     }
+    // ⌘O: the session note in the inspector, from anywhere: the jot bar
+    // writes to it.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'o' && session) {
+      e.preventDefault();
+      openPath(session.path);
+      return;
+    }
     if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
     // ? or ⌘/: the shortcut sheet, as in Legend Lore. Not from the editor,
     // where ⌘/ is CodeMirror's comment.
@@ -511,6 +518,19 @@
     });
   }
 
+  /** A line jotted in Play, at the end of the session note's own text.
+   *  Resolves whether it was written, so the jot bar can keep a refused one. */
+  async function jot(text: string): Promise<boolean> {
+    const path = session!.path;
+    let written = false;
+    await run(async () => {
+      await settle(path);
+      await commandApi.jot(campaign!, path, text);
+      written = true;
+    });
+    return written;
+  }
+
   // -- beats --------------------------------------------------------------
 
   /** A click in Prep on anything but a row — empty space, a plate, a ghost
@@ -679,7 +699,7 @@
       action('New session', newSession),
       ...(session
         ? [
-            action('Edit session note', () => openPath(session!.path)),
+            keyed('Edit session note', 'command.sessionNote', () => openPath(session!.path)),
             action('Show in Finder', () => reveal(session!.path)),
             divider,
             action('Move to Trash', trashSession, true),
@@ -1045,6 +1065,7 @@
               onEdit={openPath}
               onFollow={followLink}
               onSpent={setSpent}
+              onJot={jot}
             />
           {:else}
             <div class="empty">

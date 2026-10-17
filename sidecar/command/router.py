@@ -164,6 +164,12 @@ class Stop(BaseModel):
     campaign: str
 
 
+class Jot(BaseModel):
+    campaign: str
+    session: str
+    text: str
+
+
 class CopyIn(BaseModel):
     campaign: str
     from_campaign: str
@@ -567,6 +573,15 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             snapshot = live.set(body.campaign, None, [])
         announce(snapshot)
         return snapshot
+
+    @router.post("/jot")
+    def jot(body: Jot):
+        """A line the GM jots in Play, at the end of the session note's own
+        text, above its log."""
+        camp = campaign_path(body.campaign)
+        with write_lock:
+            prep.require_in(camp, body.session, prep.SESSIONS)
+            return {"line": log.jot(camp, body.session, body.text)}
 
     # -- deletion is Rust's (the OS trash); this only vouches for the path --
 

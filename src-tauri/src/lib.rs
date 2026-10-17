@@ -676,6 +676,7 @@ pub fn run() {
             command::command_launch,
             command::command_set_live,
             command::command_stop,
+            command::command_jot,
             command::command_send_targets,
             command::command_send,
             command::command_copy_note,

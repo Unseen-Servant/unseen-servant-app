@@ -160,6 +160,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer spent, or unspent', scope: 'command' },
   // In Prep and Play, from the editor too: Obsidian's reading-view key.
   { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
+  // In Prep and Play, from the editor and the jot bar too.
+  { id: 'command.sessionNote',   keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open the session note in the inspector', scope: 'command' },
   // In Play, on the session player, as Legend Lore's collections take them.
   { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'command' },
   { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'command' },

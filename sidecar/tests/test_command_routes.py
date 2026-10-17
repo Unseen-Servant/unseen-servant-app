@@ -247,6 +247,17 @@ def test_improvising_changes_the_live_set_not_the_beat(table):
     assert (stopped["beat"], stopped["notes"]) == (None, [])
 
 
+def test_a_jot_lands_in_the_session_note_not_its_log(table, campaign_root):
+    assert table.post("/api/command/jot", json={
+        "campaign": "Strahd", "session": "Sessions/Session 1.md", "text": "the party insulted the burgomaster",
+    }).json() == {"line": "- the party insulted the burgomaster"}
+    text = (campaign_root / "Strahd" / "Sessions" / "Session 1.md").read_text()
+    assert text.endswith("\n- the party insulted the burgomaster\n")
+    assert session_log(table) == []
+    not_a_session = table.post("/api/command/jot", json={"campaign": "Strahd", "session": "NPCs/Ismark.md", "text": "x"})
+    assert not_a_session.status_code == 422
+
+
 def test_spends_from_play_are_logged(table):
     play = {"campaign": "Strahd", "path": "NPCs/Ismark.md", "session": "Sessions/Session 1.md"}
     table.post("/api/command/spent", json={**play, "spent": True})
