@@ -386,7 +386,7 @@
 
   /* Wider than the session player, for a sentence. */
   .jot-bar {
-    flex: 0 1 20rem;
+    flex: 0 1 22rem;
     min-width: 0;
   }
 
