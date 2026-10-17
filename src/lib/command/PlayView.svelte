@@ -149,13 +149,14 @@
     frame: (card, f) => apply([frameOp(card, f)]),
   };
 
-  function dataFor(lit: Set<string>, notes: Map<string, NoteEntry>, _tick: number) {
+  function dataFor(lit: Set<string>, notes: Map<string, NoteEntry>, pigments: Record<string, string>, _tick: number) {
     return (card: Card): CardData => {
       const note = card.path ? notes.get(card.path) : undefined;
       return {
         card,
         name: note?.name ?? '',
         track: note?.track ?? null,
+        pigment: note?.track ? (pigments[note.track] ?? null) : null,
         live: !!card.path && lit.has(card.path),
         spent: note?.spent ?? null,
         source: note?.source ?? null,
@@ -163,7 +164,7 @@
       };
     };
   }
-  $: dataOf = dataFor(liveNotes, notesByPath, bodiesTick);
+  $: dataOf = dataFor(liveNotes, notesByPath, index.pigments, bodiesTick);
 
   // -- framing ------------------------------------------------------------
 

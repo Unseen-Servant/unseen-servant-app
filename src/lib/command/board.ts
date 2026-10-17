@@ -161,6 +161,8 @@ export interface CardData extends Record<string, unknown> {
   /** A note card's note name; empty for the other kinds. */
   name: string;
   track: string | null;
+  /** Its track's pigment (palette.ts), which fills its head; or null. */
+  pigment: string | null;
   live: boolean;
   spent: string | null;
   /** The PDF page it came from (Send to Command), which its key opens. */

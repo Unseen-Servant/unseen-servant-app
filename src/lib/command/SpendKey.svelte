@@ -40,7 +40,9 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    background: transparent;
+    /* A pigmented card head sets the ground (NoteCard), so the pigment
+       doesn't show through the well. */
+    background: var(--key-ground, transparent);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     color: var(--text-tertiary);

@@ -57,23 +57,9 @@
   class:missing
   on:dblclick={() => !missing && actions.edit(card)}
 >
-  <header class="card-head">
-    {#if !missing}
-      <button
-        type="button"
-        class="play-key nodrag"
-        class:playing={data.live}
-        aria-pressed={data.live}
-        title={data.live ? `Take ${title} out of play` : `Play ${title}`}
-        on:click|stopPropagation={() => actions.launch(card, !data.live)}
-      >
-        {#if data.live}
-          <span class="stop-mark" aria-hidden="true"></span>
-        {:else}
-          <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
-        {/if}
-      </button>
-    {/if}
+  <!-- The title first; then its track, and its keys at the end, as a
+       row's transport sits at its end: play, then spent. -->
+  <header class="card-head" class:pigmented={!!data.pigment} style:--pigment={data.pigment}>
     <span class="card-name" {title}>{title}</span>
     {#if data.track}<span class="card-track">{data.track}</span>{/if}
     {#if data.source}
@@ -91,6 +77,20 @@
       </button>
     {/if}
     {#if !missing}
+      <button
+        type="button"
+        class="play-key nodrag"
+        class:playing={data.live}
+        aria-pressed={data.live}
+        title={data.live ? `Take ${title} out of play` : `Play ${title}`}
+        on:click|stopPropagation={() => actions.launch(card, !data.live)}
+      >
+        {#if data.live}
+          <span class="stop-mark" aria-hidden="true"></span>
+        {:else}
+          <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
+        {/if}
+      </button>
       <SpendKey spent={data.spent} name={title} onToggle={() => actions.spend(card, !data.spent)} />
     {/if}
   </header>
@@ -150,6 +150,33 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  /* The track's pigment fills the head, as it fills the track's plate in
+     Prep (TrackGrid .nameplate.pigmented), in ink, bold as there. */
+  .card-head.pigmented {
+    background: var(--pigment);
+    --key-ground: var(--bg-container);
+  }
+
+  /* Its keys keep the plain head's ground, as a pigmented plate's count
+     badge does (TrackGrid .nameplate.pigmented .count), so the pigment
+     doesn't show through their wells. */
+  .card-head.pigmented .play-key {
+    background: var(--key-ground);
+  }
+
+  .card-head.pigmented .play-key.playing {
+    background: color-mix(in srgb, var(--text-active) 15%, var(--bg-container));
+  }
+
+  .card-head.pigmented .card-name {
+    color: var(--text-inverse);
+    font-weight: 700;
+  }
+
+  .card-head.pigmented .source-key {
+    color: color-mix(in srgb, var(--text-inverse) 70%, transparent);
+  }
+
   .card-name {
     flex: 1;
     min-width: 0;
@@ -161,9 +188,20 @@
     color: var(--text-primary);
   }
 
+  /* The track in a well like the keys beside it, on their ground, bold:
+     a plate's label set into the head. */
   .card-track {
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 0.35rem;
+    background: var(--key-ground, transparent);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
     font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
     color: var(--text-tertiary);
   }
 
