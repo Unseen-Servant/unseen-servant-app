@@ -906,17 +906,25 @@ def _now_iso() -> str:
 
 
 # Collections store their pigment's hex, so a palette change remaps here.
-# The retired manuscript pigments → their sorcerer's-cabinet successors
-# (src/lib/legend-lore/palette.ts). Ember folds into Madder: the cabinet
-# leaves orange to the interface's amber and vermilion.
+# Retired pigments → their successors in the current sorcerer's cabinet
+# (src/lib/legend-lore/palette.ts). The cabinet keeps one green: every
+# retired green folds into Malachite.
 _RETIRED_PIGMENTS = {
-    "#c2736d": "#d07c87",  # Madder    → Madder
-    "#bb7b4e": "#d07c87",  # Ember     → Madder
-    "#9f8b3e": "#abc279",  # Gilt      → Arsenic
-    "#6b9b60": "#4e9766",  # Moss      → Malachite
-    "#2fa094": "#43a49f",  # Verdigris → Verdigris
-    "#5b90c7": "#6b9ad0",  # Woad      → Woad
-    "#b5739f": "#dba2c3",  # Plum      → Murex
+    # Manuscript pigments
+    "#c2736d": "#eb98a2",  # Madder    → Madder
+    "#bb7b4e": "#f29349",  # Ember     → Realgar
+    "#9f8b3e": "#e6c667",  # Gilt      → Ochre
+    "#6b9b60": "#66965c",  # Moss      → Malachite
+    "#2fa094": "#66965c",  # Verdigris → Malachite
+    "#5b90c7": "#478bdb",  # Woad      → Lapis
+    "#b5739f": "#d379b7",  # Plum      → Murex
+    # First cabinet
+    "#d07c87": "#eb98a2",  # Madder    → Madder
+    "#abc279": "#e6c667",  # Arsenic   → Ochre
+    "#4e9766": "#66965c",  # Malachite → Malachite
+    "#43a49f": "#66965c",  # Verdigris → Malachite
+    "#6b9ad0": "#478bdb",  # Woad      → Lapis
+    "#dba2c3": "#d379b7",  # Murex     → Murex
 }
 
 
