@@ -14,15 +14,15 @@ from pathlib import Path
 from evals.engines.base import SearchOptions
 from evals.engines.v2 import SIDECAR_DIR
 
-PAGE_SVELTE = Path(__file__).resolve().parents[2] / "src" / "routes" / "legend-lore" / "+page.svelte"
+PANEL_SVELTE = Path(__file__).resolve().parents[2] / "src" / "lib" / "legend-lore" / "LegendLorePanel.svelte"
 
 
 def test_default_request_size_is_the_ui_first_page():
-    match = re.search(r"const PAGE_SIZE_INITIAL = (\d+)", PAGE_SVELTE.read_text())
-    assert match, f"PAGE_SIZE_INITIAL not found in {PAGE_SVELTE}"
+    match = re.search(r"const PAGE_SIZE_INITIAL = (\d+)", PANEL_SVELTE.read_text())
+    assert match, f"PAGE_SIZE_INITIAL not found in {PANEL_SVELTE}"
     assert SearchOptions().n_results == int(match.group(1)), (
         "evals.engines.base.SearchOptions.n_results must track PAGE_SIZE_INITIAL "
-        "in src/routes/legend-lore/+page.svelte — quality is gated at the page "
+        "in src/lib/legend-lore/LegendLorePanel.svelte — quality is gated at the page "
         "size the UI actually sends (metrics stay graded @10)"
     )
 
