@@ -122,11 +122,11 @@
     padding: 0 0.5rem;
     background: var(--bg-header);
   }
-  /* Room for the traffic lights, placed at x 16 (tauri.conf.json), and a
-     clear gap after them before the mark: the buttons' pitch varies by
-     macOS version, so this leaves headroom. */
+  /* Room for the traffic lights, then 12px before the mark. Placed at x 16
+     (tauri.conf.json), the buttons end near 76px: a 23.5px pitch and 15px
+     across, measured off a macOS 26 screenshot. */
   .rack-bar.overlaid {
-    padding-left: 100px;
+    padding-left: 88px;
   }
 
   /* Sized by height, the width following the mark's 685 × 960 ink. */
