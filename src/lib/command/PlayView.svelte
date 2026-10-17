@@ -306,12 +306,6 @@
       />
     </div>
 
-    <!-- An empty board says where its cards come from: printed in its
-         corner as a legend, not a control. -->
-    {#if view && !allCards.length}
-      <span class="legend">Plan beats in Prep to put their notes here</span>
-    {/if}
-
     <!-- The jot bar, in the board's bottom corner: a line at the end of
          the session note, which the key beside it (and ⌘O) opens. -->
     <div class="jot">
@@ -379,18 +373,6 @@
     max-height: calc(100% - 1rem);
     display: flex;
     flex-direction: column;
-  }
-
-  /* In the board's corner, under the cards, above the jot bar. */
-  .legend {
-    position: absolute;
-    left: 0.75rem;
-    bottom: 2.6rem;
-    z-index: 5;
-    font-size: 0.8rem;
-    font-style: italic;
-    color: var(--text-tertiary);
-    pointer-events: none;
   }
 
   /* The bar and, beside it, the key that opens what it writes to, level
