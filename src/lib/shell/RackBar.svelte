@@ -147,8 +147,8 @@
   /* Sized by height, the width following the mark's 685 × 960 ink. */
   .mark {
     flex-shrink: 0;
-    width: 17px;
-    height: 24px;
+    width: 14px;
+    height: 20px;
     fill: currentColor;
   }
   .wordmark {
