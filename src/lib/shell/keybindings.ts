@@ -157,10 +157,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
   // In Prep and Play, from the editor too: Obsidian's reading-view key.
   { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
-  // In Play, on the plan, as Legend Lore's collections take ↑↓ and P/Space.
-  { id: 'command.next',          keys: { mac: '↓',    other: '↓' },             label: 'Focus the next beat in Play',  scope: 'command' },
-  { id: 'command.prev',          keys: { mac: '↑',    other: '↑' },             label: 'Focus the previous beat in Play', scope: 'command' },
-  { id: 'command.play',          keys: { mac: 'Space', other: 'Space' },        label: 'Launch or stop the focused beat in Play', scope: 'command', switch: true },
+  // In Play, on the session player, as Legend Lore's collections take them.
+  { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'command' },
+  { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'command' },
+  { id: 'command.play',          keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Launch or stop the focused beat', scope: 'command', switch: true },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

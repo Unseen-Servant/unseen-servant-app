@@ -32,6 +32,9 @@
   export let active: boolean;
   /** Cards to frame; a new object asks again. */
   export let frame: { ids: string[] } | null = null;
+  /** How far, in px, something floats over the board from its left edge
+   *  (the session player): framed cards keep clear of it. */
+  export let covered = 0;
   export let onOps: (ops: BoardOp[]) => void;
   export let onCardMenu: (card: Card, e: MouseEvent) => void;
   export let onLineMenu: (id: string, e: MouseEvent) => void;
@@ -152,7 +155,7 @@
     <!-- Graph paper, the old-school dungeon map's: a faint square grid that
          scales with the zoom. -->
     <Background variant={BackgroundVariant.Lines} gap={24} />
-    <BoardFramer request={frame} />
+    <BoardFramer request={frame} {covered} />
   </SvelteFlow>
 </div>
 

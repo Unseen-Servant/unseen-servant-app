@@ -1,10 +1,12 @@
 <script lang="ts">
-  // Play's arrangement (design §5.2): the session's plan, worked as Legend
-  // Lore's collections panel: a click focuses a beat, ↑↓ move the focus, and
-  // Space launches the focused beat, or stops it while it's live, as P/Space
-  // play a collection. A beat's transport sits at the row's end; the live
-  // beat's ■ stops the set, and the key beside it frames the live cards.
-  import { PLAY } from '../ui/iconPaths';
+  // Play's arrangement (design §5.2), named the session player: a box over
+  // the board's corner holding the session's plan, worked as Legend Lore's
+  // collections panel: a click focuses a beat, ↑↓ or J/K move the focus,
+  // and P or Space launches the focused beat, or stops it while it's live,
+  // as they play a collection. A beat's transport sits at the row's end;
+  // the live beat's ■ stops the set, and the key beside it frames the live
+  // cards. The plate folds the list down to the live beat.
+  import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { menuSlotHeld } from '../shell/menuSlot';
   import CommandMenu from './CommandMenu.svelte';
@@ -13,6 +15,8 @@
   import type { BeatEntry } from './types';
 
   export let rows: PlanRow[];
+  /** The list unfolded. Folded, only the live beat's row shows. */
+  export let open: boolean;
   /** True while the panel is visible: keys do nothing otherwise (PANELS.md). */
   export let active: boolean;
   /** The beat the live set was launched from. */
@@ -29,8 +33,9 @@
 
   /** The focused beat: ringed, and what Space launches. */
   let focused: string | null = null;
-  $: beats = rows.flatMap((r) => (r.beat ? [r.beat] : []));
-  // A beat that left the plan can't stay focused.
+  $: shown = open ? rows : rows.filter((r) => r.beat && r.beat.path === liveBeat);
+  $: beats = shown.flatMap((r) => (r.beat ? [r.beat] : []));
+  // A beat that left the plan, or is folded away, can't stay focused.
   $: if (focused && !beats.some((b) => b.path === focused)) focused = null;
 
   // Hover latched on pointerenter, as Legend Lore's rows.
@@ -65,10 +70,11 @@
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const target = e.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const lk = e.key.toLowerCase();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || lk === 'j' || lk === 'k') {
       e.preventDefault();
-      step(e.key === 'ArrowDown' ? 1 : -1);
-    } else if (e.key === ' ') {
+      step(e.key === 'ArrowDown' || lk === 'j' ? 1 : -1);
+    } else if (lk === 'p' || lk === ' ') {
       // Space is the DAW's play/stop, as in Legend Lore's collections.
       e.preventDefault();
       if (e.repeat) return;
@@ -97,12 +103,15 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<section class="arrangement" aria-label="Play">
-  <header class="nameplate">
-    <span class="ledger-label">play</span>
-  </header>
+<section class="arrangement" aria-label="Session player">
+  <!-- The plate folds the list, as a group's title does in Prep. -->
+  <button type="button" class="nameplate" aria-expanded={open} on:click={() => (open = !open)}>
+    <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+    <span class="ledger-label">session player</span>
+  </button>
+  {#if open || shown.length}
   <div class="plan">
-    {#each rows as row (row.at + ':' + row.link)}
+    {#each shown as row (row.at + ':' + row.link)}
       {#if row.beat}
         {@const beat = row.beat}
         {@const playing = beat.path === liveBeat}
@@ -132,7 +141,7 @@
               class="tr-btn"
               class:playing
               aria-pressed={playing}
-              title={`${playing ? 'Stop' : 'Launch'} ${beat.name} (Space)`}
+              title={`${playing ? 'Stop' : 'Launch'} ${beat.name} (P)`}
               on:click|stopPropagation={(e) => e.detail <= 1 && toggle(beat)}
             >
               {#if playing}
@@ -170,6 +179,7 @@
       <p class="quiet">Nothing planned. Beats added to the session in Prep show here.</p>
     {/each}
   </div>
+  {/if}
 </section>
 
 {#if menu}
@@ -177,14 +187,18 @@
 {/if}
 
 <style>
+  /* A box over the cards (PlayView places it): the column's plate and rows,
+     edged and lifted as a menu is, and only as tall as the plan. */
   .arrangement {
-    flex: 0 0 14rem;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    border-right: 1px solid var(--border-subtle);
+    overflow: hidden;
     background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Centred, not baseline-aligned, as Legend Lore's panel head: the
@@ -204,8 +218,41 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  /* The plate is the fold's key: a group title's caret and hover
+     (BeatColumn .group-head), the caret where other plates start their
+     title. */
+  button.nameplate {
+    gap: 0.3rem;
+    width: 100%;
+    border-width: 0 0 1px;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  /* Folded with nothing live, the plate is the box's last line. */
+  .nameplate:last-child {
+    border-bottom: none;
+  }
+
+  .nameplate .caret {
+    align-self: center;
+    width: 0.7rem;
+    height: 0.7rem;
+    color: var(--text-tertiary);
+  }
+
+  .nameplate .ledger-label {
+    transition: color var(--transition-fast);
+  }
+
+  .nameplate:hover .ledger-label,
+  .nameplate:hover .caret {
+    color: var(--text-secondary);
+  }
+
   .plan {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding: 0.25rem;

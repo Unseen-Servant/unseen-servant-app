@@ -6,6 +6,9 @@
 
   /** Card ids to frame; a new object asks again. Empty frames everything. */
   export let request: { ids: string[] } | null = null;
+  /** Px of the board's left edge something floats over (Board's covered):
+   *  the cards are framed a grid square clear of it. */
+  export let covered = 0;
 
   const flow = useSvelteFlow();
   let last: { ids: string[] } | null = null;
@@ -17,7 +20,7 @@
     requestAnimationFrame(() => {
       void flow.fitView({
         nodes: ids.length ? ids.map((id) => ({ id })) : undefined,
-        padding: 0.15,
+        padding: covered ? { x: 0.15, y: 0.15, left: `${covered + 24}px` } : 0.15,
         maxZoom: 1.1,
         duration: 250,
       });

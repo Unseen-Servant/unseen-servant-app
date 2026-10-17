@@ -33,6 +33,8 @@
   export let onLive: (live: LiveSet) => void;
   export let onEdit: (path: string) => void;
   export let onFollow: (name: string) => void;
+  /** The session player unfolded; CommandPanel keeps it across Tab. */
+  export let playerOpen: boolean;
   /** A note or a beat marked spent, or not. */
   export let onSpent: (note: { name: string; path: string }, spent: boolean) => void;
 
@@ -162,6 +164,12 @@
 
   let frame: { ids: string[] } | null = null;
 
+  /** The session player sits over the board's left edge: framing keeps the
+   *  cards clear of how far it reaches. */
+  let player: HTMLElement | undefined;
+  let playerWidth = 0;
+  $: covered = player && playerWidth ? player.offsetLeft + playerWidth : 0;
+
   /** Frame the cards of `paths`, wherever the board has them — or, with
    *  `orAll` and no paths, the whole board. */
   function frameNotes(paths: Iterable<string>, orAll = false) {
@@ -219,17 +227,6 @@
 </script>
 
 <div class="play">
-  <Arrangement
-    rows={planRows(index, session)}
-    {active}
-    liveBeat={live?.beat ?? null}
-    onLaunch={launch}
-    onStop={stop}
-    onReframe={() => frameNotes(live?.notes ?? [])}
-    onEdit={(beat) => onEdit(beat.path)}
-    {onSpent}
-  />
-
   <div class="stage">
     {#if view}
       <Board
@@ -240,6 +237,7 @@
         {removable}
         {active}
         {frame}
+        {covered}
         onOps={apply}
         onCardMenu={cardMenu}
         onLineMenu={lineMenu}
@@ -247,6 +245,21 @@
     {:else if boardError}
       <p class="board-note" role="alert">{boardError}</p>
     {/if}
+
+    <!-- The session player, a box over the board's top-left corner. -->
+    <div class="player" bind:this={player} bind:offsetWidth={playerWidth}>
+      <Arrangement
+        rows={planRows(index, session)}
+        bind:open={playerOpen}
+        {active}
+        liveBeat={live?.beat ?? null}
+        onLaunch={launch}
+        onStop={stop}
+        onReframe={() => frameNotes(live?.notes ?? [])}
+        onEdit={(beat) => onEdit(beat.path)}
+        {onSpent}
+      />
+    </div>
 
     <!-- An empty board says where its cards come from: printed in its
          corner as a legend, not a control. -->
@@ -275,9 +288,22 @@
     min-height: 0;
   }
 
+  /* Centred, clear of the session player in the corner. */
   .board-note {
     margin: 2rem;
+    text-align: center;
     color: var(--text-danger);
+  }
+
+  .player {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 5;
+    width: 14rem;
+    max-height: calc(100% - 1rem);
+    display: flex;
+    flex-direction: column;
   }
 
   /* In the board's corner, under the cards. */

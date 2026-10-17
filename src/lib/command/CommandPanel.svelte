@@ -79,6 +79,9 @@
   let shelfOpen = true;
   /** The beat column in Prep, the same. */
   let beatsOpen = true;
+  /** The session player's list in Play, folded from its plate: kept here so
+   *  it stays folded across Tab. */
+  let playerOpen = true;
 
   /** The row clicked last, a note's or a beat's: what R renames. A note's
    *  wears Legend Lore's focus ring. */
@@ -1000,6 +1003,7 @@
               {session}
               {live}
               {run}
+              bind:playerOpen
               onLive={applyLive}
               onEdit={openPath}
               onFollow={followLink}
@@ -1007,7 +1011,7 @@
             />
           {:else}
             <div class="empty">
-              <p class="lede">Play runs a session: its board, what's live, and the log.</p>
+              <p class="lede">Play runs a session: its board and what's live.</p>
               <ActionButton label="new session" onClick={newSession} />
             </div>
           {/if}
