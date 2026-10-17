@@ -123,6 +123,7 @@
         <div
           class="beat-row"
           class:focused={beat.path === focused}
+          class:playing
           class:spent={!!beat.spent}
           class:hovered={$hoverLive && hovered === beat.path}
           title={beat.spent ? `${beat.name} — spent ${beat.spent}` : beat.name}
@@ -260,13 +261,14 @@
 
   /* The session planner's row (BeatColumn .beat-row), a collection's: a
      note row's height, the rule slot reserved on the left. The name starts
-     under the plate's: its 0.6rem inset, less the list's padding and the
-     rule. */
+     under the plate's label, as the planner's start under its group heads':
+     the plate's 0.6rem inset plus the caret's box and gap (1rem), less the
+     list's padding and the rule. */
   .beat-row {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.15rem 0.35rem 0.15rem calc(0.6rem - 0.25rem - 3px);
+    padding: 0.15rem 0.35rem 0.15rem calc(1.6rem - 0.25rem - 3px);
     border-left: 3px solid transparent;
     font-size: 0.9rem;
     line-height: 1.5;
@@ -281,6 +283,14 @@
      focused beat. */
   .beat-row.hovered {
     background: var(--bg-container);
+  }
+
+  /* The live beat wears a playing collection's highlight
+     (CollectionsPanel .row-container.playing): parchment wash and purple
+     rule, kept under the pointer. */
+  .beat-row.playing {
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
   }
 
   .beat-row.focused {

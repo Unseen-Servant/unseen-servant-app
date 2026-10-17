@@ -302,12 +302,14 @@
     color: var(--text-danger);
   }
 
+  /* The session planner's width (BeatColumn), room for a name beside the
+     transport and the count. */
   .player {
     position: absolute;
     top: 0.5rem;
     left: 0.5rem;
     z-index: 5;
-    width: 14rem;
+    width: 15rem;
     max-height: calc(100% - 1rem);
     display: flex;
     flex-direction: column;
