@@ -238,6 +238,7 @@
   // -- the jot bar --------------------------------------------------------
 
   let jot = '';
+  let jotEl: HTMLTextAreaElement | undefined;
 
   /** Enter sends the line and clears the bar for the next; a refused line
    *  comes back, unless something new was typed meanwhile. */
@@ -247,6 +248,25 @@
     jot = '';
     if (!(await onJot(text)) && !jot) jot = text;
   }
+
+  function jotKey(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
+    if (e.key === 'Escape') e.currentTarget.blur();
+    // Enter sends: a jot is one line, however it wraps.
+    else if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      void submitJot();
+    }
+  }
+
+  /** The bar wraps its text and is as tall as its lines, up to its
+   *  max-height. Each change of the text, typed or cleared, refits it. */
+  async function fitJot(_text: string) {
+    await tick();
+    if (!jotEl) return;
+    jotEl.style.height = 'auto';
+    jotEl.style.height = `${jotEl.scrollHeight + jotEl.offsetHeight - jotEl.clientHeight}px`;
+  }
+  $: void fitJot(jot);
 </script>
 
 <div class="play">
@@ -295,16 +315,16 @@
     <!-- The jot bar, in the board's bottom corner: a line at the end of
          the session note, which the key beside it (and ⌘O) opens. -->
     <div class="jot">
-      <form class="jot-bar" on:submit|preventDefault={submitJot}>
-        <input
-          type="text"
-          bind:value={jot}
-          placeholder="Write to session notes…"
-          aria-label="Add a line to the session note"
-          spellcheck="false"
-          on:keydown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
-        />
-      </form>
+      <textarea
+        class="jot-bar"
+        rows="1"
+        bind:this={jotEl}
+        bind:value={jot}
+        placeholder="Write to session notes…"
+        aria-label="Add a line to the session note"
+        spellcheck="false"
+        on:keydown={jotKey}
+      ></textarea>
       <button
         type="button"
         class="note-key"
@@ -373,7 +393,8 @@
     pointer-events: none;
   }
 
-  /* The bar and, beside it, the key that opens what it writes to. */
+  /* The bar and, beside it, the key that opens what it writes to, level
+     with the bar's last line as it grows up from the corner. */
   .jot {
     position: absolute;
     left: 0.5rem;
@@ -381,36 +402,40 @@
     z-index: 5;
     max-width: calc(100% - 1rem);
     display: flex;
+    align-items: flex-end;
     gap: 0.3rem;
   }
 
-  /* Wider than the session player, for a sentence. */
+  /* Wider than the session player, for a sentence. One line is the app's
+     row height, which the key matches (0.85rem × 1.3 + padding + border);
+     longer text wraps and the bar grows (fitJot), then scrolls. */
   .jot-bar {
-    flex: 0 1 22rem;
+    flex: 0 1 auto;
+    width: 22rem;
     min-width: 0;
-  }
-
-  /* The app's row height, which the key matches. */
-  .jot-bar input {
-    width: 100%;
-    height: 1.65rem;
+    min-height: 1.65rem;
+    max-height: 9rem;
     box-sizing: border-box;
-    padding: 0 0.45rem;
+    display: block;
+    padding: 0.21rem 0.45rem;
+    resize: none;
+    overflow-y: auto;
     background: var(--bg-container);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     font-family: var(--font-body);
     font-size: 0.85rem;
+    line-height: 1.3;
     color: var(--text-primary);
   }
 
   /* As Legend Lore's search bar. */
-  .jot-bar input::placeholder {
+  .jot-bar::placeholder {
     color: var(--text-secondary);
     font-style: italic;
   }
 
-  .jot-bar input:focus {
+  .jot-bar:focus {
     outline: none;
     border-color: var(--text-accent);
   }
