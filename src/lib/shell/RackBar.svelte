@@ -106,12 +106,12 @@
     {/each}
   </div>
 
-  <!-- The splash's mark and name, small, at the bar's far end. The pointer
+  <!-- The splash's name and mark, small, at the bar's far end. The pointer
        passes through, so a press here drags the window as the bare plate
        does. -->
   <span class="brand">
-    <svg class="mark" viewBox={MARK_VIEWBOX} aria-hidden="true"><path d={MARK} /></svg>
     <span class="wordmark">Unseen Servant</span>
+    <svg class="mark" viewBox={MARK_VIEWBOX} aria-hidden="true"><path d={MARK} /></svg>
   </span>
 </nav>
 
@@ -138,7 +138,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin-left: auto;
+    margin: 0 0.5rem 0 auto;
     color: var(--text-tertiary);
     pointer-events: none;
   }
@@ -151,7 +151,7 @@
   }
   .wordmark {
     font-family: var(--font-heading);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     line-height: 1;
     letter-spacing: 0.01em;
     white-space: nowrap;
