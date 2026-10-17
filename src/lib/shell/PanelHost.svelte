@@ -317,13 +317,14 @@
 </div>
 
 <style>
-  /* The rack's frame shows under the bar and, as rails, between tools. */
+  /* The rack's frame is the tools' own ground: it parts the plates, under
+     the bar and as rails between tools, and runs into their bodies. */
   .host {
     height: 100vh;
     display: flex;
     flex-direction: column;
     gap: var(--rail);
-    background: var(--bg-rack);
+    background: var(--bg-app);
   }
 
   .rack {
@@ -435,7 +436,7 @@
     color: var(--text-accent);
   }
   .drop.refused {
-    background: color-mix(in srgb, var(--bg-rack) 50%, transparent);
+    background: color-mix(in srgb, var(--bg-app) 50%, transparent);
     outline: none;
   }
   .drop.refused .ledger-label {

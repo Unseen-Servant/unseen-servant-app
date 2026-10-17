@@ -102,14 +102,14 @@
 </nav>
 
 <style>
-  /* A plate between the rack's frame and the tools' own header plates. */
+  /* The tools' header plate (Header .header, Command's .bar). */
   .rack-bar {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 1rem;
     padding: 0.3rem 0.5rem;
-    background: var(--bg-container);
+    background: var(--bg-header);
   }
 
   /* Wells cut like Header's view switch. */
