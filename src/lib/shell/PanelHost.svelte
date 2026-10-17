@@ -327,10 +327,14 @@
     background: var(--bg-app);
   }
 
+  /* Inset by a rail at either side, so the frame runs as evenly round the
+     outer edges as between tools. A margin, not padding: the slots are
+     placed from the rack's own box, which bind:clientWidth measures. */
   .rack {
     position: relative;
     flex: 1;
     min-height: 0;
+    margin: 0 var(--rail);
   }
   .rack.resizing {
     user-select: none;
