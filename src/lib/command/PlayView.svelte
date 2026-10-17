@@ -5,6 +5,7 @@
   // the log are the only things written — what's live is the sidecar's.
   import { tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import type { Viewport } from '@xyflow/svelte';
   import Arrangement from './Arrangement.svelte';
   import Board from './Board.svelte';
   import CommandMenu from './CommandMenu.svelte';
@@ -35,6 +36,9 @@
   export let onFollow: (name: string) => void;
   /** The session player unfolded; CommandPanel keeps it across Tab. */
   export let playerOpen: boolean;
+  /** Where each session's board was left, by board key: CommandPanel's, so
+   *  it outlives Tab. */
+  export let boardViews: Map<string, Viewport>;
   /** A note or a beat marked spent, or not. */
   export let onSpent: (note: { name: string; path: string }, spent: boolean) => void;
 
@@ -59,8 +63,9 @@
         const first = view === null;
         view = loaded;
         boardError = null;
-        // Open on what's in play, readable; nothing in play, on everything.
-        if (first) {
+        // Open where the board was left; the first time, on what's in play,
+        // readable, and with nothing in play on everything.
+        if (first && !boardViews.has(key)) {
           await tick();
           frameNotes(live?.notes ?? [], true);
         }
@@ -238,6 +243,8 @@
         {active}
         {frame}
         {covered}
+        initialViewport={boardViews.get(boardKey)}
+        onLeave={(viewport) => boardViews.set(boardKey, viewport)}
         onOps={apply}
         onCardMenu={cardMenu}
         onLineMenu={lineMenu}

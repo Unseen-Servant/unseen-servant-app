@@ -7,6 +7,7 @@
   // rules.
   import { onDestroy, onMount, tick, type Snippet } from 'svelte';
   import type { UnlistenFn } from '@tauri-apps/api/event';
+  import type { Viewport } from '@xyflow/svelte';
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import ActionButton from '../ui/ActionButton.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
@@ -82,6 +83,9 @@
   /** The session player's list in Play, folded from its plate: kept here so
    *  it stays folded across Tab. */
   let playerOpen = true;
+  /** Where each session's board was left in Play, so Tab back to Play finds
+   *  it as it was, for the sitting. */
+  const boardViews = new Map<string, Viewport>();
 
   /** The row clicked last, a note's or a beat's: what R renames. A note's
    *  wears Legend Lore's focus ring. */
@@ -1004,6 +1008,7 @@
               {live}
               {run}
               bind:playerOpen
+              {boardViews}
               onLive={applyLive}
               onEdit={openPath}
               onFollow={followLink}

@@ -9,6 +9,7 @@
     ConnectionMode,
     SvelteFlow,
     type Connection,
+    type Viewport,
     type Edge,
     type Node,
   } from '@xyflow/svelte';
@@ -35,6 +36,10 @@
   /** How far, in px, something floats over the board from its left edge
    *  (the session player): framed cards keep clear of it. */
   export let covered = 0;
+  /** Where the viewport opens: where the board was left (PlayView). */
+  export let initialViewport: Viewport | undefined = undefined;
+  /** The viewport as the board closes, to open there again. */
+  export let onLeave: (viewport: Viewport) => void;
   export let onOps: (ops: BoardOp[]) => void;
   export let onCardMenu: (card: Card, e: MouseEvent) => void;
   export let onLineMenu: (id: string, e: MouseEvent) => void;
@@ -137,6 +142,7 @@
     bind:edges
     {nodeTypes}
     connectionMode={ConnectionMode.Loose}
+    {initialViewport}
     minZoom={0.2}
     maxZoom={2}
     deleteKey={active ? ['Backspace', 'Delete'] : null}
@@ -155,7 +161,7 @@
     <!-- Graph paper, the old-school dungeon map's: a faint square grid that
          scales with the zoom. -->
     <Background variant={BackgroundVariant.Lines} gap={24} />
-    <BoardFramer request={frame} {covered} />
+    <BoardFramer request={frame} {covered} {onLeave} />
   </SvelteFlow>
 </div>
 
