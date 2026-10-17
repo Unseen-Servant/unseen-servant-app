@@ -11,6 +11,7 @@
   import type { KnownGameSystem } from './types';
   import SystemTagMenu from './SystemTagMenu.svelte';
   import { hoverLive } from '../ui/inputModality';
+  import { grab } from '../ui/grab';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
 
   export let results: SearchResultItem[] = [];
@@ -243,7 +244,7 @@
         class:weak={dimWeak && result.tier === 'weak'}
         style={collColor ? `--collection-color: ${collColor}` : ''}
         bind:this={rowEls[i]}
-        draggable="true"
+        use:grab
         on:dragstart={(e) => handleDragStart(e, result)}
         on:dragend={clearTreePathsPayload}
         on:click={() => handleRowClick(i)}

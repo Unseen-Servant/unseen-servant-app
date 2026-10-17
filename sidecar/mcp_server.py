@@ -1,5 +1,6 @@
 """
-Legend Lore — MCP server for TTRPG PDF library.
+Unseen Servant — MCP server for Legend Lore (the TTRPG PDF library) and
+Command (the GM's campaign notes).
 
 This is a separate process from the FastAPI sidecar. Claude Desktop
 launches it via stdio, and it calls the sidecar's HTTP API to fulfill
@@ -204,7 +205,7 @@ class SidecarClient:
 sidecar: SidecarClient | None = None
 
 mcp = MCPServer(
-    name="Legend Lore",
+    name="Unseen Servant",
     instructions=(
         "You have access to the user's indexed TTRPG PDF library via Legend Lore. "
         "Use the search and retrieval tools to find rules, lore, stat blocks, "
@@ -225,7 +226,19 @@ mcp = MCPServer(
         "its full section, or pass search_library's full_text=True to get "
         "full sections for every result up front.\n"
         "- Use get_pages() to read a specific page range straight from a PDF "
-        "(e.g. a table of contents or a map) when search doesn't surface it."
+        "(e.g. a table of contents or a map) when search doesn't surface it.\n\n"
+        "You also have the GM's campaign notes via Command: Markdown notes in "
+        "tracks (NPCs, Locations, Secrets, …), a shelf of gathered material not "
+        "filed on a track yet, beats (scenes, each a set of notes) and sessions "
+        "(a plan of beats and a log of play). Tools act on the campaign open in "
+        "the app unless you pass campaign=.\n"
+        "- Call current_session() to see what's planned and what has happened, "
+        "and live_set() for what's in play at the table right now.\n"
+        "- Read notes with read_note() and find them with find_notes() before "
+        "describing them — never invent what a note says.\n"
+        "- create_note() writes new material into a track, or onto the shelf "
+        "when it isn't clear where it belongs; add_to_live_set() and spend() "
+        "follow the table during play."
     ),
 )
 
@@ -522,6 +535,301 @@ async def list_game_systems() -> str:
     for s in systems:
         lines.append(f"  - {s}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Command (docs/roadmap/2026-10-11-command-design.md §8)
+# ---------------------------------------------------------------------------
+
+_NO_CAMPAIGN = (
+    "No campaign is open in Command. Open one in the app, or pass campaign= "
+    "(list_campaigns() lists them)."
+)
+
+
+def _q(**params: str | None) -> str:
+    return "&".join(f"{k}={quote(v, safe='')}" for k, v in params.items() if v is not None)
+
+
+async def _context() -> dict:
+    """The campaign and session open in the app; empty when it can't say."""
+    ctx = await sidecar.get("/api/command/context")
+    return ctx if isinstance(ctx, dict) else {}
+
+
+async def _campaign_index(campaign: str | None) -> tuple[dict | None, dict, str | None]:
+    """The campaign to act on — ``campaign``, else the one open in the app —
+    its index, and the app's context; or the message saying why not."""
+    reply = await sidecar.get("/api/command/context")
+    if isinstance(reply, str) and not campaign:
+        return None, {}, reply  # the app isn't answering: say that, not "nothing open"
+    ctx = reply if isinstance(reply, dict) else {}
+    name = campaign or ctx.get("campaign")
+    if not name:
+        return None, ctx, _NO_CAMPAIGN
+    index = await sidecar.get(f"/api/command/campaign?{_q(name=name)}")
+    if isinstance(index, str):
+        return None, ctx, index
+    return index, ctx, None
+
+
+def _note(index: dict, name: str) -> tuple[dict | None, str | None]:
+    """The note ``name`` means: a path (``NPCs/Ismark``) or a name, as a
+    wikilink resolves it; or the message saying why not."""
+    wanted = name.strip().removesuffix(".md")
+    for n in index["notes"]:
+        if n["path"].removesuffix(".md").casefold() == wanted.casefold():
+            return n, None
+    target = wanted.split("/")[-1].casefold()
+    hits = [n for n in index["notes"] if n["name"].casefold() == target]
+    if len(hits) == 1:
+        return hits[0], None
+    if not hits:
+        return None, f'No note named "{name}" in {index["name"]}. Try find_notes("{name}").'
+    paths = ", ".join(n["path"] for n in hits)
+    return None, f'"{name}" names more than one note in {index["name"]} ({paths}) — pass the path.'
+
+
+def _session(index: dict, ctx: dict) -> dict | None:
+    """The session open in the app if it's this campaign's, else the latest."""
+    sessions = index["sessions"]
+    if ctx.get("campaign") == index["name"]:
+        open_one = next((s for s in sessions if s["name"] == ctx.get("session")), None)
+        if open_one:
+            return open_one
+    return sessions[-1] if sessions else None
+
+
+def _label(index: dict, ref: dict) -> str:
+    """A beat's note as a plan line names it: name and track, or missing."""
+    note = next((n for n in index["notes"] if n["path"] == ref.get("path")), None)
+    if note is None:
+        return f"{ref['link']} (not written yet)"
+    spent = ", spent" if note.get("spent") else ""
+    return f"{note['name']} ({note['track'] or 'loose'}{spent})"
+
+
+@mcp.tool()
+async def list_campaigns() -> str:
+    """List the campaigns in Command, the GM's campaign notes, and say which
+    one is open in the app (the one the other Command tools act on)."""
+    data = await sidecar.get("/api/command/campaigns")
+    if isinstance(data, str):
+        return data
+    campaigns = data.get("campaigns", [])
+    if not campaigns:
+        return "No campaigns yet. Create one in Command."
+    ctx = await _context()
+    lines = ["Campaigns:"]
+    for name in campaigns:
+        mark = ""
+        if name == ctx.get("campaign"):
+            mark = f" (open, session: {ctx['session']})" if ctx.get("session") else " (open)"
+        lines.append(f"  - {name}{mark}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def current_session(campaign: str | None = None) -> str:
+    """The session at the table: its plan of beats (scenes) with the notes
+    each holds, what's live, and the log of what has happened so far.
+
+    Args:
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    session = _session(index, ctx)
+    if session is None:
+        return f"{index['name']} has no session yet. Start one in Command."
+    live = await sidecar.get(f"/api/command/live?{_q(campaign=index['name'])}")
+    live = live if isinstance(live, dict) else {}
+    beats = {b["path"]: b for b in index["beats"]}
+
+    when = f" ({session['date']})" if session.get("date") else ""
+    lines = [f"{session['name']}{when} — {index['name']}", "", "Plan:"]
+    if not session["beats"]:
+        lines.append("  (nothing planned)")
+    for i, ref in enumerate(session["beats"], 1):
+        beat = beats.get(ref.get("path"))
+        if beat is None:
+            lines.append(f"  {i}. {ref['link']} — not written yet")
+            continue
+        marks = [f"spent {beat['spent']}"] if beat.get("spent") else []
+        if beat["path"] == live.get("beat"):
+            marks.append("live")
+        lines.append(f"  {i}. {beat['name']}" + (f" — {', '.join(marks)}" if marks else ""))
+        if beat["notes"]:
+            lines.append("     " + ", ".join(_label(index, r) for r in beat["notes"]))
+
+    playing = live.get("notes") or []
+    lines.append("")
+    if playing:
+        source = beats.get(live.get("beat"))
+        origin = f" from {source['name']}" if source else ""
+        lines.append(f"Live{origin}: {len(playing)} note(s) — live_set() has their text.")
+    else:
+        lines.append("Nothing is live.")
+
+    lines += ["", "Log:"]
+    if not session["log"]:
+        lines.append("  (nothing yet)")
+    verbs = {"launch": "▶", "spent": "spent", "unspent": "unspent", "captured": "captured"}
+    for entry in session["log"]:
+        what = entry["text"] if entry["kind"] == "jot" else f"{verbs[entry['kind']]} {entry['link']}"
+        lines.append(f"  {entry['time'] or '--:--'} {what}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def live_set(campaign: str | None = None) -> str:
+    """The notes in play at the table right now, each with its full text.
+
+    Args:
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    live = await sidecar.get(f"/api/command/live?{_q(campaign=index['name'])}")
+    if isinstance(live, str):
+        return live
+    if not live.get("notes"):
+        return f"Nothing is live in {index['name']}."
+    beat = next((b for b in index["beats"] if b["path"] == live.get("beat")), None)
+    lines = [f"Live in {index['name']}" + (f", launched from {beat['name']}" if beat else "") + ":"]
+    for path in live["notes"]:
+        note = await sidecar.get(f"/api/command/note?{_q(campaign=index['name'], path=path)}")
+        if isinstance(note, str):
+            lines += ["", f"## {path}", "(can't be read right now)"]
+            continue
+        lines += ["", f"## {note['name']} ({path})", note["content"].strip()]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def read_note(name: str, campaign: str | None = None) -> str:
+    """Read one of the GM's notes in full: an NPC, a location, a beat, a
+    session — anything in the campaign.
+
+    Args:
+        name: The note's name ("Ismark"), or its path ("NPCs/Ismark") when
+              the name is shared.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    entry, error = _note(index, name)
+    if error:
+        return error
+    note = await sidecar.get(f"/api/command/note?{_q(campaign=index['name'], path=entry['path'])}")
+    if isinstance(note, str):
+        return note
+    return f"{note['name']} ({note['path']})\n\n{note['content']}"
+
+
+@mcp.tool()
+async def find_notes(query: str, campaign: str | None = None, track: str | None = None) -> str:
+    """Find the GM's notes whose name or text mentions something.
+
+    Args:
+        query: Words to look for, matched case-insensitively.
+        campaign: A campaign name; defaults to the one open in the app.
+        track: Only notes in this track (e.g. "NPCs").
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    data = await sidecar.get(f"/api/command/find?{_q(campaign=index['name'], query=query, track=track)}")
+    if isinstance(data, str):
+        return data
+    notes = data.get("notes", [])
+    if not notes:
+        return f'No note in {index["name"]} mentions "{query}".'
+    lines = [f'Notes in {index["name"]} mentioning "{query}":']
+    for n in notes:
+        snippet = f" — {n['snippet']}" if n.get("snippet") else ""
+        lines.append(f"  - {n['name']} ({n['path']}){snippet}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def create_note(track: str, name: str, content: str = "", campaign: str | None = None) -> str:
+    """Write a new note into one of the campaign's tracks, or onto its shelf.
+
+    Args:
+        track: The track (folder) it belongs to, e.g. "NPCs" or "Secrets";
+               "Shelf" for material not filed on a track yet.
+        name: The note's name, which links reach it by; unique in the campaign.
+        content: Its Markdown text. Link other notes as [[Name]].
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    if track not in index["tracks"] and track.casefold() != "shelf":
+        return (
+            f'{index["name"]} has no track named "{track}". '
+            f'Its tracks: {", ".join(index["tracks"])}, or "Shelf".'
+        )
+    made = await sidecar.post("/api/command/notes", {
+        "campaign": index["name"], "folder": track, "name": name, "content": content,
+    })
+    if isinstance(made, str):
+        return made
+    return f"Created {made['path']} in {index['name']}."
+
+
+@mcp.tool()
+async def add_to_live_set(name: str, campaign: str | None = None) -> str:
+    """Put a note in play at the table, beside whatever is live already.
+
+    Args:
+        name: The note's name, or its path when the name is shared.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    entry, error = _note(index, name)
+    if error:
+        return error
+    live = await sidecar.post("/api/command/live/note", {
+        "campaign": index["name"], "note": entry["path"], "live": True,
+    })
+    if isinstance(live, str):
+        return live
+    return f"{entry['name']} is live: {len(live['notes'])} note(s) in play."
+
+
+@mcp.tool()
+async def spend(name: str, spent: bool = True, campaign: str | None = None) -> str:
+    """Mark a note spent (a secret revealed, a treasure given, an NPC dead, a
+    beat played) or unspent again. Logged in the session at the table.
+
+    Args:
+        name: The note's name, or its path when the name is shared.
+        spent: False to mark it unspent.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    entry, error = _note(index, name)
+    if error:
+        return error
+    session = _session(index, ctx)
+    data = await sidecar.post("/api/command/spent", {
+        "campaign": index["name"], "path": entry["path"], "spent": spent,
+        "session": session["path"] if session else None,
+    })
+    if isinstance(data, str):
+        return data
+    state = f"spent ({data['spent']})" if data.get("spent") else "unspent"
+    logged = f", logged in {session['name']}" if session else ""
+    return f"{entry['name']} is {state}{logged}."
 
 
 # ---------------------------------------------------------------------------

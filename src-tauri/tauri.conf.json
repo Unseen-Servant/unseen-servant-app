@@ -13,13 +13,16 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "Legend Lore",
+        "title": "Unseen Servant",
         "width": 1280,
         "height": 800,
         "minWidth": 940,
         "minHeight": 600,
         "maximized": true,
         "dragDropEnabled": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 20 },
         "create": false,
         "visible": false
       },

@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { CollectionInfo } from './types';
-  import { CARET_RIGHT, CIRCLE, CIRCLE_RING, GEM } from '../ui/iconPaths';
+  import { CIRCLE, CIRCLE_RING, GEM, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import SystemBadge from './SystemBadge.svelte';
+  import RenameField from '../ui/RenameField.svelte';
   import { PIGMENTS } from './palette';
   import { flushSync, onDestroy, tick } from 'svelte';
   import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut, slotChord } from '../shell/keybindings';
@@ -12,6 +13,7 @@
   import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from '../ui/menuGeometry';
+  import { grab } from '../ui/grab';
   import { orderCollections, transportNames } from './collectionOrder';
 
   export let collections: Record<string, CollectionInfo> = {};
@@ -62,7 +64,8 @@
   export let onDelete: (name: string) => void = () => {};
   export let onToggleArchived: (name: string, archived: boolean) => void = () => {};
   export let onCreate: () => void = () => {};
-  export let onRename: (name: string, newName: string) => void = () => {};
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRename: (name: string, newName: string) => Promise<string | null> = async () => null;
   export let onSetColor: (name: string, color: string | null) => void = () => {};
   export let onTogglePlay: (name: string) => void = () => {};
   export let onSetSortKey: (key: 'custom' | 'name' | 'size' | 'created') => void = () => {};
@@ -130,29 +133,27 @@
   // this only ever renames something that already exists.
   // ------------------------------------------------------------------
   let renamingName: string | null = null;
-  let renameValue = '';
 
   function startRename(name: string) {
     renamingName = name;
-    renameValue = name;
   }
 
-  function commitRename() {
-    if (renamingName === null) return;
-    const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== renamingName) onRename(renamingName, trimmed);
-    renamingName = null;
-  }
-
-  function handleRenameKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitRename();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      renamingName = null;
+  // An open collection stays open under its new name. The row remounts
+  // under that name as soon as the rename lands, before onRename resolves,
+  // so the new name is opened up front and the loser dropped after.
+  async function commitRename(from: string, to: string): Promise<string | null> {
+    const open = expandedNames.has(from) && !expandedNames.has(to);
+    if (open) {
+      expandedNames.add(to);
+      expandedNames = expandedNames;
     }
+    const refusal = await onRename(from, to);
+    if (open) {
+      expandedNames.delete(refusal ? to : from);
+      expandedNames = expandedNames;
+    }
+    if (!refusal) renamingName = null;
+    return refusal;
   }
 
   // ------------------------------------------------------------------
@@ -372,12 +373,11 @@
 
   // ------------------------------------------------------------------
   // Context menu (right-click a collection row): the transport first
-  // (Arm / Play / Mute), then the track's properties (Gem ▸ / Rename /
+  // (Arm / Play / Mute), then the track's properties (its gems / Rename /
   // Archive), then Delete. Same visual family as the file tree's
   // ContextMenu, scoped to what a collection can do.
   // ------------------------------------------------------------------
   let ctxMenu: { x: number; y: number; name: string } | null = null;
-  let ctxPigmentOpen = false;
   let ctxPositioned = false;
 
   function openContextMenu(e: MouseEvent, name: string) {
@@ -391,7 +391,6 @@
       flushSync();
     }
     onFocusCollection(name);
-    ctxPigmentOpen = false;
     ctxPositioned = false;
     ctxMenu = { x: e.clientX, y: e.clientY, name };
     claimMenuSlot(closeContextMenu);
@@ -413,7 +412,6 @@
 
   function closeContextMenu() {
     ctxMenu = null;
-    ctxPigmentOpen = false;
     releaseMenuSlot(closeContextMenu);
   }
 
@@ -777,7 +775,7 @@
           class:drop-after={dropInsertIndex === i + 1 && i === rows.length - 1}
           title={col.description || col.name}
           data-cp-row={col.name}
-          draggable={canDrag && !isRenamingRow}
+          use:grab={canDrag && !isRenamingRow}
           on:pointerenter={() => (hoveredRowName = col.name)}
           on:pointerleave={() => leaveRow(col.name)}
           on:dragstart={(e) => handleDragStart(e, col.name)}
@@ -795,14 +793,6 @@
           on:dblclick={() => { if (!isRenamingRow) startRename(col.name); }}
           on:contextmenu={(e) => openContextMenu(e, col.name)}
         >
-          <!-- The slot is reserved under every sort so the caret keeps its
-               column when the sort changes; only custom order fills it. -->
-          <span
-            class="grip"
-            class:filled={sortKey === 'custom'}
-            title={sortKey === 'custom' ? 'Drag to reorder' : undefined}
-            aria-hidden="true"
-          >{sortKey === 'custom' ? '⠿' : ''}</span>
           {#if col.color}
             <!-- Pigment gem — this is where the color↔collection
                  mapping is taught; the same gem reappears in scope
@@ -817,13 +807,11 @@
             </svg>
           {/if}
           {#if isRenamingRow}
-            <input
-              class="rename-input"
-              bind:value={renameValue}
-              on:keydown={handleRenameKeydown}
-              on:blur={commitRename}
-              on:click|stopPropagation
-              use:autofocusInput
+            <RenameField
+              value={col.name}
+              label={`Rename ${col.name}`}
+              onCommit={(name) => commitRename(col.name, name)}
+              onCancel={() => (renamingName = null)}
             />
           {:else}
             <span class="row-name">{col.name}</span>
@@ -856,8 +844,7 @@
                   {#if playing}
                     <span class="stop-mark" aria-hidden="true"></span>
                   {:else}
-                    <!-- Font Awesome "play" icon (src/lib/ui/icons/play-solid-full.svg) -->
-                    <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z"/></svg>
+                    <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY}/></svg>
                   {/if}
                 </button>
               {/if}
@@ -934,7 +921,6 @@
        so Esc costs nothing. -->
   {#if creating !== null}
     <div class="row-container ghost naming">
-      <span class="grip" aria-hidden="true"></span>
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
         <path d={GEM}/>
       </svg>
@@ -967,7 +953,6 @@
       title={`New collection${chordHint('collections.new')} — or drop books here`}
       aria-keyshortcuts={keyShortcut('collections.new') || undefined}
     >
-      <span class="grip" aria-hidden="true"></span>
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
         <path d={GEM}/>
       </svg>
@@ -1015,53 +1000,28 @@
       <span class="menu-chord" class:bare={isBareKeyChord('collections.mute')} aria-hidden="true">{chord('collections.mute')}</span>
     </button>
     <hr class="menu-divider" />
-    <div
-      class="context-item has-submenu"
-      class:open={ctxPigmentOpen}
-      on:mouseenter={() => { ctxPigmentOpen = true; }}
-      on:mouseleave={() => { ctxPigmentOpen = false; }}
-      on:click={() => { ctxPigmentOpen = !ctxPigmentOpen; }}
-      role="menuitem"
-      tabindex="-1"
-      aria-haspopup="menu"
-      aria-expanded={ctxPigmentOpen}
-    >
-      <!-- "Gem" names the glyph the user sees; the palette entries behind
-           it stay pigments in code. -->
-      <span>Gem</span>
-      <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
-      {#if ctxPigmentOpen}
-        <div class="submenu" role="menu">
-          {#each PIGMENTS as pig (pig.hex)}
-            <button
-              class="context-item"
-              role="menuitemradio"
-              aria-checked={col?.color === pig.hex}
-              on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
-            >
-              <span class="menu-pip" class:on={col?.color === pig.hex} aria-hidden="true"></span>
-              <svg class="bkm" style={`color: ${pig.hex}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-                <path d={GEM}/>
-              </svg>
-              <span>{pig.name}</span>
-            </button>
-          {/each}
-          <hr class="menu-divider" />
-          <button
-            class="context-item"
-            role="menuitemradio"
-            aria-checked={!col?.color}
-            on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, null))}
-          >
-            <span class="menu-pip" class:on={!col?.color} aria-hidden="true"></span>
-            <svg class="bkm" style="color: var(--text-tertiary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
-              <path d={GEM}/>
-            </svg>
-            <span>None</span>
-          </button>
-        </div>
-      {/if}
+    <!-- "Gem" names the glyph the user sees; the palette entries behind
+         it stay pigments in code. -->
+    <div class="menu-picks" role="group" aria-label="Gem">
+      {#each [...PIGMENTS, { name: 'None', hex: null }] as pig (pig.name)}
+        {@const on = pig.hex ? col?.color === pig.hex : !col?.color}
+        <button
+          class="menu-pick"
+          role="menuitemradio"
+          aria-checked={on}
+          aria-label={pig.name}
+          title={pig.name}
+          on:click|stopPropagation={() => ctxAction((name) => onSetColor(name, pig.hex))}
+        >
+          <!-- No pigment — outline gem in tertiary, same grammar as the chips -->
+          <svg class="pick-gem" style={`color: ${pig.hex ?? 'var(--text-tertiary)'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
+            <path d={GEM}/>
+          </svg>
+          <span class="menu-pip" class:on aria-hidden="true"></span>
+        </button>
+      {/each}
     </div>
+    <hr class="menu-divider" />
     <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
       Rename collection
       <span class="menu-chord" class:bare={isBareKeyChord('collections.rename')} aria-hidden="true">{chord('collections.rename')}</span>
@@ -1097,7 +1057,7 @@
        taller line box off-centre. */
     align-items: center;
     gap: 0.5rem;
-    padding: 0.3rem 0.75rem;
+    padding: 0.15rem 0.75rem;
     margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
@@ -1196,18 +1156,20 @@
     align-items: center;
     gap: 0.3rem;
     /* Right gutter matches the filter panel's rows so the two panels'
-       count readouts share a column down the dock. On the left, 0.25rem +
-       the grip (0.55rem) + the gap (0.3rem) is the filter row's 1.1rem
-       inset, so the gem lands in the same column as the filter panel's
-       shields, with the grip in front of it. */
-    padding: 0.22rem 0.75rem 0.22rem 0.25rem;
+       count readouts share a column down the dock. On the left, the
+       filter row's 1.1rem inset, so the gem lands in the same column as
+       the filter panel's shields. Rows carry no drag grip, as a Mac
+       list's don't: under custom order a row drags, and the drag shows
+       itself. */
+    padding: 0.15rem 0.75rem 0.15rem 1.1rem;
     /* Reserved for the solo rule so engaging S doesn't shift layout. */
     border-left: 3px solid transparent;
     cursor: pointer;
     transition: background var(--transition-fast);
     /* Shared with the filter panel's rows: above both panels' natural
-       content height, so one number pins both to the same rhythm. */
-    min-height: 30px;
+       content height, so one number pins both to the same rhythm: a
+       list row's (the tree's, Command's notes'). */
+    min-height: 1.65rem;
   }
   .row-container.hovered {
     background: var(--bg-container);
@@ -1225,10 +1187,8 @@
   }
   /* While any collection plays, stopped rows dim to 45% (out of scope),
      never hidden. Hover restores legibility, mirroring the tree's muted
-     rows. The transport stays full-strength — it's the way back in.
-     The grip is excluded at rest so dimming doesn't override its
-     hidden-until-hover opacity; the hover rule below still dims it. */
-  .row-container.dimmed > :not(.tr):not(.grip) {
+     rows. The transport stays full-strength — it's the way back in. */
+  .row-container.dimmed > :not(.tr) {
     opacity: var(--opacity-out-of-scope);
   }
   .row-container.dimmed.hovered > :not(.tr) {
@@ -1252,34 +1212,13 @@
     box-shadow: inset 0 -2px 0 var(--text-accent);
   }
 
-  /* Drag grip — fades in at the row's left edge on hover, custom order
-     only. The slot itself is always in the markup, empty under the other
-     sorts, so switching sort doesn't shift the caret's column. */
-  .grip {
-    width: 0.55rem;
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
-    letter-spacing: -0.05em;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-  }
-  /* Only the filled slot offers the grab — an empty spacer must not. */
-  .grip.filled {
-    cursor: grab;
-  }
-  .row-container.hovered .grip {
-    opacity: 1;
-  }
-
   /* The filter panel's shield size, so the two icon columns match. */
   .bkm {
     width: 0.8rem;
     height: 0.8rem;
     flex-shrink: 0;
     /* Tops the row's 0.3rem gap up to the filter rows' 0.45rem, so names
-       start in one column down the dock. The gap itself stays 0.3rem: the
-       grip-to-gem inset above depends on it. */
+       start in one column down the dock. */
     margin-right: 0.15rem;
   }
 
@@ -1292,19 +1231,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .rename-input {
-    flex: 1;
-    min-width: 0;
-    -webkit-user-select: text;
-    user-select: text;
-    background: var(--bg-container);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-family: var(--font-body);
+  /* The rename field takes the name's place and size. */
+  .row-container :global(.rename-field) {
     font-size: 0.9rem;
-    padding: 0.05rem 0.3rem;
-    outline: none;
   }
 
   /* LED count readout — the filter panel's channel count, same box, so a
@@ -1404,7 +1333,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.18rem 0.75rem 0.18rem 0.75rem;
+    padding: 0.15rem 0.75rem 0.15rem 0.75rem;
     border-left: 3px solid transparent;
     font-size: 0.9rem;
     color: var(--text-primary);
@@ -1533,8 +1462,11 @@
     padding: 0;
     outline: none;
   }
+  /* Italic, as the ghost's own label is, until a name is typed: every
+     naming row, here and in Command, waits in the same voice. */
   .new-coll-input::placeholder {
     color: var(--text-tertiary);
+    font-style: italic;
   }
   /* The arm the row will land with — purple ink, but no glow: a glow
      reports a state you switched on, and this one is only a promise until
@@ -1622,33 +1554,15 @@
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
-  .context-item:hover,
-  .context-item.open {
+  .context-item:hover {
     background: var(--bg-focused);
   }
   .context-item.danger {
     color: var(--text-danger);
   }
-  .has-submenu {
-    position: relative;
-  }
-  .submenu-caret {
-    margin-left: auto;
-    font-size: 0.7rem;
-    opacity: 0.6;
-  }
-  .submenu {
-    position: absolute;
-    left: 100%;
-    top: -0.15rem;
-    background: var(--bg-container);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-dropdown);
-    padding: 0.15rem 0;
-    min-width: var(--submenu-width);
-    max-width: var(--menu-max-width);
-    z-index: 2;
+  .pick-gem {
+    width: 1rem;
+    height: 1rem;
   }
 
   .empty {

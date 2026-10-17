@@ -29,6 +29,7 @@ from legend_lore.embedder import (
     start_background_tasks,
 )
 from legend_lore.library_store import LIBRARY_FILENAME, LibraryStore
+from command.router import build_router as build_command_router
 from legend_lore.router import build_router
 from legend_lore.service import (
     load_manifest,
@@ -208,6 +209,9 @@ def create_app(
     app.include_router(
         build_router(app, store, embed_fn, data_dir)
     )
+
+    # Command
+    app.include_router(build_command_router(app, data_dir))
 
     return app
 

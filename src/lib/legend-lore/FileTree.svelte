@@ -12,8 +12,11 @@
   import { BOOK, CARET_RIGHT, GEM } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { markName } from './nameFilter';
+  import { renameTarget } from './renameTarget';
+  import RenameField from '../ui/RenameField.svelte';
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
+  import { grab } from '../ui/grab';
 
   export let item: FileItem;
   export let level: number = 0;
@@ -32,7 +35,9 @@
 
   // Inline rename props
   export let renamingFilePath: string | null = null;
-  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => void = () => {};
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => Promise<string | null> =
+    async () => null;
   export let onRenameCancel: () => void = () => {};
 
   // Expand state (lifted to page level)
@@ -246,37 +251,13 @@
     }
   }
 
-  function handleRenameKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      const input = event.currentTarget as HTMLInputElement;
-      const ext = item.is_dir ? '' : (item.name.match(/\.[^.]+$/)?.[0] ?? '');
-      onRenameSubmit(item.path, input.value + ext, item.is_dir);
-    } else if (event.key === 'Escape') {
-      // The global Escape ladder owns cancel (it nulls renamingFilePath
-      // and returns before the focus-clear branch). What it doesn't
-      // address is WebKit's delayed scroll reset: ~2 frames after the
-      // rename input is removed, the engine fires a scroll event that
-      // nudges scrollTop (likely its "scroll on focus removal"
-      // heuristic). A single rAF restore runs before that fires and is
-      // futile; restoring across frame 1 AND frame 2 wins.
-      const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
-      if (scroller) {
-        const saved = scroller.scrollTop;
-        const restore = () => { scroller.scrollTop = saved; };
-        requestAnimationFrame(restore);
-        requestAnimationFrame(() => requestAnimationFrame(restore));
-      }
-    }
-  }
-
-  function autofocus(node: HTMLInputElement) {
-    // preventScroll: true so mounting the rename input doesn't nudge the
-    // .file-tree-area scrollTop. R is only ever pressed on a focused row,
-    // which is by construction visible — focus() doesn't need to scroll
-    // anything into view, and letting it do so means Esc-cancel restores
-    // to the post-nudge position, which the user reads as "drift."
-    node.focus({ preventScroll: true });
-    node.select();
+  // The field shows a file's name without its extension; renameTarget puts
+  // it back, and finds nothing to do for an extension alone.
+  function commitRename(typed: string): Promise<string | null> | null {
+    const target = renameTarget(item.name, typed, item.is_dir);
+    if (target !== null) return onRenameSubmit(item.path, target, item.is_dir);
+    onRenameCancel();
+    return null;
   }
 
 </script>
@@ -310,13 +291,13 @@
       aria-checked={boxMixed ? 'mixed' : boxOn}
     ></button>
 
-    <!-- Draggable on .row, not .row-container: the checkbox and the S/M
+    <!-- Grabbed by .row, not .row-container: the checkbox and the S/M
          buttons are siblings, so no drag can start from them. Never while
-         renaming — a draggable ancestor kills text selection inside a
-         descendant input in WebKit. -->
+         renaming — a grab would take the press meant for selecting text
+         in the field. -->
     <button
       class="row"
-      draggable={hasIndexedMaterial && !isRenaming}
+      use:grab={hasIndexedMaterial && !isRenaming}
       on:dragstart={handleDragStart}
       on:dragend={() => { clearTreePathsPayload(); hovered = false; }}
       on:click={handleRowClick}
@@ -340,12 +321,14 @@
         </span>
       {/if}
       {#if isRenaming}
-        <input
-          class="rename-input"
+        <!-- Inside the row's button: the field keeps its own clicks, so a
+             click doesn't fold the folder nor a right-click open the row's
+             menu. -->
+        <RenameField
           value={item.is_dir ? item.name : item.name.replace(/\.[^.]+$/, '')}
-          on:keydown={handleRenameKeydown}
-          on:blur={onRenameCancel}
-          use:autofocus
+          label={`Rename ${item.name}`}
+          onCommit={commitRename}
+          onCancel={onRenameCancel}
         />
       {:else}
         <span class="name">{#each markName(item.name, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
@@ -466,11 +449,12 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  /* Square, as the collection rows: every list row's fill and ring end
+     on a straight edge. */
   .row-container {
     display: flex;
     align-items: center;
     padding: 0 0.4rem;
-    border-radius: var(--radius-sm);
     transition: background var(--transition-fast);
   }
   .row-container.hovered {
@@ -524,11 +508,10 @@
   .row {
     display: flex;
     align-items: center;
-    padding: 0.25rem;
+    padding: 0.15rem 0.25rem;
     cursor: pointer;
     background: none;
     border: none;
-    border-radius: var(--radius-sm);
     flex: 1;
     text-align: left;
     font-size: 0.9rem;
@@ -588,17 +571,6 @@
   /* What the / filter matched — the same mark the search rows use. */
   .hit {
     color: var(--text-accent);
-  }
-  .rename-input {
-    background: var(--bg-container);
-    color: var(--text-primary);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    padding: 0.1rem 0.3rem;
-    font-size: 0.9rem;
-    font-family: var(--font-body);
-    outline: none;
-    width: 100%;
   }
   .badge-wrapper {
     position: relative;

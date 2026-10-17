@@ -30,6 +30,15 @@ export function parseNavKey(key: string): { name: string; path: string | null } 
   return i < 0 ? { name: key, path: null } : { name: key.slice(0, i), path: key.slice(i + 1) };
 }
 
+/** A focus key after collection `from` is renamed `to`: its head row and
+ *  its file rows follow the new name; any other key stays. */
+export function renameNavKey(key: string | null, from: string, to: string): string | null {
+  if (key === null) return null;
+  const { name, path } = parseNavKey(key);
+  if (name !== from) return key;
+  return path === null ? to : childNavKey(to, path);
+}
+
 export function computeCollectionNav(
   names: string[],
   expanded: Set<string>,

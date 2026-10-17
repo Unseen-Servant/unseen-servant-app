@@ -1,32 +1,20 @@
 <script lang="ts">
+  // The status bar at a window's foot: the workstation's lamps, then each
+  // tool's status section, hoisted into the slots its host passes in as
+  // children (PANELS.md), then the window's notes; shortcuts and settings
+  // at the far end.
   import { jobNotification, pendingNotification } from './notificationStore';
   import { chordHint } from './keybindings';
-  import { FOLDER, FOLDER_OPEN } from '../ui/iconPaths';
+  import { machinery } from './machinery';
 
-  export let selectedFolder: string;
-  export let sidecarConnected: boolean;
-  // Embedding runtime (process answers) vs. ready (it also has the model):
-  // the remedies differ — launch the runtime vs. pull the model — so the
-  // lamp shows the half-way state dim rather than folding it into "off".
-  export let embedderRunning: boolean = false;
-  export let embedderReady: boolean = false;
-  export let mcpConnected: boolean = false;
-  export let mcpActive: boolean = false;
-  export let selectedCount: number;
-  export let indexedCount: number;
-  export let gameSystemCount: number;
-  export let topGameSystem: string = '';
-  export let totalChunks: number = 0;
-  export let storageBytes: number;
-  export let isSyncing: boolean = false;
-  // Master bypass is lit, not persisted — the lamp is the only thing
-  // telling you the console you can see isn't currently doing anything.
-  export let scopeBypassed: boolean = false;
-  export let lastSyncTime: Date | null = null;
-  export let onSync: (() => void) | undefined = undefined;
-  export let onOpenFolder: () => void;
   export let onOpenSettings: () => void;
   export let onShowHelp: () => void;
+
+  $: sidecarConnected = $machinery.sidecarConnected;
+  $: embedderRunning = $machinery.embedderRunning;
+  $: embedderReady = $machinery.embedderReady;
+  $: mcpConnected = $machinery.mcpConnected;
+  $: mcpActive = $machinery.mcpActive;
 
   $: jobNote = $jobNotification;
   $: pendingNote = $pendingNotification;
@@ -59,12 +47,6 @@
     pendingNotification.dismiss();
   }
 
-  // lastSyncTime is stamped by every index-status check, not only by
-  // syncs, and this button runs a check — so name it for what it is.
-  $: syncTooltip = (lastSyncTime
-    ? `Check for changes — last checked ${lastSyncTime.toLocaleTimeString()}`
-    : 'Check for changes') + chordHint('sync.run');
-
   $: sidecarTooltip = sidecarConnected ? 'Sidecar connected' : 'Sidecar disconnected';
   $: mcpTooltip = mcpActive ? 'MCP active — agent querying' : mcpConnected ? 'MCP connected' : 'MCP not detected';
 
@@ -73,13 +55,6 @@
     : embedderRunning
       ? 'Embedder running — model missing'
       : 'Embedder not running';
-
-  function formatSize(bytes: number): string {
-    if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
-    if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB';
-    if (bytes >= 1_024) return (bytes / 1_024).toFixed(0) + ' KB';
-    return bytes + ' B';
-  }
 </script>
 
 <footer class="statusbar">
@@ -124,46 +99,7 @@
         <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/>
       </svg>
     </span>
-    {#if selectedFolder}
-      {#if scopeBypassed}
-        <span class="rule" aria-hidden="true"></span>
-        <span
-          class="bypass-lamp readout-label"
-          title="Scope bypassed — every indexed file is in scope. B restores it."
-        >BYPASS</span>
-      {/if}
-      <span class="rule" aria-hidden="true"></span>
-      {#if indexedCount > 0}
-        <!-- Rules divide groups; readouts within a group sit apart on
-             spacing alone, so the two levels never look alike. -->
-        <span class="stats">
-          <span title="{indexedCount} book{indexedCount === 1 ? '' : 's'} indexed, {totalChunks.toLocaleString()} searchable chunks">{indexedCount} book{indexedCount === 1 ? '' : 's'}</span>
-          {#if gameSystemCount > 0}
-            <span title={topGameSystem}>{gameSystemCount} system{gameSystemCount === 1 ? '' : 's'}</span>
-          {/if}
-          {#if storageBytes > 0}
-            <span>{formatSize(storageBytes)}</span>
-          {/if}
-        </span>
-      {:else}
-        <span>{selectedCount} book{selectedCount === 1 ? '' : 's'} selected</span>
-      {/if}
-      <span class="rule" aria-hidden="true"></span>
-      <button class="icon-btn" on:click={onOpenFolder} aria-label="Reveal library folder" title={`Reveal library folder${chordHint('library.reveal')}`}>
-        <svg class="btn-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-          <path class="folder-shut" d={FOLDER}/>
-          <path class="folder-opened" d={FOLDER_OPEN}/>
-        </svg>
-      </button>
-      {#if onSync}
-        <button class="icon-btn" class:spinning={isSyncing} on:click={onSync} aria-label={isSyncing ? 'Syncing' : 'Check for changes'} title={syncTooltip} disabled={isSyncing}>
-          <!-- Font Awesome "arrows-rotate" icon (src/lib/ui/icons/arrows-rotate-solid-full.svg) -->
-          <svg class="btn-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-            <path d="M129.9 292.5C143.2 199.5 223.3 128 320 128C373 128 421 149.5 455.8 184.2C456 184.4 456.2 184.6 456.4 184.8L464 192L416.1 192C398.4 192 384.1 206.3 384.1 224C384.1 241.7 398.4 256 416.1 256L544.1 256C561.8 256 576.1 241.7 576.1 224L576.1 96C576.1 78.3 561.8 64 544.1 64C526.4 64 512.1 78.3 512.1 96L512.1 149.4L500.8 138.7C454.5 92.6 390.5 64 320 64C191 64 84.3 159.4 66.6 283.5C64.1 301 76.2 317.2 93.7 319.7C111.2 322.2 127.4 310 129.9 292.6zM573.4 356.5C575.9 339 563.7 322.8 546.3 320.3C528.9 317.8 512.6 330 510.1 347.4C496.8 440.4 416.7 511.9 320 511.9C267 511.9 219 490.4 184.2 455.7C184 455.5 183.8 455.3 183.6 455.1L176 447.9L223.9 447.9C241.6 447.9 255.9 433.6 255.9 415.9C255.9 398.2 241.6 383.9 223.9 383.9L96 384C87.5 384 79.3 387.4 73.3 393.5C67.3 399.6 63.9 407.7 64 416.3L65 543.3C65.1 561 79.6 575.2 97.3 575C115 574.8 129.2 560.4 129 542.7L128.6 491.2L139.3 501.3C185.6 547.4 249.5 576 320 576C449 576 555.7 480.6 573.4 356.5z"/>
-          </svg>
-        </button>
-      {/if}
-    {/if}
+    <slot />
     {#if jobNote}
       <span class="rule" aria-hidden="true"></span>
       <div class="status-note" class:status-error={jobNote.type === 'error'} title={jobTitle}>
@@ -257,8 +193,14 @@
   /* Only the notes give way when the row runs long (they ellipsize);
      lamps, counts and buttons keep their width. No overflow: hidden
      here — it would clip the lamps' glows. */
-  .statusbar-left > :not(.status-note) {
+  .statusbar-left > :not(.status-note),
+  .statusbar-left :global(.status-section > :not(.status-note)) {
     flex-shrink: 0;
+  }
+  /* A tool's section and the host's slot for it are wrappers only: what's
+     inside sits in the row with the lamps. */
+  .statusbar :global(.status-section) {
+    display: contents;
   }
 
   .statusbar-right {
@@ -410,7 +352,8 @@
     color: var(--text-secondary);
   }
 
-  .icon-btn {
+  /* The bar's vocabulary, shared with the tools' sections. */
+  .statusbar :global(.icon-btn) {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -421,54 +364,33 @@
     transition: color var(--transition-fast);
     line-height: 0;
   }
-  .statusbar-left .icon-btn + .icon-btn {
+  .statusbar-left :global(.icon-btn + .icon-btn) {
     margin-left: 0.2rem;
   }
-  .icon-btn:hover:not(:disabled) {
+  .statusbar :global(.icon-btn:hover:not(:disabled)) {
     color: var(--text-primary);
   }
-  .icon-btn:active:not(:disabled) {
+  .statusbar :global(.icon-btn:active:not(:disabled)) {
     transform: scale(0.97);
   }
-  .icon-btn:disabled {
+  .statusbar :global(.icon-btn:disabled) {
     cursor: default;
     color: var(--text-tertiary);
   }
-  .icon-btn.spinning,
-  .icon-btn.spinning:disabled {
-    color: var(--text-accent);
-  }
-  .btn-icon {
+  .statusbar :global(.btn-icon) {
     width: 12px;
     height: 12px;
   }
-  .icon-btn.spinning .btn-icon {
-    animation: spin 1s linear infinite;
-    filter: var(--glow-accent);
-  }
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  /* Purple + glow: bypass is a mode you switched on, which is what the
-     colour semantics reserve purple for. Not amber — that is connectivity
-     — and not danger, since nothing is being destroyed. */
-  .bypass-lamp {
-    color: var(--text-active);
-    filter: var(--glow-active);
-  }
-
   /* Group divider — the scope bar's master rule, same size and tone. A
      box has no font metrics, so it centres on the icon row unaided. */
-  .rule {
+  .statusbar :global(.rule) {
     width: 1px;
     height: 12px;
     margin: 0 0.15rem;
     background: var(--bg-category);
   }
 
-  .stats {
+  .statusbar :global(.stats) {
     display: inline-flex;
     align-items: center;
     gap: 0.6rem;

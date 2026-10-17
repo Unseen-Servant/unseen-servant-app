@@ -1,39 +1,42 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick, flushSync } from 'svelte';
+  import { onMount, onDestroy, tick, flushSync, type Snippet } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { pdfFileUrl } from '../../lib/legend-lore/pdfUrl';
+  import { pdfFileUrl } from './pdfUrl';
+  import { sendTargets, sendToCommand, type SendTargets } from './sendToCommand';
   import { load } from '@tauri-apps/plugin-store';
-  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from '../../lib/legend-lore/types';
-  import { decideSyncAction } from '../../lib/legend-lore/syncPolicy';
-  import { DEFAULT_SYNC_PREFERENCES } from '../../lib/legend-lore/types';
-  import FileTree from '../../lib/legend-lore/FileTree.svelte';
-  import ContextMenu from '../../lib/legend-lore/ContextMenu.svelte';
-  import Header from '../../lib/shell/Header.svelte';
-  import SearchResults from '../../lib/legend-lore/SearchResults.svelte';
-  import SearchInspector from '../../lib/legend-lore/SearchInspector.svelte';
-  import SearchScopeBar from '../../lib/legend-lore/SearchScopeBar.svelte';
-  import InspectorPlate from '../../lib/legend-lore/InspectorPlate.svelte';
-  import StatusBar from '../../lib/shell/StatusBar.svelte';
-  import GettingStartedPage from '../../lib/legend-lore/GettingStartedPage.svelte';
-  import SettingsModal from '../../lib/shell/SettingsModal.svelte';
-  import KeyboardHelpOverlay from '../../lib/shell/KeyboardHelpOverlay.svelte';
-  import DocumentStatsModal from '../../lib/legend-lore/DocumentStatsModal.svelte';
-  import ConfirmDialog from '../../lib/ui/ConfirmDialog.svelte';
-  import { confirmPrompt } from '../../lib/shell/confirmStore';
-  import { holdLatch } from '../../lib/ui/holdLatch';
-  import CollectionsPanel from '../../lib/legend-lore/CollectionsPanel.svelte';
-  import FilterPanel from '../../lib/legend-lore/FilterPanel.svelte';
-  import SystemsView from '../../lib/legend-lore/SystemsView.svelte';
-  import { jobNotification, pendingNotification } from '../../lib/shell/notificationStore';
-  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn, renamePathKeys } from '../../lib/legend-lore/selectionUtils';
-  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, visibleFileSpan, type VisibleRow } from '../../lib/legend-lore/treeNav';
-  import { materializeKey } from '../../lib/shell/paneFocus';
-  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from '../../lib/legend-lore/searchScope';
-  import { runSyncJob } from '../../lib/legend-lore/syncJob';
-  import { clearSummary, reindexSummary, syncPromptMessage, syncSummary } from '../../lib/legend-lore/syncMessages';
+  import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from './types';
+  import { decideSyncAction } from './syncPolicy';
+  import { DEFAULT_SYNC_PREFERENCES } from './types';
+  import FileTree from './FileTree.svelte';
+  import ContextMenu from './ContextMenu.svelte';
+  import Header from '../shell/Header.svelte';
+  import SearchResults from './SearchResults.svelte';
+  import SearchInspector from './SearchInspector.svelte';
+  import SearchScopeBar from './SearchScopeBar.svelte';
+  import InspectorPlate from './InspectorPlate.svelte';
+  import LibraryStatus from './LibraryStatus.svelte';
+  import { hoist } from '../shell/hoist';
+  import { machinery } from '../shell/machinery';
+  import { OPEN_SETTINGS_EVENT } from '../shell/shellState';
+  import GettingStartedPage from './GettingStartedPage.svelte';
+  import SettingsModal from '../shell/SettingsModal.svelte';
+  import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
+  import DocumentStatsModal from './DocumentStatsModal.svelte';
+  import { confirmPrompt } from '../shell/confirmStore';
+  import { holdLatch } from '../ui/holdLatch';
+  import CollectionsPanel from './CollectionsPanel.svelte';
+  import FilterPanel from './FilterPanel.svelte';
+  import SystemsView from './SystemsView.svelte';
+  import { jobNotification, pendingNotification } from '../shell/notificationStore';
+  import { computeAncestorPaths, areAllDescendantsSelected, isPathOrAncestorIn, renamePathKeys } from './selectionUtils';
+  import { computeVisibleRows, indexOfPath, rowHasIndexedMaterial, visibleFileSpan, type VisibleRow } from './treeNav';
+  import { materializeKey } from '../shell/paneFocus';
+  import { resolveMix, resolveScopeSet, searchGameSystemsFilter, emptyScopeMessage, type CurationKey, type ScopeRef } from './searchScope';
+  import { runSyncJob } from './syncJob';
+  import { clearSummary, reindexSummary, syncPromptMessage, syncSummary } from './syncMessages';
   import {
     indexedPathsUnder,
     collectionsContaining,
@@ -43,23 +46,32 @@
     memberStateFor,
     addMembers,
     removeMembers,
-  } from '../../lib/legend-lore/collectionMembership';
-  import { buildRibbonIndex, firstColorByPath } from '../../lib/legend-lore/collectionRibbons';
-  import { createCommitScheduler, mergeArmedCollection } from '../../lib/legend-lore/collectionCommit';
-  import { setTreePathsPayload, type TreePathsPayload } from '../../lib/legend-lore/dragPayload';
-  import { chord, digitChord, isDeleteChord, jumpEdge } from '../../lib/shell/keybindings';
-  import { filterByQuery, playOnly, stepPick, transportNames } from '../../lib/legend-lore/collectionOrder';
-  import { menuSlotHeld } from '../../lib/shell/menuSlot';
-  import { viewFilter } from '../../lib/shell/mention';
-  import { filterTree, filterWords, nameMatches } from '../../lib/legend-lore/nameFilter';
+  } from './collectionMembership';
+  import { buildRibbonIndex, firstColorByPath } from './collectionRibbons';
+  import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
+  import { renameNavKey } from './collectionsNav';
+  import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
+  import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
+  import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
+  import { menuSlotHeld } from '../shell/menuSlot';
+  import { viewFilter } from '../shell/mention';
+  import { filterTree, filterWords, nameMatches } from './nameFilter';
   import {
     parseString,
     parseBoolean,
     parseStringArray,
     parseEnum,
-  } from '../../lib/shell/storeParsers';
-  import { parseScopeConsoleState } from '../../lib/legend-lore/scopeConsole';
-  import type { ScopeConsoleState } from '../../lib/legend-lore/scopeConsole';
+  } from '../shell/storeParsers';
+  import { parseScopeConsoleState } from './scopeConsole';
+  import type { ScopeConsoleState } from './scopeConsole';
+
+  /** False while another panel has the keyboard (PANELS.md), even one on
+   *  screen beside this one. */
+  export let active = true;
+  // The host's dock toggle, drawn at the right end of the header (PANELS.md).
+  export let windowKey: Snippet | undefined = undefined;
+  // The host's slot for this panel in its status bar (PANELS.md).
+  export let statusSlot: HTMLElement | null = null;
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -183,6 +195,9 @@
     isIndexed: boolean;
     initialSubmenu: 'collection' | null;
     hideState: { directlyHidden: boolean; inheritedHidden: boolean };
+    /** Set when the menu is a search hit's: it can go to Command. */
+    result?: SearchResultItem;
+    sendTargets?: SendTargets | 'loading';
   } | null = null;
   let renamingFilePath: string | null = null;
   let statsModalPath: string | null = null;
@@ -286,10 +301,12 @@
   let storageBytes = 0;
   let totalChunks = 0;
 
-  // Sidecar health
-  let sidecarConnected = false;
-  let mcpConnected = false;
-  let mcpActive = false;
+  // The machinery, as the shell polls it for the status bar's lamps.
+  $: sidecarConnected = $machinery.sidecarConnected;
+  $: mcpConnected = $machinery.mcpConnected;
+  $: mcpActive = $machinery.mcpActive;
+  $: ollamaRunning = $machinery.embedderRunning;
+  $: ollamaModelReady = $machinery.embedderReady;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
@@ -298,18 +315,12 @@
   let motionReady = false;
   let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
-  let healthInterval: ReturnType<typeof setInterval> | null = null;
-  let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
 
   // User-configurable behavior
   let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
   // Weak search results fade back in the list (General settings).
   let dimWeakResults = true;
   let dataDir = '';
-
-  // Ollama health
-  let ollamaRunning = false;
-  let ollamaModelReady = false;
 
   // In-app search state
   let searchQuery = '';
@@ -712,6 +723,7 @@
   }
 
   let unlistenSidecarFailed: (() => void) | null = null;
+  let unlistenOpenSettings: (() => void) | null = null;
   // Set when the startup load surfaces a missing-folder toast; cleared
   // by loadFiles when a subsequent load succeeds — typically when the
   // user picks a new folder.
@@ -735,6 +747,12 @@
       'sidecar://failed',
       (event) => showSidecarFailure(event.payload),
     );
+    // Settings is the app's, and this panel hosts its modal: any status bar
+    // asks for it, in whichever window this panel lives (shellState.ts).
+    unlistenOpenSettings = await listen(OPEN_SETTINGS_EVENT, () => {
+      settingsInitialTab = 'general';
+      showSettings = true;
+    });
 
     try {
       const stashed = await invoke<{ log_path: string; message: string } | null>(
@@ -878,19 +896,6 @@
       console.log('Could not fetch data dir:', e);
     }
 
-    // Poll sidecar + Ollama health
-    checkSidecarHealth();
-    checkOllamaHealth();
-    healthInterval = setInterval(() => {
-      checkSidecarHealth();
-      checkOllamaHealth();
-    }, 10000);
-
-    // Poll MCP status more frequently so the active-query pulse is
-    // caught (backend keeps the active flag for 5s after a query).
-    checkMcpStatus();
-    mcpStatusInterval = setInterval(checkMcpStatus, 5000);
-
     restartAutoSyncInterval();
   });
 
@@ -974,19 +979,10 @@
   onDestroy(() => {
     // Best effort: land any membership still sitting in the debounce.
     void armCommitter.flush();
-    if (healthInterval) clearInterval(healthInterval);
-    if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
     if (unlistenSidecarFailed) unlistenSidecarFailed();
+    if (unlistenOpenSettings) unlistenOpenSettings();
   });
-
-  async function checkSidecarHealth() {
-    try {
-      sidecarConnected = await invoke<boolean>('check_sidecar_health');
-    } catch {
-      sidecarConnected = false;
-    }
-  }
 
   async function setViewMode(mode: 'tree' | 'systems') {
     // Selecting a view is also the exit from the search view. Blur the
@@ -1330,31 +1326,6 @@
     mutedCuration = mutedCuration;
     persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
-  }
-
-  async function checkMcpStatus() {
-    try {
-      const status = await invoke<{ connected: boolean; active: boolean }>('check_mcp_status');
-      mcpConnected = status.connected;
-      mcpActive = status.active;
-    } catch {
-      mcpConnected = false;
-      mcpActive = false;
-    }
-  }
-
-  async function checkOllamaHealth() {
-    try {
-      const status = await invoke<{
-        models: { role: string; runtime_up: boolean; ready: boolean }[];
-      }>('check_models_status');
-      const embed = status.models.find((m) => m.role === 'embed');
-      ollamaRunning = embed?.runtime_up ?? false;
-      ollamaModelReady = embed?.ready ?? false;
-    } catch {
-      ollamaRunning = false;
-      ollamaModelReady = false;
-    }
   }
 
   async function fetchIndexStatus(): Promise<IndexStatusResult | null> {
@@ -2310,6 +2281,7 @@
   }
 
   function handleGlobalKeydown(event: KeyboardEvent) {
+    if (!active) return;
     // When a native <dialog> is open via showModal(), the browser inerts
     // the rest of the page (clicks, focus, screen-readers all skip), but
     // window-level keydown listeners still fire because keydown bubbles
@@ -2719,6 +2691,28 @@
 
   function handleResultContextMenu(event: MouseEvent, result: SearchResultItem) {
     handleContextMenu(event, resultToFileItem(result));
+    if (!contextMenu) return;
+    contextMenu = { ...contextMenu, result, sendTargets: 'loading' };
+    sendTargets()
+      .then((targets) => {
+        if (contextMenu?.result === result) contextMenu = { ...contextMenu, sendTargets: targets };
+      })
+      .catch(() => {
+        if (contextMenu?.result === result) contextMenu = { ...contextMenu, sendTargets: { campaign: null, tracks: [] } };
+      });
+  }
+
+  async function handleSendToCommand(track: string | null) {
+    const result = contextMenu?.result;
+    contextMenu = null;
+    if (!result) return;
+    try {
+      const sent = await sendToCommand(result, track);
+      const name = sent.path.split('/').pop()?.replace(/\.md$/, '') ?? sent.path;
+      jobNotification.show({ type: 'success', message: `Sent to Command: ${name} in ${sent.campaign} › ${track ?? 'Shelf'}`, duration: 4000 });
+    } catch (e) {
+      jobNotification.show({ type: 'error', message: `Couldn't send to Command: ${e}`, duration: 5000 });
+    }
   }
 
   // ⌘O on a collections-panel child row.
@@ -2922,7 +2916,9 @@
     return { result: updated, changed };
   }
 
-  async function handleRenameSubmit(oldPath: string, newName: string, isDir: boolean = false) {
+  // Resolves the reason a rename was refused, which the field shows and
+  // stays open for, or null once it took.
+  async function handleRenameSubmit(oldPath: string, newName: string, isDir: boolean = false): Promise<string | null> {
     try {
       let newPath: string;
       if (isDir) {
@@ -2961,9 +2957,16 @@
         persistScopeConsole();
         if (committedQuery) runSearch(committedQuery);
       }
-      renamingFilePath = null;
+      // The field holds the new name until the tree has it, so the old
+      // one never flashes back.
       if (selectedFolder) await loadFiles(selectedFolder);
+      renamingFilePath = null;
+      // The sidecar moved the path in every collection holding it: reload,
+      // or the book's gems vanish and the next membership write sends the
+      // old path back.
+      await loadCollections();
       refreshIndexStatus();
+      return null;
     } catch (e) {
       console.error('Rename failed', { oldPath, newName, isDir, error: e });
       // "File not found" / "Folder not found" almost always means the
@@ -2973,11 +2976,9 @@
       // surfacing the raw rust error.
       const msg = String(e);
       const isMissing = msg === 'File not found' || msg === 'Folder not found';
-      const message = isMissing
+      return isMissing
         ? `${msg} — the ${isDir ? 'folder' : 'file'} may have been moved or renamed outside the app. Press ${chord('sync.run')} to refresh and try again.`
-        : `Rename failed: ${msg}`;
-      jobNotification.show({ type: 'error', message, duration: 8000 });
-      renamingFilePath = null;
+        : msg;
     }
   }
 
@@ -3467,9 +3468,10 @@
   }
 
   // Inline rename of an existing collection (R / double-click on the
-  // panel row). Collisions surface as a notification; the row snaps back.
-  async function renameCollection(name: string, newName: string) {
-    if (newName === name) return;
+  // panel row). Resolves the reason it was refused, which the field shows
+  // and stays open for, or null once it took.
+  async function renameCollection(name: string, newName: string): Promise<string | null> {
+    if (newName === name) return null;
     // Land any armed writes under the old name — after the rename they
     // would 404.
     if (armedCollection === name) await armCommitter.flush();
@@ -3487,6 +3489,10 @@
         const { [name]: _gone, ...rest } = collections;
         collections = { ...rest, [newName]: { ...renamed, name: newName } };
       }
+      // The keyboard's place follows too, in the same tick: a ring on a
+      // name the map no longer carries is a ring on nothing.
+      focusedCollectionName = renameNavKey(focusedCollectionName, name, newName);
+      lastFocusedCollectionName = renameNavKey(lastFocusedCollectionName, name, newName);
       // The arm follows the rename, like the transport state below.
       if (armedCollection === name) armedCollection = newName;
       // Migrate any playing state keyed by the old name so an armed
@@ -3507,19 +3513,11 @@
         collectionsCustomOrder = collectionsCustomOrder.map((n) => (n === name ? newName : n));
         persistCollectionsSort();
       }
-      jobNotification.show({
-        type: 'success',
-        message: `Renamed to "${newName}"`,
-        duration: 4000,
-      });
       await loadCollections();
       if (committedQuery) runSearch(committedQuery);
+      return null;
     } catch (e) {
-      jobNotification.show({
-        type: 'error',
-        message: `Rename failed: ${String(e)}`,
-        duration: 5000,
-      });
+      return String(e);
     }
   }
 
@@ -3720,6 +3718,7 @@
     onSetViewMode={setViewMode}
     onMentionChange={(q) => (mentionQuery = q)}
     onMentionKey={handleMentionKey}
+    {windowKey}
   />
 
   {#if selectedFolder}
@@ -3765,7 +3764,7 @@
               onReorder={reorderCollections}
               focusedName={focusedCollectionName}
               lastFocusedName={lastFocusedCollectionName}
-              active={activePane === 'collections'}
+              active={active && activePane === 'collections'}
               onActivate={() => pointAtEmpty('collections')}
               onFocusCollection={setFocusedCollectionName}
               pickQuery={mentionQuery}
@@ -3802,7 +3801,7 @@
               canReset={scopeConsoleEngaged}
               focusedRow={focusedFilterRow}
               lastFocusedRow={lastFocusedFilterRow}
-              active={activePane === 'filters'}
+              active={active && activePane === 'filters'}
               onActivate={() => pointAtEmpty('filters')}
               onFocusRow={setFocusedFilterRow}
             />
@@ -3925,7 +3924,7 @@
             libraryRoot={selectedFolder}
             {focusedFilePath}
             lastFocusedPath={lastFocusedFilePath}
-            active={activePane === 'files'}
+            active={active && activePane === 'files'}
             onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
             {renamingFilePath}
@@ -4038,6 +4037,8 @@
       directlyHidden={contextMenu.hideState.directlyHidden}
       inheritedHidden={contextMenu.hideState.inheritedHidden}
       onToggleHidden={handleContextToggleHidden}
+      sendTargets={contextMenu.result ? (contextMenu.sendTargets ?? 'loading') : null}
+      onSendToCommand={handleSendToCommand}
       canRename={!searchViewOpen}
       onClose={() => { contextMenu = null; }}
     />
@@ -4050,30 +4051,24 @@
     />
   {/if}
 
-  <!-- One prompt for the whole app; confirmStore decides when it shows. -->
-  <ConfirmDialog />
-
-  <StatusBar
-    {selectedFolder}
-    {sidecarConnected}
-    embedderRunning={ollamaRunning}
-    embedderReady={ollamaModelReady}
-    {mcpConnected}
-    {mcpActive}
-    selectedCount={selectedPaths.size}
-    indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
-    {gameSystemCount}
-    {topGameSystem}
-    {totalChunks}
-    {storageBytes}
-    {isSyncing}
-    {scopeBypassed}
-    {lastSyncTime}
-    onSync={handleManualSync}
-    onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
-    onOpenSettings={() => { settingsInitialTab = 'general'; showSettings = true; }}
-    onShowHelp={() => { showHelpOverlay = true; }}
-  />
+  {#if statusSlot}
+    <div class="status-section" use:hoist={statusSlot}>
+      <LibraryStatus
+        {selectedFolder}
+        selectedCount={selectedPaths.size}
+        indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+        {gameSystemCount}
+        {topGameSystem}
+        {totalChunks}
+        {storageBytes}
+        {isSyncing}
+        {scopeBypassed}
+        {lastSyncTime}
+        onSync={handleManualSync}
+        onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
+      />
+    </div>
+  {/if}
 </main>
 
 <SettingsModal
@@ -4120,7 +4115,7 @@
   .app-layout {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
     background: var(--bg-app);
   }
@@ -4236,9 +4231,9 @@
 
   .error-banner {
     padding: 0.4rem 1rem;
-    background: rgba(239, 68, 68, 0.1);
+    background: color-mix(in srgb, var(--text-danger) 10%, transparent);
     color: var(--text-danger);
-    border-top: 1px solid rgba(239, 68, 68, 0.3);
+    border-top: 1px solid color-mix(in srgb, var(--text-danger) 30%, transparent);
     font-size: 0.85rem;
     flex-shrink: 0;
   }

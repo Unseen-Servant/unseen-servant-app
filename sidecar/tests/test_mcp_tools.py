@@ -687,5 +687,8 @@ def test_registered_tools_are_the_public_surface():
     assert names == {
         "search_library", "get_section", "get_pages",
         "list_sources", "list_game_systems", "list_collections",
+        # Command's (test_mcp_command.py)
+        "list_campaigns", "current_session", "live_set", "read_note",
+        "find_notes", "create_note", "add_to_live_set", "spend",
     }
 

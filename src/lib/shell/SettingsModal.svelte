@@ -5,6 +5,7 @@
   import GameSystemsSettings from '../legend-lore/GameSystemsSettings.svelte';
   import GeneralSettings from '../legend-lore/GeneralSettings.svelte';
   import LibrarySettings from '../legend-lore/LibrarySettings.svelte';
+  import CommandSettingsPane from '../command/CommandSettingsPane.svelte';
   import GuidesPane from './help/GuidesPane.svelte';
   import ReferencePane from './help/ReferencePane.svelte';
   import AboutPane from './help/AboutPane.svelte';
@@ -39,10 +40,10 @@
   export let filesIndexed: boolean = false;
   export let collectionsCreated: boolean = false;
   export let mcpConnected: boolean = false;
-  export let initialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
+  export let initialTab: 'general' | 'library' | 'game-systems' | 'command' | 'help' = 'general';
   export let initialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
 
-  let activeTab: 'general' | 'library' | 'game-systems' | 'help' = initialTab;
+  let activeTab: 'general' | 'library' | 'game-systems' | 'command' | 'help' = initialTab;
   let activeHelpSubTab: 'guides' | 'reference' | 'about' = initialHelpSubTab;
   $: if (visible) {
     activeTab = initialTab;
@@ -53,6 +54,7 @@
     { id: 'general' as const, label: 'General' },
     { id: 'library' as const, label: 'Library' },
     { id: 'game-systems' as const, label: 'Game Systems' },
+    { id: 'command' as const, label: 'Command' },
     { id: 'help' as const, label: 'Help' },
   ];
 
@@ -86,6 +88,8 @@
       <GeneralSettings {dimWeakResults} {onDimWeakResultsChange} />
     {:else if activeTab === 'game-systems'}
       <GameSystemsSettings {knownSystems} {onSystemsChanged} />
+    {:else if activeTab === 'command'}
+      <CommandSettingsPane />
     {:else if activeTab === 'library'}
       <LibrarySettings
         {selectedFolder}

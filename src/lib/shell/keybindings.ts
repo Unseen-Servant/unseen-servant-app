@@ -14,6 +14,7 @@ export type KeyScope =
   | 'searchInput'
   | 'searchResults'
   | 'filterPanel'
+  | 'command'
   | 'contextMenu'
   | 'modal';
 
@@ -55,12 +56,13 @@ const isMac =
 export const KEYBINDINGS: KeybindingEntry[] = [
   // Global
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open settings',               scope: 'global' },
-  { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle Collections sidebar',  scope: 'global' },
+  { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle the sidebar: collections, shelf', scope: 'global' },
   { id: 'focus.dock',            keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Focus the left dock',         scope: 'global' },
   { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Focus right pane',            scope: 'global' },
   { id: 'focus.dockDown',        keys: { mac: '⌘⌥↓',  other: 'Ctrl+Alt+↓' },    label: 'Dock: Collections → Filters', scope: 'global' },
   { id: 'focus.dockUp',          keys: { mac: '⌘⌥↑',  other: 'Ctrl+Alt+↑' },    label: 'Dock: Filters → Collections', scope: 'global' },
-  { id: 'view.toggle',           keys: { mac: 'Tab',  other: 'Tab' },           label: 'Switch between tree and systems view', scope: 'global' },
+  { id: 'view.toggle',           keys: { mac: 'Tab',  other: 'Tab' },           label: 'Switch views: tree ⇄ systems, Prep ⇄ Play', scope: 'global' },
+  { id: 'rack.view',             keys: { mac: '1–8',  other: '1–8' },           label: 'Bring up rack view N',        scope: 'global' },
   { id: 'collections.slot',      keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Play only collection N (again stops it)', scope: 'global' },
   { id: 'collections.slotMix',   keys: { mac: '⌘⇧1–9', other: 'Ctrl+Shift+1–9' }, label: 'Add collection N to the mix, or take it out', scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
@@ -149,6 +151,22 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'filterPanel.solo',      keys: { mac: 'S',    other: 'S' },             label: 'Solo / stop soloing focused channel', scope: 'filterPanel', switch: true },
   { id: 'filterPanel.mute',      keys: { mac: 'M',    other: 'M' },             label: 'Mute / unmute focused channel', scope: 'filterPanel', switch: true },
   { id: 'filterPanel.release',   keys: { mac: 'Esc',  other: 'Esc' },           label: 'Release focus / leave the panel', scope: 'filterPanel' },
+
+  // Command, in Prep (on the selected row). No `match`: Command's menus show
+  // the hint without taking the key, as the collections menu does, and 'r'
+  // is tree.rename's.
+  { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
+  // In Prep and Play, on the row or card under the pointer, as Legend Lore's
+  // A shelves a collection. No `match`, as R.
+  { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer spent, or unspent', scope: 'command' },
+  // In Prep and Play, from the editor too: Obsidian's reading-view key.
+  { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
+  // In Prep and Play, from the editor and the jot bar too.
+  { id: 'command.sessionNote',   keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open the session note in the inspector', scope: 'command' },
+  // In Play, on the session player, as Legend Lore's collections take them.
+  { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'command' },
+  { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'command' },
+  { id: 'command.play',          keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Launch or stop the focused beat', scope: 'command', switch: true },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

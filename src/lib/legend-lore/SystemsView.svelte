@@ -15,6 +15,9 @@
   import { BOOK, CARET_RIGHT, GEM, SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { markName, markPath, nameMatches, pathMatches } from './nameFilter';
+  import { renameTarget } from './renameTarget';
+  import RenameField from '../ui/RenameField.svelte';
+  import { grab } from '../ui/grab';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -26,7 +29,7 @@
 
   // Capture-phase press recording: the chips' bubble-phase
   // stopPropagation runs after this, so the row always sees the true
-  // press target. dragstart's own target is the draggable li (the
+  // press target. dragstart's own target is the grabbed li (the
   // drag source node per the HTML spec), never the pressed chip — the
   // guard has to remember the press instead.
   let pressedControl = false;
@@ -37,7 +40,7 @@
 
   function handleDragStart(event: DragEvent, entry: FileStatusEntry) {
     // No drag from the console switches or the curation checkbox — the
-    // tree gets this structurally (draggable sits on a sibling of its
+    // tree gets this structurally (the grab sits on a sibling of its
     // cluster); here the li itself is the drag source, so bail when the
     // press began on one.
     if (pressedControl) {
@@ -128,7 +131,9 @@
   // occurrence so a multi-tagged file doesn't grow editors in every
   // group it appears under.
   export let renamingFilePath: string | null = null;
-  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => void = () => {};
+  /** Resolves the reason a rename was refused, or null when it took. */
+  export let onRenameSubmit: (oldPath: string, newName: string, isDir: boolean) => Promise<string | null> =
+    async () => null;
   export let onRenameCancel: () => void = () => {};
 
   // Whether the parent's context menu is open. Used to yield Esc handling
@@ -618,37 +623,13 @@
     return v?.entry ? entryToFileItem(v.entry) : null;
   }
 
-  // Inline rename helpers. Enter commits with the extension preserved,
-  // blur cancels. The page's global Escape ladder owns cancel (it nulls
-  // renamingFilePath and returns before the focus-clear branch). On Esc
-  // we additionally snap the scroll container back to its pre-unmount
-  // scrollTop via a microtask — when Svelte unmounts the input, WebKit
-  // reassigns DOM focus and resets the parent container's scrollTop,
-  // bouncing the user back to the top.
-  function handleRenameKeydown(event: KeyboardEvent, entry: FileStatusEntry) {
-    if (event.key === 'Enter') {
-      const input = event.currentTarget as HTMLInputElement;
-      const ext = entry.filename.match(/\.[^.]+$/)?.[0] ?? '';
-      onRenameSubmit(entry.path, input.value + ext, false);
-    } else if (event.key === 'Escape') {
-      // See FileTree.handleRenameKeydown for why two rAF rounds: WebKit
-      // fires a delayed scroll reset ~2 frames after the input unmounts,
-      // and a single rAF runs too early to overwrite it.
-      const scroller = (event.currentTarget as HTMLElement).closest('.file-tree-area') as HTMLElement | null;
-      if (scroller) {
-        const saved = scroller.scrollTop;
-        const restore = () => { scroller.scrollTop = saved; };
-        requestAnimationFrame(restore);
-        requestAnimationFrame(() => requestAnimationFrame(restore));
-      }
-    }
-  }
-  function autofocus(node: HTMLInputElement) {
-    // preventScroll mirrors FileTree's autofocus — R is pressed on a
-    // focused (visible) row, so focus()'s default scroll-into-view is
-    // both unnecessary and the source of drift on Esc-cancel.
-    node.focus({ preventScroll: true });
-    node.select();
+  // As the tree's: the field shows the name without its extension, and
+  // renameTarget puts it back.
+  function commitRename(entry: FileStatusEntry, typed: string): Promise<string | null> | null {
+    const target = renameTarget(entry.filename, typed, false);
+    if (target !== null) return onRenameSubmit(entry.path, target, false);
+    onRenameCancel();
+    return null;
   }
 
   // The Cmd+Alt+→ jump: passing a path restores that entry when it's still
@@ -770,7 +751,7 @@
                 class:out-of-scope={rowOutOfScope && !groupDimmed && !rowHidden}
                 class:hovered={$hoverLive && hoveredRow === rowHoverKey(group.tag, entry.path)}
                 data-sv-row={entry.path}
-                draggable={renamingFilePath !== entry.path}
+                use:grab={renamingFilePath !== entry.path}
                 on:dragstart={(e) => handleDragStart(e, entry)}
                 on:dragend={() => { clearTreePathsPayload(); clearHover(); }}
                 on:click={(e) => handleRowClick(e, entry, group.tag, group.entries)}
@@ -798,14 +779,11 @@
                   </svg>
                 </span>
                 {#if renamingFilePath === entry.path && isFocused(entry, group.tag)}
-                  <input
-                    class="rename-input"
+                  <RenameField
                     value={entry.filename.replace(/\.[^.]+$/, '')}
-                    on:click|stopPropagation
-                    on:mousedown|stopPropagation
-                    on:keydown={(e) => handleRenameKeydown(e, entry)}
-                    on:blur={onRenameCancel}
-                    use:autofocus
+                    label={`Rename ${entry.filename}`}
+                    onCommit={(typed) => commitRename(entry, typed)}
+                    onCancel={onRenameCancel}
                   />
                 {:else}
                   <span class="file-name">{#each markName(entry.filename, filterWords) as part, i (i)}{#if part.hit}<span class="hit">{part.text}</span>{:else}{part.text}{/if}{/each}</span>
@@ -899,6 +877,9 @@
        border stays full-bleed because this is padding, not margin. */
     padding-right: 1rem;
     border-bottom: 1px solid var(--border-subtle);
+    /* A list row's height, its rule included, as the plates and rows
+       around it (.nameplate). */
+    min-height: 1.65rem;
   }
   /* The untagged bucket is a bucket, not an identity: grey, never the
      parchment fallback that uncolored real systems get. */
@@ -1090,9 +1071,10 @@
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    padding: 0.25rem calc(0.75rem + var(--count-w) + 0.25rem) 0.25rem calc(1.2rem + 0.3px);
+    padding: 0.15rem calc(0.75rem + var(--count-w) + 0.25rem) 0.15rem calc(1.2rem + 0.3px);
     margin: 0 0.25rem;
-    border-radius: var(--radius-sm);
+    /* Square, as the collection rows: every list row's fill and ring end
+       on a straight edge. */
     cursor: pointer;
     transition: background var(--transition-fast);
     -webkit-user-select: none;
@@ -1150,17 +1132,9 @@
   .file:not(:has(.file-path)) .file-name {
     flex: 1 1 auto;
   }
-  .rename-input {
-    flex: 1;
-    min-width: 0;
-    background: var(--bg-container);
-    color: var(--text-primary);
-    border: 1px solid var(--text-accent);
-    border-radius: var(--radius-sm);
-    padding: 0.1rem 0.3rem;
+  /* The rename field takes the file name's place and size. */
+  .file :global(.rename-field) {
     font-size: 0.9rem;
-    font-family: var(--font-body);
-    outline: none;
   }
   .file-sep {
     color: var(--text-tertiary);

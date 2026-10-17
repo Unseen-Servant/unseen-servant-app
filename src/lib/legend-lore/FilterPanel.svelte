@@ -604,7 +604,7 @@
        taller line box off-centre. */
     align-items: center;
     gap: 0.5rem;
-    padding: 0.3rem 0.75rem;
+    padding: 0.15rem 0.75rem;
     margin-bottom: 0.3rem;
     flex-shrink: 0;
   }
@@ -628,9 +628,12 @@
     margin-top: 0.35rem;
     padding: 0.2rem 0.25rem 0.2rem calc(0.3rem + 3px);
   }
+  /* A list row's height (.row), centred in it, as the systems view's
+     group heads: a section head is a row you click. */
   .sect-toggle {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    min-height: 1.65rem;
     width: 100%;
     background: none;
     border: none;
@@ -667,8 +670,8 @@
   .sect-split .reset-link {
     margin-left: 0.4rem;
   }
-  /* The toggle aligns on baseline, which for an <svg> is its bottom edge;
-     centre it instead. The margin restores the old text arrow's gap. */
+  /* Centred with the label, as the toggle centres everything; the margin
+     restores the old text arrow's gap. */
   .sect-arrow {
     align-self: center;
     margin-right: 0.3rem;
@@ -681,9 +684,9 @@
     /* Vertical padding and type size match the collections panel's rows, so
        names read the same down the dock and the natural height stays under
        the shared min-height. */
-    padding: 0.22rem 0.75rem 0.22rem 1.1rem;
+    padding: 0.15rem 0.75rem 0.15rem 1.1rem;
     /* Matches the collections panel's rows — see the note there. */
-    min-height: 30px;
+    min-height: 1.65rem;
     font-size: 0.9rem;
     color: var(--text-primary);
     /* Reserved for the solo rule so engaging S doesn't shift layout. */

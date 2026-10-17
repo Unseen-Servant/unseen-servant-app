@@ -45,6 +45,14 @@ describe('parseRustCommands', () => {
     expect(cmd.required).toEqual(['name']);
   });
 
+  it('drops managed state, lifetime and all', () => {
+    const [cmd] = parseRustCommands(`
+      #[tauri::command]
+      async fn command_send(state: tauri::State<'_, AppContext>, track: String) -> Result<(), String> {}
+    `);
+    expect(cmd.required).toEqual(['track']);
+  });
+
   it('is not fooled by commas inside generics', () => {
     const [cmd] = parseRustCommands(
       '#[tauri::command] fn f(map: HashMap<String, String>, n: u32) {}'

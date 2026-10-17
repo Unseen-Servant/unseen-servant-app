@@ -8,6 +8,7 @@ use std::path::Path;
 use tauri::Emitter;
 
 use super::sidecar_url;
+use crate::sse::SseFrames;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -448,30 +449,6 @@ fn sync_refusal(status: reqwest::StatusCode, body: &str) -> String {
         "sync-busy: a sync is already in progress".to_string()
     } else {
         format!("Sidecar error ({}): {}", status, body)
-    }
-}
-
-/// Splits an SSE byte stream into its `data:` frames' JSON. Buffers bytes,
-/// not text, so a multibyte character split across chunks survives; frames
-/// that aren't JSON data (comments, keep-alives) are skipped.
-#[derive(Default)]
-struct SseFrames {
-    buffer: Vec<u8>,
-}
-
-impl SseFrames {
-    fn push(&mut self, chunk: &[u8]) -> Vec<serde_json::Value> {
-        self.buffer.extend_from_slice(chunk);
-        let mut out = Vec::new();
-        while let Some(pos) = self.buffer.windows(2).position(|w| w == b"\n\n") {
-            let frame: Vec<u8> = self.buffer.drain(..pos + 2).collect();
-            if let Some(data) = frame[..pos].strip_prefix(b"data: ") {
-                if let Ok(json) = serde_json::from_slice(data) {
-                    out.push(json);
-                }
-            }
-        }
-        out
     }
 }
 
@@ -1007,6 +984,32 @@ pub async fn create_collection(
     Ok(result)
 }
 
+/// A refusal from the sidecar in its own words: FastAPI's `detail` when the
+/// body carries one, the status and body otherwise.
+fn sidecar_refusal(status: reqwest::StatusCode, body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("detail")?.as_str().map(str::to_string))
+        .unwrap_or_else(|| format!("Sidecar error ({}): {}", status, body))
+}
+
+/// The sidecar URL for one collection. Its name is the GM's own text, so it
+/// goes in percent-encoded as a single path segment: a `?`, `#`, `%` or `/`
+/// would otherwise end the path or split it.
+fn collection_url(base: &str, name: &str, action: Option<&str>) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(base).map_err(|e| e.to_string())?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| format!("Not a base URL: {}", base))?;
+        segments.pop_if_empty().extend(["api", "collections", name]);
+        if let Some(action) = action {
+            segments.push(action);
+        }
+    }
+    Ok(url)
+}
+
 #[tauri::command]
 pub async fn update_collection(
     name: String,
@@ -1031,7 +1034,7 @@ pub async fn update_collection(
     }
 
     let response = client
-        .put(format!("{}/api/collections/{}", sidecar_url(), name))
+        .put(collection_url(&sidecar_url(), &name, None)?)
         .json(&body)
         .send()
         .await
@@ -1058,16 +1061,18 @@ pub async fn rename_collection(
 ) -> Result<CollectionMutationResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/api/collections/{}/rename", sidecar_url(), name))
+        .post(collection_url(&sidecar_url(), &name, Some("rename"))?)
         .json(&serde_json::json!({ "new_name": new_name }))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
+    // The rename field shows a refusal under itself, so it's the sidecar's
+    // sentence, not the HTTP exchange.
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(format!("Sidecar error ({}): {}", status, body));
+        return Err(sidecar_refusal(status, &body));
     }
 
     let result: CollectionMutationResult = response
@@ -1082,7 +1087,7 @@ pub async fn rename_collection(
 pub async fn delete_collection(name: String) -> Result<CollectionDeleteResult, String> {
     let client = reqwest::Client::new();
     let response = client
-        .delete(format!("{}/api/collections/{}", sidecar_url(), name))
+        .delete(collection_url(&sidecar_url(), &name, None)?)
         .send()
         .await
         .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
@@ -1139,6 +1144,31 @@ fn validate_rename_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether renaming `old` to `new_path` would land on another entry. On a
+/// case-insensitive volume (macOS's default) a change of case alone makes
+/// the new spelling "exist" because it is the source itself; the folder's
+/// own listing tells that apart from a second entry spelled that way, which
+/// only a case-sensitive volume can hold.
+fn rename_target_taken(old: &Path, new_path: &Path) -> bool {
+    if !new_path.exists() {
+        return false;
+    }
+    let (Some(old_name), Some(new_name), Some(parent)) =
+        (old.file_name(), new_path.file_name(), new_path.parent())
+    else {
+        return true;
+    };
+    if old_name.to_string_lossy().to_lowercase() != new_name.to_string_lossy().to_lowercase() {
+        return true;
+    }
+    match fs::read_dir(parent) {
+        Ok(entries) => entries
+            .flatten()
+            .any(|e| e.file_name() == new_name && e.file_name() != old_name),
+        Err(_) => true,
+    }
+}
+
 #[tauri::command]
 pub async fn rename_file(old_path: String, new_name: String) -> Result<String, String> {
     validate_rename_name(&new_name)?;
@@ -1154,7 +1184,7 @@ pub async fn rename_file(old_path: String, new_name: String) -> Result<String, S
     if new_path.parent() != Some(parent) {
         return Err("Name escapes parent directory".to_string());
     }
-    if new_path.exists() {
+    if rename_target_taken(old, &new_path) {
         return Err(format!("A file named '{}' already exists", new_name));
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
@@ -1212,7 +1242,7 @@ pub async fn rename_folder(old_path: String, new_name: String) -> Result<String,
     if new_path.parent() != Some(parent) {
         return Err("Name escapes parent directory".to_string());
     }
-    if new_path.exists() {
+    if rename_target_taken(old, &new_path) {
         return Err(format!("A folder named '{}' already exists", new_name));
     }
     fs::rename(old, &new_path).map_err(|e| e.to_string())?;
@@ -1376,35 +1406,6 @@ mod tests {
     }
 
     #[test]
-    fn sse_frames_reassembles_frames_split_across_chunks() {
-        let mut frames = SseFrames::default();
-        assert!(frames.push(b"data: {\"event\":\"prog").is_empty());
-        let out = frames.push(b"ress\"}\n\ndata: {\"event\":\"started\"}\n\n");
-        assert_eq!(out.len(), 2);
-        assert_eq!(out[0]["event"], "progress");
-        assert_eq!(out[1]["event"], "started");
-    }
-
-    #[test]
-    fn sse_frames_keeps_a_multibyte_char_split_across_chunks() {
-        let bytes = "data: {\"current_file\":\"Grimoire é.pdf\"}\n\n".as_bytes();
-        let cut = bytes.iter().position(|&b| b == 0xC3).unwrap() + 1;
-        let mut frames = SseFrames::default();
-        assert!(frames.push(&bytes[..cut]).is_empty());
-        let out = frames.push(&bytes[cut..]);
-        assert_eq!(out[0]["current_file"], "Grimoire é.pdf");
-    }
-
-    #[test]
-    fn sse_frames_skips_frames_that_are_not_json_data() {
-        let mut frames = SseFrames::default();
-        let out =
-            frames.push(b": keep-alive\n\ndata: not json\n\ndata: {\"event\":\"started\"}\n\n");
-        assert_eq!(out.len(), 1);
-        assert_eq!(out[0]["event"], "started");
-    }
-
-    #[test]
     fn sync_event_reads_started_and_progress_as_progress() {
         let started = serde_json::json!({"event": "started", "total_files": 12});
         match sync_event(&started) {
@@ -1476,6 +1477,87 @@ mod tests {
         assert!(!msg.starts_with("sync-busy:"), "{msg}");
         assert!(msg.contains("500"), "{msg}");
         assert!(msg.contains("No data directory configured"), "{msg}");
+    }
+
+    #[test]
+    fn a_sidecar_refusal_reads_in_its_own_words() {
+        assert_eq!(
+            sidecar_refusal(
+                reqwest::StatusCode::CONFLICT,
+                r#"{"detail":"Collection already exists: Monsters"}"#
+            ),
+            "Collection already exists: Monsters"
+        );
+        assert_eq!(
+            sidecar_refusal(reqwest::StatusCode::INTERNAL_SERVER_ERROR, "boom"),
+            "Sidecar error (500 Internal Server Error): boom"
+        );
+    }
+
+    #[test]
+    fn a_collection_url_keeps_the_name_to_one_path_segment() {
+        let base = "http://127.0.0.1:8420";
+        assert_eq!(
+            collection_url(base, "Monsters", None).unwrap().as_str(),
+            "http://127.0.0.1:8420/api/collections/Monsters"
+        );
+        assert_eq!(
+            collection_url(base, "Act 1/Prep? #50%", Some("rename"))
+                .unwrap()
+                .as_str(),
+            "http://127.0.0.1:8420/api/collections/Act%201%2FPrep%3F%20%2350%25/rename"
+        );
+    }
+
+    #[test]
+    fn rename_target_is_free_under_a_new_name() {
+        let dir = scratch_dir("rename-free");
+        fs::write(dir.join("a.pdf"), b"").unwrap();
+        assert!(!rename_target_taken(&dir.join("a.pdf"), &dir.join("b.pdf")));
+    }
+
+    #[test]
+    fn rename_target_is_taken_by_another_entry() {
+        let dir = scratch_dir("rename-taken");
+        fs::write(dir.join("a.pdf"), b"").unwrap();
+        fs::write(dir.join("b.pdf"), b"").unwrap();
+        assert!(rename_target_taken(&dir.join("a.pdf"), &dir.join("b.pdf")));
+        fs::create_dir(dir.join("Modules")).unwrap();
+        fs::create_dir(dir.join("Adventures")).unwrap();
+        assert!(rename_target_taken(
+            &dir.join("Modules"),
+            &dir.join("Adventures")
+        ));
+    }
+
+    #[test]
+    fn a_change_of_case_alone_renames_the_entry_itself() {
+        let dir = scratch_dir("rename-case");
+        fs::write(dir.join("players handbook.pdf"), b"").unwrap();
+        let old = dir.join("players handbook.pdf");
+        let new = dir.join("Players Handbook.pdf");
+        // On a case-insensitive volume the new spelling "exists": it's the
+        // source itself, so it isn't taken.
+        assert!(!rename_target_taken(&old, &new));
+        fs::rename(&old, &new).unwrap();
+        let names: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["Players Handbook.pdf"]);
+    }
+
+    #[test]
+    fn a_change_of_case_onto_another_file_is_taken_where_case_matters() {
+        let dir = scratch_dir("rename-case-other");
+        fs::write(dir.join("a.pdf"), b"").unwrap();
+        fs::write(dir.join("A.pdf"), b"").unwrap();
+        // Only a case-sensitive volume holds both; on the others the second
+        // write landed on the first and there's nothing else to clobber.
+        if fs::read_dir(&dir).unwrap().count() == 2 {
+            assert!(rename_target_taken(&dir.join("a.pdf"), &dir.join("A.pdf")));
+        }
     }
 
     #[test]

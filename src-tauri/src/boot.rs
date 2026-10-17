@@ -171,6 +171,14 @@ fn run(app: &AppHandle, spawned: Result<(), String>, app_data_dir: &Path) {
     });
 
     let up = settle_sidecar(app, spawned, app_data_dir, &set);
+    if up {
+        crate::command::start_event_relay(app.clone());
+        // Command reopens the campaign open when the app last quit (or a
+        // blank Untitled), before any window asks what's open.
+        if let Err(e) = tauri::async_runtime::block_on(crate::command::reopen(app)) {
+            eprintln!("Command couldn't open a campaign: {}", e);
+        }
+    }
 
     // The tool window loads behind the splash from here on. Its first calls
     // need the sidecar settled, whichever way it went.

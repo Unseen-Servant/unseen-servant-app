@@ -370,7 +370,7 @@
     /* A nameplate like the dock's panel mastheads (.nameplate supplies the
        plate). No bottom rule: the plate's grey parts it from the rows
        scrolling beneath. */
-    padding: 0.3rem 0.75rem;
+    padding: 0.15rem 0.75rem;
     font-family: var(--font-body);
     font-size: 0.75rem;
     color: var(--text-secondary);

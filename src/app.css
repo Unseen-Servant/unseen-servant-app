@@ -99,11 +99,18 @@
      no room for that rule's 2px offset. A ring rather than a fill so it
      composes over the engaged wash instead of competing with it. */
   --ring-focus: inset 0 0 0 1px var(--text-accent);
+  /* A rename field's ring once the name is refused: the focus ring with
+     danger's hue swapped in. */
+  --ring-refused: inset 0 0 0 1px var(--text-danger);
   /* Drop target under a drag. Dashed parchment is already the app's
      "prospective, not yet real" idiom (+ New collection, + tag), and it
      can't be mistaken for purple-armed or the engaged wash. Drawn as an
      outline so it composes over --ring-focus rather than replacing it. */
   --outline-drop: 1px dashed var(--text-accent);
+  /* Selected text, in a field or the note editor: a parchment wash, so a
+     highlight is content (brass) rather than the system's blue, the one
+     hue the app doesn't otherwise use. */
+  --bg-text-selection: color-mix(in srgb, var(--text-accent) 22%, transparent);
 
   /* Corner radii */
   --radius-cell: 1px; /* LED gauge cells */
@@ -186,10 +193,22 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* A drag held by hand (ui/grab.ts): the closed hand wherever it goes, over
+   every row's own pointer, and no text caught up on the way. */
+html.grabbing,
+html.grabbing * {
+  cursor: grabbing !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* --- Scrollbar --- */
 
+/* Height is a horizontal bar's thickness: without it WebKit draws those at
+   its own, thicker default. */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -221,6 +240,12 @@ button {
 
 input {
   font-family: inherit;
+  /* The note editor's caret (editorTheme.ts), in every field. */
+  caret-color: var(--text-accent);
+}
+
+::selection {
+  background: var(--bg-text-selection);
 }
 
 /* --- Action buttons --- */
@@ -435,6 +460,39 @@ button:focus-visible .folder-opened {
 
 /* --- Form Controls --- */
 
+/* The rename field (ui/RenameField), in the name's place and its type: it
+   takes the font around it, and a list whose name is set apart from the
+   row (a plate's ledger label, a collection's name) gives it that type.
+   Its padding is taken back by the same negative margin, so the text sits
+   where the name did and the row keeps its height; the edge is the focus
+   ring, drawn inside, on the container ground. Here rather than in the
+   component so a list's own rule wins over it plainly. */
+.rename-field {
+  flex: 1;
+  width: calc(100% + 0.6rem);
+  min-width: 0;
+  margin: -0.1rem -0.3rem;
+  padding: 0.1rem 0.3rem;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--text-primary);
+  background: var(--bg-container);
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--ring-focus);
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.rename-field.refused {
+  box-shadow: var(--ring-refused);
+}
+
+.rename-field::placeholder {
+  color: var(--text-tertiary);
+}
+
 /* Themed checkbox matching the file-tree look (parchment border, accent fill,
    dark checkmark). Replace the native checkbox by adding this class. */
 .app-checkbox {
@@ -635,6 +693,43 @@ dialog[open]::backdrop {
   border-top: 1px solid var(--border-subtle);
 }
 
+/* Choices side by side in one row, between dividers: every pigment at once,
+   each drawn as what it colours (a collection's gem, a track's plate) and
+   named only in its tooltip. The lit pip under a pick is the one in effect;
+   the rest are dark.
+   The first glyph starts in the rows' label column. */
+.menu-picks {
+  display: flex;
+  gap: 0.1rem;
+  padding: 0.1rem calc(0.6rem - 0.25rem);
+}
+.menu-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.25rem 0.1rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.menu-pick:hover:not(.hover-dark *) {
+  background: var(--bg-focused);
+}
+.menu-pick:active {
+  transform: scale(0.97);
+}
+.menu-pick .menu-pip {
+  width: auto;
+}
+/* The other picks' lamps sit dark, as unlit LEDs: the app's floor, a step
+   under the menu. */
+.menu-pick .menu-pip:not(.on)::before {
+  background: var(--bg-app);
+}
+
 /* Menu selection lamp — reports which option is in effect on rows whose whole
    surface is the click target. Deliberately unlike .app-checkbox: 5px vs 14px
    and no border, because a panel LED has no bezel you press. Decorative;
@@ -725,8 +820,10 @@ dialog[open]::backdrop {
   /* One height for every plate, so the scope bar's lines up with the
      Collections plate across the dock seam. Their content (a title row, or
      the scope bar's chip row) fits inside it; a floor, not a cap, so a
-     scope bar whose chips wrap still grows. */
-  min-height: 1.875rem;
+     scope bar whose chips wrap still grows. A list row's height (the
+     tree's, the collections', Command's notes'), so a plate heads its
+     rows rather than standing over them. */
+  min-height: 1.65rem;
   background: var(--bg-container);
 }
 /* A plate names its module in the rail voice the modals use: .ledger-label

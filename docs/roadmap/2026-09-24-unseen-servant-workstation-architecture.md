@@ -1,7 +1,7 @@
 # Unseen Servant workstation — codebase architecture
 
 **Date:** 2026-09-24
-**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25. 2026-09-26: Phase 5 store swap done ahead of the runtime swap, which waits on its reopened target and a real-library eval tier (§6 order table).
+**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25. 2026-09-26: Phase 5 store swap done ahead of the runtime swap, which waits on its reopened target and a real-library eval tier (§6 order table). 2026-10-03: D3 amended — a tabbed main window hosts every tool as a panel, and any panel pops out into its own window. 2026-10-17: D3 amended again — the tabs become one rack with eight user-built views.
 **Objective:** grow this repository from one tool (Legend Lore) into the GM workstation — one app, **Unseen Servant**, hosting three tools: Legend Lore (RAG over the PDF library), Command (session manager), and the Servant (assistant) — without a rewrite, a plugin system, or a second repository.
 
 ---
@@ -10,7 +10,7 @@
 
 - **One repo, one Tauri app, one sidecar process.** No multi-repo, no npm/cargo/uv workspaces, no plugin architecture. Solo dev, three tools that always ship together under one version number — every boundary those would add has nobody on the other side of it.
 - **Tool folders inside each layer, not layers inside tool folders.** The build boundaries are per layer (Vite → `src/`, Cargo → `src-tauri/`, PyInstaller → `sidecar/`), so each layer gets `legend-lore/`, `command/`, `servant/` plus a `shell/` for what the workstation itself owns.
-- **One window per tool.** Each tool is a `WebviewWindow` whose label is the tool id and whose title is the tool name; the app name (dock, menu bar, tray, About) is Unseen Servant. Rust owns the window registry. This is the DAW model — arrange / mixer / floating plugin windows — and it is what a GM with a laptop and a second screen at the table actually wants.
+- **One rack, panels pop out** (amended 2026-10-03, then 2026-10-17). The main window is a rack: up to eight views, each an arrangement of tools the GM builds side by side and resizes; any panel pops out into its own `WebviewWindow` and docks back. Rust owns which panels are popped out. Still the DAW model — arrange window plus floating plugin windows — and the second screen at the table gets whichever tool the GM pops onto it.
 - **Every window is its own JS context.** Anything two windows must agree on has Rust or the sidecar as source of truth, with windows subscribing via Tauri events. Svelte stores are per window by definition.
 - **The seam between tools is the MCP tool surface.** Legend Lore already exposes its tools; Command exposes its state the same way; the Servant is an MCP client of both — it gets exactly what Claude Desktop gets, no privileged back door.
 - **The vault is the user's, indexes are caches.** Authored data (sessions, notes, NPCs) is plain Markdown/YAML in a user-chosen folder; derived data (embeddings, FTS, parents) lives per tool in app-data and is rebuildable.
@@ -85,6 +85,14 @@ Rules:
 
 ### D3 — One window per tool, Rust owns the registry
 
+> **Amended 2026-10-17: one rack, eight views.** The tab strip gives way to a rack bar: view keys 1–8 (also bare 1–8 while no field has the caret), then one well per tool — a key whose lamp is lit while the tool is in the current view, and a lock. A view is a tree of splits with one tool per slot, built by pressing a tool's key or carrying it onto a slot's edge (split) or middle (swap); rails between slots resize them down to each tool's rack minimum. Views start empty, and each one's layout and locks persist in the settings store. A lock is per view and holds the tool there: no pop-out, no resizing, no drops onto it. A popped-out tool keeps a placeholder slot in every view that holds it. Pop-out, Rust's popped set and the panel contract stand, except that `active` now means "has the keyboard": two tools on screen, one of them listening (`src/lib/shell/PANELS.md`, *The rack*). The Servant joins the rack when it's built.
+>
+> Why: a GM wants two tools at once at prep and at the table (the book open beside the session board), and switching tabs hides one. Fixed views recalled by number are the DAW's screensets.
+
+> **Amended 2026-10-03: tabbed host + pop-out.** The main window (label `main`, route `/`) hosts every tool as a *panel* in a tab. Any panel pops out into its own window (label `panel-<id>`, route `/panel/<id>`) and docks back; closing a pop-out docks it. A panel renders the same either way — the contract is `src/lib/shell/PANELS.md`. Rust owns the set of popped-out panels (`src-tauri/src/panels.rs`) and creates the windows, so a panel is never live twice; shared workstation state (active campaign / session) lives in `src-tauri/src/app_context.rs` and reaches every window as events (D4 unchanged). No persisted layout yet: everything starts docked.
+>
+> Why the reversal: the objection below — tools competing for one viewport — is answered by pop-out, which gives the second screen any tool on demand while the laptop keeps a single home for the rest. What survives from the original D3: Rust creates windows (`pop_out_panel`, not `core:webview:allow-create-webview-window`), single instance per tool, tool titles on pop-out windows, close-to-tray for `main`. What it replaces: the window-label-per-tool scheme, `open_tool(id)`, per-window capability files (pop-outs share `default.json` via `panel-*`), and startup restoring a set of windows. The original text is kept below for the record.
+
 Each tool is a `WebviewWindow` opening a route of the same SvelteKit bundle:
 
 ```rust
@@ -112,7 +120,7 @@ WebviewWindowBuilder::new(app, "legend-lore", WebviewUrl::App("legend-lore".into
 - **Startup restores the layout.** The existing per-label `save_window_size` already keys on the label; extend the same store entry with the *set* of windows visible at quit, and reopen that set on launch. First launch: Legend Lore only. If this grows past a screen of code, swap for `tauri-plugin-window-state`.
 - **One capability file per window.** `legend-lore.json` keeps the current `opener`/`dialog`/`clipboard`/`store` grants; `servant.json` gets `core:default` and `store:default` only. Free least-privilege.
 
-**Rejected:** a single window with a tool rail / tabs. It works, but it puts the tools in competition for one viewport, which is the opposite of what live play needs (rulebook search on the second screen while the session view stays up), and it would have shipped a one-item rail until Command exists.
+**Rejected (reversed 2026-10-03, see the amendment above):** a single window with a tool rail / tabs. It works, but it puts the tools in competition for one viewport, which is the opposite of what live play needs (rulebook search on the second screen while the session view stays up), and it would have shipped a one-item rail until Command exists.
 
 ### D4 — Every window is its own JS context
 
@@ -231,8 +239,8 @@ Three slices, each its own commit, each verified by the full Linux suite plus `n
 | | Slice | Verify |
 |---|---|---|
 | 2a | Settings funnel: one `shell/settings.ts` owns every `tauri-plugin-store` read/write (today `+page.svelte` and `storeParsers.ts` call it directly) and subscribes with `onKeyChange`, which the plugin already broadcasts to every window (§4 Q1) | vitest; a setting changed in Settings is read back through the funnel only |
-| 2b | Window label `main` → `legend-lore`: `tauri.conf.json`, capability file, `Reopen`, `save_window_size`. Resets saved geometry once | relaunch restores geometry after the second launch |
-| 2c | Rust window registry: `open_tool(id)` (focus-or-create), `tools.ts` manifest, **Window** menu + tray entries, remembered set of open windows; per-window capability files | `npm run tauri build` locally (with the exec-bit fix); tray Quit saves every window; relaunch reopens the same set |
+| 2b | *Superseded 2026-10-03 (D3 amendment: `main` is the host).* Window label `main` → `legend-lore`: `tauri.conf.json`, capability file, `Reopen`, `save_window_size`. Resets saved geometry once | relaunch restores geometry after the second launch |
+| 2c | *Partly superseded 2026-10-03: the panel registry, pop-out and dock-back shipped with the D3 amendment; Window menu, tray entries and a remembered layout remain open.* Rust window registry: `open_tool(id)` (focus-or-create), `tools.ts` manifest, **Window** menu + tray entries, remembered set of open windows; per-window capability files | `npm run tauri build` locally (with the exec-bit fix); tray Quit saves every window; relaunch reopens the same set |
 
 ### Step 3 — cross-window state
 
@@ -240,7 +248,9 @@ Lift Ollama status, sidecar health and sync/reindex progress to Rust source of t
 
 ### Step 4 — Command
 
-Greenfield (§4 Q5). Second window; Svelte UI over Tauri proxy commands; state and vault I/O in `sidecar/command/` (§4 Q4, D6); its MCP tools registered in `mcp_server.py`. Needs its own design doc before code. **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
+Greenfield (§4 Q5). Second window; Svelte UI over Tauri proxy commands; state and vault I/O in `sidecar/command/` (§4 Q4, D6); its MCP tools registered in `mcp_server.py`. Design: [2026-10-11-command-design.md](2026-10-11-command-design.md). **Verify:** an MCP client lists Command tools beside Legend Lore's; Send-to-Command round-trips a search hit.
+
+**Command phases 0–5 built 2026-10-12 on `workstation`** (vault, beats and sessions, Play, cross-tool, each campaign's shelf), unpushed. A stdio MCP client lists Command's eight tools beside Legend Lore's six. Send to Command is tested in parts (the hit's note, the sidecar's write, the menu) but not yet end to end in the running app. Images on cards (3b) remain; the shared Library became a per-campaign shelf.
 
 ### Step 5 — Servant
 

@@ -7,8 +7,13 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
+mod app_context;
 mod boot;
+mod command;
+mod file_menu;
 mod legend_lore;
+mod panels;
+mod sse;
 
 // ---------------------------------------------------------------------------
 // Sidecar state — holds the Python child process handle and any startup
@@ -35,7 +40,7 @@ struct SidecarFailedPayload {
 // Tool window
 // ---------------------------------------------------------------------------
 
-/// Create the Legend Lore window, hidden, from its tauri.conf.json entry
+/// Create the main window, hidden, from its tauri.conf.json entry
 /// (`create: false` keeps Tauri from opening it at launch). The boot calls
 /// this once the sidecar has settled and shows it when the splash closes.
 ///
@@ -46,7 +51,7 @@ fn open_tool_window(app: &tauri::AppHandle) {
         return;
     };
     if let Err(e) = tauri::WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()) {
-        eprintln!("Failed to open the Legend Lore window: {}", e);
+        eprintln!("Failed to open the main window: {}", e);
     }
 }
 
@@ -486,6 +491,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .on_menu_event(|app, event| file_menu::on_event(app, event.id().as_ref()))
         .invoke_handler(tauri::generate_handler![
             legend_lore::select_folder,
             legend_lore::list_files,
@@ -522,7 +528,48 @@ pub fn run() {
             boot::get_boot_state,
             legend_lore::search_index,
             legend_lore::get_search_settings,
-            legend_lore::update_search_settings
+            legend_lore::update_search_settings,
+            app_context::get_app_context,
+            app_context::set_active_campaign,
+            app_context::set_active_session,
+            panels::get_popped_panels,
+            panels::pop_out_panel,
+            panels::dock_panel,
+            command::command_get_settings,
+            command::command_set_root,
+            command::command_choose_root,
+            command::command_list_campaigns,
+            command::command_open_untitled,
+            command::command_rename_campaign,
+            command::command_get_campaign,
+            command::command_create_track,
+            command::command_rename_track,
+            command::command_order_tracks,
+            command::command_pigment_track,
+            command::command_order_notes,
+            command::command_read_note,
+            command::command_save_note,
+            command::command_create_note,
+            command::command_rename_note,
+            command::command_move_note,
+            command::command_create_beat,
+            command::command_set_member,
+            command::command_order_beats,
+            command::command_create_session,
+            command::command_edit_plan,
+            command::command_set_spent,
+            command::command_set_spend_on_launch,
+            command::command_get_board,
+            command::command_edit_board,
+            command::command_get_live,
+            command::command_launch,
+            command::command_set_live,
+            command::command_stop,
+            command::command_jot,
+            command::command_send_targets,
+            command::command_send,
+            command::command_copy_note,
+            command::command_trash
         ])
         .setup(|app| {
             // Determine where the sidecar keeps its data (library store, manifest)
@@ -537,6 +584,13 @@ pub fn run() {
 
             app.manage(SidecarFailureState(Mutex::new(None)));
             app.manage(boot::BootState::new());
+            app.manage(app_context::AppContext::default());
+            app.manage(panels::PoppedPanels::default());
+            // Losing the File menu is no reason not to start: log it.
+            #[cfg(target_os = "macos")]
+            if let Err(e) = file_menu::install(app.handle()) {
+                eprintln!("Could not build the File menu: {}", e);
+            }
 
             // The splash draws its own rounded corners on a transparent window.
             // macOS shapes the shadow to them; Windows would frame the square
@@ -616,13 +670,20 @@ pub fn run() {
                     label,
                     event: tauri::WindowEvent::CloseRequested { api, .. },
                     ..
-                } => {
+                } if panels::panel_of_label(&label).is_none() => {
                     // Hide window instead of closing — app stays alive in tray
                     api.prevent_close();
                     if let Some(window) = app_handle.get_webview_window(&label) {
                         let _ = window.hide();
                     }
                 }
+                // A pop-out's close goes through, unlike the arm above: the
+                // window is destroyed and its panel docks back.
+                tauri::RunEvent::WindowEvent {
+                    label,
+                    event: tauri::WindowEvent::Destroyed,
+                    ..
+                } => panels::on_window_destroyed(app_handle, &label),
                 tauri::RunEvent::ExitRequested { api, code, .. } => {
                     // Some(_) is app.exit() (tray Quit or Cmd+Q) — let it proceed.
                     if code.is_none() {
@@ -640,6 +701,12 @@ pub fn run() {
                     }
                 }
                 tauri::RunEvent::Exit => {
+                    // A blank Untitled goes with the app, as it does when the
+                    // GM switches away from it. Before the sidecar stops.
+                    if let Some(campaign) = app_handle.state::<app_context::AppContext>().campaign()
+                    {
+                        tauri::async_runtime::block_on(command::discard_if_blank(&campaign));
+                    }
                     let state = app_handle.state::<SidecarState>();
                     stop_sidecar(state.inner());
                     println!("Sidecar stopped.");
