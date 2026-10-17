@@ -18,7 +18,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-clipboard-manager": "^2.4.0",
+    "@tauri-apps/plugin-clipboard-manager": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-store": "^2",
     "svelte-exmarkdown": "^5.0.2"
