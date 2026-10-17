@@ -21,7 +21,7 @@
     type CardData,
   } from './board';
   import { action, divider, type MenuItem, type OpenMenu } from './menu';
-  import { planRows, sessionNotePaths } from './prep';
+  import { memberPaths, planRows, sessionNotePaths } from './prep';
   import type { BeatEntry, BoardOp, BoardView, CampaignIndex, LiveSet, NoteEntry, SessionEntry } from './types';
 
   export let active: boolean;
@@ -262,7 +262,7 @@
         liveBeat={live?.beat ?? null}
         onLaunch={launch}
         onStop={stop}
-        onReframe={() => frameNotes(live?.notes ?? [])}
+        onFrame={(beat) => frameNotes(beat.path === live?.beat ? (live?.notes ?? []) : memberPaths(beat))}
         onEdit={(beat) => onEdit(beat.path)}
         {onSpent}
       />

@@ -3,9 +3,10 @@
   // the board's corner holding the session's plan, worked as Legend Lore's
   // collections panel: a click focuses a beat, ↑↓ or J/K move the focus,
   // and P or Space launches the focused beat, or stops it while it's live,
-  // as they play a collection. A beat's transport sits at the row's end;
-  // the live beat's ■ stops the set, and the key beside it frames the live
-  // cards. The plate folds the list down to the live beat.
+  // as they play a collection. A beat's transport sits at the row's end:
+  // its play key, the live beat's ■ stopping the set, and a key framing
+  // its cards, the live set's on the live beat. The plate folds the list
+  // down to the live beat.
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
   import { menuSlotHeld } from '../shell/menuSlot';
@@ -24,8 +25,9 @@
   export let onLaunch: (beat: BeatEntry) => void;
   /** Clears the live set: the live beat's key, as in Prep. */
   export let onStop: () => void;
-  /** Brings the live cards back into view on the board. */
-  export let onReframe: () => void;
+  /** Brings a beat's cards into view on the board, the live set's for the
+   *  live beat. */
+  export let onFrame: (beat: BeatEntry) => void;
   export let onEdit: (beat: BeatEntry) => void;
   export let onSpent: (beat: BeatEntry, spent: boolean) => void;
 
@@ -92,7 +94,7 @@
     const playing = beat.path === liveBeat;
     const items: MenuItem[] = [
       keyed(playing ? 'Stop' : 'Launch', 'command.play', () => toggle(beat)),
-      ...(playing ? [action('Frame the live cards', onReframe)] : []),
+      action(playing ? 'Frame the live cards' : 'Frame its cards', () => onFrame(beat)),
       divider,
       action(beat.spent ? 'Mark unspent' : 'Mark spent', () => onSpent(beat, !beat.spent)),
       action('Edit beat', () => onEdit(beat)),
@@ -150,22 +152,20 @@
                 <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
               {/if}
             </button>
-            {#if playing}
-              <button
-                type="button"
-                class="tr-btn"
-                title="Frame the live cards"
-                aria-label="Frame the live cards"
-                on:click|stopPropagation={onReframe}
-              >
-                <!-- Font Awesome "expand" icon (src/lib/ui/icons/expand-solid-full.svg),
-                     its viewBox cropped to the glyph so it fills the well as the
-                     arm circle does. -->
-                <svg class="frame-glyph" viewBox="96 96 448 448" fill="currentColor" aria-hidden="true">
-                  <path d="M128 96C110.3 96 96 110.3 96 128L96 224C96 241.7 110.3 256 128 256C145.7 256 160 241.7 160 224L160 160L224 160C241.7 160 256 145.7 256 128C256 110.3 241.7 96 224 96L128 96zM160 416C160 398.3 145.7 384 128 384C110.3 384 96 398.3 96 416L96 512C96 529.7 110.3 544 128 544L224 544C241.7 544 256 529.7 256 512C256 494.3 241.7 480 224 480L160 480L160 416zM416 96C398.3 96 384 110.3 384 128C384 145.7 398.3 160 416 160L480 160L480 224C480 241.7 494.3 256 512 256C529.7 256 544 241.7 544 224L544 128C544 110.3 529.7 96 512 96L416 96zM544 416C544 398.3 529.7 384 512 384C494.3 384 480 398.3 480 416L480 480L416 480C398.3 480 384 494.3 384 512C384 529.7 398.3 544 416 544L512 544C529.7 544 544 529.7 544 512L544 416z" />
-                </svg>
-              </button>
-            {/if}
+            <button
+              type="button"
+              class="tr-btn"
+              title={playing ? 'Frame the live cards' : `Frame the cards of ${beat.name}`}
+              aria-label={playing ? 'Frame the live cards' : `Frame the cards of ${beat.name}`}
+              on:click|stopPropagation={(e) => e.detail <= 1 && onFrame(beat)}
+            >
+              <!-- Font Awesome "expand" icon (src/lib/ui/icons/expand-solid-full.svg),
+                   its viewBox cropped to the glyph so it fills the well as the
+                   arm circle does. -->
+              <svg class="frame-glyph" viewBox="96 96 448 448" fill="currentColor" aria-hidden="true">
+                <path d="M128 96C110.3 96 96 110.3 96 128L96 224C96 241.7 110.3 256 128 256C145.7 256 160 241.7 160 224L160 160L224 160C241.7 160 256 145.7 256 128C256 110.3 241.7 96 224 96L128 96zM160 416C160 398.3 145.7 384 128 384C110.3 384 96 398.3 96 416L96 512C96 529.7 110.3 544 128 544L224 544C241.7 544 256 529.7 256 512C256 494.3 241.7 480 224 480L160 480L160 416zM416 96C398.3 96 384 110.3 384 128C384 145.7 398.3 160 416 160L480 160L480 224C480 241.7 494.3 256 512 256C529.7 256 544 241.7 544 224L544 128C544 110.3 529.7 96 512 96L416 96zM544 416C544 398.3 529.7 384 512 384C494.3 384 480 398.3 480 416L480 480L416 480C398.3 480 384 494.3 384 512C384 529.7 398.3 544 416 544L512 544C529.7 544 544 529.7 544 512L544 416z" />
+              </svg>
+            </button>
           </span>
           <!-- The notes it lights, as Prep's count. -->
           <span class="row-count">{memberPaths(beat).size}</span>
