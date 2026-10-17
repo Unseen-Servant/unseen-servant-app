@@ -327,6 +327,7 @@
     data-row
     class:focused={beat.path === focusedPath}
     class:armed
+    class:playing
     class:spent={!!beat.spent}
     class:hovered={$hoverLive && hovered === beat.path}
     class:dragging={dragging !== null && dragging === (row ?? beat)}
@@ -702,6 +703,14 @@
 
   .beat-row.focused {
     box-shadow: var(--ring-focus);
+  }
+
+  /* Live: a playing collection's row (CollectionsPanel .row-container
+     .playing), as in Play's session player. Armed, after it, wins the
+     wash, as in Legend Lore. */
+  .beat-row.playing {
+    background: color-mix(in srgb, var(--text-accent) 8%, transparent);
+    border-left-color: var(--text-active);
   }
 
   /* Armed: the row Legend Lore wears for the collection you're editing —
