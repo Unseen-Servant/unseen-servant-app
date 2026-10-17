@@ -4,7 +4,7 @@
 // operations the sidecar applies to the file.
 
 import { linkTarget } from './editorTheme';
-import type { BoardOp, BoardView, CampaignIndex, CanvasNode, NoteEntry, Side } from './types';
+import type { BoardOp, BoardView, CampaignIndex, CanvasNode, Side } from './types';
 
 export const CARD = { width: 260, height: 180 };
 export const GAP = 32;
@@ -266,16 +266,3 @@ export function applyOps(view: BoardView, ops: BoardOp[], campaign: string): Boa
   return { nodes, edges, notes };
 }
 
-/** The notes the find line offers for `query`: names starting with it,
- *  then names containing it, each by name. Beats and sessions aren't
- *  cards, so they're left out. */
-export function findNotes(index: CampaignIndex, query: string, limit = 8): NoteEntry[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const reserved = new Set(['beats', 'sessions']);
-  const byName = (a: NoteEntry, b: NoteEntry) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-  const notes = index.notes.filter((n) => !(n.track && reserved.has(n.track.toLowerCase())));
-  const starts = notes.filter((n) => n.name.toLowerCase().startsWith(q)).sort(byName);
-  const within = notes.filter((n) => !n.name.toLowerCase().startsWith(q) && n.name.toLowerCase().includes(q)).sort(byName);
-  return [...starts, ...within].slice(0, limit);
-}

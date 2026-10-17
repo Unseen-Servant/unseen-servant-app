@@ -165,12 +165,6 @@ pub struct Sent {
     path: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Captured {
-    path: String,
-    live: LiveSet,
-}
-
 #[derive(Deserialize)]
 struct Named {
     name: String,
@@ -719,41 +713,6 @@ pub async fn command_stop(campaign: String) -> Result<LiveSet, String> {
     .await
 }
 
-/// Keep the live set as a new beat in `session`'s plan.
-#[tauri::command]
-pub async fn command_capture(
-    campaign: String,
-    session: String,
-    name: String,
-) -> Result<Captured, String> {
-    answer(
-        client()
-            .post(api("/live/capture"))
-            .json(&serde_json::json!({
-                "campaign": campaign, "session": session, "name": name,
-            })),
-    )
-    .await
-}
-
-/// Append a timestamped line to the session's log. Returns the line written.
-#[tauri::command]
-pub async fn command_jot(
-    campaign: String,
-    session: String,
-    text: String,
-) -> Result<String, String> {
-    #[derive(Deserialize)]
-    struct Line {
-        line: String,
-    }
-    answer::<Line>(client().post(api("/log")).json(&serde_json::json!({
-        "campaign": campaign, "session": session, "text": text,
-    })))
-    .await
-    .map(|l| l.line)
-}
-
 // -- cross-tool (design §8) -------------------------------------------------
 
 /// Tell the sidecar which campaign and session are open, so MCP acts on them
@@ -989,13 +948,12 @@ mod tests {
         let parsed: CommandSettings = serde_json::from_value(settings.clone()).unwrap();
         assert_eq!(serde_json::to_value(parsed).unwrap(), settings);
 
-        let captured = serde_json::json!({
-            "path": "Beats/Ireena flees.md",
-            "live": {"campaign": "Strahd", "seq": 4, "beat": "Beats/Ireena flees.md",
-                     "notes": ["NPCs/Ireena.md"]},
+        let live = serde_json::json!({
+            "campaign": "Strahd", "seq": 4, "beat": "Beats/Ambush.md",
+            "notes": ["NPCs/Ireena.md"],
         });
-        let parsed: Captured = serde_json::from_value(captured.clone()).unwrap();
-        assert_eq!(serde_json::to_value(parsed).unwrap(), captured);
+        let parsed: LiveSet = serde_json::from_value(live.clone()).unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap(), live);
     }
 
     #[test]

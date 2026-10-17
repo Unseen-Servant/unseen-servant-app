@@ -7,7 +7,6 @@ import type {
   BoardOp,
   BoardView,
   CampaignIndex,
-  Captured,
   CommandSettings,
   LiveSet,
   Moved,
@@ -94,9 +93,6 @@ export const commandApi = {
   setLive: (campaign: string, note: string, live: boolean) =>
     invoke<LiveSet>('command_set_live', { campaign, note, live }),
   stop: (campaign: string) => invoke<LiveSet>('command_stop', { campaign }),
-  capture: (campaign: string, session: string, name: string) =>
-    invoke<Captured>('command_capture', { campaign, session, name }),
-  jot: (campaign: string, session: string, text: string) => invoke<string>('command_jot', { campaign, session, text }),
   /** A campaign (no path), or a note or folder inside one, to the OS trash. */
   trash: (campaign: string, path: string | null) => invoke<void>('command_trash', { campaign, path }),
 };

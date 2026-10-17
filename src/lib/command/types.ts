@@ -115,11 +115,6 @@ export interface LiveSet {
   notes: string[];
 }
 
-export interface Captured {
-  path: string;
-  live: LiveSet;
-}
-
 export type Side = 'top' | 'right' | 'bottom' | 'left';
 
 /** A JSON Canvas node as on disk. Fields Command doesn't use pass through. */

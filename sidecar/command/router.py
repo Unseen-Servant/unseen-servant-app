@@ -164,18 +164,6 @@ class Stop(BaseModel):
     campaign: str
 
 
-class Capture(BaseModel):
-    campaign: str
-    session: str
-    name: str
-
-
-class Jot(BaseModel):
-    campaign: str
-    session: str
-    text: str
-
-
 class CopyIn(BaseModel):
     campaign: str
     from_campaign: str
@@ -579,32 +567,6 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             snapshot = live.set(body.campaign, None, [])
         announce(snapshot)
         return snapshot
-
-    @router.post("/live/capture")
-    def capture(body: Capture):
-        """Keep the live set as a new beat, placed in the plan after the
-        beat it was launched from, and logged. The live set then comes
-        from the new beat."""
-        camp = campaign_path(body.campaign)
-        with write_lock:
-            prep.require_in(camp, body.session, prep.SESSIONS)
-            current = live.get(body.campaign)
-            notes = [n for n in current["notes"] if (camp / n).is_file()]
-            path = prep.create_beat(camp, body.name, notes)
-            plan = next(s for s in prep.index(camp)["sessions"] if s["path"] == body.session)["beats"]
-            after = next((i for i, r in enumerate(plan) if r["path"] == current["beat"]), None)
-            prep.edit_plan(camp, body.session, "add", beat=path, to=None if after is None else after + 1)
-            log.append(camp, body.session, f"captured [[{vault.note_path(camp, path).stem}]]")
-            snapshot = live.set(body.campaign, path, notes)
-        announce(snapshot)
-        return {"path": path, "live": snapshot}
-
-    @router.post("/log")
-    def jot(body: Jot):
-        camp = campaign_path(body.campaign)
-        with write_lock:
-            prep.require_in(camp, body.session, prep.SESSIONS)
-            return {"line": log.append(camp, body.session, body.text)}
 
     # -- deletion is Rust's (the OS trash); this only vouches for the path --
 

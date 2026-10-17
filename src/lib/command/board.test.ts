@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, findNotes, frameOp, lines, linkify, rehypeMissingLinks, type Card } from './board';
+import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, frameOp, lines, linkify, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -163,17 +163,5 @@ describe('applyOps', () => {
       notes: { b: 'NPCs/Ireena.md' },
     });
     expect(view.nodes[0].x).toBe(0);
-  });
-});
-
-describe('findNotes', () => {
-  it('offers names starting with the query, then containing it, never beats or sessions', () => {
-    const withBeats: CampaignIndex = {
-      ...index,
-      notes: [...index.notes, ...['Beats/Ireena flees.md', 'Sessions/Session 1.md', 'NPCs/Mad Mary.md'].map(note)],
-    };
-    expect(findNotes(withBeats, 'ir').map((n) => n.name)).toEqual(['Ireena']);
-    expect(findNotes(withBeats, 'MA').map((n) => n.name)).toEqual(['Mad Mary', 'Ismark']);
-    expect(findNotes(withBeats, '  ')).toEqual([]);
   });
 });

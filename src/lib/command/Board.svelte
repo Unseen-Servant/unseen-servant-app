@@ -4,6 +4,8 @@
   // while it's dragged; every gesture's end goes out as card operations,
   // and the cards are re-derived from what comes back.
   import {
+    Background,
+    BackgroundVariant,
     ConnectionMode,
     SvelteFlow,
     type Connection,
@@ -124,6 +126,9 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="board" on:keydown={keepBackspace}>
+  <!-- The arrangement's keys are the table's: ↑↓ step through the plan and
+       Space launches, so the board gives up moving a focused card by arrow
+       (a move it wouldn't save) and Space's hold-to-pan; a drag still pans. -->
   <SvelteFlow
     bind:nodes
     bind:edges
@@ -134,6 +139,8 @@
     deleteKey={active ? ['Backspace', 'Delete'] : null}
     selectionKey={active ? 'Shift' : null}
     multiSelectionKey={active ? 'Meta' : null}
+    disableKeyboardA11y
+    panActivationKey={null}
     zoomOnDoubleClick={false}
     attributionPosition="bottom-right"
     onnodedragstop={dragStop}
@@ -142,6 +149,9 @@
     onnodecontextmenu={nodeMenu}
     onedgecontextmenu={edgeMenu}
   >
+    <!-- Graph paper, the old-school dungeon map's: a faint square grid that
+         scales with the zoom. -->
+    <Background variant={BackgroundVariant.Lines} gap={24} />
     <BoardFramer request={frame} />
   </SvelteFlow>
 </div>
@@ -155,6 +165,7 @@
   /* Svelte Flow's chrome in the app's tokens. */
   .board :global(.svelte-flow) {
     --xy-background-color: var(--bg-app);
+    --xy-background-pattern-color: var(--bg-header);
     --xy-edge-stroke: var(--text-tertiary);
     --xy-edge-stroke-selected: var(--text-accent);
     --xy-edge-stroke-width: 1.5;

@@ -247,38 +247,16 @@ def test_improvising_changes_the_live_set_not_the_beat(table):
     assert (stopped["beat"], stopped["notes"]) == (None, [])
 
 
-def test_capture_keeps_the_live_set_as_a_beat_after_the_launched_one(table):
-    table.post("/api/command/beats", json={"campaign": "Strahd", "name": "Later", "session": "Sessions/Session 1.md"})
-    table.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"})
-    table.post("/api/command/live/note", json={"campaign": "Strahd", "note": "NPCs/Ireena.md", "live": True})
-    captured = table.post("/api/command/live/capture", json={
-        "campaign": "Strahd", "session": "Sessions/Session 1.md", "name": "Ireena flees",
-    }).json()
-    assert captured["path"] == "Beats/Ireena flees.md"
-    assert captured["live"]["beat"] == "Beats/Ireena flees.md"
-    index = table.get("/api/command/campaign", params={"name": "Strahd"}).json()
-    assert [b["link"] for b in index["sessions"][0]["beats"]] == ["Ambush", "Ireena flees", "Later"]
-    beat = next(b for b in index["beats"] if b["name"] == "Ireena flees")
-    assert [n["path"] for n in beat["notes"]] == ["NPCs/Ismark.md", "NPCs/Ireena.md"]
-    assert session_log(table) == [("captured", "Ireena flees", "Beats/Ireena flees.md")]
-
-
-def test_jots_and_spends_from_play_are_logged(table):
-    assert table.post("/api/command/log", json={
-        "campaign": "Strahd", "session": "Sessions/Session 1.md", "text": "the party insulted the burgomaster",
-    }).json() == {"line": "- 19:42 the party insulted the burgomaster"}
+def test_spends_from_play_are_logged(table):
     play = {"campaign": "Strahd", "path": "NPCs/Ismark.md", "session": "Sessions/Session 1.md"}
     table.post("/api/command/spent", json={**play, "spent": True})
     table.post("/api/command/spent", json={**play, "spent": True})  # already spent: no second line
     table.post("/api/command/spent", json={**play, "spent": False})
     table.post("/api/command/spent", json={"campaign": "Strahd", "path": "NPCs/Ireena.md", "spent": True})  # from Prep
     assert session_log(table) == [
-        ("jot", None, None),
         ("spent", "Ismark", "NPCs/Ismark.md"),
         ("unspent", "Ismark", "NPCs/Ismark.md"),
     ]
-    not_a_session = table.post("/api/command/log", json={"campaign": "Strahd", "session": "NPCs/Ismark.md", "text": "x"})
-    assert not_a_session.status_code == 422
 
 
 def test_the_board_over_http_follows_a_session_rename(table):
