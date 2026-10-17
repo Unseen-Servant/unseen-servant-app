@@ -13,12 +13,14 @@
   // The host's dock toggle. A panel without a header of its own leaves it
   // out (PANELS.md).
   export let windowKey: Snippet;
+  // The host's slot for the panel in its status bar, once it's drawn.
+  export let statusSlot: HTMLElement | null = null;
 </script>
 
 {#if id === 'legend-lore'}
-  <LegendLorePanel {active} {windowKey} />
+  <LegendLorePanel {active} {windowKey} {statusSlot} />
 {:else if id === 'command'}
-  <CommandPanel {active} {windowKey} />
+  <CommandPanel {active} {windowKey} {statusSlot} />
 {:else}
   <ServantPanel />
 {/if}

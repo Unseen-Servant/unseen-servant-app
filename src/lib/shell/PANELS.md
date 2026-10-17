@@ -7,8 +7,8 @@ into its own window. Two hosts render panels, and both go through
 
 | Host | Window label | Route | Chrome around the panel |
 |---|---|---|---|
-| `PanelHost.svelte` | `main` | `/` | rack bar (`RackBar.svelte`), rails, dock toggle |
-| `StandaloneFrame.svelte` | `panel-<id>` | `/panel/<id>` | dock toggle only |
+| `PanelHost.svelte` | `main` | `/` | rack bar (`RackBar.svelte`), rails, dock toggle, status bar |
+| `StandaloneFrame.svelte` | `panel-<id>` | `/panel/<id>` | dock toggle, status bar |
 
 The panel ids, titles and rack minimums live in `panels.ts`; Rust keeps its
 own copy of the window defaults in `src-tauri/src/panels.rs`, because it
@@ -32,6 +32,13 @@ laid over its slot, so switching views moves it without remounting; a tool
 with no slot in the current view stays mounted, hidden. The Servant isn't in
 the rack until it's built.
 
+The status bar under the rack (`StatusBar.svelte`) spans every tool: the
+machinery lamps (`machinery.ts`, polled once per window), each docked tool's
+status section whatever the view, the window's notes, and the shortcut sheet
+and settings at the far end. Settings is Legend Lore's modal for now, so its
+key asks with `openSettings()` and brings Legend Lore's window forward when
+it's popped out.
+
 ## What a panel receives
 
 - **`active: boolean`** — true while the panel has the keyboard. Always true
@@ -50,6 +57,12 @@ the rack until it's built.
   its own window, where it docks it back. A panel with a header renders it
   there (Legend Lore: right of the search bar). While the panel is locked in
   the current view the host dims the toggle and makes it inert.
+- **`statusSlot`**, an element in the host's status bar (null until the bar
+  is drawn). A panel with something to report renders its status section
+  under `use:hoist={statusSlot}` (`hoist.ts`), which moves it into the bar:
+  under the rack in the main window, at the window's foot when popped out.
+  Wrap it in `.status-section`; the bar dresses `.rule`, `.stats` and
+  `.icon-btn` inside it.
 
 ## What a panel may emit
 

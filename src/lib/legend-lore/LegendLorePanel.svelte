@@ -17,7 +17,10 @@
   import SearchInspector from './SearchInspector.svelte';
   import SearchScopeBar from './SearchScopeBar.svelte';
   import InspectorPlate from './InspectorPlate.svelte';
-  import StatusBar from '../shell/StatusBar.svelte';
+  import LibraryStatus from './LibraryStatus.svelte';
+  import { hoist } from '../shell/hoist';
+  import { machinery } from '../shell/machinery';
+  import { OPEN_SETTINGS_EVENT } from '../shell/shellState';
   import GettingStartedPage from './GettingStartedPage.svelte';
   import SettingsModal from '../shell/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
@@ -62,11 +65,13 @@
   import { parseScopeConsoleState } from './scopeConsole';
   import type { ScopeConsoleState } from './scopeConsole';
 
-  /** False while another panel's tab is showing (PANELS.md): the window's
-   *  keyboard belongs to that panel then. */
+  /** False while another panel has the keyboard (PANELS.md), even one on
+   *  screen beside this one. */
   export let active = true;
   // The host's dock toggle, drawn at the right end of the header (PANELS.md).
   export let windowKey: Snippet | undefined = undefined;
+  // The host's slot for this panel in its status bar (PANELS.md).
+  export let statusSlot: HTMLElement | null = null;
 
   let selectedFolder = '';
   let files: FileItem[] = [];
@@ -296,10 +301,12 @@
   let storageBytes = 0;
   let totalChunks = 0;
 
-  // Sidecar health
-  let sidecarConnected = false;
-  let mcpConnected = false;
-  let mcpActive = false;
+  // The machinery, as the shell polls it for the status bar's lamps.
+  $: sidecarConnected = $machinery.sidecarConnected;
+  $: mcpConnected = $machinery.mcpConnected;
+  $: mcpActive = $machinery.mcpActive;
+  $: ollamaRunning = $machinery.embedderRunning;
+  $: ollamaModelReady = $machinery.embedderReady;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
@@ -308,18 +315,12 @@
   let motionReady = false;
   let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
   let settingsInitialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
-  let healthInterval: ReturnType<typeof setInterval> | null = null;
-  let mcpStatusInterval: ReturnType<typeof setInterval> | null = null;
 
   // User-configurable behavior
   let syncPreferences: SyncPreferences = { ...DEFAULT_SYNC_PREFERENCES };
   // Weak search results fade back in the list (General settings).
   let dimWeakResults = true;
   let dataDir = '';
-
-  // Ollama health
-  let ollamaRunning = false;
-  let ollamaModelReady = false;
 
   // In-app search state
   let searchQuery = '';
@@ -722,6 +723,7 @@
   }
 
   let unlistenSidecarFailed: (() => void) | null = null;
+  let unlistenOpenSettings: (() => void) | null = null;
   // Set when the startup load surfaces a missing-folder toast; cleared
   // by loadFiles when a subsequent load succeeds — typically when the
   // user picks a new folder.
@@ -745,6 +747,12 @@
       'sidecar://failed',
       (event) => showSidecarFailure(event.payload),
     );
+    // Settings is the app's, and this panel hosts its modal: any status bar
+    // asks for it, in whichever window this panel lives (shellState.ts).
+    unlistenOpenSettings = await listen(OPEN_SETTINGS_EVENT, () => {
+      settingsInitialTab = 'general';
+      showSettings = true;
+    });
 
     try {
       const stashed = await invoke<{ log_path: string; message: string } | null>(
@@ -888,19 +896,6 @@
       console.log('Could not fetch data dir:', e);
     }
 
-    // Poll sidecar + Ollama health
-    checkSidecarHealth();
-    checkOllamaHealth();
-    healthInterval = setInterval(() => {
-      checkSidecarHealth();
-      checkOllamaHealth();
-    }, 10000);
-
-    // Poll MCP status more frequently so the active-query pulse is
-    // caught (backend keeps the active flag for 5s after a query).
-    checkMcpStatus();
-    mcpStatusInterval = setInterval(checkMcpStatus, 5000);
-
     restartAutoSyncInterval();
   });
 
@@ -984,19 +979,10 @@
   onDestroy(() => {
     // Best effort: land any membership still sitting in the debounce.
     void armCommitter.flush();
-    if (healthInterval) clearInterval(healthInterval);
-    if (mcpStatusInterval) clearInterval(mcpStatusInterval);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
     if (unlistenSidecarFailed) unlistenSidecarFailed();
+    if (unlistenOpenSettings) unlistenOpenSettings();
   });
-
-  async function checkSidecarHealth() {
-    try {
-      sidecarConnected = await invoke<boolean>('check_sidecar_health');
-    } catch {
-      sidecarConnected = false;
-    }
-  }
 
   async function setViewMode(mode: 'tree' | 'systems') {
     // Selecting a view is also the exit from the search view. Blur the
@@ -1340,31 +1326,6 @@
     mutedCuration = mutedCuration;
     persistScopeConsole();
     if (committedQuery) runSearch(committedQuery);
-  }
-
-  async function checkMcpStatus() {
-    try {
-      const status = await invoke<{ connected: boolean; active: boolean }>('check_mcp_status');
-      mcpConnected = status.connected;
-      mcpActive = status.active;
-    } catch {
-      mcpConnected = false;
-      mcpActive = false;
-    }
-  }
-
-  async function checkOllamaHealth() {
-    try {
-      const status = await invoke<{
-        models: { role: string; runtime_up: boolean; ready: boolean }[];
-      }>('check_models_status');
-      const embed = status.models.find((m) => m.role === 'embed');
-      ollamaRunning = embed?.runtime_up ?? false;
-      ollamaModelReady = embed?.ready ?? false;
-    } catch {
-      ollamaRunning = false;
-      ollamaModelReady = false;
-    }
   }
 
   async function fetchIndexStatus(): Promise<IndexStatusResult | null> {
@@ -4090,27 +4051,24 @@
     />
   {/if}
 
-  <StatusBar
-    {selectedFolder}
-    {sidecarConnected}
-    embedderRunning={ollamaRunning}
-    embedderReady={ollamaModelReady}
-    {mcpConnected}
-    {mcpActive}
-    selectedCount={selectedPaths.size}
-    indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
-    {gameSystemCount}
-    {topGameSystem}
-    {totalChunks}
-    {storageBytes}
-    {isSyncing}
-    {scopeBypassed}
-    {lastSyncTime}
-    onSync={handleManualSync}
-    onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
-    onOpenSettings={() => { settingsInitialTab = 'general'; showSettings = true; }}
-    onShowHelp={() => { showHelpOverlay = true; }}
-  />
+  {#if statusSlot}
+    <div class="status-section" use:hoist={statusSlot}>
+      <LibraryStatus
+        {selectedFolder}
+        selectedCount={selectedPaths.size}
+        indexedCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+        {gameSystemCount}
+        {topGameSystem}
+        {totalChunks}
+        {storageBytes}
+        {isSyncing}
+        {scopeBypassed}
+        {lastSyncTime}
+        onSync={handleManualSync}
+        onOpenFolder={() => { if (selectedFolder) revealItemInDir(selectedFolder); }}
+      />
+    </div>
+  {/if}
 </main>
 
 <SettingsModal

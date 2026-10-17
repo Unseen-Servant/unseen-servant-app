@@ -18,11 +18,13 @@
   import { menuSlotHeld } from '../shell/menuSlot';
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
+  import { hoist } from '../shell/hoist';
   import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import NoteEditor from './NoteEditor.svelte';
   import NoteReader from './NoteReader.svelte';
   import PlayView from './PlayView.svelte';
+  import SessionStatus from './SessionStatus.svelte';
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
@@ -33,11 +35,13 @@
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
   import type { BeatEntry, CampaignIndex, CommandSettings, LiveSet, NoteEntry, VaultEvent } from './types';
 
-  // True while the panel is visible: window-level keys do nothing otherwise
-  // (PANELS.md).
+  // True while the panel has the keyboard: window-level keys do nothing
+  // otherwise (PANELS.md).
   export let active: boolean = true;
   // The host's dock toggle (PANELS.md), drawn at the right of the bar.
   export let windowKey: Snippet | undefined = undefined;
+  // The host's slot for this panel in its status bar (PANELS.md).
+  export let statusSlot: HTMLElement | null = null;
 
   /** What a rename, move, spend or trash needs of a note or a beat. */
   type Named = { name: string; path: string };
@@ -1292,6 +1296,12 @@
     </div>
   {/if}
 </section>
+
+{#if statusSlot}
+  <div class="status-section" use:hoist={statusSlot}>
+    <SessionStatus {campaign} session={session?.name ?? null} liveBeat={beatAt(live?.beat ?? null)?.name ?? null} />
+  </div>
+{/if}
 
 {#if menu}
   <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />

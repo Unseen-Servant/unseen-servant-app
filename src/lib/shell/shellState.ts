@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 import { rustMirror } from './rustMirror';
 import type { PanelId } from './panels';
 
@@ -42,4 +43,12 @@ export function popOut(id: PanelId): Promise<void> {
 
 export function dock(id: PanelId): Promise<void> {
   return invoke('dock_panel', { id });
+}
+
+/** Asks for the app's settings modal. Legend Lore hosts it for now, so this
+ *  goes to every window and the one holding Legend Lore opens it. */
+export const OPEN_SETTINGS_EVENT = 'shell://open-settings';
+
+export function openSettings(): Promise<void> {
+  return emit(OPEN_SETTINGS_EVENT);
 }

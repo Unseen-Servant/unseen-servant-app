@@ -3,15 +3,18 @@
   // tool is mounted once and laid over its slot in the current view, so a
   // view switch moves tools rather than remounting them; a tool with no slot
   // here stays mounted, hidden. A popped-out tool is unmounted, and keeps its
-  // slot in every view that holds it as the way back to it.
+  // slot in every view that holds it as the way back to it. The status bar
+  // under the rack carries the lamps and every docked tool's section.
   import { onDestroy, onMount } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
   import { load } from '@tauri-apps/plugin-store';
   import ActionButton from '../ui/ActionButton.svelte';
   import ConfirmDialog from '../ui/ConfirmDialog.svelte';
   import DockToggle from './DockToggle.svelte';
+  import KeyboardHelpOverlay from './KeyboardHelpOverlay.svelte';
   import PanelView from './PanelView.svelte';
   import RackBar from './RackBar.svelte';
+  import StatusBar from './StatusBar.svelte';
   import { menuSlotHeld } from './menuSlot';
   import { isPanelId, panelTitle, type PanelId } from './panels';
   import {
@@ -30,7 +33,7 @@
     type Rail,
     type RackView,
   } from './rack';
-  import { dock, popOut, poppedPanels } from './shellState';
+  import { dock, openSettings, popOut, poppedPanels } from './shellState';
 
   /** The private type a tool's key carries into the rack. */
   const CARRY = 'application/x-unseen-rack-tool';
@@ -42,6 +45,9 @@
   let rackEl: HTMLElement;
   let rackW = 0;
   let rackH = 0;
+  // Each tool's slot in the status bar, which it hoists its section into.
+  let statusSlots: Partial<Record<PanelId, HTMLElement>> = {};
+  let showHelp = false;
 
   $: view = views[current];
   $: present = toolsIn(view.root);
@@ -221,6 +227,13 @@
   function report(action: Promise<void>, what: string) {
     action.catch((err) => console.error(`Failed to ${what}:`, err));
   }
+
+  // Settings lives with Legend Lore for now; out in its own window, that
+  // window comes forward to show it.
+  function showSettings() {
+    if (popped.has('legend-lore')) report(popOut('legend-lore'), 'bring Legend Lore forward');
+    report(openSettings(), 'open settings');
+  }
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -272,7 +285,7 @@
           {:else}
             <!-- Locked in this view, the pop-out key stays in place but out
                  of reach, as Command's Prep keys do in Play. -->
-            <PanelView id={tool.id} active={!!r && focused === tool.id}>
+            <PanelView id={tool.id} active={!!r && focused === tool.id} statusSlot={statusSlots[tool.id] ?? null}>
               {#snippet windowKey()}
                 <span class="window-key" class:locked inert={locked}><DockToggle id={tool.id} popped={false} /></span>
               {/snippet}
@@ -312,6 +325,13 @@
     {/if}
   </div>
 
+  <StatusBar onOpenSettings={showSettings} onShowHelp={() => (showHelp = true)}>
+    {#each RACK_TOOLS as tool (tool.id)}
+      <div class="status-section" bind:this={statusSlots[tool.id]}></div>
+    {/each}
+  </StatusBar>
+
+  <KeyboardHelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
   <!-- One prompt per window, for whichever panel asks (confirmStore). -->
   <ConfirmDialog />
 </div>
