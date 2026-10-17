@@ -297,7 +297,7 @@
       <input
         type="text"
         bind:value={jot}
-        placeholder="jot in the session note…"
+        placeholder="Write to session notes…"
         aria-label="Add a line to the session note"
         spellcheck="false"
         on:keydown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
