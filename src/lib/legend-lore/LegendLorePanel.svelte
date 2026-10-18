@@ -2404,9 +2404,10 @@
     // The search bar is the exception: its Tab stops (× and the dock
     // behind it) are the mouse's, so there Tab flips too — out of the
     // search view, as either half of the view switch does.
-    // ⇧Tab flips too: with two views, direction means nothing.
+    // ⇧Tab flips too: with two views, direction means nothing. With no
+    // library folder too: the switch is on screen, so its key works.
     const tabFlips = inSearchInput ? !event.isComposing : !searchViewOpen && !inAnyInput;
-    if (event.key === 'Tab' && !meta && !event.altKey && selectedFolder && tabFlips
+    if (event.key === 'Tab' && !meta && !event.altKey && tabFlips
         && !contextMenu && !renamingFilePath && !menuSlotHeld()) {
       event.preventDefault();
       void setViewMode(viewMode === 'tree' ? 'systems' : 'tree');
