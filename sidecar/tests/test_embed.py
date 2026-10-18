@@ -49,11 +49,20 @@ def test_embed_timeout_env_override(ollama, monkeypatch):
     assert ollama["requests"][0]["timeout"] == 30
 
 
-def test_embed_surfaces_ollamas_error_message(ollama):
+def test_embed_explains_a_model_that_was_never_pulled(ollama):
     ollama["response"] = httpx.Response(
         404, json={"error": 'model "bge-m3" not found, try pulling it first'}
     )
-    with pytest.raises(RuntimeError, match=r"404.*not found, try pulling"):
+    with pytest.raises(RuntimeError) as err:
+        embedder.embed(["x"])
+    assert str(err.value) == (
+        "Embedder is running without bge-m3. Run `ollama pull bge-m3` and try again."
+    )
+
+
+def test_embed_surfaces_ollamas_error_message(ollama):
+    ollama["response"] = httpx.Response(400, json={"error": "input length exceeds context"})
+    with pytest.raises(RuntimeError, match=r"400.*input length exceeds context"):
         embedder.embed(["x"])
 
 

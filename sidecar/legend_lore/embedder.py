@@ -79,6 +79,13 @@ def embed(texts: list[str]) -> list[list[float]]:
             detail = resp.json().get("error", resp.text)
         except ValueError:
             detail = resp.text
+        # Ollama's answer when the model was never pulled; the boot splash
+        # names this state the same way.
+        if resp.status_code == 404 and "pull" in detail:
+            raise RuntimeError(
+                f"Embedder is running without {EMBEDDING_MODEL}. "
+                f"Run `ollama pull {EMBEDDING_MODEL}` and try again."
+            )
         raise RuntimeError(f"embed failed ({resp.status_code}): {detail}")
     return resp.json()["embeddings"]
 

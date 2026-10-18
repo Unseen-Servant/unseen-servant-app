@@ -884,7 +884,7 @@ pub async fn search_index(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(format!("Search failed ({}): {}", status, body));
+        return Err(sidecar_refusal(status, &body));
     }
 
     let result: SearchResponse = response
