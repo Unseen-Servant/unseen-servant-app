@@ -13,7 +13,7 @@
 </script>
 
 <div class="pane">
-  <h3 class="pane-title ledger-label">Setting up Legend Lore</h3>
+  <h3 class="pane-title ledger-label">Legend Lore</h3>
 
   <GettingStartedSteps
     {sidecarConnected}
@@ -26,7 +26,7 @@
     {onCopyMcpConfig}
   />
 
-  <h3 class="pane-title ledger-label second">Using Command</h3>
+  <h3 class="pane-title ledger-label second">Command</h3>
 
   <CommandGuide />
 </div>

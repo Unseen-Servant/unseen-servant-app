@@ -10,8 +10,10 @@
   export let onSelectFolder: () => void;
   export let onCopyMcpConfig: () => void;
 
-  const OLLAMA_BADGE = {
-    unknown: 'Unknown',
+  // What a dark or half-lit lamp means, for its tooltip and screen readers:
+  // every tag reads READY, and the lamp says whether it is.
+  const OLLAMA_STATE = {
+    unknown: "Unknown: the sidecar isn't running",
     ready: 'Ready',
     model: 'Model missing',
     missing: 'Not detected',
@@ -19,7 +21,7 @@
 
   // Ollama is probed through the sidecar: with the sidecar down its state is
   // unknown, and "not detected" would send a working setup to reinstall it.
-  let ollamaState: keyof typeof OLLAMA_BADGE;
+  let ollamaState: keyof typeof OLLAMA_STATE;
   $: ollamaState = !sidecarConnected
     ? 'unknown'
     : ollamaRunning && ollamaModelReady
@@ -29,7 +31,7 @@
         : 'missing';
 </script>
 
-<!-- Each step leads with what to do; its badge reads the live state. -->
+<!-- Each step leads with what to do; its lamp reads the live state. -->
 <div class="manual">
   <section class="field">
     <div class="field-title-row">
@@ -38,7 +40,10 @@
         class="tag readout-label"
         class:lit={ollamaState === 'ready'}
         class:half={ollamaState === 'model'}
-      ><span class="led"></span>{OLLAMA_BADGE[ollamaState]}</span>
+        role="img"
+        aria-label={OLLAMA_STATE[ollamaState]}
+        title={OLLAMA_STATE[ollamaState]}
+      ><span class="led"></span>Ready</span>
     </div>
     <p class="field-desc">
       Runs the model that lets search find passages by meaning, on this
@@ -62,9 +67,13 @@
   <section class="field">
     <div class="field-title-row">
       <h3 class="field-title section-title">Library folder</h3>
-      <span class="tag readout-label" class:lit={folderSelected}>
-        <span class="led"></span>{folderSelected ? 'Selected' : 'Unset'}
-      </span>
+      <span
+        class="tag readout-label"
+        class:lit={folderSelected}
+        role="img"
+        aria-label={folderSelected ? 'Ready' : 'No folder chosen'}
+        title={folderSelected ? 'Ready' : 'No folder chosen'}
+      ><span class="led"></span>Ready</span>
     </div>
     <p class="field-desc">
       The folder that holds your PDFs. They are read where they are, nothing
@@ -80,9 +89,13 @@
   <section class="field">
     <div class="field-title-row">
       <h3 class="field-title section-title">Index</h3>
-      <span class="tag readout-label" class:lit={filesIndexed}>
-        <span class="led"></span>{filesIndexed ? 'Indexed' : 'None yet'}
-      </span>
+      <span
+        class="tag readout-label"
+        class:lit={filesIndexed}
+        role="img"
+        aria-label={filesIndexed ? 'Ready' : 'Nothing indexed yet'}
+        title={filesIndexed ? 'Ready' : 'Nothing indexed yet'}
+      ><span class="led"></span>Ready</span>
     </div>
     <p class="field-desc">
       Tick books or folders in the tree; the status bar then offers
@@ -116,9 +129,13 @@
       <h3 class="field-title section-title">
         AI agent <span class="opt">(optional)</span>
       </h3>
-      <span class="tag readout-label" class:lit={mcpConnected}>
-        <span class="led"></span>{mcpConnected ? 'Connected' : 'Not detected'}
-      </span>
+      <span
+        class="tag readout-label"
+        class:lit={mcpConnected}
+        role="img"
+        aria-label={mcpConnected ? 'Connected' : 'Not detected'}
+        title={mcpConnected ? 'Connected' : 'Not detected'}
+      ><span class="led"></span>Ready</span>
     </div>
     <p class="field-desc">
       Lets an MCP client such as Claude Desktop search your library and work
