@@ -29,6 +29,7 @@
         ['Live set', 'The notes in play right now'],
         ['Spent', 'Used up at the table, and dimmed from then on (A)'],
         ['Board', "Play's cards, one board per session"],
+        ['Card tray', 'The live set as a hand of cards, under the board'],
       ],
     },
     {

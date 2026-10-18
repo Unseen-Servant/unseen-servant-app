@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, frameOp, lines, linkify, placeAll, rehypeMissingLinks, type Card } from './board';
+import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, frameOp, handOf, handStep, lines, linkify, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -126,6 +126,22 @@ describe('operations', () => {
     expect(ops.filter((o) => o.op === 'place' && o.path === 'NPCs/Ireena.md')).toHaveLength(1);
     after = cards(applyOps(view, ops, 'Strahd'), index, wanted);
     expect(where(after)).toEqual([where(board)[0], ['NPCs/Ireena.md', 5, 500], ...where(board.slice(2))]);
+  });
+});
+
+describe('the card tray', () => {
+  it('holds the live notes in the live set\'s order, each once', () => {
+    const board = cards(empty, index, ['NPCs/Ismark.md', 'Locations/Tser Pool.md', 'NPCs/Ireena.md']);
+    const hand = handOf(board, ['Locations/Tser Pool.md', 'NPCs/Ismark.md', 'NPCs/Gone.md']);
+    expect(hand.map((c) => c.path)).toEqual(['Locations/Tser Pool.md', 'NPCs/Ismark.md']);
+  });
+
+  it('sets cards side by side while they fit, then overlaps them evenly', () => {
+    expect(handStep(5, 1248, 234, 8)).toBe(242);
+    // Nine: the last card ends at the row's end.
+    const step = handStep(9, 1248, 234, 8);
+    expect(8 * step + 234).toBeCloseTo(1248);
+    expect(handStep(1, 100, 234, 8)).toBe(0);
   });
 });
 

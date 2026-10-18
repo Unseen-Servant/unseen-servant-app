@@ -92,6 +92,8 @@
   /** The session player's list in Play, folded from its plate: kept here so
    *  it stays folded across Tab. */
   let playerOpen = true;
+  /** Play's card tray, folded from its plate, the same. */
+  let trayOpen = true;
   /** Where each session's board was left in Play, so Tab back to Play finds
    *  it as it was, for the sitting. */
   const boardViews = new Map<string, Viewport>();
@@ -1092,6 +1094,7 @@
               {live}
               {run}
               bind:playerOpen
+              bind:trayOpen
               {boardViews}
               {expanded}
               onExpand={onFill}

@@ -170,6 +170,25 @@ export interface CardData extends Record<string, unknown> {
   source: string | null;
   /** The Markdown to show; null while it loads. */
   body: string | null;
+  /** Its card in the card tray is pointed at: the board outlines it. */
+  outlined: boolean;
+}
+
+/** The card tray's hand: the board's cards for the live set's notes, in
+ *  the live set's order, so a note played on its own joins at the end. */
+export function handOf(board: Card[], notes: string[]): Card[] {
+  const byPath = new Map<string, Card>();
+  for (const c of board) if (c.kind === 'note' && c.path && !byPath.has(c.path)) byPath.set(c.path, c);
+  return notes.flatMap((p) => byPath.get(p) ?? []);
+}
+
+/** How far apart the card tray sets `count` cards `width` px wide in a
+ *  row `room` px long: side by side, `gap` apart, while they fit; past
+ *  that, overlapping evenly so the last ends at the row's end and every
+ *  card's left edge stays in view. */
+export function handStep(count: number, room: number, width: number, gap: number): number {
+  if (count * width + (count - 1) * gap <= room) return width + gap;
+  return Math.max(0, (room - width) / (count - 1));
 }
 
 /** What putting a card at `frame` writes: a placed card is framed; an

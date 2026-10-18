@@ -1,23 +1,27 @@
 <script lang="ts">
-  // Play (design §5.2–§5.3): the arrangement down the left, the session's
-  // board in the middle. Launching a beat makes its notes the live set and
-  // frames their cards; a card's key plays one note. The board's file, the
-  // log and the jot bar's lines in the session note are the only things
-  // written — what's live is the sidecar's.
-  import { tick } from 'svelte';
+  // Play (design §5.2–§5.3): the session's board, the arrangement over its
+  // corner and the card tray under it. Launching a beat makes its notes the
+  // live set, frames their cards and deals them to the tray; a card's key
+  // plays one note. The board's file, the log and the jot bar's lines in
+  // the session note are the only things written — what's live is the
+  // sidecar's.
+  import { setContext, tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import type { Viewport } from '@xyflow/svelte';
   import Arrangement from './Arrangement.svelte';
   import Board from './Board.svelte';
+  import CardTray from './CardTray.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
   import { chordHint } from '../shell/keybindings';
   import { commandApi } from './api';
   import {
+    CARD_ACTIONS,
     applyOps,
     bodyOf,
     cards as boardCards,
     frameOp,
+    handOf,
     lines as boardLines,
     placeAll,
     type Card,
@@ -40,6 +44,8 @@
   export let onFollow: (name: string) => void;
   /** The session player unfolded; CommandPanel keeps it across Tab. */
   export let playerOpen: boolean;
+  /** The card tray unfolded, the same. */
+  export let trayOpen: boolean;
   /** Where each session's board was left, by board key: CommandPanel's, so
    *  it outlives Tab. */
   export let boardViews: Map<string, Viewport>;
@@ -158,8 +164,22 @@
     follow: (name) => onFollow(name),
     frame: (card, f) => apply([frameOp(card, f)]),
   };
+  // The tray's cards ask what the board's do.
+  setContext(CARD_ACTIONS, actions);
 
-  function dataFor(lit: Set<string>, notes: Map<string, NoteEntry>, pigments: Record<string, string>, _tick: number) {
+  /** The live set's cards, for the tray. */
+  $: hand = handOf(allCards, live?.notes ?? []);
+  $: liveBeatName = live?.beat ? (index.beats.find((b) => b.path === live?.beat)?.name ?? null) : null;
+  /** The note whose tray card is pointed at: its board card is outlined. */
+  let pointed: string | null = null;
+
+  function dataFor(
+    lit: Set<string>,
+    notes: Map<string, NoteEntry>,
+    pigments: Record<string, string>,
+    outlined: string | null,
+    _tick: number,
+  ) {
     return (card: Card): CardData => {
       const note = card.path ? notes.get(card.path) : undefined;
       return {
@@ -171,10 +191,11 @@
         spent: note?.spent ?? null,
         source: note?.source ?? null,
         body: card.path ? (bodies.get(card.path) ?? null) : null,
+        outlined: !!card.path && card.path === outlined,
       };
     };
   }
-  $: dataOf = dataFor(liveNotes, notesByPath, index.pigments, bodiesTick);
+  $: dataOf = dataFor(liveNotes, notesByPath, index.pigments, pointed, bodiesTick);
 
   // -- framing ------------------------------------------------------------
 
@@ -359,6 +380,17 @@
       </button>
     </div>
   </div>
+
+  {#if hand.length}
+    <CardTray
+      cards={hand}
+      {dataOf}
+      beat={liveBeatName}
+      bind:open={trayOpen}
+      onPoint={(path) => (pointed = path)}
+      onMenu={cardMenu}
+    />
+  {/if}
 </div>
 
 {#if menu}
@@ -366,10 +398,12 @@
 {/if}
 
 <style>
+  /* The board, then the card tray docked under it. */
   .play {
     flex: 1;
     min-width: 0;
     display: flex;
+    flex-direction: column;
     min-height: 0;
   }
 
