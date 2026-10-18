@@ -266,6 +266,67 @@ def test_sync_names_the_books_it_could_not_extract(
     assert data["errors"] == ["scanned_module.pdf: Empty or scanned PDF"]
 
 
+def _embedder_down(texts):
+    raise RuntimeError("Embedder not running — nothing answered. Start it and try again.")
+
+
+def test_sync_with_the_embedder_down_extracts_nothing(
+    test_store, tmp_path, sample_pdf_path, monkeypatch
+):
+    """Every book would fail at its first batch, so none is extracted: the
+    sync ends at once, each book failing with the embedder's own reason,
+    and none is taken for unindexable — the next sync retries them."""
+    from fastapi.testclient import TestClient
+
+    from legend_lore import router as router_mod
+    from server import create_app
+
+    def no_extraction(*args, **kwargs):
+        raise AssertionError("extracted a book with the embedder down")
+
+    monkeypatch.setattr(router_mod, "prepare_pdf", no_extraction)
+    client = TestClient(create_app(store=test_store, data_dir=tmp_path, embed_fn=_embedder_down))
+
+    data = run_sync(client, {"selected_paths": [str(sample_pdf_path)]})
+
+    assert data["added"] == 0
+    assert data["errors"] == [
+        "dragonbane_monsters.pdf: Embedder not running — nothing answered. Start it and try again."
+    ]
+    assert data["unindexable_paths"] == []
+
+
+def test_sync_with_the_embedder_down_keeps_a_modified_books_index(
+    client, test_store, tmp_path, sample_pdf_path, monkeypatch
+):
+    """An update skipped for a down embedder keeps the book's old index and
+    records why, as a failed re-index does."""
+    from fastapi.testclient import TestClient
+
+    from legend_lore import router as router_mod
+    from server import create_app
+
+    run_sync(client, {"selected_paths": [str(sample_pdf_path)]})
+    os.utime(sample_pdf_path, (time.time() + 5, time.time() + 5))
+    units_before = test_store.count_units()
+
+    def no_extraction(*args, **kwargs):
+        raise AssertionError("extracted a book with the embedder down")
+
+    monkeypatch.setattr(router_mod, "prepare_pdf", no_extraction)
+
+    down = TestClient(create_app(store=test_store, data_dir=tmp_path, embed_fn=_embedder_down))
+    data = run_sync(down, {"selected_paths": [str(sample_pdf_path)]})
+
+    assert data["updated"] == 0
+    assert data["errors"] == [
+        "dragonbane_monsters.pdf: Embedder not running — nothing answered. Start it and try again."
+    ]
+    assert test_store.count_units() == units_before
+    entry = json.loads((tmp_path / MANIFEST_FILENAME).read_text())["files"][str(sample_pdf_path)]
+    assert entry["last_error"] == data["errors"][0]
+
+
 def test_manifest_persists_after_sync(client, sample_pdf_path, tmp_path):
     """The manifest file should survive a reload after sync."""
     run_sync(client, {

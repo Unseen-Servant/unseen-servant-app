@@ -337,6 +337,16 @@ def build_router(
             chunks_total += transferred
             yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": new_path.name, "phase": "rename"}
 
+        # Adds and updates embed. Ask the embedder once before extracting
+        # anything: down, or without its model, it would fail every book at
+        # its first batch, after minutes of extraction each.
+        embed_problem = None
+        if diff["to_add"] or diff["to_update"]:
+            try:
+                embed_fn(["ready"])
+            except Exception as e:
+                embed_problem = str(e)
+
         # Phase 2: Index new files
         for entry in diff["to_add"]:
             pdf_path = Path(entry["path"])
@@ -344,6 +354,11 @@ def build_router(
             # on a dense rulebook — otherwise the status bar keeps naming the
             # previous book the whole time.
             yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+            if embed_problem:
+                errors.append(f"{pdf_path.name}: {embed_problem}")
+                files_done += 1
+                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+                continue
             override = (
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
@@ -403,6 +418,13 @@ def build_router(
         for entry in diff["to_update"]:
             pdf_path = Path(entry["path"])
             yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
+            if embed_problem:
+                err_msg = f"{pdf_path.name}: {embed_problem}"
+                errors.append(err_msg)
+                files_done += 1
+                _mark_manifest_error(manifest, data_dir, entry["path"], err_msg)
+                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
+                continue
             override = (
                 request.game_system_overrides.get(entry["path"])
                 if request.game_system_overrides else None
