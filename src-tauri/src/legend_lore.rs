@@ -319,8 +319,10 @@ fn ui_path(path: &Path) -> String {
     ui_path_string(&path.to_string_lossy(), cfg!(windows))
 }
 
+/// The folder picked, or None when the dialog was cancelled: a cancel is
+/// not an error.
 #[tauri::command]
-pub async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
+pub async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let folder = app
@@ -329,10 +331,7 @@ pub async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
         .set_title("Select your TTRPG folder")
         .blocking_pick_folder();
 
-    match folder {
-        Some(path) => Ok(ui_path_string(&path.to_string(), cfg!(windows))),
-        None => Err("No folder selected".to_string()),
-    }
+    Ok(folder.map(|path| ui_path_string(&path.to_string(), cfg!(windows))))
 }
 
 fn count_pdfs_in_dir(folder: &Path) -> u64 {

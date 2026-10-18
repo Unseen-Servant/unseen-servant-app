@@ -1416,7 +1416,9 @@
   async function handleSelectFolder() {
     const wasEmpty = !selectedFolder;
     try {
-      const folder = await invoke<string>('select_folder');
+      const folder = await invoke<string | null>('select_folder');
+      // Cancelled: nothing changes, and nothing is wrong.
+      if (folder === null) return;
       selectedFolder = folder;
       expandedPaths = new Set();
       await loadFiles(selectedFolder);
@@ -1424,7 +1426,7 @@
       await saveState();
       if (wasEmpty) restartAutoSyncInterval();
     } catch (e) {
-      // User cancelled the dialog — keep the current folder
+      // The dialog itself failed — keep the current folder
       if (!selectedFolder) {
         error = String(e);
       }
