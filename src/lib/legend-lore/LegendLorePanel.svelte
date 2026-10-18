@@ -4092,10 +4092,10 @@
   {syncPreferences}
   {dataDir}
   {lastSyncTime}
+  {sidecarConnected}
   {ollamaRunning}
   {ollamaModelReady}
   filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
-  collectionsCreated={Object.keys(collections).length > 0}
   {mcpConnected}
   onSelectFolder={handleSelectFolder}
   onDeselectFolder={handleDeselectFolder}

@@ -35,10 +35,10 @@
   export let onOpenDataDir: () => void = () => {};
   export let onSync: () => void = () => {};
   export let onCopyMcpConfig: () => void = () => {};
+  export let sidecarConnected: boolean = true;
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;
   export let filesIndexed: boolean = false;
-  export let collectionsCreated: boolean = false;
   export let mcpConnected: boolean = false;
   export let initialTab: 'general' | 'library' | 'game-systems' | 'command' | 'help' = 'general';
   export let initialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
@@ -126,11 +126,11 @@
         <div class="subtab-body">
           {#if activeHelpSubTab === 'guides'}
             <GuidesPane
+              {sidecarConnected}
               {ollamaRunning}
               {ollamaModelReady}
               folderSelected={!!selectedFolder}
               {filesIndexed}
-              {collectionsCreated}
               {mcpConnected}
               {onSelectFolder}
               {onCopyMcpConfig}

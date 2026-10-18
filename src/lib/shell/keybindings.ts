@@ -190,9 +190,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.info',          keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused result', scope: 'searchResults' },
   { id: 'results.exit',          keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave search — back to browse view', scope: 'searchResults' },
 
-  // Modal — excluded from the cheat sheet by both KeyboardHelpOverlay's and
-  // help/ReferencePane's SCOPE_ORDER; each keeps its own copy of that list,
-  // and both must keep omitting 'modal'. Defined anyway so the commit
+  // Modal — excluded from the cheat sheet by KeyboardHelpOverlay's
+  // SCOPE_ORDER, which must keep omitting 'modal'. Defined anyway so the commit
   // switch's face and the dialog's matcher read the chord from one place
   // instead of hardcoding a glyph in each.
   { id: 'confirm.commit',        keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Commit a destructive confirmation', scope: 'modal' },

@@ -1,114 +1,77 @@
 <script lang="ts">
-  import { KEYBINDINGS, chord, type KeyScope } from '../keybindings';
-
-  const SCOPE_ORDER: KeyScope[] = [
-    'global',
-    'fileTree',
-    'systemsView',
-    'collections',
-    'searchInput',
-    'searchResults',
-    'filterPanel',
-    'command',
-    'contextMenu',
+  // The tools sidecar/mcp_server.py registers. Keep in step with it.
+  const MCP_TOOLS: { group: string; tools: [name: string, what: string][] }[] = [
+    {
+      group: 'Library',
+      tools: [
+        ['search_library', 'Search by meaning, optionally within a source, game system or collection'],
+        ['get_section', 'Read a whole section from a search result'],
+        ['get_pages', 'Read up to 20 pages of a PDF as text'],
+        ['list_sources', 'List the indexed PDFs'],
+        ['list_collections', 'List the collections'],
+        ['list_game_systems', 'List the game systems in the library'],
+      ],
+    },
+    {
+      group: 'Command · reads',
+      tools: [
+        ['list_campaigns', 'List the campaigns and say which is open'],
+        ['current_session', "The session's plan of beats, what's live, and its log"],
+        ['live_set', 'The notes in play, in full'],
+        ['read_note', 'Read one note'],
+        ['find_notes', 'Find notes by name or text'],
+      ],
+    },
+    {
+      group: 'Command · writes',
+      tools: [
+        ['create_note', 'Write a new note on a track or the shelf'],
+        ['add_to_live_set', 'Put a note in play'],
+        ['spend', 'Mark a note spent or unspent, in the session log'],
+      ],
+    },
   ];
-
-  const SCOPE_LABELS: Record<KeyScope, string> = {
-    global: 'Global',
-    fileTree: 'File tree',
-    systemsView: 'Systems view',
-    collections: 'Collections',
-    searchInput: 'Search input',
-    searchResults: 'Search results',
-    filterPanel: 'Filter console',
-    command: 'Command',
-    contextMenu: 'Context menu',
-    modal: 'Modal',
-  };
-
-  $: grouped = SCOPE_ORDER
-    .map(scope => ({
-      scope,
-      label: SCOPE_LABELS[scope],
-      entries: KEYBINDINGS.filter(k => k.scope === scope),
-    }))
-    .filter(g => g.entries.length > 0);
 </script>
 
 <div class="pane">
   <section class="block">
-    <header class="block-head">
-      <h3 class="block-title section-title">Keyboard shortcuts</h3>
-      <p class="block-desc">
-        Press <code class="kbd">?</code> anywhere in the app to show these as
-        an overlay.
-      </p>
-    </header>
-
-    <div class="kb-groups">
-      {#each grouped as group (group.scope)}
-        <section class="kb-group">
-          <h4 class="kb-group-title ledger-label">{group.label}</h4>
-          <dl class="bindings">
-            {#each group.entries as entry (entry.id)}
-              <dt class="chord">{chord(entry.id)}</dt>
-              <dd class="label">{entry.label}</dd>
-            {/each}
-          </dl>
-        </section>
-      {/each}
-    </div>
-  </section>
-
-  <section class="block">
-    <header class="block-head">
-      <h3 class="block-title section-title">Game system keywords</h3>
-      <p class="block-desc">
-        How the keywords you set in Settings → Game systems are matched against
-        your library.
-      </p>
-    </header>
-
+    <h3 class="block-title section-title">Keyboard shortcuts</h3>
     <p class="block-desc">
-      Keyword matching ignores case, spaces, punctuation, and accents — so
-      <em>d&amp;d 5e</em>, <em>dnd-5e</em>, and <em>DnD 5E</em> all match the
-      same keyword. Avoid very short keywords such as two-letter
-      abbreviations: they false-positive on unrelated paths.
+      Press <code class="kbd">?</code> outside a text field, or click the
+      keyboard key in the status bar, to see every shortcut.
     </p>
   </section>
 
   <section class="block">
-    <header class="block-head">
-      <h3 class="block-title section-title">MCP tools</h3>
-      <p class="block-desc">
-        What an AI agent connected via MCP (Claude Desktop, Claude Code, or
-        anything else that speaks the Model Context Protocol) can do with your
-        library.
-      </p>
-    </header>
-
-    <ul class="tools-list">
-      <li>
-        <strong>Search the library</strong> by meaning — scoped by source,
-        game system, or collection. Results come back with page numbers and
-        section headings, ready to cite.
-      </li>
-      <li>
-        <strong>List indexed PDFs</strong> — what's actually queryable.
-      </li>
-      <li>
-        <strong>List collections</strong> — your curated subsets, with the
-        active one marked.
-      </li>
-      <li>
-        <strong>List game systems</strong> — which systems are present, so
-        the agent doesn't guess names.
-      </li>
-    </ul>
-    <p class="tools-footnote">
-      Set an active collection and search and listings auto-scope to it —
-      your agent stays focused on tonight's session.
+    <h3 class="block-title section-title">Game system keywords</h3>
+    <p class="block-desc">
+      A book gets a game system when one of that system's keywords appears in
+      its path (folders and filename) or, failing that, near the start of its
+      text. Case, spaces, accents and punctuation don't count, and
+      <em>&amp;</em> reads as <em>n</em>: <em>d&amp;d 5e</em>,
+      <em>dnd-5e</em> and <em>DnD 5E</em> all match. Keep keywords to four
+      characters or more; shorter ones turn up inside unrelated words.
     </p>
+    <p class="block-desc">Name a system in a search and its books come first.</p>
+  </section>
+
+  <section class="block">
+    <h3 class="block-title section-title">MCP tools</h3>
+    <p class="block-desc">
+      What an AI agent connected through MCP can do. Command tools work on the
+      campaign open in the app unless the agent names another.
+    </p>
+    {#each MCP_TOOLS as group (group.group)}
+      <section class="tool-group">
+        <h4 class="tool-group-title ledger-label">{group.group}</h4>
+        <dl class="tools">
+          {#each group.tools as [name, what] (name)}
+            <dt class="tool">{name}</dt>
+            <dd class="what">{what}</dd>
+          {/each}
+        </dl>
+      </section>
+    {/each}
   </section>
 </div>
 
@@ -123,12 +86,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
-  }
-
-  .block-head {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
   }
 
   .block-title {
@@ -153,69 +110,37 @@
     color: var(--text-primary);
   }
 
-  .kb-groups {
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-  }
-
-  .kb-group {
+  .tool-group {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
   }
 
-  .kb-group-title {
+  .tool-group-title {
     margin: 0;
   }
 
-  .bindings {
+  .tools {
     margin: 0;
     display: grid;
     grid-template-columns: 9rem 1fr;
     column-gap: 1.25rem;
     row-gap: 0.25rem;
+    align-items: baseline;
     font-size: 0.8rem;
   }
 
-  .chord {
+  .tool {
     margin: 0;
     font-family: var(--font-mono);
+    font-size: 0.72rem;
     color: var(--text-primary);
     white-space: nowrap;
   }
 
-  .label {
+  .what {
     margin: 0;
     color: var(--text-secondary);
     line-height: 1.35;
-  }
-
-  .tools-list {
-    margin: 0;
-    padding-left: 1.1rem;
-    list-style: disc;
-    font-family: var(--font-body);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    line-height: 1.45;
-  }
-  .tools-list li {
-    margin-bottom: 0.4rem;
-  }
-  .tools-list li:last-child {
-    margin-bottom: 0;
-  }
-  .tools-list strong {
-    color: var(--text-primary);
-    font-weight: 600;
-  }
-
-  .tools-footnote {
-    margin: 0.2rem 0 0;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
-    line-height: 1.45;
   }
 </style>
