@@ -2,7 +2,7 @@
   // Command's pane in Settings: where the campaigns live, and whether
   // launching a beat spends it (design §4). The sidecar keeps both.
   import { onMount } from 'svelte';
-  import ActionButton from '../ui/ActionButton.svelte';
+  import { FOLDER, FOLDER_OPEN } from '../ui/iconPaths';
   import { commandApi } from './api';
   import type { CommandSettings } from './types';
 
@@ -44,15 +44,49 @@
 </script>
 
 <div class="command-settings">
-  <section class="field">
-    <div class="field-head">
-      <h3 class="field-title section-title">Play</h3>
-      <p class="field-desc">How Command keeps track of a session at the table.</p>
-    </div>
+  {#if loadError}
+    <p class="field-desc error-text">Could not load Command's settings — is the sidecar running? ({loadError})</p>
+  {:else if settings}
+    <section class="field">
+      <div class="field-head">
+        <h3 class="field-title section-title">Campaigns folder</h3>
+        <p class="field-desc">
+          Each campaign is a folder in here. Changing the folder closes the open
+          campaign and opens a fresh Untitled in the new one — nothing is moved.
+        </p>
+      </div>
 
-    {#if loadError}
-      <p class="field-desc error-text">Could not load Command's settings — is the sidecar running? ({loadError})</p>
-    {:else if settings}
+      <!-- Legend Lore's library folder row (LibrarySettings.svelte), copied. -->
+      <div class="path-row">
+        <input
+          type="text"
+          class="path-input"
+          readonly
+          value={settings.root ?? ''}
+          placeholder="No folder selected"
+          title={settings.root ?? ''}
+        />
+        <button
+          type="button"
+          class="btn-icon"
+          on:click={chooseRoot}
+          title="Change campaigns folder"
+          aria-label="Change campaigns folder"
+        >
+          <svg class="btn-icon-svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+            <path class="folder-shut" d={FOLDER}/>
+            <path class="folder-opened" d={FOLDER_OPEN}/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="field">
+      <div class="field-head">
+        <h3 class="field-title section-title">Play</h3>
+        <p class="field-desc">How Command keeps track of a session at the table.</p>
+      </div>
+
       <div class="setting-row">
         <div class="setting-row-head">
           <div class="setting-row-title">Spend beats on launch</div>
@@ -70,20 +104,11 @@
           <option value="off">Off</option>
         </select>
       </div>
-      <div class="setting-row">
-        <div class="setting-row-head">
-          <div class="setting-row-title">Campaigns folder</div>
-          <div class="setting-row-desc path" title={settings.root ?? ''}>
-            {settings.root ?? 'Not set yet'}
-          </div>
-        </div>
-        <ActionButton label="change" title="Choose another campaigns folder" onClick={chooseRoot} />
-      </div>
-      {#if saveError}<p class="field-desc error-text">{saveError}</p>{/if}
-    {:else}
-      <p class="field-desc">Loading…</p>
-    {/if}
-  </section>
+    </section>
+    {#if saveError}<p class="field-desc error-text">{saveError}</p>{/if}
+  {:else}
+    <p class="field-desc">Loading…</p>
+  {/if}
 </div>
 
 <style>
@@ -147,12 +172,51 @@
     line-height: 1.35;
   }
 
-  .path {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .path-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .path-input {
+    flex: 1;
+    min-width: 0;
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: 0.7rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-focused);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+  .path-input:focus {
+    outline: 1px solid var(--text-accent);
+    outline-offset: -1px;
+  }
+  .path-input::placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .btn-icon {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.35rem;
+    line-height: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .btn-icon:hover {
+    color: var(--text-accent);
+  }
+  .btn-icon-svg {
+    width: 16px;
+    height: 16px;
   }
 
   .setting-select {
