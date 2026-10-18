@@ -1,4 +1,47 @@
 <script lang="ts">
+  // The words the app uses that a newcomer meets without a definition.
+  const GLOSSARY: { group: string; terms: [term: string, meaning: string][] }[] = [
+    {
+      group: 'Legend Lore',
+      terms: [
+        ['Collection', 'A named set of books'],
+        ['Play', 'Search covers only the playing collections (P)'],
+        ['Mix', 'Several collections playing together'],
+        ['Arm', 'While a collection or a beat is armed (●), clicks file things in or out'],
+        ['Solo', 'Narrow search to a book, folder or game system (S)'],
+        ['Mute', 'Leave a book, folder, game system or collection out of search (M)'],
+        ['Bypass', 'Set every play, solo and mute aside without clearing them (B)'],
+        ['Strong · Good · Weak', 'How closely a result matches; weak ones fade'],
+        ['Sync', 'Index the ticked books (⌘S)'],
+      ],
+    },
+    {
+      group: 'Command',
+      terms: [
+        ['Campaign', 'A folder in the campaigns folder, holding all it uses'],
+        ['Track', 'A folder in a campaign, shown as a column: NPCs, Secrets…'],
+        ['Note', 'A Markdown file; [[Name]] links to one'],
+        ['Shelf', 'Notes gathered but not filed on a track yet'],
+        ['Beat', 'A scene: the notes it needs'],
+        ['Session', 'The beats planned for one game, and its log'],
+        ['Prep · Play', 'Arranging and running, switched with Tab'],
+        ['Launch', 'Put a beat or a note in play (P)'],
+        ['Live set', 'The notes in play right now'],
+        ['Spent', 'Used up at the table, and dimmed from then on (A)'],
+        ['Board', "Play's cards, one board per session"],
+      ],
+    },
+    {
+      group: 'Machinery',
+      terms: [
+        ['Sidecar', "Indexes and searches in the background; the status bar's first lamp"],
+        ['Embedder', 'Ollama with bge-m3, reading text for meaning; the second lamp'],
+        ['MCP', 'How an AI agent reaches the library and campaigns; the third lamp'],
+        ['Rack', "The main window's tools, laid out in views; 1–8 switch views"],
+      ],
+    },
+  ];
+
   // The tools sidecar/mcp_server.py registers. Keep in step with it.
   const MCP_TOOLS: { group: string; tools: [name: string, what: string][] }[] = [
     {
@@ -40,6 +83,21 @@
       Press <code class="kbd">?</code> outside a text field, or click the
       keyboard key in the status bar, to see every shortcut.
     </p>
+  </section>
+
+  <section class="block">
+    <h3 class="block-title section-title">Glossary</h3>
+    {#each GLOSSARY as group (group.group)}
+      <section class="tool-group">
+        <h4 class="tool-group-title ledger-label">{group.group}</h4>
+        <dl class="terms">
+          {#each group.terms as [term, meaning] (term)}
+            <dt class="term">{term}</dt>
+            <dd class="what">{meaning}</dd>
+          {/each}
+        </dl>
+      </section>
+    {/each}
   </section>
 
   <section class="block">
@@ -120,7 +178,8 @@
     margin: 0;
   }
 
-  .tools {
+  .tools,
+  .terms {
     margin: 0;
     display: grid;
     grid-template-columns: 9rem 1fr;
@@ -134,6 +193,13 @@
     margin: 0;
     font-family: var(--font-mono);
     font-size: 0.72rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  .term {
+    margin: 0;
+    font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
   }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import GettingStartedSteps from '../../legend-lore/GettingStartedSteps.svelte';
+  import CommandGuide from '../../command/CommandGuide.svelte';
 
   export let sidecarConnected: boolean = true;
   export let ollamaRunning: boolean = false;
@@ -24,6 +25,10 @@
     {onSelectFolder}
     {onCopyMcpConfig}
   />
+
+  <h3 class="pane-title ledger-label second">Using Command</h3>
+
+  <CommandGuide />
 </div>
 
 <style>
@@ -35,5 +40,8 @@
 
   .pane-title {
     margin: 0;
+  }
+  .pane-title.second {
+    margin-top: 1rem;
   }
 </style>
