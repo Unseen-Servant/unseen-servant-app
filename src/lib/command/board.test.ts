@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, frameOp, lines, linkify, rehypeMissingLinks, type Card } from './board';
+import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, frameOp, lines, linkify, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -101,6 +101,31 @@ describe('operations', () => {
     const ops = connectOps(at('a', 0, 0), at('b', 300, 0, false), 'right', 'left');
     expect(ops.map((o) => o.op)).toEqual(['place', 'connect']);
     expect(ops[1]).toMatchObject({ source: 'a', target: ops[0].id, fromSide: 'right', toSide: 'left' });
+  });
+
+  it('puts every auto-placed card down where it sits, so a card moved later moves alone', () => {
+    const view: BoardView = {
+      nodes: [{ id: 'a', type: 'file', file: 'Strahd/NPCs/Ismark.md', x: 0, y: 0, width: 100, height: 100 }],
+      edges: [],
+      notes: { a: 'NPCs/Ismark.md' },
+    };
+    const wanted = ['NPCs/Ismark.md', 'NPCs/Ireena.md', 'Locations/Tser Pool.md', 'Overview.md'];
+    const where = (board: Card[]) => board.map((c) => [c.path, c.x, c.y]);
+    let board = cards(view, index, wanted);
+
+    // Moving the placed card right would push the auto-placed ones after it.
+    let ops = placeAll(board, [frameOp(board[0], { x: 900, y: -50, width: 100, height: 100 })]);
+    expect(ops.map((o) => o.op)).toEqual(['frame', 'place', 'place', 'place']);
+    let after = cards(applyOps(view, ops, 'Strahd'), index, wanted);
+    expect(after.every((c) => c.placed)).toBe(true);
+    expect(where(after)).toEqual([['NPCs/Ismark.md', 900, -50], ...where(board.slice(1))]);
+
+    // An auto-placed card moved first is placed once, where it's dropped.
+    board = cards(view, index, wanted);
+    ops = placeAll(board, [frameOp(board[1], { x: 5, y: 500, width: 260, height: 180 })]);
+    expect(ops.filter((o) => o.op === 'place' && o.path === 'NPCs/Ireena.md')).toHaveLength(1);
+    after = cards(applyOps(view, ops, 'Strahd'), index, wanted);
+    expect(where(after)).toEqual([where(board)[0], ['NPCs/Ireena.md', 5, 500], ...where(board.slice(2))]);
   });
 });
 

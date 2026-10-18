@@ -19,6 +19,7 @@
     cards as boardCards,
     frameOp,
     lines as boardLines,
+    placeAll,
     type Card,
     type CardActions,
     type CardData,
@@ -83,8 +84,9 @@
     }
   }
 
-  function apply(ops: BoardOp[]) {
-    if (!view || !ops.length) return;
+  function apply(change: BoardOp[]) {
+    if (!view || !change.length) return;
+    const ops = placeAll(allCards, change);
     const key = boardKey;
     const path = session.path;
     view = applyOps(view, ops, campaign);

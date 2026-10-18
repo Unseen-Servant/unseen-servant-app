@@ -19,7 +19,8 @@ export interface Card {
   kind: CardKind;
   /** The note a note card shows; null when the note it names isn't there. */
   path: string | null;
-  /** False for a note auto-placed beside the arrangement: moving it places it. */
+  /** False for a note auto-placed beside the arrangement: the board's next
+   *  change places it (placeAll). */
   placed: boolean;
   x: number;
   y: number;
@@ -182,6 +183,16 @@ export function frameOp(card: Card, frame: Frame): BoardOp {
   };
   if (card.placed) return { op: 'frame', id: card.id, ...rounded };
   return { op: 'place', id: newId(), path: card.path!, ...rounded };
+}
+
+/** `ops` and a place for every auto-placed card they leave where it sits.
+ *  The auto-placed cards are laid out around the placed ones, so a change
+ *  that left them out would move them all; once every card is in the
+ *  file, each moves alone. */
+export function placeAll(board: Card[], ops: BoardOp[]): BoardOp[] {
+  const placing = new Set(ops.flatMap((o) => (o.op === 'place' ? [o.path] : [])));
+  const rest = board.filter((c) => !c.placed && !placing.has(c.path!));
+  return [...ops, ...rest.map((c) => frameOp(c, c))];
 }
 
 /** The operations a line drawn from `a` to `b` writes: an auto-placed end
