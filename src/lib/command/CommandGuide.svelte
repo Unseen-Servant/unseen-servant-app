@@ -42,8 +42,8 @@
       notes as cards. In the session player, <strong>P</strong> or &#9654;
       launches the focused beat and lights its cards; a card's &#9654; puts
       one more note in play. The card tray under the board holds what's in
-      play: point at a card to read all of it, or select cards and
-      <em>spread</em> them to read side by side. <strong>A</strong> marks the note or beat under
+      play: point at a card to read all of it, or click cards, then
+      <em>select</em>, to read them side by side. <strong>A</strong> marks the note or beat under
       the pointer spent (a secret told, an NPC dead), and it stays dimmed in
       later sessions.
     </p>

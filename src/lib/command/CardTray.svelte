@@ -3,10 +3,10 @@
   // docked under the board as a deckbuilder's hand sits under its table.
   // Each card keeps its reading width; past what fits they overlap evenly,
   // so every one stays in view. Pointing at a card brings it to the front,
-  // whole, and outlines its card on the board. Clicking cards selects them,
-  // raised in the hand; [spread] lays the selected side by side to read
+  // whole, and outlines its card on the board. Clicking cards picks them,
+  // raised in the hand; [select] lays the picked side by side to read
   // together, the rest on their side as spines. A new live set clears the
-  // selection. Folded, the tray is its plate, the hand as nameplates that
+  // picks. Folded, the tray is its plate, the hand as nameplates that
   // bring their card up when pointed at.
   import { onDestroy, onMount } from 'svelte';
   import { CARET_RIGHT } from '../ui/iconPaths';
@@ -26,34 +26,34 @@
 
   $: held = cards.map(dataOf);
 
-  // -- selection and the spread ---------------------------------------------
+  // -- picks and the spread -------------------------------------------------
 
-  let selected: string[] = [];
-  /** The selected cards laid side by side, the rest as spines. */
-  let spreading = false;
+  let picked: string[] = [];
+  /** The picked cards laid side by side, the rest as spines. */
+  let selecting = false;
   let setKey: string | null = null;
   $: {
     const key = [beat ?? '', ...cards.map((c) => c.path)].join('\n');
     if (key !== setKey) {
       setKey = key;
-      selected = [];
+      picked = [];
     }
   }
-  $: spread = spreading && selected.length > 0;
-  // With nothing left selected, the spread gathers back into the hand.
-  $: if (!selected.length) spreading = false;
+  $: spread = selecting && picked.length > 0;
+  // With nothing left picked, the spread goes back into the hand.
+  $: if (!picked.length) selecting = false;
 
-  /** A click selects a card or puts it back; a double-click's second click
+  /** A click picks a card or puts it back; a double-click's second click
    *  is the card's, which opens the note. A link or a key keeps its own. */
   function toggle(path: string, e: MouseEvent) {
     if (e.detail > 1 || (e.target as HTMLElement).closest('a, button')) return;
-    selected = selected.includes(path) ? selected.filter((p) => p !== path) : [...selected, path];
+    picked = picked.includes(path) ? picked.filter((p) => p !== path) : [...picked, path];
   }
 
-  /** A nameplate on the folded plate opens the tray with its card selected. */
+  /** A nameplate on the folded plate opens the tray with its card picked. */
   function unfold(path: string) {
     open = true;
-    selected = [path];
+    picked = [path];
   }
 
   // -- pointing -------------------------------------------------------------
@@ -106,10 +106,10 @@
       <button
         type="button"
         class="plate-btn"
-        disabled={!selected.length}
-        title={spread ? 'Put the cards back in the hand' : 'Lay the selected cards side by side'}
-        on:click={() => (spreading = !spread)}
-      >{spread ? 'gather' : 'spread'}</button>
+        disabled={!picked.length}
+        title={spread ? 'Put the cards back in the hand' : 'Lay the picked cards side by side'}
+        on:click={() => (selecting = !spread)}
+      >{spread ? 'deselect' : 'select'}</button>
     {:else}
       <!-- Folded: a nameplate per card in its track's pigment, as Prep's
            track plates wear it. -->
@@ -154,8 +154,8 @@
       >
         {#each held as d, i (d.card.id)}
           {@const path = d.card.path ?? ''}
-          {@const isSelected = selected.includes(path)}
-          {#if spread && !isSelected}
+          {@const isPicked = picked.includes(path)}
+          {#if spread && !isPicked}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
               class="spine"
@@ -178,9 +178,9 @@
               class="slot"
               role="button"
               tabindex="-1"
-              aria-pressed={isSelected}
+              aria-pressed={isPicked}
               data-path={path}
-              class:selected={isSelected}
+              class:picked={isPicked}
               class:look={pointed === path}
               style:left={spread ? null : `${i * step}px`}
               style:width={spread ? null : `${CARD_REM}rem`}
@@ -433,13 +433,13 @@
     max-height: 28rem;
   }
 
-  /* Selected: the board's selected card's accent rule, and in the hand
+  /* Picked: the board's selected card's accent rule, and in the hand
      raised a step, as a card readied to play. */
-  .slot.selected :global(.card) {
+  .slot.picked :global(.card) {
     border-color: var(--text-accent);
   }
 
-  .cards:not(.spread) .slot.selected .lift {
+  .cards:not(.spread) .slot.picked .lift {
     transform: translateY(-0.4rem);
   }
 
