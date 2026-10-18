@@ -3607,14 +3607,17 @@
         streamsProgress: true,
         buildResultMessage: syncSummary,
         onComplete: async (r) => {
-          // Reconcile selectedPaths with renames / auto-removals / stale paths
+          // Reconcile selectedPaths with renames / auto-removals / stale paths,
+          // and untick books with no text to index (a scanned PDF), which
+          // would otherwise be offered again after every check
           for (const { old_path, new_path } of r.renames ?? []) {
             selectedPaths.delete(old_path);
             selectedPaths.add(new_path);
           }
           for (const path of r.auto_removed_paths ?? []) selectedPaths.delete(path);
           for (const path of r.stale_paths ?? []) selectedPaths.delete(path);
-          if ((r.renames?.length || 0) + (r.auto_removed_paths?.length || 0) + (r.stale_paths?.length || 0) > 0) {
+          for (const path of r.unindexable_paths ?? []) selectedPaths.delete(path);
+          if ((r.renames?.length || 0) + (r.auto_removed_paths?.length || 0) + (r.stale_paths?.length || 0) + (r.unindexable_paths?.length || 0) > 0) {
             selectedPaths = selectedPaths;
           }
 

@@ -252,6 +252,20 @@ def test_sync_mixed_operations(
     assert str(sample_pdf_path) not in manifest_raw["files"]
 
 
+def test_sync_names_the_books_it_could_not_extract(
+    client, sample_pdf_path, empty_pdf_path
+):
+    """A scanned PDF never yields text, so the result names it: the app
+    unticks it rather than offering to add it again after every check."""
+    data = run_sync(client, {
+        "selected_paths": [str(sample_pdf_path), str(empty_pdf_path)]
+    })
+
+    assert data["added"] == 1
+    assert data["unindexable_paths"] == [str(empty_pdf_path)]
+    assert data["errors"] == ["scanned_module.pdf: Empty or scanned PDF"]
+
+
 def test_manifest_persists_after_sync(client, sample_pdf_path, tmp_path):
     """The manifest file should survive a reload after sync."""
     run_sync(client, {

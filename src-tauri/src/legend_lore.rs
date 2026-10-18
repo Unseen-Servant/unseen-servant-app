@@ -95,6 +95,8 @@ pub struct SyncResult {
     renames: Vec<RenameMapping>,
     auto_removed_paths: Vec<String>,
     stale_paths: Vec<String>,
+    #[serde(default)]
+    unindexable_paths: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1438,11 +1440,13 @@ mod tests {
             "total_indexed": 9, "chunks_total": 120,
             "renames": [{"old_path": "/a.pdf", "new_path": "/b.pdf"}],
             "auto_removed_paths": [], "stale_paths": [],
+            "unindexable_paths": ["/bad.pdf"],
         });
         match sync_event(&complete) {
             Ok(Some(SyncEvent::Complete(r))) => {
                 assert_eq!((r.added, r.renamed, r.total_indexed), (2, 1, 9));
                 assert_eq!(r.errors, vec!["bad.pdf: no text"]);
+                assert_eq!(r.unindexable_paths, vec!["/bad.pdf"]);
             }
             other => panic!("expected complete, got {:?}", other),
         }

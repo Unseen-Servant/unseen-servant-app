@@ -281,6 +281,10 @@ def build_router(
         added = 0
         updated = 0
         errors = []
+        # Books whose text couldn't be extracted (a scanned PDF): the app
+        # unticks them, as it drops stale paths, so they aren't offered
+        # again after every check.
+        unindexable_paths: list[str] = []
 
         yield {"event": "started", "total_files": total_files}
 
@@ -350,6 +354,7 @@ def build_router(
             )
             if error:
                 errors.append(error)
+                unindexable_paths.append(entry["path"])
                 files_done += 1
                 yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
                 continue
@@ -489,6 +494,7 @@ def build_router(
             ],
             "auto_removed_paths": [e["path"] for e in diff["to_auto_remove"]],
             "stale_paths": diff["stale_paths"],
+            "unindexable_paths": unindexable_paths,
         }
 
     @router.post("/api/sync-index-stream")

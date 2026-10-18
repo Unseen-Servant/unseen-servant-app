@@ -13,7 +13,7 @@ function result(overrides: Partial<SyncResult> = {}): SyncResult {
   return {
     added: 0, removed: 0, auto_removed: 0, renamed: 0, updated: 0,
     errors: [], total_indexed: 0, chunks_total: 999,
-    renames: [], auto_removed_paths: [], stale_paths: [],
+    renames: [], auto_removed_paths: [], stale_paths: [], unindexable_paths: [],
     ...overrides,
   };
 }

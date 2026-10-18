@@ -84,6 +84,9 @@ export interface SyncResult {
   renames: RenameMapping[];
   auto_removed_paths: string[];
   stale_paths: string[];
+  // Books whose text couldn't be extracted (a scanned PDF); the panel
+  // unticks them.
+  unindexable_paths: string[];
 }
 
 export interface CollectionInfo {
