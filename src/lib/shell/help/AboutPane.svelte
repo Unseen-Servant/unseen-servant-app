@@ -174,41 +174,8 @@
     font-size: 0.75rem;
   }
 
-  /* Bracketed terminal-style action — matches LibrarySettings.svelte pattern */
   .btn-link {
-    background: transparent;
-    border: none;
-    padding: 0;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-accent);
-    cursor: pointer;
     flex-shrink: 0;
-    transition: filter var(--transition-fast);
-  }
-  .btn-link::before,
-  .btn-link::after {
-    color: var(--text-secondary);
-    transition: color var(--transition-fast);
-  }
-  .btn-link::before {
-    content: '[';
-    margin-right: 0.15rem;
-  }
-  .btn-link::after {
-    content: ']';
-    margin-left: 0.15rem;
-  }
-  .btn-link:hover:not(:disabled) {
-    filter: brightness(1.25);
-  }
-  .btn-link:hover:not(:disabled)::before,
-  .btn-link:hover:not(:disabled)::after {
-    color: var(--text-accent);
-  }
-  .btn-link:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
 
 </style>

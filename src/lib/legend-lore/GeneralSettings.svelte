@@ -342,34 +342,6 @@
   }
 
   .btn-link {
-    background: transparent;
-    border: none;
-    padding: 0;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-accent);
-    cursor: pointer;
     flex-shrink: 0;
-    transition: filter var(--transition-fast);
-  }
-  .btn-link::before,
-  .btn-link::after {
-    color: var(--text-secondary);
-    transition: color var(--transition-fast);
-  }
-  .btn-link::before {
-    content: '[';
-    margin-right: 0.15rem;
-  }
-  .btn-link::after {
-    content: ']';
-    margin-left: 0.15rem;
-  }
-  .btn-link:hover {
-    filter: brightness(1.25);
-  }
-  .btn-link:hover::before,
-  .btn-link:hover::after {
-    color: var(--text-accent);
   }
 </style>

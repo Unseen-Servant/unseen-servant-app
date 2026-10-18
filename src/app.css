@@ -839,8 +839,12 @@ dialog[open]::backdrop {
    code-flavoured affordance; a step below the settings modal's 0.7rem
    because it sits on a dense panel's masthead, and a control nobody reaches
    for often shouldn't carry that weight. Parchment when it can act, with
-   the brackets a step quieter until hovered. */
-.plate-btn {
+   the brackets a step quieter until hovered.
+   .btn-link is the same control in the settings modal's text (Settings,
+   Help), at that 0.7rem. Layout (align-self, flex-shrink) stays in the
+   component. */
+.plate-btn,
+.btn-link {
   background: none;
   border: none;
   padding: 0;
@@ -850,41 +854,55 @@ dialog[open]::backdrop {
   cursor: pointer;
   transition: filter var(--transition-fast), transform var(--transition-fast);
 }
+.btn-link {
+  font-size: 0.7rem;
+}
 .plate-btn::before,
-.plate-btn::after {
+.plate-btn::after,
+.btn-link::before,
+.btn-link::after {
   color: var(--text-secondary);
   transition: color var(--transition-fast);
 }
-.plate-btn::before {
+.plate-btn::before,
+.btn-link::before {
   content: '[';
   margin-right: 0.15rem;
 }
-.plate-btn::after {
+.plate-btn::after,
+.btn-link::after {
   content: ']';
   margin-left: 0.15rem;
 }
-.plate-btn:hover:not(:disabled) {
+.plate-btn:hover:not(:disabled),
+.btn-link:hover:not(:disabled) {
   filter: brightness(1.25);
 }
 /* Hovered, or holding its menu open: the brackets light with the label. */
 .plate-btn:hover:not(:disabled)::before,
 .plate-btn:hover:not(:disabled)::after,
 .plate-btn[aria-expanded="true"]::before,
-.plate-btn[aria-expanded="true"]::after {
+.plate-btn[aria-expanded="true"]::after,
+.btn-link:hover:not(:disabled)::before,
+.btn-link:hover:not(:disabled)::after {
   color: var(--text-accent);
 }
-.plate-btn:active:not(:disabled) {
+.plate-btn:active:not(:disabled),
+.btn-link:active:not(:disabled) {
   transform: scale(0.97);
 }
 /* Unavailable is a step down the text ramp, not a veil. The brackets go
    with it: they sit at --text-secondary, lighter than tertiary, so leaving
    them would light the frame around a dead label. */
-.plate-btn:disabled {
+.plate-btn:disabled,
+.btn-link:disabled {
   color: var(--text-tertiary);
   cursor: default;
 }
 .plate-btn:disabled::before,
-.plate-btn:disabled::after {
+.plate-btn:disabled::after,
+.btn-link:disabled::before,
+.btn-link:disabled::after {
   color: var(--text-tertiary);
 }
 

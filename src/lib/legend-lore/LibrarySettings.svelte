@@ -488,45 +488,8 @@
     min-width: 0;
   }
 
-  /*
-   * Link action — Option B: bracketed terminal-style affordance.
-   * Brackets in muted color, label in accent. Hover brightens the
-   * brackets so the whole token feels reactive.
-   */
   .btn-link {
-    background: transparent;
-    border: none;
-    padding: 0;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-accent);
-    cursor: pointer;
     flex-shrink: 0;
-    transition: filter var(--transition-fast);
-  }
-  .btn-link::before,
-  .btn-link::after {
-    color: var(--text-secondary);
-    transition: color var(--transition-fast);
-  }
-  .btn-link::before {
-    content: '[';
-    margin-right: 0.15rem;
-  }
-  .btn-link::after {
-    content: ']';
-    margin-left: 0.15rem;
-  }
-  .btn-link:hover:not(:disabled) {
-    filter: brightness(1.25);
-  }
-  .btn-link:hover:not(:disabled)::before,
-  .btn-link:hover:not(:disabled)::after {
-    color: var(--text-accent);
-  }
-  .btn-link:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
 
   .setting-row {
@@ -603,7 +566,9 @@
     padding: 0 0.3rem;
   }
 
-  button {
+  /* Not the bracket links, which are app.css's .btn-link. :where keeps
+     this rule's weight under .btn-icon's. */
+  button:not(:where(.btn-link)) {
     font-family: var(--font-body);
     font-size: 0.85rem;
     padding: 0.4rem 0.75rem;
@@ -612,7 +577,7 @@
     transition: all var(--transition-fast);
   }
 
-  button:disabled {
+  button:not(:where(.btn-link)):disabled {
     cursor: default;
     opacity: 0.5;
   }
