@@ -165,5 +165,5 @@ def test_search_reports_the_model_missing(production_embed_client, monkeypatch):
 
     assert response.status_code == 500
     assert response.json()["detail"] == (
-        'embed failed (404): model "bge-m3" not found, try pulling it first'
+        "Embedder is running without bge-m3. Run `ollama pull bge-m3` and try again."
     )
