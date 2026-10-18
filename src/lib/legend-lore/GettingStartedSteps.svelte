@@ -35,10 +35,10 @@
     <div class="field-title-row">
       <h3 class="field-title section-title">Ollama</h3>
       <span
-        class="field-status readout-label"
-        class:ok={ollamaState === 'ready'}
-        class:partial={ollamaState === 'model'}
-      >{OLLAMA_BADGE[ollamaState]}</span>
+        class="tag readout-label"
+        class:lit={ollamaState === 'ready'}
+        class:half={ollamaState === 'model'}
+      ><span class="led"></span>{OLLAMA_BADGE[ollamaState]}</span>
     </div>
     <p class="field-desc">
       Runs the model that lets search find passages by meaning, on this
@@ -62,8 +62,8 @@
   <section class="field">
     <div class="field-title-row">
       <h3 class="field-title section-title">Library folder</h3>
-      <span class="field-status readout-label" class:ok={folderSelected}>
-        {folderSelected ? 'Selected' : 'Unset'}
+      <span class="tag readout-label" class:lit={folderSelected}>
+        <span class="led"></span>{folderSelected ? 'Selected' : 'Unset'}
       </span>
     </div>
     <p class="field-desc">
@@ -80,8 +80,8 @@
   <section class="field">
     <div class="field-title-row">
       <h3 class="field-title section-title">Index</h3>
-      <span class="field-status readout-label" class:ok={filesIndexed}>
-        {filesIndexed ? 'Indexed' : 'None yet'}
+      <span class="tag readout-label" class:lit={filesIndexed}>
+        <span class="led"></span>{filesIndexed ? 'Indexed' : 'None yet'}
       </span>
     </div>
     <p class="field-desc">
@@ -116,8 +116,8 @@
       <h3 class="field-title section-title">
         AI agent <span class="opt">(optional)</span>
       </h3>
-      <span class="field-status readout-label" class:ok={mcpConnected}>
-        {mcpConnected ? 'Connected' : 'Not detected'}
+      <span class="tag readout-label" class:lit={mcpConnected}>
+        <span class="led"></span>{mcpConnected ? 'Connected' : 'Not detected'}
       </span>
     </div>
     <p class="field-desc">
@@ -142,7 +142,7 @@
 <style>
   /* Shape mirrors LibrarySettings: stacked .field sections at 1.25rem
      gap, .field-title in Almendra at 0.95rem, .field-desc in body at
-     0.85rem. The Setup-specific bits — right-aligned status badge and
+     0.85rem. The Setup-specific bits — right-aligned status tag and
      command box — extend that vocabulary rather than replace it. */
   .manual {
     display: flex;
@@ -178,15 +178,38 @@
     margin-left: 0.3rem;
   }
 
-  .field-status {
+  /* A step's state as a readout set in a well, its pilot lamp at the left:
+     the splash's LED (LaunchSplash.svelte), dark until the step is done,
+     amber once it is, half-lit when Ollama answers without its model, as
+     the status bar's embedder lamp is. */
+  .tag {
     flex-shrink: 0;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0.5rem 0.15rem 0.4rem;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 0.62rem;
     color: var(--text-tertiary);
   }
-  .field-status.ok {
-    color: var(--text-active);
+  .tag.lit,
+  .tag.half {
+    color: var(--text-secondary);
   }
-  .field-status.partial {
-    color: var(--text-accent);
+  .led {
+    width: 12px;
+    height: 5px;
+    border-radius: var(--radius-cell);
+    background: var(--bg-category);
+  }
+  .tag.lit .led {
+    background: var(--text-connected);
+  }
+  .tag.half .led {
+    background: color-mix(in srgb, var(--text-connected) 45%, transparent);
   }
 
   .field-desc {
