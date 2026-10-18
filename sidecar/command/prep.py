@@ -269,9 +269,20 @@ def copy_in(campaign: Path, source: Path, rel: str) -> str:
     path = vault.note_path(source, rel)
     if PurePosixPath(rel).parts[0].casefold() in {BEATS.casefold(), SESSIONS.casefold()}:
         raise vault.Invalid("Beats and sessions belong to their campaign; copy their notes instead")
+    return _copy_onto_shelf(campaign, path)
+
+
+def copy_from_place(campaign: Path, folder: Path, rel: str) -> str:
+    """Copy the note at ``rel`` in a place, a folder the GM added (design
+    §3.6), onto this campaign's shelf, as another campaign's note is. Its
+    folders are its own, so a ``Sessions/`` there holds notes like any."""
+    return _copy_onto_shelf(campaign, vault.note_path(folder, rel))
+
+
+def _copy_onto_shelf(campaign: Path, path: Path) -> str:
     text = vault.read_text(path)
     try:
         text = fm.set_key(text, "spent", None)
     except fm.FrontmatterError:
         pass  # a block that doesn't parse holds no spent mark Command could read
-    return vault.create_note(campaign, reserved_folder(campaign, SHELF), _stem(rel), text)
+    return vault.create_note(campaign, reserved_folder(campaign, SHELF), _stem(path.name), text)

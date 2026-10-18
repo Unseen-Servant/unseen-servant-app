@@ -31,7 +31,7 @@ def cmd(bare_client, campaign_root):
 
 def test_nothing_works_until_a_campaign_folder_is_set(bare_client):
     assert bare_client.get("/api/command/settings").json() == {
-        "root": None, "spend_on_launch": False, "last_campaign": None,
+        "root": None, "spend_on_launch": False, "last_campaign": None, "places": [],
     }
     assert bare_client.get("/api/command/campaigns").status_code == 409
 
@@ -39,7 +39,7 @@ def test_nothing_works_until_a_campaign_folder_is_set(bare_client):
 def test_settings_refuse_a_missing_folder_and_persist(bare_client, campaign_root, tmp_path):
     assert bare_client.put("/api/command/settings", json={"root": str(tmp_path / "nope")}).status_code == 422
     assert bare_client.put("/api/command/settings", json={"root": str(campaign_root)}).json() == {
-        "root": str(campaign_root), "spend_on_launch": False, "last_campaign": None,
+        "root": str(campaign_root), "spend_on_launch": False, "last_campaign": None, "places": [],
     }
     assert load_settings(tmp_path).root == str(campaign_root)
 
@@ -47,10 +47,10 @@ def test_settings_refuse_a_missing_folder_and_persist(bare_client, campaign_root
 def test_settings_change_only_the_fields_sent(bare_client, campaign_root, tmp_path):
     bare_client.put("/api/command/settings", json={"root": str(campaign_root)})
     assert bare_client.put("/api/command/settings", json={"spend_on_launch": True}).json() == {
-        "root": str(campaign_root), "spend_on_launch": True, "last_campaign": None,
+        "root": str(campaign_root), "spend_on_launch": True, "last_campaign": None, "places": [],
     }
     assert bare_client.put("/api/command/settings", json={"root": None}).json() == {
-        "root": None, "spend_on_launch": True, "last_campaign": None,
+        "root": None, "spend_on_launch": True, "last_campaign": None, "places": [],
     }
     assert load_settings(tmp_path).spend_on_launch is True
 
@@ -358,6 +358,51 @@ def test_the_shelf_over_http(cmd, campaign_root):
     assert cmd.post("/api/command/notes/copy", json={
         "campaign": "Tomb", "from_campaign": "Strahd", "path": "Shelf/Idea.md",
     }).status_code == 409
+
+
+def test_the_shelf_copies_from_a_folder_the_gm_added(cmd, campaign_root, tmp_path):
+    vault = tmp_path / "Old vault"
+    (vault / "NPCs" / "Vallaki").mkdir(parents=True)
+    (vault / ".obsidian").mkdir()
+    (vault / "Sessions").mkdir()
+    (vault / "Ideas.md").write_text("A hunch.\n")
+    (vault / "NPCs" / "Vallaki" / "Lady Wachter.md").write_text("---\nspent: 2026-01-02\nmood: sly\n---\nSly.\n")
+    (vault / "Sessions" / "Session 1.md").write_text("Notes from the first night.\n")
+    (vault / ".obsidian" / "Hidden.md").write_text("")
+
+    assert cmd.post("/api/command/places", json={"path": str(vault)}).json() == {"path": str(vault)}
+    cmd.post("/api/command/places", json={"path": str(vault)})  # added once
+    assert cmd.get("/api/command/settings").json()["places"] == [str(vault)]
+    assert load_settings(tmp_path).places == [str(vault)]
+
+    notes = cmd.get("/api/command/place", params={"path": str(vault)}).json()["notes"]
+    assert [(n["path"], n["track"], n["group"]) for n in notes] == [
+        ("Ideas.md", None, None),
+        ("NPCs/Vallaki/Lady Wachter.md", "NPCs", "Vallaki"),
+        ("Sessions/Session 1.md", "Sessions", None),
+    ]
+
+    # A folder's Sessions are its own notes, not a campaign's.
+    for rel in ("NPCs/Vallaki/Lady Wachter.md", "Sessions/Session 1.md"):
+        copied = cmd.post("/api/command/notes/copy", json={"campaign": "Strahd", "from_place": str(vault), "path": rel})
+        assert copied.status_code == 200
+    copy = (campaign_root / "Strahd" / "Shelf" / "Lady Wachter.md").read_text()
+    assert copy == "---\nmood: sly\n---\nSly.\n"
+    assert (campaign_root / "Strahd" / "Shelf" / "Session 1.md").exists()
+    escape = cmd.post("/api/command/notes/copy", json={"campaign": "Strahd", "from_place": str(vault), "path": "../x.md"})
+    assert escape.status_code == 422
+
+    assert cmd.post("/api/command/places/remove", json={"path": str(vault)}).json()["places"] == []
+    assert cmd.get("/api/command/place", params={"path": str(vault)}).status_code == 404
+    gone = cmd.post("/api/command/notes/copy", json={"campaign": "Strahd", "from_place": str(vault), "path": "Ideas.md"})
+    assert gone.status_code == 404
+
+
+def test_a_place_must_be_a_folder_outside_the_campaigns(cmd, campaign_root, tmp_path):
+    assert cmd.post("/api/command/places", json={"path": str(tmp_path / "nope")}).status_code == 422
+    assert cmd.post("/api/command/places", json={"path": str(campaign_root)}).status_code == 422
+    assert cmd.post("/api/command/places", json={"path": str(campaign_root / "Strahd")}).status_code == 422
+    assert cmd.get("/api/command/settings").json()["places"] == []
 
 
 def test_untitled_takes_the_default_folder_when_none_is_set(bare_client, tmp_path, monkeypatch):

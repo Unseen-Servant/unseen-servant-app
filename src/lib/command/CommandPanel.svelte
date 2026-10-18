@@ -33,7 +33,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
-  import type { BeatEntry, CampaignIndex, CommandSettings, LiveSet, NoteEntry, VaultEvent } from './types';
+  import type { BeatEntry, CampaignIndex, CommandSettings, CopySource, LiveSet, NoteEntry, VaultEvent } from './types';
 
   // True while the panel has the keyboard: window-level keys do nothing
   // otherwise (PANELS.md).
@@ -504,13 +504,30 @@
   }
 
   /** Spending from Play is logged in the session; from Prep it isn't. */
-  /** Another campaign's note, copied onto this shelf — and into the armed
-   *  beat, if there is one, as a note started then would be. */
-  function copyNote(fromCampaign: string, note: NoteEntry) {
+  /** Another campaign's note, or a place's, copied onto this shelf — and
+   *  into the armed beat, if there is one, as a note started then would be. */
+  function copyNote(from: CopySource, note: NoteEntry) {
     run(async () => {
-      const path = await commandApi.copyNote(campaign!, fromCampaign, note.path);
+      const path = await commandApi.copyNote(campaign!, from, note.path);
       if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
       await refreshIndex();
+    });
+  }
+
+  /** A folder for the shelf to copy from, from the native picker: its
+   *  path, or null when the GM cancels or it's refused. */
+  async function addPlace(): Promise<string | null> {
+    let added: string | null = null;
+    await run(async () => {
+      added = await commandApi.addPlace();
+      if (added) settings = await commandApi.getSettings();
+    });
+    return added;
+  }
+
+  function forgetPlace(path: string) {
+    run(async () => {
+      settings = await commandApi.forgetPlace(path);
     });
   }
 
@@ -1096,6 +1113,7 @@
             bind:this={shelf}
             {campaign}
             {campaigns}
+            places={settings?.places ?? []}
             {index}
             openPath={bufState.path}
             selectedPath={selected}
@@ -1114,6 +1132,8 @@
             onReveal={(note) => reveal(note.path)}
             onTrash={(note) => trashNote(note)}
             onCopy={copyNote}
+            onAddPlace={addPlace}
+            onForgetPlace={forgetPlace}
           />
         {/if}
         <div class="grid-pane">

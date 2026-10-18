@@ -315,6 +315,12 @@ def scan(campaign: Path) -> dict:
     }
 
 
+def folder_notes(folder: Path) -> list[dict]:
+    """Every note in a place, a folder outside the campaigns that the shelf
+    copies from (design §3.6), with its track and group as a campaign's."""
+    return [asdict(_entry(folder, p)) for p in _walk_notes(folder)]
+
+
 def _names_in_use(campaign: Path) -> set[str]:
     return {_stem(p.name).casefold() for p in _walk_notes(campaign)}
 

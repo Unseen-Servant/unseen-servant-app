@@ -38,6 +38,9 @@ pub struct CommandSettings {
     /// Launching a beat marks it spent (design §4).
     #[serde(default)]
     spend_on_launch: bool,
+    /// Folders outside the campaigns the shelf copies from (design §3.6).
+    #[serde(default)]
+    places: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -101,6 +104,12 @@ pub struct CampaignIndex {
     ambiguous: Vec<String>,
     beats: Vec<BeatEntry>,
     sessions: Vec<SessionEntry>,
+}
+
+/// A place's notes, as a campaign's index lists them.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlaceIndex {
+    notes: Vec<NoteEntry>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -290,6 +299,45 @@ pub async fn command_choose_root(app: AppHandle) -> Result<Option<CommandSetting
     let changed = command_set_root(Some(path.to_string())).await;
     open_untitled(&app).await?;
     changed.map(Some)
+}
+
+/// Add a folder for the shelf to copy from, picked with the native
+/// picker (design §3.6). Its path, as the sidecar keeps it; `None` when
+/// the GM cancels.
+#[tauri::command]
+pub async fn command_add_place(app: AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Choose a folder of notes to copy from")
+        .blocking_pick_folder();
+    let Some(path) = picked else {
+        return Ok(None);
+    };
+    answer::<AtPath>(
+        client()
+            .post(api("/places"))
+            .json(&serde_json::json!({ "path": path.to_string() })),
+    )
+    .await
+    .map(|p| Some(p.path))
+}
+
+#[tauri::command]
+pub async fn command_forget_place(path: String) -> Result<CommandSettings, String> {
+    answer(
+        client()
+            .post(api("/places/remove"))
+            .json(&serde_json::json!({ "path": path })),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn command_get_place(path: String) -> Result<PlaceIndex, String> {
+    answer(client().get(api_query("/place", &[("path", &path)])?)).await
 }
 
 #[tauri::command]
@@ -802,16 +850,18 @@ pub async fn command_send(
     })
 }
 
-/// Copy another campaign's note onto this campaign's shelf. Returns the
-/// copy's path.
+/// Copy another campaign's note, or a place's, onto this campaign's
+/// shelf. Returns the copy's path.
 #[tauri::command]
 pub async fn command_copy_note(
     campaign: String,
-    from_campaign: String,
+    from_campaign: Option<String>,
+    from_place: Option<String>,
     path: String,
 ) -> Result<String, String> {
     answer::<AtPath>(client().post(api("/notes/copy")).json(&serde_json::json!({
-        "campaign": campaign, "from_campaign": from_campaign, "path": path,
+        "campaign": campaign, "from_campaign": from_campaign,
+        "from_place": from_place, "path": path,
     })))
     .await
     .map(|p| p.path)
@@ -963,7 +1013,9 @@ mod tests {
 
     #[test]
     fn settings_and_live_sets_keep_their_fields_on_the_way_through() {
-        let settings = serde_json::json!({ "root": "/campaigns", "spend_on_launch": true });
+        let settings = serde_json::json!({
+            "root": "/campaigns", "spend_on_launch": true, "places": ["/Homebrew"],
+        });
         let parsed: CommandSettings = serde_json::from_value(settings.clone()).unwrap();
         assert_eq!(serde_json::to_value(parsed).unwrap(), settings);
 

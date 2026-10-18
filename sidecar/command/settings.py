@@ -27,6 +27,10 @@ class CommandSettings(BaseModel):
     spend_on_launch: bool = False
     # The campaign open when the app last quit, which launch reopens.
     last_campaign: str | None = None
+    # Folders outside the campaigns that the shelf copies from (design
+    # §3.6), in the order they were added, as Live's browser keeps the
+    # folders added to its Places. The machine's, not a campaign's.
+    places: list[str] = []
 
 
 def load_settings(data_dir: Path | None) -> CommandSettings:

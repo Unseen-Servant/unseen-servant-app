@@ -172,7 +172,13 @@ class Jot(BaseModel):
 
 class CopyIn(BaseModel):
     campaign: str
-    from_campaign: str
+    # Another campaign, or else a place (a folder the GM added).
+    from_campaign: str | None = None
+    from_place: str | None = None
+    path: str
+
+
+class Place(BaseModel):
     path: str
 
 
@@ -272,6 +278,44 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         if settings.root != before.root:
             watcher.root_changed()
         return settings.model_dump()
+
+    # -- places: folders the shelf copies from (design §3.6) ----------------
+
+    def place(path: str) -> Path:
+        """A folder the GM added. Only those: the shelf reads no other."""
+        if path not in state["settings"].places:
+            raise HTTPException(404, f"{path} isn't a folder the shelf copies from")
+        folder = Path(path)
+        if not folder.is_dir():
+            raise HTTPException(409, f"The folder {path} is missing")
+        return folder
+
+    def keep_places(update) -> None:
+        with write_lock:
+            before = state["settings"]
+            settings = before.model_copy(update={"places": update(before.places)})
+            save_settings(data_dir, settings)
+            state["settings"] = settings
+
+    @router.post("/places")
+    def add_place(body: Place):
+        path = Path(body.path).expanduser()
+        if not path.is_absolute() or not path.is_dir():
+            raise HTTPException(422, f"Not a folder: {body.path}")
+        configured = state["settings"].root
+        if configured and path.resolve().is_relative_to(Path(configured).resolve()):
+            raise HTTPException(422, "That folder is in the campaign folder, whose campaigns are listed already")
+        keep_places(lambda places: places if str(path) in places else [*places, str(path)])
+        return {"path": str(path)}
+
+    @router.post("/places/remove")
+    def remove_place(body: Place):
+        keep_places(lambda places: [p for p in places if p != body.path])
+        return state["settings"].model_dump()
+
+    @router.get("/place")
+    def get_place(path: str):
+        return {"notes": vault.folder_notes(place(path))}
 
     # -- the workstation's context (design §6.2) ----------------------------
 
@@ -425,9 +469,15 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.post("/notes/copy")
     def copy_note(body: CopyIn):
-        """Another campaign's note, copied onto this one's shelf."""
+        """Another campaign's note, or a place's, copied onto this one's shelf."""
+        camp = campaign_path(body.campaign)
         with write_lock:
-            path = prep.copy_in(campaign_path(body.campaign), campaign_path(body.from_campaign), body.path)
+            if body.from_campaign is not None:
+                path = prep.copy_in(camp, campaign_path(body.from_campaign), body.path)
+            elif body.from_place is not None:
+                path = prep.copy_from_place(camp, place(body.from_place), body.path)
+            else:
+                raise HTTPException(422, "Copy from a campaign or a folder")
         return {"path": path}
 
     @router.get("/find")

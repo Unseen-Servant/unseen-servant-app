@@ -86,7 +86,13 @@ export interface CommandSettings {
   root: string | null;
   /** Launching a beat marks it spent. */
   spend_on_launch: boolean;
+  /** Folders outside the campaigns the shelf copies from, as added. */
+  places: string[];
 }
+
+/** Where the shelf copies from (design §3.6): another campaign, or a
+ *  place, a folder the GM added. */
+export type CopySource = { kind: 'campaign'; name: string } | { kind: 'place'; path: string };
 
 export interface Moved {
   path: string;

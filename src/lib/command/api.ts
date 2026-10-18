@@ -8,10 +8,12 @@ import type {
   BoardView,
   CampaignIndex,
   CommandSettings,
+  CopySource,
   LiveSet,
   Moved,
   NewSession,
   Note,
+  NoteEntry,
   Renamed,
   SaveOutcome,
   VaultEvent,
@@ -34,6 +36,11 @@ export const commandApi = {
   getSettings: () => invoke<CommandSettings>('command_get_settings'),
   chooseRoot: () => invoke<MaybeSettings>('command_choose_root'),
   listCampaigns: () => invoke<string[]>('command_list_campaigns'),
+  /** A folder for the shelf to copy from, from the native picker: its
+   *  path, or null when the GM cancels. */
+  addPlace: () => invoke<string | null>('command_add_place'),
+  forgetPlace: (path: string) => invoke<CommandSettings>('command_forget_place', { path }),
+  getPlace: (path: string) => invoke<{ notes: NoteEntry[] }>('command_get_place', { path }),
   /** New campaign: a fresh Untitled, opened in every window. Returns its name. */
   openUntitled: () => invoke<string>('command_open_untitled'),
   renameCampaign: (name: string, newName: string) =>
@@ -60,9 +67,14 @@ export const commandApi = {
   /** Into `folder`, first among its notes, or in `order` when given. */
   moveNote: (campaign: string, path: string, folder: string, order?: string[]) =>
     invoke<Moved>('command_move_note', { campaign, path, folder, order: order ?? null }),
-  /** Another campaign's note, copied onto this one's shelf. */
-  copyNote: (campaign: string, fromCampaign: string, path: string) =>
-    invoke<string>('command_copy_note', { campaign, fromCampaign, path }),
+  /** Another campaign's note, or a place's, copied onto this one's shelf. */
+  copyNote: (campaign: string, from: CopySource, path: string) =>
+    invoke<string>('command_copy_note', {
+      campaign,
+      fromCampaign: from.kind === 'campaign' ? from.name : null,
+      fromPlace: from.kind === 'place' ? from.path : null,
+      path,
+    }),
   createBeat: (campaign: string, name: string, notes: string[], session: string | null) =>
     invoke<string>('command_create_beat', { campaign, name, notes, session }),
   /** The campaign's beats by name, in the order the GM dragged them. */

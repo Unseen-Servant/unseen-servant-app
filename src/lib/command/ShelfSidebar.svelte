@@ -3,8 +3,9 @@
   // on a track yet, then its loose notes. Its rows behave as the grid's: a
   // click opens a note, or with a beat armed puts it in the beat; the menu
   // files it on a track. A note dragged off a track drops back on the shelf
-  // anywhere over it. The picker browses another campaign instead,
-  // whose notes copy onto this shelf: reuse between campaigns is a copy.
+  // anywhere over it. The picker browses another campaign instead, or a
+  // place (a folder the GM added), whose notes copy onto this shelf:
+  // reuse between campaigns is a copy.
   import CommandMenu from './CommandMenu.svelte';
   import InlineName from './InlineName.svelte';
   import RenameField from '../ui/RenameField.svelte';
@@ -15,10 +16,12 @@
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
   import { newRowKey } from './columns';
-  import type { CampaignIndex, NoteEntry } from './types';
+  import type { CampaignIndex, CopySource, NoteEntry } from './types';
 
   export let campaign: string;
   export let campaigns: string[];
+  /** Folders the shelf copies from (CommandSettings.places). */
+  export let places: string[];
   export let index: CampaignIndex;
   export let openPath: string | null;
   /** Notes in the focused beat. */
@@ -42,7 +45,10 @@
   export let onMove: (note: NoteEntry, track: string) => void;
   export let onReveal: (note: NoteEntry) => void;
   export let onTrash: (note: NoteEntry) => void;
-  export let onCopy: (fromCampaign: string, note: NoteEntry) => void;
+  export let onCopy: (from: CopySource, note: NoteEntry) => void;
+  /** Resolves the folder added, or null when the GM cancelled. */
+  export let onAddPlace: () => Promise<string | null>;
+  export let onForgetPlace: (path: string) => void;
 
   const SHELF = 'shelf';
   /** The shelf's folder, as notes are filed into it. */
@@ -64,30 +70,45 @@
   $: shelf = index.notes.filter(onShelf).sort(byName);
   $: loose = index.notes.filter((n) => n.track === null).sort(byName);
 
-  // -- browsing another campaign ------------------------------------------
+  // -- browsing another campaign or a place --------------------------------
 
-  /** The campaign being browsed to copy from; null for this one's shelf. */
-  let source: string | null = null;
-  let other: CampaignIndex | null = null;
+  type Section = { title: string; notes: NoteEntry[] };
+
+  /** What's being browsed to copy from; null for this campaign's shelf. */
+  let source: CopySource | null = null;
+  let other: Section[] | null = null;
   let otherError: string | null = null;
 
-  $: if (source && (source === campaign || !campaigns.includes(source))) source = null;
+  /** A place by its folder's name, as Finder's sidebar names it. */
+  const placeName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+  const sourceName = (s: CopySource) => (s.kind === 'campaign' ? s.name : placeName(s.path));
+
+  $: if (
+    source &&
+    (source.kind === 'campaign'
+      ? source.name === campaign || !campaigns.includes(source.name)
+      : !places.includes(source.path))
+  )
+    source = null;
   $: void browse(source);
 
-  async function browse(name: string | null) {
+  async function browse(from: CopySource | null) {
     other = null;
     otherError = null;
-    if (!name) return;
+    if (!from) return;
     try {
-      const loaded = await commandApi.getCampaign(name);
-      if (source === name) other = loaded;
+      const loaded =
+        from.kind === 'campaign'
+          ? sections(await commandApi.getCampaign(from.name))
+          : placeSections((await commandApi.getPlace(from.path)).notes);
+      if (source === from) other = loaded;
     } catch (e) {
-      if (source === name) otherError = String(e);
+      if (source === from) otherError = String(e);
     }
   }
 
   /** Another campaign's notes to copy from: its shelf, then each track. */
-  function sections(idx: CampaignIndex): { title: string; notes: NoteEntry[] }[] {
+  function sections(idx: CampaignIndex): Section[] {
     const of = (track: string) => idx.notes.filter((n) => n.track === track).sort(byName);
     return [
       { title: SHELF, notes: idx.notes.filter(onShelf).sort(byName) },
@@ -95,15 +116,40 @@
     ].filter((s) => s.notes.length);
   }
 
+  /** A place's notes by the folder they're in, its own first, untitled. */
+  function placeSections(notes: NoteEntry[]): Section[] {
+    const folder = (n: NoteEntry) => [n.track, n.group].filter(Boolean).join('/');
+    const folders = [...new Set(notes.map(folder))].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }),
+    );
+    return folders.map((f) => ({ title: f, notes: notes.filter((n) => folder(n) === f).sort(byName) }));
+  }
+
+  async function addPlace() {
+    const added = await onAddPlace();
+    if (added) source = { kind: 'place', path: added };
+  }
+
+  // Copy from is always offered: with no other campaign, it's where a
+  // folder is added.
   function pickSource(e: MouseEvent) {
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const others = campaigns.filter((c) => c !== campaign);
+    const browsing = source;
     menu = {
       x: box.left,
       y: box.bottom + 4,
       items: [
         action(`${campaign}'s shelf`, () => (source = null)),
-        ...(others.length ? [divider, submenu('Copy from', others.map((c) => action(c, () => (source = c))))] : []),
+        divider,
+        submenu('Copy from', [
+          ...others.map((c) => action(c, () => (source = { kind: 'campaign', name: c }))),
+          ...(others.length && places.length ? [divider] : []),
+          ...places.map((p) => action(placeName(p), () => (source = { kind: 'place', path: p }))),
+          ...(others.length || places.length ? [divider] : []),
+          action('Add folder…', () => void addPlace()),
+        ]),
+        ...(browsing?.kind === 'place' ? [action('Forget this folder', () => onForgetPlace(browsing.path))] : []),
       ],
     };
   }
@@ -258,7 +304,7 @@
 >
   <header class="nameplate">
     <button type="button" class="source-key" title="This shelf, or another campaign to copy from" on:click={pickSource}>
-      <span class="ledger-label">{source ? `from ${source}` : 'shelf'}</span>
+      <span class="ledger-label">{source ? `from ${sourceName(source)}` : 'shelf'}</span>
       <span class="drop" aria-hidden="true">▾</span>
     </button>
     {#if !source}<span class="count">{shelf.length}</span>{/if}
@@ -311,8 +357,8 @@
     {:else if otherError}
       <p class="quiet error">{otherError}</p>
     {:else if other}
-      {#each sections(other) as section (section.title)}
-        <div class="ledger-label section-head">{section.title}</div>
+      {#each other as section (section.title)}
+        {#if section.title}<div class="ledger-label section-head">{section.title}</div>{/if}
         {#each section.notes as note (note.path)}
           <button
             type="button"
@@ -325,7 +371,7 @@
           </button>
         {/each}
       {:else}
-        <p class="quiet">{source} has no notes to copy.</p>
+        <p class="quiet">{source && sourceName(source)} has no notes to copy.</p>
       {/each}
     {/if}
   </div>
