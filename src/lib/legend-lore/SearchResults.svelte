@@ -20,6 +20,8 @@
   // letting search calls fail with cryptic connection errors. Defaults
   // to true so existing usage isn't affected.
   export let ollamaRunning: boolean = true;
+  // Ollama is probed through the sidecar, so a down sidecar comes first.
+  export let sidecarConnected: boolean = true;
   // True only when a fresh search is in flight — i.e., the displayed
   // rows belong to an older query than the one currently committed.
   // Dims the rows so they read as stale, distinguishes from "load more"
@@ -192,7 +194,11 @@
   aria-label="Search results"
   on:scroll={handleScroll}
 >
-  {#if !ollamaRunning && results.length === 0}
+  {#if !sidecarConnected && results.length === 0}
+    <div class="state-msg state-warn">
+      The sidecar isn&rsquo;t running. Quit Unseen Servant and open it again to search.
+    </div>
+  {:else if !ollamaRunning && results.length === 0}
     <div class="state-msg state-warn">
       Ollama isn&rsquo;t running. Start it to search.
     </div>

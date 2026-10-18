@@ -1,20 +1,28 @@
 <script lang="ts">
+  // Ollama is probed through the sidecar: with the sidecar down its state is
+  // unknown, and saying "not detected" would send a working setup to
+  // reinstall Ollama.
+  export let sidecarConnected: boolean = true;
   export let ollamaRunning: boolean = false;
   export let ollamaModelReady: boolean = false;
   export let onSelectFolder: () => void;
   export let onOpenHelp: () => void = () => {};
 
-  $: ollamaState = ollamaRunning && ollamaModelReady
-    ? 'ready'
-    : ollamaRunning
-      ? 'pending'
-      : 'missing';
+  $: ollamaState = !sidecarConnected
+    ? 'offline'
+    : ollamaRunning && ollamaModelReady
+      ? 'ready'
+      : ollamaRunning
+        ? 'pending'
+        : 'missing';
 
-  $: ollamaLabel = ollamaState === 'ready'
-    ? 'READY'
-    : ollamaState === 'pending'
-      ? 'MODEL PENDING'
-      : 'NOT DETECTED';
+  $: ollamaLabel = ollamaState === 'offline'
+    ? 'SIDECAR · NOT RUNNING'
+    : ollamaState === 'ready'
+      ? 'OLLAMA · READY'
+      : ollamaState === 'pending'
+        ? 'OLLAMA · MODEL PENDING'
+        : 'OLLAMA · NOT DETECTED';
 </script>
 
 <div class="page">
@@ -26,7 +34,7 @@
         class:ok={ollamaState === 'ready'}
         class:partial={ollamaState === 'pending'}
       >
-        OLLAMA · {ollamaLabel}
+        {ollamaLabel}
       </span>
     </header>
 
@@ -41,7 +49,12 @@
         [ Choose library folder ]
       </button>
 
-      {#if ollamaState === 'missing'}
+      {#if ollamaState === 'offline'}
+        <p class="ollama-hint">
+          The sidecar isn&rsquo;t running, so search and indexing are offline.
+          Quit Unseen Servant from the tray and open it again.
+        </p>
+      {:else if ollamaState === 'missing'}
         <p class="ollama-hint">
           Ollama not detected — install from <strong>ollama.com</strong>,
           then launch the app.

@@ -3876,6 +3876,7 @@
                 stale={isSearching && committedQuery !== resultsQuery}
                 query={committedQuery}
                 error={searchError}
+                {sidecarConnected}
                 {ollamaRunning}
                 indexedFileCount={searchableFileCount}
                 libraryEmpty={indexedPaths.size === 0}
@@ -3993,6 +3994,7 @@
     </div>
   {:else}
     <GettingStartedPage
+      {sidecarConnected}
       {ollamaRunning}
       {ollamaModelReady}
       onSelectFolder={handleSelectFolder}
