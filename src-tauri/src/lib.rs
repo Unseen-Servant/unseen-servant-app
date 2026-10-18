@@ -218,7 +218,7 @@ fn get_mcp_config(app_handle: tauri::AppHandle) -> Result<String, String> {
 
     let config = serde_json::json!({
         "mcpServers": {
-            "Legend Lore": {
+            "Unseen Servant": {
                 "command": command,
                 "args": args,
             }

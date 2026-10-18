@@ -57,7 +57,7 @@
     <h3 class="entry-title section-title">The AI agent can't reach the library</h3>
     <p class="shows">
       &ldquo;MCP not detected&rdquo; on the status bar lamp &middot; the agent
-      says &ldquo;Cannot connect to Legend Lore app&rdquo;
+      says &ldquo;Cannot connect to Unseen Servant&rdquo;
     </p>
     <p class="fix">
       Unseen Servant has to be running: closing its window doesn't quit it,

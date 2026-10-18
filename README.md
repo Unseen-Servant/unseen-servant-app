@@ -134,7 +134,7 @@ Manual config:
 ```json
 {
   "mcpServers": {
-    "legend-lore": {
+    "Unseen Servant": {
       "command": "/full/path/to/sidecar/.venv/bin/python3",
       "args": [
         "/full/path/to/legend-lore/sidecar/mcp_server.py",

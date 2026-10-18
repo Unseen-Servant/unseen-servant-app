@@ -63,7 +63,7 @@ def _strip_bold(s: str) -> str:
 # ---------------------------------------------------------------------------
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Legend Lore MCP server")
+    parser = argparse.ArgumentParser(description="Unseen Servant MCP server")
     parser.add_argument(
         "--sidecar-url",
         type=str,
@@ -134,11 +134,11 @@ def discover_sidecar_url(args) -> str:
 # ---------------------------------------------------------------------------
 
 _SIDECAR_DOWN_HINT = (
-    "Cannot connect to Legend Lore app. Make sure the desktop app is running."
+    "Cannot connect to Unseen Servant. Make sure the desktop app is running."
 )
 
 _SIDECAR_TIMEOUT_HINT = (
-    "Legend Lore timed out waiting for the app to respond. It may be busy "
+    "Timed out waiting for Unseen Servant to respond. It may be busy "
     "(a large library or a slow search) — try again, or narrow your query."
 )
 
@@ -262,7 +262,7 @@ async def list_collections() -> str:
 
     collections = data.get("collections", {})
     if not collections:
-        return "No collections defined yet. Create one in the Legend Lore desktop app."
+        return "No collections defined yet. Create one in Legend Lore, in Unseen Servant."
 
     lines = [f"Collections ({data['count']}):\n"]
     for name, c in collections.items():
@@ -503,7 +503,7 @@ async def list_sources() -> str:
 
     sources = data.get("sources", [])
     if not sources:
-        return "No documents indexed yet. Open the Legend Lore app and index some PDFs first."
+        return "No documents indexed yet. Open Unseen Servant and index some PDFs in Legend Lore first."
 
     lines = [f"Indexed library: {len(sources)} document(s)\n"]
     for s in sources:
@@ -846,7 +846,7 @@ def check_sidecar_health(url: str) -> None:
     except (httpx.ConnectError, httpx.TimeoutException):
         print(
             f"Warning: Sidecar not reachable at {url}. "
-            f"Make sure the Legend Lore app is running.",
+            f"Make sure Unseen Servant is running.",
             file=sys.stderr,
         )
 
