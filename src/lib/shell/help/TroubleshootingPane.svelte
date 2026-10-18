@@ -61,10 +61,10 @@
     </p>
     <p class="fix">
       Unseen Servant has to be running: closing its window doesn't quit it,
-      quitting does. Check the config is in Claude Desktop (Help &rarr; Guides
-      &rarr; AI agent) and restart Claude after any edit. If the app moved
-      since you copied the config, copy it again: the config holds the app's
-      location.
+      quitting does. Check the config is in the agent's MCP settings (Help
+      &rarr; Guides &rarr; Servant) and restart the agent after any edit. If
+      the app moved since you copied the config, copy it again: the config
+      holds the app's location.
     </p>
   </section>
 

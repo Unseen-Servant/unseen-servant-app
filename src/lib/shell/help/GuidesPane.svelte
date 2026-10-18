@@ -1,6 +1,7 @@
 <script lang="ts">
   import GettingStartedSteps from '../../legend-lore/GettingStartedSteps.svelte';
   import CommandGuide from '../../command/CommandGuide.svelte';
+  import ServantGuide from '../../servant/ServantGuide.svelte';
 
   export let sidecarConnected: boolean = true;
   export let ollamaRunning: boolean = false;
@@ -21,14 +22,17 @@
     {ollamaModelReady}
     {folderSelected}
     {filesIndexed}
-    {mcpConnected}
     {onSelectFolder}
-    {onCopyMcpConfig}
   />
 
   <h3 class="pane-title ledger-label second">Command</h3>
 
   <CommandGuide />
+
+  <!-- MCP reaches both tools, so its step is the Servant's, not one tool's. -->
+  <h3 class="pane-title ledger-label second">Servant</h3>
+
+  <ServantGuide {mcpConnected} {onCopyMcpConfig} />
 </div>
 
 <style>
