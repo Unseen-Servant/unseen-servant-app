@@ -291,8 +291,15 @@ fn record_sidecar_failure(app: &tauri::AppHandle, payload: SidecarFailedPayload)
 ///
 /// The sidecar binds with ``--port 0`` so the OS assigns a free port; we
 /// learn what that port is by polling for ``data_dir/sidecar.port`` to
-/// appear. PyInstaller ``--onefile`` extraction in production can take a
-/// few seconds on first run, hence the longer attempt budget there.
+/// appear.
+///
+/// The budget is generous because a miss lasts the whole session. A cold
+/// start of the bundled ``--onefile`` sidecar unpacks it and imports the
+/// extraction stack before the port file lands: 6–8 s on an M-series Mac,
+/// more on the first launch of a downloaded app (Gatekeeper checks the
+/// binary), a slower machine, or under an antivirus scan, and a dev venv
+/// compiles its bytecode on first import. ``exited`` ends the wait at once
+/// when the sidecar quits, so a crash doesn't sit out the budget.
 ///
 /// ``on_port`` fires once, when the port file first parses: Python is up.
 /// The socket only accepts later, once the store is open and the app serves.
@@ -300,15 +307,19 @@ fn wait_for_sidecar(
     port_file: &Path,
     log_path: &Path,
     mut on_port: impl FnMut(),
+    mut exited: impl FnMut() -> bool,
 ) -> Result<u16, String> {
     use std::net::TcpStream;
     use std::time::Duration;
 
-    let max_attempts: u32 = if cfg!(debug_assertions) { 50 } else { 150 };
+    let max_attempts: u32 = if cfg!(debug_assertions) { 300 } else { 600 };
     let connect_timeout = Duration::from_millis(200);
     let mut port_seen = false;
 
     for attempt in 1..=max_attempts {
+        if exited() {
+            return Err(sidecar_not_ready_message(log_path));
+        }
         if let Ok(contents) = std::fs::read_to_string(port_file) {
             if let Ok(port) = contents.trim().parse::<u16>() {
                 if !port_seen {
@@ -740,12 +751,34 @@ mod tests {
         std::fs::write(dir.join("sidecar.port"), format!("{port}\n")).unwrap();
         let mut port_seen = 0;
 
-        let got = wait_for_sidecar(&dir.join("sidecar.port"), &dir.join("sidecar.log"), || {
-            port_seen += 1
-        });
+        let got = wait_for_sidecar(
+            &dir.join("sidecar.port"),
+            &dir.join("sidecar.log"),
+            || port_seen += 1,
+            || false,
+        );
 
         assert_eq!(got, Ok(port));
         assert_eq!(port_seen, 1);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn wait_for_sidecar_stops_at_once_when_the_sidecar_quits() {
+        let dir = scratch_dir("wait-exited");
+        std::fs::write(dir.join("sidecar.log"), "ImportError: no module named fitz").unwrap();
+        let started = std::time::Instant::now();
+
+        let got = wait_for_sidecar(
+            &dir.join("sidecar.port"),
+            &dir.join("sidecar.log"),
+            || {},
+            || true,
+        );
+
+        let msg = got.unwrap_err();
+        assert!(msg.contains("ImportError: no module named fitz"), "{msg}");
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

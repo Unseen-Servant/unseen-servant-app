@@ -259,11 +259,25 @@ fn settle_sidecar(
     set("sidecar", StepState::Running, None);
     let mut port_seen = false;
     let port_file = app_data_dir.join("chroma_db").join("sidecar.port");
-    let result = crate::wait_for_sidecar(&port_file, &log_path, || {
-        port_seen = true;
-        set("sidecar", StepState::Done, None);
-        set("store", StepState::Running, None);
-    });
+    let sidecar_exited = || {
+        let state = app.state::<crate::SidecarState>();
+        let Ok(mut guard) = state.0.lock() else {
+            return false;
+        };
+        guard
+            .as_mut()
+            .is_some_and(|child| matches!(child.try_wait(), Ok(Some(_))))
+    };
+    let result = crate::wait_for_sidecar(
+        &port_file,
+        &log_path,
+        || {
+            port_seen = true;
+            set("sidecar", StepState::Done, None);
+            set("store", StepState::Running, None);
+        },
+        sidecar_exited,
+    );
     match result {
         Ok(port) => {
             crate::SIDECAR_PORT.store(port, Ordering::Relaxed);
