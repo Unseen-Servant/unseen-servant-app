@@ -45,10 +45,11 @@ export function dock(id: PanelId): Promise<void> {
   return invoke('dock_panel', { id });
 }
 
-/** Asks for the app's settings modal. Legend Lore hosts it for now, so this
- *  goes to every window and the one holding Legend Lore opens it. */
+/** Asks for the app's settings modal, at General or at Help. Legend Lore
+ *  hosts it for now, so this goes to every window and the one holding Legend
+ *  Lore opens it. The Help menu (file_menu.rs) sends it too. */
 export const OPEN_SETTINGS_EVENT = 'shell://open-settings';
 
-export function openSettings(): Promise<void> {
-  return emit(OPEN_SETTINGS_EVENT);
+export function openSettings(tab: 'general' | 'help' = 'general'): Promise<void> {
+  return emit(OPEN_SETTINGS_EVENT, tab);
 }

@@ -19,8 +19,8 @@
   // panel's header aside.
   let filled = false;
 
-  function showSettings() {
-    openSettings().catch((err) => console.error('Failed to open settings:', err));
+  function showSettings(tab: 'general' | 'help') {
+    openSettings(tab).catch((err) => console.error('Failed to open settings:', err));
   }
 </script>
 
@@ -31,7 +31,11 @@
     </PanelView>
   </div>
 
-  <StatusBar onOpenSettings={showSettings} onShowHelp={() => (showHelp = true)}>
+  <StatusBar
+    onOpenSettings={() => showSettings('general')}
+    onOpenHelp={() => showSettings('help')}
+    onShowShortcuts={() => (showHelp = true)}
+  >
     <div class="status-section" bind:this={statusSlot}></div>
   </StatusBar>
 

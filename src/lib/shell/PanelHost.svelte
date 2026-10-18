@@ -245,9 +245,9 @@
 
   // Settings lives with Legend Lore for now; out in its own window, that
   // window comes forward to show it.
-  function showSettings() {
+  function showSettings(tab: 'general' | 'help') {
     if (popped.has('legend-lore')) report(popOut('legend-lore'), 'bring Legend Lore forward');
-    report(openSettings(), 'open settings');
+    report(openSettings(tab), 'open settings');
   }
 </script>
 
@@ -347,7 +347,11 @@
     {/if}
   </div>
 
-  <StatusBar onOpenSettings={showSettings} onShowHelp={() => (showHelp = true)}>
+  <StatusBar
+    onOpenSettings={() => showSettings('general')}
+    onOpenHelp={() => showSettings('help')}
+    onShowShortcuts={() => (showHelp = true)}
+  >
     {#each RACK_TOOLS as tool (tool.id)}
       <div class="status-section" bind:this={statusSlots[tool.id]}></div>
     {/each}

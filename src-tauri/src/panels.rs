@@ -173,6 +173,18 @@ pub fn show_panel(app: &AppHandle, id: &str) {
     let _ = app.emit_to("main", SHOW_EVENT, id);
 }
 
+/// Bring forward the window holding this panel and leave the rack's view as
+/// it is: the panel's own window when it's popped out, else the main one.
+pub fn show_window_of(app: &AppHandle, id: &str) {
+    match app.get_webview_window(&label_of(id)) {
+        Some(window) => {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+        None => crate::show_tool_window(app),
+    }
+}
+
 /// Called for every destroyed window; docks the panel if it was a pop-out.
 pub fn on_window_destroyed(app: &AppHandle, label: &str) {
     if let Some(id) = panel_of_label(label) {

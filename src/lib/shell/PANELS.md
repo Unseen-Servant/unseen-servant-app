@@ -36,10 +36,12 @@ the rack until it's built.
 
 The status bar under the rack (`StatusBar.svelte`) spans every tool: the
 machinery lamps (`machinery.ts`, polled once per window), each docked tool's
-status section whatever the view, the window's notes, and the shortcut sheet
-and settings at the far end. Settings is Legend Lore's modal for now, so its
-key asks with `openSettings()` and brings Legend Lore's window forward when
-it's popped out.
+status section whatever the view, the window's notes, and the shortcut sheet,
+help and settings at the far end. Settings is Legend Lore's modal for now,
+hoisted to the body so it shows whatever the view; its key and the help key
+(Settings → Help) ask with `openSettings()` and bring Legend Lore's window
+forward when it's popped out. On macOS, Help → Unseen Servant Help does the
+same from the menu bar.
 
 ## What a panel receives
 

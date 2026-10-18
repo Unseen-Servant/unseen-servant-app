@@ -1,5 +1,7 @@
 //! The macOS File menu: Command's campaigns, as the switcher in its bar
 //! offers them (design §3.7), for when Command isn't the window in front.
+//! And the Help menu's one item, opening Settings → Help as the status bar's
+//! help key does.
 //!
 //! Built on Tauri's default menu, so Edit, View and Window keep their
 //! standard items and File keeps Close Window below the campaign items.
@@ -11,8 +13,10 @@
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
 use std::sync::{Mutex, PoisonError};
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Manager, Wry};
+use tauri::menu::{
+    CheckMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID,
+};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::app_context::{switch_campaign_with, AppContext};
@@ -22,6 +26,11 @@ const OPEN: &str = "campaign.open";
 const OPEN_PREFIX: &str = "campaign.open:";
 const SHOW_FOLDER: &str = "campaign.folder.show";
 const CHANGE_FOLDER: &str = "campaign.folder.change";
+const HELP: &str = "help.open";
+
+/// `OPEN_SETTINGS_EVENT` in shellState.ts: the window holding Legend Lore
+/// opens Settings at the tab it carries.
+const OPEN_SETTINGS_EVENT: &str = "shell://open-settings";
 
 /// Open Campaign ▸, rebuilt whenever the campaigns or the open one change.
 /// The lock keeps two rebuilds from interleaving their rows.
@@ -62,6 +71,16 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
             ],
             0,
         )?;
+    }
+    // The Help menu macOS gives every app, empty until now.
+    if let Some(MenuItemKind::Submenu(help)) = menu.get(HELP_SUBMENU_ID) {
+        help.append(&MenuItem::with_id(
+            app,
+            HELP,
+            "Unseen Servant Help",
+            true,
+            None::<&str>,
+        )?)?;
     }
     app.set_menu(menu)?;
     app.manage(FileMenu(Mutex::new(open)));
@@ -148,6 +167,10 @@ pub fn on_event(app: &AppHandle, id: &str) {
         tauri::async_runtime::spawn(async move {
             report(crate::command::command_choose_root(app.clone()).await);
         });
+    } else if id == HELP {
+        // Settings lives with Legend Lore for now (shellState.ts).
+        crate::panels::show_window_of(&app, "legend-lore");
+        let _ = app.emit(OPEN_SETTINGS_EVENT, "help");
     }
 }
 

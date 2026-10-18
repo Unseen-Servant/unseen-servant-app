@@ -1,14 +1,15 @@
 <script lang="ts">
   // The status bar at a window's foot: the workstation's lamps, then each
   // tool's status section, hoisted into the slots its host passes in as
-  // children (PANELS.md), then the window's notes; shortcuts and settings
-  // at the far end.
+  // children (PANELS.md), then the window's notes; shortcuts, help and
+  // settings at the far end.
   import { jobNotification, pendingNotification } from './notificationStore';
   import { chordHint } from './keybindings';
   import { machinery } from './machinery';
 
   export let onOpenSettings: () => void;
-  export let onShowHelp: () => void;
+  export let onOpenHelp: () => void;
+  export let onShowShortcuts: () => void;
 
   $: sidecarConnected = $machinery.sidecarConnected;
   $: embedderRunning = $machinery.embedderRunning;
@@ -146,10 +147,16 @@
     {/if}
   </div>
   <div class="statusbar-right">
-    <button class="icon-btn" on:click={onShowHelp} aria-label="Keyboard shortcuts" title={`Keyboard shortcuts${chordHint('help.overlay')}`}>
+    <button class="icon-btn" on:click={onShowShortcuts} aria-label="Keyboard shortcuts" title={`Keyboard shortcuts${chordHint('help.overlay')}`}>
       <!-- Font Awesome "keyboard" icon (src/lib/ui/icons/keyboard-solid-full.svg) -->
       <svg class="btn-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
         <path d="M96 128C60.7 128 32 156.7 32 192L32 448C32 483.3 60.7 512 96 512L544 512C579.3 512 608 483.3 608 448L608 192C608 156.7 579.3 128 544 128L96 128zM112 192L144 192C152.8 192 160 199.2 160 208L160 240C160 248.8 152.8 256 144 256L112 256C103.2 256 96 248.8 96 240L96 208C96 199.2 103.2 192 112 192zM96 304C96 295.2 103.2 288 112 288L144 288C152.8 288 160 295.2 160 304L160 336C160 344.8 152.8 352 144 352L112 352C103.2 352 96 344.8 96 336L96 304zM208 192L240 192C248.8 192 256 199.2 256 208L256 240C256 248.8 248.8 256 240 256L208 256C199.2 256 192 248.8 192 240L192 208C192 199.2 199.2 192 208 192zM192 304C192 295.2 199.2 288 208 288L240 288C248.8 288 256 295.2 256 304L256 336C256 344.8 248.8 352 240 352L208 352C199.2 352 192 344.8 192 336L192 304zM208 384L432 384C440.8 384 448 391.2 448 400L448 432C448 440.8 440.8 448 432 448L208 448C199.2 448 192 440.8 192 432L192 400C192 391.2 199.2 384 208 384zM288 208C288 199.2 295.2 192 304 192L336 192C344.8 192 352 199.2 352 208L352 240C352 248.8 344.8 256 336 256L304 256C295.2 256 288 248.8 288 240L288 208zM304 288L336 288C344.8 288 352 295.2 352 304L352 336C352 344.8 344.8 352 336 352L304 352C295.2 352 288 344.8 288 336L288 304C288 295.2 295.2 288 304 288zM384 208C384 199.2 391.2 192 400 192L432 192C440.8 192 448 199.2 448 208L448 240C448 248.8 440.8 256 432 256L400 256C391.2 256 384 248.8 384 240L384 208zM400 288L432 288C440.8 288 448 295.2 448 304L448 336C448 344.8 440.8 352 432 352L400 352C391.2 352 384 344.8 384 336L384 304C384 295.2 391.2 288 400 288zM480 208C480 199.2 487.2 192 496 192L528 192C536.8 192 544 199.2 544 208L544 240C544 248.8 536.8 256 528 256L496 256C487.2 256 480 248.8 480 240L480 208zM496 288L528 288C536.8 288 544 295.2 544 304L544 336C544 344.8 536.8 352 528 352L496 352C487.2 352 480 344.8 480 336L480 304C480 295.2 487.2 288 496 288z"/>
+      </svg>
+    </button>
+    <button class="icon-btn" on:click={onOpenHelp} aria-label="Help" title="Help">
+      <!-- Font Awesome "circle-info" icon (src/lib/ui/icons/circle-info-solid-full.svg) -->
+      <svg class="btn-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+        <path d="M320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576zM288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224C352 241.7 337.7 256 320 256C302.3 256 288 241.7 288 224zM280 288L328 288C341.3 288 352 298.7 352 312L352 400L360 400C373.3 400 384 410.7 384 424C384 437.3 373.3 448 360 448L280 448C266.7 448 256 437.3 256 424C256 410.7 266.7 400 280 400L304 400L304 336L280 336C266.7 336 256 325.3 256 312C256 298.7 266.7 288 280 288z"/>
       </svg>
     </button>
     <button class="icon-btn" on:click={onOpenSettings} aria-label="Settings" title={`Settings${chordHint('settings.open')}`}>

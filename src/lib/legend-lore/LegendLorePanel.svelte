@@ -749,8 +749,8 @@
     );
     // Settings is the app's, and this panel hosts its modal: any status bar
     // asks for it, in whichever window this panel lives (shellState.ts).
-    unlistenOpenSettings = await listen(OPEN_SETTINGS_EVENT, () => {
-      settingsInitialTab = 'general';
+    unlistenOpenSettings = await listen<'general' | 'help'>(OPEN_SETTINGS_EVENT, (event) => {
+      settingsInitialTab = event.payload;
       showSettings = true;
     });
 
@@ -4074,40 +4074,46 @@
   {/if}
 </main>
 
-<SettingsModal
-  visible={showSettings}
-  onClose={() => { showSettings = false; }}
-  initialTab={settingsInitialTab}
-  initialHelpSubTab={settingsInitialHelpSubTab}
-  {knownSystems}
-  onSystemsChanged={refreshKnownSystems}
-  {selectedFolder}
-  indexedFileCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
-  outdatedFileCount={indexStatus?.summary?.outdated ?? 0}
-  {totalFilesFound}
-  {totalChunks}
-  {storageBytes}
-  {gameSystemCount}
-  {isSyncing}
-  {syncPreferences}
-  {dataDir}
-  {lastSyncTime}
-  {sidecarConnected}
-  {ollamaRunning}
-  {ollamaModelReady}
-  filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
-  {mcpConnected}
-  onSelectFolder={handleSelectFolder}
-  onDeselectFolder={handleDeselectFolder}
-  onReindexAll={handleReindexAll}
-  onDeleteIndex={handleDeleteIndex}
-  onSyncPreferencesChange={handleSyncPreferencesChange}
-  {dimWeakResults}
-  onDimWeakResultsChange={handleDimWeakResultsChange}
-  onOpenDataDir={handleOpenDataDir}
-  onSync={handleManualSync}
-  onCopyMcpConfig={handleCopyMcpConfig}
-/>
+<!-- Settings is the app's, asked for from any status bar or the Help menu,
+     so it lives on the body: in the rack this panel's slot is display:none
+     while the view doesn't hold Legend Lore, and a modal dialog under it
+     opens unseen and leaves the window inert. -->
+<div use:hoist={document.body}>
+  <SettingsModal
+    visible={showSettings}
+    onClose={() => { showSettings = false; }}
+    initialTab={settingsInitialTab}
+    initialHelpSubTab={settingsInitialHelpSubTab}
+    {knownSystems}
+    onSystemsChanged={refreshKnownSystems}
+    {selectedFolder}
+    indexedFileCount={(indexStatus?.summary?.up_to_date ?? 0) + (indexStatus?.summary?.update ?? 0) + (indexStatus?.summary?.remove ?? 0)}
+    outdatedFileCount={indexStatus?.summary?.outdated ?? 0}
+    {totalFilesFound}
+    {totalChunks}
+    {storageBytes}
+    {gameSystemCount}
+    {isSyncing}
+    {syncPreferences}
+    {dataDir}
+    {lastSyncTime}
+    {sidecarConnected}
+    {ollamaRunning}
+    {ollamaModelReady}
+    filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
+    {mcpConnected}
+    onSelectFolder={handleSelectFolder}
+    onDeselectFolder={handleDeselectFolder}
+    onReindexAll={handleReindexAll}
+    onDeleteIndex={handleDeleteIndex}
+    onSyncPreferencesChange={handleSyncPreferencesChange}
+    {dimWeakResults}
+    onDimWeakResultsChange={handleDimWeakResultsChange}
+    onOpenDataDir={handleOpenDataDir}
+    onSync={handleManualSync}
+    onCopyMcpConfig={handleCopyMcpConfig}
+  />
+</div>
 
 <KeyboardHelpOverlay
   visible={showHelpOverlay}
