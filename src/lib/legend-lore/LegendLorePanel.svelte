@@ -21,12 +21,12 @@
   import { hoist } from '../shell/hoist';
   import { machinery } from '../shell/machinery';
   import { OPEN_SETTINGS_EVENT } from '../shell/shellState';
-  import GettingStartedPage from './GettingStartedPage.svelte';
   import SettingsModal from '../shell/SettingsModal.svelte';
   import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
   import DocumentStatsModal from './DocumentStatsModal.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
   import { holdLatch } from '../ui/holdLatch';
+  import ActionButton from '../ui/ActionButton.svelte';
   import CollectionsPanel from './CollectionsPanel.svelte';
   import FilterPanel from './FilterPanel.svelte';
   import SystemsView from './SystemsView.svelte';
@@ -223,7 +223,7 @@
   let collectionsPanelOpen = true;
   // The filter panel docks below the collections panel in the left pane;
   // both persist across launches independently.
-  let filterPanelOpen = false;
+  let filterPanelOpen = true;
   // Collections-panel sort. 'custom' is the DAW default — collections
   // are tracks, drag-reorderable; the order (a name array) persists with
   // the sort choice. Names missing from the array sort after it.
@@ -3703,9 +3703,7 @@
   <Header
     bind:this={headerComponent}
     bind:searchQuery
-    disabled={!selectedFolder}
     panelOpen={collectionsPanelOpen}
-    panelToggleVisible={!!selectedFolder}
     {filterPanelOpen}
     onToggleFilterPanel={toggleFilterPanel}
     {collectionsEngaged}
@@ -3717,7 +3715,7 @@
     onQuery={handleSearchQuery}
     onTogglePanel={togglePanel}
     onCollapseAll={collapseAll}
-    viewToggleVisible={!!selectedFolder}
+    viewToggleVisible={true}
     {searchViewOpen}
     {viewMode}
     onSetViewMode={setViewMode}
@@ -3726,285 +3724,282 @@
     {windowKey}
   />
 
-  {#if selectedFolder}
-    <div class="workspace">
-      {#if collectionsPanelShown || filterPanelOpen}
-        <!-- Left dock: collections on top, filters below. Each panel
-             scrolls its own rows; the dock owns the width, and each
-             panel's nameplate divides it from the one above.
+  <!-- With no library folder the console is drawn as ever, over whatever is
+       stored (nothing, on a first run), with an invitation where the books
+       would be. -->
+  <div class="workspace">
+    {#if collectionsPanelShown || filterPanelOpen}
+      <!-- Left dock: collections on top, filters below. Each panel
+           scrolls its own rows; the dock owns the width, and each
+           panel's nameplate divides it from the one above.
 
-             Both panes stay keyboard-live while the search view is open —
-             the console must stay reachable while the mix is audible.
-             Arbitration is by activePane alone: entering search (and any
-             click on the search side) points it at 'files', the search
-             block yields whenever a dock pane holds it, and ⌘⌥←/→ move
-             between the two sides. -->
-        <div class="left-dock">
-          {#if collectionsPanelShown}
-            <CollectionsPanel
-              bind:this={collectionsPanelComponent}
-              {collections}
-              armedName={armedCollection}
-              onArm={armCollection}
-              onDropPaths={dropPathsOnCollection}
-              onDropNewCollection={dropPathsOnNewCollection}
-              onRemoveFile={removeFileFromCollection}
-              onOpenFile={openCollectionFile}
-              creating={newCollectionSeed}
-              onCommitCreate={commitNewCollection}
-              onCancelCreate={cancelNewCollection}
-              playingNames={playingCollections}
-              mutedNames={mutedCollectionNames}
-              gameSystemMap={effectiveGameSystemMap}
-              sortKey={collectionsSortKey}
-              customOrder={collectionsCustomOrder}
-              onDelete={requestDeleteCollection}
-              onToggleArchived={toggleArchived}
-              onCreate={inlineCreateCollection}
-              onRename={renameCollection}
-              onSetColor={setCollectionColor}
-              onTogglePlay={togglePlayCollection}
-              onToggleMute={toggleCollectionMute}
-              onSetSortKey={setCollectionsSortKey}
-              onReorder={reorderCollections}
-              focusedName={focusedCollectionName}
-              lastFocusedName={lastFocusedCollectionName}
-              active={active && activePane === 'collections'}
-              onActivate={() => pointAtEmpty('collections')}
-              onFocusCollection={setFocusedCollectionName}
-              pickQuery={mentionQuery}
-              {pickMatches}
-              {pickCursor}
-            />
-          {/if}
-          {#if filterPanelOpen}
-            <FilterPanel
-              bind:this={filterPanelComponent}
-              excludedSystems={filterExcludedSystems}
-              {soloedSystems}
-              systems={gameSystemStats}
-              untaggedCount={untaggedFileCount}
-              showSystemFilter={systemsFilterRelevant}
-              onToggleSystem={toggleSystemFilter}
-              onToggleSolo={toggleSystemSolo}
-              {showHidden}
-              {hiddenCount}
-              onToggleShowHidden={toggleShowHidden}
-              onClearHidden={clearHidden}
-              {hideOutOfScope}
-              onToggleHideOutOfScope={toggleHideOutOfScope}
-              {hideUnindexed}
-              onToggleHideUnindexed={toggleHideUnindexed}
-              showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
-              {collectedCount}
-              {uncollectedCount}
-              curationSolos={soloCuration}
-              curationMutes={mutedCuration}
-              onToggleCurationSolo={toggleCurationSolo}
-              onToggleCurationMute={toggleCurationMute}
-              onClearAll={clearAllFilters}
-              canReset={scopeConsoleEngaged}
-              focusedRow={focusedFilterRow}
-              lastFocusedRow={lastFocusedFilterRow}
-              active={active && activePane === 'filters'}
-              onActivate={() => pointAtEmpty('filters')}
-              onFocusRow={setFocusedFilterRow}
-            />
-          {/if}
-        </div>
-      {/if}
-
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div class="file-tree-area" class:search-mode={searchViewOpen} on:mousedown={handleFileTreeAreaMousedown}>
-        <!-- The scope bar is the readout in every mode: chips for each
-             narrowing, plus the hits meter while a search is active. The
-             console itself is the docked FilterPanel. -->
-        {#snippet scopeBar()}
-          <SearchScopeBar
-            {scopeBypassed}
-            onToggleBypass={toggleScopeBypass}
-            {collectionPlays}
-            {collectionSolos}
-            {collectionMutes}
-            {collectionTrackMutes}
+           Both panes stay keyboard-live while the search view is open —
+           the console must stay reachable while the mix is audible.
+           Arbitration is by activePane alone: entering search (and any
+           click on the search side) points it at 'files', the search
+           block yields whenever a dock pane holds it, and ⌘⌥←/→ move
+           between the two sides. -->
+      <div class="left-dock">
+        {#if collectionsPanelShown}
+          <CollectionsPanel
+            bind:this={collectionsPanelComponent}
+            {collections}
+            armedName={armedCollection}
+            onArm={armCollection}
+            onDropPaths={dropPathsOnCollection}
+            onDropNewCollection={dropPathsOnNewCollection}
+            onRemoveFile={removeFileFromCollection}
+            onOpenFile={openCollectionFile}
+            creating={newCollectionSeed}
+            onCommitCreate={commitNewCollection}
+            onCancelCreate={cancelNewCollection}
+            playingNames={playingCollections}
+            mutedNames={mutedCollectionNames}
+            gameSystemMap={effectiveGameSystemMap}
+            sortKey={collectionsSortKey}
+            customOrder={collectionsCustomOrder}
+            onDelete={requestDeleteCollection}
+            onToggleArchived={toggleArchived}
+            onCreate={inlineCreateCollection}
+            onRename={renameCollection}
+            onSetColor={setCollectionColor}
+            onTogglePlay={togglePlayCollection}
+            onToggleMute={toggleCollectionMute}
+            onSetSortKey={setCollectionsSortKey}
+            onReorder={reorderCollections}
+            focusedName={focusedCollectionName}
+            lastFocusedName={lastFocusedCollectionName}
+            active={active && activePane === 'collections'}
+            onActivate={() => pointAtEmpty('collections')}
+            onFocusCollection={setFocusedCollectionName}
+            pickQuery={mentionQuery}
+            {pickMatches}
+            {pickCursor}
+          />
+        {/if}
+        {#if filterPanelOpen}
+          <FilterPanel
+            bind:this={filterPanelComponent}
             excludedSystems={filterExcludedSystems}
             {soloedSystems}
+            systems={gameSystemStats}
+            untaggedCount={untaggedFileCount}
+            showSystemFilter={systemsFilterRelevant}
+            onToggleSystem={toggleSystemFilter}
+            onToggleSolo={toggleSystemSolo}
+            {showHidden}
+            {hiddenCount}
+            onToggleShowHidden={toggleShowHidden}
+            onClearHidden={clearHidden}
+            {hideOutOfScope}
+            onToggleHideOutOfScope={toggleHideOutOfScope}
+            {hideUnindexed}
+            onToggleHideUnindexed={toggleHideUnindexed}
+            showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
+            {collectedCount}
+            {uncollectedCount}
             curationSolos={soloCuration}
             curationMutes={mutedCuration}
-            {showHidden}
-            {hideOutOfScope}
-            {hideUnindexed}
-            resultCount={searchResults.length}
-            indexedFileCount={searchableFileCount}
-            isLoading={isSearching}
-            searchActive={searchViewOpen && searchActive}
-            onClearCollectionPlay={togglePlayCollection}
-            onClearCollectionSolo={handleClearCollectionSolo}
-            onClearCollectionMute={handleClearCollectionMute}
-            onClearCollectionTrackMute={toggleCollectionMute}
-            onToggleSystemFilter={toggleSystemFilter}
-            onToggleSystemSolo={toggleSystemSolo}
             onToggleCurationSolo={toggleCurationSolo}
             onToggleCurationMute={toggleCurationMute}
-            onToggleShowHidden={toggleShowHidden}
-            onToggleHideOutOfScope={toggleHideOutOfScope}
-            onToggleHideUnindexed={toggleHideUnindexed}
+            onClearAll={clearAllFilters}
+            canReset={scopeConsoleEngaged}
+            focusedRow={focusedFilterRow}
+            lastFocusedRow={lastFocusedFilterRow}
+            active={active && activePane === 'filters'}
+            onActivate={() => pointAtEmpty('filters')}
+            onFocusRow={setFocusedFilterRow}
           />
-        {/snippet}
-        {#if searchViewOpen}
-          <!-- In search mode the bar splits at the list/inspector seam: the
-               scope readout over the list, the inspector's plate — the
-               selected section's path and [open] — over the text. Both
-               columns size as the split's panes do, so the seam runs
-               straight down. -->
-          <div class="search-plates">
-            <div class="search-list-pane">{@render scopeBar()}</div>
-            <div class="search-inspector-pane">
-              <InspectorPlate result={selectedResult} onOpenResult={handleOpenResult} />
-            </div>
-          </div>
-        {:else}
-          {@render scopeBar()}
         {/if}
-        {#if searchViewOpen}
-          <div class="search-split">
-            <div class="search-list-pane">
-              <SearchResults
-                bind:this={searchResultsComponent}
-                results={searchResults}
-                isLoading={isSearching}
-                stale={isSearching && committedQuery !== resultsQuery}
-                query={committedQuery}
-                error={searchError}
-                {sidecarConnected}
-                {ollamaRunning}
-                indexedFileCount={searchableFileCount}
-                libraryEmpty={indexedPaths.size === 0}
-                selectedIndex={selectedResultIndex}
-                canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
-                {hiddenPaths}
-                {collectionColorByPath}
-                dimWeak={dimWeakResults}
-                onSelect={(i) => { selectedResultIndex = i; setActivePane('files'); }}
-                onLoadMore={loadMoreResults}
-                onOpenResult={handleOpenResult}
-                onBeginDrag={beginPathDrag}
-                onContextMenu={handleResultContextMenu}
-                curating={armState !== null}
-                collectionPaths={armState?.paths ?? EMPTY_PATHS}
-                onCollectionAdd={curationAdd}
-                onCollectionRemove={curationRemove}
-                {knownSystems}
-                gameSystemMap={effectiveGameSystemMap}
-                onSetGameSystems={handleSetGameSystems}
-              />
-            </div>
-            <div class="search-inspector-pane">
-              <SearchInspector
-                bind:this={searchInspectorComponent}
-                result={selectedResult}
-                query={committedQuery}
-                onOpenResult={handleOpenResult}
-              />
-            </div>
+      </div>
+    {/if}
+
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="file-tree-area" class:search-mode={searchViewOpen} on:mousedown={handleFileTreeAreaMousedown}>
+      <!-- The scope bar is the readout in every mode: chips for each
+           narrowing, plus the hits meter while a search is active. The
+           console itself is the docked FilterPanel. -->
+      {#snippet scopeBar()}
+        <SearchScopeBar
+          {scopeBypassed}
+          onToggleBypass={toggleScopeBypass}
+          {collectionPlays}
+          {collectionSolos}
+          {collectionMutes}
+          {collectionTrackMutes}
+          excludedSystems={filterExcludedSystems}
+          {soloedSystems}
+          curationSolos={soloCuration}
+          curationMutes={mutedCuration}
+          {showHidden}
+          {hideOutOfScope}
+          {hideUnindexed}
+          resultCount={searchResults.length}
+          indexedFileCount={searchableFileCount}
+          isLoading={isSearching}
+          searchActive={searchViewOpen && searchActive}
+          onClearCollectionPlay={togglePlayCollection}
+          onClearCollectionSolo={handleClearCollectionSolo}
+          onClearCollectionMute={handleClearCollectionMute}
+          onClearCollectionTrackMute={toggleCollectionMute}
+          onToggleSystemFilter={toggleSystemFilter}
+          onToggleSystemSolo={toggleSystemSolo}
+          onToggleCurationSolo={toggleCurationSolo}
+          onToggleCurationMute={toggleCurationMute}
+          onToggleShowHidden={toggleShowHidden}
+          onToggleHideOutOfScope={toggleHideOutOfScope}
+          onToggleHideUnindexed={toggleHideUnindexed}
+        />
+      {/snippet}
+      {#if searchViewOpen}
+        <!-- In search mode the bar splits at the list/inspector seam: the
+             scope readout over the list, the inspector's plate — the
+             selected section's path and [open] — over the text. Both
+             columns size as the split's panes do, so the seam runs
+             straight down. -->
+        <div class="search-plates">
+          <div class="search-list-pane">{@render scopeBar()}</div>
+          <div class="search-inspector-pane">
+            <InspectorPlate result={selectedResult} onOpenResult={handleOpenResult} />
           </div>
-        {:else if viewMode === 'systems'}
-          <SystemsView
-            bind:this={systemsViewComponent}
-            entries={indexedEntries}
-            {displayPaths}
-            filterWords={filterWordList}
-            {scopeBrightPaths}
-            {hideOutOfScope}
-            {scopeBypassed}
-            excludedSystems={filterExcludedSystems}
-            {soloedSystems}
-            onToggleSystemFilter={toggleSystemFilter}
-            onToggleSystemSolo={toggleSystemSolo}
-            {soloedScopePaths}
-            {mutedScopePaths}
-            onToggleScopeSolo={toggleScopeSolo}
-            onToggleScopeMute={toggleScopeMute}
-            {hiddenPaths}
-            {showHidden}
-            libraryRoot={selectedFolder}
+        </div>
+      {:else}
+        {@render scopeBar()}
+      {/if}
+      {#if searchViewOpen}
+        <div class="search-split">
+          <div class="search-list-pane">
+            <SearchResults
+              bind:this={searchResultsComponent}
+              results={searchResults}
+              isLoading={isSearching}
+              stale={isSearching && committedQuery !== resultsQuery}
+              query={committedQuery}
+              error={searchError}
+              {sidecarConnected}
+              {ollamaRunning}
+              indexedFileCount={searchableFileCount}
+              libraryEmpty={indexedPaths.size === 0}
+              selectedIndex={selectedResultIndex}
+              canLoadMore={!isSearching && !reachedEnd && pageSize < PAGE_SIZE_MAX}
+              {hiddenPaths}
+              {collectionColorByPath}
+              dimWeak={dimWeakResults}
+              onSelect={(i) => { selectedResultIndex = i; setActivePane('files'); }}
+              onLoadMore={loadMoreResults}
+              onOpenResult={handleOpenResult}
+              onBeginDrag={beginPathDrag}
+              onContextMenu={handleResultContextMenu}
+              curating={armState !== null}
+              collectionPaths={armState?.paths ?? EMPTY_PATHS}
+              onCollectionAdd={curationAdd}
+              onCollectionRemove={curationRemove}
+              {knownSystems}
+              gameSystemMap={effectiveGameSystemMap}
+              onSetGameSystems={handleSetGameSystems}
+            />
+          </div>
+          <div class="search-inspector-pane">
+            <SearchInspector
+              bind:this={searchInspectorComponent}
+              result={selectedResult}
+              query={committedQuery}
+              onOpenResult={handleOpenResult}
+            />
+          </div>
+        </div>
+      {:else if !selectedFolder}
+        <div class="library-invite" role="note">
+          <div class="nameplate"><span class="ledger-label">library</span></div>
+          <div class="invite-body">
+            <p>Legend Lore reads the PDFs in a folder.</p>
+            <ActionButton label="choose library folder" onClick={handleSelectFolder} />
+          </div>
+        </div>
+      {:else if viewMode === 'systems'}
+        <SystemsView
+          bind:this={systemsViewComponent}
+          entries={indexedEntries}
+          {displayPaths}
+          filterWords={filterWordList}
+          {scopeBrightPaths}
+          {hideOutOfScope}
+          {scopeBypassed}
+          excludedSystems={filterExcludedSystems}
+          {soloedSystems}
+          onToggleSystemFilter={toggleSystemFilter}
+          onToggleSystemSolo={toggleSystemSolo}
+          {soloedScopePaths}
+          {mutedScopePaths}
+          onToggleScopeSolo={toggleScopeSolo}
+          onToggleScopeMute={toggleScopeMute}
+          {hiddenPaths}
+          {showHidden}
+          libraryRoot={selectedFolder}
+          {focusedFilePath}
+          lastFocusedPath={lastFocusedFilePath}
+          active={active && activePane === 'files'}
+          onFocusFile={setFocusedFilePath}
+          onContextMenu={handleContextMenu}
+          {renamingFilePath}
+          onRenameSubmit={handleRenameSubmit}
+          onRenameCancel={handleRenameCancel}
+          contextMenuOpen={!!contextMenu}
+          {ribbonIndex}
+          onBeginDrag={beginPathDrag}
+          curating={armState !== null}
+          collectionPaths={armState?.paths ?? EMPTY_PATHS}
+          onCollectionAdd={curationAdd}
+          onCollectionRemove={curationRemove}
+        />
+      {:else}
+        {#if hideOutOfScope && scopeBrightPaths !== null && scopeBrightPaths.size === 0}
+          <div class="scope-empty">Everything is out of scope.</div>
+        {:else if hideUnindexed && indexedPaths.size === 0 && selectedPaths.size === 0}
+          <div class="scope-empty">Nothing in the library yet.</div>
+        {:else if treeFilter && treeFilter.show.size === 0}
+          <div class="scope-empty">No folder or file name matches.</div>
+        {/if}
+        {#each treeRoots as file (file.path)}
+          <FileTree
+            item={file}
+            level={0}
+            {selectedPaths}
+            {foldersWithSelections}
+            gameSystemMap={effectiveGameSystemMap}
+            {knownSystems}
+            {indexedPaths}
+            onToggle={toogleSelection}
+            onSetGameSystems={handleSetGameSystems}
+            {expandedPaths}
+            onToggleExpand={handleToggleExpand}
             {focusedFilePath}
-            lastFocusedPath={lastFocusedFilePath}
-            active={active && activePane === 'files'}
             onFocusFile={setFocusedFilePath}
             onContextMenu={handleContextMenu}
             {renamingFilePath}
             onRenameSubmit={handleRenameSubmit}
             onRenameCancel={handleRenameCancel}
-            contextMenuOpen={!!contextMenu}
+            displayPaths={treeDisplayPaths}
+            filterWords={filterWordList}
+            {hiddenPaths}
+            {showHidden}
+            {soloedScopePaths}
+            {mutedScopePaths}
+            {scopeBrightPaths}
+            {indexedFolderPaths}
+            {hideOutOfScope}
+            {hideUnindexed}
             {ribbonIndex}
+            arm={armState}
+            {onToggleMembership}
             onBeginDrag={beginPathDrag}
-            curating={armState !== null}
-            collectionPaths={armState?.paths ?? EMPTY_PATHS}
-            onCollectionAdd={curationAdd}
-            onCollectionRemove={curationRemove}
+            onToggleScopeSolo={toggleScopeSolo}
+            onToggleScopeMute={toggleScopeMute}
           />
-        {:else}
-          {#if hideOutOfScope && scopeBrightPaths !== null && scopeBrightPaths.size === 0}
-            <div class="scope-empty">Everything is out of scope.</div>
-          {:else if hideUnindexed && indexedPaths.size === 0 && selectedPaths.size === 0}
-            <div class="scope-empty">Nothing in the library yet.</div>
-          {:else if treeFilter && treeFilter.show.size === 0}
-            <div class="scope-empty">No folder or file name matches.</div>
-          {/if}
-          {#each treeRoots as file (file.path)}
-            <FileTree
-              item={file}
-              level={0}
-              {selectedPaths}
-              {foldersWithSelections}
-              gameSystemMap={effectiveGameSystemMap}
-              {knownSystems}
-              {indexedPaths}
-              onToggle={toogleSelection}
-              onSetGameSystems={handleSetGameSystems}
-              {expandedPaths}
-              onToggleExpand={handleToggleExpand}
-              {focusedFilePath}
-              onFocusFile={setFocusedFilePath}
-              onContextMenu={handleContextMenu}
-              {renamingFilePath}
-              onRenameSubmit={handleRenameSubmit}
-              onRenameCancel={handleRenameCancel}
-              displayPaths={treeDisplayPaths}
-              filterWords={filterWordList}
-              {hiddenPaths}
-              {showHidden}
-              {soloedScopePaths}
-              {mutedScopePaths}
-              {scopeBrightPaths}
-              {indexedFolderPaths}
-              {hideOutOfScope}
-              {hideUnindexed}
-              {ribbonIndex}
-              arm={armState}
-              {onToggleMembership}
-              onBeginDrag={beginPathDrag}
-              onToggleScopeSolo={toggleScopeSolo}
-              onToggleScopeMute={toggleScopeMute}
-            />
-          {/each}
-        {/if}
-      </div>
+        {/each}
+      {/if}
     </div>
-  {:else}
-    <GettingStartedPage
-      {sidecarConnected}
-      {ollamaRunning}
-      {ollamaModelReady}
-      onSelectFolder={handleSelectFolder}
-      onOpenHelp={() => {
-        settingsInitialTab = 'help';
-        settingsInitialHelpSubTab = 'guides';
-        showSettings = true;
-      }}
-    />
-  {/if}
+  </div>
 
   {#if error}
     <div class="error-banner">Error: {error}</div>
@@ -4179,6 +4174,44 @@
     padding: 1rem 0.8rem;
     font-style: italic;
     color: var(--text-tertiary);
+  }
+
+  /* The one cue with no library, where the books would be, drawn as Play's
+     session player is (Arrangement .arrangement): a plate over a body, at
+     its width, edged and lifted as a menu is. */
+  .library-invite {
+    width: 15rem;
+    margin: 2rem auto 0;
+    overflow: hidden;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-dropdown);
+  }
+
+  /* The session player's plate, its label at the plate's inset. */
+  .library-invite .nameplate {
+    display: flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem 0.15rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .invite-body {
+    padding: 0.4rem 0.6rem 0.25rem;
+  }
+
+  .invite-body p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+  }
+
+  /* Its bracket under the sentence's first letter: the button's own
+     padding, taken back. */
+  .invite-body :global(.action-btn) {
+    margin-left: -0.5rem;
   }
 
   /* Search mode replaces the scrollable single column with a fixed scope
