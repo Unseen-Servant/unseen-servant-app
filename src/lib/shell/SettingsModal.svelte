@@ -7,6 +7,7 @@
   import LibrarySettings from '../legend-lore/LibrarySettings.svelte';
   import CommandSettingsPane from '../command/CommandSettingsPane.svelte';
   import GuidesPane from './help/GuidesPane.svelte';
+  import TroubleshootingPane from './help/TroubleshootingPane.svelte';
   import ReferencePane from './help/ReferencePane.svelte';
   import AboutPane from './help/AboutPane.svelte';
 
@@ -41,10 +42,10 @@
   export let filesIndexed: boolean = false;
   export let mcpConnected: boolean = false;
   export let initialTab: 'general' | 'library' | 'game-systems' | 'command' | 'help' = 'general';
-  export let initialHelpSubTab: 'guides' | 'reference' | 'about' = 'guides';
+  export let initialHelpSubTab: 'guides' | 'troubleshooting' | 'reference' | 'about' = 'guides';
 
   let activeTab: 'general' | 'library' | 'game-systems' | 'command' | 'help' = initialTab;
-  let activeHelpSubTab: 'guides' | 'reference' | 'about' = initialHelpSubTab;
+  let activeHelpSubTab: 'guides' | 'troubleshooting' | 'reference' | 'about' = initialHelpSubTab;
   $: if (visible) {
     activeTab = initialTab;
     activeHelpSubTab = initialHelpSubTab;
@@ -60,6 +61,7 @@
 
   const helpSubTabs = [
     { id: 'guides' as const, label: 'Guides' },
+    { id: 'troubleshooting' as const, label: 'Troubleshooting' },
     { id: 'reference' as const, label: 'Reference' },
     { id: 'about' as const, label: 'About' },
   ];
@@ -135,6 +137,8 @@
               {onSelectFolder}
               {onCopyMcpConfig}
             />
+          {:else if activeHelpSubTab === 'troubleshooting'}
+            <TroubleshootingPane {onOpenDataDir} />
           {:else if activeHelpSubTab === 'reference'}
             <ReferencePane />
           {:else if activeHelpSubTab === 'about'}
