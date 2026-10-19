@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
-  import { openUrl } from '@tauri-apps/plugin-opener';
+  import { resolveResource } from '@tauri-apps/api/path';
+  import { openPath, openUrl } from '@tauri-apps/plugin-opener';
 
   export let dataDir: string = '';
   export let onOpenDataDir: () => void = () => {};
@@ -22,6 +23,12 @@
 
   function open(url: string) {
     openUrl(url).catch(() => {});
+  }
+
+  // Bundled beside LICENSE (tauri.conf.json resources), written by
+  // scripts/acknowledgements.py.
+  function openAcknowledgements() {
+    resolveResource('ACKNOWLEDGEMENTS.txt').then(openPath).catch(() => {});
   }
 </script>
 
@@ -63,7 +70,7 @@
       </li>
       <li>
         <button class="btn-link" on:click={() => open(LICENSE_URL)}>software license</button>
-        <span class="link-desc">Unseen Servant Games Software License</span>
+        <span class="link-desc">GNU AGPL v3.0 or later</span>
       </li>
     </ul>
   </section>
@@ -73,6 +80,10 @@
       <h3 class="block-title section-title">Credits</h3>
     </header>
     <ul class="link-list">
+      <li>
+        <button class="btn-link" on:click={openAcknowledgements}>acknowledgements</button>
+        <span class="link-desc">third-party software and its licences</span>
+      </li>
       <li>
         <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7.2.0</button>
         <span class="link-desc">icons &copy; Fonticons, Inc. — CC BY 4.0</span>

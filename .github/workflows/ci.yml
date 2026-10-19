@@ -48,8 +48,6 @@ jobs:
               - 'evals/**'
               - 'sidecar/pyproject.toml'
               - 'sidecar/uv.lock'
-              - 'third_party/**'
-              - 'scripts/check-third-party.py'
             rust:
               - 'src-tauri/**'
             frontend:
@@ -99,9 +97,6 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: sidecar/uv.lock
-
-      - name: Check component inventory
-        run: python scripts/check-third-party.py
 
       - name: Run harness tests
         run: uv run --frozen --project sidecar pytest evals/tests

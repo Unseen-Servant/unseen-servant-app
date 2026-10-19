@@ -105,6 +105,14 @@ jobs:
           cp sidecar/dist/legend-lore-sidecar "src-tauri/binaries/legend-lore-sidecar-${TRIPLE}"
           cp sidecar/dist/legend-lore-mcp "src-tauri/binaries/legend-lore-mcp-${TRIPLE}"
 
+      # The bundled ACKNOWLEDGEMENTS.txt lists this platform's Python
+      # packages. uv run syncs the sidecar env when the cache hit above
+      # skipped it.
+      - name: Generate acknowledgements
+        env:
+          UV_PYTHON_PREFERENCE: only-managed
+        run: uv run --frozen --project sidecar --group build python scripts/acknowledgements.py
+
       - name: Set up signing keychain
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -235,6 +243,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path src-tauri\binaries
           Copy-Item sidecar\dist\legend-lore-sidecar.exe "src-tauri\binaries\legend-lore-sidecar-$triple.exe"
           Copy-Item sidecar\dist\legend-lore-mcp.exe "src-tauri\binaries\legend-lore-mcp-$triple.exe"
+
+      # Lists this platform's Python packages (pywin32 only here).
+      - name: Generate acknowledgements
+        run: uv run --frozen --project sidecar --group build python scripts/acknowledgements.py
 
       - name: Build Tauri app
         run: npm run tauri build

@@ -56,7 +56,8 @@
       "entitlements": "entitlements.plist"
     },
     "resources": {
-      "../LICENSE": "LICENSE"
+      "../LICENSE": "LICENSE",
+      "../ACKNOWLEDGEMENTS.txt": "ACKNOWLEDGEMENTS.txt"
     },
     "externalBin": [
       "binaries/legend-lore-sidecar",
