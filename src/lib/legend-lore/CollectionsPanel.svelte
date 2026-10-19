@@ -1470,8 +1470,9 @@
   }
   /* The arm the row will land with — purple ink, but no glow: a glow
      reports a state you switched on, and this one is only a promise until
-     the name is committed (the rack-unit commit switch's rule). */
-  .ghost-arm {
+     the name is committed (the rack-unit commit switch's rule). At the lit
+     key's weight (.tr-btn.arm-btn.armed) and after it, so the filter holds. */
+  .tr-btn.arm-btn.ghost-arm {
     cursor: default;
     filter: none;
   }
