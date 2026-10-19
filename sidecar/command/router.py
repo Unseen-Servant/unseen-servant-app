@@ -81,6 +81,7 @@ class NoteSave(BaseModel):
     path: str
     content: str
     base_hash: str
+    keep_frontmatter: bool = False  # content is the text below it (prep.write_text)
 
 
 class NoteRename(BaseModel):
@@ -452,10 +453,9 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.put("/note")
     def save_note(body: NoteSave):
+        write = prep.write_text if body.keep_frontmatter else vault.write_note
         with write_lock:
-            new_hash = vault.write_note(
-                campaign_path(body.campaign), body.path, body.content, body.base_hash
-            )
+            new_hash = write(campaign_path(body.campaign), body.path, body.content, body.base_hash)
         return {"hash": new_hash}
 
     @router.post("/notes")

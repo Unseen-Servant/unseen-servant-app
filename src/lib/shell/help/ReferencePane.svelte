@@ -62,7 +62,7 @@
         ['campaign_overview', "The campaigns, then the open one's tracks, notes, beats and sessions"],
         ['current_session', "The session's plan of beats, and what's live"],
         ['live_set', 'The notes in play, in full'],
-        ['read_note', 'Read one note'],
+        ['read_note', 'Read one note, with the hash an edit needs'],
         ['find_notes', 'Find notes by name or text'],
       ],
     },
@@ -70,6 +70,7 @@
       group: 'Command · writes',
       tools: [
         ['create_note', 'Write a new note on a track or the shelf'],
+        ['edit_note', "Replace a note's text, keeping its frontmatter"],
         ['add_to_live_set', 'Put a note in play'],
         ['spend', 'Mark a note spent or unspent'],
       ],

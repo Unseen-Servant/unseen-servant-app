@@ -322,11 +322,11 @@ Play renders notes with `svelte-exmarkdown` (already a dependency) plus a wikili
 *As built (phase 4, 2026-10-12):*
 
 - **The active campaign reaches the sidecar.** Rust pushes `{seq, campaign, session}` to `PUT /command/context` on every change (`app_context.rs`) and whenever the event relay connects, since a restarted sidecar knows nothing. The newest `seq` wins. MCP tools act on that campaign unless given `campaign=`, and on its open session, else the latest.
-- **The tools** are `campaign_overview` (the campaigns, then one's tracks, notes, beats and sessions by name; it replaced `list_campaigns` on 2026-10-19), `current_session` (plan with each beat's notes, what's live), `live_set` (each live note's full text), `read_note` and `find_notes` (by name or text), `create_note` (into a track only), `add_to_live_set` and `spend`. (Until 2026-10-18 `current_session` read the session log too, and `spend` wrote to it.)
+- **The tools** are `campaign_overview` (the campaigns, then one's tracks, notes, beats and sessions by name; it replaced `list_campaigns` on 2026-10-19), `current_session` (plan with each beat's notes, what's live), `live_set` (each live note's full text), `read_note` (with the note's hash) and `find_notes` (by name or text), `create_note` (into a track only), `edit_note` (the text below the frontmatter, hash-checked through `PUT /note`'s `keep_frontmatter`; since 2026-10-19), `add_to_live_set` and `spend`. (Until 2026-10-18 `current_session` read the session log too, and `spend` wrote to it.)
   - Notes are named as a wikilink names them. An ambiguous name asks for the path.
   - With the app closed, they say so instead of "nothing open".
   - The server introduces itself as *Unseen Servant* now that it serves both tools. The Claude Desktop config key is unchanged, so no migration is needed.
-  - A real stdio MCP client lists all fourteen tools.
+  - A real stdio MCP client lists all fifteen tools.
 - **Send to Command** is a submenu on a search hit's menu (beside *Collection*), listing the open campaign's tracks. With no campaign open, it says so.
   - Legend Lore calls `command_send_targets` and `command_send` in Rust and nothing else of Command.
   - The note is named after the section's heading, with characters a name can't hold dropped and a clash numbered. It holds the section's text, then a link back citing book and printed pages.

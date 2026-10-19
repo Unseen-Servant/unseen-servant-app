@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 
 - **Claude sees a campaign's shape in one call.** `campaign_overview` replaces `list_campaigns`: the campaigns, then the open one's tracks with their notes, the shelf, beats with their notes and the sessions planning them, and how many beats each session plans, by name only. A refused request now reads as the reason alone, and a note name already in use says where that note is
+- **Claude can correct a note.** `edit_note` replaces a note's text and keeps its frontmatter, so a beat keeps its notes and a spent mark stays. It's checked against the hash `read_note` now shows, so it never overwrites a change you made since Claude read the note
 
 ### Removed
 

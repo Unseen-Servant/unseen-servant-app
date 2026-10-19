@@ -4,6 +4,7 @@ sidecar's routes (architecture D5), so these exercise both halves."""
 
 import argparse
 import asyncio
+import hashlib
 from datetime import date
 
 import httpx
@@ -15,7 +16,7 @@ from command import prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
-COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "add_to_live_set", "spend"}
+COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "add_to_live_set", "spend"}
 
 
 @pytest.fixture
@@ -140,8 +141,9 @@ def test_current_session_reads_the_plan_and_the_live_set(strahd, app):
 
 
 def test_read_and_find_notes(strahd):
+    text = "Son of the burgomaster. Protects [[Ireena]].\n"
     assert run(mcp_server.read_note("ismark")) == (
-        "Ismark (NPCs/Ismark.md)\n\nSon of the burgomaster. Protects [[Ireena]].\n"
+        f"Ismark (NPCs/Ismark.md)\nhash: {hashlib.sha256(text.encode()).hexdigest()}\n\n{text}"
     )
     assert "names more than one note" in run(mcp_server.read_note("Ireena"))
     assert run(mcp_server.read_note("Locations/Ireena")).startswith("Ireena (Locations/Ireena.md)")
@@ -166,6 +168,30 @@ def test_create_note_only_in_a_track(strahd):
         'it\'s there: read_note("NPCs/Doru.md"). Otherwise pick another name.'
     )
     assert run(mcp_server.create_note("NPCs", "Doru/Son")) == "A name can't contain /"
+
+
+def hash_in(reply):
+    return next(line.removeprefix("hash: ") for line in reply.splitlines() if line.startswith("hash: "))
+
+
+def test_edit_note_replaces_the_text_and_keeps_the_frontmatter(strahd):
+    ambush = strahd / "Strahd" / "Beats" / "Ambush.md"
+    read = run(mcp_server.read_note("Ambush"))
+    saved = run(mcp_server.edit_note("Ambush", "Wolves at dusk.\n", hash_in(read)))
+    assert saved.startswith("Saved Beats/Ambush.md in Strahd.\nhash: ")
+    assert ambush.read_text().endswith("---\nWolves at dusk.\n")
+    assert "Ismark (NPCs), Village of Barovia (Locations)" in run(mcp_server.current_session())
+
+    assert run(mcp_server.edit_note("Ambush", "Clobber.\n", hash_in(read))) == (
+        'Ambush changed since you read it. read_note("Beats/Ambush.md") again.'
+    )
+    as_read = run(mcp_server.read_note("Ambush")).split("\n\n", 1)[1]
+    assert run(mcp_server.edit_note("Ambush", as_read.replace("Wolves", "Ghouls"), hash_in(saved))).startswith("Saved")
+    assert ambush.read_text().endswith("---\nGhouls at dusk.\n")
+    meddled = as_read.replace("notes:", "spent: 2026-10-18\nnotes:")
+    assert run(mcp_server.edit_note("Ambush", meddled, hash_in(run(mcp_server.read_note("Ambush"))))) == (
+        "Only the text below the frontmatter changes here, and spent would change. Send the text alone."
+    )
 
 
 def test_play_from_mcp_live_set_and_spend(strahd, app):

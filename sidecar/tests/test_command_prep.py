@@ -190,6 +190,38 @@ def test_any_note_can_be_spent_including_beats(camp):
     assert len(beat["notes"]) == 3
 
 
+def hash_of(c, rel):
+    return vault.read_note(c, rel)["hash"]
+
+
+def test_writing_text_keeps_the_frontmatter_byte_for_byte(camp):
+    ismark = camp / "NPCs" / "Ismark.md"
+    prep.write_text(camp, "NPCs/Ismark.md", "Elder brother.\n", hash_of(camp, "NPCs/Ismark.md"))
+    assert ismark.read_text() == "---\nrole: ally\n---\nElder brother.\n"
+    # The frontmatter sent back as read, even requoted, is dropped.
+    prep.write_text(camp, "NPCs/Ismark.md", '---\nrole: "ally"\n---\nWary.\n', hash_of(camp, "NPCs/Ismark.md"))
+    assert ismark.read_text() == "---\nrole: ally\n---\nWary.\n"
+    prep.write_text(camp, "Beats/Ambush.md", "Night falls.\n", hash_of(camp, "Beats/Ambush.md"))
+    beat = next(b for b in prep.index(camp)["beats"] if b["name"] == "Ambush")
+    assert len(beat["notes"]) == 3
+    unclosed = write(camp / "NPCs" / "Doru.md", "---\nrole: thrall\n---")
+    prep.write_text(camp, "NPCs/Doru.md", "Hungry.", hash_of(camp, "NPCs/Doru.md"))
+    assert unclosed.read_text() == "---\nrole: thrall\n---\nHungry."
+
+
+def test_writing_text_refuses_a_changed_key_or_a_stale_hash(camp):
+    with pytest.raises(Invalid, match="role would change"):
+        prep.write_text(camp, "NPCs/Ismark.md", "---\nrole: foe\n---\nTraitor.\n", hash_of(camp, "NPCs/Ismark.md"))
+    with pytest.raises(Invalid, match="spent would change"):
+        prep.write_text(camp, "NPCs/Ireena.md", "---\nspent: 2026-10-18\n---\nGone.\n", hash_of(camp, "NPCs/Ireena.md"))
+    stale = hash_of(camp, "NPCs/Ismark.md")
+    prep.write_text(camp, "NPCs/Ismark.md", "Wary.\n", stale)
+    with pytest.raises(Conflict) as refused:
+        prep.write_text(camp, "NPCs/Ismark.md", "Clobber.\n", stale)
+    assert refused.value.current_hash == hash_of(camp, "NPCs/Ismark.md")
+    assert (camp / "NPCs" / "Ismark.md").read_text() == "---\nrole: ally\n---\nWary.\n"
+
+
 def test_renaming_a_beat_rewrites_session_plans(camp):
     session(camp, "Session 1", "2026-10-11", ["Ambush"])
     vault.rename_note(camp, "Beats/Ambush.md", "Ambush on the road")

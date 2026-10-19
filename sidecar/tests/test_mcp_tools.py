@@ -688,6 +688,6 @@ def test_registered_tools_are_the_public_surface():
         "list_sources", "list_game_systems", "list_collections",
         # Command's (test_mcp_command.py)
         "campaign_overview", "current_session", "live_set", "read_note",
-        "find_notes", "create_note", "add_to_live_set", "spend",
+        "find_notes", "create_note", "edit_note", "add_to_live_set", "spend",
     }
 

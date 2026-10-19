@@ -206,6 +206,24 @@ class SidecarClient:
         except httpx.HTTPStatusError as e:
             return _refusal(e.response)
 
+    async def put(self, path: str, json: dict) -> dict | str:
+        url = self._resolve()
+        if url is None:
+            return _SIDECAR_DOWN_HINT
+        try:
+            async with httpx.AsyncClient(
+                headers=MCP_HEADERS, timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS
+            ) as client:
+                resp = await client.put(f"{url}{path}", json=json)
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.ConnectError:
+            return _SIDECAR_DOWN_HINT
+        except httpx.TimeoutException:
+            return _SIDECAR_TIMEOUT_HINT
+        except httpx.HTTPStatusError as e:
+            return _refusal(e.response)
+
 
 # ---------------------------------------------------------------------------
 # MCP server setup
@@ -251,8 +269,9 @@ mcp = MCPServer(
         "- Read notes with read_note() and find them with find_notes() before "
         "describing them — never invent what a note says.\n"
         "- create_note() writes new material into a track, or onto the shelf "
-        "when it isn't clear where it belongs; add_to_live_set() and spend() "
-        "follow the table during play."
+        "when it isn't clear where it belongs, and edit_note() corrects a "
+        "note's text with the hash read_note() shows; add_to_live_set() and "
+        "spend() follow the table during play."
     ),
 )
 
@@ -790,7 +809,7 @@ async def live_set(campaign: str | None = None) -> str:
 @mcp.tool()
 async def read_note(name: str, campaign: str | None = None) -> str:
     """Read one of the GM's notes in full: an NPC, a location, a beat, a
-    session — anything in the campaign.
+    session — anything in the campaign. Its hash is what edit_note() needs.
 
     Args:
         name: The note's name ("Ismark"), or its path ("NPCs/Ismark") when
@@ -806,7 +825,43 @@ async def read_note(name: str, campaign: str | None = None) -> str:
     note = await sidecar.get(f"/api/command/note?{_q(campaign=index['name'], path=entry['path'])}")
     if isinstance(note, str):
         return note
-    return f"{note['name']} ({note['path']})\n\n{note['content']}"
+    return f"{note['name']} ({note['path']})\nhash: {note['hash']}\n\n{note['content']}"
+
+
+@mcp.tool()
+async def edit_note(name: str, content: str, hash: str, campaign: str | None = None) -> str:
+    """Replace the text of one of the GM's notes, any note: fill a stub, fix
+    a line. The note's frontmatter stays as it is, so content is the text
+    below it, or the whole note as read_note() showed it with the
+    frontmatter unchanged. Keys keep their own writers: spend() marks a note
+    spent, and the rest are the GM's, in the app.
+
+    Args:
+        name: The note's name, or its path when the name is shared.
+        content: Its whole new Markdown text. Link other notes as [[Name]].
+        hash: The hash read_note() showed, or the last edit_note() replied
+              with, so an edit never overwrites a change made since.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    entry, error = _note(index, name)
+    if error:
+        return error
+    where = _q(campaign=index["name"], path=entry["path"])
+    note = await sidecar.get(f"/api/command/note?{where}")
+    if isinstance(note, str):
+        return note
+    if note["hash"] != hash.strip():
+        return f'{entry["name"]} changed since you read it. read_note("{entry["path"]}") again.'
+    saved = await sidecar.put("/api/command/note", {
+        "campaign": index["name"], "path": entry["path"], "content": content,
+        "base_hash": note["hash"], "keep_frontmatter": True,
+    })
+    if isinstance(saved, str):
+        return saved
+    return f"Saved {entry['path']} in {index['name']}.\nhash: {saved['hash']}"
 
 
 @mcp.tool()

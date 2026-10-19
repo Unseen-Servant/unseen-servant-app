@@ -237,6 +237,30 @@ def spent_of(campaign: Path, rel: str) -> str | None:
     return fm.spent_value(fm.load(vault.read_text(vault.note_path(campaign, rel))).get("spent"))
 
 
+def write_text(campaign: Path, rel: str, text: str, base_hash: str) -> str:
+    """Save ``text`` as the note's text below its frontmatter, which stays
+    as it is, if the file is still the one the caller read (vault.write_note).
+    ``text`` may open with that frontmatter, as read_note showed it; a block
+    with a key changed is refused, since each key keeps its own writer
+    (MCP's edit_note, design §8)."""
+    note = vault.read_note(campaign, rel)
+    if note["hash"] != base_hash:
+        raise vault.Conflict(f"{rel!r} changed on disk", current_hash=note["hash"])
+    old, new = fm.split(note["content"]), fm.split(text)
+    if new.block is not None and new.block != old.block:
+        was, now = fm.load_lenient(note["content"]), fm.load(text)
+        changed = sorted(str(k) for k in was.keys() | now.keys() if was.get(k) != now.get(k))
+        if changed:
+            raise vault.Invalid(
+                f"Only the text below the frontmatter changes here, and {', '.join(changed)} "
+                "would change. Send the text alone."
+            )
+    head = old.bom + old.open + (old.block or "") + old.close
+    if old.block is not None and new.body and not old.close.endswith("\n"):
+        head += old.newline
+    return vault.write_note(campaign, rel, head + new.body, base_hash)
+
+
 # ---------------------------------------------------------------------------
 # Gathering: the shelf, material sent from Legend Lore (design §3.6, §8)
 # ---------------------------------------------------------------------------
