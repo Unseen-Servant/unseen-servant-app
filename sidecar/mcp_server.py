@@ -613,17 +613,25 @@ async def _campaign_index(campaign: str | None) -> tuple[dict | None, dict, str 
     return index, ctx, None
 
 
-def _note(index: dict, name: str) -> tuple[dict | None, str | None]:
-    """The note ``name`` means: a path (``NPCs/Ismark``) or a name, as a
-    wikilink resolves it; or the message saying why not."""
-    wanted = name.strip().removesuffix(".md")
-    for n in index["notes"]:
-        if n["path"].removesuffix(".md").casefold() == wanted.casefold():
-            return n, None
-    target = wanted.split("/")[-1].casefold()
-    hits = [n for n in index["notes"] if n["name"].casefold() == target]
+def _kind(note: dict) -> str:
+    """What a note is, by its first folder: a beat, a session, or a note."""
+    return {"beats": "beat", "sessions": "session"}.get((note["track"] or "").casefold(), "note")
+
+
+def _note(index: dict, name: str, kind: str | None = None) -> tuple[dict | None, str | None]:
+    """The note ``name`` means: a name, or a path ending in it
+    (``NPCs/Ismark``), as a wikilink resolves it, and of one ``kind`` when
+    given, since a beat may share a note's name; or the message saying why
+    not."""
+    wanted = name.strip().removesuffix(".md").casefold()
+    parts = [p for p in wanted.split("/") if p]
+    pool = [n for n in index["notes"] if kind is None or _kind(n) == kind]
+    exact = [n for n in pool if n["path"].removesuffix(".md").casefold() == wanted]
+    hits = exact or [n for n in pool if n["path"].removesuffix(".md").casefold().split("/")[-len(parts):] == parts]
     if len(hits) == 1:
         return hits[0], None
+    if not hits and kind == "beat":
+        return None, f'No beat named "{name}" in {index["name"]}. campaign_overview() lists the beats.'
     if not hits:
         return None, f'No note named "{name}" in {index["name"]}. Try find_notes("{name}").'
     paths = ", ".join(n["path"] for n in hits)
@@ -651,14 +659,16 @@ def _session_named(index: dict, name: str) -> tuple[dict | None, str | None]:
     return None, f'{index["name"]} has no session named "{name}". Its sessions: {known}.'
 
 
-def _taken(index: dict, name: str) -> str | None:
-    """The message for a name already in use: names are unique campaign-wide,
-    beats and sessions included, and a retried create meets what it made."""
-    clash = next((n for n in index["notes"] if n["name"].casefold() == name.strip().casefold()), None)
+def _taken(index: dict, name: str, kind: str) -> str | None:
+    """The message for a name another of ``kind`` has: a beat may share a
+    note's name, never another beat's. A retried create meets what it made."""
+    clash = next((
+        n for n in index["notes"] if _kind(n) == kind and n["name"].casefold() == name.strip().casefold()
+    ), None)
     if clash is None:
         return None
     return (
-        f'A note named "{clash["name"]}" already exists ({clash["path"]}). If you just made it, '
+        f'A {kind} named "{clash["name"]}" already exists ({clash["path"]}). If you just made it, '
         f'it\'s there: read_note("{clash["path"]}"). Otherwise pick another name.'
     )
 
@@ -759,8 +769,11 @@ async def campaign_overview(campaign: str | None = None) -> str:
 
     if index["ambiguous"]:
         lines += ["", "Names more than one note answers to (pass the path):"]
-        for shared in index["ambiguous"]:
-            hits = [n for n in notes if n["name"].casefold() == shared]
+        shared: dict[tuple[str, str], list[dict]] = {}
+        for n in notes:
+            if n["path"] in index["ambiguous"]:
+                shared.setdefault((_kind(n), n["name"].casefold()), []).append(n)
+        for hits in shared.values():
             lines.append(f"  {hits[0]['name']}: {', '.join(n['path'] for n in hits)}")
     return "\n".join(lines)
 
@@ -934,7 +947,8 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
     Args:
         track: The track (folder) it belongs to, e.g. "NPCs" or "Secrets";
                "Shelf" for material not filed on a track yet.
-        name: The note's name, which links reach it by; unique in the campaign.
+        name: The note's name, which links reach it by; no other note's
+              (a beat's may be the same).
         content: Its Markdown text. Link other notes as [[Name]].
         campaign: A campaign name; defaults to the one open in the app.
     """
@@ -946,7 +960,7 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
             f'{index["name"]} has no track named "{track}". '
             f'Its tracks: {", ".join(index["tracks"])}, or "Shelf".'
         )
-    if taken := _taken(index, name):
+    if taken := _taken(index, name, "note"):
         return taken
     made = await sidecar.post("/api/command/notes", {
         "campaign": index["name"], "folder": track, "name": name, "content": content,
@@ -970,7 +984,8 @@ async def create_beat(
     session's beats one at a time, in play order; plan_beat() reorders.
 
     Args:
-        name: The beat's name; unique in the campaign, as every note's is.
+        name: The beat's name; no other beat's, though it may be a note's,
+              as a scene named after its place.
         notes: The notes it holds, by name, or by path when a name is shared.
         content: The scene in Markdown: what happens, what the players
                  face. Link notes as [[Name]].
@@ -980,11 +995,11 @@ async def create_beat(
     index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    if taken := _taken(index, name):
+    if taken := _taken(index, name, "beat"):
         return taken
     members = []
     for n in notes or []:
-        entry, error = _note(index, n)
+        entry, error = _note(index, n, "note")
         if error:
             return error
         members.append(entry)
@@ -1020,14 +1035,12 @@ async def add_to_beat(name: str, beat: str, member: bool = True, campaign: str |
     index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    entry, error = _note(index, name)
+    entry, error = _note(index, name, "note")
     if error:
         return error
-    scene, error = _note(index, beat)
+    scene, error = _note(index, beat, "beat")
     if error:
         return error
-    if scene["path"] not in {b["path"] for b in index["beats"]}:
-        return f'{scene["name"]} isn\'t a beat. campaign_overview() lists the beats.'
     data = await sidecar.post("/api/command/beats/members", {
         "campaign": index["name"], "beat": scene["path"], "note": entry["path"], "member": member,
     })
@@ -1131,9 +1144,7 @@ async def plan_beat(
         target = _session(index, ctx)
         if target is None:
             return f"{index['name']} has no session yet. create_session() starts one."
-    beat, missing = _note(index, name)
-    if beat and beat["path"] not in {b["path"] for b in index["beats"]}:
-        return f'{beat["name"]} isn\'t a beat. campaign_overview() lists the beats.'
+    beat, missing = _note(index, name, "beat")
     wanted = name.strip().removesuffix(".md").casefold()
     refs = target["beats"]
     at = next((
@@ -1178,7 +1189,7 @@ async def add_to_live_set(name: str, campaign: str | None = None) -> str:
     index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    entry, error = _note(index, name)
+    entry, error = _note(index, name, "note")
     if error:
         return error
     live = await sidecar.post("/api/command/live/note", {

@@ -38,8 +38,9 @@ def _stem(rel: str) -> str:
 def index(campaign: Path) -> dict:
     """The campaign as Prep and Play draw it: the vault scan, each note's
     spent mark, beats with their notes, sessions with their plans — every
-    link resolved to a note's path, or None when no single note answers
-    to it."""
+    link resolved to a path, or None when no single note answers to it: a
+    beat's notes among the notes, a session's beats among the beats, since
+    a beat may share a note's name (design §3.2)."""
     base = vault.scan(campaign)
 
     def text(rel: str) -> str:
@@ -51,27 +52,24 @@ def index(campaign: Path) -> dict:
 
     texts = {n["path"]: text(n["path"]) for n in base["notes"]}
     metas = {rel: fm.load_lenient(t) for rel, t in texts.items()}
-    by_name: dict[str, list[str]] = {}
+    by_name: dict[tuple[str, str], list[str]] = {}
     for n in base["notes"]:
-        by_name.setdefault(n["name"].casefold(), []).append(n["path"])
+        by_name.setdefault((vault.kind(n["path"]), n["name"].casefold()), []).append(n["path"])
         n["spent"] = fm.spent_value(metas[n["path"]].get("spent"))
         source = metas[n["path"]].get("source")
         n["source"] = source if isinstance(source, str) and source.strip() else None
 
-    def resolve(name: str) -> str | None:
-        paths = by_name.get(name.casefold(), [])
-        return paths[0] if len(paths) == 1 else None
-
-    def ref(entry) -> dict:
-        target = fm.link_target(entry)
-        return {"link": target, "path": resolve(target)}
+    def ref(entry, of: str) -> dict:
+        target, spelled = fm.link_target(entry), fm.link_path(entry)
+        paths = [p for p in by_name.get((of, target.casefold()), []) if vault.answers(campaign, spelled, p)]
+        return {"link": target, "path": paths[0] if len(paths) == 1 else None}
 
     base["beats"] = [
         {
             "name": n["name"],
             "path": n["path"],
             "spent": n["spent"],
-            "notes": [ref(e) for e in fm.as_list(metas[n["path"]].get("notes"))],
+            "notes": [ref(e, "note") for e in fm.as_list(metas[n["path"]].get("notes"))],
         }
         for n in base["notes"]
         if _in(n, BEATS)
@@ -84,7 +82,7 @@ def index(campaign: Path) -> dict:
             "name": n["name"],
             "path": n["path"],
             "date": fm.date_value(metas[n["path"]].get("date")),
-            "beats": [ref(e) for e in fm.as_list(metas[n["path"]].get("beats"))],
+            "beats": [ref(e, "beat") for e in fm.as_list(metas[n["path"]].get("beats"))],
         }
         for n in base["notes"]
         if _in(n, SESSIONS)
@@ -130,17 +128,26 @@ def _targets(entries) -> list[str]:
     return [fm.link_target(e) for e in entries]
 
 
+def _link(campaign: Path, rel: str) -> str:
+    """The link Command writes for the note at ``rel``: its name, or its
+    path when another note shares the name, so Obsidian opens this one
+    (design §3.3)."""
+    rel = vault.note_path(campaign, rel).relative_to(campaign).as_posix()
+    return f"[[{rel[:-3] if vault.name_shared(campaign, rel) else _stem(rel)}]]"
+
+
 def set_member(campaign: Path, beat: str, note: str, member: bool) -> list[str]:
     """Add the note at ``note`` to the beat's notes, or take it out — every
     entry naming it, whatever its spelling (alias, path, case)."""
     require_in(campaign, beat, BEATS)
-    name = _stem(str(vault.note_path(campaign, note).relative_to(campaign)))
+    link = _link(campaign, note)
+    name = fm.link_target(link)
 
     def compute(current):
         entries = [fm.entry_text(e) for e in fm.as_list(current)]
         naming = [e for e in entries if fm.link_target(e).casefold() == name.casefold()]
         if member:
-            return entries if naming else entries + [f"[[{name}]]"]
+            return entries if naming else entries + [link]
         return [e for e in entries if e not in naming]
 
     return _targets(_update(campaign, beat, "notes", compute))
@@ -152,10 +159,13 @@ def create_beat(
     """A new note in Beats/, holding ``notes`` (paths) if any, with the
     scene in ``content`` below them, and added to the end of ``session``'s
     plan if one is given."""
-    members = [_stem(str(vault.note_path(campaign, n).relative_to(campaign))) for n in notes]
+    for n in notes:
+        vault.note_path(campaign, n)  # each a note, before the beat is made
     rel = vault.create_note(campaign, reserved_folder(campaign, BEATS), name, content)
-    if members:
-        _update(campaign, rel, "notes", lambda _: [f"[[{m}]]" for m in members])
+    if notes:
+        # Linked once the beat exists: a note it's named after shares its name.
+        links = [_link(campaign, n) for n in notes]
+        _update(campaign, rel, "notes", lambda _: links)
     if session:
         edit_plan(campaign, session, "add", beat=rel)
     return rel
@@ -196,6 +206,7 @@ def edit_plan(
     plan on disk no longer has it there."""
     require_in(campaign, session, SESSIONS)
     name = require_in(campaign, beat, BEATS) if op == "add" and beat else None
+    link = _link(campaign, beat) if name else None
 
     def compute(current):
         entries = [fm.entry_text(e) for e in fm.as_list(current)]
@@ -205,7 +216,7 @@ def edit_plan(
             if any(fm.link_target(e).casefold() == name.casefold() for e in entries):
                 return entries
             pos = len(entries) if to is None else max(0, min(to, len(entries)))
-            entries.insert(pos, f"[[{name}]]")
+            entries.insert(pos, link)
             return entries
         if op in ("remove", "move"):
             if (

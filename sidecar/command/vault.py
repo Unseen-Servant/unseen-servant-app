@@ -106,6 +106,16 @@ def _stem(filename: str) -> str:
     return filename[:-3]
 
 
+def kind(rel: str) -> str:
+    """What the note at ``rel`` is, by its first folder: a beat, a session,
+    or a note (a track's, the shelf's, a loose one). Names are unique within
+    a kind, so a beat may share a note's name, as a scene named after its
+    place does (design §3.2)."""
+    parts = PurePosixPath(rel).parts
+    head = parts[0].casefold() if len(parts) > 1 else None
+    return {RESERVED[0].casefold(): "beat", RESERVED[1].casefold(): "session"}.get(head, "note")
+
+
 def campaign_dir(root: Path, campaign: str) -> Path:
     if not campaign or "/" in campaign or "\\" in campaign or _hidden(campaign):
         raise Invalid(f"Not a campaign name: {campaign!r}")
@@ -300,18 +310,23 @@ def track_order(campaign: Path) -> list[str]:
 
 def scan(campaign: Path) -> dict:
     """The campaign as the UI draws it: tracks in order, every note, and the
-    names more than one note answers to (a link to those is ambiguous)."""
+    notes sharing their name with another of their kind (a link to that
+    name is ambiguous)."""
     notes = [_entry(campaign, p) for p in _walk_notes(campaign)]
-    seen: dict[str, int] = {}
+
+    def key(n: NoteEntry) -> tuple[str, str]:
+        return kind(n.path), n.name.casefold()
+
+    seen: dict[tuple[str, str], int] = {}
     for n in notes:
-        seen[n.name.casefold()] = seen.get(n.name.casefold(), 0) + 1
+        seen[key(n)] = seen.get(key(n), 0) + 1
     return {
         "name": campaign.name,
         "tracks": track_order(campaign),
         "notes": [asdict(n) for n in notes],
         "note_order": note_order(campaign),
         "pigments": track_pigments(campaign),
-        "ambiguous": sorted(k for k, count in seen.items() if count > 1),
+        "ambiguous": [n.path for n in notes if seen[key(n)] > 1],
     }
 
 
@@ -321,8 +336,16 @@ def folder_notes(folder: Path) -> list[dict]:
     return [asdict(_entry(folder, p)) for p in _walk_notes(folder)]
 
 
-def _names_in_use(campaign: Path) -> set[str]:
-    return {_stem(p.name).casefold() for p in _walk_notes(campaign)}
+def _names_in_use(campaign: Path, of: str) -> set[str]:
+    """The names the campaign's notes of kind ``of`` have."""
+    return {_stem(p.name).casefold() for p in _walk_notes(campaign) if kind(_rel(campaign, p)) == of}
+
+
+def name_shared(campaign: Path, rel: str) -> bool:
+    """Whether another note of any kind has the name of the one at ``rel``,
+    as a beat named after its place does."""
+    name = _stem(PurePosixPath(rel).name).casefold()
+    return sum(_stem(p.name).casefold() == name for p in _walk_notes(campaign)) > 1
 
 
 def content_hash(data: bytes) -> str:
@@ -402,8 +425,9 @@ def _folder(campaign: Path, folder: str) -> Path:
 def create_note(campaign: Path, folder: str, name: str, content: str = "") -> str:
     name = validate_name(name)
     parent = _folder(campaign, folder)
-    if name.casefold() in _names_in_use(campaign):
-        raise Conflict(f"A note named {name!r} already exists in this campaign")
+    of = kind(_rel(campaign, parent / f"{name}.md"))
+    if name.casefold() in _names_in_use(campaign, of):
+        raise Conflict(f"A {of} named {name!r} already exists in this campaign")
     path = parent / f"{name}.md"
     with open(path, "xb") as f:
         f.write(content.encode("utf-8"))
@@ -411,12 +435,13 @@ def create_note(campaign: Path, folder: str, name: str, content: str = "") -> st
 
 
 def free_name(campaign: Path, wanted: str) -> str:
-    """``wanted`` made into a name Command may create, and one no note in
-    the campaign has yet: characters a note name can't hold become spaces,
-    and a clash takes the next number ("Fire Drake 2")."""
+    """``wanted`` made into a name Command may create, and one no other note
+    in the campaign has yet (a beat or a session may): characters a note
+    name can't hold become spaces, and a clash takes the next number
+    ("Fire Drake 2")."""
     name = re.sub(r"\s+", " ", "".join(" " if c in _FORBIDDEN or ord(c) < 32 else c for c in wanted))
     name = name.strip().strip(".").strip()[:120].strip() or "Untitled"
-    taken = _names_in_use(campaign)
+    taken = _names_in_use(campaign, "note")
     candidate, n = name, 1
     while candidate.casefold() in taken:
         n += 1
@@ -567,6 +592,11 @@ def create_track(campaign: Path, name: str) -> str:
 
 _WIKILINK = re.compile(r"\[\[([^\[\]\n]+?)\]\]")
 _FRONTMATTER = re.compile(r"\A﻿?---\r?\n.*?^(?:---|\.\.\.)[ \t]*$", re.S | re.M)
+# A beat's notes name notes and a session's beats name beats; a link
+# anywhere else names a note first, then a beat, then a session (§3.3).
+_LIST_KEY = re.compile(r"(notes|beats)[ \t]*:")
+_LIST_KINDS = {"notes": ("note",), "beats": ("beat",)}
+_ANY_KIND = ("note", "beat", "session")
 
 Parts = tuple[str, ...]
 
@@ -595,6 +625,31 @@ def _answers(parts: Parts, location: Parts) -> bool:
     return _fold(parts[-n:]) == _fold(location[-n:]) and (n == len(parts) or n == len(location))
 
 
+def answers(campaign: Path, link: str, rel: str) -> bool:
+    """Whether a link spelled ``link`` (``Ismark``, ``NPCs/Ismark``) names
+    the note at ``rel``: by its name or a path ending in it."""
+    parts = tuple(p for p in link.split("/") if p)
+    return bool(parts) and _answers(parts, _vault_parts(campaign, rel))
+
+
+def _kind_at(location: Parts) -> str:
+    return kind("/".join(location[1:]))
+
+
+def _among(text: str, pos: int, fm_end: int) -> tuple[str, ...]:
+    """The kinds a link at ``pos`` in ``text`` may name, in the order it
+    names them: one in a beat's ``notes`` or a session's ``beats``, any
+    elsewhere."""
+    if pos >= fm_end:
+        return _ANY_KIND
+    # Back to the line of the top-level key the link's line belongs to.
+    start = text.rfind("\n", 0, pos) + 1
+    while start > 0 and text[start] in " \t-\r\n":
+        start = text.rfind("\n", 0, start - 1) + 1
+    key = _LIST_KEY.match(text, start) if start > 0 else None
+    return _LIST_KINDS[key.group(1)] if key else _ANY_KIND
+
+
 def _stayed(campaign: Path, moves: list[tuple[Parts, Parts]]) -> dict[str, list[Parts]]:
     """The campaign's notes that didn't move, by folded name, for
     ``_retarget`` to tell a link only a moved note answered to."""
@@ -611,6 +666,7 @@ def _retarget(
     target: str,
     moves: list[tuple[Parts, Parts]],
     stayed: dict[str, list[Parts]] | None = None,
+    among: tuple[str, ...] = _ANY_KIND,
 ) -> str | None:
     """The new spelling of ``target`` if it pointed at a moved note, else None.
 
@@ -619,9 +675,11 @@ def _retarget(
     writes paths relative to wherever the vault is rooted). The rewrite keeps
     the link's shape: a name stays a name, an n-part path stays n parts.
 
-    A link more than one note answers to — a moved one and one in ``stayed``,
-    or two moved ones — is ambiguous (``scan``), so it points at neither and
-    is left as it is: it may be meant for the other.
+    Of the notes a link answers to, it names those of the first kind in
+    ``among`` that any is of: in a body ``[[Crypt]]`` names the note Crypt
+    rather than the beat. Two of that kind — a moved one and one in
+    ``stayed``, or two moved ones — make it ambiguous (``scan``), so it
+    points at neither and is left as it is: it may be meant for the other.
     """
     stripped = target.strip()
     has_ext = stripped.lower().endswith(".md")
@@ -630,9 +688,11 @@ def _retarget(
     if not parts:
         return None
     hits = [(old, new) for old, new in moves if _answers(parts, old)]
-    if len(hits) != 1:
-        return None
-    if any(_answers(parts, other) for other in (stayed or {}).get(parts[-1].casefold(), [])):
+    others = [o for o in (stayed or {}).get(parts[-1].casefold(), []) if _answers(parts, o)]
+    kinds = {_kind_at(o) for o in [*(old for old, _ in hits), *others]}
+    named = next((k for k in among if k in kinds), None)
+    hits = [(old, new) for old, new in hits if _kind_at(old) == named]
+    if len(hits) != 1 or any(_kind_at(o) == named for o in others):
         return None
     old, new = hits[0]
     n = len(parts)
@@ -667,7 +727,7 @@ def rewrite_links(
 
     def replace(m: re.Match) -> str:
         target, rest = _split_link(m.group(1))
-        new = _retarget(target, moves, stayed)
+        new = _retarget(target, moves, stayed, _among(text, m.start(), fm_end))
         if new is None:
             return m.group(0)
         # A single-quoted YAML scalar escapes ' by doubling it.
@@ -740,8 +800,9 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
     old_name = _stem(src.name)
     if new_name == old_name:
         return _rel(campaign, src), []
-    if not _same_name(new_name, old_name) and new_name.casefold() in _names_in_use(campaign):
-        raise Conflict(f"A note named {new_name!r} already exists in this campaign")
+    of = kind(_rel(campaign, src))
+    if not _same_name(new_name, old_name) and new_name.casefold() in _names_in_use(campaign, of):
+        raise Conflict(f"A {of} named {new_name!r} already exists in this campaign")
     dst = src.with_name(f"{new_name}.md")
     moves = _relocate(campaign, src, dst)
     # A renamed note keeps its place among its folder's notes.
@@ -751,7 +812,7 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
         save_note_order(campaign, folder, [new_name if _same_name(n, old_name) else n for n in names])
     # A renamed beat keeps its place in the beats' order.
     beats = beat_order(campaign)
-    if any(_same_name(b, old_name) for b in beats):
+    if of == "beat" and any(_same_name(b, old_name) for b in beats):
         _save_list(campaign, "beats", [new_name if _same_name(b, old_name) else b for b in beats])
     return _rel(campaign, dst), _rewrite_campaign(campaign, moves)
 
@@ -766,6 +827,9 @@ def move_note(campaign: Path, rel: str, folder: str, order: list[str] | None = N
     dst = parent / src.name
     if dst == src:
         return rel, []
+    to = kind(_rel(campaign, dst))
+    if to != kind(_rel(campaign, src)) and _stem(src.name).casefold() in _names_in_use(campaign, to):
+        raise Conflict(f"A {to} named {_stem(src.name)!r} already exists in this campaign")
     if dst.exists():
         raise Conflict(f"{_rel(campaign, dst)!r} already exists")
     moves = _relocate(campaign, src, dst)

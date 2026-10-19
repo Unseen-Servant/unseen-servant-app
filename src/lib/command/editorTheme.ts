@@ -84,24 +84,24 @@ export const markdownHighlight = HighlightStyle.define([
   { tag: [tags.punctuation, tags.separator, tags.squareBracket, tags.brace], color: 'var(--text-tertiary)' },
 ]);
 
-/** The note a wikilink names: its target, without alias, heading, folder or
- *  `.md`. A table cell's escaped pipe (`\|`) counts as the alias bar. */
+/** The note a wikilink names, as it spells it: its target, folders kept,
+ *  without alias, heading or `.md`. A table cell's escaped pipe (`\|`)
+ *  counts as the alias bar. */
 export function linkTarget(inner: string): string {
-  const target = inner.split(/\\?\||#/)[0].trim();
-  return (target.split('/').pop() ?? '').replace(/\.md$/i, '');
+  return inner.split(/\\?\||#/)[0].trim().replace(/\.md$/i, '');
 }
 
 /** Marks `[[links]]`: parchment when they resolve, dashed when nothing in
- *  the campaign answers to the name. `data-target` carries the name for
+ *  the campaign answers to the target. `data-target` carries it for
  *  ⌘-click to follow. */
 export function wikilinkMarks(resolves: (name: string) => boolean) {
   const decorator = new MatchDecorator({
     regexp: /\[\[([^[\]\n]+?)\]\]/g,
     decoration: (m) => {
-      const name = linkTarget(m[1]);
+      const target = linkTarget(m[1]);
       return Decoration.mark({
-        class: resolves(name) ? 'cm-wikilink' : 'cm-wikilink cm-wikilink-missing',
-        attributes: { 'data-target': name },
+        class: resolves(target) ? 'cm-wikilink' : 'cm-wikilink cm-wikilink-missing',
+        attributes: { 'data-target': target },
       });
     },
   });

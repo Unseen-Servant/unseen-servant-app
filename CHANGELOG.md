@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Claude can correct a note.** `edit_note` replaces a note's text and keeps its frontmatter, so a beat keeps its notes and a spent mark stays. It's checked against the hash `read_note` now shows, so it never overwrites a change you made since Claude read the note
 - **Claude can make beats.** `create_beat` makes a scene from notes already written, with the scene's text, and can add it to the end of a session's plan; `add_to_beat` puts a note in a beat or takes it out
 - **Claude can plan a session.** `create_session` starts the next session and opens it in the app, `set_active_session` opens one that exists, and `plan_beat` puts a beat in a plan, moves it or takes it out, including an entry whose beat is gone. `current_session` reads any session by name
+- **A beat can share a note's name.** Name the scene on the Svalich Road after the road: a name now only has to be unique among the notes, among the beats and among the sessions. Where a name is shared, Command links the note by its path (`[[Locations/Svalich Road]]`) so Obsidian opens the right file, and a link in a note's text opens the note
 
 ### Removed
 

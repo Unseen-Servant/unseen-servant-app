@@ -157,7 +157,7 @@ describe('bodyOf', () => {
 describe('linkify', () => {
   it('makes wikilinks followable and leaves embeds alone', () => {
     expect(linkify('Ask [[Ismark]] or [[NPCs/Ireena.md|her]] about [[Tser Pool#Camp]]. ![[map.png]]')).toBe(
-      `Ask [Ismark](${NOTE_HREF}Ismark) or [her](${NOTE_HREF}Ireena) about [Tser Pool#Camp](${NOTE_HREF}Tser%20Pool). ![[map.png]]`,
+      `Ask [Ismark](${NOTE_HREF}Ismark) or [her](${NOTE_HREF}NPCs%2FIreena) about [Tser Pool#Camp](${NOTE_HREF}Tser%20Pool). ![[map.png]]`,
     );
   });
 });

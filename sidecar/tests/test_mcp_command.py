@@ -185,7 +185,7 @@ def test_create_beat_holds_notes_and_joins_a_plan(strahd):
         'Strahd has no session named "Session 9". Its sessions: Session 1.'
     )
     assert run(mcp_server.create_beat("Raid", notes=["Doru"])).startswith('No note named "Doru"')
-    assert run(mcp_server.create_beat("ismark")).startswith('A note named "Ismark" already exists (NPCs/Ismark.md).')
+    assert run(mcp_server.create_beat("ambush")).startswith('A beat named "Ambush" already exists (Beats/Ambush.md).')
     assert sorted(p.name for p in beats.iterdir()) == ["Ambush.md", "Church.md"]
     assert run(mcp_server.create_beat("Raid")) == "Created Beats/Raid.md in Strahd, holding no notes yet."
 
@@ -199,8 +199,36 @@ def test_add_to_beat_puts_a_note_in_and_takes_it_out(strahd):
             "Ismark is in Ambush, which holds Village of Barovia, Ismark."
         )
     assert run(mcp_server.add_to_beat("Ismark", "Village of Barovia")) == (
-        "Village of Barovia isn't a beat. campaign_overview() lists the beats."
+        'No beat named "Village of Barovia" in Strahd. campaign_overview() lists the beats.'
     )
+
+
+def test_a_beat_may_be_named_after_its_place(strahd, app):
+    assert run(mcp_server.create_beat(
+        "Village of Barovia", notes=["Village of Barovia", "Ismark"], session="Session 1",
+    )) == (
+        "Created Beats/Village of Barovia.md in Strahd, holding Village of Barovia, Ismark. "
+        "It's beat 2 of Session 1's plan."
+    )
+    assert "  2. Village of Barovia\n     Village of Barovia (Locations), Ismark (NPCs)" in run(
+        mcp_server.current_session()
+    )
+    # A tool that takes a note or a beat knows which is meant; one that
+    # takes either asks for the path.
+    assert run(mcp_server.add_to_beat("Village of Barovia", "Village of Barovia", member=False)) == (
+        "Village of Barovia is out of Village of Barovia, which holds Ismark."
+    )
+    assert run(mcp_server.plan_beat("Village of Barovia", planned=False)) == "Session 1's plan:\n  1. Ambush"
+    assert run(mcp_server.add_to_live_set("Village of Barovia")) == "Village of Barovia is live: 1 note(s) in play."
+    assert run(mcp_server.read_note("Village of Barovia")) == (
+        '"Village of Barovia" names more than one note in Strahd '
+        "(Beats/Village of Barovia.md, Locations/Village of Barovia.md) — pass the path."
+    )
+    assert run(mcp_server.read_note("Beats/Village of Barovia")).startswith(
+        "Village of Barovia (Beats/Village of Barovia.md)"
+    )
+    assert "Names more than one note answers to (pass the path):\n  Ireena:" in run(mcp_server.campaign_overview())
+    assert "  Village of Barovia:" not in run(mcp_server.campaign_overview()).split("Names more")[1]
 
 
 def test_current_session_reads_any_session_by_name(strahd, app):
@@ -226,8 +254,8 @@ def test_plan_beat_adds_moves_and_takes_out(strahd, app):
     session = strahd / "Strahd" / "Sessions" / "Session 1.md"
     session.write_text(session.read_text().replace("beats:\n", 'beats:\n  - "[[Gone]]"\n'))
     assert run(mcp_server.plan_beat("Gone", planned=False)) == "Session 1's plan:\n  1. Church\n  2. Ambush"
-    assert run(mcp_server.plan_beat("Gone")).startswith('No note named "Gone"')
-    assert run(mcp_server.plan_beat("Ismark")) == "Ismark isn't a beat. campaign_overview() lists the beats."
+    assert run(mcp_server.plan_beat("Gone")).startswith('No beat named "Gone"')
+    assert run(mcp_server.plan_beat("Ismark")) == 'No beat named "Ismark" in Strahd. campaign_overview() lists the beats.'
     assert run(mcp_server.plan_beat("Raid", position=0)) == "position counts from 1, the plan's first beat."
 
 

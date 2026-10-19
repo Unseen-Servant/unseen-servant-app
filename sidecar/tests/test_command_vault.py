@@ -99,9 +99,12 @@ def test_scan_reads_the_folders(camp):
     assert not any(".obsidian" in p or ".draft" in p or p.endswith(".png") for p in by_path)
 
 
-def test_scan_flags_names_shared_across_folders(camp):
+def test_scan_flags_names_shared_within_a_kind(camp):
+    # Two notes named Ismark make a link to it ambiguous; a beat named after
+    # a note doesn't, since a beat's links and a note's are read apart.
     write(camp / "Locations" / "ismark.md", "")
-    assert vault.scan(camp)["ambiguous"] == ["ismark"]
+    write(camp / "Beats" / "Ireena.md", "")
+    assert vault.scan(camp)["ambiguous"] == ["Locations/ismark.md", "NPCs/Ismark.md"]
 
 
 def test_track_order_keeps_saved_order_then_alphabetical(camp):
@@ -211,13 +214,28 @@ def test_create_track_appends_and_refuses_reserved(camp):
         vault.create_track(camp, "npcs")
 
 
-def test_create_note_refuses_a_name_taken_anywhere_in_the_campaign(camp):
+def test_create_note_refuses_a_name_another_note_has(camp):
     assert vault.create_note(camp, "Locations", "Tser Pool") == "Locations/Tser Pool.md"
     assert (camp / "Locations" / "Tser Pool.md").read_bytes() == b""
     with pytest.raises(Conflict):
         vault.create_note(camp, "Locations", "ireena")
     with pytest.raises(NotFound):
         vault.create_note(camp, "Nowhere", "X")
+
+
+def test_a_name_is_unique_among_its_kind_only(camp):
+    # A beat may be named after its place, never after another beat: in
+    # Beats/, in a rename, or for a note moved in among the beats.
+    assert vault.create_note(camp, "Beats", "Ismark") == "Beats/Ismark.md"
+    assert vault.create_note(camp, "Locations", "Ambush") == "Locations/Ambush.md"
+    with pytest.raises(Conflict, match="A beat named 'ambush' already exists"):
+        vault.create_note(camp, "Beats", "ambush")
+    assert vault.rename_note(camp, "Beats/Ambush.md", "Ireena")[0] == "Beats/Ireena.md"
+    with pytest.raises(Conflict, match="A beat named 'Ismark' already exists"):
+        vault.rename_note(camp, "Beats/Ireena.md", "Ismark")
+    write(camp / "Beats" / "Act 1" / "Overview.md", "")
+    with pytest.raises(Conflict, match="A beat named 'Overview' already exists"):
+        vault.move_note(camp, "Overview.md", "Beats")
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +304,34 @@ def test_rename_note_leaves_links_another_note_also_answers_to(camp):
     assert (camp / "Overview.md").read_text() == "[[Ismark]] [[NPCs/Ismark Kolyanovich]] [[Locations/Ismark]]"
     assert "[[Ismark]]" in (camp / "NPCs" / "Ireena.md").read_text()
     assert (camp / "Beats" / "Ambush.md").read_text() == '---\nnotes: ["[[Ismark]]", "[[Wolves]]"]\n---\n'
+
+
+# A beat named after its note: a beat's notes name notes, a session's
+# beats name beats, and a link anywhere else a note first (design §3.3).
+NAMED_ALIKE = {
+    "Beats/Ismark.md": '---\nnotes: ["[[Ismark]]"]\n---\nIsmark pleads.\n',
+    "Sessions/Session 1.md": '---\nbeats:\n- "[[Ismark]]"\n---\nAsk [[Ismark]].\n',
+}
+
+
+def test_renaming_a_beat_named_after_its_note_rewrites_what_names_the_beat(camp):
+    for rel, text in NAMED_ALIKE.items():
+        write(camp / rel, text)
+    _, rewritten = vault.rename_note(camp, "Beats/Ismark.md", "Plea")
+    assert rewritten == ["Sessions/Session 1.md"]
+    assert (camp / "Sessions" / "Session 1.md").read_text() == '---\nbeats:\n- "[[Plea]]"\n---\nAsk [[Ismark]].\n'
+
+
+def test_renaming_the_note_a_beat_is_named_after_rewrites_what_names_the_note(camp):
+    for rel, text in NAMED_ALIKE.items():
+        write(camp / rel, text)
+    vault.save_beat_order(camp, ["Ismark", "Ambush"])
+    vault.rename_note(camp, "NPCs/Ismark.md", "Ismark Kolyanovich")
+    assert (camp / "Beats" / "Ismark.md").read_text() == '---\nnotes: ["[[Ismark Kolyanovich]]"]\n---\nIsmark pleads.\n'
+    assert (camp / "Sessions" / "Session 1.md").read_text() == (
+        '---\nbeats:\n- "[[Ismark]]"\n---\nAsk [[Ismark Kolyanovich]].\n'
+    )
+    assert vault.beat_order(camp) == ["Ismark", "Ambush"]  # the beat's name, not the note's
 
 
 def test_move_note_leaves_a_path_link_another_note_also_answers_to(camp):

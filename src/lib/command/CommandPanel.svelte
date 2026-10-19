@@ -28,7 +28,7 @@
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
-  import { columns, isAmbiguous, isNewRowKey, linkableNames, type Column } from './columns';
+  import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, type Column } from './columns';
   import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
@@ -154,7 +154,6 @@
   $: untitled = !!campaign && /^Untitled(?: [1-9][0-9]*)?$/.test(campaign);
   $: sunk = menu && menu === switcher ? switcherFor : null;
   $: cols = index ? columns(index) : ([] as Column[]);
-  $: nameSet = new Set((index?.notes ?? []).map((n) => n.name.toLowerCase()));
   $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
   $: openName = openEntry?.name ?? (bufState.path ? stem(bufState.path) : '');
   $: renamable = bufState.status !== 'conflict' && bufState.status !== 'unreadable';
@@ -433,12 +432,13 @@
     if (!reading) void tick().then(() => editor?.focus());
   }
 
-  function followLink(name: string) {
-    const target = index?.notes.find((n) => n.name.toLowerCase() === name.toLowerCase());
-    if (target) {
-      openPath(target.path);
+  function followLink(target: string) {
+    const note = index && linkedNote(index, target);
+    if (note) {
+      openPath(note.path);
       return;
     }
+    const name = target.split('/').pop() ?? '';
     const track = openEntry?.track && index?.tracks.includes(openEntry.track) ? openEntry.track : cols[0]?.track;
     if (!track || !name) return;
     run(async () => {
@@ -1124,7 +1124,7 @@
             {members}
             {inSession}
             {armed}
-            ambiguous={(name) => isAmbiguous(index!, name)}
+            ambiguous={(path) => isAmbiguous(index!, path)}
             onOpen={(note) => openPath(note.path)}
             onToggleMember={toggleMember}
             onCreate={(name) => createNote('Shelf', name)}
@@ -1151,7 +1151,7 @@
             litBeatName={beatAt(focusedBeat)?.name ?? null}
             {inSession}
             {armed}
-            ambiguous={(name) => isAmbiguous(index!, name)}
+            ambiguous={(path) => isAmbiguous(index!, path)}
             onOpen={(note) => openPath(note.path)}
             onToggleMember={toggleMember}
             onSpent={setSpent}
@@ -1300,7 +1300,7 @@
             <div class="editor-slot">
               <NoteReader
                 text={noteText}
-                resolves={(name) => nameSet.has(name.toLowerCase())}
+                resolves={(target) => !!index && !!linkedNote(index, target)}
                 onFollow={followLink}
                 onError={(message) => (error = message)}
               />
@@ -1310,7 +1310,7 @@
             <NoteEditor
               bind:this={editor}
               names={() => (index ? linkableNames(index) : [])}
-              resolves={(name) => nameSet.has(name.toLowerCase())}
+              resolves={(target) => !!index && !!linkedNote(index, target)}
               onEdit={(content) => {
                 noteText = content;
                 buffer.edit(content);

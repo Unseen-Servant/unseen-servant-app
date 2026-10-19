@@ -181,7 +181,7 @@ Dispositions: **KEEP** · **CHANGE** (an existing tool) · **ADD** · **DEFER** 
   3. `create_session` if the next session doesn't exist yet (it opens in the app), or `set_active_session` to open the one that does.
   4. `create_beat` in play order, one at a time. The plan takes beats in the order calls arrive, so parallel calls scramble it.
   5. Fix with `edit_note`, `move_note`, `add_to_beat` and `plan_beat`. Renames and deletes are the GM's: say what should change.
-  - Names are unique campaign-wide, beats and sessions included.
+  - Names are unique within their kind: a beat may share a note's name, never another beat's (design §3.2, since 2026-10-19).
 - **B5.2 CHANGE:** each new tool's docstring names its neighbour (`create_beat` → `plan_beat`, `read_note` → `edit_note`).
 
 ---
@@ -243,7 +243,7 @@ Existing `## Log` sections in old session notes stay on disk as plain text. Jot 
   2. B3, and `campaign_overview`.
   3. `read_note`'s hash, and `edit_note`.
   4. `create_beat`, `add_to_beat`.
-  5. `set_active_session`, `create_session`, `plan_beat`, `current_session(session)`.
+  5. `set_active_session`, `create_session`, `plan_beat`, `current_session(session)`. Then, asked for after the step, names unique within their kind, so a beat may be named after its place (design §3.2, §3.3).
   6. `create_track` and `move_note`, plus the small changes: `find_notes`, `create_note`'s track case, `add_to_live_set`.
   7. `cite_section`.
 - **Deferred:** `launch_beat`, `stop` and `jot` (a Play pass); a whole-plan setter; `campaign_overview(track=)`.

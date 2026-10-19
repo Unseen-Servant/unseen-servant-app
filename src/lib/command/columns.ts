@@ -77,9 +77,26 @@ export function linkableNames(index: CampaignIndex): string[] {
   return [...new Set(index.notes.map((n) => n.name))].sort(byName);
 }
 
-/** Whether more than one note answers to `name`. The sidecar case-folds
- *  with Python's casefold(); lower-casing agrees for every name short of
- *  oddities like ß. */
-export function isAmbiguous(index: CampaignIndex, name: string): boolean {
-  return index.ambiguous.includes(name.toLowerCase());
+/** Whether the note at `path` shares its name with another of its kind, so
+ *  a link to the name is ambiguous. */
+export function isAmbiguous(index: CampaignIndex, path: string): boolean {
+  return index.ambiguous.includes(path);
+}
+
+/** A link names a note before a beat, and a beat before a session, since a
+ *  beat may share a note's name (design §3.3). */
+const kindRank = (n: NoteEntry) => ['beats', 'sessions'].indexOf(n.track?.toLowerCase() ?? '') + 1;
+
+/** The note a link's target names: by its name, or a path ending in it
+ *  (`Locations/Svalich Road`), as the sidecar resolves it. Lower-casing
+ *  agrees with its casefold() for every name short of oddities like ß. */
+export function linkedNote(index: CampaignIndex, target: string): NoteEntry | undefined {
+  const parts = target.toLowerCase().split('/').filter(Boolean);
+  if (!parts.length) return undefined;
+  const answers = (n: NoteEntry) => {
+    const own = [index.name, ...n.path.replace(/\.md$/i, '').split('/')].map((p) => p.toLowerCase());
+    const k = Math.min(parts.length, own.length);
+    return parts.slice(-k).join('/') === own.slice(-k).join('/');
+  };
+  return index.notes.filter(answers).sort((a, b) => kindRank(a) - kindRank(b))[0];
 }

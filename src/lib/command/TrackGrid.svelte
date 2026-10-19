@@ -43,7 +43,7 @@
   export let armed: boolean;
   export let onToggleMember: (note: NoteEntry) => void;
   export let onSpent: (note: NoteEntry, spent: boolean) => void;
-  export let ambiguous: (name: string) => boolean;
+  export let ambiguous: (path: string) => boolean;
   export let onOpen: (note: NoteEntry) => void;
   /** The note last clicked: Legend Lore's focused row. */
   export let selectedPath: string | null;
@@ -405,7 +405,7 @@
     class:selected={note.path === selectedPath}
     class:hovered={$hoverLive && hovered === note.path}
     class:grouped={grouped}
-    class:ambiguous={ambiguous(note.name)}
+    class:ambiguous={ambiguous(note.path)}
     class:member={members.has(note.path)}
     class:in-session={inSession.has(note.path)}
     class:spent={!!note.spent}
@@ -414,7 +414,7 @@
     class:drop-before={lineBefore === note.path}
     class:drop-after={lineAfter === note.path}
     aria-pressed={armed ? members.has(note.path) : undefined}
-    title={ambiguous(note.name)
+    title={ambiguous(note.path)
       ? `Another note is also named “${note.name}”, so links to it are ambiguous`
       : note.spent
         ? `${note.name} — spent ${note.spent}`

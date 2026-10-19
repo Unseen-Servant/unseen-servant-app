@@ -30,7 +30,7 @@
   export let inSession: Set<string>;
   /** A beat is armed: a click toggles membership instead of opening. */
   export let armed: boolean;
-  export let ambiguous: (name: string) => boolean;
+  export let ambiguous: (path: string) => boolean;
   export let onOpen: (note: NoteEntry) => void;
   /** The note last clicked: Legend Lore's focused row. */
   export let selectedPath: string | null;
@@ -245,7 +245,7 @@
     class:open={note.path === openPath}
     class:selected={note.path === selectedPath}
     class:hovered={$hoverLive && hovered === note.path}
-    class:ambiguous={ambiguous(note.name)}
+    class:ambiguous={ambiguous(note.path)}
     class:member={members.has(note.path)}
     class:in-session={inSession.has(note.path)}
     class:spent={!!note.spent}

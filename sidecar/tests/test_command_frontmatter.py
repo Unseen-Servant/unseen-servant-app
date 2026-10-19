@@ -35,6 +35,11 @@ def test_link_target(entry, target):
     assert fm.link_target(entry) == target
 
 
+def test_link_path_keeps_the_folders():
+    assert fm.link_path("[[Locations/Svalich Road.md|the road]]") == "Locations/Svalich Road"
+    assert fm.entry_text([["NPCs/Ismark"]]) == "[[NPCs/Ismark]]"  # `- [[NPCs/Ismark]]` unquoted
+
+
 def test_set_key_adds_frontmatter_to_a_bare_note():
     out = fm.set_key("Dusk. The wolves come.\n", "notes", ["[[Ismark]]", "[[Wolves]]"])
     assert out == '---\nnotes:\n  - "[[Ismark]]"\n  - "[[Wolves]]"\n---\nDusk. The wolves come.\n'

@@ -47,7 +47,8 @@ export interface CampaignIndex {
   /** Each track's pigment, a hex from Legend Lore's palette (palette.ts);
    *  a track it doesn't name has none. */
   pigments: Record<string, string>;
-  /** Case-folded names more than one note answers to. */
+  /** The notes sharing their name with another of their kind (a beat may
+   *  share a note's), by path. */
   ambiguous: string[];
   beats: BeatEntry[];
   /** Oldest first, by date then number. */

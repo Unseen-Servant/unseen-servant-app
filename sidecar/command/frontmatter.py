@@ -91,24 +91,30 @@ def load_lenient(text: str) -> dict:
 _LINK = re.compile(r"\[\[([^\[\]\n]+?)\]\]")
 
 
-def link_target(entry) -> str:
-    """The note a list entry names: the target of a `[[link]]` (no alias,
-    heading, folder or .md), or a plain string as written. An unquoted
-    `- [[Name]]` reaches YAML as a nested list and is read the same way."""
+def link_path(entry) -> str:
+    """The note a list entry names, as it spells it: the target of a
+    `[[link]]`, folders kept (no alias, heading or .md), or a plain string
+    as written. An unquoted `- [[Name]]` reaches YAML as a nested list and
+    is read the same way."""
     if isinstance(entry, list) and len(entry) == 1 and isinstance(entry[0], list) and len(entry[0]) == 1:
         entry = f"[[{entry[0][0]}]]"
     text = str(entry).strip()
     m = _LINK.search(text)
     if m:
         text = re.split(r"\\?\||#", m.group(1))[0].strip()
-    return text.split("/")[-1].removesuffix(".md").strip()
+    return text.removesuffix(".md").strip()
+
+
+def link_target(entry) -> str:
+    """The name a list entry's link names: link_path without its folders."""
+    return link_path(entry).split("/")[-1].strip()
 
 
 def entry_text(entry) -> str:
     """An entry as the string Command writes back."""
     if isinstance(entry, str):
         return entry
-    return f"[[{link_target(entry)}]]"
+    return f"[[{link_path(entry)}]]"
 
 
 def as_list(value) -> list:

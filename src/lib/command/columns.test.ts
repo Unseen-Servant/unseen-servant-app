@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columns, folderOrder, isAmbiguous, linkableNames } from './columns';
+import { columns, folderOrder, isAmbiguous, linkableNames, linkedNote } from './columns';
 import { insertion, openTarget } from './wikilinks';
 import type { CampaignIndex, NoteEntry } from './types';
 
@@ -26,7 +26,7 @@ const index: CampaignIndex = {
   ].map(note),
   note_order: {},
   pigments: {},
-  ambiguous: ['doru'],
+  ambiguous: ['NPCs/Barovia/Doru.md'],
   beats: [],
   sessions: [],
 };
@@ -100,9 +100,18 @@ describe('columns', () => {
     expect(linkableNames(index)).toContain('Overview');
   });
 
-  it('flags names more than one note answers to', () => {
-    expect(isAmbiguous(index, 'Doru')).toBe(true);
-    expect(isAmbiguous(index, 'Ismark')).toBe(false);
+  it('flags the notes sharing their name with another of their kind', () => {
+    expect(isAmbiguous(index, 'NPCs/Barovia/Doru.md')).toBe(true);
+    expect(isAmbiguous(index, 'NPCs/Ismark.md')).toBe(false);
+  });
+
+  it('follows a link to a note before a beat named alike, and a path to either', () => {
+    const alike = { ...index, notes: [...index.notes, note('Locations/Ambush.md')] };
+    expect(linkedNote(alike, 'ambush')?.path).toBe('Locations/Ambush.md');
+    expect(linkedNote(alike, 'Beats/Ambush')?.path).toBe('Beats/Ambush.md');
+    expect(linkedNote(alike, 'Strahd/Beats/Ambush')?.path).toBe('Beats/Ambush.md');
+    expect(linkedNote(alike, 'NPCs/Ambush')).toBeUndefined();
+    expect(linkedNote(index, 'Ambush')?.path).toBe('Beats/Ambush.md');
   });
 });
 

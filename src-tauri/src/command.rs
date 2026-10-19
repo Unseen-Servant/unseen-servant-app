@@ -89,6 +89,7 @@ pub struct CampaignIndex {
     note_order: std::collections::BTreeMap<String, Vec<String>>,
     /// Each track's pigment, a hex from Legend Lore's palette.
     pigments: std::collections::BTreeMap<String, String>,
+    /// The notes sharing their name with another of their kind, by path.
     ambiguous: Vec<String>,
     beats: Vec<BeatEntry>,
     sessions: Vec<SessionEntry>,

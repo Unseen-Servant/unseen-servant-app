@@ -115,6 +115,28 @@ def test_create_beat_makes_beats_folder_holds_notes_and_joins_the_plan(tmp_path)
     assert prep.index(c)["beats"][0]["notes"] == [{"link": "Innkeeper", "path": "NPCs/Innkeeper.md"}]
 
 
+def test_a_beat_named_after_its_note_tells_them_apart_by_path(camp):
+    # For Obsidian, which would open either at a bare link: the beat holds
+    # the note by its path, and the plan holds the beat by its own.
+    session(camp, "Session 1", "2026-10-18", [])
+    rel = prep.create_beat(camp, "Svalich Road", ["Locations/Svalich Road.md", "NPCs/Ireena.md"], "Sessions/Session 1.md")
+    assert (camp / rel).read_text() == '---\nnotes:\n  - "[[Locations/Svalich Road]]"\n  - "[[Ireena]]"\n---\n'
+    assert (camp / "Sessions" / "Session 1.md").read_text() == (
+        '---\ndate: 2026-10-18\nbeats:\n  - "[[Beats/Svalich Road]]"\n---\n'
+    )
+    assert prep.set_member(camp, "Beats/Tser Pool.md", "Locations/Svalich Road.md", True) == ["Svalich Road"]
+    # Each list is read among its own kind, a bare link written before the
+    # name was shared too.
+    session(camp, "Session 2", "2026-10-25", ["Svalich Road"])
+    write(camp / "Beats" / "Played.md", '---\nnotes: ["[[Svalich Road]]"]\n---\n')
+    index = prep.index(camp)
+    road = {"link": "Svalich Road", "path": "Locations/Svalich Road.md"}
+    held = {b["name"]: b["notes"] for b in index["beats"]}
+    assert held["Svalich Road"] == [road, {"link": "Ireena", "path": "NPCs/Ireena.md"}]
+    assert held["Tser Pool"] == held["Played"] == [road]
+    assert [s["beats"] for s in index["sessions"]] == [[{"link": "Svalich Road", "path": rel}]] * 2
+
+
 def test_a_new_beat_holds_its_scene_below_its_notes(camp):
     rel = prep.create_beat(camp, "Raid", ["NPCs/Ismark.md"], content="Torches at the gate.\n")
     assert (camp / rel).read_text() == '---\nnotes:\n  - "[[Ismark]]"\n---\nTorches at the gate.\n'
