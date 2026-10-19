@@ -386,4 +386,5 @@ Open:
 ## 12. Related
 
 - [2026-09-24-unseen-servant-workstation-architecture.md](2026-09-24-unseen-servant-workstation-architecture.md) — D2–D6 and §4 Q4, which this doc builds on.
+- [2026-10-18-command-mcp-tools-design.md](2026-10-18-command-mcp-tools-design.md) — the MCP tools' audit and the plan that extends §8.
 - `src/lib/shell/PANELS.md` — the panel contract Command's UI follows.
