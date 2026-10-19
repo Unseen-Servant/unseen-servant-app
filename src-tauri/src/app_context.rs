@@ -76,15 +76,35 @@ impl AppContext {
     }
 
     fn set_session(&self, session: Option<String>) -> Option<AppContextSnapshot> {
-        let session = normalize(session);
+        put_session(
+            &mut self.snap.lock().unwrap_or_else(PoisonError::into_inner),
+            session,
+        )
+    }
+
+    /// `set_session`, but only while `campaign` is still the open one: the
+    /// ask came from outside the app (`open_session`), and the GM may have
+    /// switched campaigns since.
+    fn set_session_in(&self, campaign: &str, session: String) -> Option<AppContextSnapshot> {
         let mut snap = self.snap.lock().unwrap_or_else(PoisonError::into_inner);
-        if snap.session == session {
+        if snap.campaign.as_deref() != Some(campaign) {
             return None;
         }
-        snap.session = session;
-        snap.seq += 1;
-        Some(snap.clone())
+        put_session(&mut snap, Some(session))
     }
+}
+
+fn put_session(
+    snap: &mut AppContextSnapshot,
+    session: Option<String>,
+) -> Option<AppContextSnapshot> {
+    let session = normalize(session);
+    if snap.session == session {
+        return None;
+    }
+    snap.session = session;
+    snap.seq += 1;
+    Some(snap.clone())
 }
 
 fn broadcast(app: &AppHandle, changed: Option<AppContextSnapshot>) {
@@ -140,6 +160,14 @@ pub fn set_active_session(
     broadcast(&app, state.set_session(session));
 }
 
+/// Open `session` of `campaign` in every window, as picking it there would:
+/// Command's MCP tools ask through the sidecar's event stream
+/// (`command::relay`).
+pub(crate) fn open_session(app: &AppHandle, campaign: &str, session: &str) {
+    let state = app.state::<AppContext>();
+    broadcast(app, state.set_session_in(campaign, session.to_string()));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,6 +205,26 @@ mod tests {
         assert_eq!(snap.session.as_deref(), Some("Session 12"));
         assert!(ctx.set_session(some("Session 12")).is_none());
         assert_eq!(ctx.snapshot().seq, 2);
+    }
+
+    #[test]
+    fn a_session_asked_for_from_outside_opens_only_in_its_campaign() {
+        let ctx = AppContext::default();
+        assert!(ctx
+            .set_session_in("Curse of Strahd", "Session 2".into())
+            .is_none());
+        ctx.set_campaign(some("Curse of Strahd"));
+        let snap = ctx
+            .set_session_in("Curse of Strahd", "Session 2".into())
+            .unwrap();
+        assert_eq!((snap.seq, snap.session.as_deref()), (2, Some("Session 2")));
+        assert!(ctx
+            .set_session_in("Curse of Strahd", "Session 2".into())
+            .is_none());
+        assert!(ctx
+            .set_session_in("Into the Odd", "Session 1".into())
+            .is_none());
+        assert_eq!(ctx.snapshot().session.as_deref(), Some("Session 2"));
     }
 
     #[test]

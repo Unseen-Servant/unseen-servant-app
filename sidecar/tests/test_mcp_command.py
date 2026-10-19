@@ -5,6 +5,7 @@ sidecar's routes (architecture D5), so these exercise both halves."""
 import argparse
 import asyncio
 import hashlib
+import threading
 from datetime import date
 
 import httpx
@@ -12,11 +13,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 import mcp_server
-from command import prep
+from command import events, prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
-COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "add_to_live_set", "spend"}
+COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend"}
 
 
 @pytest.fixture
@@ -200,6 +201,70 @@ def test_add_to_beat_puts_a_note_in_and_takes_it_out(strahd):
     assert run(mcp_server.add_to_beat("Ismark", "Village of Barovia")) == (
         "Village of Barovia isn't a beat. campaign_overview() lists the beats."
     )
+
+
+def test_current_session_reads_any_session_by_name(strahd, app):
+    app.post("/api/command/sessions", json={"campaign": "Strahd"})
+    assert run(mcp_server.current_session(session="session 2")) == (
+        "Session 2 (2026-10-18) — Strahd\n\nPlan:\n  (nothing planned)\n\nNothing is live."
+    )
+    assert run(mcp_server.current_session(session="Session 9")) == (
+        'Strahd has no session named "Session 9". Its sessions: Session 1, Session 2.'
+    )
+
+
+def test_plan_beat_adds_moves_and_takes_out(strahd, app):
+    for name in ("Church", "Raid"):
+        app.post("/api/command/beats", json={"campaign": "Strahd", "name": name})
+    assert run(mcp_server.plan_beat("Church")) == "Session 1's plan:\n  1. Ambush\n  2. Church"
+    assert run(mcp_server.plan_beat("raid", position=1)) == "Session 1's plan:\n  1. Raid\n  2. Ambush\n  3. Church"
+    assert run(mcp_server.plan_beat("Church", position=1)).endswith("1. Church\n  2. Raid\n  3. Ambush")
+    assert run(mcp_server.plan_beat("Church")).endswith("1. Church\n  2. Raid\n  3. Ambush")  # planned already
+    assert run(mcp_server.plan_beat("Raid", planned=False)) == "Session 1's plan:\n  1. Church\n  2. Ambush"
+    assert run(mcp_server.plan_beat("Raid", planned=False)) == "Raid isn't in Session 1's plan."
+    # An entry whose beat is gone can still be taken out, but not planned.
+    session = strahd / "Strahd" / "Sessions" / "Session 1.md"
+    session.write_text(session.read_text().replace("beats:\n", 'beats:\n  - "[[Gone]]"\n'))
+    assert run(mcp_server.plan_beat("Gone", planned=False)) == "Session 1's plan:\n  1. Church\n  2. Ambush"
+    assert run(mcp_server.plan_beat("Gone")).startswith('No note named "Gone"')
+    assert run(mcp_server.plan_beat("Ismark")) == "Ismark isn't a beat. campaign_overview() lists the beats."
+    assert run(mcp_server.plan_beat("Raid", position=0)) == "position counts from 1, the plan's first beat."
+
+
+@pytest.fixture
+def relay(app, monkeypatch):
+    """Rust's relay, as far as MCP can tell: it hears an ask to open a
+    session, and pushes the context back a moment later."""
+    real = events.VaultWatcher.publish
+    seq = iter(range(100, 200))
+
+    def publish(self, event):
+        if event["type"] != "session":
+            return real(self, event)
+        push = {"seq": next(seq), "campaign": event["campaign"], "session": event["session"]}
+        threading.Timer(0.05, lambda: app.put("/api/command/context", json=push)).start()
+        return True
+
+    monkeypatch.setattr(events.VaultWatcher, "publish", publish)
+
+
+def test_create_session_opens_it_in_the_app(strahd, app, relay):
+    assert run(mcp_server.create_session()) == (
+        "Created Session 2 (Sessions/Session 2.md) in Strahd, with nothing planned. Session 2 is open in the app."
+    )
+    assert app.get("/api/command/context").json() == {"campaign": "Strahd", "session": "Session 2"}
+    assert run(mcp_server.set_active_session("session 1")) == "Session 1 is open in the app."
+    assert run(mcp_server.set_active_session("Session 1")) == "Session 1 is open in the app."
+    app.post("/api/command/campaigns", json={"name": "Tomb"})
+    assert run(mcp_server.create_session(campaign="Tomb")).endswith(
+        "The app has Strahd open, not Tomb, so Session 1 isn't open there."
+    )
+
+
+def test_with_no_app_listening_a_session_isnt_opened(strahd, app):
+    app.post("/api/command/sessions", json={"campaign": "Strahd"})
+    assert run(mcp_server.set_active_session("Session 2")) == "The app isn't listening, so Session 2 isn't open there."
+    assert app.get("/api/command/context").json()["session"] == "Session 1"
 
 
 def hash_in(reply):

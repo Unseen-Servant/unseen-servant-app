@@ -276,7 +276,7 @@ Placement follows the architecture doc (D2, D4, D5, §4 Q4).
 - **Index:** *as built, no cache at all:* every read scans the campaign folder (tracks, notes with track and group, ambiguous names), and a rename scans the notes' text for links. A few hundred notes take a fraction of a second; a cache — in memory, then SQLite — only when a measurement asks for one. Phase 2 parses every note's frontmatter on each read, leniently — one broken block doesn't hide the campaign.
 - **Watcher:** `watchfiles` on the root. Changes update the index and go out on the event stream. Command's own writes take the same path, so there is one way a change becomes visible.
 - **Writer:** §3.5 — atomic writes, the hash check, link rewriting on rename. *As built (phase 2):* frontmatter is never re-serialised. `command/frontmatter.py` replaces only the lines of the one key it writes, then parses the result back (PyYAML) and refuses unless that key holds exactly what was written and every other key is unchanged. `ruamel.yaml` was dropped: it re-indents sequences document-wide, which touches keys Command doesn't own.
-- **Event stream:** `GET /command/events`, server-sent events: `vault` (campaign, changed paths) and `live` (a snapshot with `seq`).
+- **Event stream:** `GET /command/events`, server-sent events: `vault` (campaign, changed paths), `live` (a snapshot with `seq`) and, since 2026-10-19, `session` (an agent's ask to open one, §6.2).
 
 ### 6.2 Live state
 
@@ -284,10 +284,12 @@ The live set lives in the sidecar, because MCP has to read it (D5): per campaign
 
 The active campaign and session stay owned by Rust (`app_context.rs`, unchanged). Rust pushes them to the sidecar on every change and whenever the sidecar (re)starts, so MCP can answer "current session" with no window open.
 
+*Since 2026-10-19* MCP can ask Rust to open a session of the open campaign (`set_active_session`, `create_session`). `POST /command/context/session` publishes a `session` event on the stream Rust relays; the relay calls `app_context::open_session`, which switches only while that campaign is still the open one, then broadcasts to every window and pushes the context back. The tool waits until the sidecar's context shows the session, so its reply is true. Rust still owns the context: the sidecar only asks.
+
 ### 6.3 Rust — `src-tauri/src/command.rs`
 
 - Proxy commands over the routes, as `legend_lore.rs` does.
-- **The event relay:** after boot, one task subscribes to `/command/events` (reusing `SseFrames` from `legend_lore.rs`) and re-emits `command://vault` and `command://live` to every window, reconnecting when the sidecar restarts.
+- **The event relay:** after boot, one task subscribes to `/command/events` (reusing `SseFrames` from `legend_lore.rs`) and re-emits `command://vault` and `command://live` to every window, reconnecting when the sidecar restarts. A `session` event opens that session instead (§6.2).
 - Deletes through `trash::delete`.
 
 ### 6.4 Frontend — `src/lib/command/`
@@ -322,11 +324,11 @@ Play renders notes with `svelte-exmarkdown` (already a dependency) plus a wikili
 *As built (phase 4, 2026-10-12):*
 
 - **The active campaign reaches the sidecar.** Rust pushes `{seq, campaign, session}` to `PUT /command/context` on every change (`app_context.rs`) and whenever the event relay connects, since a restarted sidecar knows nothing. The newest `seq` wins. MCP tools act on that campaign unless given `campaign=`, and on its open session, else the latest.
-- **The tools** are `campaign_overview` (the campaigns, then one's tracks, notes, beats and sessions by name; it replaced `list_campaigns` on 2026-10-19), `current_session` (plan with each beat's notes, what's live), `live_set` (each live note's full text), `read_note` (with the note's hash) and `find_notes` (by name or text), `create_note` (into a track only), `edit_note` (the text below the frontmatter, hash-checked through `PUT /note`'s `keep_frontmatter`; since 2026-10-19), `create_beat` (notes that exist, the scene's text, optionally the end of a session's plan) and `add_to_beat` (since 2026-10-19), `add_to_live_set` and `spend`. (Until 2026-10-18 `current_session` read the session log too, and `spend` wrote to it.)
+- **The tools** are `campaign_overview` (the campaigns, then one's tracks, notes, beats and sessions by name; it replaced `list_campaigns` on 2026-10-19), `current_session` (plan with each beat's notes, what's live; any session by name since 2026-10-19), `live_set` (each live note's full text), `read_note` (with the note's hash) and `find_notes` (by name or text), `create_note` (into a track only), `edit_note` (the text below the frontmatter, hash-checked through `PUT /note`'s `keep_frontmatter`; since 2026-10-19), `create_beat` (notes that exist, the scene's text, optionally the end of a session's plan) and `add_to_beat`, `set_active_session` and `create_session` (which opens what it makes, §6.2), `plan_beat` (add, move to a 1-based position, or take out, dangling entries included; all since 2026-10-19), `add_to_live_set` and `spend`. (Until 2026-10-18 `current_session` read the session log too, and `spend` wrote to it.)
   - Notes are named as a wikilink names them. An ambiguous name asks for the path.
   - With the app closed, they say so instead of "nothing open".
   - The server introduces itself as *Unseen Servant* now that it serves both tools. The Claude Desktop config key is unchanged, so no migration is needed.
-  - A real stdio MCP client lists all seventeen tools.
+  - A real stdio MCP client lists all twenty tools.
 - **Send to Command** is a submenu on a search hit's menu (beside *Collection*), listing the open campaign's tracks. With no campaign open, it says so.
   - Legend Lore calls `command_send_targets` and `command_send` in Rust and nothing else of Command.
   - The note is named after the section's heading, with characters a name can't hold dropped and a clash numbered. It holds the section's text, then a link back citing book and printed pages.

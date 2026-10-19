@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import asyncio
 import re
 import sys
 import threading
@@ -271,9 +272,12 @@ mcp = MCPServer(
         "- create_note() writes new material into a track, or onto the shelf "
         "when it isn't clear where it belongs, and edit_note() corrects a "
         "note's text with the hash read_note() shows.\n"
-        "- create_beat() makes a scene from notes already written, and can "
-        "add it to a session's plan; make a plan's beats one at a time, in "
-        "play order. add_to_beat() puts a note in a beat or takes it out.\n"
+        "- To prep a session: create_session() starts the next one and opens "
+        "it in the app, or set_active_session() opens one that exists. Then "
+        "create_beat(session=) makes each scene from notes already written, "
+        "one at a time in play order, since a plan takes beats as the calls "
+        "arrive. add_to_beat() and plan_beat() fix a beat or the plan.\n"
+        "- Renaming and deleting are the GM's: say what should change.\n"
         "- add_to_live_set() and spend() follow the table during play."
     ),
 )
@@ -762,19 +766,26 @@ async def campaign_overview(campaign: str | None = None) -> str:
 
 
 @mcp.tool()
-async def current_session(campaign: str | None = None) -> str:
-    """The session at the table: its plan of beats (scenes) with the notes
-    each holds, and what's live.
+async def current_session(campaign: str | None = None, session: str | None = None) -> str:
+    """The session at the table, or any other: its plan of beats (scenes)
+    with the notes each holds, and what's live.
 
     Args:
         campaign: A campaign name; defaults to the one open in the app.
+        session: A session's name ("Session 3"); defaults to the one open
+                 in the app, else the latest.
     """
     index, ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    session = _session(index, ctx)
+    if session:
+        session, error = _session_named(index, session)
+        if error:
+            return error
+    else:
+        session = _session(index, ctx)
     if session is None:
-        return f"{index['name']} has no session yet. Start one in Command."
+        return f"{index['name']} has no session yet. create_session() starts one."
     live = await sidecar.get(f"/api/command/live?{_q(campaign=index['name'])}")
     live = live if isinstance(live, dict) else {}
     beats = {b["path"]: b for b in index["beats"]}
@@ -860,8 +871,8 @@ async def edit_note(name: str, content: str, hash: str, campaign: str | None = N
     a line. The note's frontmatter stays as it is, so content is the text
     below it, or the whole note as read_note() showed it with the
     frontmatter unchanged. Keys keep their own writers: spend() marks a note
-    spent, add_to_beat() changes a beat's notes, and the rest are the GM's,
-    in the app.
+    spent, add_to_beat() changes a beat's notes, plan_beat() a session's
+    plan, and the rest are the GM's, in the app.
 
     Args:
         name: The note's name, or its path when the name is shared.
@@ -956,7 +967,7 @@ async def create_beat(
     """Make a beat: a scene, holding the notes it needs, with the scene
     itself in its text. Write the notes first; a beat holds only notes that
     exist. Given a session, the beat joins the end of its plan, so make a
-    session's beats one at a time, in play order.
+    session's beats one at a time, in play order; plan_beat() reorders.
 
     Args:
         name: The beat's name; unique in the campaign, as every note's is.
@@ -1024,6 +1035,136 @@ async def add_to_beat(name: str, beat: str, member: bool = True, campaign: str |
         return data
     where = "in" if member else "out of"
     return f"{entry['name']} is {where} {scene['name']}, which holds {', '.join(data['notes']) or 'no notes'}."
+
+
+# How long set_active_session waits for the app to report the switch.
+OPEN_SESSION_WAIT_SECONDS = 3.0
+
+
+async def _open_in_app(campaign: str, path: str, name: str) -> str:
+    """Ask the app to open a session, and wait until its context says so, so
+    the reply is true. The open campaign's sessions only."""
+    ctx = await _context()
+    if ctx.get("campaign") != campaign:
+        return f"The app has {ctx.get('campaign') or 'no campaign'} open, not {campaign}, so {name} isn't open there."
+    if ctx.get("session") == name:
+        return f"{name} is open in the app."
+    asked = await sidecar.post("/api/command/context/session", {"campaign": campaign, "session": path})
+    if isinstance(asked, str):
+        return asked
+    if not asked["sent"]:
+        return f"The app isn't listening, so {name} isn't open there."
+    deadline = time.monotonic() + OPEN_SESSION_WAIT_SECONDS
+    while time.monotonic() < deadline:
+        await asyncio.sleep(0.1)
+        if (await _context()).get("session") == name:
+            return f"{name} is open in the app."
+    return f"Asked the app to open {name}, but it hasn't said it has."
+
+
+@mcp.tool()
+async def set_active_session(session: str) -> str:
+    """Open a session in the app, as the GM picking it there would, so the
+    session tools (and the GM) are on it. Sessions of the campaign open in
+    the app only.
+
+    Args:
+        session: The session's name ("Session 4").
+    """
+    index, _ctx, error = await _campaign_index(None)
+    if error:
+        return error
+    entry, error = _session_named(index, session)
+    if error:
+        return error
+    return await _open_in_app(index["name"], entry["path"], entry["name"])
+
+
+@mcp.tool()
+async def create_session(campaign: str | None = None) -> str:
+    """Start the next session, Session N, dated today with nothing planned,
+    and open it in the app, as its New session does. Each call makes
+    another, so check campaign_overview() for one not played yet first.
+
+    Args:
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    made = await sidecar.post("/api/command/sessions", {"campaign": index["name"]})
+    if isinstance(made, str):
+        return made
+    opened = await _open_in_app(index["name"], made["path"], made["name"])
+    return f"Created {made['name']} ({made['path']}) in {index['name']}, with nothing planned. {opened}"
+
+
+@mcp.tool()
+async def plan_beat(
+    name: str,
+    planned: bool = True,
+    position: int | None = None,
+    session: str | None = None,
+    campaign: str | None = None,
+) -> str:
+    """Put a beat in a session's plan, move it, or take it out.
+
+    Args:
+        name: The beat's name. Taking out also finds an entry whose beat
+              no longer exists.
+        planned: False to take it out of the plan.
+        position: Where it goes, 1 first, as current_session() numbers the
+                  plan; a beat already planned moves there. Without one, a
+                  new beat goes at the end.
+        session: The session's name; defaults to the one open in the app,
+                 else the latest.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    if session:
+        target, error = _session_named(index, session)
+        if error:
+            return error
+    else:
+        target = _session(index, ctx)
+        if target is None:
+            return f"{index['name']} has no session yet. create_session() starts one."
+    beat, missing = _note(index, name)
+    if beat and beat["path"] not in {b["path"] for b in index["beats"]}:
+        return f'{beat["name"]} isn\'t a beat. campaign_overview() lists the beats.'
+    wanted = name.strip().removesuffix(".md").casefold()
+    refs = target["beats"]
+    at = next((
+        i for i, r in enumerate(refs)
+        if (beat and r.get("path") == beat["path"]) or r["link"].casefold() == wanted
+    ), None)
+    if position is not None and position < 1:
+        return "position counts from 1, the plan's first beat."
+
+    edit = None
+    if not planned:
+        if at is None:
+            return f"{name} isn't in {target['name']}'s plan."
+        edit = {"op": "remove", "at": at, "expect": refs[at]["link"]}
+    elif beat is None:
+        return missing
+    elif at is None:
+        edit = {"op": "add", "beat": beat["path"], "to": None if position is None else position - 1}
+    elif position is not None and position - 1 != at:
+        edit = {"op": "move", "at": at, "to": position - 1, "expect": refs[at]["link"]}
+
+    plan = [r["link"] for r in refs]
+    if edit:
+        data = await sidecar.post("/api/command/sessions/plan", {
+            "campaign": index["name"], "session": target["path"], **edit,
+        })
+        if isinstance(data, str):
+            return data
+        plan = data["beats"]
+    lines = [f"{target['name']}'s plan:"] + [f"  {i}. {b}" for i, b in enumerate(plan, 1)]
+    return "\n".join(lines if plan else [f"{target['name']}'s plan: nothing planned."])
 
 
 @mcp.tool()

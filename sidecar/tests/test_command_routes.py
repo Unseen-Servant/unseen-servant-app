@@ -83,6 +83,18 @@ def test_note_create_read_save_and_conflict(cmd, campaign_root):
     assert (campaign_root / "Strahd" / "NPCs" / "Ismark.md").read_text() == "Hello\n"
 
 
+def test_opening_a_session_from_outside_takes_the_open_campaigns_sessions_only(cmd):
+    cmd.post("/api/command/sessions", json={"campaign": "Strahd"})
+    cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Ismark"})
+    ask = {"campaign": "Strahd", "session": "Sessions/Session 1.md"}
+    assert cmd.post("/api/command/context/session", json=ask).status_code == 409
+    cmd.put("/api/command/context", json={"seq": 1, "campaign": "Strahd", "session": None})
+    # Nobody's relaying in a test: the ask goes nowhere, and says so.
+    assert cmd.post("/api/command/context/session", json=ask).json() == {"session": "Session 1", "sent": False}
+    wrong = {"campaign": "Strahd", "session": "NPCs/Ismark.md"}
+    assert cmd.post("/api/command/context/session", json=wrong).status_code == 422
+
+
 def test_rename_reports_the_notes_it_rewrote(cmd, campaign_root):
     cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Ismark"})
     (campaign_root / "Strahd" / "NPCs" / "Ireena.md").write_text("[[Ismark]]")

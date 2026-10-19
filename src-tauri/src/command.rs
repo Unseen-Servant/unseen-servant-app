@@ -917,6 +917,14 @@ async fn relay(app: &AppHandle) -> Result<(), String> {
                 Some("live") => {
                     let _ = app.emit(LIVE_EVENT, &event);
                 }
+                // An agent asking for a session (MCP's set_active_session).
+                Some("session") => {
+                    if let (Some(campaign), Some(session)) =
+                        (event["campaign"].as_str(), event["session"].as_str())
+                    {
+                        crate::app_context::open_session(app, campaign, session);
+                    }
+                }
                 _ => {}
             }
         }

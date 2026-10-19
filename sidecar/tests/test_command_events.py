@@ -136,7 +136,7 @@ async def test_a_published_event_reaches_every_listener_from_any_thread(campaign
     await next_event(first)
     await next_event(second)
     event = {"type": "live", "campaign": "Strahd", "seq": 1, "beat": None, "notes": []}
-    await asyncio.to_thread(watcher.publish, event)
+    assert await asyncio.to_thread(watcher.publish, event) is True
     assert await until(first, lambda e: e["type"] == "live") == event
     assert await until(second, lambda e: e["type"] == "live") == event
     await first.aclose()
@@ -144,4 +144,4 @@ async def test_a_published_event_reaches_every_listener_from_any_thread(campaign
 
 
 def test_publishing_with_nobody_listening_does_nothing():
-    VaultWatcher(lambda: None).publish({"type": "live"})
+    assert VaultWatcher(lambda: None).publish({"type": "live"}) is False

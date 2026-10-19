@@ -60,7 +60,7 @@
       group: 'Command · reads',
       tools: [
         ['campaign_overview', "The campaigns, then the open one's tracks, notes, beats and sessions"],
-        ['current_session', "The session's plan of beats, and what's live"],
+        ['current_session', "A session's plan of beats, and what's live"],
         ['live_set', 'The notes in play, in full'],
         ['read_note', 'Read one note, with the hash an edit needs'],
         ['find_notes', 'Find notes by name or text'],
@@ -73,6 +73,9 @@
         ['edit_note', "Replace a note's text, keeping its frontmatter"],
         ['create_beat', 'Make a beat from notes, with its scene, optionally in a session'],
         ['add_to_beat', 'Put a note in a beat, or take it out'],
+        ['create_session', 'Start the next session and open it in the app'],
+        ['set_active_session', 'Open a session in the app'],
+        ['plan_beat', "Put a beat in a session's plan, move it, or take it out"],
         ['add_to_live_set', 'Put a note in play'],
         ['spend', 'Mark a note spent or unspent'],
       ],

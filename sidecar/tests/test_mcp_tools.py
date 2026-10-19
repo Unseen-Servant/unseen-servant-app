@@ -689,6 +689,6 @@ def test_registered_tools_are_the_public_surface():
         # Command's (test_mcp_command.py)
         "campaign_overview", "current_session", "live_set", "read_note",
         "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat",
-        "add_to_live_set", "spend",
+        "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend",
     }
 

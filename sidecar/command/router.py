@@ -189,6 +189,11 @@ class Context(BaseModel):
     session: str | None = None
 
 
+class OpenSession(BaseModel):
+    campaign: str
+    session: str  # the session note's path
+
+
 class Send(BaseModel):
     campaign: str
     # None: onto the campaign's shelf (design §3.6).
@@ -330,6 +335,18 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             context["current"] = body
             remember(body.campaign)
         return get_context()
+
+    @router.post("/context/session")
+    def open_session(body: OpenSession):
+        """Ask the app to open a session of its open campaign (MCP's
+        set_active_session). Rust owns the context: its relay makes the
+        switch, then pushes the context back here. ``sent`` is whether the
+        relay was listening."""
+        name = prep.require_in(campaign_path(body.campaign), body.session, prep.SESSIONS)
+        if body.campaign != context["current"].campaign:
+            raise HTTPException(409, f"{body.campaign} isn't the campaign open in the app")
+        sent = watcher.publish({"type": "session", "campaign": body.campaign, "session": name})
+        return {"session": name, "sent": sent}
 
     # -- change events -----------------------------------------------------
 
