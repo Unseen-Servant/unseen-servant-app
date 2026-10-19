@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Claude sees a campaign's shape in one call.** `campaign_overview` replaces `list_campaigns`: the campaigns, then the open one's tracks with their notes, the shelf, beats with their notes and the sessions planning them, and how many beats each session plans, by name only. A refused request now reads as the reason alone, and a note name already in use says where that note is
+
 ### Removed
 
 - **The session log.** Launching a beat or marking a note spent no longer writes a line under `## Log` in the session note. Lines already written stay in your notes as plain text. The jot bar still writes to the session note, now always at the end of its text. For Claude, `current_session` no longer reports a log and `spend` no longer logs

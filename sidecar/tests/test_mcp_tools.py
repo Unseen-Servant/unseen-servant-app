@@ -475,8 +475,7 @@ async def test_get_section_not_found(http_sidecar):
 
     http_sidecar["fn"] = not_found
     result = await get_section("nope")
-    assert "404" in result
-    assert "Section not found: nope" in result
+    assert result == "Section not found: nope"
     assert seen == {"path": "/api/section/nope", "source": "mcp"}
 
 
@@ -688,7 +687,7 @@ def test_registered_tools_are_the_public_surface():
         "search_library", "get_section", "get_pages",
         "list_sources", "list_game_systems", "list_collections",
         # Command's (test_mcp_command.py)
-        "list_campaigns", "current_session", "live_set", "read_note",
+        "campaign_overview", "current_session", "live_set", "read_note",
         "find_notes", "create_note", "add_to_live_set", "spend",
     }
 

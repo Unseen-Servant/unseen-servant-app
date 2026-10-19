@@ -143,6 +143,18 @@ _SIDECAR_TIMEOUT_HINT = (
 )
 
 
+def _refusal(response: httpx.Response) -> str:
+    """Why the sidecar refused a request: its ``detail`` when that's a
+    sentence (every Command refusal is), else the status and the body."""
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = None
+    if isinstance(detail, str) and detail:
+        return detail
+    return f"Sidecar error: {response.status_code} — {response.text}"
+
+
 class SidecarClient:
     """Thin wrapper around httpx for calling the FastAPI sidecar.
 
@@ -174,7 +186,7 @@ class SidecarClient:
         except httpx.TimeoutException:
             return _SIDECAR_TIMEOUT_HINT
         except httpx.HTTPStatusError as e:
-            return f"Sidecar error: {e.response.status_code} — {e.response.text}"
+            return _refusal(e.response)
 
     async def post(self, path: str, json: dict) -> dict | str:
         url = self._resolve()
@@ -192,7 +204,7 @@ class SidecarClient:
         except httpx.TimeoutException:
             return _SIDECAR_TIMEOUT_HINT
         except httpx.HTTPStatusError as e:
-            return f"Sidecar error: {e.response.status_code} — {e.response.text}"
+            return _refusal(e.response)
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +244,8 @@ mcp = MCPServer(
         "filed on a track yet, beats (scenes, each a set of notes) and sessions "
         "(a plan of beats). Tools act on the campaign open in the app unless "
         "you pass campaign=.\n"
+        "- Start with campaign_overview(): the campaigns, then the open one's "
+        "tracks, notes, beats and sessions by name.\n"
         "- Call current_session() to see what's planned, and live_set() for "
         "what's in play at the table right now.\n"
         "- Read notes with read_note() and find them with find_notes() before "
@@ -543,7 +557,7 @@ async def list_game_systems() -> str:
 
 _NO_CAMPAIGN = (
     "No campaign is open in Command. Open one in the app, or pass campaign= "
-    "(list_campaigns() lists them)."
+    "(campaign_overview() lists them)."
 )
 
 
@@ -609,10 +623,32 @@ def _label(index: dict, ref: dict) -> str:
     return f"{note['name']} ({note['track'] or 'loose'}{spent})"
 
 
+def _in_folder_order(index: dict, notes: list[dict], track: str) -> list[dict]:
+    """A track's notes as its Prep column lists them: those directly in it,
+    then each subfolder's, every folder in the GM's order, then by name."""
+    def key(n: dict):
+        folder = f"{track}/{n['group']}" if n["group"] else track
+        saved = [s.casefold() for s in index["note_order"].get(folder, [])]
+        name = n["name"].casefold()
+        rank = saved.index(name) if name in saved else len(saved)
+        return (n["group"] is not None, (n["group"] or "").casefold(), rank, name)
+    return sorted(notes, key=key)
+
+
+def _names(notes: list[dict]) -> str:
+    return ", ".join(n["name"] + (" (spent)" if n.get("spent") else "") for n in notes) or "(empty)"
+
+
 @mcp.tool()
-async def list_campaigns() -> str:
-    """List the campaigns in Command, the GM's campaign notes, and say which
-    one is open in the app (the one the other Command tools act on)."""
+async def campaign_overview(campaign: str | None = None) -> str:
+    """Start here. The campaigns in Command, the GM's campaign notes, with
+    the one open in the app marked (the one the other Command tools act on);
+    then that campaign's shape: its tracks with their notes, the shelf,
+    beats with their notes, and sessions. Names only: read_note() reads one.
+
+    Args:
+        campaign: A campaign name; defaults to the one open in the app.
+    """
     data = await sidecar.get("/api/command/campaigns")
     if isinstance(data, str):
         return data
@@ -626,6 +662,57 @@ async def list_campaigns() -> str:
         if name == ctx.get("campaign"):
             mark = f" (open, session: {ctx['session']})" if ctx.get("session") else " (open)"
         lines.append(f"  - {name}{mark}")
+    name = campaign or ctx.get("campaign")
+    if not name:
+        return "\n".join(lines + ["", "None is open in the app: pass campaign= to see one."])
+    index = await sidecar.get(f"/api/command/campaign?{_q(name=name)}")
+    if isinstance(index, str):
+        return "\n".join(lines + ["", index])
+
+    notes = index["notes"]
+    lines += ["", f"Tracks in {index['name']}:"]
+    for track in index["tracks"]:
+        mine = _in_folder_order(index, [n for n in notes if n["track"] == track], track)
+        lines.append(f"  {track}: {_names(mine)}")
+    shelf = [n for n in notes if (n["track"] or "").casefold() == "shelf"]
+    if shelf:
+        shelf = _in_folder_order(index, shelf, shelf[0]["track"])  # the folder as it is on disk
+    lines += ["", f"Shelf: {_names(shelf)}"]
+    loose = sorted((n for n in notes if n["track"] is None), key=lambda n: n["name"].casefold())
+    if loose:
+        lines.append(f"Loose, outside any track: {_names(loose)}")
+
+    planning: dict[str, list[str]] = {}
+    for s in index["sessions"]:
+        for ref in s["beats"]:
+            if ref.get("path"):
+                planning.setdefault(ref["path"], []).append(s["name"])
+    names = {n["path"]: n["name"] for n in notes}
+    lines += ["", "Beats:"]
+    if not index["beats"]:
+        lines.append("  (none yet)")
+    for b in index["beats"]:
+        held = ", ".join(
+            names[r["path"]] if r.get("path") else f"{r['link']} (not written yet)" for r in b["notes"]
+        ) or "(no notes)"
+        spent = " (spent)" if b.get("spent") else ""
+        planned = f" — planned in {', '.join(planning[b['path']])}" if b["path"] in planning else ""
+        lines.append(f"  {b['name']}{spent}: {held}{planned}")
+
+    lines += ["", "Sessions:"]
+    if not index["sessions"]:
+        lines.append("  (none yet)")
+    for s in index["sessions"]:
+        when = f" ({s['date']})" if s.get("date") else ""
+        missing = sum(1 for r in s["beats"] if not r.get("path"))
+        count = f"{len(s['beats'])} beat(s) planned" if s["beats"] else "nothing planned"
+        lines.append(f"  {s['name']}{when}: {count}" + (f", {missing} not written yet" if missing else ""))
+
+    if index["ambiguous"]:
+        lines += ["", "Names more than one note answers to (pass the path):"]
+        for shared in index["ambiguous"]:
+            hits = [n for n in notes if n["name"].casefold() == shared]
+            lines.append(f"  {hits[0]['name']}: {', '.join(n['path'] for n in hits)}")
     return "\n".join(lines)
 
 
@@ -765,6 +852,13 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
         return (
             f'{index["name"]} has no track named "{track}". '
             f'Its tracks: {", ".join(index["tracks"])}, or "Shelf".'
+        )
+    # Names are unique campaign-wide; a retried create meets the note it made.
+    clash = next((n for n in index["notes"] if n["name"].casefold() == name.strip().casefold()), None)
+    if clash:
+        return (
+            f'A note named "{clash["name"]}" already exists ({clash["path"]}). If you just made it, '
+            f'it\'s there: read_note("{clash["path"]}"). Otherwise pick another name.'
         )
     made = await sidecar.post("/api/command/notes", {
         "campaign": index["name"], "folder": track, "name": name, "content": content,

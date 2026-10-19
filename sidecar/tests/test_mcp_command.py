@@ -15,7 +15,7 @@ from command import prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
-COMMAND = {"list_campaigns", "current_session", "live_set", "read_note", "find_notes", "create_note", "add_to_live_set", "spend"}
+COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "add_to_live_set", "spend"}
 
 
 @pytest.fixture
@@ -76,9 +76,54 @@ def test_nothing_open_says_so(app, tmp_path):
     assert run(mcp_server.current_session()) == mcp_server._NO_CAMPAIGN
 
 
-def test_list_campaigns_marks_the_open_one(strahd, app):
+def test_campaign_overview_lists_the_campaigns_then_the_open_ones_shape(strahd, app):
     app.post("/api/command/campaigns", json={"name": "Tomb"})
-    assert run(mcp_server.list_campaigns()) == "Campaigns:\n  - Strahd (open, session: Session 1)\n  - Tomb"
+    app.post("/api/command/notes", json={"campaign": "Strahd", "folder": "Shelf", "name": "Rumour"})
+    app.post("/api/command/spent", json={"campaign": "Strahd", "path": "NPCs/Ismark.md", "spent": True})
+    app.post("/api/command/sessions", json={"campaign": "Strahd"})
+    (strahd / "Strahd" / "Sessions" / "Session 2.md").write_text(
+        '---\ndate: 2026-10-18\nbeats:\n  - "[[Ambush]]"\n  - "[[Raid]]"\n---\n'
+    )
+    assert run(mcp_server.campaign_overview()) == (
+        "Campaigns:\n"
+        "  - Strahd (open, session: Session 1)\n"
+        "  - Tomb\n"
+        "\n"
+        "Tracks in Strahd:\n"
+        "  PCs: (empty)\n"
+        "  Secrets: (empty)\n"
+        "  Locations: Ireena, Village of Barovia\n"
+        "  NPCs: Ireena, Ismark (spent)\n"
+        "  Monsters: (empty)\n"
+        "  Traps: (empty)\n"
+        "  Treasures: (empty)\n"
+        "\n"
+        "Shelf: Rumour\n"
+        "\n"
+        "Beats:\n"
+        "  Ambush: Ismark, Village of Barovia — planned in Session 1, Session 2\n"
+        "\n"
+        "Sessions:\n"
+        "  Session 1 (2026-10-18): 1 beat(s) planned\n"
+        "  Session 2 (2026-10-18): 2 beat(s) planned, 1 not written yet\n"
+        "\n"
+        "Names more than one note answers to (pass the path):\n"
+        "  Ireena: Locations/Ireena.md, NPCs/Ireena.md"
+    )
+    assert run(mcp_server.campaign_overview(campaign="Tomb")).endswith(
+        "Shelf: (empty)\n\nBeats:\n  (none yet)\n\nSessions:\n  (none yet)"
+    )
+    assert run(mcp_server.campaign_overview(campaign="Ravenloft")).endswith("\n\nNo campaign named 'Ravenloft'")
+
+
+def test_campaign_overview_with_nothing_open_lists_the_campaigns(app, tmp_path):
+    (tmp_path / "campaigns").mkdir()
+    app.put("/api/command/settings", json={"root": str(tmp_path / "campaigns")})
+    assert run(mcp_server.campaign_overview()) == "No campaigns yet. Create one in Command."
+    app.post("/api/command/campaigns", json={"name": "Tomb"})
+    assert run(mcp_server.campaign_overview()) == (
+        "Campaigns:\n  - Tomb\n\nNone is open in the app: pass campaign= to see one."
+    )
 
 
 def test_current_session_reads_the_plan_and_the_live_set(strahd, app):
@@ -116,6 +161,11 @@ def test_create_note_only_in_a_track(strahd):
     assert (strahd / "Strahd" / "NPCs" / "Doru.md").read_text() == "Turned by [[Strahd]]."
     assert run(mcp_server.create_note("Beats", "Raid")).startswith('Strahd has no track named "Beats"')
     assert run(mcp_server.create_note("Shelf", "Rumour", "The baron is ill.")) == "Created Shelf/Rumour.md in Strahd."
+    assert run(mcp_server.create_note("Locations", "doru")) == (
+        'A note named "Doru" already exists (NPCs/Doru.md). If you just made it, '
+        'it\'s there: read_note("NPCs/Doru.md"). Otherwise pick another name.'
+    )
+    assert run(mcp_server.create_note("NPCs", "Doru/Son")) == "A name can't contain /"
 
 
 def test_play_from_mcp_live_set_and_spend(strahd, app):

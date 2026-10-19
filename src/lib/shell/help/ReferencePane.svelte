@@ -59,7 +59,7 @@
     {
       group: 'Command · reads',
       tools: [
-        ['list_campaigns', 'List the campaigns and say which is open'],
+        ['campaign_overview', "The campaigns, then the open one's tracks, notes, beats and sessions"],
         ['current_session', "The session's plan of beats, and what's live"],
         ['live_set', 'The notes in play, in full'],
         ['read_note', 'Read one note'],
