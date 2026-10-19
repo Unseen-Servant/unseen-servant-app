@@ -72,24 +72,12 @@ pub struct BeatEntry {
     notes: Vec<LinkRef>,
 }
 
-/// A line of a session's log: what happened (`launch`, `spent`, `unspent`,
-/// `captured`, or `jot` for anything else), when, and the note it names.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct LogEntry {
-    time: Option<String>,
-    kind: String,
-    link: Option<String>,
-    path: Option<String>,
-    text: String,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SessionEntry {
     name: String,
     path: String,
     date: Option<String>,
     beats: Vec<LinkRef>,
-    log: Vec<LogEntry>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -669,26 +657,24 @@ pub async fn command_edit_plan(
 }
 
 /// Mark a note spent (today) or unspent. Returns the spent date, if any.
-/// Play passes its session, so the change is logged there.
 #[tauri::command]
 pub async fn command_set_spent(
     campaign: String,
     path: String,
     spent: bool,
-    session: Option<String>,
 ) -> Result<Option<String>, String> {
     #[derive(Deserialize)]
     struct Spent {
         spent: Option<String>,
     }
     answer::<Spent>(client().post(api("/spent")).json(&serde_json::json!({
-        "campaign": campaign, "path": path, "spent": spent, "session": session,
+        "campaign": campaign, "path": path, "spent": spent,
     })))
     .await
     .map(|s| s.spent)
 }
 
-// -- play: the board, the live set, the log --------------------------------
+// -- play: the board, the live set, jots ------------------------------------
 
 /// A session's board: JSON Canvas `nodes` and `edges` exactly as on disk,
 /// plus `notes`, the note each card shows. Kept as JSON on the way through,
@@ -725,15 +711,11 @@ pub async fn command_get_live(campaign: String) -> Result<LiveSet, String> {
     answer(client().get(api_query("/live", &[("campaign", &campaign)])?)).await
 }
 
-/// Launch a beat: its notes become the live set, logged in `session`.
+/// Launch a beat: its notes become the live set.
 #[tauri::command]
-pub async fn command_launch(
-    campaign: String,
-    beat: String,
-    session: Option<String>,
-) -> Result<LiveSet, String> {
+pub async fn command_launch(campaign: String, beat: String) -> Result<LiveSet, String> {
     answer(client().post(api("/live/launch")).json(&serde_json::json!({
-        "campaign": campaign, "beat": beat, "session": session,
+        "campaign": campaign, "beat": beat,
     })))
     .await
 }
@@ -761,8 +743,8 @@ pub async fn command_stop(campaign: String) -> Result<LiveSet, String> {
     .await
 }
 
-/// Add a line to the end of the session note's own text, above its log.
-/// Returns the line written.
+/// Add a line to the end of the session note's text. Returns the line
+/// written.
 #[tauri::command]
 pub async fn command_jot(
     campaign: String,
@@ -1001,11 +983,7 @@ mod tests {
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,
                        "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
-                          "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}],
-                          "log": [{"time": "19:42", "kind": "launch", "link": "Ambush",
-                                   "path": "Beats/Ambush.md", "text": "▶ [[Ambush]]"},
-                                  {"time": null, "kind": "jot", "link": null, "path": null,
-                                   "text": "later"}]}],
+                          "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}]}],
         });
         let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
         assert_eq!(serde_json::to_value(index).unwrap(), sidecar);

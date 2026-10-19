@@ -129,7 +129,7 @@ def test_prep_round_trip_over_http(cmd, campaign_root, monkeypatch):
     index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
     assert index["sessions"] == [{
         "name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
-        "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}], "log": [],
+        "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}],
     }]
     assert index["beats"] == [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": "2026-10-18", "notes": []}]
 
@@ -183,19 +183,18 @@ def test_track_pigment_over_http(cmd):
 
 
 # ---------------------------------------------------------------------------
-# Play: the board, the live set, the log
+# Play: the board, the live set, jots
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
 def table(cmd, campaign_root, monkeypatch):
     """Strahd with Ismark and Ireena, an Ambush beat holding Ismark, and
-    Session 1 planning it. Every log line is stamped 19:42."""
-    from datetime import date, datetime
+    Session 1 planning it."""
+    from datetime import date
 
-    from command import log, prep
+    from command import prep
 
     monkeypatch.setattr(prep, "today", lambda: date(2026, 10, 18))
-    monkeypatch.setattr(log, "now", lambda: datetime(2026, 10, 18, 19, 42))
     for name in ("Ismark", "Ireena"):
         cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": name})
     cmd.post("/api/command/sessions", json={"campaign": "Strahd"})
@@ -205,19 +204,13 @@ def table(cmd, campaign_root, monkeypatch):
     return cmd
 
 
-def session_log(client):
-    index = client.get("/api/command/campaign", params={"name": "Strahd"}).json()
-    return [(e["kind"], e["link"], e["path"]) for e in index["sessions"][0]["log"]]
-
-
-def test_launching_a_beat_makes_its_notes_live_and_logs_it(table, campaign_root):
-    launched = table.post("/api/command/live/launch", json={
-        "campaign": "Strahd", "beat": "Beats/Ambush.md", "session": "Sessions/Session 1.md",
-    }).json()
+def test_launching_a_beat_makes_its_notes_live_and_writes_nothing(table, campaign_root):
+    session = campaign_root / "Strahd" / "Sessions" / "Session 1.md"
+    before = session.read_text()
+    launched = table.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"}).json()
     assert launched == {"campaign": "Strahd", "seq": 1, "beat": "Beats/Ambush.md", "notes": ["NPCs/Ismark.md"]}
     assert table.get("/api/command/live", params={"campaign": "Strahd"}).json() == launched
-    assert "## Log\n- 19:42 ▶ [[Ambush]]\n" in (campaign_root / "Strahd" / "Sessions" / "Session 1.md").read_text()
-    assert session_log(table) == [("launch", "Ambush", "Beats/Ambush.md")]
+    assert session.read_text() == before
     index = table.get("/api/command/campaign", params={"name": "Strahd"}).json()
     assert index["beats"][0]["spent"] is None
 
@@ -230,7 +223,6 @@ def test_spend_on_launch_spends_the_beat(table):
     table.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"})
     index = table.get("/api/command/campaign", params={"name": "Strahd"}).json()
     assert index["beats"][0]["spent"] == "2026-10-18"
-    assert session_log(table) == []
 
 
 def test_improvising_changes_the_live_set_not_the_beat(table):
@@ -247,27 +239,14 @@ def test_improvising_changes_the_live_set_not_the_beat(table):
     assert (stopped["beat"], stopped["notes"]) == (None, [])
 
 
-def test_a_jot_lands_in_the_session_note_not_its_log(table, campaign_root):
+def test_a_jot_lands_at_the_end_of_the_session_note(table, campaign_root):
     assert table.post("/api/command/jot", json={
         "campaign": "Strahd", "session": "Sessions/Session 1.md", "text": "the party insulted the burgomaster",
     }).json() == {"line": "- the party insulted the burgomaster"}
     text = (campaign_root / "Strahd" / "Sessions" / "Session 1.md").read_text()
     assert text.endswith("\n- the party insulted the burgomaster\n")
-    assert session_log(table) == []
     not_a_session = table.post("/api/command/jot", json={"campaign": "Strahd", "session": "NPCs/Ismark.md", "text": "x"})
     assert not_a_session.status_code == 422
-
-
-def test_spends_from_play_are_logged(table):
-    play = {"campaign": "Strahd", "path": "NPCs/Ismark.md", "session": "Sessions/Session 1.md"}
-    table.post("/api/command/spent", json={**play, "spent": True})
-    table.post("/api/command/spent", json={**play, "spent": True})  # already spent: no second line
-    table.post("/api/command/spent", json={**play, "spent": False})
-    table.post("/api/command/spent", json={"campaign": "Strahd", "path": "NPCs/Ireena.md", "spent": True})  # from Prep
-    assert session_log(table) == [
-        ("spent", "Ismark", "NPCs/Ismark.md"),
-        ("unspent", "Ismark", "NPCs/Ismark.md"),
-    ]
 
 
 def test_the_board_over_http_follows_a_session_rename(table):

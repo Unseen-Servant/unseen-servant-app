@@ -28,26 +28,12 @@ export interface BeatEntry {
   notes: LinkRef[];
 }
 
-/** A line of a session's `## Log`. Command's own lines say what happened;
- *  anything else the GM wrote there is a jot. */
-export interface LogEntry {
-  /** "19:42"; null for a line without one. */
-  time: string | null;
-  kind: 'launch' | 'spent' | 'unspent' | 'captured' | 'jot';
-  /** The note the line names, for every kind but a jot. */
-  link: string | null;
-  path: string | null;
-  /** The line after its time. */
-  text: string;
-}
-
 export interface SessionEntry {
   name: string;
   path: string;
   date: string | null;
   /** The plan, in order. */
   beats: LinkRef[];
-  log: LogEntry[];
 }
 
 export interface CampaignIndex {

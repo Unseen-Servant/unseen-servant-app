@@ -11,7 +11,7 @@
 - **Ableton Live for prep and play.** Tracks are kinds of material (PCs, Secrets, Locations, NPCs, Monsters, Traps, Treasures — editable), notes are clips, beats are scenes. Prep builds; Play runs the table: launch a beat and its notes light up, improvise by launching more.
 - **The vault is folders of Markdown, and nothing else is truth.** A campaign is a folder in a user-chosen root, a track is a folder in the campaign, a note is any `.md` file in a track. Beats and sessions are notes too. Open the root in Obsidian and everything reads, links and edits.
 - **References are `[[wikilinks]]` by note name**, in frontmatter lists Command owns: a beat lists its notes, a session lists its beats. Nothing stores ids, paths or copies.
-- **Play state never touches notes.** What's live is sidecar state; only story facts are written: a note marked spent, the session log.
+- **Play state never touches notes.** What's live is sidecar state; only story facts are written: a note marked spent.
 - **Spent replaces carry-forward for notes.** Any note can be spent (secret revealed, treasure given, beat played, NPC dead); an unspent note is simply still bright next session. Nothing carries forward, plans included: a new session plans nothing, and the last one's unspent beats wait under *not in this session* (2026-10-15; it used to start with them).
 - **The campaign is the unit**, as a project folder is Live's: everything a campaign uses lives in its folder, so the folder is complete on its own. Gathered material waits on the campaign's shelf (§3.6); reuse across campaigns is copying from another campaign.
 - **Same app, same look.** A panel per `src/lib/shell/PANELS.md`; vault I/O and state in `sidecar/command/` (architecture D2, §4 Q4); one sidecar event stream relayed by Rust to every window; Legend Lore's vocabulary (arm, play, pigments, lamps, dim) means the same thing here.
@@ -43,9 +43,8 @@ Two implementations of this tool exist: `~/code/unseen-app-desktop` (Electron + 
 | Track | Track | a folder in the campaign |
 | Clip | Note | a `.md` file in a track folder |
 | Scene | Beat | a note in `Beats/` listing its notes |
-| Live Set | Session | a note in `Sessions/` listing its beats, with its log |
+| Live Set | Session | a note in `Sessions/` listing its beats |
 | Playing clips | Live set | sidecar state, never in notes |
-| Recording into the Arrangement | Log | the `## Log` section of the session note |
 | Session View / Arrangement View | Prep / Play | — |
 | Browser: Current Project | Shelf | `Shelf/` in the campaign |
 
@@ -115,11 +114,11 @@ A note's track is the folder it lives in, so a beat carries no per-track keys an
 
 ### 3.5 Writing discipline
 
-1. **Surgical.** Command changes only the keys above, appends to a session's log, and writes the notes it creates. Body text it didn't author is never rewritten; frontmatter round-trips with key order, quoting and comments preserved.
+1. **Surgical.** Command changes only the keys above, appends the GM's jots to a session note, and writes the notes it creates. Body text it didn't author is never rewritten; frontmatter round-trips with key order, quoting and comments preserved.
 2. **Atomic.** Write a temp file in the same folder, then rename it over the original.
 3. **Optimistic.** Every save carries the path and the content hash it was loaded from. If the file changed on disk since, the sidecar refuses (409) rather than overwriting, and the editor shows the conflict (§7).
 4. **Deletes go to the OS trash**, through the `trash` crate Legend Lore already uses — never an unlink.
-5. **Play state is not written.** The live set, the armed beat and launches live in the sidecar (§6.2). Only spends and the log reach disk.
+5. **Play state is not written.** The live set, the armed beat and launches live in the sidecar (§6.2). Only spends reach disk.
 6. **Boards keep Obsidian's shape.** A session's board (§5.2) is written in Obsidian's own canvas layout: tab-indented, one node per line. Every node, edge and field Command didn't touch is kept, so a board Obsidian wrote comes back byte for byte.
    - A card names its note by path from the root, as Obsidian does with the root as its vault. A campaign-relative path (a vault opened on the campaign folder) also resolves.
    - Command's renames and moves rewrite these paths in every `.canvas` in the campaign, as they rewrite links.
@@ -167,7 +166,7 @@ The campaign is the unit. Everything a campaign uses lives in its folder, so a c
 
 ## 4. Sessions
 
-A session owns two things: its **plan** (`beats`, in order) and its **log**. The rest of the table's state is on the notes themselves (`spent`), which is why notes need no carry-forward: a secret not yet revealed is just an unspent note in Secrets, still bright next session.
+A session owns its **plan** (`beats`, in order). It kept a log too, until 2026-10-18 (lifecycle 3). The rest of the table's state is on the notes themselves (`spent`), which is why notes need no carry-forward: a secret not yet revealed is just an unspent note in Secrets, still bright next session.
 
 ```markdown
 ---
@@ -176,23 +175,19 @@ beats: ["[[The mists close in]]", "[[Ambush on the road]]", "[[Tser Pool camp]]"
 ---
 Prep notes, reminders…
 
-## Log
-- 19:42 ▶ [[Ambush on the road]]
-- 20:15 spent [[Ravens watch]]
-- 20:22 the party insulted the burgomaster
+- the party insulted the burgomaster
 ```
 
 **Lifecycle**
 
 1. **`[new session]`** creates `Sessions/Session N.md` — N one more than the highest number in an existing session's name; renameable afterwards — with `date` set to today, and makes it the active session (`src-tauri/src/app_context.rs`). It plans nothing, and has no board until the GM arranges one (2026-10-15): every beat starts out spent or not in this session, so a copied board's cards would be notes no beat of it holds. Until then its plan started with the previous session's unspent beats and its board as a copy of the previous one. Renaming a session renames its board, and trashing a session trashes its board.
 2. **Prep** edits the plan (add, remove, reorder beats) and the beats themselves. Beats in no plan stay in `Beats/` as potential scenes and can be pulled into one.
-3. **Play** appends to the log as things happen: a beat launched (`▶`), a note spent or un-spent. (An improvised beat captured was logged too, until capture was removed on 2026-10-16, and a line the GM wrote, until the jot line was removed on 2026-10-17; both still read.)
-4. **There is no end-of-session state.** A session with a log has been played. The live set persists until something else is launched, so a session that stops on a cliffhanger resumes there.
+3. **Play** writes the GM's jots to the session note (§5.2), and nothing else. *Until 2026-10-18* it also appended a log under `## Log` as things happened: a beat launched (`▶`), a note spent or un-spent. The log was dropped then; lines already written stay in session notes as plain text, and nothing reads them.
+4. **There is no end-of-session state.** The live set persists until something else is launched, so a session that stops on a cliffhanger resumes there.
 
 Further rules:
 
 - **Spending is manual by default, beats included:** launching a beat doesn't spend it. A setting, *spend beats on launch* (default off), makes a launch spend the beat. The UI says "spent" for every note, beats included: it's one word for one key (§10).
-- **Command only ever appends to the log.** It writes under the last `## Log` heading, adding the heading at the end of the note if there is none. Command parses lines shaped `- HH:MM <verb> [[Name]]`; a line the GM has edited into another shape shows as a jot.
 - **The active session** defaults to the latest by `date` when a campaign opens.
 
 ---
@@ -224,13 +219,13 @@ Further rules:
 - **Connections** are lines between cards. They mean nothing to Command yet. *Decided on 2026-10-12. What following one could do, like Live's follow actions, comes later.*
 - **At the table the board needs no handling.** Launching frames the live cards. Dragging and connecting are allowed but never required; arranging happens before the session, in Play with nothing launched.
 - **Editing in Play.** Cards are read-only. A card's `[edit]` opens its note in the same right-hand editor as in Prep, closed until asked for, for a quick change mid-session such as Ismark turning hostile.
-- **The arrangement** runs down one side: the session's plan with spent beats ticked, and log entries at the times they happened. It is the session as played, and the recap for next time.
+- **The arrangement** runs down one side: the session's plan with spent beats ticked.
 - **Launching what isn't on the board.** Typing outside the editor opens a find line on the board, listing the campaign's matching notes. Launching one puts it on the board, auto-placed. This replaces the compact grid planned before the board, since the board already holds the session's notes. *Removed on 2026-10-17:* Play plays what the board holds, the session's planned notes and anything live; a note outside the plan joins a beat in Prep first, or Claude adds it (`add_to_live_set`).
-- **A jot bar** in the board's bottom-left corner adds a line to the session note. Long text wraps and the bar grows up from the corner. Enter writes `- text`, untimed, at the end of the note's own text, above `## Log`, and clears the bar for the next. The GM keeps notes in the session note rather than reading back a log. A pen key (Font Awesome's `pen-to-square`) beside the bar, or ⌘O, opens the session note in the inspector, from Prep or Play, the editor and the bar included (2026-10-17). *Until then (removed earlier on 2026-10-17, with the log's display below):* a jot line under the log appended a timestamped line to the log.
+- **A jot bar** in the board's bottom-left corner adds a line to the session note. Long text wraps and the bar grows up from the corner. Enter writes `- text`, untimed, at the end of the note's text, and clears the bar for the next. The GM keeps notes in the session note rather than reading back a log. A pen key (Font Awesome's `pen-to-square`) beside the bar, or ⌘O, opens the session note in the inspector, from Prep or Play, the editor and the bar included (2026-10-17). *Until then (removed earlier on 2026-10-17, with the log's display below):* a jot line under the log appended a timestamped line to the log.
 - **The card tray** (2026-10-18) holds the live set as a hand of cards, docked under the board, as a deckbuilder's hand sits under its table. The board is where the session's notes are arranged, and the tray is what's in play now, readable at a glance and in one place whatever the board's zoom. It shows only while something is live, in the live set's order, so a note played on its own joins at the end. Each card is a board card's face (`CardFace`), at a reading width that fits five across a 1280px window. Past what fits, the cards overlap evenly, so every one stays in view with its pigment and the start of its title. The card under the pointer is the one whose strip the pointer is on, so moving along the hand steps through every card. That card comes to the front, whole, and a note longer than the tray grows up over the board. Its board card is outlined. Clicking cards picks them: a picked card takes the accent rule and rises a step in the hand, as a card readied to play, and the hand stays as it was. The plate's `[select]` then lays the picked cards side by side, sharing the tray's width, with the rest on their side as spines, one click from joining them; `[deselect]` puts them back in the hand, still picked (2026-10-18: a click first laid them out at once, and the user asked for the step between; the keys first read `[spread]`/`[gather]`). A new live set (a launch, a stop, a note played or taken out) clears the picks. The plate (*in play*, the count, the live beat) folds the tray, as the session player's does, and the fold holds across Tab. Folded, the plate holds a nameplate per card in its track's pigment. Pointing at one brings its card up above it, and clicking one opens the tray with that card picked. Launching still frames the live cards on the board. Mocked in the full window first (https://claude.ai/artifact/DC5ZAAiXzbN1gNSq97tPpJ): a fanned hand (Slay the Spire) and a rail of nameplates lost to the docked tray, which keeps the rail as its folded state and the fan's whole hand as its overlap.
 - *As built (phase 3):*
   - **Layout.** The board fills the view, and the note editor opens on the right as in Prep. The arrangement, named the *session player* (2026-10-17), is a 15rem box over the board's top-left corner, the session planner's width, edged and lifted as a menu is and only as tall as the plan, scrolling past the board's height. Launching and the frame key fit the cards to the board beside the box, a grid square clear of it. Its plate folds the list (2026-10-17), as a group's title does in Prep, the caret where other plates start their title: folded, only the live beat's row shows, and with nothing live only the plate. The fold holds across Tab, for the sitting. *Until 2026-10-17* it was a column down the left under a plate named *play*.
-  - *Removed on 2026-10-17:* the log followed the plan, newest at the bottom, then the jot line (*Write in the log…*), and a day's version docked it in Prep under the session planner too. Neither was what the GM wanted. The log is still written to the session note, where Obsidian shows it and Claude reads it (`current_session`), but Command doesn't show it.
+  - *Removed on 2026-10-17:* the log followed the plan, newest at the bottom, then the jot line (*Write in the log…*), and a day's version docked it in Prep under the session planner too. Neither was what the GM wanted. The log was still written to the session note, where Obsidian showed it and Claude read it (`current_session`), but Command didn't show it. Since 2026-10-18 it isn't written either (§4).
   - **The plan works as Legend Lore's collections panel** (2026-10-16): rows of a note row's height, the name first, a collection's transport at the row's end (hidden at rest, shown on the hovered or focused row, kept while live) and its LED count of the notes the beat lights. A click focuses a beat, ringed; ↑↓ or J/K step the focus, and P or Space launches the focused beat or stops it while it's live, as they do a collection (J/K and P since 2026-10-17, when the find line stopped taking letters). A double-click opens the beat in the editor, and right-click focuses it and opens its menu, the transport first: *Launch*/*Stop*, *Frame the live cards*, then *Mark spent* and *Edit beat*. The live beat's ■ is the only stop, and the live beat's row wears a playing collection's highlight, the 8% parchment wash under a 3px purple rule (2026-10-17, asked for over beat states' one cue per state), and the session planner's live beat in Prep the same; an armed beat's 25% wash wins over it, as in Legend Lore. Beside each play key, shown with it, a frame key (Font Awesome's `expand`) frames the beat's cards, and on the live beat the live set's (on every beat since 2026-10-17; before, on the live beat only). The board gives these keys up: no moving a focused card by arrow, no Space to pan.
   - *Replaced on 2026-10-16:* a transport strip floated over the board's top edge (an amber lamp, the live beat's name, the count, `[frame]`, `[capture]`, `[stop]`), and the plan's rows put the play key first and the launch times after the name. The times are the log's. A click on a beat name framed its cards. Where the strip said what typing does, a legend is printed in the board's corner, and since the find line went (2026-10-17) only on an empty board: *Plan beats in Prep to put their notes here*. The legend went on 2026-10-17, after the jot bar took the corner.
   - **The board** is graph paper (2026-10-16), the old-school dungeon map's: Svelte Flow's line background, 24px squares in `--bg-header`, scaling with the zoom.
@@ -241,7 +236,7 @@ Further rules:
 
 ### 5.3 Launching
 
-- **Launching a beat** makes the live set exactly its notes, and logs it. Only Play launches (2026-10-14, §5.1).
+- **Launching a beat** makes the live set exactly its notes. Only Play launches (2026-10-14, §5.1).
 - **Launching a note** adds it to the live set; launching a live note again takes it out. This is improvising: it changes the live set only, never the beat the set came from.
 - *Capture, removed on 2026-10-16:* `[capture]` saved the live set as a new beat, named by the GM, after the last launched beat in the plan. Naming a beat mid-session is the friction the table doesn't take, and what it bought, relaunching an improvised scene, is rare.
 - **Stop** clears the live set.
@@ -327,7 +322,7 @@ Play renders notes with `svelte-exmarkdown` (already a dependency) plus a wikili
 *As built (phase 4, 2026-10-12):*
 
 - **The active campaign reaches the sidecar.** Rust pushes `{seq, campaign, session}` to `PUT /command/context` on every change (`app_context.rs`) and whenever the event relay connects, since a restarted sidecar knows nothing. The newest `seq` wins. MCP tools act on that campaign unless given `campaign=`, and on its open session, else the latest.
-- **The tools** are `list_campaigns`, `current_session` (plan with each beat's notes, what's live, the log), `live_set` (each live note's full text), `read_note` and `find_notes` (by name or text), `create_note` (into a track only), `add_to_live_set` and `spend` (logged in the open session).
+- **The tools** are `list_campaigns`, `current_session` (plan with each beat's notes, what's live), `live_set` (each live note's full text), `read_note` and `find_notes` (by name or text), `create_note` (into a track only), `add_to_live_set` and `spend`. (Until 2026-10-18 `current_session` read the session log too, and `spend` wrote to it.)
   - Notes are named as a wikilink names them. An ambiguous name asks for the path.
   - With the app closed, they say so instead of "nothing open".
   - The server introduces itself as *Unseen Servant* now that it serves both tools. The Claude Desktop config key is unchanged, so no migration is needed.

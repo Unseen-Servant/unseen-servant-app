@@ -542,10 +542,9 @@
   }
 
   function setSpent(note: Named, spent: boolean) {
-    const logIn = mode === 'play' ? (session?.path ?? null) : null;
     run(async () => {
       await settle(note.path);
-      await commandApi.setSpent(campaign!, note.path, spent, logIn);
+      await commandApi.setSpent(campaign!, note.path, spent);
       await refreshIndex();
     });
   }

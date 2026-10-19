@@ -12,7 +12,7 @@ import re
 from datetime import date
 from pathlib import Path, PurePosixPath
 
-from . import log, vault
+from . import vault
 from . import frontmatter as fm
 
 BEATS, SESSIONS, SHELF = vault.RESERVED
@@ -37,9 +37,9 @@ def _stem(rel: str) -> str:
 
 def index(campaign: Path) -> dict:
     """The campaign as Prep and Play draw it: the vault scan, each note's
-    spent mark, beats with their notes, sessions with their plans and logs
-    — every link resolved to a note's path, or None when no single note
-    answers to it."""
+    spent mark, beats with their notes, sessions with their plans — every
+    link resolved to a note's path, or None when no single note answers
+    to it."""
     base = vault.scan(campaign)
 
     def text(rel: str) -> str:
@@ -85,10 +85,6 @@ def index(campaign: Path) -> dict:
             "path": n["path"],
             "date": fm.date_value(metas[n["path"]].get("date")),
             "beats": [ref(e) for e in fm.as_list(metas[n["path"]].get("beats"))],
-            "log": [
-                {**entry, "path": resolve(entry["link"]) if entry["link"] else None}
-                for entry in log.parse(texts[n["path"]])
-            ],
         }
         for n in base["notes"]
         if _in(n, SESSIONS)

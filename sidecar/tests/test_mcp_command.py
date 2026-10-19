@@ -4,14 +4,14 @@ sidecar's routes (architecture D5), so these exercise both halves."""
 
 import argparse
 import asyncio
-from datetime import date, datetime
+from datetime import date
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 import mcp_server
-from command import log, prep
+from command import prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
@@ -31,7 +31,6 @@ def app(test_store, tmp_path, monkeypatch):
     args = argparse.Namespace(sidecar_url="http://sidecar.test", data_dir=None)
     monkeypatch.setattr(mcp_server, "sidecar", mcp_server.SidecarClient(args))
     monkeypatch.setattr(prep, "today", lambda: date(2026, 10, 18))
-    monkeypatch.setattr(log, "now", lambda: datetime(2026, 10, 18, 20, 15))
     return TestClient(application)
 
 
@@ -82,10 +81,8 @@ def test_list_campaigns_marks_the_open_one(strahd, app):
     assert run(mcp_server.list_campaigns()) == "Campaigns:\n  - Strahd (open, session: Session 1)\n  - Tomb"
 
 
-def test_current_session_reads_the_plan_the_live_set_and_the_log(strahd, app):
-    app.post("/api/command/live/launch", json={
-        "campaign": "Strahd", "beat": "Beats/Ambush.md", "session": "Sessions/Session 1.md",
-    })
+def test_current_session_reads_the_plan_and_the_live_set(strahd, app):
+    app.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"})
     assert run(mcp_server.current_session()) == (
         "Session 1 (2026-10-18) — Strahd\n"
         "\n"
@@ -93,10 +90,7 @@ def test_current_session_reads_the_plan_the_live_set_and_the_log(strahd, app):
         "  1. Ambush — live\n"
         "     Ismark (NPCs), Village of Barovia (Locations)\n"
         "\n"
-        "Live from Ambush: 2 note(s) — live_set() has their text.\n"
-        "\n"
-        "Log:\n"
-        "  20:15 ▶ Ambush"
+        "Live from Ambush: 2 note(s) — live_set() has their text."
     )
 
 
@@ -128,10 +122,8 @@ def test_play_from_mcp_live_set_and_spend(strahd, app):
     assert run(mcp_server.add_to_live_set("Ireena", campaign="Strahd")).startswith('"Ireena" names more')
     assert run(mcp_server.add_to_live_set("NPCs/Ireena")) == "Ireena is live: 1 note(s) in play."
     assert run(mcp_server.live_set()) == "Live in Strahd:\n\n## Ireena (NPCs/Ireena.md)\nBitten twice."
-    assert run(mcp_server.spend("Ismark")) == "Ismark is spent (2026-10-18), logged in Session 1."
-    index = app.get("/api/command/campaign", params={"name": "Strahd"}).json()
-    assert [(e["kind"], e["link"]) for e in index["sessions"][0]["log"]] == [("spent", "Ismark")]
-    assert run(mcp_server.spend("Ismark", spent=False)) == "Ismark is unspent, logged in Session 1."
+    assert run(mcp_server.spend("Ismark")) == "Ismark is spent (2026-10-18)."
+    assert run(mcp_server.spend("Ismark", spent=False)) == "Ismark is unspent."
 
 
 def test_with_the_app_closed_the_tools_say_so(monkeypatch):

@@ -230,10 +230,10 @@ mcp = MCPServer(
         "You also have the GM's campaign notes via Command: Markdown notes in "
         "tracks (NPCs, Locations, Secrets, …), a shelf of gathered material not "
         "filed on a track yet, beats (scenes, each a set of notes) and sessions "
-        "(a plan of beats and a log of play). Tools act on the campaign open in "
-        "the app unless you pass campaign=.\n"
-        "- Call current_session() to see what's planned and what has happened, "
-        "and live_set() for what's in play at the table right now.\n"
+        "(a plan of beats). Tools act on the campaign open in the app unless "
+        "you pass campaign=.\n"
+        "- Call current_session() to see what's planned, and live_set() for "
+        "what's in play at the table right now.\n"
         "- Read notes with read_note() and find them with find_notes() before "
         "describing them — never invent what a note says.\n"
         "- create_note() writes new material into a track, or onto the shelf "
@@ -632,7 +632,7 @@ async def list_campaigns() -> str:
 @mcp.tool()
 async def current_session(campaign: str | None = None) -> str:
     """The session at the table: its plan of beats (scenes) with the notes
-    each holds, what's live, and the log of what has happened so far.
+    each holds, and what's live.
 
     Args:
         campaign: A campaign name; defaults to the one open in the app.
@@ -671,14 +671,6 @@ async def current_session(campaign: str | None = None) -> str:
         lines.append(f"Live{origin}: {len(playing)} note(s) — live_set() has their text.")
     else:
         lines.append("Nothing is live.")
-
-    lines += ["", "Log:"]
-    if not session["log"]:
-        lines.append("  (nothing yet)")
-    verbs = {"launch": "▶", "spent": "spent", "unspent": "unspent", "captured": "captured"}
-    for entry in session["log"]:
-        what = entry["text"] if entry["kind"] == "jot" else f"{verbs[entry['kind']]} {entry['link']}"
-        lines.append(f"  {entry['time'] or '--:--'} {what}")
     return "\n".join(lines)
 
 
@@ -807,29 +799,26 @@ async def add_to_live_set(name: str, campaign: str | None = None) -> str:
 @mcp.tool()
 async def spend(name: str, spent: bool = True, campaign: str | None = None) -> str:
     """Mark a note spent (a secret revealed, a treasure given, an NPC dead, a
-    beat played) or unspent again. Logged in the session at the table.
+    beat played) or unspent again.
 
     Args:
         name: The note's name, or its path when the name is shared.
         spent: False to mark it unspent.
         campaign: A campaign name; defaults to the one open in the app.
     """
-    index, ctx, error = await _campaign_index(campaign)
+    index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
     entry, error = _note(index, name)
     if error:
         return error
-    session = _session(index, ctx)
     data = await sidecar.post("/api/command/spent", {
         "campaign": index["name"], "path": entry["path"], "spent": spent,
-        "session": session["path"] if session else None,
     })
     if isinstance(data, str):
         return data
     state = f"spent ({data['spent']})" if data.get("spent") else "unspent"
-    logged = f", logged in {session['name']}" if session else ""
-    return f"{entry['name']} is {state}{logged}."
+    return f"{entry['name']} is {state}."
 
 
 # ---------------------------------------------------------------------------

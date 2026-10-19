@@ -92,16 +92,14 @@ export const commandApi = {
       to: edit.to ?? null,
       expect: edit.expect ?? null,
     }),
-  /** From Play, pass the session: the change is logged there. */
-  setSpent: (campaign: string, path: string, spent: boolean, session: string | null = null) =>
-    invoke<string | null>('command_set_spent', { campaign, path, spent, session }),
+  setSpent: (campaign: string, path: string, spent: boolean) =>
+    invoke<string | null>('command_set_spent', { campaign, path, spent }),
   setSpendOnLaunch: (enabled: boolean) => invoke<CommandSettings>('command_set_spend_on_launch', { enabled }),
   getBoard: (campaign: string, session: string) => invoke<BoardView>('command_get_board', { campaign, session }),
   editBoard: (campaign: string, session: string, ops: BoardOp[]) =>
     invoke<BoardView>('command_edit_board', { campaign, session, ops }),
   getLive: (campaign: string) => invoke<LiveSet>('command_get_live', { campaign }),
-  launch: (campaign: string, beat: string, session: string | null) =>
-    invoke<LiveSet>('command_launch', { campaign, beat, session }),
+  launch: (campaign: string, beat: string) => invoke<LiveSet>('command_launch', { campaign, beat }),
   setLive: (campaign: string, note: string, live: boolean) =>
     invoke<LiveSet>('command_set_live', { campaign, note, live }),
   stop: (campaign: string) => invoke<LiveSet>('command_stop', { campaign }),

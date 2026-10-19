@@ -47,8 +47,7 @@
     if (hovered === path) hovered = null;
   }
 
-  /** The live beat's key stops the set; launching it again would only log
-   *  it twice. */
+  /** The live beat's key stops the set. */
   function toggle(beat: BeatEntry) {
     if (beat.path === liveBeat) onStop();
     else onLaunch(beat);

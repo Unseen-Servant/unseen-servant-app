@@ -53,8 +53,7 @@
     <h3 class="field-title section-title">Session notes</h3>
     <p class="field-desc">
       The bar in the board's corner writes a line into the session note, and
-      <strong>&#8984;O</strong> opens the note. Command logs each launch and
-      spend there too, under <em>## Log</em>.
+      <strong>&#8984;O</strong> opens the note.
     </p>
   </section>
 </div>

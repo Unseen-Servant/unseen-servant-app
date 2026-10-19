@@ -2,8 +2,8 @@
   // Play (design §5.2–§5.3): the session's board, the arrangement over its
   // corner and the card tray under it. Launching a beat makes its notes the
   // live set, frames their cards and deals them to the tray; a card's key
-  // plays one note. The board's file, the log and the jot bar's lines in
-  // the session note are the only things written — what's live is the
+  // plays one note. The board's file and the jot bar's lines in the
+  // session note are the only things written — what's live is the
   // sidecar's.
   import { setContext, tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
@@ -223,7 +223,7 @@
 
   function launch(beat: BeatEntry) {
     void run(async () => {
-      const launched = await commandApi.launch(campaign, beat.path, session.path);
+      const launched = await commandApi.launch(campaign, beat.path);
       onLive(launched);
       await tick();
       frameNotes(launched.notes);

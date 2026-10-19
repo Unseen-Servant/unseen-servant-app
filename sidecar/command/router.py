@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import board, log, prep, vault
+from . import board, jot, prep, vault
 from .events import VaultWatcher
 from .live import LiveSets
 from .settings import default_root, load_settings, save_settings
@@ -138,8 +138,6 @@ class Spent(BaseModel):
     campaign: str
     path: str
     spent: bool
-    # Play passes the session, so the spend is logged (design §4).
-    session: str | None = None
 
 
 class BoardEdit(BaseModel):
@@ -151,7 +149,6 @@ class BoardEdit(BaseModel):
 class Launch(BaseModel):
     campaign: str
     beat: str
-    session: str | None = None
 
 
 class LiveNote(BaseModel):
@@ -549,18 +546,10 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.post("/spent")
     def set_spent(body: Spent):
-        camp = campaign_path(body.campaign)
         with write_lock:
-            if body.session:
-                prep.require_in(camp, body.session, prep.SESSIONS)
-            before = prep.spent_of(camp, body.path)
-            after = prep.set_spent(camp, body.path, body.spent)
-            if body.session and bool(before) != bool(after):
-                verb = "spent" if after else "unspent"
-                log.append(camp, body.session, f"{verb} [[{vault.note_path(camp, body.path).stem}]]")
-        return {"spent": after}
+            return {"spent": prep.set_spent(campaign_path(body.campaign), body.path, body.spent)}
 
-    # -- play: the board, the live set, the log (design §5.2, §5.3) --------
+    # -- play: the board, the live set, jots (design §5.2, §5.3) -----------
 
     @router.get("/board")
     def get_board(campaign: str, session: str):
@@ -582,19 +571,15 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.post("/live/launch")
     def launch(body: Launch):
-        """Make the beat's notes the live set and log it. With *spend beats
-        on launch* on, the beat is spent too."""
+        """Make the beat's notes the live set. With *spend beats on launch*
+        on, the beat is spent too."""
         camp = campaign_path(body.campaign)
         with write_lock:
             prep.require_in(camp, body.beat, prep.BEATS)
-            if body.session:
-                prep.require_in(camp, body.session, prep.SESSIONS)
             beat = next((b for b in prep.index(camp)["beats"] if b["path"] == body.beat), None)
             if beat is None:
                 raise vault.NotFound(f"No beat at {body.beat!r}")
             notes = [r["path"] for r in beat["notes"] if r["path"]]
-            if body.session:
-                log.append(camp, body.session, f"▶ [[{beat['name']}]]")
             if state["settings"].spend_on_launch and not beat["spent"]:
                 prep.set_spent(camp, body.beat, True)
             snapshot = live.set(body.campaign, body.beat, notes)
@@ -625,13 +610,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         return snapshot
 
     @router.post("/jot")
-    def jot(body: Jot):
-        """A line the GM jots in Play, at the end of the session note's own
-        text, above its log."""
+    def write_jot(body: Jot):
+        """A line the GM jots in Play, at the end of the session note's
+        text."""
         camp = campaign_path(body.campaign)
         with write_lock:
             prep.require_in(camp, body.session, prep.SESSIONS)
-            return {"line": log.jot(camp, body.session, body.text)}
+            return {"line": jot.jot(camp, body.session, body.text)}
 
     # -- deletion is Rust's (the OS trash); this only vouches for the path --
 

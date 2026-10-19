@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+
+- **The session log.** Launching a beat or marking a note spent no longer writes a line under `## Log` in the session note. Lines already written stay in your notes as plain text. The jot bar still writes to the session note, now always at the end of its text. For Claude, `current_session` no longer reports a log and `spend` no longer logs
+
 ## [4.0.0] - 2026-10-17
 
 **Unseen Servant is now a workstation with two tools.** Legend Lore is joined by Command, a session tool for running the table, and both live in one window, the rack. Your library, index and collections carry over as they are: nothing needs re-indexing.

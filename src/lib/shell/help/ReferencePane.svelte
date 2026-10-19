@@ -23,7 +23,7 @@
         ['Note', 'A Markdown file; [[Name]] links to one'],
         ['Shelf', 'Notes gathered but not filed on a track yet'],
         ['Beat', 'A scene: the notes it needs'],
-        ['Session', 'The beats planned for one game, and its log'],
+        ['Session', 'The beats planned for one game'],
         ['Prep · Play', 'Arranging and running, switched with Tab'],
         ['Launch', 'Put a beat or a note in play (P)'],
         ['Live set', 'The notes in play right now'],
@@ -60,7 +60,7 @@
       group: 'Command · reads',
       tools: [
         ['list_campaigns', 'List the campaigns and say which is open'],
-        ['current_session', "The session's plan of beats, what's live, and its log"],
+        ['current_session', "The session's plan of beats, and what's live"],
         ['live_set', 'The notes in play, in full'],
         ['read_note', 'Read one note'],
         ['find_notes', 'Find notes by name or text'],
@@ -71,7 +71,7 @@
       tools: [
         ['create_note', 'Write a new note on a track or the shelf'],
         ['add_to_live_set', 'Put a note in play'],
-        ['spend', 'Mark a note spent or unspent, in the session log'],
+        ['spend', 'Mark a note spent or unspent'],
       ],
     },
   ];
