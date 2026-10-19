@@ -152,6 +152,6 @@ uv run --frozen --project sidecar --group build python scripts/acknowledgements.
 - One fix per pull request, kept small. Say what was broken, how you tested the
   fix, and on which OS.
 - Match the code around your change. Interface changes follow the design
-  conventions in [CLAUDE.md](CLAUDE.md).
+  conventions in [AGENTS.md](AGENTS.md).
 - Commit messages follow the history's style: `fix(sidecar): …`,
   `feat(command): …`.
