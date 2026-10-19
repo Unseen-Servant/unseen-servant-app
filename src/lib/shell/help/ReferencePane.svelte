@@ -71,6 +71,8 @@
       tools: [
         ['create_note', 'Write a new note on a track or the shelf'],
         ['edit_note', "Replace a note's text, keeping its frontmatter"],
+        ['create_beat', 'Make a beat from notes, with its scene, optionally in a session'],
+        ['add_to_beat', 'Put a note in a beat, or take it out'],
         ['add_to_live_set', 'Put a note in play'],
         ['spend', 'Mark a note spent or unspent'],
       ],

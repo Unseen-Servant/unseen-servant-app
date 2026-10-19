@@ -107,6 +107,7 @@ class BeatCreate(BaseModel):
     name: str
     notes: list[str] = []
     session: str | None = None
+    content: str = ""
 
 
 class BeatOrder(BaseModel):
@@ -514,7 +515,9 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     @router.post("/beats")
     def create_beat(body: BeatCreate):
         with write_lock:
-            path = prep.create_beat(campaign_path(body.campaign), body.name, body.notes, body.session)
+            path = prep.create_beat(
+                campaign_path(body.campaign), body.name, body.notes, body.session, body.content
+            )
         return {"path": path}
 
     @router.put("/beats/order")

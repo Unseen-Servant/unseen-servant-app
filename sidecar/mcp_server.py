@@ -270,8 +270,11 @@ mcp = MCPServer(
         "describing them — never invent what a note says.\n"
         "- create_note() writes new material into a track, or onto the shelf "
         "when it isn't clear where it belongs, and edit_note() corrects a "
-        "note's text with the hash read_note() shows; add_to_live_set() and "
-        "spend() follow the table during play."
+        "note's text with the hash read_note() shows.\n"
+        "- create_beat() makes a scene from notes already written, and can "
+        "add it to a session's plan; make a plan's beats one at a time, in "
+        "play order. add_to_beat() puts a note in a beat or takes it out.\n"
+        "- add_to_live_set() and spend() follow the table during play."
     ),
 )
 
@@ -633,6 +636,29 @@ def _session(index: dict, ctx: dict) -> dict | None:
     return sessions[-1] if sessions else None
 
 
+def _session_named(index: dict, name: str) -> tuple[dict | None, str | None]:
+    """The session ``name`` means, by name or path; or the message saying
+    why not."""
+    wanted = name.strip().removesuffix(".md").casefold()
+    for s in index["sessions"]:
+        if wanted in (s["name"].casefold(), s["path"].removesuffix(".md").casefold()):
+            return s, None
+    known = ", ".join(s["name"] for s in index["sessions"]) or "none yet"
+    return None, f'{index["name"]} has no session named "{name}". Its sessions: {known}.'
+
+
+def _taken(index: dict, name: str) -> str | None:
+    """The message for a name already in use: names are unique campaign-wide,
+    beats and sessions included, and a retried create meets what it made."""
+    clash = next((n for n in index["notes"] if n["name"].casefold() == name.strip().casefold()), None)
+    if clash is None:
+        return None
+    return (
+        f'A note named "{clash["name"]}" already exists ({clash["path"]}). If you just made it, '
+        f'it\'s there: read_note("{clash["path"]}"). Otherwise pick another name.'
+    )
+
+
 def _label(index: dict, ref: dict) -> str:
     """A beat's note as a plan line names it: name and track, or missing."""
     note = next((n for n in index["notes"] if n["path"] == ref.get("path")), None)
@@ -834,7 +860,8 @@ async def edit_note(name: str, content: str, hash: str, campaign: str | None = N
     a line. The note's frontmatter stays as it is, so content is the text
     below it, or the whole note as read_note() showed it with the
     frontmatter unchanged. Keys keep their own writers: spend() marks a note
-    spent, and the rest are the GM's, in the app.
+    spent, add_to_beat() changes a beat's notes, and the rest are the GM's,
+    in the app.
 
     Args:
         name: The note's name, or its path when the name is shared.
@@ -908,19 +935,95 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
             f'{index["name"]} has no track named "{track}". '
             f'Its tracks: {", ".join(index["tracks"])}, or "Shelf".'
         )
-    # Names are unique campaign-wide; a retried create meets the note it made.
-    clash = next((n for n in index["notes"] if n["name"].casefold() == name.strip().casefold()), None)
-    if clash:
-        return (
-            f'A note named "{clash["name"]}" already exists ({clash["path"]}). If you just made it, '
-            f'it\'s there: read_note("{clash["path"]}"). Otherwise pick another name.'
-        )
+    if taken := _taken(index, name):
+        return taken
     made = await sidecar.post("/api/command/notes", {
         "campaign": index["name"], "folder": track, "name": name, "content": content,
     })
     if isinstance(made, str):
         return made
     return f"Created {made['path']} in {index['name']}."
+
+
+@mcp.tool()
+async def create_beat(
+    name: str,
+    notes: list[str] | None = None,
+    content: str = "",
+    session: str | None = None,
+    campaign: str | None = None,
+) -> str:
+    """Make a beat: a scene, holding the notes it needs, with the scene
+    itself in its text. Write the notes first; a beat holds only notes that
+    exist. Given a session, the beat joins the end of its plan, so make a
+    session's beats one at a time, in play order.
+
+    Args:
+        name: The beat's name; unique in the campaign, as every note's is.
+        notes: The notes it holds, by name, or by path when a name is shared.
+        content: The scene in Markdown: what happens, what the players
+                 face. Link notes as [[Name]].
+        session: A session to add it to the end of ("Session 4").
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    if taken := _taken(index, name):
+        return taken
+    members = []
+    for n in notes or []:
+        entry, error = _note(index, n)
+        if error:
+            return error
+        members.append(entry)
+    planned = None
+    if session:
+        # Resolved first: the route makes the beat before it plans it.
+        planned, error = _session_named(index, session)
+        if error:
+            return error
+    made = await sidecar.post("/api/command/beats", {
+        "campaign": index["name"], "name": name, "notes": [m["path"] for m in members],
+        "content": content, "session": planned["path"] if planned else None,
+    })
+    if isinstance(made, str):
+        return made
+    held = ", ".join(m["name"] for m in members) or "no notes yet"
+    reply = f"Created {made['path']} in {index['name']}, holding {held}."
+    if planned:
+        reply += f" It's beat {len(planned['beats']) + 1} of {planned['name']}'s plan."
+    return reply
+
+
+@mcp.tool()
+async def add_to_beat(name: str, beat: str, member: bool = True, campaign: str | None = None) -> str:
+    """Put a note in a beat, or take it out.
+
+    Args:
+        name: The note's name, or its path when the name is shared.
+        beat: The beat's name.
+        member: False to take the note out of the beat.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    entry, error = _note(index, name)
+    if error:
+        return error
+    scene, error = _note(index, beat)
+    if error:
+        return error
+    if scene["path"] not in {b["path"] for b in index["beats"]}:
+        return f'{scene["name"]} isn\'t a beat. campaign_overview() lists the beats.'
+    data = await sidecar.post("/api/command/beats/members", {
+        "campaign": index["name"], "beat": scene["path"], "note": entry["path"], "member": member,
+    })
+    if isinstance(data, str):
+        return data
+    where = "in" if member else "out of"
+    return f"{entry['name']} is {where} {scene['name']}, which holds {', '.join(data['notes']) or 'no notes'}."
 
 
 @mcp.tool()

@@ -16,7 +16,7 @@ from command import prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
-COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "add_to_live_set", "spend"}
+COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "add_to_live_set", "spend"}
 
 
 @pytest.fixture
@@ -168,6 +168,38 @@ def test_create_note_only_in_a_track(strahd):
         'it\'s there: read_note("NPCs/Doru.md"). Otherwise pick another name.'
     )
     assert run(mcp_server.create_note("NPCs", "Doru/Son")) == "A name can't contain /"
+
+
+def test_create_beat_holds_notes_and_joins_a_plan(strahd):
+    beats = strahd / "Strahd" / "Beats"
+    assert run(mcp_server.create_beat(
+        "Church", notes=["ismark", "Village of Barovia"], content="Doru howls below.\n", session="session 1",
+    )) == "Created Beats/Church.md in Strahd, holding Ismark, Village of Barovia. It's beat 2 of Session 1's plan."
+    assert (beats / "Church.md").read_text() == (
+        '---\nnotes:\n  - "[[Ismark]]"\n  - "[[Village of Barovia]]"\n---\nDoru howls below.\n'
+    )
+    assert "  2. Church\n     Ismark (NPCs), Village of Barovia (Locations)" in run(mcp_server.current_session())
+    # A missing session or note, or a name in use, makes nothing.
+    assert run(mcp_server.create_beat("Raid", session="Session 9")) == (
+        'Strahd has no session named "Session 9". Its sessions: Session 1.'
+    )
+    assert run(mcp_server.create_beat("Raid", notes=["Doru"])).startswith('No note named "Doru"')
+    assert run(mcp_server.create_beat("ismark")).startswith('A note named "Ismark" already exists (NPCs/Ismark.md).')
+    assert sorted(p.name for p in beats.iterdir()) == ["Ambush.md", "Church.md"]
+    assert run(mcp_server.create_beat("Raid")) == "Created Beats/Raid.md in Strahd, holding no notes yet."
+
+
+def test_add_to_beat_puts_a_note_in_and_takes_it_out(strahd):
+    assert run(mcp_server.add_to_beat("Ismark", "Ambush", member=False)) == (
+        "Ismark is out of Ambush, which holds Village of Barovia."
+    )
+    for _ in range(2):
+        assert run(mcp_server.add_to_beat("ismark", "ambush")) == (
+            "Ismark is in Ambush, which holds Village of Barovia, Ismark."
+        )
+    assert run(mcp_server.add_to_beat("Ismark", "Village of Barovia")) == (
+        "Village of Barovia isn't a beat. campaign_overview() lists the beats."
+    )
 
 
 def hash_in(reply):

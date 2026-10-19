@@ -146,11 +146,14 @@ def set_member(campaign: Path, beat: str, note: str, member: bool) -> list[str]:
     return _targets(_update(campaign, beat, "notes", compute))
 
 
-def create_beat(campaign: Path, name: str, notes: list[str] = (), session: str | None = None) -> str:
-    """A new note in Beats/, holding ``notes`` (paths) if any, and added to
-    the end of ``session``'s plan if one is given."""
+def create_beat(
+    campaign: Path, name: str, notes: list[str] = (), session: str | None = None, content: str = ""
+) -> str:
+    """A new note in Beats/, holding ``notes`` (paths) if any, with the
+    scene in ``content`` below them, and added to the end of ``session``'s
+    plan if one is given."""
     members = [_stem(str(vault.note_path(campaign, n).relative_to(campaign))) for n in notes]
-    rel = vault.create_note(campaign, reserved_folder(campaign, BEATS), name)
+    rel = vault.create_note(campaign, reserved_folder(campaign, BEATS), name, content)
     if members:
         _update(campaign, rel, "notes", lambda _: [f"[[{m}]]" for m in members])
     if session:

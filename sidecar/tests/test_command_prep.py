@@ -115,6 +115,11 @@ def test_create_beat_makes_beats_folder_holds_notes_and_joins_the_plan(tmp_path)
     assert prep.index(c)["beats"][0]["notes"] == [{"link": "Innkeeper", "path": "NPCs/Innkeeper.md"}]
 
 
+def test_a_new_beat_holds_its_scene_below_its_notes(camp):
+    rel = prep.create_beat(camp, "Raid", ["NPCs/Ismark.md"], content="Torches at the gate.\n")
+    assert (camp / rel).read_text() == '---\nnotes:\n  - "[[Ismark]]"\n---\nTorches at the gate.\n'
+
+
 # ---------------------------------------------------------------------------
 # Sessions
 # ---------------------------------------------------------------------------
