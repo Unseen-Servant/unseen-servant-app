@@ -34,6 +34,7 @@ files.
 - [Retrieval informed by how Legend Lore is searched](roadmap/2026-09-26-search-ux-informed-retrieval.md) — failure classes across both suites, typing vs committing, scoped-search evals, investigation order
 - [Command](roadmap/2026-10-11-command-design.md) — the session tool: vault layout, beats and sessions, Prep and Play
 - [Command MCP tools](roadmap/2026-10-18-command-mcp-tools-design.md) — audit after a prep-through-MCP run; 8 → 16 tools and the order to build them
+- [Command board toolbar](roadmap/2026-10-19-command-board-toolbar-design.md) — Miro's creation toolbar for Play's board, limited to what JSON Canvas holds
 
 ## retrieval/
 
