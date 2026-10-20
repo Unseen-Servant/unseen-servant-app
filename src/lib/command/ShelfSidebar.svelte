@@ -15,7 +15,7 @@
   import { commandApi } from './api';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
-  import { newRowKey } from './columns';
+  import { nameParts, newRowKey } from './columns';
   import type { CampaignIndex, CopySource, NoteEntry } from './types';
 
   export let campaign: string;
@@ -207,27 +207,29 @@
   // A right-click selects the row, as the grid's does.
   function noteMenu(e: MouseEvent, note: NoteEntry) {
     onSelect(note);
-    menu = {
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)),
-        // The grid's Move to flyout, in the columns' order: the shelf at the
-        // left, for a loose note, then the tracks.
-        ...(index.tracks.length || note.track === null
-          ? [
-              divider,
-              submenu('Move to', [
-                ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
-                ...index.tracks.map((t) => action(t, () => onMove(note, t))),
-              ]),
-            ]
-          : []),
-        divider,
+    const groups = [
+      // An image isn't spent (images design §2).
+      note.type === 'image' ? [] : [keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent))],
+      // The grid's Move to flyout, in the columns' order: the shelf at the
+      // left, for a loose note, then the tracks.
+      index.tracks.length || note.track === null
+        ? [
+            submenu('Move to', [
+              ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
+              ...index.tracks.map((t) => action(t, () => onMove(note, t))),
+            ]),
+          ]
+        : [],
+      [
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
         action('Show in Finder', () => onReveal(note)),
         action('Move to Trash', () => onTrash(note), true),
       ],
+    ].filter((g) => g.length);
+    menu = {
+      x: e.clientX,
+      y: e.clientY,
+      items: groups.flatMap((g, i) => (i ? [divider, ...g] : g)),
     };
   }
 </script>
@@ -272,7 +274,7 @@
     <!-- As the grid's: a rename takes the name's place in the row. -->
     {#if renaming}
       <RenameField
-        value={note.name}
+        value={nameParts(note).stem}
         label="Rename note"
         onCommit={async (name) => {
           const refusal = await onRename(note, name);
@@ -282,11 +284,13 @@
         onCancel={() => (renamingPath = null)}
       />
     {:else}
-      <span class="label">{note.name}</span>
+      {@const name = nameParts(note)}
+      <span class="label">{name.stem}{#if name.ext}<span class="ext">{name.ext}</span>{/if}</span>
     {/if}
     <!-- Spent, its key lit and kept through a rename; otherwise shown on
-         the hovered or selected row, as a collection's transport is. -->
-    {#if note.spent || (!renaming && (($hoverLive && hovered === note.path) || note.path === selectedPath))}
+         the hovered or selected row, as a collection's transport is. An
+         image isn't spent, so it has none (images design §4). -->
+    {#if note.type !== 'image' && (note.spent || (!renaming && (($hoverLive && hovered === note.path) || note.path === selectedPath)))}
       <SpendKey spent={note.spent ?? null} name={note.name} onToggle={() => onSpent(note, !note.spent)} />
     {/if}
   </div>
@@ -360,13 +364,14 @@
       {#each other as section (section.title)}
         {#if section.title}<div class="ledger-label section-head">{section.title}</div>{/if}
         {#each section.notes as note (note.path)}
+          {@const name = nameParts(note)}
           <button
             type="button"
             class="note-row copy-row"
             title={`Copy ${note.name} onto ${campaign}'s shelf`}
             on:click={() => onCopy(source!, note)}
           >
-            <span class="label">{note.name}</span>
+            <span class="label">{name.stem}{#if name.ext}<span class="ext">{name.ext}</span>{/if}</span>
             <span class="copy-hint" aria-hidden="true">copy</span>
           </button>
         {/each}
@@ -579,6 +584,11 @@
 
   .note-row.member .label {
     color: var(--text-accent);
+  }
+
+  /* An image's extension, a step down the text ramp from its name. */
+  .ext {
+    color: var(--text-secondary);
   }
 
   .note-row.arming.hovered:not(.member) .slot {

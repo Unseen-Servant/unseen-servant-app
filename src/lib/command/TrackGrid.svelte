@@ -26,7 +26,7 @@
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import { CARET_RIGHT } from '../ui/iconPaths';
-  import { folderOrder, newRowKey, type Column, type NoteGroup } from './columns';
+  import { folderOrder, nameParts, newRowKey, type Column, type NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
   export let cols: Column[];
@@ -120,8 +120,8 @@
       x: e.clientX,
       y: e.clientY,
       items: [
-        keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)),
-        divider,
+        // An image isn't spent (images design §2).
+        ...(note.type === 'image' ? [] : [keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)), divider]),
         // In the columns' order: the shelf at the left, then the tracks.
         submenu('Move to', [
           action('Shelf', () => onMoveNote(note, 'Shelf')),
@@ -442,7 +442,7 @@
          text in the field. -->
     {#if renaming}
       <RenameField
-        value={note.name}
+        value={nameParts(note).stem}
         label="Rename note"
         onCommit={async (name) => {
           const refusal = await onRenameNote(note, name);
@@ -452,11 +452,13 @@
         onCancel={() => (renamingPath = null)}
       />
     {:else}
-      <span class="label">{note.name}</span>
+      {@const name = nameParts(note)}
+      <span class="label">{name.stem}{#if name.ext}<span class="ext">{name.ext}</span>{/if}</span>
     {/if}
     <!-- Spent, its key lit and kept through a rename; otherwise shown on
-         the hovered or selected row, as a collection's transport is. -->
-    {#if note.spent || (!renaming && (($hoverLive && hovered === note.path) || note.path === selectedPath))}
+         the hovered or selected row, as a collection's transport is. An
+         image isn't spent, so it has none (images design §4). -->
+    {#if note.type !== 'image' && (note.spent || (!renaming && (($hoverLive && hovered === note.path) || note.path === selectedPath)))}
       <SpendKey spent={note.spent ?? null} name={note.name} onToggle={() => onSpent(note, !note.spent)} />
     {/if}
   </div>
@@ -1011,6 +1013,11 @@
 
   .note-row.member .label {
     color: var(--text-accent);
+  }
+
+  /* An image's extension, a step down the text ramp from its name. */
+  .ext {
+    color: var(--text-secondary);
   }
 
   /* Armed: the slot under the pointer blinks lit, as a splash lamp does

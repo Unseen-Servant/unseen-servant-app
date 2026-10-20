@@ -50,13 +50,15 @@ def index(campaign: Path) -> dict:
         except vault.Invalid:
             return ""
 
-    texts = {n["path"]: text(n["path"]) for n in base["notes"]}
+    # An image has no text, so no frontmatter: never spent, no source.
+    texts = {n["path"]: text(n["path"]) for n in base["notes"] if n["type"] == "note"}
     metas = {rel: fm.load_lenient(t) for rel, t in texts.items()}
     by_name: dict[tuple[str, str], list[str]] = {}
     for n in base["notes"]:
         by_name.setdefault((vault.kind(n["path"]), n["name"].casefold()), []).append(n["path"])
-        n["spent"] = fm.spent_value(metas[n["path"]].get("spent"))
-        source = metas[n["path"]].get("source")
+        meta = metas.get(n["path"], {})
+        n["spent"] = fm.spent_value(meta.get("spent"))
+        source = meta.get("source")
         n["source"] = source if isinstance(source, str) and source.strip() else None
 
     def ref(entry, of: str) -> dict:
@@ -129,11 +131,12 @@ def _targets(entries) -> list[str]:
 
 
 def _link(campaign: Path, rel: str) -> str:
-    """The link Command writes for the note at ``rel``: its name, or its
-    path when another note shares the name, so Obsidian opens this one
-    (design §3.3)."""
-    rel = vault.note_path(campaign, rel).relative_to(campaign).as_posix()
-    return f"[[{rel[:-3] if vault.name_shared(campaign, rel) else _stem(rel)}]]"
+    """The link Command writes for the note or image at ``rel``: its name,
+    or its path when another note shares the name, so Obsidian opens this
+    one (design §3.3). An image's keeps its extension, as Obsidian's do."""
+    rel = vault.clip_path(campaign, rel).relative_to(campaign).as_posix()
+    path = rel[:-3] if rel.lower().endswith(".md") else rel
+    return f"[[{path if vault.name_shared(campaign, rel) else _stem(rel)}]]"
 
 
 def set_member(campaign: Path, beat: str, note: str, member: bool) -> list[str]:
@@ -160,7 +163,7 @@ def create_beat(
     scene in ``content`` below them, and added to the end of ``session``'s
     plan if one is given."""
     for n in notes:
-        vault.note_path(campaign, n)  # each a note, before the beat is made
+        vault.clip_path(campaign, n)  # each a note or an image, before the beat is made
     rel = vault.create_note(campaign, reserved_folder(campaign, BEATS), name, content)
     if notes:
         # Linked once the beat exists: a note it's named after shares its name.
@@ -239,7 +242,10 @@ def edit_plan(
 
 def set_spent(campaign: Path, rel: str, spent: bool) -> str | None:
     """Mark the note spent today, or unspent. A note already spent keeps
-    the date it was spent."""
+    the date it was spent. An image has nowhere to keep it, and a story
+    fact can't go in the presentation file (images design §2)."""
+    if vault.is_image(rel):
+        raise vault.Invalid("An image isn't spent: spend the beat that shows it, or the note it reveals")
     current = spent_of(campaign, rel)
     if spent and current:
         return current
@@ -304,7 +310,7 @@ def copy_in(campaign: Path, source: Path, rel: str) -> str:
     and the frontmatter, but not the other table's ``spent`` mark."""
     if source.resolve() == campaign.resolve():
         raise vault.Invalid("That note is already in this campaign")
-    path = vault.note_path(source, rel)
+    path = vault.clip_path(source, rel)
     if PurePosixPath(rel).parts[0].casefold() in {BEATS.casefold(), SESSIONS.casefold()}:
         raise vault.Invalid("Beats and sessions belong to their campaign; copy their notes instead")
     return _copy_onto_shelf(campaign, path)
@@ -314,10 +320,13 @@ def copy_from_place(campaign: Path, folder: Path, rel: str) -> str:
     """Copy the note at ``rel`` in a place, a folder the GM added (design
     §3.6), onto this campaign's shelf, as another campaign's note is. Its
     folders are its own, so a ``Sessions/`` there holds notes like any."""
-    return _copy_onto_shelf(campaign, vault.note_path(folder, rel))
+    path = vault.image_path(folder, rel) if vault.is_image(rel) else vault.note_path(folder, rel)
+    return _copy_onto_shelf(campaign, path)
 
 
 def _copy_onto_shelf(campaign: Path, path: Path) -> str:
+    if vault.is_image(path.name):
+        return vault.create_image(campaign, reserved_folder(campaign, SHELF), path.name, path.read_bytes())
     text = vault.read_text(path)
     try:
         text = fm.set_key(text, "spent", None)

@@ -278,6 +278,14 @@ def test_the_board_over_http_follows_a_session_rename(table):
     assert renamed.json()["notes"] == {"a1": "NPCs/Ismark.md"}
 
 
+def test_an_image_plays_but_isnt_spent(table, campaign_root):
+    (campaign_root / "Strahd" / "Locations" / "Barovia.png").write_bytes(b"\x89PNG")
+    played = table.post("/api/command/live/note", json={"campaign": "Strahd", "note": "Locations/Barovia.png", "live": True})
+    assert played.json()["notes"][-1] == "Locations/Barovia.png"
+    spent = table.post("/api/command/spent", json={"campaign": "Strahd", "path": "Locations/Barovia.png", "spent": True})
+    assert spent.status_code == 422
+
+
 def test_renaming_a_live_note_keeps_it_live(table):
     table.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"})
     table.post("/api/command/notes/rename", json={"campaign": "Strahd", "path": "NPCs/Ismark.md", "new_name": "Isaac"})

@@ -120,6 +120,12 @@ def _stem(filename: str) -> str:
     return filename[:-3]
 
 
+def _name(filename: str) -> str:
+    """What a link calls the file: a note by its stem, an image by its
+    whole file name, extension and all (images design §3.1)."""
+    return _stem(filename) if filename.lower().endswith(".md") else filename
+
+
 def kind(rel: str) -> str:
     """What the note at ``rel`` is, by its first folder: a beat, a session,
     or a note (a track's, the shelf's, a loose one). Names are unique within
@@ -169,6 +175,7 @@ class NoteEntry:
     path: str
     track: str | None  # first folder; None for a loose note at the campaign root
     group: str | None  # folders below the track, e.g. "Vallaki"
+    type: str = "note"  # or "image": an image is a clip too (images design §3)
 
 
 def _walk(campaign: Path, keep):
@@ -186,6 +193,19 @@ def _walk_notes(campaign: Path):
     return _walk(campaign, _is_note_file)
 
 
+def _is_clip(campaign: Path, path: Path) -> bool:
+    """A note, or an image where a note would be a note's: in a track, on
+    the shelf or loose. Images among the beats or the sessions are their
+    attachments, which embeds show and no list does (images design §3.1)."""
+    return _is_note_file(path.name) or kind(_rel(campaign, path)) == "note"
+
+
+def _walk_clips(campaign: Path):
+    """Every note under ``campaign``, and every image a track or the shelf
+    holds, in one walk, so they sort together."""
+    return (p for p in _walk(campaign, _is_linked_file) if _is_clip(campaign, p))
+
+
 def _is_canvas_file(name: str) -> bool:
     return not _hidden(name) and name.lower().endswith(".canvas")
 
@@ -194,10 +214,11 @@ def _entry(campaign: Path, path: Path) -> NoteEntry:
     parts = path.relative_to(campaign).parts
     folders = parts[:-1]
     return NoteEntry(
-        name=_stem(parts[-1]),
+        name=_name(parts[-1]),
         path="/".join(parts),
         track=folders[0] if folders else None,
         group="/".join(folders[1:]) or None,
+        type="image" if _is_image_file(parts[-1]) else "note",
     )
 
 
@@ -326,7 +347,7 @@ def scan(campaign: Path) -> dict:
     """The campaign as the UI draws it: tracks in order, every note, and the
     notes sharing their name with another of their kind (a link to that
     name is ambiguous)."""
-    notes = [_entry(campaign, p) for p in _walk_notes(campaign)]
+    notes = [_entry(campaign, p) for p in _walk_clips(campaign)]
 
     def key(n: NoteEntry) -> tuple[str, str]:
         return kind(n.path), n.name.casefold()
@@ -348,21 +369,23 @@ def scan(campaign: Path) -> dict:
 
 
 def folder_notes(folder: Path) -> list[dict]:
-    """Every note in a place, a folder outside the campaigns that the shelf
-    copies from (design §3.6), with its track and group as a campaign's."""
-    return [asdict(_entry(folder, p)) for p in _walk_notes(folder)]
+    """Every note and image in a place, a folder outside the campaigns that
+    the shelf copies from (design §3.6), with its track and group as a
+    campaign's. A place has no beats or sessions, so every image counts."""
+    return [asdict(_entry(folder, p)) for p in _walk(folder, _is_linked_file)]
 
 
 def _names_in_use(campaign: Path, of: str) -> set[str]:
-    """The names the campaign's notes of kind ``of`` have."""
-    return {_stem(p.name).casefold() for p in _walk_notes(campaign) if kind(_rel(campaign, p)) == of}
+    """The names the campaign's notes of kind ``of`` have, images among
+    the notes."""
+    return {_name(p.name).casefold() for p in _walk_clips(campaign) if kind(_rel(campaign, p)) == of}
 
 
 def name_shared(campaign: Path, rel: str) -> bool:
     """Whether another note of any kind has the name of the one at ``rel``,
     as a beat named after its place does."""
-    name = _stem(PurePosixPath(rel).name).casefold()
-    return sum(_stem(p.name).casefold() == name for p in _walk_notes(campaign)) > 1
+    name = _name(PurePosixPath(rel).name).casefold()
+    return sum(_name(p.name).casefold() == name for p in _walk_clips(campaign)) > 1
 
 
 def content_hash(data: bytes) -> str:
@@ -390,23 +413,48 @@ def image_path(campaign: Path, rel: str) -> Path:
     return path
 
 
+def clip_path(campaign: Path, rel: str) -> Path:
+    """The note at ``rel``, or the image a track or the shelf holds there:
+    what a beat, the live set and the board take (images design §3)."""
+    path = resolve(campaign, rel)
+    if not path.is_file() or not _is_linked_file(path.name) or not _is_clip(campaign, path):
+        raise Invalid(f"Not a note or an image: {rel!r}")
+    return path
+
+
+def _image_names(campaign: Path) -> set[str]:
+    """The names an image can't take: every image's in the campaign, since
+    an embed names one by its file name, and every note's."""
+    return {p.name.casefold() for p in _walk(campaign, _is_image_file)} | _names_in_use(campaign, "note")
+
+
+def create_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
+    """Write the image ``name`` into ``folder``, as a copy keeps it: a name
+    another image or note has is refused, not numbered. Its path."""
+    name = validate_name(name)
+    if not _is_image_file(name):
+        raise Invalid(f"Not an image: {name!r}")
+    if name.casefold() in _image_names(campaign):
+        raise Conflict(f"An image named {name!r} already exists in this campaign")
+    path = _folder(campaign, folder) / name
+    atomic_write(path, data)
+    return _rel(campaign, path)
+
+
 def add_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
     """Write an image into ``folder``, named after ``name`` and numbered
-    when another image in the campaign has that name ("map 2.png"), since
-    an embed names an image by its file name. Its path."""
+    when the name is taken ("map 2.png"). Its path."""
     suffix = PurePosixPath(name).suffix
     if suffix.lower() not in IMAGE_SUFFIXES:
         raise Invalid(f"Not an image: {name!r}")
     stem = re.sub(r"\s+", " ", "".join(" " if c in _FORBIDDEN or ord(c) < 32 else c for c in name[: -len(suffix)]))
     stem = stem.strip(" .")[:120].strip(" .") or "Image"
-    taken = {p.name.casefold() for p in _walk(campaign, _is_image_file)}
+    taken = _image_names(campaign)
     candidate, n = f"{stem}{suffix}", 1
     while candidate.casefold() in taken:
         n += 1
         candidate = f"{stem} {n}{suffix}"
-    path = _folder(campaign, folder) / candidate
-    atomic_write(path, data)
-    return _rel(campaign, path)
+    return create_image(campaign, folder, candidate, data)
 
 
 def read_text(path: Path) -> str:
@@ -502,17 +550,18 @@ def find_notes(campaign: Path, query: str, track: str | None = None, limit: int 
     """Notes whose name or text holds ``query`` (case-insensitive): names
     first, each with a line of context from the text below the frontmatter:
     around the match, else the text's opening. The frontmatter is searched
-    too, so a beat holding a note is found by the note's name."""
+    too, so a beat holding a note is found by the note's name. An image is
+    found by its name."""
     q = query.strip().casefold()
     if not q:
         return []
     named, inside = [], []
-    for path in _walk_notes(campaign):
+    for path in _walk_clips(campaign):
         entry = _entry(campaign, path)
         if track and (entry.track or "").casefold() != track.casefold():
             continue
         try:
-            text = path.read_bytes().decode("utf-8")
+            text = "" if entry.type == "image" else path.read_bytes().decode("utf-8")
         except UnicodeDecodeError:
             text = ""
         at = text.casefold().find(q)
@@ -850,17 +899,20 @@ def _same_name(a: str, b: str) -> bool:
 
 
 def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]]:
+    """Rename a note, or an image, whose extension stays: the name given is
+    its stem, or its whole name with that extension (images design §3.3)."""
     new_name = validate_name(new_name)
-    src = resolve(campaign, rel)
-    if not src.is_file() or not _is_note_file(src.name):
-        raise Invalid(f"Not a note: {rel!r}")
-    old_name = _stem(src.name)
+    src = clip_path(campaign, rel)
+    image = _is_image_file(src.name)
+    if image and not new_name.casefold().endswith(src.suffix.casefold()):
+        new_name += src.suffix
+    old_name = _name(src.name)
     if new_name == old_name:
         return _rel(campaign, src), []
     of = kind(_rel(campaign, src))
     if not _same_name(new_name, old_name) and new_name.casefold() in _names_in_use(campaign, of):
         raise Conflict(f"A {of} named {new_name!r} already exists in this campaign")
-    dst = src.with_name(f"{new_name}.md")
+    dst = src.with_name(new_name if image else f"{new_name}.md")
     moves = _relocate(campaign, src, dst)
     # A renamed note keeps its place among its folder's notes.
     folder = str(PurePosixPath(_rel(campaign, dst)).parent)
@@ -875,24 +927,25 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
 
 
 def move_note(campaign: Path, rel: str, folder: str, order: list[str] | None = None) -> tuple[str, list[str]]:
-    """Move a note into ``folder``, first among its notes, or in ``order``
-    (a drop between rows: the folder's notes with it in place)."""
-    src = resolve(campaign, rel)
-    if not src.is_file() or not _is_note_file(src.name):
-        raise Invalid(f"Not a note: {rel!r}")
+    """Move a note, or an image, into ``folder``, first among its notes, or
+    in ``order`` (a drop between rows: the folder's notes with it in
+    place)."""
+    src = clip_path(campaign, rel)
     parent = _folder(campaign, folder)
     dst = parent / src.name
     if dst == src:
         return rel, []
     to = kind(_rel(campaign, dst))
-    if to != kind(_rel(campaign, src)) and _stem(src.name).casefold() in _names_in_use(campaign, to):
-        raise Conflict(f"A {to} named {_stem(src.name)!r} already exists in this campaign")
+    if _is_image_file(src.name) and to != "note":
+        raise Invalid(f"An image goes in a track or on the shelf, not in {folder}/")
+    if to != kind(_rel(campaign, src)) and _name(src.name).casefold() in _names_in_use(campaign, to):
+        raise Conflict(f"A {to} named {_name(src.name)!r} already exists in this campaign")
     if dst.exists():
         raise Conflict(f"{_rel(campaign, dst)!r} already exists")
     moves = _relocate(campaign, src, dst)
     # Wherever it came from and whatever its name, so a move always lands
     # the same way. Its old folder forgets it.
-    name = _stem(src.name)
+    name = _name(src.name)
     orders = note_order(campaign)
     left, joined = _rel(campaign, src.parent), _rel(campaign, parent)
     if left in orders:

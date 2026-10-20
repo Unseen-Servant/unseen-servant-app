@@ -26,6 +26,14 @@ export interface Column {
 
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
 
+/** A note's name as its row shows it: an image's extension apart, set a
+ *  step down the text ramp, and left out of what a rename edits (images
+ *  design §4). */
+export function nameParts(note: NoteEntry): { stem: string; ext: string } {
+  const dot = note.type === 'image' ? note.name.lastIndexOf('.') : -1;
+  return dot > 0 ? { stem: note.name.slice(0, dot), ext: note.name.slice(dot) } : { stem: note.name, ext: '' };
+}
+
 export function columns(index: CampaignIndex): Column[] {
   return index.tracks.map((track) => {
     const notes = index.notes.filter((n) => n.track === track);

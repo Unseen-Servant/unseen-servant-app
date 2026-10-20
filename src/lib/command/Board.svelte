@@ -37,7 +37,6 @@
   import BoardNoteField from './BoardNoteField.svelte';
   import BoardPointer from './BoardPointer.svelte';
   import FrameCard from './FrameCard.svelte';
-  import ImageCard from './ImageCard.svelte';
   import NoteCard from './NoteCard.svelte';
   import {
     BAR_LINE,
@@ -97,7 +96,7 @@
   /** Images dropped from Finder, and where on the board they fell (#407). */
   export let onDropImages: (files: File[], at: XYPosition) => void;
 
-  const nodeTypes = { note: NoteCard, image: ImageCard, frame: FrameCard };
+  const nodeTypes = { note: NoteCard, frame: FrameCard };
   const edgeTypes = { line: BoardLine };
   setContext(CARD_ACTIONS, actions);
 
@@ -117,7 +116,8 @@
       const was = current.get(c.id);
       return {
         id: c.id,
-        type: c.kind === 'note' || c.kind === 'image' ? c.kind : 'frame',
+        // An image wears a note card's face, its picture for the text.
+        type: c.kind === 'note' || c.kind === 'image' ? 'note' : 'frame',
         position: was && (was.dragging || carried.has(c.id)) ? was.position : { x: c.x, y: c.y },
         width: c.width,
         height: c.height,
@@ -328,13 +328,14 @@
   const FIELD_WIDTH = 14 * 16;
   const FIELD_ROOM = 360;
 
-  /** The picked note's card goes where the board was clicked: one already
-   *  on the board moves there, as a note has one card per board. */
+  /** The picked note's card, or image's, goes where the board was
+   *  clicked: one already on the board moves there, as a note has one card
+   *  per board. */
   function placeNote(path: string) {
     if (!naming) return;
     const { at } = naming;
     naming = null;
-    const card = cards.find((c) => c.kind === 'note' && c.path === path);
+    const card = cards.find((c) => (c.kind === 'note' || c.kind === 'image') && c.path === path);
     onOps([card ? frameOp(card, { ...at, width: card.width, height: card.height }) : { op: 'place', id: newId(), path, ...at, ...CARD }]);
     onToolDone();
   }

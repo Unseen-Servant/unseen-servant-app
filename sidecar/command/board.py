@@ -394,12 +394,13 @@ def arrange(campaign: Path, session: str, groups: list[tuple[str, list[str]]] | 
     the arrangement starts under it."""
     board, _ = _load(board_file(campaign, session))
     nodes = _placed(board)
-    notes = _view(campaign, board)["notes"]
+    view = _view(campaign, board)
+    notes = {**view["notes"], **view["images"]}
     if groups is None:
         groups = plan_groups(campaign, session)
     for _, rels in groups:
         for rel in rels:
-            vault.note_path(campaign, rel)
+            vault.clip_path(campaign, rel)
     new_id = _new_ids(board)
 
     card_of: dict[str, dict] = {}
@@ -487,7 +488,8 @@ def settle(campaign: Path, session: str, live: list[str]) -> dict:
     index = prep.index(campaign)
     names = {n["path"]: n["name"] for n in index["notes"]}
     groups = [rels for _, rels in plan_groups(campaign, session, index)]
-    on_board = set(_view(campaign, board)["notes"].values())
+    view = _view(campaign, board)
+    on_board = {*view["notes"].values(), *view["images"].values()}
     wanted = [rel for rels in groups for rel in rels] + list(live)
     loose = {rel for rel in wanted if rel not in on_board and rel in names}
     if not loose:

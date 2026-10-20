@@ -4,7 +4,7 @@ import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
   const parts = path.split('/');
-  return { name: parts[parts.length - 1].replace(/\.md$/, ''), path, track: parts.length > 1 ? parts[0] : null, group: null, spent: null, source: null };
+  return { name: parts[parts.length - 1].replace(/\.md$/, ''), path, track: parts.length > 1 ? parts[0] : null, group: null, spent: null, source: null, type: path.endsWith('.md') ? 'note' : 'image' };
 };
 
 const index: CampaignIndex = {
@@ -249,6 +249,16 @@ describe('image cards', () => {
       images: { m: 'Maps/Barovia.png' },
     };
     expect(cards(view, index, []).map((c) => [c.kind, c.path, c.text])).toEqual([['image', 'Maps/Barovia.png', 'Strahd/Maps/Barovia.png']]);
+  });
+
+  it('lays out a planned image the board doesn’t hold as an image card, and deals it to the tray', () => {
+    const withImage: CampaignIndex = { ...index, notes: [...index.notes, note('Maps/Barovia.png')] };
+    const out = cards(empty, withImage, ['NPCs/Ismark.md', 'Maps/Barovia.png']);
+    expect(out.map((c) => [c.kind, c.path, c.placed])).toEqual([
+      ['image', 'Maps/Barovia.png', false],
+      ['note', 'NPCs/Ismark.md', false],
+    ]);
+    expect(handOf(out, ['Maps/Barovia.png']).map((c) => c.kind)).toEqual(['image']);
   });
 
   it('sizes a dropped image in its proportions, at most IMAGE_CARD a side', () => {

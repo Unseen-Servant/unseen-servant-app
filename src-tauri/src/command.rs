@@ -54,6 +54,9 @@ pub struct NoteEntry {
     /// Where it came from: a PDF page's file URL (Send to Command).
     #[serde(default)]
     source: Option<String>,
+    /// "note", or "image" for a picture a track holds (images design §3).
+    #[serde(rename = "type")]
+    kind: String,
 }
 
 /// A link from a beat or a session's plan: the name it gives, and the note
@@ -1053,7 +1056,9 @@ mod tests {
         let sidecar = serde_json::json!({
             "name": "Strahd", "tracks": ["NPCs"], "ambiguous": [],
             "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18",
-                       "source": "file:///b.pdf#page=3"}],
+                       "source": "file:///b.pdf#page=3", "type": "note"},
+                      {"name": "Barovia.png", "path": "Maps/Barovia.png", "track": "Maps", "group": null, "spent": null,
+                       "source": null, "type": "image"}],
             "note_order": {"NPCs": ["Ismark", "Ireena"]},
             "pigments": {"NPCs": "#d07c87"},
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,

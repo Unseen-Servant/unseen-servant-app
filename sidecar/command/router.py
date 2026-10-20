@@ -664,7 +664,7 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         never changes the beat the set came from (design §5.3)."""
         camp = campaign_path(body.campaign)
         with write_lock:
-            vault.note_path(camp, body.note)
+            vault.clip_path(camp, body.note)
             current = live.get(body.campaign)
             notes = [n for n in current["notes"] if n != body.note]
             if body.live:

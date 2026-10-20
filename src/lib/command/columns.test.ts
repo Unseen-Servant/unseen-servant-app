@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columns, folderOrder, isAmbiguous, linkableNames, linkedNote, placeableNotes } from './columns';
+import { columns, folderOrder, isAmbiguous, linkableNames, linkedNote, nameParts, placeableNotes } from './columns';
 import { insertion, openTarget } from './wikilinks';
 import type { CampaignIndex, NoteEntry } from './types';
 
@@ -7,7 +7,7 @@ const note = (path: string): NoteEntry => {
   const parts = path.split('/');
   const name = parts[parts.length - 1].replace(/\.md$/, '');
   const folders = parts.slice(0, -1);
-  return { name, path, track: folders[0] ?? null, group: folders.slice(1).join('/') || null, spent: null, source: null };
+  return { name, path, track: folders[0] ?? null, group: folders.slice(1).join('/') || null, spent: null, source: null, type: path.endsWith('.md') ? 'note' : 'image' };
 };
 
 const index: CampaignIndex = {
@@ -139,5 +139,12 @@ describe('wikilink completion', () => {
   it('closes the link unless the brackets are already there', () => {
     expect(insertion('Ireena', '')).toBe('Ireena]]');
     expect(insertion('Ireena', ']] lives')).toBe('Ireena');
+  });
+});
+
+describe('nameParts', () => {
+  it('sets an image’s extension apart, and leaves a note’s name whole', () => {
+    expect(nameParts(note('Maps/Barovia map.png'))).toEqual({ stem: 'Barovia map', ext: '.png' });
+    expect(nameParts(note('NPCs/Dr. Who.md'))).toEqual({ stem: 'Dr. Who', ext: '' });
   });
 });

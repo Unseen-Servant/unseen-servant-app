@@ -28,8 +28,8 @@
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
-  import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, type Column } from './columns';
-  import { imageSource } from './embeds';
+  import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, nameParts, type Column } from './columns';
+  import { IMAGE, imageSource } from './embeds';
   import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
@@ -136,6 +136,13 @@
   let reading = false;
   /** The editor's text, for the reader: what's loaded, then every edit. */
   let noteText = '';
+  /** The image open in the inspector (images design §4): shown there, not
+   *  read into the note buffer, which holds a note's text. */
+  let openImage: string | null = null;
+  /** The webview couldn't load it: gone meanwhile, or outside the
+   *  campaigns folder. */
+  let imageFailed = false;
+  $: openImage, (imageFailed = false);
 
   const buffer = new NoteBuffer(
     {
@@ -155,11 +162,15 @@
   $: untitled = !!campaign && /^Untitled(?: [1-9][0-9]*)?$/.test(campaign);
   $: sunk = menu && menu === switcher ? switcherFor : null;
   $: cols = index ? columns(index) : ([] as Column[]);
-  $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
+  /** What the inspector shows: the open image, else the open note. */
+  $: shown = openImage ?? bufState.path;
+  $: inspecting = openImage !== null || bufState.status !== 'empty';
+  $: openEntry = index?.notes.find((n) => n.path === shown) ?? null;
   /** Where notes' embedded images load from (#407). */
   $: images = imageSource(settings?.root ?? null, campaign ?? '', index?.images ?? []);
-  $: openName = openEntry?.name ?? (bufState.path ? stem(bufState.path) : '');
-  $: renamable = bufState.status !== 'conflict' && bufState.status !== 'unreadable';
+  $: openName = openEntry?.name ?? (shown ? stem(shown) : '');
+  // An image renames when a track or the shelf holds it, and only its stem.
+  $: renamable = openImage !== null ? !!openEntry : bufState.status !== 'conflict' && bufState.status !== 'unreadable';
   $: session = index ? activeSession(index, $appContext.session) : null;
   // Only the board fills: with the bar gone, nothing else could hand the
   // space back, so Prep, or a Play with no board, lets go of it.
@@ -214,6 +225,7 @@
 
   async function leaveCampaign() {
     await buffer.close();
+    openImage = null;
     campaign = null;
     index = null;
     live = null;
@@ -363,7 +375,7 @@
     if (e.key.toLowerCase() === 'a' && !mod && !e.altKey && !e.shiftKey && !e.isComposing && index) {
       const path = pathUnderPointer();
       const note = index.notes.find((n) => n.path === path) ?? index.beats.find((b) => b.path === path);
-      if (note) {
+      if (note && !('type' in note && note.type === 'image')) {
         e.preventDefault();
         if (e.repeat || !pointed) return;
         pointed = false;
@@ -406,11 +418,23 @@
   // -- notes --------------------------------------------------------------
 
   function openPath(path: string) {
-    if (path === bufState.path) return;
+    if (path === shown) return;
     run(async () => {
+      if (IMAGE.test(path)) {
+        await buffer.close();
+        openImage = path;
+        return;
+      }
+      openImage = null;
       freshOpen = true;
       await buffer.open(path);
     });
+  }
+
+  /** `[close]`: the note, saved first, or the image. */
+  async function closeInspector() {
+    openImage = null;
+    await buffer.close();
   }
 
   function createNote(folder: string, name: string) {
@@ -420,6 +444,7 @@
       if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
       await refreshIndex();
       selected = path;
+      openImage = null;
       freshOpen = true;
       await buffer.open(path);
       // A new note is empty: there's nothing to read yet.
@@ -470,6 +495,7 @@
       if (isOpen) await buffer.flush();
       const moved = await commandApi.renameNote(campaign!, note.path, name);
       if (isOpen) await buffer.retarget(moved.path);
+      if (note.path === openImage) openImage = moved.path;
       if (isSession) await setSession(stem(moved.path));
       await refreshIndex();
       if (wasSelected) selected = moved.path;
@@ -487,6 +513,7 @@
       if (isOpen) await buffer.flush();
       const moved = await commandApi.moveNote(campaign!, note.path, folder, order);
       if (isOpen) await buffer.retarget(moved.path);
+      if (note.path === openImage) openImage = moved.path;
       await refreshIndex();
       if (wasSelected) selected = moved.path;
     });
@@ -503,6 +530,7 @@
       });
       if (!confirmed) return;
       if (note.path === bufState.path) await buffer.close();
+      if (note.path === openImage) openImage = null;
       await commandApi.trash(campaign!, note.path);
       await refreshIndex();
     });
@@ -758,6 +786,7 @@
       if (inside) await buffer.flush();
       const renamed = await commandApi.renameTrack(campaign!, track, name);
       if (inside) await buffer.retarget(renamed.name + open!.slice(track.length));
+      if (openImage?.startsWith(`${track}/`)) openImage = renamed.name + openImage.slice(track.length);
       await refreshIndex();
     });
   }
@@ -811,6 +840,7 @@
       });
       if (!confirmed) return;
       if (bufState.path?.startsWith(`${column.track}/`)) await buffer.close();
+      if (openImage?.startsWith(`${column.track}/`)) openImage = null;
       await commandApi.trash(campaign!, column.track);
       await refreshIndex();
     });
@@ -1121,7 +1151,7 @@
             {campaigns}
             places={settings?.places ?? []}
             {index}
-            openPath={bufState.path}
+            openPath={shown}
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
             onSelectNew={(key) => (selected = key)}
@@ -1147,7 +1177,7 @@
             bind:this={grid}
             {cols}
             pigments={index.pigments}
-            openPath={bufState.path}
+            openPath={shown}
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
             onSelectNew={(key) => (selected = key)}
@@ -1205,8 +1235,8 @@
 
         <!-- Kept mounted while closed, so a note opening has an editor to
              land in; closed, it gives the grid its width back. -->
-        <aside class="inspector" class:closed={bufState.status === 'empty'}>
-          {#if bufState.status !== 'empty'}
+        <aside class="inspector" class:closed={!inspecting}>
+          {#if inspecting}
             <!-- Legend Lore's inspector plate (InspectorPlate), level with the
                  track and beat plates across the seam: where the note lives
                  (its track, the pigment standing where the system's shield
@@ -1233,11 +1263,11 @@
                   <!-- The title is the note's name field, as Obsidian's inline
                        title: any note renames here, a beat or a session
                        included. Not while the disk and the editor disagree. -->
-                  {#if renamingOpen && bufState.path}
-                    {@const path = bufState.path}
+                  {#if renamingOpen && shown}
+                    {@const path = shown}
                     <span class="note-name-field">
                       <RenameField
-                        value={openName}
+                        value={openEntry ? nameParts(openEntry).stem : openName}
                         placeholder="Note name"
                         label="Rename note"
                         onCommit={async (name) => {
@@ -1266,13 +1296,15 @@
                 <span class="readout">{STATUS_TEXT[bufState.status]}</span>
               {/if}
               <!-- Names what it switches to, as the plate's other actions
-                   name what they do. -->
-              <button
-                type="button"
-                class="plate-btn"
-                title={(reading ? 'Edit the note' : 'Read the note rendered') + chordHint('command.read')}
-                on:click={toggleReading}
-              >{reading ? 'edit' : 'read'}</button>
+                   name what they do. An image is only shown. -->
+              {#if !openImage}
+                <button
+                  type="button"
+                  class="plate-btn"
+                  title={(reading ? 'Edit the note' : 'Read the note rendered') + chordHint('command.read')}
+                  on:click={toggleReading}
+                >{reading ? 'edit' : 'read'}</button>
+              {/if}
               {#if openEntry?.source}
                 {@const source = openEntry.source}
                 <button
@@ -1282,7 +1314,7 @@
                   on:click={() => void openUrl(source).catch((e) => (error = String(e)))}
                 >source</button>
               {/if}
-              <button type="button" class="plate-btn" title="Close the note" on:click={() => run(() => buffer.close())}>close</button>
+              <button type="button" class="plate-btn" title={openImage ? 'Close the image' : 'Close the note'} on:click={() => run(closeInspector)}>close</button>
             </div>
             {#if bufState.status === 'conflict'}
               <div class="notice" role="alert">
@@ -1298,6 +1330,17 @@
               <div class="notice" role="alert"><span>Not saved: {bufState.error}</span></div>
             {/if}
           {/if}
+          {#if openImage}
+            <!-- An image is shown, fitted to the pane's width on the vellum
+                 (images design §4). -->
+            <div class="editor-slot image-view">
+              {#if imageFailed}
+                <div class="notice" role="alert"><span>Can't show this image from disk.</span></div>
+              {:else}
+                <img src={images.file(openImage)} alt={openName} on:error={() => (imageFailed = true)} />
+              {/if}
+            </div>
+          {/if}
           <!-- Reading hides the editor rather than unmounting it, so its
                undo history and caret are there on the way back. -->
           {#if reading && bufState.status !== 'empty'}
@@ -1312,7 +1355,7 @@
               />
             </div>
           {/if}
-          <div class="editor-slot" class:hidden={reading}>
+          <div class="editor-slot" class:hidden={reading || openImage !== null}>
             <NoteEditor
               bind:this={editor}
               names={() => (index ? linkableNames(index) : [])}
@@ -1794,6 +1837,18 @@
 
   .editor-slot.hidden {
     display: none;
+  }
+
+  .image-view {
+    overflow-y: auto;
+    padding: 0.75rem 1rem;
+  }
+
+  .image-view img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
   }
 
   .error-line {

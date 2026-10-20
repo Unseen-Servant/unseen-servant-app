@@ -139,7 +139,7 @@ export function cards(view: BoardView, index: CampaignIndex, wanted: Iterable<st
     ...columns.flatMap((column, i) =>
       column.map((path, row) => ({
         id: AUTO + path,
-        kind: 'note' as const,
+        kind: notes.get(path)!.type === 'image' ? ('image' as const) : ('note' as const),
         path,
         placed: false,
         x: x0 + i * (CARD.width + GAP),
@@ -249,6 +249,9 @@ export interface CardData extends Record<string, unknown> {
   /** Its track's pigment (palette.ts), which fills its head; or null. */
   pigment: string | null;
   live: boolean;
+  /** It can go in the live set: a note, or an image a track or the shelf
+   *  holds (images design §3), which the campaign's index lists. */
+  playable: boolean;
   spent: string | null;
   /** The PDF page it came from (Send to Command), which its key opens. */
   source: string | null;
@@ -262,11 +265,12 @@ export interface CardData extends Record<string, unknown> {
   linking: boolean;
 }
 
-/** The card tray's hand: the board's cards for the live set's notes, in
- *  the live set's order, so a note played on its own joins at the end. */
+/** The card tray's hand: the board's cards for the live set's notes and
+ *  images, in the live set's order, so a note played on its own joins at
+ *  the end. */
 export function handOf(board: Card[], notes: string[]): Card[] {
   const byPath = new Map<string, Card>();
-  for (const c of board) if (c.kind === 'note' && c.path && !byPath.has(c.path)) byPath.set(c.path, c);
+  for (const c of board) if ((c.kind === 'note' || c.kind === 'image') && c.path && !byPath.has(c.path)) byPath.set(c.path, c);
   return notes.flatMap((p) => byPath.get(p) ?? []);
 }
 

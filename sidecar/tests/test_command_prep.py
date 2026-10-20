@@ -210,6 +210,26 @@ def test_spending_twice_keeps_the_first_date_and_unspending_removes_it(camp):
     assert (camp / "Secrets" / "Ravens watch.md").read_text() == ""
 
 
+def test_an_image_is_a_beats_clip_and_never_spent(camp):
+    # Images design §3.3: a beat holds an image by its name, extension and
+    # all, and the image has nowhere to keep a spent mark.
+    (camp / "Locations" / "Barovia.png").write_bytes(b"\x89PNG")
+    assert prep.set_member(camp, "Beats/Tser Pool.md", "Locations/Barovia.png", True) == ["Barovia.png"]
+    assert '"[[Barovia.png]]"' in (camp / "Beats" / "Tser Pool.md").read_text()
+    index = prep.index(camp)
+    image = next(n for n in index["notes"] if n["type"] == "image")
+    assert (image["name"], image["spent"], image["source"]) == ("Barovia.png", None, None)
+    pool = next(b for b in index["beats"] if b["name"] == "Tser Pool")
+    assert pool["notes"] == [{"link": "Barovia.png", "path": "Locations/Barovia.png"}]
+    with pytest.raises(Invalid):
+        prep.set_spent(camp, "Locations/Barovia.png", True)
+    # Another image of the name is linked by its path, extension kept.
+    (camp / "Locations" / "Old").mkdir()
+    (camp / "Locations" / "Old" / "Barovia.png").write_bytes(b"\x89PNG")
+    prep.set_member(camp, "Beats/Played.md", "Locations/Old/Barovia.png", True)
+    assert '"[[Locations/Old/Barovia.png]]"' in (camp / "Beats" / "Played.md").read_text()
+
+
 def test_any_note_can_be_spent_including_beats(camp):
     assert prep.set_spent(camp, "Beats/Ambush.md", True) == "2026-10-18"
     beat = next(b for b in prep.index(camp)["beats"] if b["name"] == "Ambush")
@@ -310,3 +330,18 @@ def test_copying_from_another_campaign_leaves_the_spent_mark_behind(camp, tmp_pa
         prep.copy_in(camp, other, "Beats/Market.md")
     with pytest.raises(Invalid):
         prep.copy_in(camp, camp, "NPCs/Ismark.md")
+
+
+def test_copying_an_image_copies_its_bytes_and_keeps_its_name(camp, tmp_path):
+    other = tmp_path / "Tomb"
+    (other / "Maps").mkdir(parents=True)
+    (other / "Maps" / "Crypt.jpg").write_bytes(b"\xff\xd8jpeg")
+    path = prep.copy_in(camp, other, "Maps/Crypt.jpg")
+    assert path == "Shelf/Crypt.jpg"
+    assert (camp / path).read_bytes() == b"\xff\xd8jpeg"
+    with pytest.raises(Conflict):
+        prep.copy_in(camp, other, "Maps/Crypt.jpg")
+    place = tmp_path / "Handouts"
+    (place / "Sessions").mkdir(parents=True)
+    (place / "Sessions" / "Letter.png").write_bytes(b"\x89PNG")
+    assert prep.copy_from_place(camp, place, "Sessions/Letter.png") == "Shelf/Letter.png"

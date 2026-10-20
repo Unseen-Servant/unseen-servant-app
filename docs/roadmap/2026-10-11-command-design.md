@@ -85,7 +85,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
 
 - A note is any `.md` file. Its **name** is the filename stem, as in Obsidian. Frontmatter is optional, and keys Command doesn't own are left alone.
 - **Names are unique within their kind**, compared case-insensitively (as the default macOS file system and Obsidian's link resolution compare them): a note's among the notes (the tracks', the Shelf's, loose ones), a beat's among the beats, a session's among the sessions. So a beat may share a note's name, as a scene named after its place does (2026-10-19; until then names were unique across the campaign). Command refuses to create, rename or move into a clash within a kind; a clash made outside Command is flagged, and links to that name show as ambiguous.
-- Non-`.md` files are not notes. Images show on cards and boards (phase 3b, §5.2); [the images design](2026-10-20-command-images-design.md) makes them clips.
+- An image in a track or on the shelf (png, jpg, gif, webp, svg) is a clip too, since 2026-10-20 ([the images design](2026-10-20-command-images-design.md), step 2): named by its file name with the extension, as Obsidian links one, a beat holds it, Play launches it and its card shows it, and it's never spent. Other files aren't notes. Images among the beats or the sessions are attachments, which embeds show (phase 3b, §5.2) and no list does.
 
 ### 3.3 Links
 

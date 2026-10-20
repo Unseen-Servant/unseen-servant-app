@@ -384,6 +384,19 @@ def test_play_from_mcp_live_set_and_spend(strahd, app):
     assert run(mcp_server.spend("Ismark", spent=False)) == "Ismark is unspent."
 
 
+def test_an_image_plays_and_joins_beats_but_has_no_text_to_read_or_spend(strahd, app):
+    # Images design §7: the tools that take a note by name take an image.
+    (strahd / "Strahd" / "Locations" / "Barovia.png").write_bytes(b"\x89PNG")
+    assert run(mcp_server.add_to_beat("Barovia.png", "Ambush")).startswith("Barovia.png")
+    assert run(mcp_server.add_to_live_set("Barovia.png")) == "Barovia.png is live: 1 note(s) in play."
+    assert run(mcp_server.live_set()) == "Live in Strahd:\n\n## Barovia.png (Locations/Barovia.png)\n(an image, shown on its card)"
+    said = "Barovia.png is an image (Locations/Barovia.png): it has no text. Its card shows it in Play."
+    assert run(mcp_server.read_note("Barovia.png")) == said
+    assert run(mcp_server.edit_note("Barovia.png", "text", "hash")) == said
+    assert run(mcp_server.spend("Barovia.png")).startswith("An image isn't spent")
+    assert run(mcp_server.connect_cards("Barovia.png", "Ismark", label="map of")).startswith("Joined Barovia.png and Ismark")
+
+
 def board_of(strahd, session="Session 1"):
     canvas = json.loads((strahd / "Strahd" / "Sessions" / f"{session}.canvas").read_text())
     return canvas, {n["file"].removeprefix("Strahd/"): n for n in canvas["nodes"] if n["type"] == "file"}

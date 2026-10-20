@@ -91,12 +91,31 @@ def test_scan_reads_the_folders(camp):
     # Tracks are the non-reserved folders, alphabetical with no saved order.
     assert index["tracks"] == ["Locations", "NPCs"]
     # A note without frontmatter is a note (unseen-command hid these).
-    assert by_path["NPCs/Ireena.md"] == {"name": "Ireena", "path": "NPCs/Ireena.md", "track": "NPCs", "group": None}
+    assert by_path["NPCs/Ireena.md"] == {"name": "Ireena", "path": "NPCs/Ireena.md", "track": "NPCs", "group": None, "type": "note"}
     assert by_path["NPCs/Vallaki/Lady Wachter.md"]["group"] == "Vallaki"
     assert by_path["Overview.md"]["track"] is None
     assert by_path["Beats/Ambush.md"]["track"] == "Beats"
-    # Hidden files and folders, and non-Markdown files, are not notes.
-    assert not any(".obsidian" in p or ".draft" in p or p.endswith(".png") for p in by_path)
+    # Hidden files and folders are not notes.
+    assert not any(".obsidian" in p or ".draft" in p for p in by_path)
+
+
+def test_scan_lists_a_tracks_images_as_clips_named_with_their_extension(camp):
+    # Images design §3.1: a track's or the shelf's image is a clip, a loose
+    # one too; one among the sessions is an attachment, and no list's.
+    write(camp / "Shelf" / "Crest.webp", "", raw=b"")
+    write(camp / "Sessions" / "handout.png", "", raw=b"")
+    write(camp / "Locations" / "notes.txt", "")
+    clips = {n["path"]: n for n in vault.scan(camp)["notes"] if n["type"] == "image"}
+    assert clips == {
+        "Locations/map.png": {"name": "map.png", "path": "Locations/map.png", "track": "Locations", "group": None, "type": "image"},
+        "Shelf/Crest.webp": {"name": "Crest.webp", "path": "Shelf/Crest.webp", "track": "Shelf", "group": None, "type": "image"},
+    }
+    assert vault.find_notes(camp, "crest")[0]["path"] == "Shelf/Crest.webp"
+    vault.clip_path(camp, "Locations/map.png")
+    with pytest.raises(Invalid):
+        vault.clip_path(camp, "Sessions/handout.png")
+    with pytest.raises(Invalid):
+        vault.clip_path(camp, "Locations/notes.txt")
 
 
 def test_scan_lists_the_images_wherever_they_sit(camp):
@@ -463,6 +482,28 @@ def test_a_track_rename_carries_the_links_that_spell_an_image(camp):
     write(camp / "Overview.md", "![[Locations/map.png|300]] ![[map.png]] [[Locations/Village of Barovia]]")
     vault.rename_track(camp, "Locations", "Places")
     assert (camp / "Overview.md").read_text() == "![[Places/map.png|300]] ![[map.png]] [[Places/Village of Barovia]]"
+
+
+def test_an_image_renames_and_moves_as_a_note_does_keeping_its_extension(camp):
+    write(camp / "Overview.md", "![[map.png|300]] and [[Locations/map.png]]")
+    # The field edits the stem; the whole name with its extension works too.
+    path, rewritten = vault.rename_note(camp, "Locations/map.png", "Village map")
+    assert path == "Locations/Village map.png"
+    assert (camp / "Overview.md").read_text() == "![[Village map.png|300]] and [[Locations/Village map.png]]"
+    assert rewritten == ["Overview.md"]
+    assert vault.rename_note(camp, path, "Old map.png")[0] == "Locations/Old map.png"
+    # Two images can't share a name, wherever they are; an image named
+    # after a note (Ismark.png beside Ismark) can.
+    write(camp / "NPCs" / "Ireena.png", "", raw=b"")
+    write(camp / "Shelf" / "Ismark.png", "", raw=b"")
+    with pytest.raises(Conflict):
+        vault.rename_note(camp, "NPCs/Ireena.png", "ismark")
+    assert vault.rename_note(camp, "Shelf/Ismark.png", "Ismark portrait")[0] == "Shelf/Ismark portrait.png"
+    moved, _ = vault.move_note(camp, "Locations/Old map.png", "NPCs")
+    assert moved == "NPCs/Old map.png"
+    # An image goes in a track or on the shelf.
+    with pytest.raises(Invalid):
+        vault.move_note(camp, moved, "Beats")
 
 
 def test_add_image_names_it_after_the_file_and_numbers_a_clash(camp):

@@ -171,7 +171,7 @@
   $: allCards = view ? boardCards(view, index, wanted, groups.map((g) => g.notes)) : [];
   $: allLines = view ? boardLines(view, allCards) : [];
 
-  const removable = (card: Card) => card.kind !== 'note' || !card.path || !wanted.has(card.path);
+  const removable = (card: Card) => (card.kind !== 'note' && card.kind !== 'image') || !card.path || !wanted.has(card.path);
 
   // -- what the cards show ------------------------------------------------
 
@@ -367,6 +367,7 @@
         track: note?.track ?? null,
         pigment: note?.track ? (pigments[note.track] ?? null) : null,
         live: !!card.path && lit.has(card.path),
+        playable: !!note,
         spent: note?.spent ?? null,
         source: note?.source ?? null,
         body: card.path ? (bodies.get(card.path) ?? null) : null,
@@ -391,7 +392,7 @@
   /** Frame the cards of `paths`, wherever the board has them — or, with
    *  `orAll` and no paths, the whole board. */
   function frameNotes(paths: Iterable<string>, orAll = false) {
-    const idOf = new Map(Object.entries(view?.notes ?? {}).map(([id, path]) => [path, id]));
+    const idOf = new Map(Object.entries({ ...view?.notes, ...view?.images }).map(([id, path]) => [path, id]));
     const ids = [...paths].map((p) => idOf.get(p) ?? `auto:${p}`);
     if (ids.length || orAll) frame = { ids };
   }
@@ -436,11 +437,13 @@
     const note = card.path ? notesByPath.get(card.path) : undefined;
     if (note) {
       const playing = liveNotes.has(note.path);
+      const image = note.type === 'image';
       items.push(
-        action('Edit note', () => onEdit(note.path)),
+        action(image ? 'Show image' : 'Edit note', () => onEdit(note.path)),
         action(playing ? 'Take out of play' : 'Play', () => setLive(note.path, !playing)),
-        keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)),
       );
+      // An image isn't spent (images design §2).
+      if (!image) items.push(keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)));
       const source = note.source;
       if (source) items.push(action('Open source', () => void openUrl(source).catch(() => {})));
     }

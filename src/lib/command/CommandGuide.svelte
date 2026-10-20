@@ -85,6 +85,11 @@
       there; it's copied into the campaign's <em>Shelf</em> folder, so the
       campaign keeps everything it uses.
     </p>
+    <p class="field-desc">
+      An image in a track or on the shelf works as a note does: put it in a
+      beat, play it, and its card shows it. Double-click it to see it in
+      the inspector. An image isn't spent: spend the beat that shows it.
+    </p>
   </section>
 
   <section class="field">

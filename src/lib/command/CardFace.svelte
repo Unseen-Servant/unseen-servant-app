@@ -3,7 +3,9 @@
   // that reads as a row. The board's cards wear it (NoteCard) and so does
   // the card tray's hand (CardTray). Its play key puts the note in the live
   // set or takes it out, as Legend Lore's key plays a collection; on the
-  // board the card itself lights in parchment while live.
+  // board the card itself lights in parchment while live. An image's card
+  // is the same head over the picture, with no spend key: an image isn't
+  // spent (images design §5).
   import Markdown from 'svelte-exmarkdown';
   import { gfmPlugin } from 'svelte-exmarkdown/gfm';
   import { openUrl } from '@tauri-apps/plugin-opener';
@@ -27,6 +29,12 @@
   $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeEmbeds, $images, card.path] }];
   $: missing = card.kind === 'note' && card.path === null;
   $: title = data.name || card.text.split('/').pop()?.replace(/\.md$/i, '') || 'Untitled';
+  $: image = card.kind === 'image';
+  $: src = image && card.path ? $images.file(card.path) : null;
+  /** The webview couldn't load the picture: gone meanwhile, or outside
+   *  the campaigns folder. */
+  let failed = false;
+  $: src, (failed = false);
 
   /** Links in the body: a `[[link]]` opens its note, a web link the browser. */
   function click(e: MouseEvent) {
@@ -45,7 +53,7 @@
   class:live={data.live && !held}
   class:outlined={data.outlined && !held}
   class:spent={!!data.spent}
-  class:missing
+  class:missing={missing || (image && (!src || failed))}
   on:dblclick={() => !missing && actions.edit(card)}
 >
   <!-- The title first; then its track, and its keys at the end, as a
@@ -67,7 +75,7 @@
         <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={BOOK} /></svg>
       </button>
     {/if}
-    {#if !missing}
+    {#if data.playable}
       <button
         type="button"
         class="play-key nodrag"
@@ -82,17 +90,30 @@
           <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PLAY} /></svg>
         {/if}
       </button>
+    {/if}
+    {#if !missing && !image}
       <SpendKey spent={data.spent} name={title} onToggle={() => actions.spend(card, !data.spent)} />
     {/if}
   </header>
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="card-body nowheel" on:click={click}>
-    {#if missing}
-      <p class="note-missing">Nothing is at {card.text} any more.</p>
-    {:else if data.body !== null}
-      <Markdown md={linkify(embedImages(data.body))} {plugins} />
-    {/if}
-  </div>
+  {#if image}
+    <!-- The picture fitted inside the card, letterboxed on the vellum. -->
+    <div class="card-picture">
+      {#if src && !failed}
+        <img {src} alt={title} draggable="false" on:error={() => (failed = true)} />
+      {:else}
+        <p class="note-missing">Nothing is at {card.path} any more.</p>
+      {/if}
+    </div>
+  {:else}
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="card-body nowheel" on:click={click}>
+      {#if missing}
+        <p class="note-missing">Nothing is at {card.text} any more.</p>
+      {:else if data.body !== null}
+        <Markdown md={linkify(embedImages(data.body))} {plugins} />
+      {/if}
+    </div>
+  {/if}
 </article>
 
 <style>
@@ -290,6 +311,27 @@
   .note-missing {
     margin: 0;
     color: var(--text-secondary);
+  }
+
+  .card-picture {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+  }
+
+  .card-picture img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .card-picture .note-missing {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.88rem;
   }
 
   .card-body :global(> *:first-child) { margin-top: 0; }

@@ -12,6 +12,9 @@ export interface NoteEntry {
   spent: string | null;
   /** Where it came from: a PDF page's file URL (Send to Command). */
   source: string | null;
+  /** A note, or an image a track or the shelf holds: a clip too, named
+   *  with its extension and never spent (images design §3). */
+  type: 'note' | 'image';
 }
 
 /** A link in a beat or a plan: the name it gives and the note it resolves

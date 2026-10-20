@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **Images on the board.** A note's embedded images (`![[map.png]]`, as Obsidian writes them, with `|300` for a width) show on its card in Play and when you read it in the inspector; one naming no image in the campaign shows its name, dashed. Drop an image from Finder on a board to put it there: it's copied into the campaign's `Shelf/` folder, so the campaign keeps everything it uses. An image Obsidian Canvas put on a board shows as itself, and renaming its track or the campaign keeps it on the board
+- **Images are clips.** An image in a track or on the shelf shows in Prep beside the notes, named with its extension as Obsidian links it (`[[Barovia.png]]`). Put it in a beat, play it and its card shows the picture, on the board and in the tray; double-click it to see it in the inspector. It renames, moves and copies from another campaign as a note does, and isn't spent: spend the beat that shows it. Claude finds images by name, puts them in beats and in play, and says an image has no text to read
 
 ### Changed
 

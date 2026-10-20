@@ -18,8 +18,9 @@ export function startNoteDrag(e: DragEvent, note: NoteEntry) {
   // Copy onto a beat (it's linked, not moved); move onto another track.
   e.dataTransfer.effectAllowed = 'copyMove';
   e.dataTransfer.setData(NOTE_MIME, note.path);
-  // Anywhere else that takes text, a note drops as its link.
-  e.dataTransfer.setData('text/plain', `[[${note.name}]]`);
+  // Anywhere else that takes text, a note drops as its link, and an image
+  // as its embed, as Obsidian drops one.
+  e.dataTransfer.setData('text/plain', `${note.type === 'image' ? '!' : ''}[[${note.name}]]`);
 }
 
 export function isNoteDrag(e: DragEvent): boolean {

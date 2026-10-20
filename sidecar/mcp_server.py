@@ -717,6 +717,13 @@ def _track(index: dict, track: str) -> tuple[str | None, str | None]:
     return folder, None
 
 
+def _no_text(entry: dict) -> str | None:
+    """The message for an image, which has no text to read or edit."""
+    if entry.get("type") != "image":
+        return None
+    return f'{entry["name"]} is an image ({entry["path"]}): it has no text. Its card shows it in Play.'
+
+
 def _names(notes: list[dict]) -> str:
     return ", ".join(n["name"] + (" (spent)" if n.get("spent") else "") for n in notes) or "(empty)"
 
@@ -870,7 +877,11 @@ async def live_set(campaign: str | None = None) -> str:
         return f"Nothing is live in {index['name']}."
     beat = next((b for b in index["beats"] if b["path"] == live.get("beat")), None)
     lines = [f"Live in {index['name']}" + (f", launched from {beat['name']}" if beat else "") + ":"]
+    images = {n["path"]: n for n in index["notes"] if n.get("type") == "image"}
     for path in live["notes"]:
+        if path in images:
+            lines += ["", f"## {images[path]['name']} ({path})", "(an image, shown on its card)"]
+            continue
         note = await sidecar.get(f"/api/command/note?{_q(campaign=index['name'], path=path)}")
         if isinstance(note, str):
             lines += ["", f"## {path}", "(can't be read right now)"]
@@ -894,6 +905,8 @@ async def read_note(name: str, campaign: str | None = None) -> str:
         return error
     entry, error = _note(index, name)
     if error:
+        return error
+    if error := _no_text(entry):
         return error
     note = await sidecar.get(f"/api/command/note?{_q(campaign=index['name'], path=entry['path'])}")
     if isinstance(note, str):
@@ -922,6 +935,8 @@ async def edit_note(name: str, content: str, hash: str, campaign: str | None = N
         return error
     entry, error = _note(index, name)
     if error:
+        return error
+    if error := _no_text(entry):
         return error
     where = _q(campaign=index["name"], path=entry["path"])
     note = await sidecar.get(f"/api/command/note?{where}")
@@ -1411,7 +1426,7 @@ async def connect_cards(
         ends.append(entry)
     if ends[0]["path"] == ends[1]["path"]:
         return "A line joins two different notes."
-    cards = {rel: card_id for card_id, rel in view["notes"].items()}
+    cards = {rel: card_id for card_id, rel in {**view["notes"], **view["images"]}.items()}
     where = f"{target['name']}'s board"
     missing = [e for e in ends if e["path"] not in cards]
     if len(missing) == 2:
@@ -1507,7 +1522,7 @@ async def add_text(text: str, near: str | None = None, session: str | None = Non
         entry, error = _note(index, near, "note")
         if error:
             return error
-        card_id = next((i for i, rel in view["notes"].items() if rel == entry["path"]), None)
+        card_id = next((i for i, rel in {**view["notes"], **view["images"]}.items() if rel == entry["path"]), None)
         if card_id is None:
             return f"{entry['name']} isn't on {where}. Leave near out to put the card under the board."
     spot = await sidecar.get(

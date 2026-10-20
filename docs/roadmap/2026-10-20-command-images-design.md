@@ -1,6 +1,6 @@
 # Command images (2026-10-20)
 
-**Status:** settled 2026-10-20 (§12). Nothing built yet. Extends [#407](https://github.com/Unseen-Servant/unseen-servant-app/issues/407), phase 3b of the [Command design](2026-10-11-command-design.md) (§9), and lifts two of its exclusions (§8).
+**Status:** settled 2026-10-20 (§12). Step 1 (#407) and step 2, images as clips, built 2026-10-20; steps 3 and 4 to come. Extends [#407](https://github.com/Unseen-Servant/unseen-servant-app/issues/407), phase 3b of the [Command design](2026-10-11-command-design.md) (§9), and lifts two of its exclusions (§8).
 
 ## 0. TL;DR
 

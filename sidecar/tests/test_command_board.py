@@ -456,6 +456,20 @@ def test_arranging_leaves_the_rest_of_the_board_and_starts_under_it(planned):
 # For MCP (board toolbar design §6, step 4)
 # ---------------------------------------------------------------------------
 
+def test_a_planned_image_settles_and_arranges_as_a_note_does(planned):
+    # Images design §3.3: a beat's image is on its session's board.
+    (planned / "Maps").mkdir()
+    (planned / "Maps" / "Barovia.png").write_bytes(b"\x89PNG")
+    write(planned / "Beats" / "Village.md", '---\nnotes:\n  - "[[Ireena]]"\n  - "[[Barovia.png]]"\n---\n')
+    view = board.settle(planned, SESSION, [])
+    assert list(view["images"].values()) == ["Maps/Barovia.png"]
+    assert board.plan_groups(planned, SESSION)[-1] == ("Village", ["Maps/Barovia.png"])
+    board.apply(planned, SESSION, board.arrange(planned, SESSION))
+    village = frames_by_label(board.read(planned, SESSION))["Village"]
+    image = next(n for n in board.read(planned, SESSION)["nodes"] if n.get("file") == "Strahd/Maps/Barovia.png")
+    assert board._within(image, village)
+
+
 def test_settling_writes_in_what_the_app_shows_where_it_shows_it(planned):
     # As board.ts `cards` lays them out: to the right of what's placed, a
     # column per group, then one for the rest (here a live note) by name.
