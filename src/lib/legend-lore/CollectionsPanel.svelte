@@ -913,12 +913,12 @@
     {/each}
   </ul>
   <!-- The ghost track: the next collection, waiting — a row's exact
-       geometry drawn in outline, the way a DAW leaves an empty lane below
-       its last track. Outside the scroll container, so it trails the last
-       row while the list is short and stays in view once it overflows.
-       Click, ⌘N, a drop or a folder's "New collection" all turn it into the
-       row it will become, in place; nothing exists until that's committed,
-       so Esc costs nothing. -->
+       geometry with no name, the way a DAW leaves an empty lane below its
+       last track, and as Command's lists end on an empty row. Outside the
+       scroll container, so it trails the last row while the list is short
+       and stays in view once it overflows. Click, ⌘N, a drop or a folder's
+       "New collection" all turn it into the row it will become, in place;
+       nothing exists until that's committed, so Esc costs nothing. -->
   {#if creating !== null}
     <div class="row-container ghost naming">
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -939,9 +939,6 @@
         <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor"><path d={CIRCLE}/></svg>
       </span>
     </div>
-    <div class="ghost-keys micro-label" aria-hidden="true">
-      <span><kbd>↵</kbd> create</span><span><kbd>esc</kbd> back</span>
-    </div>
   {:else}
     <button
       class="row-container ghost"
@@ -951,23 +948,18 @@
       on:dragleave={handlePathDragLeave}
       on:drop={handleNewDrop}
       title={`New collection${chordHint('collections.new')} — or drop books here`}
+      aria-label="New collection"
       aria-keyshortcuts={keyShortcut('collections.new') || undefined}
     >
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
         <path d={GEM}/>
       </svg>
-      {#if dropIntoNew && newDropPreview}
-        <!-- Under a drag, say what the drop will make. -->
-        <span class="ghost-label">New collection from <em>{newDropPreview.label}</em></span>
-        <span class="row-count">{newDropPreview.count}</span>
-      {:else}
-        <span class="ghost-label">New collection</span>
-        <span class="new-chord" aria-hidden="true">{chord('collections.new')}</span>
-      {/if}
+      <!-- Words only under a drag, to say what the drop will make. One
+           label throughout, as the session planner's empty row keeps:
+           WebKit refuses a drop whose target left mid-drag. -->
+      <span class="ghost-label">{#if dropIntoNew && newDropPreview}New collection from <em>{newDropPreview.label}</em>{/if}</span>
+      {#if dropIntoNew && newDropPreview}<span class="row-count">{newDropPreview.count}</span>{/if}
     </button>
-    {#if hasNone}
-      <div class="empty"><span class="ledger-label">or drag books here from the tree</span></div>
-    {/if}
   {/if}
 </aside>
 
@@ -1058,7 +1050,8 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.15rem 0.75rem;
-    margin-bottom: 0.3rem;
+    /* The first row sits flush under the plate, as a Command track's
+       first note: a gap would make it the ledger's one taller line. */
     flex-shrink: 0;
   }
   .panel-name {
@@ -1152,6 +1145,7 @@
   }
 
   .row-container {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -1170,6 +1164,29 @@
        content height, so one number pins both to the same rhythm: a
        list row's (the tree's, Command's notes'). */
     min-height: 1.65rem;
+  }
+  /* Ruled rows, a ledger's lines, as Command's tracks and session planner
+     (TrackGrid .note-row): a hairline under each row in the divider grey,
+     drawn over the row's foot so it keeps its 1.65rem. A collection's
+     books are ruled too, and so is the ghost track. */
+  .row-container::before,
+  .child-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-subtle);
+    pointer-events: none;
+  }
+  /* A ring is drawn inside the row, on the same last pixel: there the ring
+     is the row's rule. So is the drop line under it. */
+  .row-container.kb-focused::before,
+  .row-container.drop-after::before,
+  .row-container.naming::before,
+  .child-row.kb-focused::before {
+    display: none;
   }
   .row-container.hovered {
     background: var(--bg-container);
@@ -1195,8 +1212,9 @@
     opacity: var(--opacity-out-of-scope-hover);
   }
   /* Shelved — quieter than the playing-dim and italic, a track set
-     aside rather than one merely out of the current scope. */
-  .row-container.archived {
+     aside rather than one merely out of the current scope. Its contents
+     fade, not the row, so its rule stays level with the others'. */
+  .row-container.archived > * {
     opacity: 0.55;
   }
   .row-container.archived .row-name {
@@ -1330,6 +1348,7 @@
   /* Expanded file rows — the collection's contents, indented under the
      folder row. A playing collection's files take the wash too. */
   .child-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -1341,7 +1360,8 @@
   .child-row.washed {
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
   }
-  .child-row.dimmed {
+  /* Its contents, so the row's rule stays level with the others'. */
+  .child-row.dimmed > * {
     opacity: var(--opacity-out-of-scope);
   }
   /* Same ring the head rows wear — children are peer stops for j/k now. */
@@ -1402,10 +1422,10 @@
   }
 
   /* The ghost track — the next collection, waiting. It wears .row-container,
-     so it is a row's exact geometry, drawn in outline: a plain tertiary
-     gem in the icon column (not dashed — dashes are Loose's, "in no
-     collection", in the filter panel), an italic tertiary name, the ⌘N cap
-     at its end. Hover is the rows' own grey step. */
+     so it is a row's exact geometry with no name: a plain tertiary gem in
+     the icon column (not dashed — dashes are Loose's, "in no collection",
+     in the filter panel), as a Command track's empty row shows its dark
+     slot. Hover is the rows' own grey step. */
   .ghost {
     width: 100%;
     flex-shrink: 0;
@@ -1425,7 +1445,6 @@
     flex: 1;
     min-width: 0;
     font-size: 0.9rem;
-    font-style: italic;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1437,9 +1456,6 @@
     outline-offset: -3px;
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
     color: var(--text-accent);
-  }
-  .ghost.drop-into .ghost-label {
-    font-style: normal;
   }
   /* Naming in place: the slot already dresses as the row it will become —
      the armed wash and purple rule, and the caret's ring on the field. */
@@ -1462,8 +1478,8 @@
     padding: 0;
     outline: none;
   }
-  /* Italic, as the ghost's own label is, until a name is typed: every
-     naming row, here and in Command, waits in the same voice. */
+  /* Italic until a name is typed: every naming row, here and in Command,
+     waits in the same voice. */
   .new-coll-input::placeholder {
     color: var(--text-tertiary);
     font-style: italic;
@@ -1475,18 +1491,6 @@
   .tr-btn.arm-btn.ghost-arm {
     cursor: default;
     filter: none;
-  }
-  /* Key hints under the naming row, starting in the name's column. */
-  .ghost-keys {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.2rem 0.75rem 0.35rem calc(3px + 1.1rem + 0.8rem + 0.3rem);
-  }
-  .ghost-keys kbd {
-    font-family: var(--font-mono);
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--text-secondary);
   }
   /* The same key cap as the search bar's ⌘K (Header.svelte .search-chord):
      a shortcut on a standing control reads as a cap, one in a menu row as

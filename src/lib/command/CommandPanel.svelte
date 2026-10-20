@@ -1256,6 +1256,8 @@
             sessionName={session?.name ?? null}
             focusedPath={focusedBeat}
             armedPath={armedBeat}
+            selectedPath={selected}
+            onSelectNew={(key) => (selected = key)}
             onSelect={selectBeat}
             onFocus={focusOn}
             onOpen={(beat) => openPath(beat.path)}

@@ -125,7 +125,8 @@
   export function rename(path: string) {
     const named = cols.find((c) => newRowKey(c.track) === path);
     if (named) {
-      creatingIn = named.track;
+      if (kinds[named.track] === 'image') onAddImages(named.track);
+      else creatingIn = named.track;
       return;
     }
     const has = (c: Column) => c.groups.some((g) => g.notes.some((n) => n.path === path)) || c.spent.some((n) => n.path === path);
@@ -629,15 +630,20 @@
 
         {#if kinds[column.track] === 'image'}
           <!-- An image track's empty row adds images from the Mac (images
-               design §4), copied in, as the campaign keeps what it uses. -->
+               design §4), copied in, as the campaign keeps what it uses.
+               Selected as a note track's is; a double-click, or R on it,
+               opens the picker where a note's would name it. -->
           <button
             type="button"
-            class="ghost-row add-images"
-            title={`Add images to ${column.track}`}
-            on:click={() => onAddImages(column.track)}
+            class="ghost-row"
+            data-row
+            class:selected={selectedPath === newRowKey(column.track)}
+            title="Add images — double-click to choose them"
+            aria-label={`Add images to ${column.track}`}
+            on:click={() => onSelectNew(newRowKey(column.track))}
+            on:dblclick={() => onAddImages(column.track)}
           >
             <span class="slot" aria-hidden="true"></span>
-            <span class="ghost-label">+ image</span>
           </button>
         {:else if creatingIn === column.track}
           <div class="row-edit naming">
@@ -1155,16 +1161,6 @@
   .note-row.selected,
   .ghost-row.selected {
     box-shadow: var(--ring-focus);
-  }
-
-  /* `+ image` in the tertiary grey of `+ track`, brightening on hover as
-     a key does. */
-  .ghost-row.add-images {
-    color: var(--text-tertiary);
-  }
-
-  .ghost-row.add-images:hover {
-    color: var(--text-primary);
   }
 
   /* The note in the inspector: content on show, so the parchment wash

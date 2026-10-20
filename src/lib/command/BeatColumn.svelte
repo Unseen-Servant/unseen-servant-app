@@ -16,6 +16,7 @@
   import { CARET_RIGHT, CIRCLE, CIRCLE_RING } from '../ui/iconPaths';
   import { action, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { draggedNote, isNoteDrag } from './noteDrag';
+  import { newRowKey } from './columns';
   import { memberPaths, planMoveTo, type PlanRow } from './prep';
   import type { BeatEntry, NoteEntry } from './types';
   import { grab } from '../ui/grab';
@@ -29,6 +30,10 @@
   export let focusedPath: string | null;
   /** The focused beat, while it's armed. */
   export let armedPath: string | null;
+  /** The selected row: the empty row is ringed by it, as a track's is. */
+  export let selectedPath: string | null;
+  /** Select the empty row, by its key (columns.ts newRowKey). */
+  export let onSelectNew: (key: string) => void;
   /** A click: the beat is focused, or let go if it was. */
   export let onSelect: (beat: BeatEntry) => void;
   /** A right-click: the beat is focused, as Legend Lore's right-click
@@ -58,6 +63,8 @@
   export let onReorder: (names: string[]) => void;
 
   let creating = false;
+  // Beats/ is reserved, so no track's empty row shares the key.
+  const NEW_BEAT = newRowKey('Beats');
   let renamingPath: string | null = null;
   let menu: OpenMenu | null = null;
 
@@ -283,8 +290,13 @@
     ];
   }
 
-  /** R on the selected beat: renamed in its row, if the column shows it. */
+  /** R on the selected beat: renamed in its row, if the column shows it.
+   *  On the selected empty row, the new beat is named there. */
   export function rename(path: string) {
+    if (path === NEW_BEAT) {
+      if (planOpen) creating = true;
+      return;
+    }
     const planned = planOpen && rows.some((r) => r.beat?.path === path);
     const unplanned = (spareOpen && shown.some((b) => b.path === path)) || (spentOpen && spent.some((b) => b.path === path));
     if (planned || unplanned) renamingPath = path;
@@ -488,10 +500,11 @@
         {/if}
       {/each}
 
-      <!-- Legend Lore's ghost track: the next beat, waiting, drawn as a row in
-           outline. It sits after the plan, where a new beat lands. Naming
-           dresses it as the row it becomes; nothing exists until Enter. A
-           note dropped on it starts the beat with that note. -->
+      <!-- The empty row, the ledger's next line, as under a track's notes:
+           a beat row with no name, after the plan, where a new beat lands.
+           A click selects it and a double-click, or R on it, names the beat
+           there, dressed as the row it becomes; nothing exists until Enter.
+           A note dropped on it starts the beat with that note. -->
       {#if creating}
         <div class="beat-row ghost naming">
           <InlineName
@@ -521,29 +534,28 @@
             <span class="count-slot" aria-hidden="true"></span>
           {/if}
         </div>
-        <div class="ghost-keys micro-label" aria-hidden="true">
-          <span><kbd>↵</kbd> create</span><span><kbd>esc</kbd> back</span>
-        </div>
       {:else}
         <button
           type="button"
           class="beat-row ghost"
+          data-row
+          class:selected={selectedPath === NEW_BEAT}
           class:drop-before={dropSlot === rows.length}
           class:drop-into={incoming !== null}
-          title="New beat — or drop a note here"
-          on:click={() => (creating = true)}
+          title="New beat — double-click to name it, or drop a note here"
+          aria-label="New beat"
+          on:click={() => onSelectNew(NEW_BEAT)}
+          on:dblclick={() => (creating = true)}
           on:dragover={overGhost}
           on:drop={dropOnGhost}
         >
-          <!-- Under a drag, say what the drop will make. One label throughout:
-               swapping the element under the pointer mid-drag detaches the
-               drag's target, and WebKit then refuses the drop. -->
-          <span class="ghost-label">New beat{#if incoming}&nbsp;with <em>{incoming.name}</em>{/if}</span>
+          <!-- Words only under a drag, to say what the drop will make. One
+               label throughout: swapping the element under the pointer
+               mid-drag detaches the drag's target, and WebKit then refuses
+               the drop. -->
+          <span class="ghost-label">{#if incoming}New beat with <em>{incoming.name}</em>{/if}</span>
           {#if incoming}<span class="row-count">1</span>{/if}
         </button>
-        {#if !rows.length && !spare.length}
-          <div class="ledger-label empty-hint">or drag a note here</div>
-        {/if}
       {/if}
     {/if}
 
@@ -623,7 +635,7 @@
     min-height: 1.65rem;
     gap: 0.3rem;
     width: 100%;
-    margin: 0.2rem 0 0.05rem;
+    margin: 0;
     /* Room inside for the drop outline when a beat is dragged over it. On
        the left, the caret sits under the plate's title as the filter
        panel's sits under FILTERS: its box 0.45rem - 3px before the title
@@ -671,14 +683,17 @@
     filter: var(--glow-active);
   }
 
+  /* Flush under the plate, as a track's first note: the ledger's lines then
+     run level with the tracks' beside it. */
   .list {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 0.25rem 0.25rem 1rem;
+    padding: 0 0.25rem 1rem;
   }
 
   .beat-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -698,6 +713,30 @@
     text-align: left;
     color: var(--text-primary);
     transition: background var(--transition-fast);
+  }
+
+  /* Ruled rows, a ledger's lines, as the tracks' (TrackGrid .note-row): a
+     hairline under each beat in the columns' divider grey, drawn over the
+     row's foot so it keeps its 1.65rem. The empty row is ruled too, the
+     ledger's next line. */
+  .beat-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-subtle);
+    pointer-events: none;
+  }
+
+  /* A ring is drawn inside the row, on the same last pixel: there the ring
+     is the row's rule. So is the drop line under it. */
+  .beat-row.focused::before,
+  .beat-row.drop-after::before,
+  .ghost.selected::before,
+  .ghost.naming::before {
+    display: none;
   }
 
   /* Legend Lore's row states, as on the note rows: a latched grey-step
@@ -870,8 +909,9 @@
     color: var(--text-accent);
   }
 
-  /* Legend Lore's ghost track (CollectionsPanel .ghost): a row's geometry
-     in outline, an italic tertiary name. Hover is the rows' grey step. */
+  /* The empty row (TrackGrid .ghost-row): a beat row with no name, there
+     at all times. Hover is the rows' grey step; selected, it's ringed as a
+     focused beat is. */
   .ghost {
     color: var(--text-tertiary);
     cursor: pointer;
@@ -882,13 +922,22 @@
     color: var(--text-secondary);
   }
 
+  .ghost.selected {
+    box-shadow: var(--ring-focus);
+  }
+
   .ghost-label {
     flex: 1;
     min-width: 0;
-    font-style: italic;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* An unseen line of type, so the nameless row is a beat row's height to
+     the pixel: a min-height rounds differently from a line box. */
+  .ghost-label::after {
+    content: '\200b';
   }
 
   /* Naming in place: the slot already dresses as the row it will become —
@@ -911,26 +960,8 @@
     filter: none;
   }
 
-  /* Key hints under the naming row, starting in the name's column. */
-  .ghost-keys {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.2rem 0.35rem 0.35rem calc(0.9rem + 3px);
-  }
-
-  .ghost-keys kbd {
-    font-family: var(--font-mono);
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--text-secondary);
-  }
-
   .spare-head {
     margin-top: 0.85rem;
-  }
-
-  .empty-hint {
-    padding: 0.3rem 0.35rem 0.5rem calc(0.9rem + 3px);
   }
 
   /* Under a drag, as Legend Lore's collections panel: the dragged row fades,
@@ -956,13 +987,9 @@
     background: var(--bg-container);
   }
 
-  /* The ghost under a note drag says what it will make. */
+  /* The empty row under a note drag says what it will make. */
   .ghost.drop-into {
     background: color-mix(in srgb, var(--text-accent) 8%, transparent);
     color: var(--text-accent);
-  }
-
-  .ghost.drop-into .ghost-label {
-    font-style: normal;
   }
 </style>

@@ -27,8 +27,8 @@
   <section class="field">
     <h3 class="field-title section-title">Beats and sessions</h3>
     <p class="field-desc">
-      A beat is a scene: the notes it needs. Name one in the empty row of the
-      session planner, on the right; it starts armed (&#9679;), so clicking
+      A beat is a scene: the notes it needs. Double-click the empty row of
+      the session planner, on the right, to name one; it starts armed (&#9679;), so clicking
       notes puts them in it, and <strong>Esc</strong> disarms it.
       <em>New session</em> in the bar starts a session; drag beats into its
       plan.
@@ -94,9 +94,9 @@
       A track holds notes or images, chosen when you insert it:
       <em>+ track</em>, or a track's right-click, offers <em>Insert note
       track</em> (<strong>&#8984;T</strong>) and <em>Insert image track</em>
-      (<strong>&#8679;&#8984;T</strong>). An image track's empty row is
-      <em>+ image</em>, which copies pictures from your Mac into it, as
-      does dropping them on it from Finder; dropped on the shelf, they land
+      (<strong>&#8679;&#8984;T</strong>). Double-clicking an image track's
+      empty row copies pictures from your Mac into it, as does dropping
+      them on it from Finder; dropped on the shelf, they land
       there. An image goes only in an image track, and a note only in a note
       track; the shelf holds both. A folder of images you fill in Finder is
       an image track already. In Legend Lore's tree, right-click an image

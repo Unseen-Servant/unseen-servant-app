@@ -52,7 +52,7 @@ Curse of Strahd/
 - `command.json` gains `kinds`, `{track: "image" | "note"}`, beside `pigments`. A track rename carries its kind, as it carries its pigment (`rename_track`).
 - **The default:** with no entry, a track whose folder holds images and no notes is an image track, and any other is a note track. A `Maps/` folder filled in Finder reads right with nothing saved, and an empty track is a note track until the GM says otherwise.
 - **Choosing it:** the track's menu gains a *Kind* pick row above *Pigment*, with two picks: Notes and Images. A pick writes the entry. A new image track is `+ track`, then Images. *As built, revised the same day:* the kind is chosen when a track is inserted, as a Live track's is: `+ track` opens *Insert note track* (⌘T) and *Insert image track* (⇧⌘T), and a track's menu offers the same, inserting after that track; the keys insert after the selected note's track, else at the end. A track's kind isn't changed afterwards in the app, as a Live track's isn't. In an image track the menu's *New note* is *Add images…*.
-- **What it changes:** what the column makes, not what it holds. An image track's empty row is `+ image` (§4); a note track's names a new note, as today.
+- **What it changes:** what the column makes, not what it holds. An image track's empty row adds images (§4); a note track's names a new note, as today.
 - **Filing follows the kind** (2026-10-20): Command puts an image only in an image track and a note only in a note track, as Live keeps audio clips off MIDI tracks. A row's *Move to* lists the tracks of its kind, a dragged row lights only those columns, and the sidecar refuses a move, a new note or an added image that would mismatch, so MCP can't make one either. The shelf holds both, as Live's browser does. A mismatch made in Finder still shows, and moves within its own track.
 
 *Rejected:*
@@ -75,7 +75,7 @@ Curse of Strahd/
 - **No spend:** an image row has no spend key, A does nothing on it, and its menu has no *Mark spent*.
 - **The inspector:** a selected image opens under the inspector plate: track, group › name as the rename field, `[close]`. Below the plate, the image is fitted to the panel's width on the vellum. There's no `[read]`/`[edit]` and no save state.
 - **Adding images:**
-  - An image track's empty row is `+ image`. A click opens the native picker (images only, several at once) and copies the files into the track, numbering any clash.
+  - An image track's empty row is `+ image`. A click opens the native picker (images only, several at once) and copies the files into the track, numbering any clash. *Revised 2026-10-20:* the row is blank, as a note track's: a click selects it, and a double-click or R opens the picker.
   - Images dropped from Finder on an image track's column are copied into it, and on the shelf onto the shelf (2026-10-20); a note track's column takes none. Added images, picked or dropped, join the armed beat if there is one, as a note started then does.
   - Send to Command from Legend Lore (§6), and #407's drop from Finder onto the board.
 - **The shelf sidebar** lists its images. *Copy from* lists another campaign's images, and a place's, and copies their bytes onto the shelf, as it copies notes.

@@ -642,24 +642,23 @@
   .badge-cluster:hover :global(.game-system-badge) {
     border-color: var(--text-accent);
   }
+  /* An add key, as Command's `+ track` and `+ session`: lowercase, grey on
+     the floor, no box, brightening on hover. Not dashed: dashes are the
+     "in none" buckets' (Untagged's shield). */
   .add-tag-btn {
     display: inline-block;
-    padding: 0.1rem 0.55rem;
+    padding: 0;
     margin-left: 0.5rem;
-    border-radius: var(--radius-sm);
     font-size: 0.8rem;
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px dashed var(--text-tertiary);
+    background: none;
+    color: var(--text-tertiary);
+    border: none;
     cursor: pointer;
     line-height: 1.4;
     letter-spacing: 0.02em;
-    transition: all var(--transition-fast);
+    transition: color var(--transition-fast);
   }
   .add-tag-btn:hover {
-    background: color-mix(in srgb, var(--text-accent) 10%, transparent);
-    color: var(--text-accent);
-    border-color: var(--text-accent);
-    border-style: solid;
+    color: var(--text-primary);
   }
 </style>
