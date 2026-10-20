@@ -8,16 +8,21 @@
   import { gfmPlugin } from 'svelte-exmarkdown/gfm';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { NOTE_HREF, bodyOf, linkify, rehypeMissingLinks } from './board';
+  import { embedImages, rehypeEmbeds, type ImageSource } from './embeds';
 
   /** The editor's text, unsaved keystrokes included. */
   export let text: string;
+  /** The note's path, which its relative image paths start from. */
+  export let path: string | null;
   export let resolves: (name: string) => boolean;
+  /** What its embedded images load from (#407). */
+  export let images: ImageSource;
   /** A click on a note's link. */
   export let onFollow: (name: string) => void;
   export let onError: (message: string) => void;
 
   let plugins: Plugin[];
-  $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeMissingLinks, resolves] }];
+  $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeMissingLinks, resolves] }, { rehypePlugin: [rehypeEmbeds, images, path] }];
 
   /** As a card's links: a note's opens the note, a web link the browser,
    *  and nothing navigates the webview. */
@@ -35,7 +40,7 @@
      brings the click handled here. -->
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="reader" on:click={onClick}>
-  <Markdown md={linkify(bodyOf(text))} {plugins} />
+  <Markdown md={linkify(embedImages(bodyOf(text)))} {plugins} />
 </div>
 
 <style>
@@ -113,7 +118,7 @@
     transition: filter var(--transition-fast);
   }
   .reader :global(a:hover) { filter: brightness(1.25); }
-  .reader :global(a.missing) {
+  .reader :global(:is(a.missing, .embed-missing)) {
     color: var(--text-secondary);
     text-decoration: underline dashed;
     text-decoration-color: var(--text-accent);

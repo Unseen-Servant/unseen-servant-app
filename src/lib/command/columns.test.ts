@@ -13,6 +13,7 @@ const note = (path: string): NoteEntry => {
 const index: CampaignIndex = {
   name: 'Strahd',
   tracks: ['PCs', 'NPCs', 'Locations'],
+  images: [],
   notes: [
     'NPCs/Vallaki/Lady Wachter.md',
     'NPCs/Ismark.md',

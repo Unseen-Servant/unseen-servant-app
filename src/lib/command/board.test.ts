@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handStep, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
+import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handStep, IMAGE_CARD, imageCard, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -16,9 +16,10 @@ const index: CampaignIndex = {
   ambiguous: [],
   beats: [],
   sessions: [],
+  images: [],
 };
 
-const empty: BoardView = { nodes: [], edges: [], notes: {} };
+const empty: BoardView = { nodes: [], edges: [], notes: {}, images: {} };
 
 describe('cards', () => {
   it('lays out notes nobody placed in a column per beat group, in order, then the rest by name', () => {
@@ -43,6 +44,7 @@ describe('cards', () => {
       ],
       edges: [],
       notes: { a: 'NPCs/Ismark.md' },
+      images: {},
     };
     const out = cards(view, index, ['NPCs/Ismark.md', 'NPCs/Ireena.md']);
     expect(out.map((c) => [c.id, c.kind, c.text, c.placed])).toEqual([
@@ -60,6 +62,7 @@ describe('cards', () => {
       nodes: [{ id: 'a', type: 'file', file: 'Strahd/NPCs/Gone.md', x: 0, y: 0, width: 100, height: 100 }],
       edges: [],
       notes: {},
+      images: {},
     };
     expect(cards(view, index, [])[0]).toMatchObject({ kind: 'note', path: null, text: 'Strahd/NPCs/Gone.md' });
   });
@@ -76,6 +79,7 @@ describe('lines', () => {
     const view: BoardView = {
       nodes: [],
       notes: {},
+      images: {},
       edges: [
         { id: 'e1', fromNode: 'a', toNode: 'b', fromSide: 'top', toSide: 'top', label: 'owes', toEnd: 'none' },
         { id: 'e2', fromNode: 'b', toNode: 'a' },
@@ -93,6 +97,7 @@ describe('lines', () => {
     const view: BoardView = {
       nodes: [],
       notes: {},
+      images: {},
       edges: [{ id: 'e', fromNode: 'a', toNode: 'b', color: '4', fromEnd: 'arrow' }],
     };
     expect(lines(view, [at('a', 0, 0), at('b', 300, 0)])[0]).toMatchObject({ color: '4', fromEnd: 'arrow', toEnd: 'arrow' });
@@ -126,6 +131,7 @@ describe('operations', () => {
       nodes: [{ id: 'a', type: 'file', file: 'Strahd/NPCs/Ismark.md', x: 0, y: 0, width: 100, height: 100 }],
       edges: [],
       notes: { a: 'NPCs/Ismark.md' },
+      images: {},
     };
     const wanted = ['NPCs/Ismark.md', 'NPCs/Ireena.md', 'Locations/Tser Pool.md', 'Overview.md'];
     const where = (board: Card[]) => board.map((c) => [c.path, c.x, c.y]);
@@ -203,6 +209,7 @@ describe('applyOps', () => {
       nodes: [{ id: 'a', type: 'file', file: 'Strahd/NPCs/Ismark.md', x: 0, y: 0, width: 100, height: 100 }],
       edges: [{ id: 'old', fromNode: 'a', toNode: 'gone' }],
       notes: { a: 'NPCs/Ismark.md' },
+      images: {},
     };
     const after = applyOps(view, [
       { op: 'place', id: 'b', path: 'NPCs/Ireena.md', x: 200, y: 0, width: 100, height: 100 },
@@ -220,8 +227,35 @@ describe('applyOps', () => {
       nodes: [after.nodes[1]],
       edges: [],
       notes: { b: 'NPCs/Ireena.md' },
+      images: {},
     });
     expect(view.nodes[0].x).toBe(0);
+  });
+
+  it('files a placed image among the images, and forgets it once removed', () => {
+    const view: BoardView = { nodes: [], edges: [], notes: {}, images: {} };
+    const after = applyOps(view, [{ op: 'place', id: 'm', path: 'Shelf/Barovia.png', x: 0, y: 0, width: 480, height: 300 }], 'Strahd');
+    expect([after.notes, after.images]).toEqual([{}, { m: 'Shelf/Barovia.png' }]);
+    expect(applyOps(after, [{ op: 'remove', id: 'm' }], 'Strahd').images).toEqual({});
+  });
+});
+
+describe('image cards', () => {
+  it('shows a file node naming an image as the image (#407)', () => {
+    const view: BoardView = {
+      nodes: [{ id: 'm', type: 'file', file: 'Strahd/Maps/Barovia.png', x: 0, y: 0, width: 400, height: 300 }],
+      edges: [],
+      notes: {},
+      images: { m: 'Maps/Barovia.png' },
+    };
+    expect(cards(view, index, []).map((c) => [c.kind, c.path, c.text])).toEqual([['image', 'Maps/Barovia.png', 'Strahd/Maps/Barovia.png']]);
+  });
+
+  it('sizes a dropped image in its proportions, at most IMAGE_CARD a side', () => {
+    expect(imageCard(1920, 1080)).toEqual({ width: IMAGE_CARD, height: 270 });
+    expect(imageCard(600, 1200)).toEqual({ width: 240, height: IMAGE_CARD });
+    expect(imageCard(200, 100)).toEqual({ width: 200, height: 100 });
+    expect(imageCard(2000, 20)).toEqual({ width: IMAGE_CARD, height: 40 });
   });
 });
 
@@ -233,6 +267,7 @@ describe("the toolbar's cards", () => {
     ],
     edges: [{ id: 'e', fromNode: 'a', toNode: 'g', toEnd: 'none', label: 'in' }],
     notes: { a: 'NPCs/Ismark.md' },
+    images: {},
   };
 
   it('draws a new frame behind the cards, a new text card on top, and a line with no arrowhead', () => {

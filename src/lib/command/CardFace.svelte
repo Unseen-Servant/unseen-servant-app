@@ -10,7 +10,9 @@
   import { BOOK, PLAY } from '../ui/iconPaths';
   import SpendKey from './SpendKey.svelte';
   import { getContext } from 'svelte';
+  import type { Plugin } from 'svelte-exmarkdown';
   import { CARD_ACTIONS, NOTE_HREF, linkify, type CardActions, type CardData } from './board';
+  import { IMAGE_SOURCE, embedImages, rehypeEmbeds, type ImageSourceStore } from './embeds';
 
   export let data: CardData;
   /** In the card tray, where every card is live: it doesn't light, and the
@@ -18,9 +20,11 @@
   export let held = false;
 
   const actions = getContext<CardActions>(CARD_ACTIONS);
-  const plugins = [gfmPlugin()];
+  const images = getContext<ImageSourceStore>(IMAGE_SOURCE);
 
   $: card = data.card;
+  let plugins: Plugin[];
+  $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeEmbeds, $images, card.path] }];
   $: missing = card.kind === 'note' && card.path === null;
   $: title = data.name || card.text.split('/').pop()?.replace(/\.md$/i, '') || 'Untitled';
 
@@ -86,7 +90,7 @@
     {#if missing}
       <p class="note-missing">Nothing is at {card.text} any more.</p>
     {:else if data.body !== null}
-      <Markdown md={linkify(data.body)} {plugins} />
+      <Markdown md={linkify(embedImages(data.body))} {plugins} />
     {/if}
   </div>
 </article>
@@ -301,6 +305,15 @@
   .card-body :global(:is(ul, ol)) { margin: 0.35em 0; padding-left: 1.2em; }
   .card-body :global(li) { margin: 0.1em 0; }
   .card-body :global(a) { color: var(--text-accent); cursor: pointer; }
+  /* An embedded image, no wider than the card (#407). */
+  .card-body :global(img) { max-width: 100%; height: auto; }
+  /* An embed naming nothing: its name, dashed as a missing link is. */
+  .card-body :global(.embed-missing) {
+    color: var(--text-secondary);
+    text-decoration: underline dashed;
+    text-decoration-color: var(--text-accent);
+    text-underline-offset: 3px;
+  }
   .card-body :global(blockquote) {
     margin: 0.4em 0;
     padding-left: 0.6em;

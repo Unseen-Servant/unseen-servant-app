@@ -78,7 +78,7 @@ def test_only_canvas_objects_parse():
 # ---------------------------------------------------------------------------
 
 def test_a_session_without_a_board_reads_empty(camp):
-    assert board.read(camp, SESSION) == {"nodes": [], "edges": [], "notes": {}}
+    assert board.read(camp, SESSION) == {"nodes": [], "edges": [], "notes": {}, "images": {}}
 
 
 def test_cards_resolve_from_the_root_or_from_the_campaign(camp):
@@ -90,6 +90,28 @@ def test_cards_resolve_from_the_root_or_from_the_campaign(camp):
         {"id": "e", "type": "text", "text": "hi"},
     ], "edges": []}))
     assert board.read(camp, SESSION)["notes"] == {"a": "NPCs/Ismark.md", "b": "NPCs/Ireena.md"}
+
+
+def test_an_image_card_shows_its_image_and_places_like_a_note(camp):
+    # An image Obsidian dropped on a canvas is a file node too (#407).
+    (camp / "Maps").mkdir()
+    (camp / "Maps" / "Barovia.png").write_bytes(b"\x89PNG")
+    write(camp / "Sessions" / "Session 1.canvas", canvas.dump({"nodes": [
+        {"id": "a", "type": "file", "file": "Strahd/Maps/Barovia.png", "x": 0, "y": 0, "width": 400, "height": 300},
+        {"id": "b", "type": "file", "file": "Strahd/Maps/Gone.png"},
+    ], "edges": []}))
+    view = board.read(camp, SESSION)
+    assert (view["notes"], view["images"]) == ({}, {"a": "Maps/Barovia.png"})
+
+    # Placing one already there frames its card, as for a note.
+    placed = board.apply(camp, SESSION, [card("c", "Maps/Barovia.png", x=10, y=20)])
+    assert placed["images"] == {"a": "Maps/Barovia.png"}
+    assert placed["nodes"][0]["x"] == 10
+    board.apply(camp, SESSION, [card("d", "NPCs/Ismark.md")])
+    with pytest.raises(NotFound):
+        board.apply(camp, SESSION, [card("e", "Maps/Gone.png")])
+    with pytest.raises(Invalid):
+        board.apply(camp, SESSION, [card("e", "Sessions/Session 1.canvas")])
 
 
 def test_only_a_session_has_a_board(camp):
@@ -315,6 +337,20 @@ def test_renames_and_moves_rewrite_cards(camp, tmp_path):
     assert [n.get("file") for n in canvas.parse(board_text(moved))["nodes"][:2]] == [
         "Barovia/Folk/Isaac.md", "Secrets/Ireena.md",
     ]
+
+
+def test_renames_carry_image_cards(camp, tmp_path):
+    # An image inside a renamed track or campaign keeps its card (#407).
+    (camp / "NPCs" / "Ismark.png").write_bytes(b"\x89PNG")
+    write(camp / "Sessions" / "Session 1.canvas", canvas.dump({"nodes": [
+        {"id": "a", "type": "file", "file": "Strahd/NPCs/Ismark.png"},
+    ], "edges": []}))
+    vault.rename_track(camp, "NPCs", "Folk")
+    assert canvas.parse(board_text(camp))["nodes"][0]["file"] == "Strahd/Folk/Ismark.png"
+    vault.rename_campaign(tmp_path, "Strahd", "Barovia")
+    moved = tmp_path / "Barovia"
+    assert canvas.parse(board_text(moved))["nodes"][0]["file"] == "Barovia/Folk/Ismark.png"
+    assert board.read(moved, SESSION)["images"] == {"a": "Folk/Ismark.png"}
 
 
 def test_a_new_session_starts_without_a_board(camp, monkeypatch):

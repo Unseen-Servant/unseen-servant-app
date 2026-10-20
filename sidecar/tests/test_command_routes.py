@@ -264,7 +264,7 @@ def test_a_jot_lands_at_the_end_of_the_session_note(table, campaign_root):
 def test_the_board_over_http_follows_a_session_rename(table):
     session = "Sessions/Session 1.md"
     assert table.get("/api/command/board", params={"campaign": "Strahd", "session": session}).json() == {
-        "nodes": [], "edges": [], "notes": {},
+        "nodes": [], "edges": [], "notes": {}, "images": {},
     }
     view = table.post("/api/command/board", json={"campaign": "Strahd", "session": session, "ops": [
         {"op": "place", "id": "a1", "path": "NPCs/Ismark.md", "x": 0, "y": 0, "width": 260, "height": 180},
@@ -349,6 +349,19 @@ def test_the_shelf_over_http(cmd, campaign_root):
     assert cmd.post("/api/command/notes/copy", json={
         "campaign": "Tomb", "from_campaign": "Strahd", "path": "Shelf/Idea.md",
     }).status_code == 409
+
+
+def test_an_image_dropped_on_a_board_lands_on_the_shelf(cmd, campaign_root):
+    import shutil
+    shutil.rmtree(campaign_root / "Strahd" / "Shelf")  # a campaign made by hand has none
+    params = {"campaign": "Strahd", "name": "Barovia map.png"}
+    assert cmd.post("/api/command/images", params=params, content=b"\x89PNG").json() == {"path": "Shelf/Barovia map.png"}
+    assert cmd.post("/api/command/images", params=params, content=b"\x89PNG").json() == {"path": "Shelf/Barovia map 2.png"}
+    assert (campaign_root / "Strahd" / "Shelf" / "Barovia map.png").read_bytes() == b"\x89PNG"
+    index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert index["images"] == ["Shelf/Barovia map 2.png", "Shelf/Barovia map.png"]
+    refused = cmd.post("/api/command/images", params={"campaign": "Strahd", "name": "notes.md"}, content=b"x")
+    assert refused.status_code == 422
 
 
 def test_the_shelf_copies_from_a_folder_the_gm_added(cmd, campaign_root, tmp_path):

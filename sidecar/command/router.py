@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from . import board, jot, prep, vault
 from .events import VaultWatcher
@@ -517,6 +518,20 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
                 campaign_path(body.campaign), body.track, body.name, body.text, body.source, body.cite,
             )
         return {"path": path}
+
+    @router.post("/images")
+    async def add_image(request: Request, campaign: str, name: str):
+        """An image dropped on a board from Finder, copied onto the
+        campaign's shelf (#407), since the campaign is the unit. The body
+        is the file's bytes; the answer, the copy's path."""
+        data = await request.body()
+
+        def write() -> str:
+            camp = campaign_path(campaign)
+            with write_lock:
+                return vault.add_image(camp, shelf_or(camp, prep.SHELF), name, data)
+
+        return {"path": await run_in_threadpool(write)}
 
     @router.post("/notes/rename")
     def rename_note(body: NoteRename):

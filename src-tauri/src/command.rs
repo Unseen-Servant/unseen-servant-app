@@ -93,6 +93,9 @@ pub struct CampaignIndex {
     ambiguous: Vec<String>,
     beats: Vec<BeatEntry>,
     sessions: Vec<SessionEntry>,
+    /// Every image in the campaign, by path, for notes' embeds (#407).
+    #[serde(default)]
+    images: Vec<String>,
 }
 
 /// A place's notes, as a campaign's index lists them.
@@ -361,7 +364,25 @@ async fn open_from(app: &AppHandle, path: &str) -> Result<String, String> {
         Ok(Some(named.name))
     })
     .await?;
+    allow_campaigns_folder(app).await;
     Ok(opened.unwrap_or_default())
+}
+
+/// Let the webview load files from the campaigns folder through the asset
+/// protocol, for the images on cards (#407), and nothing outside it. Every
+/// campaign opens through `open_from`, after the root is set or changed.
+/// A folder stays allowed until the app quits, since Tauri's scope can't
+/// take an allow back; each one was the GM's choice.
+async fn allow_campaigns_folder(app: &AppHandle) {
+    let root = match command_get_settings().await {
+        Ok(settings) => settings.root,
+        Err(e) => return eprintln!("Command images: no campaigns folder ({})", e),
+    };
+    if let Some(root) = root {
+        if let Err(e) = app.asset_protocol_scope().allow_directory(&root, true) {
+            eprintln!("Command images: can't serve {} ({})", root, e);
+        }
+    }
 }
 
 /// Have the sidecar remove `campaign` if it's an untitled campaign left
@@ -848,6 +869,37 @@ pub async fn command_send(
     })
 }
 
+/// Copy an image dropped on a board from Finder onto the campaign's shelf
+/// (#407). The body is the file's bytes, raw rather than JSON; the
+/// campaign and the file's name come in headers, URI-encoded since a
+/// header is ASCII. Returns the copy's path.
+#[tauri::command]
+pub async fn command_add_image(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("The image came without its bytes".to_string());
+    };
+    let header = |key: &str| {
+        request
+            .headers()
+            .get(key)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| percent_encoding::percent_decode_str(v).decode_utf8().ok())
+            .map(|v| v.into_owned())
+            .ok_or_else(|| format!("The image came without its {}", key))
+    };
+    let (campaign, name) = (header("campaign")?, header("name")?);
+    let added: AtPath = answer(
+        client()
+            .post(api_query(
+                "/images",
+                &[("campaign", &campaign), ("name", &name)],
+            )?)
+            .body(bytes.clone()),
+    )
+    .await?;
+    Ok(added.path)
+}
+
 /// Copy another campaign's note, or a place's, onto this campaign's
 /// shelf. Returns the copy's path.
 #[tauri::command]
@@ -1008,6 +1060,7 @@ mod tests {
                        "notes": [{"link": "Ismark", "path": "NPCs/Ismark.md"}, {"link": "Wolves", "path": null}]}],
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
                           "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}]}],
+            "images": ["Maps/Barovia.png"],
         });
         let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
         assert_eq!(serde_json::to_value(index).unwrap(), sidecar);

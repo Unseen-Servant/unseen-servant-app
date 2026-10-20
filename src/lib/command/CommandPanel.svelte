@@ -29,6 +29,7 @@
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, type Column } from './columns';
+  import { imageSource } from './embeds';
   import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
@@ -155,6 +156,8 @@
   $: sunk = menu && menu === switcher ? switcherFor : null;
   $: cols = index ? columns(index) : ([] as Column[]);
   $: openEntry = index?.notes.find((n) => n.path === bufState.path) ?? null;
+  /** Where notes' embedded images load from (#407). */
+  $: images = imageSource(settings?.root ?? null, campaign ?? '', index?.images ?? []);
   $: openName = openEntry?.name ?? (bufState.path ? stem(bufState.path) : '');
   $: renamable = bufState.status !== 'conflict' && bufState.status !== 'unreadable';
   $: session = index ? activeSession(index, $appContext.session) : null;
@@ -1091,6 +1094,7 @@
               {index}
               {session}
               {live}
+              {images}
               {run}
               bind:playerOpen
               bind:trayOpen
@@ -1300,7 +1304,9 @@
             <div class="editor-slot">
               <NoteReader
                 text={noteText}
+                path={bufState.path}
                 resolves={(target) => !!index && !!linkedNote(index, target)}
+                {images}
                 onFollow={followLink}
                 onError={(message) => (error = message)}
               />

@@ -6,6 +6,7 @@
   // session note are the only things written — what's live is the
   // sidecar's.
   import { onDestroy, onMount, setContext, tick } from 'svelte';
+  import { writable } from 'svelte/store';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import type { Viewport } from '@xyflow/svelte';
   import Arrangement from './Arrangement.svelte';
@@ -18,13 +19,17 @@
   import { chord, chordHint } from '../shell/keybindings';
   import { commandApi } from './api';
   import {
+    CARD,
     CARD_ACTIONS,
+    GAP,
     applyOps,
     bodyOf,
     cards as boardCards,
     frameOp,
     handOf,
+    imageCard,
     lines as boardLines,
+    newId,
     placeAll,
     type Card,
     type CardActions,
@@ -32,6 +37,7 @@
     type Tool,
   } from './board';
   import { inverse } from './boardUndo';
+  import { IMAGE_SOURCE, type ImageSource } from './embeds';
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
   import { beatGroups, memberPaths, planRows, sessionNotePaths } from './prep';
   import type { BeatEntry, BoardOp, BoardView, CampaignIndex, LiveSet, NoteEntry, SessionEntry } from './types';
@@ -41,6 +47,8 @@
   export let index: CampaignIndex;
   export let session: SessionEntry;
   export let live: LiveSet | null;
+  /** Where the cards' images load from (#407). */
+  export let images: ImageSource;
   /** CommandPanel's job queue: one change at a time, errors on its line. */
   export let run: (job: () => Promise<void>) => Promise<void>;
   export let onLive: (live: LiveSet) => void;
@@ -174,7 +182,7 @@
 
   function loadBodies(cards: Card[]) {
     const missing = cards
-      .map((c) => c.path)
+      .flatMap((c) => (c.kind === 'note' ? [c.path] : []))
       .filter((p): p is string => !!p && !bodies.has(p) && !loading.has(p));
     for (const path of missing) {
       loading.add(path);
@@ -252,6 +260,36 @@
     });
   }
 
+  /** Images dropped from Finder (#407): each copied onto the campaign's
+   *  shelf, since the campaign is the unit, then placed where they fell,
+   *  one under another, as one step undo takes back. */
+  function dropImages(files: File[], at: { x: number; y: number }) {
+    void run(async () => {
+      const ops: BoardOp[] = [];
+      let y = at.y;
+      for (const file of files) {
+        const path = await commandApi.addImage(campaign, file.name, await file.arrayBuffer());
+        const size = await sizeOf(file);
+        ops.push({ op: 'place', id: newId(), path, x: Math.round(at.x), y: Math.round(y), ...size });
+        y += size.height + GAP;
+      }
+      apply(ops);
+    });
+  }
+
+  /** A dropped image's card size, from the image itself; a card's when the
+   *  webview can't read it. */
+  async function sizeOf(file: File) {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const size = imageCard(bitmap.width, bitmap.height);
+      bitmap.close();
+      return size;
+    } catch {
+      return { ...CARD };
+    }
+  }
+
   /** The board's keys, Miro's letters (§3.5). Taken before the session
    *  player's, so Esc puts down an armed tool before it lets go of a beat. */
   function boardKeys(e: KeyboardEvent) {
@@ -301,6 +339,10 @@
   onDestroy(() => window.removeEventListener('keydown', boardKeys, true));
   // The tray's cards ask what the board's do.
   setContext(CARD_ACTIONS, actions);
+  // The board's cards and the tray's find their images here.
+  const imageSource = writable(images);
+  $: imageSource.set(images);
+  setContext(IMAGE_SOURCE, imageSource);
 
   /** The live set's cards, for the tray. */
   $: hand = handOf(allCards, live?.notes ?? []);
@@ -483,6 +525,7 @@
         {editing}
         onCreate={create}
         onToolDone={() => (tool = 'select')}
+        onDropImages={dropImages}
         bind:this={board}
       />
     {:else if boardError}

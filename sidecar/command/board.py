@@ -62,36 +62,43 @@ def _load(path: Path) -> tuple[dict, bool]:
         raise vault.Invalid(f"{path.name!r} isn't a board Command can read ({e})")
 
 
-def note_of(campaign: Path, file) -> str | None:
-    """The campaign-relative path of the note a card names, or None when
-    it names none. Command writes paths from the root (Obsidian's vault);
-    a path from the campaign folder, as a vault opened there writes, is
-    read too."""
+def _file_of(campaign: Path, file, check) -> str | None:
+    """The campaign-relative path of the file a card names, if ``check``
+    takes it. Command writes paths from the root (Obsidian's vault); a path
+    from the campaign folder, as a vault opened there writes, is read too."""
     if not isinstance(file, str):
         return None
     parts = PurePosixPath(file).parts
     candidates = ["/".join(parts[1:])] if len(parts) > 1 and parts[0].casefold() == campaign.name.casefold() else []
     for rel in (*candidates, file):
         try:
-            vault.note_path(campaign, rel)
+            check(campaign, rel)
             return rel
         except vault.VaultError:
             continue
     return None
 
 
+def note_of(campaign: Path, file) -> str | None:
+    """The note a card names, or None when it names none."""
+    return _file_of(campaign, file, vault.note_path)
+
+
+def image_of(campaign: Path, file) -> str | None:
+    """The image a card names, as Obsidian names one dropped on a canvas
+    (#407), or None when it names none."""
+    return _file_of(campaign, file, vault.image_path)
+
+
 def _view(campaign: Path, board: dict) -> dict:
     """The board as the UI reads it: nodes and edges as on disk, plus the
-    note each card shows."""
+    note or the image each card shows."""
+    files = [n for n in board["nodes"] if n.get("type") == "file" and isinstance(n.get("id"), str)]
     return {
         "nodes": board["nodes"],
         "edges": board["edges"],
-        "notes": {
-            n["id"]: rel
-            for n in board["nodes"]
-            if n.get("type") == "file" and isinstance(n.get("id"), str)
-            and (rel := note_of(campaign, n.get("file")))
-        },
+        "notes": {n["id"]: rel for n in files if (rel := note_of(campaign, n.get("file")))},
+        "images": {n["id"]: rel for n in files if (rel := image_of(campaign, n.get("file")))},
     }
 
 
@@ -152,9 +159,9 @@ def _frame(node: dict, op: dict) -> None:
 def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
     """Apply ``ops`` in order and write the board once:
 
-    - ``place`` {id, path, x, y, width, height}: put the note at ``path``
-      on the board. A note already there is framed instead, and ``id``
-      means that card for the rest of the batch.
+    - ``place`` {id, path, x, y, width, height}: put the note or the image
+      at ``path`` on the board. One already there is framed instead, and
+      ``id`` means that card for the rest of the batch.
     - ``frame`` {id, x, y, width, height}: move or resize a card.
     - ``add`` {id, type, x, y, width, height, text | label | url, color?}:
       a text card, a frame (``group``) or a link card. A frame goes before
@@ -183,10 +190,12 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
             new_id = _id(op)
             rel = op.get("path")
             if not isinstance(rel, str):
-                raise vault.Invalid("Placing a card needs a note's path")
-            vault.note_path(campaign, rel)
+                raise vault.Invalid("Placing a card needs a note's or an image's path")
+            image = vault.is_image(rel)
+            (vault.image_path if image else vault.note_path)(campaign, rel)
+            shown = image_of if image else note_of
             existing = next(
-                (n for n in nodes if n.get("type") == "file" and note_of(campaign, n.get("file")) == rel),
+                (n for n in nodes if n.get("type") == "file" and shown(campaign, n.get("file")) == rel),
                 None,
             )
             if existing is not None:

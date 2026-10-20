@@ -99,6 +99,15 @@ def test_scan_reads_the_folders(camp):
     assert not any(".obsidian" in p or ".draft" in p or p.endswith(".png") for p in by_path)
 
 
+def test_scan_lists_the_images_wherever_they_sit(camp):
+    # For the app to resolve a note's embeds against (#407): a track's, an
+    # attachment folder's, a session's; never a hidden one.
+    write(camp / "attachments" / "Crest.JPG", "", raw=b"")
+    write(camp / "Sessions" / "handout.webp", "", raw=b"")
+    write(camp / ".obsidian" / "icon.png", "", raw=b"")
+    assert vault.scan(camp)["images"] == ["Locations/map.png", "Sessions/handout.webp", "attachments/Crest.JPG"]
+
+
 def test_scan_flags_names_shared_within_a_kind(camp):
     # Two notes named Ismark make a link to it ambiguous; a beat named after
     # a note doesn't, since a beat's links and a note's are read apart.
@@ -446,6 +455,24 @@ def test_rename_track_keeps_its_place_and_rewrites_path_links(camp):
     assert (camp / "Overview.md").read_text() == "[[Characters/Vallaki/Lady Wachter]] [[Ireena]]"
     with pytest.raises(Invalid):
         vault.rename_track(camp, "Characters", "Sessions")
+
+
+def test_a_track_rename_carries_the_links_that_spell_an_image(camp):
+    # An image moves with its track, so an embed spelling its path follows,
+    # its width kept; one naming it alone needs nothing (#407).
+    write(camp / "Overview.md", "![[Locations/map.png|300]] ![[map.png]] [[Locations/Village of Barovia]]")
+    vault.rename_track(camp, "Locations", "Places")
+    assert (camp / "Overview.md").read_text() == "![[Places/map.png|300]] ![[map.png]] [[Places/Village of Barovia]]"
+
+
+def test_add_image_names_it_after_the_file_and_numbers_a_clash(camp):
+    assert vault.add_image(camp, "Locations", "Map.PNG", b"\x89PNG") == "Locations/Map 2.PNG"
+    assert vault.add_image(camp, "NPCs", "Ismark: portrait?.webp", b"x") == "NPCs/Ismark portrait.webp"
+    assert (camp / "Locations" / "Map 2.PNG").read_bytes() == b"\x89PNG"
+    # A name can't reach out of the folder, nor hide the file.
+    assert vault.add_image(camp, "NPCs", "../../.evil.png", b"x") == "NPCs/evil.png"
+    with pytest.raises(Invalid):
+        vault.add_image(camp, "NPCs", "notes.md", b"x")
 
 
 def test_rename_campaign_rewrites_only_links_that_spell_it(root, camp):

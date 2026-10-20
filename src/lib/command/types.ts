@@ -53,6 +53,9 @@ export interface CampaignIndex {
   beats: BeatEntry[];
   /** Oldest first, by date then number. */
   sessions: SessionEntry[];
+  /** Every image in the campaign, by path, wherever it sits: what notes'
+   *  embeds resolve against (embeds.ts). */
+  images: string[];
 }
 
 export interface NewSession {
@@ -147,7 +150,10 @@ export interface CanvasEdge {
 export interface BoardView {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
+  /** The note each note card shows, by card id. */
   notes: Record<string, string>;
+  /** The image each image card shows, by card id. */
+  images: Record<string, string>;
 }
 
 type Frame = { x: number; y: number; width: number; height: number };

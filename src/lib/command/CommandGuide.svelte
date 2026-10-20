@@ -77,6 +77,17 @@
   </section>
 
   <section class="field">
+    <h3 class="field-title section-title">Images</h3>
+    <p class="field-desc">
+      A note shows the images it embeds, <em>![[map.png]]</em> as Obsidian
+      writes them (<em>![[map.png|300]]</em> sets the width), on its card and
+      when you read it. Drop an image from Finder on the board to put it
+      there; it's copied into the campaign's <em>Shelf</em> folder, so the
+      campaign keeps everything it uses.
+    </p>
+  </section>
+
+  <section class="field">
     <h3 class="field-title section-title">Session notes</h3>
     <p class="field-desc">
       The bar in the board's corner writes a line into the session note, and

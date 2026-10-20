@@ -75,6 +75,13 @@ export const commandApi = {
       fromPlace: from.kind === 'place' ? from.path : null,
       path,
     }),
+  /** An image dropped from Finder, copied onto the campaign's shelf: the
+   *  copy's path. The bytes go raw, not as JSON; the names ride in headers,
+   *  URI-encoded since a header is ASCII. */
+  addImage: (campaign: string, name: string, bytes: ArrayBuffer) =>
+    invoke<string>('command_add_image', new Uint8Array(bytes), {
+      headers: { campaign: encodeURIComponent(campaign), name: encodeURIComponent(name) },
+    }),
   createBeat: (campaign: string, name: string, notes: string[], session: string | null) =>
     invoke<string>('command_create_beat', { campaign, name, notes, session }),
   /** The campaign's beats by name, in the order the GM dragged them. */

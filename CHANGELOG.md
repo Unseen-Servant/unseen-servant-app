@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Images on the board.** A note's embedded images (`![[map.png]]`, as Obsidian writes them, with `|300` for a width) show on its card in Play and when you read it in the inspector; one naming no image in the campaign shows its name, dashed. Drop an image from Finder on a board to put it there: it's copied into the campaign's `Shelf/` folder, so the campaign keeps everything it uses. An image Obsidian Canvas put on a board shows as itself, and renaming its track or the campaign keeps it on the board
+
 ### Changed
 
 - **Claude sees a campaign's shape in one call.** `campaign_overview` replaces `list_campaigns`: the campaigns, then the open one's tracks with their notes, the shelf, beats with their notes and the sessions planning them, and how many beats each session plans, by name only. A refused request now reads as the reason alone, and a note name already in use says where that note is

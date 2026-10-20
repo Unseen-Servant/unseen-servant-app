@@ -11,6 +11,7 @@ const view: BoardView = {
   ],
   edges: [{ id: 'e1', fromNode: 'n1', fromSide: 'right', toNode: 't1', toSide: 'left', toEnd: 'none', label: 'asks' }],
   notes: { n1: 'NPCs/Ismark.md' },
+  images: {},
 };
 
 /** A board as a reader sees it: each node and line by id, key order and
@@ -43,6 +44,20 @@ describe('board undo', () => {
     expect(inverse(view, [{ op: 'remove', id: 'n1' }], 'Strahd')).toEqual([
       { op: 'place', id: 'n1', path: 'NPCs/Ismark.md', x: 0, y: 0, width: 260, height: 180 },
       expect.objectContaining({ op: 'connect', id: 'e1', source: 'n1', target: 't1', label: 'asks', toEnd: 'none' }),
+    ]);
+  });
+
+  it('puts a removed image card back, and frames one placed again (#407)', () => {
+    const mapped: BoardView = {
+      ...view,
+      nodes: [...view.nodes, { id: 'm1', type: 'file', file: 'Strahd/Maps/Barovia.png', x: 0, y: 300, width: 400, height: 300 }],
+      images: { m1: 'Maps/Barovia.png' },
+    };
+    expect(inverse(mapped, [{ op: 'remove', id: 'm1' }], 'Strahd')).toEqual([
+      { op: 'place', id: 'm1', path: 'Maps/Barovia.png', x: 0, y: 300, width: 400, height: 300 },
+    ]);
+    expect(inverse(mapped, [{ op: 'place', id: 'x', path: 'Maps/Barovia.png', x: 5, y: 5, width: 40, height: 40 }], 'Strahd')).toEqual([
+      { op: 'frame', id: 'm1', x: 0, y: 300, width: 400, height: 300 },
     ]);
   });
 

@@ -37,6 +37,7 @@
   import BoardNoteField from './BoardNoteField.svelte';
   import BoardPointer from './BoardPointer.svelte';
   import FrameCard from './FrameCard.svelte';
+  import ImageCard from './ImageCard.svelte';
   import NoteCard from './NoteCard.svelte';
   import {
     BAR_LINE,
@@ -59,6 +60,7 @@
     type Line,
     type Tool,
   } from './board';
+  import { IMAGE } from './embeds';
   import type { BoardOp, CampaignIndex, Side } from './types';
 
   export let cards: Card[];
@@ -92,8 +94,10 @@
   export let onCreate: (op: BoardOp) => void;
   /** The tool did its one thing: back to Select, as Miro's do. */
   export let onToolDone: () => void;
+  /** Images dropped from Finder, and where on the board they fell (#407). */
+  export let onDropImages: (files: File[], at: XYPosition) => void;
 
-  const nodeTypes = { note: NoteCard, frame: FrameCard };
+  const nodeTypes = { note: NoteCard, image: ImageCard, frame: FrameCard };
   const edgeTypes = { line: BoardLine };
   setContext(CARD_ACTIONS, actions);
 
@@ -113,7 +117,7 @@
       const was = current.get(c.id);
       return {
         id: c.id,
-        type: c.kind === 'note' ? 'note' : 'frame',
+        type: c.kind === 'note' || c.kind === 'image' ? c.kind : 'frame',
         position: was && (was.dragging || carried.has(c.id)) ? was.position : { x: c.x, y: c.y },
         width: c.width,
         height: c.height,
@@ -233,6 +237,26 @@
     const b = cardOf(c.target);
     if (a && b && a !== b) onOps(connectOps(a, b, sideOf(c.sourceHandle), sideOf(c.targetHandle)));
     return false;
+  }
+
+  // -- images dropped from Finder (#407) -----------------------------------
+
+  /** Only a drag carrying files lands here: Finder's. The app's own drags
+   *  carry none, and native drag and drop stays off, so this is the page's
+   *  own drop. */
+  const carriesFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+
+  function dragOver(e: DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'copy';
+  }
+
+  function drop(e: DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    const files = [...(e.dataTransfer?.files ?? [])].filter((f) => IMAGE.test(f.name));
+    if (files.length) onDropImages(files, toBoard({ x: e.clientX, y: e.clientY }));
   }
 
   // -- the toolbar's Text, Sticky and Frame --------------------------------
@@ -395,7 +419,15 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="board" class:hand={tool === 'hand'} class:linking={tool === 'line'} bind:this={boardEl} on:keydown={keepBackspace}>
+<div
+  class="board"
+  class:hand={tool === 'hand'}
+  class:linking={tool === 'line'}
+  bind:this={boardEl}
+  on:keydown={keepBackspace}
+  on:dragover={dragOver}
+  on:drop={drop}
+>
   <!-- The arrangement's keys are the table's: ↑↓ step through the plan and
        Space launches, so the board gives up moving a focused card by arrow
        (a move it wouldn't save) and Space's hold-to-pan; a drag still pans. -->

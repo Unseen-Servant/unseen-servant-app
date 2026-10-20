@@ -30,8 +30,10 @@ function undoOne(view: BoardView, op: BoardOp): BoardOp[] {
   const edge = view.edges.find((e) => e.id === op.id);
   switch (op.op) {
     case 'place': {
-      // A note already on the board is framed rather than placed again.
-      const id = Object.keys(view.notes).find((k) => view.notes[k] === op.path);
+      // A note or an image already on the board is framed rather than
+      // placed again.
+      const shown = { ...view.notes, ...view.images };
+      const id = Object.keys(shown).find((k) => shown[k] === op.path);
       const was = id ? view.nodes.find((n) => n.id === id) : undefined;
       return was ? [frameOf(was)] : [{ op: 'remove', id: op.id }];
     }
@@ -66,12 +68,12 @@ function frameOf(node: CanvasNode): BoardOp {
 }
 
 /** A removed card put back as it was, or null for one the board can't
- *  make (a kind only Obsidian knows). A note card comes back with its
- *  place and size; fields Obsidian gave it don't. */
+ *  make (a kind only Obsidian knows). A note or an image card comes back
+ *  with its place and size; fields Obsidian gave it don't. */
 function restore(view: BoardView, node: CanvasNode): BoardOp | null {
   const frame = { x: node.x, y: node.y, width: node.width, height: node.height };
   if (node.type === 'file') {
-    const path = view.notes[node.id];
+    const path = view.notes[node.id] ?? view.images[node.id];
     return path ? { op: 'place', id: node.id, path, ...frame } : null;
   }
   const type = MADE.find((t) => t === node.type);

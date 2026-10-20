@@ -5,6 +5,7 @@
 
 import { PIGMENTS } from '../legend-lore/palette';
 import { linkTarget } from './editorTheme';
+import { IMAGE } from './embeds';
 import type { BoardFields, BoardOp, BoardView, CampaignIndex, CanvasEdge, CanvasNode, End, MadeKind, Side } from './types';
 
 export const CARD = { width: 260, height: 180 };
@@ -17,6 +18,16 @@ export const NEW_FRAME = { width: 600, height: 400 };
  *  at the top for its name. */
 export const FRAME_PAD = 24;
 export const FRAME_TOP = 48;
+/** An image dropped on the board is at most this wide or tall (#407). */
+export const IMAGE_CARD = 480;
+
+/** The card for an image `width` × `height` px: in its proportions, at
+ *  most IMAGE_CARD a side, and no smaller than the sidecar lets a card be
+ *  (board.MIN_SIZE). */
+export function imageCard(width: number, height: number): { width: number; height: number } {
+  const scale = Math.min(1, IMAGE_CARD / Math.max(width, height, 1));
+  return { width: Math.max(40, Math.round(width * scale)), height: Math.max(40, Math.round(height * scale)) };
+}
 
 const pigment = (name: string) => PIGMENTS.find((p) => p.name === name)!.hex;
 /** A new sticky's colour, until the selection bar picks others. */
@@ -42,7 +53,7 @@ export function paint(color: string | null): string | null {
 /** Auto-placed cards aren't in the file yet; their ids say so. */
 const AUTO = 'auto:';
 
-export type CardKind = 'note' | 'text' | 'group' | 'link' | 'other';
+export type CardKind = 'note' | 'image' | 'text' | 'group' | 'link' | 'other';
 
 /** The board toolbar's tools (board toolbar design §3.2). */
 export type Tool = 'select' | 'hand' | 'note' | 'text' | 'sticky' | 'line' | 'frame';
@@ -50,7 +61,8 @@ export type Tool = 'select' | 'hand' | 'note' | 'text' | 'sticky' | 'line' | 'fr
 export interface Card {
   id: string;
   kind: CardKind;
-  /** The note a note card shows; null when the note it names isn't there. */
+  /** The note a note card shows, or an image card's image; null when the
+   *  note it names isn't there. */
   path: string | null;
   /** False for a note auto-placed beside the arrangement: the board's next
    *  change places it (placeAll). */
@@ -83,13 +95,15 @@ export interface Line {
 
 const KINDS: Record<string, CardKind> = { file: 'note', text: 'text', group: 'group', link: 'link' };
 
-function placedCard(node: CanvasNode, path: string | null): Card {
-  const kind = KINDS[node.type] ?? 'other';
-  const text = kind === 'note' ? node.file : kind === 'group' ? node.label : kind === 'link' ? node.url : node.text;
+/** A card the canvas holds. A file node naming an image is an image card
+ *  (#407); one naming nothing that's there is a missing note card. */
+function placedCard(node: CanvasNode, note: string | null, image: string | null): Card {
+  const kind = image ? 'image' : (KINDS[node.type] ?? 'other');
+  const text = kind === 'note' || kind === 'image' ? node.file : kind === 'group' ? node.label : kind === 'link' ? node.url : node.text;
   return {
     id: node.id,
     kind,
-    path: kind === 'note' ? path : null,
+    path: kind === 'note' ? note : image,
     placed: true,
     x: node.x,
     y: node.y,
@@ -106,7 +120,7 @@ function placedCard(node: CanvasNode, path: string | null): Card {
  *  (beatGroups: the session's notes by beat, in plan order), then one for
  *  the rest by name. */
 export function cards(view: BoardView, index: CampaignIndex, wanted: Iterable<string>, groups: string[][] = []): Card[] {
-  const placed = view.nodes.map((n) => placedCard(n, view.notes[n.id] ?? null));
+  const placed = view.nodes.map((n) => placedCard(n, view.notes[n.id] ?? null, view.images[n.id] ?? null));
   const onBoard = new Set(placed.map((c) => c.path).filter(Boolean));
   const notes = new Map(index.notes.map((n) => [n.path, n]));
   const loose = new Set([...wanted].filter((p) => !onBoard.has(p) && notes.has(p)));
@@ -353,11 +367,12 @@ export function applyOps(view: BoardView, ops: BoardOp[], campaign: string): Boa
   let nodes = [...view.nodes];
   let edges = [...view.edges];
   const notes = { ...view.notes };
+  const images = { ...view.images };
   for (const op of ops) {
     if (op.op === 'place') {
       const { op: _, path, ...frame } = op;
       nodes.push({ ...frame, type: 'file', file: `${campaign}/${path}` });
-      notes[op.id] = path;
+      (IMAGE.test(path) ? images : notes)[op.id] = path;
     } else if (op.op === 'add') {
       const { op: _, ...node } = op;
       // A frame before the cards, as the sidecar files it.
@@ -377,9 +392,10 @@ export function applyOps(view: BoardView, ops: BoardOp[], campaign: string): Boa
       nodes = nodes.filter((n) => n.id !== op.id);
       edges = edges.filter((e) => e.id !== op.id && e.fromNode !== op.id && e.toNode !== op.id);
       delete notes[op.id];
+      delete images[op.id];
     }
   }
-  return { nodes, edges, notes };
+  return { nodes, edges, notes, images };
 }
 
 /** `item` with `fields` set, a null or emptied label removed. */

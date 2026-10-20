@@ -102,6 +102,20 @@ def _is_note_file(name: str) -> bool:
     return not _hidden(name) and name.lower().endswith(".md")
 
 
+# What a card or a note's embed shows as a picture (#407).
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
+
+
+def _is_image_file(name: str) -> bool:
+    return not _hidden(name) and name.lower().endswith(IMAGE_SUFFIXES)
+
+
+def _is_linked_file(name: str) -> bool:
+    """A file a link names: a note, or an image a note embeds or a board
+    shows. Renames carry both."""
+    return _is_note_file(name) or _is_image_file(name)
+
+
 def _stem(filename: str) -> str:
     return filename[:-3]
 
@@ -327,6 +341,9 @@ def scan(campaign: Path) -> dict:
         "note_order": note_order(campaign),
         "pigments": track_pigments(campaign),
         "ambiguous": [n.path for n in notes if seen[key(n)] > 1],
+        # Wherever they sit, since Obsidian's attachment folder is the
+        # GM's choice: the app resolves a note's embeds against these.
+        "images": [_rel(campaign, p) for p in _walk(campaign, _is_image_file)],
     }
 
 
@@ -358,6 +375,38 @@ def note_path(campaign: Path, rel: str) -> Path:
     if not path.is_file() or not _is_note_file(path.name):
         raise Invalid(f"Not a note: {rel!r}")
     return path
+
+
+def is_image(rel: str) -> bool:
+    """Whether ``rel`` names an image by its suffix."""
+    return _is_image_file(PurePosixPath(rel).name)
+
+
+def image_path(campaign: Path, rel: str) -> Path:
+    """The image at ``rel``, refusing anything that isn't one."""
+    path = resolve(campaign, rel)
+    if not path.is_file() or not _is_image_file(path.name):
+        raise Invalid(f"Not an image: {rel!r}")
+    return path
+
+
+def add_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
+    """Write an image into ``folder``, named after ``name`` and numbered
+    when another image in the campaign has that name ("map 2.png"), since
+    an embed names an image by its file name. Its path."""
+    suffix = PurePosixPath(name).suffix
+    if suffix.lower() not in IMAGE_SUFFIXES:
+        raise Invalid(f"Not an image: {name!r}")
+    stem = re.sub(r"\s+", " ", "".join(" " if c in _FORBIDDEN or ord(c) < 32 else c for c in name[: -len(suffix)]))
+    stem = stem.strip(" .")[:120].strip(" .") or "Image"
+    taken = {p.name.casefold() for p in _walk(campaign, _is_image_file)}
+    candidate, n = f"{stem}{suffix}", 1
+    while candidate.casefold() in taken:
+        n += 1
+        candidate = f"{stem} {n}{suffix}"
+    path = _folder(campaign, folder) / candidate
+    atomic_write(path, data)
+    return _rel(campaign, path)
 
 
 def read_text(path: Path) -> str:
@@ -657,11 +706,11 @@ def _among(text: str, pos: int, fm_end: int) -> tuple[str, ...]:
 
 
 def _stayed(campaign: Path, moves: list[tuple[Parts, Parts]]) -> dict[str, list[Parts]]:
-    """The campaign's notes that didn't move, by folded name, for
-    ``_retarget`` to tell a link only a moved note answered to."""
+    """The campaign's notes and images that didn't move, by folded name,
+    for ``_retarget`` to tell a link only a moved one answered to."""
     moved = {_fold(new) for _, new in moves}
     stayed: dict[str, list[Parts]] = {}
-    for path in _walk_notes(campaign):
+    for path in _walk(campaign, _is_linked_file):
         location = _vault_parts(campaign, _rel(campaign, path))
         if _fold(location) not in moved:
             stayed.setdefault(location[-1].casefold(), []).append(location)
@@ -773,16 +822,18 @@ def _rewrite_campaign(campaign: Path, moves: list[tuple[Parts, Parts]]) -> list[
 
 
 def _vault_parts(campaign: Path, rel: str) -> Parts:
-    """A note's location as link parts: campaign folder first, no ``.md``."""
+    """A note's location as link parts: campaign folder first, no ``.md``.
+    An image keeps its suffix, as a link to it spells it."""
     parts = PurePosixPath(rel).parts
-    return (campaign.name, *parts[:-1], _stem(parts[-1]))
+    name = _stem(parts[-1]) if _is_note_file(parts[-1]) else parts[-1]
+    return (campaign.name, *parts[:-1], name)
 
 
 def _relocate(campaign: Path, src: Path, dst: Path) -> list[tuple[Parts, Parts]]:
     """Rename ``src`` to ``dst`` (a note or a folder) and return the moves it
-    made, one per note, for the link rewrite."""
+    made, one per note or image, for the link rewrite."""
     if src.is_dir():
-        olds = [_rel(campaign, p) for p in _walk_notes(src)]
+        olds = [_rel(campaign, p) for p in _walk(src, _is_linked_file)]
     else:
         olds = [_rel(campaign, src)]
     old_prefix = _rel(campaign, src)
@@ -895,7 +946,7 @@ def rename_campaign(root: Path, name: str, new_name: str) -> list[str]:
         c.casefold() for c in list_campaigns(root)
     }:
         raise Conflict(f"A campaign named {new_name!r} already exists")
-    rels = [_rel(src, p) for p in _walk_notes(src)]
+    rels = [_rel(src, p) for p in _walk(src, _is_linked_file)]
     dst = root / new_name
     os.rename(src, dst)
     moves = [((name, *_vault_parts(dst, r)[1:]), _vault_parts(dst, r)) for r in rels]

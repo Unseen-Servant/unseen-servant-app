@@ -583,6 +583,7 @@ pub fn run() {
             command::command_jot,
             command::command_send_targets,
             command::command_send,
+            command::command_add_image,
             command::command_copy_note,
             command::command_trash
         ])
