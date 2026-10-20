@@ -24,8 +24,12 @@ from . import canvas
 
 # In the order a GM thinks through prep (the Lazy DM's checklist): the
 # characters, what they could learn, where, from whom, what stands in the
-# way, and what they win. Strong start and scenes are beats.
-DEFAULT_TRACKS = ("PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures")
+# way, and what they win. Strong start and scenes are beats. Then Maps, an
+# image track for the table's maps (images design §3.2).
+DEFAULT_TRACKS = ("PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures", "Maps")
+# What each default track holds, saved with a new campaign so a kind never
+# turns on what's put in the folder.
+DEFAULT_KINDS = {t: "image" if t == "Maps" else "note" for t in DEFAULT_TRACKS}
 # Each default track's pigment, from Legend Lore's palette (palette.ts);
 # PCs stay plain.
 DEFAULT_PIGMENTS = {
@@ -348,9 +352,11 @@ def _saved_kinds(campaign: Path) -> dict[str, str]:
 def track_kinds(campaign: Path, notes: list[NoteEntry] | None = None) -> dict[str, str]:
     """Each track's kind: what the GM chose, else images for a folder
     holding images and no notes, else notes, so a folder of maps filled in
-    Finder reads right and an empty track holds notes. It decides what the
-    column makes, never which files it lists (images design §3.2).
-    ``notes`` is the campaign's scan, when the caller has it."""
+    Finder reads right and an empty track holds notes. A checklist track of
+    a campaign made before tracks had kinds holds notes, whatever Finder put
+    in it. It decides what the column makes, never which files it lists
+    (images design §3.2). ``notes`` is the campaign's scan, when the caller
+    has it."""
     saved = _saved_kinds(campaign)
     if notes is None:
         notes = [_entry(campaign, p) for p in _walk_clips(campaign)]
@@ -358,7 +364,15 @@ def track_kinds(campaign: Path, notes: list[NoteEntry] | None = None) -> dict[st
     for n in notes:
         if n.track is not None:
             held.setdefault(n.track, set()).add(n.type)
-    return {t: saved.get(t) or ("image" if held.get(t) == {"image"} else "note") for t in track_order(campaign)}
+
+    def kind(track: str) -> str:
+        if track in saved:
+            return saved[track]
+        if DEFAULT_KINDS.get(track) == "note":
+            return "note"
+        return "image" if held.get(track) == {"image"} else "note"
+
+    return {t: kind(t) for t in track_order(campaign)}
 
 
 def save_track_kind(campaign: Path, track: str, kind: str) -> dict[str, str]:
@@ -650,6 +664,7 @@ def create_campaign(root: Path, name: str) -> str:
         (campaign / folder).mkdir()
     _save_order(campaign, list(DEFAULT_TRACKS))
     _save_list(campaign, "pigments", DEFAULT_PIGMENTS)
+    _save_list(campaign, "kinds", DEFAULT_KINDS)
     return name
 
 

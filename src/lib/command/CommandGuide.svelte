@@ -98,8 +98,9 @@
       empty row copies pictures from your Mac into it, as does dropping
       them on it from Finder; dropped on the shelf, they land
       there. An image goes only in an image track, and a note only in a note
-      track; the shelf holds both. A folder of images you fill in Finder is
-      an image track already. In Legend Lore's tree, right-click an image
+      track; the shelf holds both. A new campaign starts with
+      <em>Maps</em>, an image track, and a folder of images you fill in
+      Finder is an image track already. In Legend Lore's tree, right-click an image
       and <em>Send to Command</em> to copy it in.
     </p>
   </section>

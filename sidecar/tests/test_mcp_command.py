@@ -101,6 +101,7 @@ def test_campaign_overview_lists_the_campaigns_then_the_open_ones_shape(strahd, 
         "  Monsters: (empty)\n"
         "  Traps: (empty)\n"
         "  Treasures: (empty)\n"
+        "  Maps: (empty)\n"
         "\n"
         "Shelf: Rumour\n"
         "\n"
@@ -210,7 +211,7 @@ def test_create_note_cites_a_library_section(strahd, app, test_store):
 def test_create_track_then_move_a_note_onto_it(strahd, app):
     assert run(mcp_server.create_track("Factions")) == (
         "Created the track Factions in Strahd. Its tracks: PCs, Secrets, Locations, NPCs, Monsters, Traps, "
-        "Treasures, Factions."
+        "Treasures, Maps, Factions."
     )
     assert run(mcp_server.create_track("factions")) == 'Strahd has a track named "Factions" already.'
     assert run(mcp_server.create_track("Beats")) == "'Beats' is reserved for Command's own notes"

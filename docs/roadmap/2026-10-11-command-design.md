@@ -62,7 +62,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
 <root>/                                  user-chosen (dev: ~/Unseen Servant)
   Curse of Strahd/                       campaign = any non-dot folder in the root
     .unseen/command.json                 presentation only: track, note and beat order, pigments
-    PCs/ Secrets/ Locations/ NPCs/ Monsters/ Traps/ Treasures/      tracks
+    PCs/ Secrets/ Locations/ NPCs/ Monsters/ Traps/ Treasures/ Maps/      tracks
       NPCs/Ismark Kolyanovich.md         a note
       NPCs/Vallaki/Lady Wachter.md       a subfolder groups notes inside a track
     Beats/
@@ -75,7 +75,7 @@ One structural break from Live: a Live scene is a row with one clip per track, b
 ```
 
 - **Root.** Chosen in settings and persisted by the sidecar (§6.1), so the watcher and MCP know it with no window open. Until the GM chooses one, it's `~/Unseen Servant` (§3.7). Every non-dot folder in it is a campaign; a folder created in Finder is a campaign.
-- **Tracks.** Every non-dot folder in a campaign except the reserved `Beats/`, `Sessions/` and `Shelf/`. A new campaign gets PCs, Secrets, Locations, NPCs, Monsters, Traps and Treasures plus the three reserved folders, in that order: the GM's chain of thought in prep, after the Lazy DM's checklist (who the characters are, what they could learn, where, from whom, what stands in the way, what they win; its strong start and scenes are beats). *Reordered and Traps added on 2026-10-12.* Adding a track is making a folder, in Command or anywhere else. Notes anywhere under a track folder belong to it; subfolders show as groups within the column.
+- **Tracks.** Every non-dot folder in a campaign except the reserved `Beats/`, `Sessions/` and `Shelf/`. A new campaign gets PCs, Secrets, Locations, NPCs, Monsters, Traps and Treasures plus the three reserved folders, in that order: the GM's chain of thought in prep, after the Lazy DM's checklist (who the characters are, what they could learn, where, from whom, what stands in the way, what they win; its strong start and scenes are beats). *Reordered and Traps added on 2026-10-12.* Since 2026-10-20 a new campaign also gets Maps, last, an image track, and each default track's kind is saved with it ([the images design](2026-10-20-command-images-design.md) §3.2). Adding a track is making a folder, in Command or anywhere else. Notes anywhere under a track folder belong to it; subfolders show as groups within the column.
 - **Loose notes** directly in a campaign folder are notes without a track: linkable and editable, not drawn in the grid. The shelf sidebar lists them under the shelf (§3.6).
 - **`.unseen/command.json`** holds only presentation (track order, each folder's note order, the order of beats outside a plan, a pigment per track, and since 2026-10-20 whether a track holds notes or images: [the images design](2026-10-20-command-images-design.md) §3.2). It travels with the campaign and stays hidden in Finder and Obsidian (a dot-folder, the `.obsidian/` precedent). It never holds membership, so drift is harmless: a track it doesn't know gets defaults, and a stale entry is ignored.
 

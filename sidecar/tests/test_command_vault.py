@@ -228,6 +228,10 @@ def test_create_campaign_lays_out_default_tracks(root):
     camp = root / "Into the Odd"
     assert vault.track_order(camp) == list(vault.DEFAULT_TRACKS)
     assert vault.track_pigments(camp) == vault.DEFAULT_PIGMENTS
+    # Each track's kind is saved, so it never turns on what's put in it:
+    # the checklist's hold notes, Maps images (images design §3.2).
+    assert vault._saved_kinds(camp) == vault.DEFAULT_KINDS
+    assert vault.track_kinds(camp)["Maps"] == "image" and vault.track_kinds(camp)["PCs"] == "note"
     assert (camp / "Beats").is_dir() and (camp / "Sessions").is_dir()
     with pytest.raises(Conflict):
         vault.create_campaign(root, "into the odd")
@@ -482,6 +486,16 @@ def test_a_track_rename_carries_the_links_that_spell_an_image(camp):
     write(camp / "Overview.md", "![[Locations/map.png|300]] ![[map.png]] [[Locations/Village of Barovia]]")
     vault.rename_track(camp, "Locations", "Places")
     assert (camp / "Overview.md").read_text() == "![[Places/map.png|300]] ![[map.png]] [[Places/Village of Barovia]]"
+
+
+def test_a_checklist_track_from_before_kinds_holds_notes_whatever_is_in_it(camp):
+    # A campaign made before tracks had kinds saved none. Portraits alone
+    # in its PCs folder don't make PCs an image track; the same in a folder
+    # of the GM's own do.
+    write(camp / "PCs" / "Bo.png", "", raw=b"")
+    write(camp / "Portraits" / "Bo.png", "", raw=b"")
+    kinds = vault.track_kinds(camp)
+    assert (kinds["PCs"], kinds["Portraits"]) == ("note", "image")
 
 
 def test_a_tracks_kind_is_chosen_or_read_from_its_folder(camp):

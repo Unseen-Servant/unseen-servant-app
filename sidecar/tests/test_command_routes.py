@@ -58,7 +58,9 @@ def test_settings_change_only_the_fields_sent(bare_client, campaign_root, tmp_pa
 def test_campaign_round_trip(cmd, campaign_root):
     assert cmd.get("/api/command/campaigns").json() == {"campaigns": ["Strahd"]}
     index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
-    assert index["tracks"] == ["PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures"]
+    assert index["tracks"] == ["PCs", "Secrets", "Locations", "NPCs", "Monsters", "Traps", "Treasures", "Maps"]
+    # Each default track keeps its kind, Maps an image track.
+    assert index["kinds"] == {**{t: "note" for t in index["tracks"]}, "Maps": "image"}
     assert index["notes"] == []
     assert cmd.post("/api/command/campaigns", json={"name": "strahd"}).status_code == 409
     assert cmd.get("/api/command/campaign", params={"name": "Nope"}).status_code == 404
@@ -174,7 +176,7 @@ def test_beat_order_over_http(cmd):
 def test_track_order_over_http(cmd):
     assert cmd.put("/api/command/tracks/order", json={
         "campaign": "Strahd", "order": ["Monsters", "PCs"],
-    }).json()["tracks"] == ["Monsters", "PCs", "Locations", "NPCs", "Secrets", "Traps", "Treasures"]
+    }).json()["tracks"] == ["Monsters", "PCs", "Locations", "Maps", "NPCs", "Secrets", "Traps", "Treasures"]
     index = cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()
     assert index["tracks"][:2] == ["Monsters", "PCs"]
 
@@ -374,14 +376,14 @@ def test_an_image_dropped_on_a_board_lands_on_the_shelf(cmd, campaign_root):
 
 
 def test_an_image_track_takes_the_images_picked_for_it(cmd, campaign_root):
-    made = cmd.post("/api/command/tracks", json={"campaign": "Strahd", "name": "Maps"})
+    made = cmd.post("/api/command/tracks", json={"campaign": "Strahd", "name": "Handouts"})
     assert made.status_code == 200
-    kinds = cmd.put("/api/command/tracks/kind", json={"campaign": "Strahd", "track": "Maps", "kind": "image"}).json()["kinds"]
-    assert kinds["Maps"] == "image" and kinds["NPCs"] == "note"
-    params = {"campaign": "Strahd", "name": "Barovia.png", "track": "Maps"}
-    assert cmd.post("/api/command/images", params=params, content=b"\x89PNG").json() == {"path": "Maps/Barovia.png"}
+    kinds = cmd.put("/api/command/tracks/kind", json={"campaign": "Strahd", "track": "Handouts", "kind": "image"}).json()["kinds"]
+    assert kinds["Handouts"] == "image" and kinds["NPCs"] == "note"
+    params = {"campaign": "Strahd", "name": "Letter.png", "track": "Handouts"}
+    assert cmd.post("/api/command/images", params=params, content=b"\x89PNG").json() == {"path": "Handouts/Letter.png"}
     assert cmd.post("/api/command/images", params={**params, "track": "Beats"}, content=b"x").status_code == 404
-    assert cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()["kinds"]["Maps"] == "image"
+    assert cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()["kinds"]["Handouts"] == "image"
 
 
 def test_the_shelf_copies_from_a_folder_the_gm_added(cmd, campaign_root, tmp_path):
