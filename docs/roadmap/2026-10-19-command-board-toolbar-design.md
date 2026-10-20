@@ -1,6 +1,6 @@
 # Command board toolbar (2026-10-19)
 
-**Status:** settled 2026-10-19 (§8). Steps 1–3 of §6 are built; step 4 isn't. No step claims the zoom keys (⌘+, ⌘−, ⌘0), which aren't built. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
+**Status:** settled 2026-10-19 (§8). All four steps of §6 are built (step 4 on 2026-10-20). No step claims the zoom keys (⌘+, ⌘−, ⌘0), which aren't built. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
 
 ## 0. TL;DR
 
@@ -189,7 +189,13 @@ None of the letters above clashes with Command's (R, A, J, K, P, Space) or with 
    - It asks first, and `⌘Z` takes it all back in one step.
    - The layout is the sidecar's (`board.arrange`, `GET /board/arrange`): it returns the operations without writing them, and the app applies them as one gesture. Step 4's `arrange_board()` uses the same function.
    - Cards never placed are laid out in the same order (§5.2): a column for Throughout, then one per planned beat, then the rest by name. The columns have no names: nothing is written until the board is touched.
-4. **MCP:** `connect_cards(a, b, label)`, `frame_cards(label, notes)`, `add_text(text, near)` and `arrange_board()`. They wrap 1–3, and the audit's "won't" on the board is lifted (`2026-10-18-command-mcp-tools-design.md`).
+4. **MCP:** `connect_cards(a, b, label)`, `frame_cards(label, notes)`, `add_text(text, near)` and `arrange_board()`, each with `session=` (the open session, else the latest) and `campaign=`. They wrap 1–3, and the audit's "won't" on the board is lifted (`2026-10-18-command-mcp-tools-design.md`). As built (2026-10-20):
+   - **Settling first.** The app shows the session's notes on a board that doesn't hold them yet, laid out beside what's placed (§5.2), and its first change writes them in where they show (`placeAll`). An agent can't see that layout, so each tool first calls `POST /board/settle`, which writes them in at the same places (`board.settle`, a port of `board.ts`'s `cards`). The agent's change then moves nothing the GM sees.
+   - `arrange_board()` applies `GET /board/arrange` as the Arrange key does.
+   - `frame_cards(label, notes)` is Arrange for one frame (`GET /board/arrange` with `frame` and `notes`): the notes go in a grid in a frame named `label`, under the rest of the board. A frame of that name is reused, keeping what's inside it, so a second call adds to it. Notes not on the board yet are placed in it.
+   - `connect_cards(a, b, label)` draws a plain line, without arrowheads. A note not on the board is placed beside the other end; when neither is, it's refused. A pair already joined is refused, as the board refuses a second line between them.
+   - `add_text(text, near)` makes a text card at the Text tool's size, beside the note `near` (to its right, else below, else past the cards in the way, as ⌘D places a copy: `GET /board/spot`), or with no `near`, under the board.
+   - The GM's `⌘Z` doesn't reach an agent's change: the board reloads from the file, as it does after Obsidian writes one.
 
 Each step updates design §5.2, Help → Guides → Command, and the CHANGELOG.
 

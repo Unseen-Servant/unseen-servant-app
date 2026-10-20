@@ -5,6 +5,7 @@ sidecar's routes (architecture D5), so these exercise both halves."""
 import argparse
 import asyncio
 import hashlib
+import json
 import threading
 from datetime import date
 
@@ -17,7 +18,7 @@ from command import events, prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
-COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend"}
+COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend", "connect_cards", "frame_cards", "add_text", "arrange_board"}
 
 
 @pytest.fixture
@@ -325,6 +326,98 @@ def test_play_from_mcp_live_set_and_spend(strahd, app):
     assert run(mcp_server.live_set()) == "Live in Strahd:\n\n## Ireena (NPCs/Ireena.md)\nBitten twice."
     assert run(mcp_server.spend("Ismark")) == "Ismark is spent (2026-10-18)."
     assert run(mcp_server.spend("Ismark", spent=False)) == "Ismark is unspent."
+
+
+def board_of(strahd, session="Session 1"):
+    canvas = json.loads((strahd / "Strahd" / "Sessions" / f"{session}.canvas").read_text())
+    return canvas, {n["file"].removeprefix("Strahd/"): n for n in canvas["nodes"] if n["type"] == "file"}
+
+
+def inside(card, frame):
+    return (
+        card["x"] >= frame["x"] and card["y"] >= frame["y"]
+        and card["x"] + card["width"] <= frame["x"] + frame["width"]
+        and card["y"] + card["height"] <= frame["y"] + frame["height"]
+    )
+
+
+def test_connect_cards_first_places_what_the_app_shows(strahd, app):
+    # Session 1's board was never touched: the app shows Ambush's notes in a
+    # column, and they're written in there before the line.
+    assert run(mcp_server.connect_cards("Ismark", "village of barovia", label="waits in")) == (
+        'Joined Ismark and Village of Barovia on Session 1\'s board, labelled "waits in".'
+    )
+    canvas, cards = board_of(strahd)
+    assert {rel: (c["x"], c["y"]) for rel, c in cards.items()} == {
+        "NPCs/Ismark.md": (0, 0), "Locations/Village of Barovia.md": (0, 212),
+    }
+    assert [(e["fromNode"], e["toNode"], e["label"], e["toEnd"]) for e in canvas["edges"]] == [
+        (cards["NPCs/Ismark.md"]["id"], cards["Locations/Village of Barovia.md"]["id"], "waits in", "none"),
+    ]
+    assert run(mcp_server.connect_cards("Village of Barovia", "Ismark")) == (
+        "A line joins Village of Barovia and Ismark on Session 1's board already."
+    )
+    # A note the session doesn't hold goes beside the other end.
+    assert run(mcp_server.connect_cards("NPCs/Ireena", "Ismark", label="sister of")) == (
+        'Joined Ireena and Ismark on Session 1\'s board, labelled "sister of". Ireena is on it now, beside Ismark.'
+    )
+    ireena = board_of(strahd)[1]["NPCs/Ireena.md"]
+    assert (ireena["x"], ireena["y"]) == (292, 0)
+    assert run(mcp_server.connect_cards("Ismark", "ismark")) == "A line joins two different notes."
+    app.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Doru"})
+    assert run(mcp_server.connect_cards("Doru", "Locations/Ireena")).startswith(
+        "Neither Doru nor Ireena is on Session 1's board."
+    )
+    assert run(mcp_server.connect_cards("Ismark", "Ambush")).startswith('No note named "Ambush"')
+
+
+def test_frame_cards_gathers_notes_under_the_board(strahd):
+    run(mcp_server.add_text("Session goals"))
+    assert run(mcp_server.frame_cards("Family", ["Ismark", "NPCs/Ireena"])) == (
+        "Framed Ismark, Ireena in Family on Session 1's board."
+    )
+    canvas, cards = board_of(strahd)
+    family = next(n for n in canvas["nodes"] if n.get("label") == "Family")
+    village = cards["Locations/Village of Barovia.md"]
+    assert family["y"] > village["y"] + village["height"]
+    for rel in ("NPCs/Ismark.md", "NPCs/Ireena.md"):
+        assert inside(cards[rel], family)
+    # Framing again under the same name uses that frame, keeping what's in it.
+    assert run(mcp_server.frame_cards("family", ["Village of Barovia"])) == (
+        "Framed Village of Barovia in Family on Session 1's board. It keeps what was in it."
+    )
+    canvas, cards = board_of(strahd)
+    frames = [n for n in canvas["nodes"] if n["type"] == "group"]
+    assert len(frames) == 1 and all(inside(c, frames[0]) for c in cards.values())
+    assert run(mcp_server.frame_cards(" ", ["Ismark"])) == "A frame needs a label."
+
+
+def test_add_text_beside_a_note_or_under_the_board(strahd):
+    assert run(mcp_server.add_text("Wolves howl at dusk.", near="Ismark")) == (
+        "Added a text card to Session 1's board, beside Ismark."
+    )
+    assert run(mcp_server.add_text("Ask about [[Ireena]].")) == "Added a text card to Session 1's board, under the rest."
+    canvas, _ = board_of(strahd)
+    texts = {n["text"]: (n["x"], n["y"], n["width"], n["height"]) for n in canvas["nodes"] if n["type"] == "text"}
+    assert texts == {"Wolves howl at dusk.": (292, 0, 260, 100), "Ask about [[Ireena]].": (0, 456, 260, 100)}
+    assert run(mcp_server.add_text("Hi", near="NPCs/Ireena")) == (
+        "Ireena isn't on Session 1's board. Leave near out to put the card under the board."
+    )
+    assert run(mcp_server.add_text("  ")) == "A text card needs text."
+
+
+def test_arrange_board_frames_each_planned_beat(strahd, app):
+    assert run(mcp_server.arrange_board()) == "Arranged Session 1's board by beat, a frame each: Ambush."
+    canvas, cards = board_of(strahd)
+    ambush = next(n for n in canvas["nodes"] if n["type"] == "group")
+    assert ambush["label"] == "Ambush" and all(inside(c, ambush) for c in cards.values())
+    assert run(mcp_server.arrange_board()) == "Arranged Session 1's board by beat, a frame each: Ambush."
+    assert len([n for n in board_of(strahd)[0]["nodes"] if n["type"] == "group"]) == 1
+    app.post("/api/command/sessions", json={"campaign": "Strahd"})
+    assert run(mcp_server.arrange_board(session="Session 2")) == (
+        "Session 2 has nothing planned, so its board has nothing to arrange."
+    )
+    assert run(mcp_server.arrange_board(session="Session 9")).startswith('Strahd has no session named "Session 9"')
 
 
 def test_with_the_app_closed_the_tools_say_so(monkeypatch):

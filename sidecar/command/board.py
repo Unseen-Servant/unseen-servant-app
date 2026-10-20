@@ -298,6 +298,7 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
 # gap between cards, and how far a frame clears its cards, more at the top
 # for its name.
 CARD = (260, 180)
+TEXT_CARD = (260, 100)
 GAP = 32
 FRAME_PAD, FRAME_TOP = 24, 48
 # Frames to a row, read left to right; cards to a frame's row, at most.
@@ -305,13 +306,13 @@ PER_ROW, CARDS_ACROSS = 4, 3
 THROUGHOUT = "Throughout"
 
 
-def plan_groups(campaign: Path, session: str) -> list[tuple[str, list[str]]]:
+def plan_groups(campaign: Path, session: str, index: dict | None = None) -> list[tuple[str, list[str]]]:
     """The session's notes as Arrange lays them out: Throughout first, with
     the notes several planned beats hold, then each planned beat by name
     with the rest of its notes, in plan order and the beat's own order.
     Throughout is left out when no note is shared; a beat whose notes are
     all shared keeps its (empty) frame."""
-    index = prep.index(campaign)
+    index = index or prep.index(campaign)
     entry = next((s for s in index["sessions"] if s["path"] == session), None)
     if entry is None:
         raise vault.NotFound(f"No session at {session!r}")
@@ -339,20 +340,20 @@ def _within(node: dict, frame: dict) -> bool:
     )
 
 
-def arrange(campaign: Path, session: str) -> list[dict]:
-    """The operations that lay the board out by beat, for the caller to
-    apply as one step (``apply``); nothing is written here.
+def _overlaps(a: dict, b: dict) -> bool:
+    return (
+        a["x"] < b["x"] + b["width"] and b["x"] < a["x"] + a["width"]
+        and a["y"] < b["y"] + b["height"] and b["y"] < a["y"] + a["height"]
+    )
 
-    Each group of ``plan_groups`` gets a frame named after it, holding its
-    notes in a grid, the frames in rows of PER_ROW. A frame already named
-    after the group is moved and sized rather than made again, and the
-    other cards wholly inside it come along, after its notes: a sticky the
-    GM put in a beat's frame stays in it. The rest of the board stays where
-    it is, and the arrangement starts under it."""
-    board, _ = _load(board_file(campaign, session))
-    nodes = [n for n in board["nodes"] if all(isinstance(n.get(k), (int, float)) for k in ("x", "y", "width", "height"))]
-    notes = _view(campaign, board)["notes"]
-    groups = plan_groups(campaign, session)
+
+def _placed(board: dict) -> list[dict]:
+    """The board's cards that say where they are."""
+    return [n for n in board["nodes"] if all(isinstance(n.get(k), (int, float)) for k in ("x", "y", "width", "height"))]
+
+
+def _new_ids(board: dict):
+    """A maker of ids the board doesn't use yet."""
     taken = {n.get("id") for n in board["nodes"]} | {e.get("id") for e in board["edges"]}
 
     def new_id() -> str:
@@ -360,6 +361,37 @@ def arrange(campaign: Path, session: str) -> list[dict]:
             pass
         taken.add(made)
         return made
+    return new_id
+
+
+def _under(nodes: list[dict]) -> tuple[int, int]:
+    """Where what's added below the board starts: under all of it, at its
+    left edge."""
+    if not nodes:
+        return 0, 0
+    return min(n["x"] for n in nodes), max(n["y"] + n["height"] for n in nodes) + GAP * 2
+
+
+def arrange(campaign: Path, session: str, groups: list[tuple[str, list[str]]] | None = None) -> list[dict]:
+    """The operations that lay the board out by beat, for the caller to
+    apply as one step (``apply``); nothing is written here.
+
+    Each group of ``plan_groups`` (or of ``groups``: one frame, for MCP's
+    ``frame_cards``) gets a frame named after it, holding its notes in a
+    grid, the frames in rows of PER_ROW. A frame already named after the
+    group is moved and sized rather than made again, and the other cards
+    wholly inside it come along, after its notes: a sticky the GM put in a
+    beat's frame stays in it. The rest of the board stays where it is, and
+    the arrangement starts under it."""
+    board, _ = _load(board_file(campaign, session))
+    nodes = _placed(board)
+    notes = _view(campaign, board)["notes"]
+    if groups is None:
+        groups = plan_groups(campaign, session)
+    for _, rels in groups:
+        for rel in rels:
+            vault.note_path(campaign, rel)
+    new_id = _new_ids(board)
 
     card_of: dict[str, dict] = {}
     for n in nodes:
@@ -427,6 +459,72 @@ def arrange(campaign: Path, session: str) -> list[dict]:
         x += width + GAP * 2
         row_height = max(row_height, height)
     return ops
+
+
+# ---------------------------------------------------------------------------
+# For MCP (board toolbar design §6, step 4)
+# ---------------------------------------------------------------------------
+
+def settle(campaign: Path, session: str, live: list[str]) -> dict:
+    """Write in the cards the app shows but the file doesn't hold yet,
+    where it shows them, and return the board. The app lays the session's
+    notes and anything ``live`` out to the right of what's placed, a column
+    per group of ``plan_groups``, then one for the rest by name (board.ts
+    ``cards``), and its first change to a board places them all
+    (``placeAll``). An agent settles a board before changing it, so its
+    change moves nothing the GM sees."""
+    board, _ = _load(board_file(campaign, session))
+    nodes = _placed(board)
+    index = prep.index(campaign)
+    names = {n["path"]: n["name"] for n in index["notes"]}
+    groups = [rels for _, rels in plan_groups(campaign, session, index)]
+    on_board = set(_view(campaign, board)["notes"].values())
+    wanted = [rel for rels in groups for rel in rels] + list(live)
+    loose = {rel for rel in wanted if rel not in on_board and rel in names}
+    if not loose:
+        return _view(campaign, board)
+
+    grouped = {rel for rels in groups for rel in rels}
+    rest = sorted((rel for rel in loose if rel not in grouped), key=lambda rel: prep.natural(names[rel]))
+    columns = [c for c in ([rel for rel in rels if rel in loose] for rels in groups + [rest]) if c]
+    x0 = max(n["x"] + n["width"] for n in nodes) + GAP * 2 if nodes else 0
+    y0 = min(n["y"] for n in nodes) if nodes else 0
+    new_id = _new_ids(board)
+    ops = [
+        {"op": "place", "id": new_id(), "path": rel, "x": x0 + i * (CARD[0] + GAP),
+         "y": y0 + row * (CARD[1] + GAP), "width": CARD[0], "height": CARD[1]}
+        for i, column in enumerate(columns) for row, rel in enumerate(column)
+    ]
+    return apply(campaign, session, ops)
+
+
+def spot(campaign: Path, session: str, size: tuple[int, int], near: str | None = None) -> dict:
+    """Where a new card of ``size`` goes: beside the card ``near``, to its
+    right, else below it when the right is taken, else past the cards in
+    the way to the right, as a duplicate goes (board.ts ``duplicateOps``); a
+    frame ``near`` sits in isn't in the way. With no ``near``, under the
+    board."""
+    board, _ = _load(board_file(campaign, session))
+    nodes = _placed(board)
+    width, height = size
+    if near is None:
+        x, y = _under(nodes)
+        return {"x": x, "y": y, "width": width, "height": height}
+    anchor = next((n for n in nodes if n.get("id") == near), None)
+    if anchor is None:
+        raise vault.NotFound(f"No card {near!r} on the board")
+    in_way = [n for n in nodes if n is not anchor and not (n.get("type") == "group" and _within(anchor, n))]
+
+    def blocking(x: int, y: int) -> list[dict]:
+        box = {"x": x, "y": y, "width": width, "height": height}
+        return [n for n in in_way if _overlaps(n, box)]
+
+    right = (anchor["x"] + anchor["width"] + GAP, anchor["y"])
+    below = (anchor["x"], anchor["y"] + anchor["height"] + GAP)
+    x, y = below if blocking(*right) and not blocking(*below) else right
+    while hit := blocking(x, y):
+        x = max(n["x"] + n["width"] for n in hit) + GAP
+    return {"x": round(x), "y": round(y), "width": width, "height": height}
 
 
 # ---------------------------------------------------------------------------

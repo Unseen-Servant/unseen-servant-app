@@ -23,7 +23,7 @@ def today() -> date:
     return date.today()
 
 
-def _natural(name: str) -> list:
+def natural(name: str) -> list:
     return [int(t) if t.isdigit() else t.casefold() for t in re.split(r"(\d+)", name)]
 
 
@@ -76,7 +76,7 @@ def index(campaign: Path) -> dict:
     ]
     # The order the GM gave the beats (vault.beat_order), then by name.
     saved = {name.casefold(): i for i, name in enumerate(vault.beat_order(campaign))}
-    base["beats"].sort(key=lambda b: (saved.get(b["name"].casefold(), len(saved)), _natural(b["name"])))
+    base["beats"].sort(key=lambda b: (saved.get(b["name"].casefold(), len(saved)), natural(b["name"])))
     sessions = [
         {
             "name": n["name"],
@@ -87,7 +87,7 @@ def index(campaign: Path) -> dict:
         for n in base["notes"]
         if _in(n, SESSIONS)
     ]
-    base["sessions"] = sorted(sessions, key=lambda s: (s["date"] or "", _natural(s["name"])))
+    base["sessions"] = sorted(sessions, key=lambda s: (s["date"] or "", natural(s["name"])))
     return base
 
 

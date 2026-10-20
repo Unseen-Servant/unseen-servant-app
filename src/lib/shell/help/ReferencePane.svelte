@@ -80,6 +80,15 @@
         ['spend', 'Mark a note spent or unspent'],
       ],
     },
+    {
+      group: 'Command · board',
+      tools: [
+        ['arrange_board', "Frame a session's planned beats on its board, as Arrange does"],
+        ['frame_cards', 'Gather notes into a named frame'],
+        ['connect_cards', "Draw a line between two notes' cards, with a label"],
+        ['add_text', 'Put a text card beside a note, or under the board'],
+      ],
+    },
   ];
 </script>
 

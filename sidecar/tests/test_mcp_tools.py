@@ -690,5 +690,6 @@ def test_registered_tools_are_the_public_surface():
         "campaign_overview", "current_session", "live_set", "read_note",
         "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat",
         "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend",
+        "connect_cards", "frame_cards", "add_text", "arrange_board",
     }
 

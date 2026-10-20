@@ -414,3 +414,55 @@ def test_arranging_leaves_the_rest_of_the_board_and_starts_under_it(planned):
     frames = frames_by_label(view)
     assert frames["Handouts"]["y"] == -300
     assert min(f["y"] for name, f in frames.items() if name != "Handouts") >= -100 + board.GAP * 2
+
+
+# ---------------------------------------------------------------------------
+# For MCP (board toolbar design §6, step 4)
+# ---------------------------------------------------------------------------
+
+def test_settling_writes_in_what_the_app_shows_where_it_shows_it(planned):
+    # As board.ts `cards` lays them out: to the right of what's placed, a
+    # column per group, then one for the rest (here a live note) by name.
+    write(planned / "Locations" / "Barovia.md", "")
+    board.apply(planned, SESSION, [
+        {"op": "add", "id": "t1", "type": "text", "text": "Goals", "x": 0, "y": -40, "width": 260, "height": 100},
+    ])
+    view = board.settle(planned, SESSION, ["Locations/Barovia.md", "NPCs/Ismark.md", "NPCs/Gone.md"])
+    assert {rel: (n["x"], n["y"]) for rel, n in note_cards(view).items()} == {
+        "NPCs/Ireena.md": (324, -40),
+        "NPCs/Ismark.md": (616, -40),
+        "Secrets/Ravens watch.md": (908, -40),
+        "Locations/Barovia.md": (1200, -40),
+    }
+    written = board_text(planned)
+    assert board.settle(planned, SESSION, []) == view
+    assert board_text(planned) == written
+
+
+def test_a_spot_is_beside_a_card_or_under_the_board(camp):
+    board.apply(camp, SESSION, [
+        {"op": "add", "id": "g", "type": "group", "label": "Barovia", "x": -24, "y": -48, "width": 900, "height": 600},
+        card("a", "NPCs/Ismark.md"),
+        card("b", "NPCs/Ireena.md", x=292),
+    ])
+    text = board.TEXT_CARD
+    # The right of a is taken, so below; the frame they sit in isn't in the way.
+    assert board.spot(camp, SESSION, text, "a") == {"x": 0, "y": 212, "width": 260, "height": 100}
+    assert board.spot(camp, SESSION, text, "b") == {"x": 584, "y": 0, "width": 260, "height": 100}
+    board.apply(camp, SESSION, [card("c", "Secrets/Ravens watch.md", y=212)])
+    assert board.spot(camp, SESSION, text, "a") == {"x": 584, "y": 0, "width": 260, "height": 100}
+    assert board.spot(camp, SESSION, board.CARD) == {"x": -24, "y": 616, "width": 260, "height": 180}
+    with pytest.raises(NotFound):
+        board.spot(camp, SESSION, text, "zz")
+
+
+def test_arranging_one_frame_gathers_its_notes_and_keeps_what_is_in_it(planned):
+    view = board.apply(planned, SESSION, board.arrange(planned, SESSION, [("Vault", ["NPCs/Ismark.md"])]))
+    assert list(frames_by_label(view)) == ["Vault"]
+    view = board.apply(planned, SESSION, board.arrange(planned, SESSION, [("vault", ["NPCs/Ireena.md"])]))
+    vault_frame = frames_by_label(view)["Vault"]
+    cards = note_cards(view)
+    assert list(cards) == ["NPCs/Ismark.md", "NPCs/Ireena.md"]
+    assert all(board._within(c, vault_frame) for c in cards.values())
+    with pytest.raises(NotFound):
+        board.arrange(planned, SESSION, [("Vault", ["NPCs/Gone.md"])])

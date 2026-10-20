@@ -17,6 +17,7 @@ Usage:
 import argparse
 import asyncio
 import re
+import secrets
 import sys
 import threading
 import time
@@ -277,6 +278,9 @@ mcp = MCPServer(
         "create_beat(session=) makes each scene from notes already written, "
         "one at a time in play order, since a plan takes beats as the calls "
         "arrive. add_to_beat() and plan_beat() fix a beat or the plan.\n"
+        "- Then arrange_board() frames each planned beat on the session's "
+        "board, and connect_cards(), frame_cards() and add_text() draw lines, "
+        "frames and text cards on it, as the GM does in Play.\n"
         "- Renaming and deleting are the GM's: say what should change.\n"
         "- add_to_live_set() and spend() follow the table during play."
     ),
@@ -1223,6 +1227,211 @@ async def spend(name: str, spent: bool = True, campaign: str | None = None) -> s
         return data
     state = f"spent ({data['spent']})" if data.get("spent") else "unspent"
     return f"{entry['name']} is {state}."
+
+
+# -- the board (board toolbar design §6, step 4) ----------------------------
+
+async def _board(campaign: str | None, session: str | None) -> tuple[dict | None, dict | None, dict | None, str | None]:
+    """The campaign's index, the session whose board it is, and the board
+    as the GM sees it, settled first so a change moves nothing they see;
+    or the message saying why not."""
+    index, ctx, error = await _campaign_index(campaign)
+    if error:
+        return None, None, None, error
+    if session:
+        target, error = _session_named(index, session)
+        if error:
+            return None, None, None, error
+    else:
+        target = _session(index, ctx)
+        if target is None:
+            return None, None, None, f"{index['name']} has no session yet. create_session() starts one."
+    view = await sidecar.post("/api/command/board/settle", {"campaign": index["name"], "session": target["path"]})
+    if isinstance(view, str):
+        return None, None, None, view
+    return index, target, view, None
+
+
+async def _edit_board(index: dict, target: dict, ops: list[dict]) -> str | None:
+    """Apply ``ops`` to the session's board; the message when it can't."""
+    done = await sidecar.post("/api/command/board", {"campaign": index["name"], "session": target["path"], "ops": ops})
+    return done if isinstance(done, str) else None
+
+
+def _new_id() -> str:
+    return secrets.token_hex(8)
+
+
+@mcp.tool()
+async def connect_cards(
+    a: str,
+    b: str,
+    label: str | None = None,
+    session: str | None = None,
+    campaign: str | None = None,
+) -> str:
+    """Draw a line between two notes' cards on a session's board, as the GM
+    would in Play: an NPC to where they wait, a clue to its secret. A note
+    not on the board yet is put beside the other.
+
+    Args:
+        a: A note's name, or its path when the name is shared.
+        b: The other note's.
+        label: Words on the line ("hides in", "owes").
+        session: The session's name; defaults to the one open in the app,
+                 else the latest.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, target, view, error = await _board(campaign, session)
+    if error:
+        return error
+    ends = []
+    for name in (a, b):
+        entry, error = _note(index, name, "note")
+        if error:
+            return error
+        ends.append(entry)
+    if ends[0]["path"] == ends[1]["path"]:
+        return "A line joins two different notes."
+    cards = {rel: card_id for card_id, rel in view["notes"].items()}
+    where = f"{target['name']}'s board"
+    missing = [e for e in ends if e["path"] not in cards]
+    if len(missing) == 2:
+        return (
+            f"Neither {ends[0]['name']} nor {ends[1]['name']} is on {where}. "
+            "frame_cards() puts notes there, or add_to_beat() makes one the session's."
+        )
+    ops: list[dict] = []
+    placed = ""
+    for entry in missing:
+        other = ends[1] if entry is ends[0] else ends[0]
+        spot = await sidecar.get(
+            f"/api/command/board/spot?{_q(campaign=index['name'], session=target['path'], kind='file', near=cards[other['path']])}"
+        )
+        if isinstance(spot, str):
+            return spot
+        cards[entry["path"]] = _new_id()
+        ops.append({"op": "place", "id": cards[entry["path"]], "path": entry["path"], **spot})
+        placed = f" {entry['name']} is on it now, beside {other['name']}."
+    source, dest = cards[ends[0]["path"]], cards[ends[1]["path"]]
+    if any({e.get("fromNode"), e.get("toNode")} == {source, dest} for e in view["edges"]):
+        return f"A line joins {ends[0]['name']} and {ends[1]['name']} on {where} already."
+    ops.append({"op": "connect", "id": _new_id(), "source": source, "target": dest, "label": (label or "").strip() or None})
+    if error := await _edit_board(index, target, ops):
+        return error
+    said = f', labelled "{label.strip()}"' if label and label.strip() else ""
+    return f"Joined {ends[0]['name']} and {ends[1]['name']} on {where}{said}.{placed}"
+
+
+@mcp.tool()
+async def frame_cards(label: str, notes: list[str], session: str | None = None, campaign: str | None = None) -> str:
+    """Gather notes' cards into a frame named label on a session's board,
+    in a grid under the rest of it; notes not on the board yet are put in
+    too. A frame of that name already there is the one used, and what's in
+    it stays. arrange_board() frames every planned beat at once.
+
+    Args:
+        label: The frame's name ("The Vault").
+        notes: The notes it holds, by name, or by path when a name is shared.
+        session: The session's name; defaults to the one open in the app,
+                 else the latest.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    if not label.strip():
+        return "A frame needs a label."
+    index, target, view, error = await _board(campaign, session)
+    if error:
+        return error
+    members = []
+    for name in notes:
+        entry, error = _note(index, name, "note")
+        if error:
+            return error
+        if entry not in members:
+            members.append(entry)
+    existing = next((
+        n["label"].strip() for n in view["nodes"]
+        if n.get("type") == "group" and isinstance(n.get("label"), str)
+        and n["label"].strip().casefold() == label.strip().casefold()
+    ), None)
+    query = _q(campaign=index["name"], session=target["path"], frame=label.strip())
+    query += "".join(f"&notes={quote(m['path'], safe='')}" for m in members)
+    data = await sidecar.get(f"/api/command/board/arrange?{query}")
+    if isinstance(data, str):
+        return data
+    if error := await _edit_board(index, target, data["ops"]):
+        return error
+    held = ", ".join(m["name"] for m in members) or "nothing new"
+    kept = " It keeps what was in it." if existing else ""
+    return f"Framed {held} in {existing or label.strip()} on {target['name']}'s board.{kept}"
+
+
+@mcp.tool()
+async def add_text(text: str, near: str | None = None, session: str | None = None, campaign: str | None = None) -> str:
+    """Put a text card on a session's board: a reminder, a question for the
+    table, a line of read-aloud. Beside a note's card, or under the board.
+
+    Args:
+        text: The card's Markdown. Link notes as [[Name]].
+        near: A note on the board to put it beside, by name or path.
+        session: The session's name; defaults to the one open in the app,
+                 else the latest.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    if not text.strip():
+        return "A text card needs text."
+    index, target, view, error = await _board(campaign, session)
+    if error:
+        return error
+    where = f"{target['name']}'s board"
+    card_id = None
+    if near:
+        entry, error = _note(index, near, "note")
+        if error:
+            return error
+        card_id = next((i for i, rel in view["notes"].items() if rel == entry["path"]), None)
+        if card_id is None:
+            return f"{entry['name']} isn't on {where}. Leave near out to put the card under the board."
+    spot = await sidecar.get(
+        f"/api/command/board/spot?{_q(campaign=index['name'], session=target['path'], kind='text', near=card_id)}"
+    )
+    if isinstance(spot, str):
+        return spot
+    if error := await _edit_board(index, target, [{"op": "add", "id": _new_id(), "type": "text", "text": text, **spot}]):
+        return error
+    return f"Added a text card to {where}, " + (f"beside {entry['name']}." if near else "under the rest.")
+
+
+@mcp.tool()
+async def arrange_board(session: str | None = None, campaign: str | None = None) -> str:
+    """Lay a session's board out by beat, as the GM's Arrange key does: a
+    frame named after each planned beat, in plan order, holding its notes;
+    notes several beats hold go in a frame named Throughout, first. Frames
+    already named after a beat are reused, with what's in them. The rest
+    of the board stays where it is, and the frames go under it.
+
+    Args:
+        session: The session's name; defaults to the one open in the app,
+                 else the latest.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, target, view, error = await _board(campaign, session)
+    if error:
+        return error
+    data = await sidecar.get(f"/api/command/board/arrange?{_q(campaign=index['name'], session=target['path'])}")
+    if isinstance(data, str):
+        return data
+    if not data["ops"]:
+        return f"{target['name']} has nothing planned, so its board has nothing to arrange."
+    if error := await _edit_board(index, target, data["ops"]):
+        return error
+    frames = {n["id"]: n.get("label") for n in view["nodes"] if n.get("type") == "group"}
+    labels = [
+        op["label"] if op["op"] == "add" else frames[op["id"]]
+        for op in data["ops"]
+        if (op["op"] == "add" and op.get("type") == "group") or (op["op"] == "frame" and op["id"] in frames)
+    ]
+    return f"Arranged {target['name']}'s board by beat, a frame each: {', '.join(labels)}."
 
 
 # ---------------------------------------------------------------------------

@@ -139,6 +139,7 @@ Dispositions: **KEEP** · **CHANGE** (an existing tool) · **ADD** · **DEFER** 
   - The tool waits until `GET /context` shows the session, with a short timeout, so its reply is true. With no app listening, it says so.
   - The open campaign's sessions only (A1.3).
 - **A4.5 WON'T** the board. It's spatial arrangement in JSON Canvas, done by the GM's hand. Play auto-places what a plan holds.
+  - *Lifted 2026-10-20*, once the GM had board tools of their own: `arrange_board`, `frame_cards`, `connect_cards` and `add_text` wrap them (the board toolbar's design, `2026-10-19-command-board-toolbar-design.md` §6, step 4).
 
 #### A5. Play
 - **A5.1 KEEP** `live_set`.

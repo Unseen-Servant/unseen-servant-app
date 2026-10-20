@@ -12,7 +12,7 @@ import json
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -146,6 +146,11 @@ class BoardEdit(BaseModel):
     campaign: str
     session: str
     ops: list[dict]
+
+
+class BoardSettle(BaseModel):
+    campaign: str
+    session: str
 
 
 class Launch(BaseModel):
@@ -581,10 +586,31 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             return board.apply(campaign_path(body.campaign), body.session, body.ops)
 
     @router.get("/board/arrange")
-    def arrange_board(campaign: str, session: str):
+    def arrange_board(campaign: str, session: str, frame: str | None = None, notes: list[str] = Query([])):
         """The operations that lay the board out by beat, unapplied: the
-        app applies them as one step it can undo."""
-        return {"ops": board.arrange(campaign_path(campaign), session)}
+        app applies them as one step it can undo. With ``frame``, they put
+        ``notes`` in the one frame of that name instead (MCP's
+        ``frame_cards``)."""
+        groups = [(frame.strip(), notes)] if frame and frame.strip() else None
+        return {"ops": board.arrange(campaign_path(campaign), session, groups)}
+
+    @router.post("/board/settle")
+    def settle_board(body: BoardSettle):
+        """Write in the cards the app shows but the board's file doesn't hold
+        yet, where it shows them, as the app's first change to a board does:
+        MCP settles a board before changing it."""
+        camp = campaign_path(body.campaign)
+        with write_lock:
+            return board.settle(camp, body.session, live.get(body.campaign)["notes"])
+
+    @router.get("/board/spot")
+    def board_spot(campaign: str, session: str, kind: str = "text", near: str | None = None):
+        """Where a new note card or text card goes: beside the card
+        ``near``, else under the board."""
+        size = {"file": board.CARD, "text": board.TEXT_CARD}.get(kind)
+        if size is None:
+            raise HTTPException(422, "A spot is for a note card (file) or a text card (text)")
+        return board.spot(campaign_path(campaign), session, size, near)
 
     @router.get("/live")
     def get_live(campaign: str):
