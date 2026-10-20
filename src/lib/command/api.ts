@@ -98,6 +98,9 @@ export const commandApi = {
   getBoard: (campaign: string, session: string) => invoke<BoardView>('command_get_board', { campaign, session }),
   editBoard: (campaign: string, session: string, ops: BoardOp[]) =>
     invoke<BoardView>('command_edit_board', { campaign, session, ops }),
+  /** What Arrange by beat would do to the board, for `editBoard` to apply. */
+  arrangeBoard: (campaign: string, session: string) =>
+    invoke<{ ops: BoardOp[] }>('command_arrange_board', { campaign, session }).then((r) => r.ops),
   getLive: (campaign: string) => invoke<LiveSet>('command_get_live', { campaign }),
   launch: (campaign: string, beat: string) => invoke<LiveSet>('command_launch', { campaign, beat }),
   setLive: (campaign: string, note: string, live: boolean) =>

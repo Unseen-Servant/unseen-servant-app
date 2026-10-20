@@ -52,6 +52,28 @@ export function memberPaths(beat: BeatEntry | null): Set<string> {
   return new Set((beat?.notes ?? []).map((r) => r.path).filter((p): p is string => p !== null));
 }
 
+/** What Arrange by beat names the frame of the notes several planned
+ *  beats hold (board toolbar design §6). */
+export const THROUGHOUT = 'Throughout';
+
+/** The session's notes as Arrange lays them out, as the sidecar's
+ *  board.plan_groups does: Throughout first, with the notes several
+ *  planned beats hold, then each planned beat with the rest of its notes,
+ *  in plan order and the beat's own order. Throughout is left out when no
+ *  note is shared. */
+export function beatGroups(index: CampaignIndex, session: SessionEntry | null): { name: string; notes: string[] }[] {
+  const planned: BeatEntry[] = [];
+  for (const row of planRows(index, session)) if (row.beat && !planned.includes(row.beat)) planned.push(row.beat);
+  const held = planned.map((b) => [...memberPaths(b)]);
+  const count = new Map<string, number>();
+  for (const notes of held) for (const p of notes) count.set(p, (count.get(p) ?? 0) + 1);
+  const shared = [...new Set(held.flat().filter((p) => count.get(p)! > 1))];
+  return [
+    ...(shared.length ? [{ name: THROUGHOUT, notes: shared }] : []),
+    ...planned.map((b, i) => ({ name: b.name, notes: held[i].filter((p) => count.get(p) === 1) })),
+  ];
+}
+
 /** Every note some beat of the session's plan holds. */
 export function sessionNotePaths(index: CampaignIndex, session: SessionEntry | null): Set<string> {
   const out = new Set<string>();

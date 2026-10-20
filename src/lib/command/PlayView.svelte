@@ -14,7 +14,8 @@
   import CardTray from './CardTray.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
-  import { chordHint } from '../shell/keybindings';
+  import { confirmPrompt } from '../shell/confirmStore';
+  import { chord, chordHint } from '../shell/keybindings';
   import { commandApi } from './api';
   import {
     CARD_ACTIONS,
@@ -32,7 +33,7 @@
   } from './board';
   import { inverse } from './boardUndo';
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
-  import { memberPaths, planRows, sessionNotePaths } from './prep';
+  import { beatGroups, memberPaths, planRows, sessionNotePaths } from './prep';
   import type { BeatEntry, BoardOp, BoardView, CampaignIndex, LiveSet, NoteEntry, SessionEntry } from './types';
 
   export let active: boolean;
@@ -99,7 +100,7 @@
         // readable, and with nothing in play on everything.
         if (first && !boardViews.has(key)) {
           await tick();
-          frameNotes(live?.notes ?? [], true);
+          frameBeat(index.beats.find((b) => b.path === live?.beat), live?.notes ?? [], true);
         }
       }
     } catch (e) {
@@ -156,7 +157,10 @@
   /** What belongs on the board beyond what's placed: the session's notes and
    *  anything live. */
   $: wanted = new Set([...sessionNotePaths(index, session), ...liveNotes]);
-  $: allCards = view ? boardCards(view, index, wanted) : [];
+  /** The session's notes by beat, as Arrange frames them: the order the
+   *  cards not yet placed are laid out in too. */
+  $: groups = beatGroups(index, session);
+  $: allCards = view ? boardCards(view, index, wanted, groups.map((g) => g.notes)) : [];
   $: allLines = view ? boardLines(view, allCards) : [];
 
   const removable = (card: Card) => card.kind !== 'note' || !card.path || !wanted.has(card.path);
@@ -228,6 +232,25 @@
 
   /** The whole board in view, clear of the session player (⌥1). */
   const fitAll = () => (frame = { ids: [] });
+
+  /** Arrange by beat (board toolbar design §6): the sidecar works out the
+   *  layout, applied as one step that undo takes back, then the whole
+   *  board is shown. */
+  async function arrange() {
+    const go = await confirmPrompt.request({
+      title: 'Arrange by beat',
+      message:
+        'Each planned beat gets a frame, in plan order, with its notes in it; notes several beats share go in Throughout. ' +
+        `Your other cards stay where they are, and ${chord('command.boardUndo')} puts it all back.`,
+      confirmLabel: 'Arrange',
+    });
+    if (!go) return;
+    void run(async () => {
+      apply(await commandApi.arrangeBoard(campaign, session.path));
+      await tick();
+      fitAll();
+    });
+  }
 
   /** The board's keys, Miro's letters (§3.5). Taken before the session
    *  player's, so Esc puts down an armed tool before it lets go of a beat. */
@@ -331,6 +354,18 @@
     if (ids.length || orAll) frame = { ids };
   }
 
+  /** Frame a beat: the frame named after it, as Arrange makes one, so a
+   *  note it shares with a beat across the board doesn't pull the view out
+   *  to both (board toolbar design §6); else the cards of `paths`. */
+  function frameBeat(beat: BeatEntry | undefined, paths: Iterable<string>, orAll = false) {
+    const name = beat?.name.trim().toLowerCase();
+    const named = name
+      ? view?.nodes.find((n) => n.type === 'group' && typeof n.label === 'string' && n.label.trim().toLowerCase() === name)
+      : undefined;
+    if (named) frame = { ids: [named.id] };
+    else frameNotes(paths, orAll);
+  }
+
   // -- the live set -------------------------------------------------------
 
   function setLive(path: string, on: boolean) {
@@ -342,7 +377,7 @@
       const launched = await commandApi.launch(campaign, beat.path);
       onLive(launched);
       await tick();
-      frameNotes(launched.notes);
+      frameBeat(beat, launched.notes);
     });
   }
 
@@ -463,7 +498,7 @@
         liveBeat={live?.beat ?? null}
         onLaunch={launch}
         onStop={stop}
-        onFrame={(beat) => frameNotes(beat.path === live?.beat ? (live?.notes ?? []) : memberPaths(beat))}
+        onFrame={(beat) => frameBeat(beat, beat.path === live?.beat ? (live?.notes ?? []) : memberPaths(beat))}
         onEdit={(beat) => onEdit(beat.path)}
         {onSpent}
       />
@@ -496,6 +531,8 @@
           onUndo={undo}
           onRedo={redo}
           onFit={fitAll}
+          canArrange={groups.length > 0}
+          onArrange={() => void arrange()}
         />
       {/if}
     </div>

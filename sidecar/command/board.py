@@ -10,11 +10,13 @@ doesn't know — is kept.
 
 from __future__ import annotations
 
+import math
 import os
 import re
+import secrets
 from pathlib import Path, PurePosixPath
 
-from . import canvas, vault
+from . import canvas, prep, vault
 
 SESSIONS = vault.RESERVED[1]
 
@@ -286,6 +288,145 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
     if not path.exists() or vault.read_text(path) != text:
         vault.atomic_write(path, text.encode("utf-8"))
     return _view(campaign, board)
+
+
+# ---------------------------------------------------------------------------
+# Arranging by beat (board toolbar design §6, step 3)
+# ---------------------------------------------------------------------------
+
+# The board's own measures (the frontend's board.ts): a note card's size, the
+# gap between cards, and how far a frame clears its cards, more at the top
+# for its name.
+CARD = (260, 180)
+GAP = 32
+FRAME_PAD, FRAME_TOP = 24, 48
+# Frames to a row, read left to right; cards to a frame's row, at most.
+PER_ROW, CARDS_ACROSS = 4, 3
+THROUGHOUT = "Throughout"
+
+
+def plan_groups(campaign: Path, session: str) -> list[tuple[str, list[str]]]:
+    """The session's notes as Arrange lays them out: Throughout first, with
+    the notes several planned beats hold, then each planned beat by name
+    with the rest of its notes, in plan order and the beat's own order.
+    Throughout is left out when no note is shared; a beat whose notes are
+    all shared keeps its (empty) frame."""
+    index = prep.index(campaign)
+    entry = next((s for s in index["sessions"] if s["path"] == session), None)
+    if entry is None:
+        raise vault.NotFound(f"No session at {session!r}")
+    beats = {b["path"]: b for b in index["beats"]}
+    planned: list[dict] = []
+    for ref in entry["beats"]:
+        beat = beats.get(ref["path"])
+        if beat is not None and beat not in planned:
+            planned.append(beat)
+    held = [list(dict.fromkeys(r["path"] for r in b["notes"] if r["path"])) for b in planned]
+    count: dict[str, int] = {}
+    for notes in held:
+        for rel in notes:
+            count[rel] = count.get(rel, 0) + 1
+    shared = list(dict.fromkeys(rel for notes in held for rel in notes if count[rel] > 1))
+    groups = [(THROUGHOUT, shared)] if shared else []
+    return groups + [(b["name"], [rel for rel in notes if count[rel] == 1]) for b, notes in zip(planned, held)]
+
+
+def _within(node: dict, frame: dict) -> bool:
+    return (
+        node["x"] >= frame["x"] and node["y"] >= frame["y"]
+        and node["x"] + node["width"] <= frame["x"] + frame["width"]
+        and node["y"] + node["height"] <= frame["y"] + frame["height"]
+    )
+
+
+def arrange(campaign: Path, session: str) -> list[dict]:
+    """The operations that lay the board out by beat, for the caller to
+    apply as one step (``apply``); nothing is written here.
+
+    Each group of ``plan_groups`` gets a frame named after it, holding its
+    notes in a grid, the frames in rows of PER_ROW. A frame already named
+    after the group is moved and sized rather than made again, and the
+    other cards wholly inside it come along, after its notes: a sticky the
+    GM put in a beat's frame stays in it. The rest of the board stays where
+    it is, and the arrangement starts under it."""
+    board, _ = _load(board_file(campaign, session))
+    nodes = [n for n in board["nodes"] if all(isinstance(n.get(k), (int, float)) for k in ("x", "y", "width", "height"))]
+    notes = _view(campaign, board)["notes"]
+    groups = plan_groups(campaign, session)
+    taken = {n.get("id") for n in board["nodes"]} | {e.get("id") for e in board["edges"]}
+
+    def new_id() -> str:
+        while (made := secrets.token_hex(8)) in taken:
+            pass
+        taken.add(made)
+        return made
+
+    card_of: dict[str, dict] = {}
+    for n in nodes:
+        rel = notes.get(n.get("id"))
+        if rel and rel not in card_of:
+            card_of[rel] = n
+    frame_of: dict[str, dict] = {}
+    for n in nodes:
+        if n.get("type") == "group" and isinstance(n.get("label"), str):
+            frame_of.setdefault(n["label"].strip().casefold(), n)
+    assigned = {rel for _, rels in groups for rel in rels}
+    moving = {id(card_of[rel]) for rel in assigned if rel in card_of}
+
+    # What each frame holds: its notes, then what was inside its old frame.
+    laid: list[tuple[str, dict | None, list[tuple[str | dict, int, int]]]] = []
+    for name, rels in groups:
+        old = frame_of.get(name.casefold())
+        items: list[tuple[str | dict, int, int]] = []
+        for rel in rels:
+            card = card_of.get(rel)
+            items.append((card, card["width"], card["height"]) if card else (rel, *CARD))
+        if old is not None:
+            moving.add(id(old))
+            inside = [
+                n for n in nodes
+                if n is not old and id(n) not in moving and n.get("type") != "group" and _within(n, old)
+            ]
+            for n in sorted(inside, key=lambda n: (n["y"], n["x"])):
+                moving.add(id(n))
+                items.append((n, n["width"], n["height"]))
+        laid.append((name, old, items))
+
+    staying = [n for n in nodes if id(n) not in moving]
+    x0 = min((n["x"] for n in nodes), default=0)
+    y0 = max((n["y"] + n["height"] for n in staying), default=None)
+    y0 = y0 + GAP * 2 if y0 is not None else min((n["y"] for n in nodes), default=0)
+
+    ops: list[dict] = []
+    x, y, row_height = x0, y0, 0
+    for i, (name, old, items) in enumerate(laid):
+        if i and i % PER_ROW == 0:
+            x, y, row_height = x0, y + row_height + GAP * 2, 0
+        across = max(1, min(CARDS_ACROSS, math.ceil(math.sqrt(len(items)))))
+        down = max(1, math.ceil(len(items) / across))
+        cell_w = max((w for _, w, _ in items), default=CARD[0])
+        cell_h = max((h for _, _, h in items), default=CARD[1])
+        width = across * cell_w + (across - 1) * GAP + FRAME_PAD * 2
+        height = FRAME_TOP + down * cell_h + (down - 1) * GAP + FRAME_PAD
+        place = {"x": round(x), "y": round(y), "width": round(width), "height": round(height)}
+        if old is not None:
+            ops.append({"op": "frame", "id": old["id"], **place})
+        else:
+            ops.append({"op": "add", "id": new_id(), "type": "group", "label": name, **place})
+        for k, (item, w, h) in enumerate(items):
+            at = {
+                "x": round(x + FRAME_PAD + (k % across) * (cell_w + GAP)),
+                "y": round(y + FRAME_TOP + (k // across) * (cell_h + GAP)),
+                "width": round(w),
+                "height": round(h),
+            }
+            if isinstance(item, str):
+                ops.append({"op": "place", "id": new_id(), "path": item, **at})
+            else:
+                ops.append({"op": "frame", "id": item["id"], **at})
+        x += width + GAP * 2
+        row_height = max(row_height, height)
+    return ops
 
 
 # ---------------------------------------------------------------------------

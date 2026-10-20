@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeSession, beatOrder, memberPaths, planMoveTo, planRows, sessionNotePaths, unscheduled } from './prep';
+import { activeSession, beatGroups, beatOrder, memberPaths, planMoveTo, planRows, sessionNotePaths, unscheduled } from './prep';
 import type { CampaignIndex } from './types';
 
 const index: CampaignIndex = {
@@ -71,5 +71,21 @@ describe('prep', () => {
     expect([...memberPaths(index.beats[0])]).toEqual(['NPCs/Ismark.md']);
     expect([...sessionNotePaths(index, activeSession(index, null))].sort()).toEqual(['NPCs/Ismark.md', 'NPCs/Madam Eva.md']);
     expect(memberPaths(null).size).toBe(0);
+  });
+
+  it('groups the session\'s notes as Arrange frames them: shared ones first, then each beat in plan order', () => {
+    const session = index.sessions[1];
+    expect(beatGroups(index, session)).toEqual([
+      { name: 'Ambush', notes: ['NPCs/Ismark.md'] },
+      { name: 'Tser Pool', notes: ['NPCs/Madam Eva.md'] },
+    ]);
+    // Tser Pool shares Ismark with Ambush, and Ambush is planned twice.
+    const sharing = { ...index, beats: index.beats.map((b) => (b.name === 'Tser Pool' ? { ...b, notes: [...b.notes, { link: 'Ismark', path: 'NPCs/Ismark.md' }] } : b)) };
+    const twice = { ...session, beats: [...session.beats, { link: 'Ambush', path: 'Beats/Ambush.md' }] };
+    expect(beatGroups(sharing, twice)).toEqual([
+      { name: 'Throughout', notes: ['NPCs/Ismark.md'] },
+      { name: 'Ambush', notes: [] },
+      { name: 'Tser Pool', notes: ['NPCs/Madam Eva.md'] },
+    ]);
   });
 });

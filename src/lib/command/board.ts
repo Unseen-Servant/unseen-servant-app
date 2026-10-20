@@ -101,43 +101,41 @@ function placedCard(node: CanvasNode, path: string | null): Card {
 }
 
 /** Every card on the board: what the canvas holds, then each note of
- *  `wanted` (the session's notes, anything live) it doesn't, laid out in
- *  columns by track to the right of what the GM arranged. */
-export function cards(view: BoardView, index: CampaignIndex, wanted: Iterable<string>): Card[] {
+ *  `wanted` (the session's notes, anything live) it doesn't, laid out to
+ *  the right of what the GM arranged in a column per group of `groups`
+ *  (beatGroups: the session's notes by beat, in plan order), then one for
+ *  the rest by name. */
+export function cards(view: BoardView, index: CampaignIndex, wanted: Iterable<string>, groups: string[][] = []): Card[] {
   const placed = view.nodes.map((n) => placedCard(n, view.notes[n.id] ?? null));
   const onBoard = new Set(placed.map((c) => c.path).filter(Boolean));
   const notes = new Map(index.notes.map((n) => [n.path, n]));
-  const loose = [...new Set(wanted)]
-    .filter((p) => !onBoard.has(p) && notes.has(p))
-    .map((p) => notes.get(p)!);
-  if (!loose.length) return placed;
+  const loose = new Set([...wanted].filter((p) => !onBoard.has(p) && notes.has(p)));
+  if (!loose.size) return placed;
 
-  const order = [...index.tracks];
-  const column = (track: string | null) => (track && order.includes(track) ? order.indexOf(track) : order.length);
-  const used = [...new Set(loose.map((n) => column(n.track)))].sort((a, b) => a - b);
+  const grouped = new Set(groups.flat());
+  const rest = [...loose]
+    .filter((p) => !grouped.has(p))
+    .sort((a, b) => notes.get(a)!.name.localeCompare(notes.get(b)!.name, undefined, { sensitivity: 'base', numeric: true }));
+  const columns = [...groups.map((g) => g.filter((p) => loose.has(p))), rest].filter((c) => c.length);
 
   const x0 = placed.length ? Math.max(...placed.map((c) => c.x + c.width)) + GAP * 2 : 0;
   const y0 = placed.length ? Math.min(...placed.map((c) => c.y)) : 0;
-  const auto: Card[] = [];
-  used.forEach((col, i) => {
-    loose
-      .filter((n) => column(n.track) === col)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
-      .forEach((n, row) =>
-        auto.push({
-          id: AUTO + n.path,
-          kind: 'note',
-          path: n.path,
-          placed: false,
-          x: x0 + i * (CARD.width + GAP),
-          y: y0 + row * (CARD.height + GAP),
-          ...CARD,
-          text: n.path,
-          color: null,
-        }),
-      );
-  });
-  return [...placed, ...auto];
+  return [
+    ...placed,
+    ...columns.flatMap((column, i) =>
+      column.map((path, row) => ({
+        id: AUTO + path,
+        kind: 'note' as const,
+        path,
+        placed: false,
+        x: x0 + i * (CARD.width + GAP),
+        y: y0 + row * (CARD.height + GAP),
+        ...CARD,
+        text: path,
+        color: null,
+      })),
+    ),
+  ];
 }
 
 function centre(c: Card) {

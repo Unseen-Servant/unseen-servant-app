@@ -21,13 +21,15 @@ const index: CampaignIndex = {
 const empty: BoardView = { nodes: [], edges: [], notes: {} };
 
 describe('cards', () => {
-  it('lays out notes nobody placed in columns by track, by name', () => {
-    const out = cards(empty, index, ['Overview.md', 'NPCs/Ismark.md', 'Locations/Tser Pool.md', 'NPCs/Ireena.md', 'NPCs/Gone.md']);
+  it('lays out notes nobody placed in a column per beat group, in order, then the rest by name', () => {
+    const wanted = ['Overview.md', 'NPCs/Ismark.md', 'Locations/Tser Pool.md', 'NPCs/Ireena.md', 'PCs/Bo.md', 'NPCs/Gone.md'];
+    const out = cards(empty, index, wanted, [['NPCs/Ismark.md', 'Overview.md'], ['Locations/Tser Pool.md']]);
     expect(out.map((c) => [c.path, c.placed, c.x, c.y])).toEqual([
-      ['NPCs/Ireena.md', false, 0, 0],
-      ['NPCs/Ismark.md', false, 0, CARD.height + GAP],
+      ['NPCs/Ismark.md', false, 0, 0],
+      ['Overview.md', false, 0, CARD.height + GAP],
       ['Locations/Tser Pool.md', false, CARD.width + GAP, 0],
-      ['Overview.md', false, 2 * (CARD.width + GAP), 0],
+      ['PCs/Bo.md', false, 2 * (CARD.width + GAP), 0],
+      ['NPCs/Ireena.md', false, 2 * (CARD.width + GAP), CARD.height + GAP],
     ]);
   });
 

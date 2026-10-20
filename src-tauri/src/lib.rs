@@ -575,6 +575,7 @@ pub fn run() {
             command::command_set_spend_on_launch,
             command::command_get_board,
             command::command_edit_board,
+            command::command_arrange_board,
             command::command_get_live,
             command::command_launch,
             command::command_set_live,

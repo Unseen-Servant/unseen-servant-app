@@ -580,6 +580,12 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         with write_lock:
             return board.apply(campaign_path(body.campaign), body.session, body.ops)
 
+    @router.get("/board/arrange")
+    def arrange_board(campaign: str, session: str):
+        """The operations that lay the board out by beat, unapplied: the
+        app applies them as one step it can undo."""
+        return {"ops": board.arrange(campaign_path(campaign), session)}
+
     @router.get("/live")
     def get_live(campaign: str):
         """What's live, less anything gone since (``LiveSets.prune``)."""

@@ -1,6 +1,6 @@
 # Command board toolbar (2026-10-19)
 
-**Status:** settled 2026-10-19 (§8). Steps 1 and 2 of §6 are built; steps 3–4 aren't. No step claims the zoom keys (⌘+, ⌘−, ⌘0), which aren't built. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
+**Status:** settled 2026-10-19 (§8). Steps 1–3 of §6 are built; step 4 isn't. No step claims the zoom keys (⌘+, ⌘−, ⌘0), which aren't built. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
 
 ## 0. TL;DR
 
@@ -145,7 +145,7 @@ None of the letters above clashes with Command's (R, A, J, K, P, Space) or with 
 - **Undo:**
   - Each gesture is one step: one batch of operations, kept with its inverse, per board, in memory only.
   - Switching sessions clears it. An undo naming something Obsidian has since removed is skipped, as operations already are.
-- **The table:** nothing here changes launching, framing a beat, or the card tray. A tool can be armed while a beat is live.
+- **The table:** a tool can be armed while a beat is live, and nothing here changes the card tray. Arrange (step 3) changes one thing: launching a beat, or its frame key, frames the frame named after the beat when the board has one, rather than all of its cards (§8).
 - **Ops in flight:** a gesture's write still goes out as it does today (`onOps`), and the board re-derives from what comes back.
 
 ## 5. Sidecar (`board.apply`)
@@ -182,9 +182,13 @@ None of the letters above clashes with Command's (R, A, J, K, P, Space) or with 
    - This is what the Session 4 board needed.
 2. **Note, colours, line ends.** The Note tool; the selection bar's colours and ends, with arrowheads drawn; duplicate; fit all and fit the selection.
 3. **Arrange by beat**, Miro's templates in Command's terms:
-   - A menu key at the toolbar's foot lays the board out as one frame per planned beat, in plan order. Each frame holds its beat's notes; a note held by several beats sits with the first.
-   - It asks first and can be undone.
-   - The same order replaces today's auto-placement by track for cards never placed (§5.2), so an untouched board reads in play order.
+   - A key at the toolbar's foot (table-cells-large), in a well of its own, lays the board out as one frame per planned beat, named after it, in plan order. Spent beats are framed too.
+   - Notes several planned beats hold go in a frame named *Throughout*, first. Each beat's frame holds the rest of its notes, in the beat's own order, in a grid at most three cards across. The frames run in rows of four, read left to right.
+   - A frame already named after a beat (or Throughout) is moved and sized rather than made again, and the other cards wholly inside it come along after its notes, so a sticky put in a beat's frame stays there. Cards keep their size.
+   - The rest of the board (stickies, text, other frames, notes in no beat) stays where it is, and the arrangement starts under it.
+   - It asks first, and `⌘Z` takes it all back in one step.
+   - The layout is the sidecar's (`board.arrange`, `GET /board/arrange`): it returns the operations without writing them, and the app applies them as one gesture. Step 4's `arrange_board()` uses the same function.
+   - Cards never placed are laid out in the same order (§5.2): a column for Throughout, then one per planned beat, then the rest by name. The columns have no names: nothing is written until the board is touched.
 4. **MCP:** `connect_cards(a, b, label)`, `frame_cards(label, notes)`, `add_text(text, near)` and `arrange_board()`. They wrap 1–3, and the audit's "won't" on the board is lifted (`2026-10-18-command-mcp-tools-design.md`).
 
 Each step updates design §5.2, Help → Guides → Command, and the CHANGELOG.
@@ -203,3 +207,5 @@ Each step updates design §5.2, Help → Guides → Command, and the CHANGELOG.
 1. **Side:** the right edge, under the expand key. The left, as in Miro, would have moved the session player and the jot bar.
 2. **Select's drag on the empty board:** pans, as today. The table pans more than it selects; Shift+drag draws the marquee.
 3. **Removing a frame** keeps its cards, text cards and stickies included.
+4. **Notes shared by beats** (step 3): they go in a frame of their own, *Throughout*, rather than with the first beat that holds them. With them in the first beat's frame, launching a later beat framed both corners of the board and the view was too far out to read (the Session 4 board showed it). Launching a beat, or its frame key, now frames the beat's frame when the board has one, and the shared notes still show in the card tray while it's live.
+5. **Arrange's key** is one key, not a menu: there's one layout. Cards keep their size, and spent beats are framed in plan order with the rest.

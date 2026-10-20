@@ -68,6 +68,12 @@
       duplicates text cards, stickies and frames. <strong>&#8997;1</strong>
       shows the whole board and <strong>&#8997;2</strong> the selection.
     </p>
+    <p class="field-desc">
+      The key at the toolbar's foot arranges the board by beat: a frame for
+      each planned beat in plan order, with the notes several beats share in
+      a frame of their own, Throughout. Once a beat has its frame, launching
+      it shows that frame.
+    </p>
   </section>
 
   <section class="field">

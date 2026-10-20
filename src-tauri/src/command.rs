@@ -707,6 +707,21 @@ pub async fn command_edit_board(
     .await
 }
 
+/// The operations that lay a session's board out by beat (board toolbar
+/// design §6, step 3), unapplied: the frontend applies them through
+/// `command_edit_board` as one step it can undo. Returns `{ ops }`.
+#[tauri::command]
+pub async fn command_arrange_board(
+    campaign: String,
+    session: String,
+) -> Result<serde_json::Value, String> {
+    answer(client().get(api_query(
+        "/board/arrange",
+        &[("campaign", &campaign), ("session", &session)],
+    )?))
+    .await
+}
+
 #[tauri::command]
 pub async fn command_get_live(campaign: String) -> Result<LiveSet, String> {
     answer(client().get(api_query("/live", &[("campaign", &campaign)])?)).await

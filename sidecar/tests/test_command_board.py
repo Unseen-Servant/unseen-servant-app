@@ -339,3 +339,78 @@ def test_renaming_a_session_renames_its_board(camp):
     assert board.follow_rename(camp, SESSION, new) == "Sessions/The mists.canvas"
     assert board.read(camp, new)["notes"] == {"a1": "NPCs/Ismark.md"}
     assert board.follow_rename(camp, "NPCs/Ismark.md", "NPCs/Isaac.md") is None
+
+
+# ---------------------------------------------------------------------------
+# Arranging by beat (board toolbar design §6, step 3)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def planned(camp):
+    """Two planned beats sharing Ireena; the first is planned twice."""
+    write(camp / "Beats" / "Ambush.md", '---\nnotes:\n  - "[[Ismark]]"\n  - "[[Ireena]]"\n---\n')
+    write(camp / "Beats" / "Village.md", '---\nnotes:\n  - "[[Ireena]]"\n  - "[[Ravens watch]]"\n---\n')
+    write(camp / SESSION, '---\ndate: 2026-10-11\nbeats:\n  - "[[Ambush]]"\n  - "[[Village]]"\n  - "[[Ambush]]"\n---\n')
+    return camp
+
+
+def frames_by_label(view):
+    return {n["label"]: n for n in view["nodes"] if n["type"] == "group"}
+
+
+def note_cards(view):
+    return {view["notes"][n["id"]]: n for n in view["nodes"] if n["id"] in view["notes"]}
+
+
+def test_arranging_puts_shared_notes_first_then_each_beat_in_plan_order(planned):
+    assert board.plan_groups(planned, SESSION) == [
+        ("Throughout", ["NPCs/Ireena.md"]),
+        ("Ambush", ["NPCs/Ismark.md"]),
+        ("Village", ["Secrets/Ravens watch.md"]),
+    ]
+
+
+def test_arranging_frames_each_group_with_its_notes_in_a_row(planned):
+    ops = board.arrange(planned, SESSION)
+    assert not (planned / SESSION).with_suffix(".canvas").exists()
+    view = board.apply(planned, SESSION, ops)
+    frames = frames_by_label(view)
+    assert list(frames) == ["Throughout", "Ambush", "Village"]
+    xs = [f["x"] for f in frames.values()]
+    assert xs == sorted(xs) and len({f["y"] for f in frames.values()}) == 1
+    cards = note_cards(view)
+    assert board._within(cards["NPCs/Ireena.md"], frames["Throughout"])
+    assert board._within(cards["NPCs/Ismark.md"], frames["Ambush"])
+    assert board._within(cards["Secrets/Ravens watch.md"], frames["Village"])
+
+
+def test_arranging_again_reuses_the_frames_and_keeps_what_the_gm_put_in_them(planned):
+    view = board.apply(planned, SESSION, board.arrange(planned, SESSION))
+    ambush = frames_by_label(view)["Ambush"]
+    view = board.apply(planned, SESSION, [
+        {"op": "add", "id": "s1", "type": "text", "text": "wolves", "color": "3",
+         "x": ambush["x"] + 30, "y": ambush["y"] + 60, "width": 100, "height": 100},
+        {"op": "frame", "id": ambush["id"], "x": 5000, "y": 5000, "width": ambush["width"] + 300, "height": ambush["height"] + 300},
+        {"op": "frame", "id": "s1", "x": 5030, "y": 5060, "width": 100, "height": 100},
+    ])
+    ops = board.arrange(planned, SESSION)
+    assert not [o for o in ops if o["op"] in ("add", "place")]
+    view = board.apply(planned, SESSION, ops)
+    frames = frames_by_label(view)
+    assert len(frames) == 3
+    sticky = next(n for n in view["nodes"] if n["id"] == "s1")
+    assert board._within(sticky, frames["Ambush"])
+    assert board._within(note_cards(view)["NPCs/Ismark.md"], frames["Ambush"])
+
+
+def test_arranging_leaves_the_rest_of_the_board_and_starts_under_it(planned):
+    board.apply(planned, SESSION, [
+        {"op": "add", "id": "t1", "type": "text", "text": "Session goals", "x": 400, "y": -500, "width": 260, "height": 100},
+        {"op": "add", "id": "g1", "type": "group", "label": "Handouts", "x": 0, "y": -300, "width": 300, "height": 200},
+    ])
+    ops = board.arrange(planned, SESSION)
+    assert not [o for o in ops if o.get("id") in ("t1", "g1")]
+    view = board.apply(planned, SESSION, ops)
+    frames = frames_by_label(view)
+    assert frames["Handouts"]["y"] == -300
+    assert min(f["y"] for name, f in frames.items() if name != "Handouts") >= -100 + board.GAP * 2

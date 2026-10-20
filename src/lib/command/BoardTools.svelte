@@ -1,7 +1,7 @@
 <script lang="ts">
   // The board's toolbar (board toolbar design §3): Miro's tools in a column
-  // of keys on the board's right edge, under the expand key, and undo, redo
-  // and fit in a well below. The current tool's key is raised, as a well's
+  // of keys on the board's right edge, under the expand key, then undo, redo
+  // and fit in a well below, and Arrange by beat at the foot (§6). The current tool's key is raised, as a well's
   // pick is; any tool but Select lights its lamp purple, since it changes
   // what a click on the board does. A tool that makes something hands back
   // to Select once it has (one shot, as Miro's do).
@@ -16,6 +16,9 @@
   export let onRedo: () => void;
   /** The whole board in view, as the beat rows' frame key frames a beat. */
   export let onFit: () => void;
+  /** Whether the session plans a beat to arrange by. */
+  export let canArrange: boolean;
+  export let onArrange: () => void;
 
   // Font Awesome Free 7.3.1 glyphs, viewBox 0 0 640 640; each from the
   // file named beside it in src/lib/ui/icons/.
@@ -77,6 +80,9 @@
   // expand-solid-full.svg, the beat rows' frame key
   const FIT =
     'M128 96C110.3 96 96 110.3 96 128L96 224C96 241.7 110.3 256 128 256C145.7 256 160 241.7 160 224L160 160L224 160C241.7 160 256 145.7 256 128C256 110.3 241.7 96 224 96L128 96zM160 416C160 398.3 145.7 384 128 384C110.3 384 96 398.3 96 416L96 512C96 529.7 110.3 544 128 544L224 544C241.7 544 256 529.7 256 512C256 494.3 241.7 480 224 480L160 480L160 416zM416 96C398.3 96 384 110.3 384 128C384 145.7 398.3 160 416 160L480 160L480 224C480 241.7 494.3 256 512 256C529.7 256 544 241.7 544 224L544 128C544 110.3 529.7 96 512 96L416 96zM544 416C544 398.3 529.7 384 512 384C494.3 384 480 398.3 480 416L480 480L416 480C398.3 480 384 494.3 384 512C384 529.7 398.3 544 416 544L512 544C529.7 544 544 529.7 544 512L544 416z';
+  // table-cells-large-solid-full.svg
+  const ARRANGE =
+    'M480 160L352 160L352 288L480 288L480 160zM544 288L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 288zM160 352L160 480L288 480L288 352L160 352zM288 288L288 160L160 160L160 288L288 288zM352 352L352 480L480 480L480 352L352 352z';
   // rotate-right-solid-full.svg
   const REDO =
     'M552 256L408 256C398.3 256 389.5 250.2 385.8 241.2C382.1 232.2 384.1 221.9 391 215L437.7 168.3C362.4 109.7 253.4 115 184.2 184.2C109.2 259.2 109.2 380.7 184.2 455.7C259.2 530.7 380.7 530.7 455.7 455.7C463.9 447.5 471.2 438.8 477.6 429.6C487.7 415.1 507.7 411.6 522.2 421.7C536.7 431.8 540.2 451.8 530.1 466.3C521.6 478.5 511.9 490.1 501 501C401 601 238.9 601 139 501C39.1 401 39 239 139 139C233.3 44.7 382.7 39.4 483.3 122.8L535 71C541.9 64.1 552.2 62.1 561.2 65.8C570.2 69.5 576 78.3 576 88L576 232C576 245.3 565.3 256 552 256z';
@@ -131,6 +137,18 @@
       <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={FIT} /></svg>
     </button>
   </div>
+  <div class="well">
+    <button
+      type="button"
+      class="key"
+      disabled={!canArrange}
+      title={canArrange ? 'Arrange by beat: a frame per planned beat, in plan order' : 'Arrange by beat: plan beats in Prep first'}
+      aria-label="Arrange by beat"
+      on:click={onArrange}
+    >
+      <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={ARRANGE} /></svg>
+    </button>
+  </div>
 </div>
 
 <style>
@@ -141,7 +159,7 @@
   }
 
   /* LatchKey's well and keys, stacked: one well for the tools, one for
-     undo, redo and fit. */
+     undo, redo and fit, one for Arrange. */
   .well {
     display: flex;
     flex-direction: column;
