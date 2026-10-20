@@ -412,6 +412,11 @@ fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
         .arg("0") // ephemeral — sidecar publishes the actual port to data_dir/sidecar.port
         .arg("--data-dir")
         .arg(data_dir.to_string_lossy().as_ref())
+        // The sidecar's watchdog exits once this PID is gone. Its own
+        // getppid() can't tell: the bundled sidecar's parent is
+        // PyInstaller's bootloader, which outlives a crashed app.
+        .arg("--parent-pid")
+        .arg(std::process::id().to_string())
         .stdout(std::process::Stdio::from(log_file))
         .stderr(std::process::Stdio::from(stderr_file));
 

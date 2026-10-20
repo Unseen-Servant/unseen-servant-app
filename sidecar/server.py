@@ -52,6 +52,8 @@ def parse_args():
                         help="HTTP port; pass 0 to bind an ephemeral port")
     parser.add_argument("--data-dir", type=str, default=None,
                         help="Directory for the library store (default: ./chroma_db)")
+    parser.add_argument("--parent-pid", type=int, default=None,
+                        help="Exit when this process ends (default: our parent)")
     return parser.parse_args()
 
 
@@ -220,16 +222,30 @@ def create_app(
 # Parent-death watchdog
 # ---------------------------------------------------------------------------
 
-def _watch_parent(parent_pid: int, poll_interval: float = 2.0) -> None:
-    """Background thread: self-terminate when parent process dies.
+def _process_alive(pid: int) -> bool:
+    """POSIX liveness probe: signal 0 checks the PID without signalling it."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # alive, just not ours
+    return True
 
-    On Unix, when a parent process dies, os.getppid() changes (typically
-    to 1/launchd). We detect this and send ourselves SIGTERM so uvicorn
-    can shut down gracefully.
+
+def _watch_parent(parent_pid: int, poll_interval: float = 2.0) -> None:
+    """Background thread: self-terminate when the app process dies.
+
+    Watches the app's PID itself rather than waiting for ``os.getppid()``
+    to change. The bundled sidecar's parent is PyInstaller's bootloader,
+    which outlives a crashed app, and a dev app that dies during our
+    imports has already handed us to launchd before ``getppid()`` is first
+    read. Either way the orphan kept the library store open. On exit we
+    send ourselves SIGTERM so uvicorn can shut down gracefully.
     """
     while True:
         time.sleep(poll_interval)
-        if os.getppid() != parent_pid:
+        if not _process_alive(parent_pid):
             print(f"Parent process (PID {parent_pid}) died, shutting down sidecar.")
             os.kill(os.getpid(), signal.SIGTERM)
             break
@@ -270,10 +286,13 @@ if __name__ == "__main__":
     data_dir.mkdir(parents=True, exist_ok=True)
     write_port_file(data_dir, actual_port)
 
-    # Start parent-death watchdog (daemon thread — won't block exit)
-    parent_pid = os.getppid()
-    watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
-    watchdog.start()
+    # Start parent-death watchdog (daemon thread — won't block exit).
+    # POSIX only: on Windows os.kill(pid, 0) sends a CTRL_C_EVENT rather
+    # than probing, and the getppid() check never fired there either.
+    if os.name == "posix":
+        parent_pid = args.parent_pid or os.getppid()
+        watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
+        watchdog.start()
 
     # Backend-specific boot helpers (truncation probe, keep-warm ticker).
     start_background_tasks()
