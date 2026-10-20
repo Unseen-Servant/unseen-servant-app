@@ -55,10 +55,10 @@ describe('board undo', () => {
     ]);
   });
 
-  it('clears a field the gesture set, and gives back an arrowhead a line had by default', () => {
+  it('clears a field the gesture set, and gives back the ends a line had by default', () => {
     const arrowed: BoardView = { ...view, edges: [{ id: 'e1', fromNode: 'n1', toNode: 't1' }] };
-    expect(inverse(arrowed, [{ op: 'set', id: 'e1', label: 'asks', toEnd: 'none' }], 'Strahd')).toEqual([
-      { op: 'set', id: 'e1', label: null, toEnd: 'arrow' },
+    expect(inverse(arrowed, [{ op: 'set', id: 'e1', label: 'asks', fromEnd: 'arrow', toEnd: 'none' }], 'Strahd')).toEqual([
+      { op: 'set', id: 'e1', label: null, fromEnd: 'none', toEnd: 'arrow' },
     ]);
   });
 

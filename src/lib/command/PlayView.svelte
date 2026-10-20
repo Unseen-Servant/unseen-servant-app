@@ -210,6 +210,7 @@
       if (fields) apply([{ op: 'set', id, ...fields }]);
     },
     remove: (id) => apply([{ op: 'remove', id }]),
+    set: (ids, fields) => apply(ids.map((id) => ({ op: 'set', id, ...fields }))),
   };
 
   // -- the toolbar (board toolbar design §3) -------------------------------
@@ -223,7 +224,10 @@
     tool = 'select';
   }
 
-  const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', t: 'text', n: 'sticky', l: 'line', f: 'frame' };
+  const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', d: 'note', t: 'text', n: 'sticky', l: 'line', f: 'frame' };
+
+  /** The whole board in view, clear of the session player (⌥1). */
+  const fitAll = () => (frame = { ids: [] });
 
   /** The board's keys, Miro's letters (§3.5). Taken before the session
    *  player's, so Esc puts down an armed tool before it lets go of a beat. */
@@ -239,6 +243,21 @@
       if (key === 'z') (e.shiftKey ? redo : undo)();
       else if (e.shiftKey) board?.unframeSelection();
       else board?.frameSelection();
+      return;
+    }
+    if (mod && !e.altKey && !e.shiftKey && key === 'd') {
+      e.preventDefault();
+      board?.duplicate();
+      return;
+    }
+    // By the key's place: ⌥ turns "1" into "¡" on a Mac.
+    if (e.altKey && !mod && !e.shiftKey && (e.code === 'Digit1' || e.code === 'Digit2')) {
+      e.preventDefault();
+      if (e.code === 'Digit1') fitAll();
+      else {
+        const ids = board?.selectedIds() ?? [];
+        if (ids.length) frame = { ids };
+      }
       return;
     }
     if (mod || e.altKey || e.shiftKey) return;
@@ -350,6 +369,9 @@
     }
     if (card.kind === 'text') items.push(action('Edit text', () => (editing = card.id)));
     if (card.kind === 'group') items.push(action('Rename frame', () => (editing = card.id)));
+    if (card.kind === 'text' || card.kind === 'group') {
+      items.push(keyed('Duplicate', 'command.boardDuplicate', () => board?.duplicate([card.id])));
+    }
     if (card.placed && removable(card)) {
       if (items.length) items.push(divider);
       const label = card.kind === 'group' ? 'Remove frame' : 'Remove from board';
@@ -410,6 +432,7 @@
       <Board
         cards={allCards}
         lines={allLines}
+        {index}
         {dataOf}
         {actions}
         {removable}
@@ -472,6 +495,7 @@
           canRedo={redos.length > 0}
           onUndo={undo}
           onRedo={redo}
+          onFit={fitAll}
         />
       {/if}
     </div>

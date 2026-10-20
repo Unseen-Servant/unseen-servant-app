@@ -13,11 +13,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Claude can make beats.** `create_beat` makes a scene from notes already written, with the scene's text, and can add it to the end of a session's plan; `add_to_beat` puts a note in a beat or takes it out
 - **Claude can plan a session.** `create_session` starts the next session and opens it in the app, `set_active_session` opens one that exists, and `plan_beat` puts a beat in a plan, moves it or takes it out, including an entry whose beat is gone. `current_session` reads any session by name
 - **A beat can share a note's name.** Name the scene on the Svalich Road after the road: a name now only has to be unique among the notes, among the beats and among the sessions. Where a name is shared, Command links the note by its path (`[[Locations/Svalich Road]]`) so Obsidian opens the right file, and a link in a note's text opens the note
-- **The board has a toolbar.** A column of tools on Play's board, after Miro's: text cards and stickies where you click (`T`, `N`), frames that carry the cards inside them (`F`, or `⌘G` around the selected cards), lines between cards and frames (`L`, or from their anchor points), and a hand to pan over the cards (`H`). Double-click a text card, a frame's name or a line to write in it, and `⌘Z` undoes any change to the board. Everything is saved in the session's canvas as Obsidian Canvas writes it
+- **The board has a toolbar.** A column of tools on Play's board, after Miro's: any note of the campaign placed where you click, by name (`D`), text cards and stickies (`T`, `N`), frames that carry the cards inside them (`F`, or `⌘G` around the selected cards), lines between cards and frames (`L`, or from their anchor points), and a hand to pan over the cards (`H`). Double-click a text card, a frame's name or a line to write in it, and `⌘Z` undoes any change to the board. A bar over the selection colours stickies, text cards, frames and lines from the pigments, and sets a line's arrowheads. `⌘D` duplicates text cards, stickies and frames, and `⌥1` and `⌥2` show the whole board or the selection. Everything is saved in the session's canvas as Obsidian Canvas writes it
+- **Arrowheads show on the board**, including those on lines Obsidian drew
 
 ### Removed
 
 - **The session log.** Launching a beat or marking a note spent no longer writes a line under `## Log` in the session note. Lines already written stay in your notes as plain text. The jot bar still writes to the session note, now always at the end of its text. For Claude, `current_session` no longer reports a log and `spend` no longer logs
+
+### Fixed
+
+- **The card tray** no longer brings up its last card when the pointer is over the tray's empty end
 
 ## [4.0.0] - 2026-10-17
 

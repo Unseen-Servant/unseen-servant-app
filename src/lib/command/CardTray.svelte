@@ -78,8 +78,9 @@
 
   /** The card whose strip is under the pointer, not the one on top there:
    *  a card brought to the front covers its neighbours' strips, and moving
-   *  along the hand should still step through them in turn. Spread, the
-   *  cards don't overlap and the one under the pointer is the one. */
+   *  along the hand should still step through them in turn. Past the last
+   *  card's edge is the empty tray, no card's. Spread, the cards don't
+   *  overlap and the one under the pointer is the one. */
   function track(e: PointerEvent & { currentTarget: HTMLElement }) {
     if (spread) {
       const slot = (e.target as HTMLElement).closest<HTMLElement>('[data-path]');
@@ -87,6 +88,10 @@
       return;
     }
     const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    if (x > (cards.length - 1) * step + CARD_REM * rem) {
+      point(null);
+      return;
+    }
     const at = step > 0 ? Math.min(Math.floor(x / step), cards.length - 1) : cards.length - 1;
     point(cards[Math.max(at, 0)]?.path ?? null);
   }

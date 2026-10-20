@@ -1,11 +1,15 @@
 <script lang="ts">
-  // A line on the board: Svelte Flow's curve, with its label drawn here so
-  // a double-click names it in place (board toolbar design §3.4). Enter or
-  // a click away keeps the name, Escape backs out, and an emptied name
-  // takes the label off.
-  import { BaseEdge, EdgeLabel, getBezierPath, type Position } from '@xyflow/svelte';
+  // A line on the board: Svelte Flow's curve, in its colour, with its
+  // arrowheads and its label drawn here so a double-click names it in
+  // place (board toolbar design §3.4). Enter or a click away keeps the
+  // name, Escape backs out, and an emptied name takes the label off. The
+  // selected line wears the selection bar over its middle (§3.3).
+  import { BaseEdge, EdgeLabel, EdgeToolbar, getBezierPath, type Position } from '@xyflow/svelte';
   import { getContext } from 'svelte';
-  import { CARD_ACTIONS, type CardActions } from './board';
+  import type { Readable } from 'svelte/store';
+  import BoardBar from './BoardBar.svelte';
+  import { BAR_LINE, CARD_ACTIONS, arrowhead, paint, type CardActions } from './board';
+  import type { Side } from './types';
 
   export let id: string;
   export let sourceX: number;
@@ -14,14 +18,21 @@
   export let targetY: number;
   export let sourcePosition: Position;
   export let targetPosition: Position;
-  /** The line's label, and whether it's being named (Board). */
+  /** The line's label, colour and ends, and whether it's being named
+   *  (Board). */
   export let data: Record<string, unknown> | undefined = undefined;
   export let interactionWidth: number | undefined = undefined;
 
   $: label = typeof data?.label === 'string' ? data.label : null;
   $: editing = data?.editing === true;
+  $: color = paint(typeof data?.color === 'string' ? data.color : null);
+  $: ends = { fromEnd: data?.fromEnd === 'arrow' ? 'arrow' : 'none', toEnd: data?.toEnd === 'arrow' ? 'arrow' : 'none' } as const;
+  /** A pigment takes the place of the line's ink; selected, it wears the
+   *  accent as any line does. */
+  $: ink = color ? `--xy-edge-stroke: ${color}` : undefined;
 
   const actions = getContext<CardActions>(CARD_ACTIONS);
+  const barLine = getContext<Readable<string | null>>(BAR_LINE);
 
   let path = '';
   let labelX = 0;
@@ -56,7 +67,26 @@
   }
 </script>
 
-<BaseEdge {id} {path} {interactionWidth} />
+<BaseEdge {id} {path} {interactionWidth} style={ink} />
+{#if ends.toEnd === 'arrow'}
+  <path class="arrowhead" d={arrowhead(targetX, targetY, targetPosition as Side)} style={ink} />
+{/if}
+{#if ends.fromEnd === 'arrow'}
+  <path class="arrowhead" d={arrowhead(sourceX, sourceY, sourcePosition as Side)} style={ink} />
+{/if}
+{#if $barLine === id && !editing}
+  <EdgeToolbar x={labelX} y={labelY} alignY="bottom" isVisible>
+    <div class="lift">
+      <BoardBar
+        {color}
+        onColor={(c) => actions.set([id], { color: c })}
+        {ends}
+        onEnds={(e) => actions.set([id], e)}
+        onLabel={() => actions.begin(id)}
+      />
+    </div>
+  </EdgeToolbar>
+{/if}
 {#if editing}
   <EdgeLabel x={labelX} y={labelY} class="nodrag nopan">
     <input
@@ -75,6 +105,25 @@
 {/if}
 
 <style>
+  .arrowhead {
+    fill: var(--xy-edge-stroke);
+  }
+
+  :global(.svelte-flow__edge.selected) .arrowhead {
+    fill: var(--xy-edge-stroke-selected);
+  }
+
+  /* Clear of the label at the line's middle; the gap lets the pointer
+     through to the line. */
+  .lift {
+    padding-bottom: 0.9rem;
+    pointer-events: none;
+  }
+
+  .lift > :global(*) {
+    pointer-events: auto;
+  }
+
   /* The label's own size and voice (Board's .svelte-flow__edge-label), as
      a field. */
   .line-name {

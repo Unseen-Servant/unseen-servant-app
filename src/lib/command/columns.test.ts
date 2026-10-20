@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columns, folderOrder, isAmbiguous, linkableNames, linkedNote } from './columns';
+import { columns, folderOrder, isAmbiguous, linkableNames, linkedNote, placeableNotes } from './columns';
 import { insertion, openTarget } from './wikilinks';
 import type { CampaignIndex, NoteEntry } from './types';
 
@@ -112,6 +112,13 @@ describe('columns', () => {
     expect(linkedNote(alike, 'Strahd/Beats/Ambush')?.path).toBe('Beats/Ambush.md');
     expect(linkedNote(alike, 'NPCs/Ambush')).toBeUndefined();
     expect(linkedNote(index, 'Ambush')?.path).toBe('Beats/Ambush.md');
+  });
+
+  it("offers the board's Note tool notes, not beats, those starting with the typing first", () => {
+    const names = (typed: string) => placeableNotes(index, typed).map((n) => n.name);
+    expect(names('i')).toEqual(['ireena', 'Ismark', 'Overview', 'Session 9', 'Session 10']);
+    expect(names('am')).toEqual([]);
+    expect(placeableNotes(index, '', 2)).toHaveLength(2);
   });
 });
 

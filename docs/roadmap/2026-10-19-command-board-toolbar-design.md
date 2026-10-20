@@ -1,6 +1,6 @@
 # Command board toolbar (2026-10-19)
 
-**Status:** settled 2026-10-19 (§8). Step 1 of §6 is built; steps 2–4 aren't. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
+**Status:** settled 2026-10-19 (§8). Steps 1 and 2 of §6 are built; steps 3–4 aren't. No step claims the zoom keys (⌘+, ⌘−, ⌘0), which aren't built. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
 
 ## 0. TL;DR
 
@@ -61,7 +61,7 @@ Play's board gets a creation toolbar modelled on Miro's: a column of tool keys w
   - Its key is raised (`--bg-header`), as the bar's wells raise their pick.
   - While any tool but Select is current, its lamp is lit purple: it's a mode, since it changes what a click or a drag on the board does. Hand counts.
   - Select is the resting tool and has no lamp.
-  - **Icons** (Font Awesome Free 7.3.1): arrow-pointer, hand, font, note-sticky, diagram-project (Line) and object-group (Frame; 7.x has no vector-square), with rotate-left and rotate-right for undo and redo.
+  - **Icons** (Font Awesome Free 7.3.1): arrow-pointer, hand, file-lines (Note), font, note-sticky, diagram-project (Line) and object-group (Frame; 7.x has no vector-square), with rotate-left and rotate-right for undo and redo, and expand (the beat rows' frame key) for fit all.
 - **One shot:** a creation tool makes one thing, then hands back to Select, as Miro's do. Esc returns to Select at any time.
 - **Cursor:** a crosshair while a creation tool is armed.
 - **Shown** in Play only, in the expanded board too. It isn't foldable in v1; it's narrow.
@@ -74,7 +74,7 @@ Each line gives the key, the tool, its Miro equivalent, what it does, and what i
 |---|---|---|---|---|
 | V | **Select** | Select | Click selects; drag a card moves it; drag the empty board pans, as today; Shift+drag draws a marquee, as today. | — |
 | H | **Hand** | Hand | Every drag pans, over cards too, so a crowded board can be moved around without nudging anything. | — |
-| D | **Note** | Card | Click: a name field at that point, with the editor's `[[` completion over the campaign's notes. Enter places that note's card there. A note already on the board moves there (one card per note). | `file` node |
+| D | **Note** | Card | Click: a name field at that point, with the editor's `[[` completion over the campaign's notes (not its beats or sessions). Enter or a click places that note's card there. A note already on the board moves there (one card per note). | `file` node |
 | T | **Text** | Text | Click: a text card, typed in place, Markdown, unboxed. | `text` node, no colour |
 | N | **Sticky** | Sticky note | Click: a square coloured card, typed in place, in the last colour used (Ochre at first). | `text` node with `color` |
 | L | **Line** | Connection line | Drag from any card (or frame) to another: a line. Any part of the card starts it, not only its handles. It has no arrowheads by default, as today. | `edge` |
@@ -88,13 +88,13 @@ Each line gives the key, the tool, its Miro equivalent, what it does, and what i
 
 ### 3.3 The selection bar (Miro's context menu)
 
-A slim well of keys floats above the selection while Select is the tool, and carries only what needs swatches or a toggle:
+A slim box floats above the selection while Select is the tool, edged and lifted as a menu is, and carries only what needs swatches or a toggle. Each choice is a pick from the track menu's pigment row, its pip lit for the one in effect:
 
 - **Text, sticky, frame:** a colour row (nine pigments, plus none). For a sticky, "none" turns it into a text card.
 - **Line:**
   - The colour row.
-  - An ends key that cycles none → arrow at the end → arrows at both ends.
-  - A label key, which opens the field on the line.
+  - The ends as three picks: none, an arrow at the end, arrows at both ends (minus, arrow-right-long, arrows-left-right). Built so instead of a key cycling through them, so every state is in view.
+  - A label key (tag), which opens the field on the line.
 - **Note cards:** no bar. Their head already carries the track's pigment, and their actions stay in the card menu (Edit note, Play, Spend, Open source, Remove from board).
 
 Actions stay in the right-click menu: Rename (frame), Duplicate (⌘D; text, sticky and frame), Remove frame, Delete. Delete and Backspace remove as today.
@@ -114,7 +114,7 @@ All of these are scoped to the board: Play, with the board focused and nothing b
 | V H D T N L F | Tools (§3.2) | Miro's letters. D is Miro's Card. |
 | Esc | Back to Select; cancels a field or a gesture | as `app.escape` |
 | ⌘Z, ⇧⌘Z | Undo, redo board edits | The editor's own ⌘Z is unaffected. |
-| ⌘D | Duplicate a text card, sticky or frame (with what's inside it) | A note has one card per board. |
+| ⌘D | Duplicate a text card, sticky or frame (with what's inside it) | A note has one card per board. The copy goes to the right, or below when that's taken, else past the cards in the way, so a copied frame takes in no other cards; it's selected, and framed if it lands out of view. |
 | ⌘G | Frame the selection | Miro's Group |
 | ⇧⌘G | Remove the selected frame, keeping its cards | Miro's Ungroup |
 | ⌥1, ⌥2 | Fit all, fit the selection | |

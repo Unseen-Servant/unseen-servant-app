@@ -202,18 +202,6 @@
     margin-left: auto;
   }
 
-  /* A pigment as the plate it fills (TrackGrid .nameplate), at a gem's
-     scale. None is the plate's outline, empty. */
-  .menu-swatch {
-    width: 1rem;
-    height: 0.7rem;
-    border-radius: var(--radius-sm);
-  }
-
-  .menu-swatch.none {
-    box-shadow: inset 0 0 0 1px var(--text-tertiary);
-  }
-
   .menu-label {
     min-width: 0;
     overflow: hidden;

@@ -1,15 +1,26 @@
+<script context="module" lang="ts">
+  import { STICKY_COLOR } from './board';
+
+  /** A new sticky's colour: the last the selection bar gave a text card,
+   *  for as long as the app runs (board toolbar design §3.2). */
+  let lastSticky = STICKY_COLOR;
+</script>
+
 <script lang="ts">
   // The session board's surface (design §5.2): Svelte Flow over the cards
   // and lines board.ts derives from the canvas. Svelte Flow moves a card
   // while it's dragged; every gesture's end goes out as card operations,
   // and the cards are re-derived from what comes back. The toolbar's tool
   // (board toolbar design §3) decides what a click or a drag does: Hand
-  // pans over the cards, Text, Sticky and Frame make one where the board is
-  // clicked or dragged, Line draws from anywhere on a card.
+  // pans over the cards, Note asks for a note to place where the board is
+  // clicked, Text, Sticky and Frame make one there, Line draws from
+  // anywhere on a card. With Select, the selection bar floats over
+  // selected text cards, stickies and frames, or over a selected line.
   import {
     Background,
     BackgroundVariant,
     ConnectionMode,
+    NodeToolbar,
     SvelteFlow,
     type Connection,
     type Viewport,
@@ -19,33 +30,41 @@
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/base.css';
   import { setContext } from 'svelte';
+  import { writable } from 'svelte/store';
+  import BoardBar from './BoardBar.svelte';
   import BoardFramer from './BoardFramer.svelte';
   import BoardLine from './BoardLine.svelte';
+  import BoardNoteField from './BoardNoteField.svelte';
   import BoardPointer from './BoardPointer.svelte';
   import FrameCard from './FrameCard.svelte';
   import NoteCard from './NoteCard.svelte';
   import {
+    BAR_LINE,
+    CARD,
     CARD_ACTIONS,
     NEW_FRAME,
     STICKY,
-    STICKY_COLOR,
     TEXT_CARD,
     around,
     connectOps,
+    duplicateOps,
     frameDepths,
     frameOp,
     inside,
     newId,
+    paint,
     type Card,
     type CardActions,
     type CardData,
     type Line,
     type Tool,
   } from './board';
-  import type { BoardOp, Side } from './types';
+  import type { BoardOp, CampaignIndex, Side } from './types';
 
   export let cards: Card[];
   export let lines: Line[];
+  /** The campaign, whose notes the Note tool places. */
+  export let index: CampaignIndex;
   export let dataOf: (card: Card) => CardData;
   /** What the cards can ask of the board. */
   export let actions: CardActions;
@@ -80,12 +99,16 @@
 
   let nodes: Node[] = [];
   let edges: Edge[] = [];
+  /** Cards to select once they're drawn: a duplicate's copies. */
+  let choose: Set<string> | null = null;
 
   /** Cards as Svelte Flow nodes. A card under the pointer keeps where the
    *  drag has it, and the selection carries over. */
   function sync(next: Card[], data: (card: Card) => CardData) {
     const current = new Map(nodes.map((n) => [n.id, n]));
     const depths = frameDepths(next);
+    const picking = choose && next.some((c) => choose!.has(c.id)) ? choose : null;
+    if (picking) choose = null;
     nodes = next.map((c) => {
       const was = current.get(c.id);
       return {
@@ -95,24 +118,64 @@
         width: c.width,
         height: c.height,
         data: data(c),
-        selected: was?.selected ?? false,
+        selected: picking ? picking.has(c.id) : (was?.selected ?? false),
         zIndex: depths.get(c.id) ?? 0,
       };
     });
   }
   $: sync(cards, dataOf);
 
-  $: edges = lines.map((l) => ({
-    id: l.id,
-    source: l.source,
-    target: l.target,
-    sourceHandle: l.fromSide,
-    targetHandle: l.toSide,
-    type: 'line',
-    data: { label: l.label, editing: l.id === editing },
-  }));
+  /** Lines as Svelte Flow edges, the selection carried over as the cards'
+   *  is, so the selection bar stays while a line is restyled. */
+  function syncEdges(next: Line[], editingId: string | null) {
+    const chosen = new Set(edges.filter((e) => e.selected).map((e) => e.id));
+    edges = next.map((l) => ({
+      id: l.id,
+      source: l.source,
+      target: l.target,
+      sourceHandle: l.fromSide,
+      targetHandle: l.toSide,
+      type: 'line',
+      selected: chosen.has(l.id),
+      data: { label: l.label, color: l.color, fromEnd: l.fromEnd, toEnd: l.toEnd, editing: l.id === editingId },
+    }));
+  }
+  $: syncEdges(lines, editing);
 
   const cardOf = (id: string) => cards.find((c) => c.id === id);
+
+  // -- the selection bar (board toolbar design §3.3) ------------------------
+
+  /** The line that wears the bar: the selection, when it's one line. */
+  const barLine = writable<string | null>(null);
+  setContext(BAR_LINE, barLine);
+
+  $: byId = new Map(cards.map((c) => [c.id, c]));
+  $: chosenCards = nodes.filter((n) => n.selected);
+  $: chosenLines = edges.filter((e) => e.selected);
+  /** The cards that wear the bar: a selection of text cards, stickies and
+   *  frames, and nothing else. A note card's head already wears its
+   *  track's pigment. */
+  $: barCards =
+    tool === 'select' &&
+    !chosenLines.length &&
+    chosenCards.length &&
+    chosenCards.every((n) => ['text', 'group'].includes(byId.get(n.id)?.kind ?? ''))
+      ? chosenCards.map((n) => n.id)
+      : [];
+  $: barLine.set(tool === 'select' && !chosenCards.length && chosenLines.length === 1 ? chosenLines[0].id : null);
+  /** The colour the bar's cards share, as drawn; undefined when they differ. */
+  $: barColor = (() => {
+    const drawn = new Set(barCards.map((id) => paint(byId.get(id)?.color ?? null)));
+    return drawn.size === 1 ? [...drawn][0] : undefined;
+  })();
+
+  /** The bar's pick. A text card given a pigment is a sticky, and the next
+   *  sticky takes it. */
+  function recolour(ids: string[], color: string | null) {
+    actions.set(ids, { color });
+    if (color && ids.some((id) => byId.get(id)?.kind === 'text')) lastSticky = color;
+  }
 
   // -- a frame carries what's inside it (board toolbar design §4) ----------
 
@@ -178,7 +241,7 @@
   let overlay: HTMLElement | undefined;
   /** A press under way with a making tool, in the window's coordinates. */
   let drawn: { x0: number; y0: number; x1: number; y1: number } | null = null;
-  $: making = tool === 'text' || tool === 'sticky' || tool === 'frame';
+  $: making = tool === 'note' || tool === 'text' || tool === 'sticky' || tool === 'frame';
 
   function press(e: PointerEvent) {
     if (e.button !== 0) return;
@@ -200,13 +263,18 @@
     const at = { x: Math.round(a.x), y: Math.round(a.y) };
     const sized = Math.abs(d.x1 - d.x0) > 4 || Math.abs(d.y1 - d.y0) > 4;
     const id = newId();
-    if (tool === 'frame') {
+    if (tool === 'note') {
+      const r = overlay!.getBoundingClientRect();
+      const left = Math.min(d.x0 - r.left, r.width - FIELD_WIDTH);
+      const top = d.y0 - r.top;
+      naming = { at, left: Math.max(0, left), top, up: top > r.height - FIELD_ROOM };
+    } else if (tool === 'frame') {
       const size = sized
         ? { width: Math.max(80, Math.round(b.x - a.x)), height: Math.max(40, Math.round(b.y - a.y)) }
         : NEW_FRAME;
       onCreate({ op: 'add', id, type: 'group', ...at, ...size });
     } else if (tool === 'sticky') {
-      onCreate({ op: 'add', id, type: 'text', text: '', color: STICKY_COLOR, ...at, ...STICKY });
+      onCreate({ op: 'add', id, type: 'text', text: '', color: lastSticky, ...at, ...STICKY });
     } else {
       onCreate({ op: 'add', id, type: 'text', text: '', ...at, ...TEXT_CARD });
     }
@@ -225,6 +293,53 @@
           };
         })()
       : null;
+
+  // -- the toolbar's Note ---------------------------------------------------
+
+  /** The Note tool's field, where the board was clicked: on the board, and
+   *  over it in px. Its list opens upward near the board's foot. */
+  let naming: { at: XYPosition; left: number; top: number; up: boolean } | null = null;
+  $: if (tool !== 'note') naming = null;
+  /** The field's width, and the room its list needs below it. */
+  const FIELD_WIDTH = 14 * 16;
+  const FIELD_ROOM = 360;
+
+  /** The picked note's card goes where the board was clicked: one already
+   *  on the board moves there, as a note has one card per board. */
+  function placeNote(path: string) {
+    if (!naming) return;
+    const { at } = naming;
+    naming = null;
+    const card = cards.find((c) => c.kind === 'note' && c.path === path);
+    onOps([card ? frameOp(card, { ...at, width: card.width, height: card.height }) : { op: 'place', id: newId(), path, ...at, ...CARD }]);
+    onToolDone();
+  }
+
+  /** The selected cards, for framing them in view (⌥2). */
+  export function selectedIds(): string[] {
+    return nodes.filter((n) => n.selected).map((n) => n.id);
+  }
+
+  /** ⌘D, or a card menu's Duplicate: copies of the text cards, stickies
+   *  and frames among `ids`, beside them, selected in their stead. Copies
+   *  set down out of view are framed, as ⌥2 would. */
+  export function duplicate(ids: string[] = selectedIds()) {
+    const ops = duplicateOps(cards, lines, ids);
+    const copies = ops.flatMap((o) => (o.op === 'add' ? [o] : []));
+    if (!copies.length) return;
+    choose = new Set(copies.map((o) => o.id));
+    onOps(ops);
+    const r = boardEl.getBoundingClientRect();
+    const a = toBoard({ x: r.left, y: r.top });
+    const b = toBoard({ x: r.right, y: r.bottom });
+    const seen = copies.every((o) => o.x >= a.x && o.y >= a.y && o.x + o.width <= b.x && o.y + o.height <= b.y);
+    if (!seen) request = { ids: [...choose] };
+  }
+
+  /** What the framer frames: the board's asks (`frame`), or the copies. */
+  let request: { ids: string[] } | null = null;
+  $: request = frame;
+  let boardEl: HTMLElement;
 
   /** ⌘G: a frame around the selected cards, its name field open. */
   export function frameSelection() {
@@ -280,7 +395,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="board" class:hand={tool === 'hand'} class:linking={tool === 'line'} on:keydown={keepBackspace}>
+<div class="board" class:hand={tool === 'hand'} class:linking={tool === 'line'} bind:this={boardEl} on:keydown={keepBackspace}>
   <!-- The arrangement's keys are the table's: ↑↓ step through the plan and
        Space launches, so the board gives up moving a focused card by arrow
        (a move it wouldn't save) and Space's hold-to-pan; a drag still pans. -->
@@ -315,8 +430,11 @@
     <!-- Graph paper, the old-school dungeon map's: a faint square grid that
          scales with the zoom. -->
     <Background variant={BackgroundVariant.Lines} gap={24} />
-    <BoardFramer request={frame} {covered} {onLeave} />
+    <BoardFramer {request} {covered} {onLeave} />
     <BoardPointer bind:toBoard />
+    <NodeToolbar nodeId={barCards} isVisible={barCards.length > 0} class="bar-holder">
+      <BoardBar color={barColor} onColor={(c) => recolour(barCards, c)} />
+    </NodeToolbar>
   </SvelteFlow>
   {#if making}
     <!-- Over the cards, under the board's keys and boxes: a making tool's
@@ -333,6 +451,19 @@
         <div class="sketch" style:left="{sketch.left}px" style:top="{sketch.top}px" style:width="{sketch.width}px" style:height="{sketch.height}px"></div>
       {/if}
     </div>
+  {/if}
+  {#if naming}
+    <BoardNoteField
+      {index}
+      left={naming.left}
+      top={naming.top}
+      up={naming.up}
+      onPick={placeNote}
+      onCancel={(putDown) => {
+        naming = null;
+        if (putDown) onToolDone();
+      }}
+    />
   {/if}
 </div>
 
@@ -370,6 +501,13 @@
     background: transparent;
     opacity: 0;
     cursor: crosshair;
+  }
+
+  /* A frame sits far back in the stack (frameDepths), and Svelte Flow sets
+     its bar there too: the bar floats over every card. (The class takes
+     the place of Svelte Flow's own.) */
+  .board :global(.bar-holder) {
+    z-index: 2000 !important;
   }
 
   .overlay {

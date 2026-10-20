@@ -5,7 +5,7 @@
 
 import { PIGMENTS } from '../legend-lore/palette';
 import { linkTarget } from './editorTheme';
-import type { BoardFields, BoardOp, BoardView, CampaignIndex, CanvasEdge, CanvasNode, Side } from './types';
+import type { BoardFields, BoardOp, BoardView, CampaignIndex, CanvasEdge, CanvasNode, End, MadeKind, Side } from './types';
 
 export const CARD = { width: 260, height: 180 };
 export const GAP = 32;
@@ -45,7 +45,7 @@ const AUTO = 'auto:';
 export type CardKind = 'note' | 'text' | 'group' | 'link' | 'other';
 
 /** The board toolbar's tools (board toolbar design §3.2). */
-export type Tool = 'select' | 'hand' | 'text' | 'sticky' | 'line' | 'frame';
+export type Tool = 'select' | 'hand' | 'note' | 'text' | 'sticky' | 'line' | 'frame';
 
 export interface Card {
   id: string;
@@ -73,6 +73,12 @@ export interface Line {
   fromSide: Side;
   toSide: Side;
   label: string | null;
+  /** As written (paint draws it); null for none. */
+  color: string | null;
+  /** Where it has arrowheads: JSON Canvas puts one on the target's end
+   *  unless told not to. */
+  fromEnd: End;
+  toEnd: End;
 }
 
 const KINDS: Record<string, CardKind> = { file: 'note', text: 'text', group: 'group', link: 'link' };
@@ -166,9 +172,26 @@ export function lines(view: BoardView, board: Card[]): Line[] {
         fromSide: e.fromSide ?? fromSide,
         toSide: e.toSide ?? toSide,
         label: typeof e.label === 'string' ? e.label : null,
+        color: typeof e.color === 'string' ? e.color : null,
+        fromEnd: e.fromEnd === 'arrow' ? 'arrow' : 'none',
+        toEnd: e.toEnd === 'none' ? 'none' : 'arrow',
       },
     ];
   });
+}
+
+const OUTWARD: Record<Side, [number, number]> = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
+
+/** An arrowhead's outline, its point at (x, y) on a card's `side` and
+ *  facing into the card. The line draws it itself rather than through an
+ *  SVG marker, whose colour WebKit won't take from a token (board toolbar
+ *  design §4). */
+export function arrowhead(x: number, y: number, side: Side): string {
+  const [nx, ny] = OUTWARD[side];
+  const [length, half] = [10, 4];
+  const bx = x + nx * length;
+  const by = y + ny * length;
+  return `M${x},${y}L${bx - ny * half},${by + nx * half}L${bx + ny * half},${by - nx * half}Z`;
 }
 
 /** A fresh id in Obsidian's shape: 16 hex digits. */
@@ -192,12 +215,18 @@ export interface CardActions {
   finish: (id: string, fields?: BoardFields) => void;
   /** Take a card or a line off the board: a text card emptied as it's edited. */
   remove: (id: string) => void;
+  /** Change cards' or lines' fields in one step: the selection bar's colour
+   *  and ends. */
+  set: (ids: string[], fields: BoardFields) => void;
 }
 
 /** Where the card components find the board's CardActions (Svelte
  *  context): functions in a node's data would make Svelte Flow take the
  *  nodes for deeply reactive state. */
 export const CARD_ACTIONS = Symbol('card actions');
+/** Where a line finds whether it's the selection, and so wears the
+ *  selection bar (a store in Svelte context). */
+export const BAR_LINE = Symbol('bar line');
 
 /** A card as Svelte Flow hands it to its component. */
 export interface CardData extends Record<string, unknown> {
@@ -378,17 +407,84 @@ export function inside(board: Card[], frame: Card): Card[] {
   );
 }
 
-/** The frame drawn around `chosen` (⌘G), clear of them on every side. */
-export function around(chosen: Card[]): Frame {
+const MADE: CardKind[] = ['text', 'group', 'link'];
+
+const overlaps = (a: Frame, b: Frame) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** Copies of the text cards, stickies, frames and links among `ids` (⌘D),
+ *  set to the right of them, or below when that's taken, and else past the
+ *  cards in the way to the right: a copied frame mustn't take in cards
+ *  that aren't its. A frame brings copies of what's wholly inside it, but
+ *  not its note cards, since a note has one card per board. The lines
+ *  between copied cards are copied too. */
+export function duplicateOps(board: Card[], drawn: Line[], ids: string[]): BoardOp[] {
+  const chosen = new Map<string, Card>();
+  for (const id of ids) {
+    const card = board.find((c) => c.id === id);
+    if (!card || !MADE.includes(card.kind)) continue;
+    chosen.set(card.id, card);
+    if (card.kind === 'group') for (const c of inside(board, card)) if (MADE.includes(c.kind)) chosen.set(c.id, c);
+  }
+  const all = [...chosen.values()];
+  if (!all.length) return [];
+  const box = around(all, 0, 0);
+  // A frame the originals sit in isn't in the way: the copies sit in it too.
+  const inWay = board.filter((c) => !chosen.has(c.id) && !(c.kind === 'group' && inside(all, c).length === all.length));
+  const blocking = (dx: number, dy: number) => inWay.filter((c) => overlaps(c, { ...box, x: box.x + dx, y: box.y + dy }));
+  const right = box.width + GAP;
+  const below = box.height + GAP;
+  let [dx, dy] = blocking(right, 0).length && !blocking(0, below).length ? [0, below] : [right, 0];
+  for (let hit = blocking(dx, dy); hit.length; hit = blocking(dx, dy)) {
+    dx = Math.max(...hit.map((c) => c.x + c.width)) - box.x + GAP;
+  }
+  const copies = new Map(all.map((c) => [c.id, newId()]));
+  const ops: BoardOp[] = all.map((c) => {
+    const content = c.kind === 'group' ? (c.text ? { label: c.text } : {}) : c.kind === 'link' ? { url: c.text } : { text: c.text };
+    return {
+      op: 'add',
+      id: copies.get(c.id)!,
+      type: c.kind as MadeKind,
+      x: c.x + dx,
+      y: c.y + dy,
+      width: c.width,
+      height: c.height,
+      ...content,
+      ...(c.color ? { color: c.color } : {}),
+    };
+  });
+  for (const l of drawn) {
+    const source = copies.get(l.source);
+    const target = copies.get(l.target);
+    if (!source || !target) continue;
+    ops.push({
+      op: 'connect',
+      id: newId(),
+      source,
+      target,
+      fromSide: l.fromSide,
+      toSide: l.toSide,
+      ...(l.label ? { label: l.label } : {}),
+      ...(l.color ? { color: l.color } : {}),
+      fromEnd: l.fromEnd,
+      toEnd: l.toEnd,
+    });
+  }
+  return ops;
+}
+
+/** The frame drawn around `chosen` (⌘G), clear of them on every side, by
+ *  more at the top for its name. */
+export function around(chosen: Card[], pad = FRAME_PAD, top = FRAME_TOP): Frame {
   const left = Math.min(...chosen.map((c) => c.x));
-  const top = Math.min(...chosen.map((c) => c.y));
+  const y = Math.min(...chosen.map((c) => c.y));
   const right = Math.max(...chosen.map((c) => c.x + c.width));
   const bottom = Math.max(...chosen.map((c) => c.y + c.height));
   return {
-    x: Math.round(left - FRAME_PAD),
-    y: Math.round(top - FRAME_TOP),
-    width: Math.round(right - left + FRAME_PAD * 2),
-    height: Math.round(bottom - top + FRAME_TOP + FRAME_PAD),
+    x: Math.round(left - pad),
+    y: Math.round(y - top),
+    width: Math.round(right - left + pad * 2),
+    height: Math.round(bottom - y + top + pad),
   };
 }
 

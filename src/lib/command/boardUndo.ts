@@ -4,10 +4,13 @@
 // what it in turn takes back for redo.
 
 import { applyOps } from './board';
-import type { BoardFields, BoardOp, BoardView, CanvasEdge, CanvasNode, MadeKind } from './types';
+import type { BoardFields, BoardOp, BoardView, CanvasEdge, CanvasNode, End, MadeKind } from './types';
 
 const MADE: MadeKind[] = ['text', 'group', 'link'];
 const FIELDS: (keyof BoardFields)[] = ['text', 'label', 'url', 'color', 'fromEnd', 'toEnd'];
+/** A line's ends as JSON Canvas reads them when unwritten: plain at the
+ *  source, an arrowhead at the target. */
+const UNSET_ENDS: Partial<Record<keyof BoardFields, End>> = { fromEnd: 'none', toEnd: 'arrow' };
 
 /** The operations that take `ops` back, applied to `view` as it was before
  *  them. Each is undone against the board it met, last first. A card or
@@ -42,8 +45,8 @@ function undoOne(view: BoardView, op: BoardOp): BoardOp[] {
       if (!target) return [];
       const was: Record<string, unknown> = {};
       for (const key of FIELDS) {
-        // A line written without a toEnd has JSON Canvas's arrowhead there.
-        if (key in op) was[key] = target[key] ?? (key === 'toEnd' ? 'arrow' : null);
+        // A line's unwritten end is put back as what it meant.
+        if (key in op) was[key] = target[key] ?? UNSET_ENDS[key] ?? null;
       }
       return [{ op: 'set', id: op.id, ...(was as BoardFields) }];
     }

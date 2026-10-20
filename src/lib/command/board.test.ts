@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, bodyOf, cards, connectOps, facing, frameDepths, frameOp, handOf, handStep, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
+import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handStep, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -75,15 +75,31 @@ describe('lines', () => {
       nodes: [],
       notes: {},
       edges: [
-        { id: 'e1', fromNode: 'a', toNode: 'b', fromSide: 'top', toSide: 'top', label: 'owes' },
+        { id: 'e1', fromNode: 'a', toNode: 'b', fromSide: 'top', toSide: 'top', label: 'owes', toEnd: 'none' },
         { id: 'e2', fromNode: 'b', toNode: 'a' },
         { id: 'e3', fromNode: 'a', toNode: 'gone' },
       ],
     };
+    const plain = { color: null, fromEnd: 'none', toEnd: 'none' };
     expect(lines(view, [at('a', 0, 0), at('b', 300, 0)])).toEqual([
-      { id: 'e1', source: 'a', target: 'b', fromSide: 'top', toSide: 'top', label: 'owes' },
-      { id: 'e2', source: 'b', target: 'a', fromSide: 'left', toSide: 'right', label: null },
+      { id: 'e1', source: 'a', target: 'b', fromSide: 'top', toSide: 'top', label: 'owes', ...plain },
+      { id: 'e2', source: 'b', target: 'a', fromSide: 'left', toSide: 'right', label: null, ...plain, toEnd: 'arrow' },
     ]);
+  });
+
+  it("reads a line's colour and ends, an unwritten target end as JSON Canvas's arrowhead", () => {
+    const view: BoardView = {
+      nodes: [],
+      notes: {},
+      edges: [{ id: 'e', fromNode: 'a', toNode: 'b', color: '4', fromEnd: 'arrow' }],
+    };
+    expect(lines(view, [at('a', 0, 0), at('b', 300, 0)])[0]).toMatchObject({ color: '4', fromEnd: 'arrow', toEnd: 'arrow' });
+  });
+
+  it('points an arrowhead into the card it ends on', () => {
+    // On a card's left side the head opens out to the left, its point on the edge.
+    expect(arrowhead(100, 50, 'left')).toBe('M100,50L90,46L90,54Z');
+    expect(arrowhead(0, 0, 'top')).toBe('M0,0L4,-10L-4,-10Z');
   });
 });
 
@@ -259,6 +275,36 @@ describe("the toolbar's cards", () => {
     expect(depths.has('a')).toBe(false);
     expect(depths.get('small')!).toBeGreaterThan(depths.get('f')!);
     expect(depths.get('small')! + 1000).toBeLessThan(0);
+  });
+
+  it('duplicates text, stickies and frames beside them, a frame with what it holds but its notes', () => {
+    const sticky: Card = { ...at('s', 20, 50), kind: 'text', path: null, text: 'Fog', color: '#e6c667' };
+    const named: Card = { ...frame, text: 'Barovia' };
+    const board = [named, sticky, at('ismark', 200, 50), { ...at('t', 900, 0), kind: 'text' as const, path: null, text: 'Later' }];
+    const drawn = [
+      { id: 'e', source: 's', target: 'f', fromSide: 'top' as const, toSide: 'top' as const, label: 'in', color: null, fromEnd: 'none' as const, toEnd: 'arrow' as const },
+      { id: 'e2', source: 's', target: 'ismark', fromSide: 'right' as const, toSide: 'left' as const, label: null, color: null, fromEnd: 'none' as const, toEnd: 'none' as const },
+    ];
+    const ops = duplicateOps(board, drawn, ['f']);
+    const added = ops.filter((o) => o.op === 'add');
+    expect(added).toEqual([
+      expect.objectContaining({ type: 'group', label: 'Barovia', x: 400 + GAP, y: 0, width: 400, height: 300 }),
+      expect.objectContaining({ type: 'text', text: 'Fog', color: '#e6c667', x: 20 + 400 + GAP, y: 50 }),
+    ]);
+    // Only the line between two copies comes along, between the copies.
+    const copied = ops.filter((o) => o.op === 'connect');
+    expect(copied).toEqual([expect.objectContaining({ source: added[1].id, target: added[0].id, label: 'in', toEnd: 'arrow' })]);
+    expect(duplicateOps(board, drawn, ['ismark'])).toEqual([]);
+  });
+
+  it('sets a copy down clear of other cards: right, else below, else past them', () => {
+    const sticky: Card = { ...at('s', 20, 50), kind: 'text', path: null, text: 'Fog' };
+    // The frame the sticky sits in isn't in the way.
+    const hall: Card = { ...frame, id: 'big', x: -100, y: -100, width: 2000, height: 1000 };
+    const copyAt = (board: Card[]) => duplicateOps(board, [], ['s']).find((o) => o.op === 'add');
+    expect(copyAt([hall, sticky])).toMatchObject({ x: 20 + 100 + GAP, y: 50 });
+    expect(copyAt([hall, sticky, at('right', 150, 0)])).toMatchObject({ x: 20, y: 50 + 100 + GAP });
+    expect(copyAt([hall, sticky, at('right', 150, 0), at('below', 0, 200)])).toMatchObject({ x: 250 + GAP, y: 50 });
   });
 
   it("paints a pigment's hex as it is and Obsidian's presets as the nearest pigment", () => {

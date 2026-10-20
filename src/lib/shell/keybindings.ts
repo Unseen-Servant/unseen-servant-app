@@ -171,6 +171,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // toolbar design §3.5). A tool that makes something hands back to Select.
   { id: 'command.boardSelect',   keys: { mac: 'V',    other: 'V' },             label: 'Board: select and move cards', scope: 'command' },
   { id: 'command.boardHand',     keys: { mac: 'H',    other: 'H' },             label: 'Board: pan, over the cards too', scope: 'command' },
+  { id: 'command.boardNote',     keys: { mac: 'D',    other: 'D' },             label: 'Board: place a note where you click', scope: 'command' },
   { id: 'command.boardText',     keys: { mac: 'T',    other: 'T' },             label: 'Board: a text card where you click', scope: 'command' },
   { id: 'command.boardSticky',   keys: { mac: 'N',    other: 'N' },             label: 'Board: a sticky where you click', scope: 'command' },
   { id: 'command.boardLine',     keys: { mac: 'L',    other: 'L' },             label: 'Board: a line from one card to another', scope: 'command' },
@@ -179,6 +180,9 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.boardUngroup',  keys: { mac: '⇧⌘G',  other: 'Ctrl+Shift+G' },  label: 'Board: remove the selected frames, keeping their cards', scope: 'command' },
   { id: 'command.boardUndo',     keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Board: undo', scope: 'command' },
   { id: 'command.boardRedo',     keys: { mac: '⇧⌘Z',  other: 'Ctrl+Shift+Z' },  label: 'Board: redo', scope: 'command' },
+  { id: 'command.boardDuplicate', keys: { mac: '⌘D',  other: 'Ctrl+D' },        label: 'Board: duplicate the selected text cards, stickies and frames', scope: 'command' },
+  { id: 'command.boardFitAll',   keys: { mac: '⌥1',   other: 'Alt+1' },         label: 'Board: fit the whole board in view', scope: 'command' },
+  { id: 'command.boardFitSelection', keys: { mac: '⌥2', other: 'Alt+2' },      label: 'Board: fit the selection in view', scope: 'command' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

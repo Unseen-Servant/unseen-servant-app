@@ -53,13 +53,20 @@
     <h3 class="field-title section-title">The board's tools</h3>
     <p class="field-desc">
       The toolbar on the board's right edge arranges it before the session.
-      <strong>T</strong> adds a text card and <strong>N</strong> a sticky where
-      you click. <strong>F</strong> draws a frame, which carries the cards
+      <strong>D</strong> places any note of the campaign where you click, by
+      name. <strong>T</strong> adds a text card and <strong>N</strong> a sticky
+      where you click. <strong>F</strong> draws a frame, which carries the cards
       inside it when you move it; <strong>&#8984;G</strong> frames the selected
       cards. <strong>L</strong> draws a line from one card to another. Double-click a text card, a
       frame's name or a line to write in it. <strong>H</strong> pans over the
       cards, <strong>V</strong> or <strong>Esc</strong> goes back to selecting,
       and <strong>&#8984;Z</strong> undoes.
+    </p>
+    <p class="field-desc">
+      Select a sticky, a text card, a frame or a line to colour it from the bar
+      over it; a line's bar also sets its arrowheads. <strong>&#8984;D</strong>
+      duplicates text cards, stickies and frames. <strong>&#8997;1</strong>
+      shows the whole board and <strong>&#8997;2</strong> the selection.
     </p>
   </section>
 

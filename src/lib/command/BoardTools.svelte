@@ -1,7 +1,7 @@
 <script lang="ts">
   // The board's toolbar (board toolbar design §3): Miro's tools in a column
-  // of keys on the board's right edge, under the expand key, and undo and
-  // redo in a well below. The current tool's key is raised, as a well's
+  // of keys on the board's right edge, under the expand key, and undo, redo
+  // and fit in a well below. The current tool's key is raised, as a well's
   // pick is; any tool but Select lights its lamp purple, since it changes
   // what a click on the board does. A tool that makes something hands back
   // to Select once it has (one shot, as Miro's do).
@@ -14,6 +14,8 @@
   export let canRedo: boolean;
   export let onUndo: () => void;
   export let onRedo: () => void;
+  /** The whole board in view, as the beat rows' frame key frames a beat. */
+  export let onFit: () => void;
 
   // Font Awesome Free 7.3.1 glyphs, viewBox 0 0 640 640; each from the
   // file named beside it in src/lib/ui/icons/.
@@ -31,6 +33,13 @@
       chord: 'command.boardHand',
       // hand-solid-full.svg
       path: 'M352 96C352 78.3 337.7 64 320 64C302.3 64 288 78.3 288 96L288 304C288 312.8 280.8 320 272 320C263.2 320 256 312.8 256 304L256 128C256 110.3 241.7 96 224 96C206.3 96 192 110.3 192 128L192 400C192 401.5 192 403.1 192.1 404.6L131.6 347C115.6 331.8 90.3 332.4 75 348.4C59.7 364.4 60.4 389.7 76.4 405L188.8 512C231.9 553.1 289.2 576 348.8 576L368 576C465.2 576 544 497.2 544 400L544 192C544 174.3 529.7 160 512 160C494.3 160 480 174.3 480 192L480 304C480 312.8 472.8 320 464 320C455.2 320 448 312.8 448 304L448 128C448 110.3 433.7 96 416 96C398.3 96 384 110.3 384 128L384 304C384 312.8 376.8 320 368 320C359.2 320 352 312.8 352 304L352 96z',
+    },
+    {
+      tool: 'note',
+      name: 'Note',
+      chord: 'command.boardNote',
+      // file-lines-solid-full.svg
+      path: 'M128 128C128 92.7 156.7 64 192 64L341.5 64C358.5 64 374.8 70.7 386.8 82.7L493.3 189.3C505.3 201.3 512 217.6 512 234.6L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 128zM336 122.5L336 216C336 229.3 346.7 240 360 240L453.5 240L336 122.5zM248 320C234.7 320 224 330.7 224 344C224 357.3 234.7 368 248 368L392 368C405.3 368 416 357.3 416 344C416 330.7 405.3 320 392 320L248 320zM248 416C234.7 416 224 426.7 224 440C224 453.3 234.7 464 248 464L392 464C405.3 464 416 453.3 416 440C416 426.7 405.3 416 392 416L248 416z',
     },
     {
       tool: 'text',
@@ -65,6 +74,9 @@
   // rotate-left-solid-full.svg
   const UNDO =
     'M88 256L232 256C241.7 256 250.5 250.2 254.2 241.2C257.9 232.2 255.9 221.9 249 215L202.3 168.3C277.6 109.7 386.6 115 455.8 184.2C530.8 259.2 530.8 380.7 455.8 455.7C380.8 530.7 259.3 530.7 184.3 455.7C174.1 445.5 165.3 434.4 157.9 422.7C148.4 407.8 128.6 403.4 113.7 412.9C98.8 422.4 94.4 442.2 103.9 457.1C113.7 472.7 125.4 487.5 139 501C239 601 401 601 501 501C601 401 601 239 501 139C406.8 44.7 257.3 39.3 156.7 122.8L105 71C98.1 64.2 87.8 62.1 78.8 65.8C69.8 69.5 64 78.3 64 88L64 232C64 245.3 74.7 256 88 256z';
+  // expand-solid-full.svg, the beat rows' frame key
+  const FIT =
+    'M128 96C110.3 96 96 110.3 96 128L96 224C96 241.7 110.3 256 128 256C145.7 256 160 241.7 160 224L160 160L224 160C241.7 160 256 145.7 256 128C256 110.3 241.7 96 224 96L128 96zM160 416C160 398.3 145.7 384 128 384C110.3 384 96 398.3 96 416L96 512C96 529.7 110.3 544 128 544L224 544C241.7 544 256 529.7 256 512C256 494.3 241.7 480 224 480L160 480L160 416zM416 96C398.3 96 384 110.3 384 128C384 145.7 398.3 160 416 160L480 160L480 224C480 241.7 494.3 256 512 256C529.7 256 544 241.7 544 224L544 128C544 110.3 529.7 96 512 96L416 96zM544 416C544 398.3 529.7 384 512 384C494.3 384 480 398.3 480 416L480 480L416 480C398.3 480 384 494.3 384 512C384 529.7 398.3 544 416 544L512 544C529.7 544 544 529.7 544 512L544 416z';
   // rotate-right-solid-full.svg
   const REDO =
     'M552 256L408 256C398.3 256 389.5 250.2 385.8 241.2C382.1 232.2 384.1 221.9 391 215L437.7 168.3C362.4 109.7 253.4 115 184.2 184.2C109.2 259.2 109.2 380.7 184.2 455.7C259.2 530.7 380.7 530.7 455.7 455.7C463.9 447.5 471.2 438.8 477.6 429.6C487.7 415.1 507.7 411.6 522.2 421.7C536.7 431.8 540.2 451.8 530.1 466.3C521.6 478.5 511.9 490.1 501 501C401 601 238.9 601 139 501C39.1 401 39 239 139 139C233.3 44.7 382.7 39.4 483.3 122.8L535 71C541.9 64.1 552.2 62.1 561.2 65.8C570.2 69.5 576 78.3 576 88L576 232C576 245.3 565.3 256 552 256z';
@@ -109,6 +121,15 @@
     >
       <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={REDO} /></svg>
     </button>
+    <button
+      type="button"
+      class="key"
+      title={'Fit the whole board' + chordHint('command.boardFitAll')}
+      aria-label="Fit the whole board"
+      on:click={onFit}
+    >
+      <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={FIT} /></svg>
+    </button>
   </div>
 </div>
 
@@ -120,7 +141,7 @@
   }
 
   /* LatchKey's well and keys, stacked: one well for the tools, one for
-     undo and redo. */
+     undo, redo and fit. */
   .well {
     display: flex;
     flex-direction: column;

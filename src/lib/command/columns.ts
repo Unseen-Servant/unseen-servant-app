@@ -87,6 +87,19 @@ export function isAmbiguous(index: CampaignIndex, path: string): boolean {
  *  beat may share a note's name (design §3.3). */
 const kindRank = (n: NoteEntry) => ['beats', 'sessions'].indexOf(n.track?.toLowerCase() ?? '') + 1;
 
+/** What the board's Note tool offers for `typed`: notes, not beats or
+ *  sessions, whose names start with it and then those holding it, each
+ *  alphabetical, case aside; at most `max`, as the editor's completion
+ *  draws. */
+export function placeableNotes(index: CampaignIndex, typed: string, max = 100): NoteEntry[] {
+  const q = typed.trim().toLowerCase();
+  const later = (n: NoteEntry) => (n.name.toLowerCase().startsWith(q) ? 0 : 1);
+  return index.notes
+    .filter((n) => kindRank(n) === 0 && n.name.toLowerCase().includes(q))
+    .sort((a, b) => later(a) - later(b) || byName(a.name, b.name))
+    .slice(0, max);
+}
+
 /** The note a link's target names: by its name, or a path ending in it
  *  (`Locations/Svalich Road`), as the sidecar resolves it. Lower-casing
  *  agrees with its casefold() for every name short of oddities like ß. */
