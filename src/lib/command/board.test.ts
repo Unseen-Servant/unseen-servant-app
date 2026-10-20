@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, GAP, NOTE_HREF, applyOps, bodyOf, cards, connectOps, facing, frameOp, handOf, handStep, lines, linkify, placeAll, rehypeMissingLinks, type Card } from './board';
+import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, bodyOf, cards, connectOps, facing, frameDepths, frameOp, handOf, handStep, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -64,7 +64,7 @@ describe('cards', () => {
 });
 
 const at = (id: string, x: number, y: number, placed = true): Card => ({
-  id, kind: 'note', path: `NPCs/${id}.md`, placed, x, y, width: 100, height: 100, text: '',
+  id, kind: 'note', path: `NPCs/${id}.md`, placed, x, y, width: 100, height: 100, text: '', color: null,
 });
 
 describe('lines', () => {
@@ -204,5 +204,67 @@ describe('applyOps', () => {
       notes: { b: 'NPCs/Ireena.md' },
     });
     expect(view.nodes[0].x).toBe(0);
+  });
+});
+
+describe("the toolbar's cards", () => {
+  const view: BoardView = {
+    nodes: [
+      { id: 'g', type: 'group', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'a', type: 'file', file: 'Strahd/NPCs/Ismark.md', x: 0, y: 0, width: 100, height: 100 },
+    ],
+    edges: [{ id: 'e', fromNode: 'a', toNode: 'g', toEnd: 'none', label: 'in' }],
+    notes: { a: 'NPCs/Ismark.md' },
+  };
+
+  it('draws a new frame behind the cards, a new text card on top, and a line with no arrowhead', () => {
+    const after = applyOps(view, [
+      { op: 'add', id: 't', type: 'text', text: '', x: 0, y: 0, width: 50, height: 50 },
+      { op: 'add', id: 'g2', type: 'group', x: 0, y: 0, width: 50, height: 50 },
+      { op: 'connect', id: 'e2', source: 't', target: 'a' },
+    ], 'Strahd');
+    expect(after.nodes.map((n) => n.id)).toEqual(['g', 'g2', 'a', 't']);
+    expect(after.edges[1]).toEqual({ id: 'e2', fromNode: 't', toNode: 'a', toEnd: 'none' });
+  });
+
+  it('sets a field, and clears one set to null or an emptied label', () => {
+    const after = applyOps(view, [
+      { op: 'set', id: 'g', label: 'Barovia', color: '#e6c667' },
+      { op: 'set', id: 'e', label: '' },
+    ], 'Strahd');
+    expect(after.nodes[0]).toMatchObject({ label: 'Barovia', color: '#e6c667' });
+    expect(after.edges[0]).not.toHaveProperty('label');
+    expect(applyOps(after, [{ op: 'set', id: 'g', color: null }], 'Strahd').nodes[0]).not.toHaveProperty('color');
+  });
+
+  const frame: Card = { ...at('f', 0, 0), kind: 'group', path: null, width: 400, height: 300 };
+
+  it('carries the cards wholly inside a frame, not those it only touches', () => {
+    const board = [frame, at('in', 20, 50), at('edge', 350, 250), at('out', 500, 0)];
+    expect(inside(board, frame).map((c) => c.id)).toEqual(['in']);
+  });
+
+  it('draws a frame around cards clear of them, more at the top for its name', () => {
+    expect(around([at('a', 0, 0), at('b', 300, 200)])).toEqual({
+      x: -FRAME_PAD,
+      y: -FRAME_TOP,
+      width: 400 + FRAME_PAD * 2,
+      height: 300 + FRAME_TOP + FRAME_PAD,
+    });
+  });
+
+  it('stacks frames behind the cards, the smaller in front even when selected', () => {
+    const small = { ...frame, id: 'small', width: 100, height: 100 };
+    const depths = frameDepths([at('a', 0, 0), frame, small]);
+    expect(depths.has('a')).toBe(false);
+    expect(depths.get('small')!).toBeGreaterThan(depths.get('f')!);
+    expect(depths.get('small')! + 1000).toBeLessThan(0);
+  });
+
+  it("paints a pigment's hex as it is and Obsidian's presets as the nearest pigment", () => {
+    expect(paint('#e6c667')).toBe('#e6c667');
+    expect(paint('3')).toBe('#e6c667');
+    expect(paint('9')).toBeNull();
+    expect(paint(null)).toBeNull();
   });
 });

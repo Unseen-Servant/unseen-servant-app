@@ -1,6 +1,6 @@
 # Command board toolbar (2026-10-19)
 
-**Status:** settled 2026-10-19 (§8); nothing built yet. Build in the order of §6. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
+**Status:** settled 2026-10-19 (§8). Step 1 of §6 is built; steps 2–4 aren't. Extends the Command design's §5.2 (Play), whose board "renders Obsidian's groups and text, and lines are lines for now".
 
 ## 0. TL;DR
 
@@ -59,8 +59,9 @@ Play's board gets a creation toolbar modelled on Miro's: a column of tool keys w
   - Each tooltip names the tool and its key (`chordHint`).
 - **The current tool:**
   - Its key is raised (`--bg-header`), as the bar's wells raise their pick.
-  - While a creation tool is armed, its lamp is lit purple: it's a mode, since it changes what a click on the board does.
+  - While any tool but Select is current, its lamp is lit purple: it's a mode, since it changes what a click or a drag on the board does. Hand counts.
   - Select is the resting tool and has no lamp.
+  - **Icons** (Font Awesome Free 7.3.1): arrow-pointer, hand, font, note-sticky, diagram-project (Line) and object-group (Frame; 7.x has no vector-square), with rotate-left and rotate-right for undo and redo.
 - **One shot:** a creation tool makes one thing, then hands back to Select, as Miro's do. Esc returns to Select at any time.
 - **Cursor:** a crosshair while a creation tool is armed.
 - **Shown** in Play only, in the expanded board too. It isn't foldable in v1; it's narrow.

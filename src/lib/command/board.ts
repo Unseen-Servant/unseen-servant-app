@@ -3,16 +3,49 @@
 // a board nobody arranged still reads. Gestures on a card become the
 // operations the sidecar applies to the file.
 
+import { PIGMENTS } from '../legend-lore/palette';
 import { linkTarget } from './editorTheme';
-import type { BoardOp, BoardView, CampaignIndex, CanvasNode, Side } from './types';
+import type { BoardFields, BoardOp, BoardView, CampaignIndex, CanvasEdge, CanvasNode, Side } from './types';
 
 export const CARD = { width: 260, height: 180 };
 export const GAP = 32;
+/** What the toolbar's Text, Sticky and Frame make at a click. */
+export const TEXT_CARD = { width: 260, height: 100 };
+export const STICKY = { width: 200, height: 200 };
+export const NEW_FRAME = { width: 600, height: 400 };
+/** A frame drawn around cards (⌘G) clears them by this much, and by more
+ *  at the top for its name. */
+export const FRAME_PAD = 24;
+export const FRAME_TOP = 48;
+
+const pigment = (name: string) => PIGMENTS.find((p) => p.name === name)!.hex;
+/** A new sticky's colour, until the selection bar picks others. */
+export const STICKY_COLOR = pigment('Ochre');
+/** Obsidian's six presets, drawn as the pigments nearest them. */
+const PRESETS: Record<string, string> = {
+  '1': pigment('Kermes'),
+  '2': pigment('Realgar'),
+  '3': pigment('Ochre'),
+  '4': pigment('Malachite'),
+  '5': pigment('Azurite'),
+  '6': pigment('Orchil'),
+};
+
+/** The colour a card or line is drawn in: its hex, a preset's pigment, or
+ *  none. */
+export function paint(color: string | null): string | null {
+  if (!color) return null;
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  return PRESETS[color] ?? null;
+}
 
 /** Auto-placed cards aren't in the file yet; their ids say so. */
 const AUTO = 'auto:';
 
 export type CardKind = 'note' | 'text' | 'group' | 'link' | 'other';
+
+/** The board toolbar's tools (board toolbar design §3.2). */
+export type Tool = 'select' | 'hand' | 'text' | 'sticky' | 'line' | 'frame';
 
 export interface Card {
   id: string;
@@ -29,6 +62,8 @@ export interface Card {
   /** A text card's Markdown, a group's label, a link's URL, or the path a
    *  note card names as written. */
   text: string;
+  /** As written (paint draws it); null for none. */
+  color: string | null;
 }
 
 export interface Line {
@@ -55,6 +90,7 @@ function placedCard(node: CanvasNode, path: string | null): Card {
     width: node.width,
     height: node.height,
     text: typeof text === 'string' ? text : '',
+    color: typeof node.color === 'string' ? node.color : null,
   };
 }
 
@@ -91,6 +127,7 @@ export function cards(view: BoardView, index: CampaignIndex, wanted: Iterable<st
           y: y0 + row * (CARD.height + GAP),
           ...CARD,
           text: n.path,
+          color: null,
         }),
       );
   });
@@ -149,6 +186,12 @@ export interface CardActions {
   edit: (card: Card) => void;
   follow: (name: string) => void;
   frame: (card: Card, frame: Frame) => void;
+  /** Edit a text card's text, a frame's name or a line's label in place. */
+  begin: (id: string) => void;
+  /** Stop editing it, writing `fields` when they changed something. */
+  finish: (id: string, fields?: BoardFields) => void;
+  /** Take a card or a line off the board: a text card emptied as it's edited. */
+  remove: (id: string) => void;
 }
 
 /** Where the card components find the board's CardActions (Svelte
@@ -172,6 +215,10 @@ export interface CardData extends Record<string, unknown> {
   body: string | null;
   /** Its card in the card tray is pointed at: the board outlines it. */
   outlined: boolean;
+  /** Its text or name is being edited in place. */
+  editing: boolean;
+  /** The Line tool is armed: a drag from anywhere on the card draws a line. */
+  linking: boolean;
 }
 
 /** The card tray's hand: the board's cards for the live set's notes, in
@@ -284,11 +331,21 @@ export function applyOps(view: BoardView, ops: BoardOp[], campaign: string): Boa
       const { op: _, path, ...frame } = op;
       nodes.push({ ...frame, type: 'file', file: `${campaign}/${path}` });
       notes[op.id] = path;
+    } else if (op.op === 'add') {
+      const { op: _, ...node } = op;
+      // A frame before the cards, as the sidecar files it.
+      const at = op.type === 'group' ? nodes.findIndex((n) => n.type !== 'group') : -1;
+      nodes.splice(at < 0 ? nodes.length : at, 0, node);
     } else if (op.op === 'frame') {
       const { op: _, id, ...frame } = op;
       nodes = nodes.map((n) => (n.id === id ? { ...n, ...frame } : n));
     } else if (op.op === 'connect') {
-      edges.push({ id: op.id, fromNode: op.source, toNode: op.target, fromSide: op.fromSide, toSide: op.toSide });
+      const { op: _, id, source, target, toEnd, ...rest } = op;
+      edges.push({ id, fromNode: source, toNode: target, ...rest, toEnd: toEnd ?? 'none' });
+    } else if (op.op === 'set') {
+      const { op: _, id, ...fields } = op;
+      nodes = nodes.map((n) => (n.id === id ? withFields(n, fields) : n));
+      edges = edges.map((e) => (e.id === id ? withFields(e, fields) : e));
     } else {
       nodes = nodes.filter((n) => n.id !== op.id);
       edges = edges.filter((e) => e.id !== op.id && e.fromNode !== op.id && e.toNode !== op.id);
@@ -296,5 +353,51 @@ export function applyOps(view: BoardView, ops: BoardOp[], campaign: string): Boa
     }
   }
   return { nodes, edges, notes };
+}
+
+/** `item` with `fields` set, a null or emptied label removed. */
+function withFields<T extends CanvasNode | CanvasEdge>(item: T, fields: BoardFields): T {
+  const out: Record<string, unknown> = { ...item };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === null || (key === 'label' && value === '')) delete out[key];
+    else if (value !== undefined) out[key] = value;
+  }
+  return out as T;
+}
+
+/** The cards wholly inside `frame`, which move with it: Obsidian's rule
+ *  for a group's contents. */
+export function inside(board: Card[], frame: Card): Card[] {
+  return board.filter(
+    (c) =>
+      c.id !== frame.id &&
+      c.x >= frame.x &&
+      c.y >= frame.y &&
+      c.x + c.width <= frame.x + frame.width &&
+      c.y + c.height <= frame.y + frame.height,
+  );
+}
+
+/** The frame drawn around `chosen` (⌘G), clear of them on every side. */
+export function around(chosen: Card[]): Frame {
+  const left = Math.min(...chosen.map((c) => c.x));
+  const top = Math.min(...chosen.map((c) => c.y));
+  const right = Math.max(...chosen.map((c) => c.x + c.width));
+  const bottom = Math.max(...chosen.map((c) => c.y + c.height));
+  return {
+    x: Math.round(left - FRAME_PAD),
+    y: Math.round(top - FRAME_TOP),
+    width: Math.round(right - left + FRAME_PAD * 2),
+    height: Math.round(bottom - top + FRAME_TOP + FRAME_PAD),
+  };
+}
+
+/** Each frame's place in the stack, behind every card: a smaller frame in
+ *  front of a larger, so one inside another can still be picked up. Low
+ *  enough that a selected frame, which Svelte Flow lifts by 1000, stays
+ *  behind the cards too. */
+export function frameDepths(board: Card[]): Map<string, number> {
+  const frames = board.filter((c) => c.kind === 'group').sort((a, b) => b.width * b.height - a.width * a.height);
+  return new Map(frames.map((c, i) => [c.id, -2000 + i]));
 }
 

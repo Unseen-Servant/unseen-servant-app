@@ -167,6 +167,18 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'command' },
   { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'command' },
   { id: 'command.play',          keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Launch or stop the focused beat', scope: 'command', switch: true },
+  // In Play, on the board: the toolbar's tools on Miro's letters (board
+  // toolbar design §3.5). A tool that makes something hands back to Select.
+  { id: 'command.boardSelect',   keys: { mac: 'V',    other: 'V' },             label: 'Board: select and move cards', scope: 'command' },
+  { id: 'command.boardHand',     keys: { mac: 'H',    other: 'H' },             label: 'Board: pan, over the cards too', scope: 'command' },
+  { id: 'command.boardText',     keys: { mac: 'T',    other: 'T' },             label: 'Board: a text card where you click', scope: 'command' },
+  { id: 'command.boardSticky',   keys: { mac: 'N',    other: 'N' },             label: 'Board: a sticky where you click', scope: 'command' },
+  { id: 'command.boardLine',     keys: { mac: 'L',    other: 'L' },             label: 'Board: a line from one card to another', scope: 'command' },
+  { id: 'command.boardFrame',    keys: { mac: 'F',    other: 'F' },             label: 'Board: a frame, clicked or dragged to size', scope: 'command' },
+  { id: 'command.boardGroup',    keys: { mac: '⌘G',   other: 'Ctrl+G' },        label: 'Board: frame the selected cards', scope: 'command' },
+  { id: 'command.boardUngroup',  keys: { mac: '⇧⌘G',  other: 'Ctrl+Shift+G' },  label: 'Board: remove the selected frames, keeping their cards', scope: 'command' },
+  { id: 'command.boardUndo',     keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Board: undo', scope: 'command' },
+  { id: 'command.boardRedo',     keys: { mac: '⇧⌘Z',  other: 'Ctrl+Shift+Z' },  label: 'Board: redo', scope: 'command' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

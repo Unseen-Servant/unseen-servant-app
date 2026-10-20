@@ -5,11 +5,12 @@
   // plays one note. The board's file and the jot bar's lines in the
   // session note are the only things written — what's live is the
   // sidecar's.
-  import { setContext, tick } from 'svelte';
+  import { onDestroy, onMount, setContext, tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import type { Viewport } from '@xyflow/svelte';
   import Arrangement from './Arrangement.svelte';
   import Board from './Board.svelte';
+  import BoardTools from './BoardTools.svelte';
   import CardTray from './CardTray.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
@@ -27,7 +28,9 @@
     type Card,
     type CardActions,
     type CardData,
+    type Tool,
   } from './board';
+  import { inverse } from './boardUndo';
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
   import { memberPaths, planRows, sessionNotePaths } from './prep';
   import type { BeatEntry, BoardOp, BoardView, CampaignIndex, LiveSet, NoteEntry, SessionEntry } from './types';
@@ -65,10 +68,24 @@
   let boardFor: string | null = null;
   /** Writes under way: the sidecar's answer is adopted once none are. */
   let pending = 0;
+  /** Each gesture's way back, last on top; and the ways forward again
+   *  (board toolbar design §4). */
+  let undos: BoardOp[][] = [];
+  let redos: BoardOp[][] = [];
+  /** The toolbar's tool, and the text card, frame or line being edited in
+   *  place (§3). */
+  let tool: Tool = 'select';
+  let editing: string | null = null;
 
   $: boardKey = `${campaign}\n${session.path}`;
   $: boardPath = session.path.replace(/\.md$/i, '.canvas');
-  $: if (boardKey !== boardFor) void loadBoard();
+  $: if (boardKey !== boardFor) {
+    // Undo is this board's, for this visit (board toolbar design §4).
+    undos = [];
+    redos = [];
+    editing = null;
+    void loadBoard();
+  }
 
   async function loadBoard() {
     const key = (boardFor = boardKey);
@@ -90,9 +107,33 @@
     }
   }
 
-  function apply(change: BoardOp[]) {
+  // -- undo (board toolbar design §4) -------------------------------------
+
+  const HISTORY = 100;
+
+  function undo() {
+    const back = undos.at(-1);
+    if (!back) return;
+    undos = undos.slice(0, -1);
+    apply(back, 'undo');
+  }
+
+  function redo() {
+    const again = redos.at(-1);
+    if (!again) return;
+    redos = redos.slice(0, -1);
+    apply(again, 'redo');
+  }
+
+  /** Change the board: draw it at once, write it, and keep the way back —
+   *  on the undo stack, or on redo's while undoing. */
+  function apply(change: BoardOp[], as: 'gesture' | 'undo' | 'redo' = 'gesture') {
     if (!view || !change.length) return;
     const ops = placeAll(allCards, change);
+    const back = inverse(view, ops, campaign);
+    if (as === 'undo') redos = [...redos, back];
+    else undos = [...undos, back].slice(-HISTORY);
+    if (as === 'gesture') redos = [];
     const key = boardKey;
     const path = session.path;
     view = applyOps(view, ops, campaign);
@@ -163,7 +204,59 @@
     edit: (card) => card.path && onEdit(card.path),
     follow: (name) => onFollow(name),
     frame: (card, f) => apply([frameOp(card, f)]),
+    begin: (id) => (editing = id),
+    finish: (id, fields) => {
+      if (editing === id) editing = null;
+      if (fields) apply([{ op: 'set', id, ...fields }]);
+    },
+    remove: (id) => apply([{ op: 'remove', id }]),
   };
+
+  // -- the toolbar (board toolbar design §3) -------------------------------
+
+  let board: Board | undefined;
+
+  /** A tool's card is made, and opens for its text or name. */
+  function create(op: BoardOp) {
+    apply([op]);
+    editing = op.id;
+    tool = 'select';
+  }
+
+  const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', t: 'text', n: 'sticky', l: 'line', f: 'frame' };
+
+  /** The board's keys, Miro's letters (§3.5). Taken before the session
+   *  player's, so Esc puts down an armed tool before it lets go of a beat. */
+  function boardKeys(e: KeyboardEvent) {
+    if (!active || menu || e.isComposing) return;
+    if (document.querySelector('dialog[open], [role="menu"]')) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    const mod = e.metaKey || e.ctrlKey;
+    const key = e.key.toLowerCase();
+    if (mod && !e.altKey && (key === 'z' || key === 'g')) {
+      e.preventDefault();
+      if (key === 'z') (e.shiftKey ? redo : undo)();
+      else if (e.shiftKey) board?.unframeSelection();
+      else board?.frameSelection();
+      return;
+    }
+    if (mod || e.altKey || e.shiftKey) return;
+    if (e.key === 'Escape' && tool !== 'select') {
+      e.preventDefault();
+      e.stopPropagation();
+      tool = 'select';
+      return;
+    }
+    const next = TOOL_KEYS[key];
+    if (next && !e.repeat) {
+      e.preventDefault();
+      tool = next;
+    }
+  }
+
+  onMount(() => window.addEventListener('keydown', boardKeys, true));
+  onDestroy(() => window.removeEventListener('keydown', boardKeys, true));
   // The tray's cards ask what the board's do.
   setContext(CARD_ACTIONS, actions);
 
@@ -178,6 +271,8 @@
     notes: Map<string, NoteEntry>,
     pigments: Record<string, string>,
     outlined: string | null,
+    editingId: string | null,
+    linking: boolean,
     _tick: number,
   ) {
     return (card: Card): CardData => {
@@ -192,10 +287,12 @@
         source: note?.source ?? null,
         body: card.path ? (bodies.get(card.path) ?? null) : null,
         outlined: !!card.path && card.path === outlined,
+        editing: card.id === editingId,
+        linking,
       };
     };
   }
-  $: dataOf = dataFor(liveNotes, notesByPath, index.pigments, pointed, bodiesTick);
+  $: dataOf = dataFor(liveNotes, notesByPath, index.pigments, pointed, editing, tool === 'line', bodiesTick);
 
   // -- framing ------------------------------------------------------------
 
@@ -251,15 +348,26 @@
       const source = note.source;
       if (source) items.push(action('Open source', () => void openUrl(source).catch(() => {})));
     }
+    if (card.kind === 'text') items.push(action('Edit text', () => (editing = card.id)));
+    if (card.kind === 'group') items.push(action('Rename frame', () => (editing = card.id)));
     if (card.placed && removable(card)) {
       if (items.length) items.push(divider);
-      items.push(action('Remove from board', () => apply([{ op: 'remove', id: card.id }]), true));
+      const label = card.kind === 'group' ? 'Remove frame' : 'Remove from board';
+      items.push(action(label, () => apply([{ op: 'remove', id: card.id }]), true));
     }
     if (items.length) menu = { x: e.clientX, y: e.clientY, items };
   }
 
   function lineMenu(id: string, e: MouseEvent) {
-    menu = { x: e.clientX, y: e.clientY, items: [action('Remove line', () => apply([{ op: 'remove', id }]), true)] };
+    menu = {
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        action('Label', () => (editing = id)),
+        divider,
+        action('Remove line', () => apply([{ op: 'remove', id }]), true),
+      ],
+    };
   }
 
   // -- the jot bar --------------------------------------------------------
@@ -310,9 +418,14 @@
         {covered}
         initialViewport={boardViews.get(boardKey)}
         onLeave={(viewport) => boardViews.set(boardKey, viewport)}
-        onOps={apply}
+        onOps={(ops) => apply(ops)}
         onCardMenu={cardMenu}
         onLineMenu={lineMenu}
+        {tool}
+        {editing}
+        onCreate={create}
+        onToolDone={() => (tool = 'select')}
+        bind:this={board}
       />
     {:else if boardError}
       <p class="board-note" role="alert">{boardError}</p>
@@ -334,8 +447,9 @@
     </div>
 
     <!-- The expand key, in the board's top-right corner: latched and lit
-         while the board fills the view, and the way back from it. -->
-    <div class="expand">
+         while the board fills the view, and the way back from it. The
+         toolbar hangs under it. -->
+    <div class="rail">
       <LatchKey
         open={expanded}
         lit={expanded}
@@ -350,6 +464,16 @@
           <path d="M408 64L552 64C565.3 64 576 74.7 576 88L576 232C576 241.7 570.2 250.5 561.2 254.2C552.2 257.9 541.9 255.9 535 249L496 210L409 297C399.6 306.4 384.4 306.4 375.1 297L343.1 265C333.7 255.6 333.7 240.4 343.1 231.1L430.1 144.1L391.1 105.1C384.2 98.2 382.2 87.9 385.9 78.9C389.6 69.9 398.3 64 408 64zM232 576L88 576C74.7 576 64 565.3 64 552L64 408C64 398.3 69.8 389.5 78.8 385.8C87.8 382.1 98.1 384.2 105 391L144 430L231 343C240.4 333.6 255.6 333.6 264.9 343L296.9 375C306.3 384.4 306.3 399.6 296.9 408.9L209.9 495.9L248.9 534.9C255.8 541.8 257.8 552.1 254.1 561.1C250.4 570.1 241.7 576 232 576z" />
         </svg>
       </LatchKey>
+      {#if view}
+        <BoardTools
+          {tool}
+          onTool={(t) => (tool = t)}
+          canUndo={undos.length > 0}
+          canRedo={redos.length > 0}
+          onUndo={undo}
+          onRedo={redo}
+        />
+      {/if}
     </div>
 
     <!-- The jot bar, in the board's bottom corner: a line at the end of
@@ -434,12 +558,17 @@
     flex-direction: column;
   }
 
-  /* Level with the session player's plate across the board. */
-  .expand {
+  /* Level with the session player's plate across the board; the toolbar
+     under the expand key, on the same edge. */
+  .rail {
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
     z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
   }
 
   /* The bar and, beside it, the key that opens what it writes to, level

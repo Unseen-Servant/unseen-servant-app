@@ -109,6 +109,9 @@ export interface LiveSet {
 }
 
 export type Side = 'top' | 'right' | 'bottom' | 'left';
+/** A line's end: plain, or an arrowhead. JSON Canvas draws a missing
+ *  `toEnd` as an arrow; Command writes `none`. */
+export type End = 'none' | 'arrow';
 
 /** A JSON Canvas node as on disk. Fields Command doesn't use pass through. */
 export interface CanvasNode {
@@ -122,6 +125,8 @@ export interface CanvasNode {
   text?: string;
   label?: string;
   url?: string;
+  /** A pigment's hex, or one of Obsidian's presets "1"–"6". */
+  color?: string;
   [key: string]: unknown;
 }
 
@@ -132,6 +137,9 @@ export interface CanvasEdge {
   fromSide?: Side;
   toSide?: Side;
   label?: string;
+  color?: string;
+  fromEnd?: End;
+  toEnd?: End;
   [key: string]: unknown;
 }
 
@@ -144,9 +152,35 @@ export interface BoardView {
 
 type Frame = { x: number; y: number; width: number; height: number };
 
+/** The cards the board's toolbar makes; note cards are placed instead. */
+export type MadeKind = 'text' | 'group' | 'link';
+
+/** What `set` changes on a card or a line; null clears a field. */
+export interface BoardFields {
+  text?: string;
+  label?: string | null;
+  url?: string;
+  color?: string | null;
+  fromEnd?: End;
+  toEnd?: End;
+}
+
 /** A change to a board, applied by the sidecar to the file on disk. */
 export type BoardOp =
   | ({ op: 'place'; id: string; path: string } & Frame)
+  | ({ op: 'add'; id: string; type: MadeKind; text?: string; label?: string; url?: string; color?: string } & Frame)
   | ({ op: 'frame'; id: string } & Frame)
-  | { op: 'connect'; id: string; source: string; target: string; fromSide?: Side; toSide?: Side }
+  | {
+      op: 'connect';
+      id: string;
+      source: string;
+      target: string;
+      fromSide?: Side;
+      toSide?: Side;
+      label?: string;
+      color?: string;
+      fromEnd?: End;
+      toEnd?: End;
+    }
+  | ({ op: 'set'; id: string } & BoardFields)
   | { op: 'remove'; id: string };

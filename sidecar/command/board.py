@@ -22,7 +22,22 @@ SESSIONS = vault.RESERVED[1]
 # accepted, since Obsidian doesn't care either.
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _SIDES = ("top", "right", "bottom", "left")
+_ENDS = ("none", "arrow")
+# A pigment's hex, or one of Obsidian's six preset colours.
+_COLOR = re.compile(r"^(#[0-9a-fA-F]{6}|[1-6])$")
 MIN_SIZE = 40
+MAX_TEXT = 16 * 1024
+# The cards `add` makes (the board toolbar), and the field each one's
+# content goes in. Note cards are `place`'s.
+_CONTENT = {"text": "text", "group": "label", "link": "url"}
+# What `set` may change on each kind of card, and on a line.
+_SETTABLE = {
+    "text": ("text", "color"),
+    "group": ("label", "color"),
+    "link": ("url", "color"),
+    "edge": ("label", "color", "fromEnd", "toEnd"),
+}
+_NAMES = {"file": "note card", "text": "text card", "group": "frame", "link": "link card", "edge": "line"}
 
 
 def board_file(campaign: Path, session: str) -> Path:
@@ -102,6 +117,29 @@ def _number(op: dict, key: str, least: int | None = None) -> int:
     return n if least is None else max(least, n)
 
 
+def _string(value, key: str) -> str:
+    if not isinstance(value, str):
+        raise vault.Invalid(f"{key} must be text")
+    if len(value) > MAX_TEXT:
+        raise vault.Invalid(f"{key} is longer than a board card holds")
+    return value
+
+
+def _field(key: str, value):
+    """``value`` for a card's or a line's ``key``, checked; None clears it."""
+    if key == "color":
+        if value is not None and (not isinstance(value, str) or not _COLOR.match(value)):
+            raise vault.Invalid(f"Not a board colour: {value!r}")
+        return value
+    if key in ("fromEnd", "toEnd"):
+        if value not in _ENDS:
+            raise vault.Invalid(f"A line's end is {' or '.join(_ENDS)}")
+        return value
+    if key == "label" and value is None:
+        return None
+    return _string(value, key)
+
+
 def _frame(node: dict, op: dict) -> None:
     node["x"] = _number(op, "x")
     node["y"] = _number(op, "y")
@@ -116,8 +154,14 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
       on the board. A note already there is framed instead, and ``id``
       means that card for the rest of the batch.
     - ``frame`` {id, x, y, width, height}: move or resize a card.
-    - ``connect`` {id, source, target, fromSide?, toSide?}: a line (no
-      arrowhead) between two cards, unless one already joins them.
+    - ``add`` {id, type, x, y, width, height, text | label | url, color?}:
+      a text card, a frame (``group``) or a link card. A frame goes before
+      the cards in the file, so Obsidian draws it behind them.
+    - ``connect`` {id, source, target, fromSide?, toSide?, label?, color?,
+      fromEnd?, toEnd?}: a line between two cards, unless one already joins
+      them; without ``toEnd``, no arrowhead.
+    - ``set`` {id, field: value, …}: change a card's or a line's fields
+      (``_SETTABLE``), or clear one with null. The rest is kept.
     - ``remove`` {id}: a card (with its lines) or a line.
 
     An operation naming a card or line that's no longer there (removed in
@@ -153,12 +197,38 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
             _frame(card, op)
             nodes.append(card)
             by_id[new_id] = card
+        elif kind == "add":
+            new_id = _id(op)
+            node_type = op.get("type")
+            if node_type not in _CONTENT:
+                raise vault.Invalid(f"Not a card the board makes: {node_type!r}")
+            key = _CONTENT[node_type]
+            content = _field(key, op.get(key)) if node_type != "group" or op.get(key) is not None else None
+            color = _field("color", op.get("color"))
+            if new_id in by_id or any(e.get("id") == new_id for e in edges):
+                raise vault.Conflict(f"The board already has {new_id!r}")
+            # In Obsidian's order: a text's or a link's content before the
+            # frame, a group's label after it.
+            card = {"id": new_id, "type": node_type}
+            if node_type != "group":
+                card[key] = content
+            _frame(card, op)
+            if node_type == "group" and content:
+                card["label"] = content
+            if color is not None:
+                card["color"] = color
+            at = len(nodes)
+            if node_type == "group":
+                at = next((i for i, n in enumerate(nodes) if n.get("type") != "group"), len(nodes))
+            nodes.insert(at, card)
+            by_id[new_id] = card
         elif kind == "frame":
             target = node(_id(op))
             if target is not None:
                 _frame(target, op)
         elif kind == "connect":
             edge_id = _id(op)
+            extra = {k: _field(k, op[k]) for k in ("label", "color", "fromEnd", "toEnd") if op.get(k) is not None}
             a, b = node(_id(op, "source")), node(_id(op, "target"))
             if a is None or b is None or a is b:
                 continue
@@ -172,10 +242,35 @@ def apply(campaign: Path, session: str, ops: list[dict]) -> dict:
             edge["toNode"] = b["id"]
             if op.get("toSide") in _SIDES:
                 edge["toSide"] = op["toSide"]
-            # A line, not an arrow: JSON Canvas puts an arrowhead on the
-            # target end unless told otherwise (design §5.2).
-            edge["toEnd"] = "none"
+            if extra.get("fromEnd") == "arrow":
+                edge["fromEnd"] = "arrow"
+            # A line, not an arrow, unless asked: JSON Canvas puts an
+            # arrowhead on the target end unless told otherwise (design §5.2).
+            edge["toEnd"] = extra.get("toEnd", "none")
+            for k in ("color", "label"):
+                if extra.get(k):
+                    edge[k] = extra[k]
             edges.append(edge)
+        elif kind == "set":
+            target_id = _id(op)
+            fields = {k: v for k, v in op.items() if k not in ("op", "id")}
+            for k, v in fields.items():
+                if not any(k in allowed for allowed in _SETTABLE.values()):
+                    raise vault.Invalid(f"The board can't set {k!r}")
+                fields[k] = _field(k, v)
+            line = next((e for e in edges if e.get("id") == target_id), None)
+            target = node(target_id) or line
+            if target is None:
+                continue
+            what = "edge" if target is line else target.get("type")
+            if what not in _SETTABLE or set(fields) - set(_SETTABLE[what]):
+                named = _NAMES.get(what, f"{what} card")
+                raise vault.Invalid(f"The board can't set {', '.join(sorted(fields))} on a {named}")
+            for k, v in fields.items():
+                if v is None or (k == "label" and v == ""):
+                    target.pop(k, None)
+                else:
+                    target[k] = v
         elif kind == "remove":
             gone = alias.get(_id(op), _id(op))
             if gone in by_id:

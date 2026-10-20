@@ -28,4 +28,8 @@
 {#each SIDES as [id, position] (id)}
   <Handle type="source" {id} {position} />
 {/each}
+<!-- The Line tool: a drag from anywhere on the card draws a line. -->
+{#if data.linking}
+  <Handle type="source" id="whole" position={Position.Top} class="whole" />
+{/if}
 <CardFace {data} />

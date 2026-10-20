@@ -208,6 +208,85 @@ def test_bad_operations_are_refused_and_nothing_is_written(camp):
 
 
 # ---------------------------------------------------------------------------
+# The toolbar's cards and lines (docs/roadmap/2026-10-19-command-board-toolbar-design.md)
+# ---------------------------------------------------------------------------
+
+def test_text_cards_and_frames_land_in_obsidians_layout(camp):
+    board.apply(camp, SESSION, [
+        card("a1", "NPCs/Ismark.md"),
+        {"op": "add", "id": "t1", "type": "text", "text": "Ask about the wolves", "x": 300, "y": 0,
+         "width": 200, "height": 200, "color": "#e6c667"},
+        {"op": "add", "id": "g1", "type": "group", "label": "Barovia", "x": -20, "y": -60, "width": 560, "height": 300},
+        {"op": "add", "id": "g2", "type": "group", "x": 0, "y": 400, "width": 100, "height": 100},
+    ])
+    # The frames go before the cards, so Obsidian draws them behind.
+    assert board_text(camp) == (
+        "{\n"
+        '\t"nodes":[\n'
+        '\t\t{"id":"g1","type":"group","x":-20,"y":-60,"width":560,"height":300,"label":"Barovia"},\n'
+        '\t\t{"id":"g2","type":"group","x":0,"y":400,"width":100,"height":100},\n'
+        '\t\t{"id":"a1","type":"file","file":"Strahd/NPCs/Ismark.md","x":0,"y":0,"width":260,"height":180},\n'
+        '\t\t{"id":"t1","type":"text","text":"Ask about the wolves","x":300,"y":0,"width":200,"height":200,"color":"#e6c667"}\n'
+        "\t],\n"
+        '\t"edges":[]\n'
+        "}"
+    )
+
+
+def test_a_line_can_carry_a_label_a_colour_and_arrowheads(camp):
+    view = board.apply(camp, SESSION, [
+        card("a1", "NPCs/Ismark.md"),
+        card("b2", "NPCs/Ireena.md"),
+        {"op": "connect", "id": "e1", "source": "a1", "target": "b2", "label": "her brother",
+         "color": "2", "fromEnd": "arrow", "toEnd": "arrow"},
+    ])
+    assert view["edges"] == [{
+        "id": "e1", "fromNode": "a1", "toNode": "b2", "fromEnd": "arrow", "toEnd": "arrow",
+        "color": "2", "label": "her brother",
+    }]
+
+
+def test_set_changes_or_clears_a_field_and_keeps_the_rest(camp):
+    write(camp / "Sessions" / "Session 1.canvas", OBSIDIAN)
+    board.apply(camp, SESSION, [
+        {"op": "set", "id": "754a8ef995f366bc", "label": "Village of Barovia"},
+        {"op": "set", "id": "6fa11ab87f90b8af", "label": "asks", "toEnd": "none"},
+    ])
+    before, after = OBSIDIAN.split("\n"), board_text(camp).split("\n")
+    assert [i for i, (a, b) in enumerate(zip(before, after, strict=True)) if a != b] == [2, 7]
+    assert '"label":"Village of Barovia"' in after[2]
+    assert after[7].endswith('"toSide":"left","label":"asks","toEnd":"none"}')
+    view = board.apply(camp, SESSION, [
+        {"op": "set", "id": "6fa11ab87f90b8af", "label": None},
+        {"op": "set", "id": "59e896bc8da20699", "text": "Tonight", "color": "#8dceee"},
+        {"op": "set", "id": "gone", "label": "skipped"},
+    ])
+    assert "label" not in view["edges"][0]
+    text = next(n for n in view["nodes"] if n["id"] == "59e896bc8da20699")
+    assert (text["text"], text["color"]) == ("Tonight", "#8dceee")
+
+
+def test_the_toolbars_bad_operations_are_refused_and_nothing_is_written(camp):
+    write(camp / "Sessions" / "Session 1.canvas", OBSIDIAN)
+    for ops in (
+        [{"op": "add", "id": "x1", "type": "shape", "x": 0, "y": 0, "width": 50, "height": 50}],
+        [{"op": "add", "id": "x1", "type": "text", "x": 0, "y": 0, "width": 50, "height": 50}],
+        [{"op": "add", "id": "x1", "type": "text", "text": "x" * (board.MAX_TEXT + 1), "x": 0, "y": 0, "width": 50, "height": 50}],
+        [{"op": "add", "id": "x1", "type": "text", "text": "", "color": "red", "x": 0, "y": 0, "width": 50, "height": 50}],
+        [{"op": "connect", "id": "e2", "source": "8132d4d894c80022", "target": "754a8ef995f366bc", "toEnd": "spear"}],
+        [{"op": "set", "id": "8132d4d894c80022", "color": "1"}],
+        [{"op": "set", "id": "59e896bc8da20699", "label": "a text card has no label"}],
+        [{"op": "set", "id": "59e896bc8da20699", "file": "Strahd/NPCs/Ireena.md"}],
+        [{"op": "set", "id": "59e896bc8da20699", "text": None}],
+    ):
+        with pytest.raises(Invalid):
+            board.apply(camp, SESSION, ops)
+    with pytest.raises(Conflict):
+        board.apply(camp, SESSION, [{"op": "add", "id": "754a8ef995f366bc", "type": "group", "x": 0, "y": 0, "width": 50, "height": 50}])
+    assert board_text(camp) == OBSIDIAN
+
+
+# ---------------------------------------------------------------------------
 # Boards follow the vault
 # ---------------------------------------------------------------------------
 

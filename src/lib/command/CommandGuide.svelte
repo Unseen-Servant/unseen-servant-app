@@ -50,6 +50,20 @@
   </section>
 
   <section class="field">
+    <h3 class="field-title section-title">The board's tools</h3>
+    <p class="field-desc">
+      The toolbar on the board's right edge arranges it before the session.
+      <strong>T</strong> adds a text card and <strong>N</strong> a sticky where
+      you click. <strong>F</strong> draws a frame, which carries the cards
+      inside it when you move it; <strong>&#8984;G</strong> frames the selected
+      cards. <strong>L</strong> draws a line from one card to another. Double-click a text card, a
+      frame's name or a line to write in it. <strong>H</strong> pans over the
+      cards, <strong>V</strong> or <strong>Esc</strong> goes back to selecting,
+      and <strong>&#8984;Z</strong> undoes.
+    </p>
+  </section>
+
+  <section class="field">
     <h3 class="field-title section-title">Session notes</h3>
     <p class="field-desc">
       The bar in the board's corner writes a line into the session note, and
