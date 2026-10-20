@@ -442,7 +442,7 @@ fn warmup_state(raw: Option<&str>) -> StepState {
 
 fn warmup_detail(id: &str, state: StepState) -> Option<String> {
     let text = match (id, state) {
-        ("reranker", StepState::Failed) => "Reranker didn't load. The first search tries again",
+        ("reranker", StepState::Failed) => "Reranker didn't load. Search runs without it",
         ("reranker", StepState::Skipped) => "Reranker is turned off",
         ("spelling", StepState::Failed) => {
             "Spelling vocabulary didn't build. The first search tries again"

@@ -1096,8 +1096,11 @@ def warm_search_stack(get_spell_corrector, report=lambda step, state: None) -> N
     else:
         report("reranker", "running")
         try:
-            rerank_scores("warm", ["warm"])
-            report("reranker", "done")
+            # None is the reranker's fallback signal: the model didn't load.
+            if rerank_scores("warm", ["warm"]) is None:
+                report("reranker", "failed")
+            else:
+                report("reranker", "done")
         except Exception:
             report("reranker", "failed")
     report("spelling", "running")

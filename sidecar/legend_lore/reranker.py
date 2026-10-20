@@ -9,7 +9,8 @@ conditions that contains the word "grappled").
 Runs entirely locally on CPU via ONNX runtime — same shape as the
 existing bge-m3 embedding pipeline. No PyTorch dependency, no API
 calls; the model weights download once on first use and are then
-cached under ``~/.cache/huggingface/``.
+cached under ``FASTEMBED_CACHE_PATH``, which the sidecar points into its
+data dir.
 
 The default is MS-MARCO MiniLM-L-6 with int8 weights (Xenova's
 ``onnx/model_quantized.onnx``, registered below as a fastembed custom

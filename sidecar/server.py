@@ -286,6 +286,11 @@ if __name__ == "__main__":
     data_dir.mkdir(parents=True, exist_ok=True)
     write_port_file(data_dir, actual_port)
 
+    # The reranker's model cache. fastembed defaults to the OS temp dir,
+    # which macOS purges of files unused for 3 days: the purge leaves the
+    # snapshot's symlinks dangling and fastembed never downloads again.
+    os.environ.setdefault("FASTEMBED_CACHE_PATH", str(data_dir / "models"))
+
     # Start parent-death watchdog (daemon thread — won't block exit).
     # POSIX only: on Windows os.kill(pid, 0) sends a CTRL_C_EVENT rather
     # than probing, and the getppid() check never fired there either.

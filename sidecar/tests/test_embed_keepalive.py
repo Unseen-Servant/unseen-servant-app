@@ -148,6 +148,18 @@ def test_warm_search_stack_reports_each_step(monkeypatch):
     ]
 
 
+def test_warm_search_stack_reports_a_reranker_that_did_not_load(monkeypatch):
+    """rerank_scores swallows a failed load and returns None, so the lamp
+    reads the None rather than waiting for an exception that never comes."""
+    monkeypatch.delenv("RERANK_DISABLED", raising=False)
+    monkeypatch.setattr(service, "rerank_scores", lambda query, docs: None)
+    reports = []
+
+    warm_search_stack(lambda: None, report=lambda step, state: reports.append((step, state)))
+
+    assert reports[:2] == [("reranker", "running"), ("reranker", "failed")]
+
+
 def test_warm_search_stack_reports_failures_and_skips(monkeypatch):
     monkeypatch.setenv("RERANK_DISABLED", "1")
 
