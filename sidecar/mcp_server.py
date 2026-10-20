@@ -272,7 +272,9 @@ mcp = MCPServer(
         "describing them — never invent what a note says.\n"
         "- create_note() writes new material into a track, or onto the shelf "
         "when it isn't clear where it belongs, and edit_note() corrects a "
-        "note's text with the hash read_note() shows.\n"
+        "note's text with the hash read_note() shows. move_note() files a "
+        "note on another track, and create_track() makes a track for a kind "
+        "of material the campaign will keep using.\n"
         "- To prep a session: create_session() starts the next one and opens "
         "it in the app, or set_active_session() opens one that exists. Then "
         "create_beat(session=) makes each scene from notes already written, "
@@ -698,6 +700,21 @@ def _in_folder_order(index: dict, notes: list[dict], track: str) -> list[dict]:
     return sorted(notes, key=key)
 
 
+def _track(index: dict, track: str) -> tuple[str | None, str | None]:
+    """The track ``track`` means, in any case, as its folder is named, or
+    "Shelf"; or the message saying why not."""
+    wanted = track.strip().casefold()
+    if wanted == "shelf":
+        return "Shelf", None
+    folder = next((t for t in index["tracks"] if t.casefold() == wanted), None)
+    if folder is None:
+        return None, (
+            f'{index["name"]} has no track named "{track}". Its tracks: '
+            f'{", ".join(index["tracks"])}, or "Shelf"; create_track() makes another.'
+        )
+    return folder, None
+
+
 def _names(notes: list[dict]) -> str:
     return ", ".join(n["name"] + (" (spent)" if n.get("spent") else "") for n in notes) or "(empty)"
 
@@ -919,34 +936,49 @@ async def edit_note(name: str, content: str, hash: str, campaign: str | None = N
     return f"Saved {entry['path']} in {index['name']}.\nhash: {saved['hash']}"
 
 
+# How many notes find_notes lists before it says the list is cut.
+FIND_LIMIT = 20
+
+
 @mcp.tool()
 async def find_notes(query: str, campaign: str | None = None, track: str | None = None) -> str:
-    """Find the GM's notes whose name or text mentions something.
+    """Find the GM's notes whose name or text mentions something, names
+    first, each with a line of its text. campaign_overview() lists every
+    note by name.
 
     Args:
         query: Words to look for, matched case-insensitively.
         campaign: A campaign name; defaults to the one open in the app.
         track: Only notes in this track (e.g. "NPCs").
     """
+    if not query.strip():
+        return "Give find_notes() words to look for. campaign_overview() lists every note by name."
     index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    data = await sidecar.get(f"/api/command/find?{_q(campaign=index['name'], query=query, track=track)}")
+    shown = FIND_LIMIT
+    data = await sidecar.get(
+        f"/api/command/find?{_q(campaign=index['name'], query=query, track=track, limit=str(shown + 1))}"
+    )
     if isinstance(data, str):
         return data
     notes = data.get("notes", [])
     if not notes:
         return f'No note in {index["name"]} mentions "{query}".'
     lines = [f'Notes in {index["name"]} mentioning "{query}":']
-    for n in notes:
+    for n in notes[:shown]:
         snippet = f" — {n['snippet']}" if n.get("snippet") else ""
         lines.append(f"  - {n['name']} ({n['path']}){snippet}")
+    if len(notes) > shown:
+        lines.append(f"(The first {shown} only: narrow the words, or pass track=.)")
     return "\n".join(lines)
 
 
 @mcp.tool()
 async def create_note(track: str, name: str, content: str = "", campaign: str | None = None) -> str:
     """Write a new note into one of the campaign's tracks, or onto its shelf.
+    When no track fits, create_track() makes one for a kind of material
+    the campaign will keep using; else use the shelf.
 
     Args:
         track: The track (folder) it belongs to, e.g. "NPCs" or "Secrets";
@@ -959,19 +991,70 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
     index, _ctx, error = await _campaign_index(campaign)
     if error:
         return error
-    if track not in index["tracks"] and track.casefold() != "shelf":
-        return (
-            f'{index["name"]} has no track named "{track}". '
-            f'Its tracks: {", ".join(index["tracks"])}, or "Shelf".'
-        )
+    folder, error = _track(index, track)
+    if error:
+        return error
     if taken := _taken(index, name, "note"):
         return taken
     made = await sidecar.post("/api/command/notes", {
-        "campaign": index["name"], "folder": track, "name": name, "content": content,
+        "campaign": index["name"], "folder": folder, "name": name, "content": content,
     })
     if isinstance(made, str):
         return made
     return f"Created {made['path']} in {index['name']}."
+
+
+@mcp.tool()
+async def create_track(name: str, campaign: str | None = None) -> str:
+    """Make a new track, a folder of notes of one kind, at the end of the
+    campaign's tracks: for material the campaign will keep using that no
+    track fits (Factions, say). Then create_note() or move_note() files
+    notes on it.
+
+    Args:
+        name: The track's name.
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    have = next((t for t in index["tracks"] if t.casefold() == name.strip().casefold()), None)
+    if have:
+        return f'{index["name"]} has a track named "{have}" already.'
+    made = await sidecar.post("/api/command/tracks", {"campaign": index["name"], "name": name})
+    if isinstance(made, str):
+        return made
+    return f"Created the track {made['name']} in {index['name']}. Its tracks: {', '.join([*index['tracks'], made['name']])}."
+
+
+@mcp.tool()
+async def move_note(name: str, track: str, campaign: str | None = None) -> str:
+    """Move a note to another track, or between a track and the shelf.
+    Links that name it by its path follow it; its name doesn't change.
+    create_track() makes a track first when none fits.
+
+    Args:
+        name: The note's name, or its path when the name is shared.
+        track: The track it goes to, or "Shelf".
+        campaign: A campaign name; defaults to the one open in the app.
+    """
+    index, _ctx, error = await _campaign_index(campaign)
+    if error:
+        return error
+    entry, error = _note(index, name, "note")
+    if error:
+        return error
+    folder, error = _track(index, track)
+    if error:
+        return error
+    if (entry["track"] or "").casefold() == folder.casefold() and entry["group"] is None:
+        return f"{entry['name']} is in {entry['track']} already."
+    moved = await sidecar.post("/api/command/notes/move", {
+        "campaign": index["name"], "path": entry["path"], "folder": folder,
+    })
+    if isinstance(moved, str):
+        return moved
+    return f"Moved {entry['name']} to {moved['path']} in {index['name']}."
 
 
 @mcp.tool()
@@ -1183,11 +1266,13 @@ async def plan_beat(
 
 
 @mcp.tool()
-async def add_to_live_set(name: str, campaign: str | None = None) -> str:
-    """Put a note in play at the table, beside whatever is live already.
+async def add_to_live_set(name: str, live: bool = True, campaign: str | None = None) -> str:
+    """Put a note in play at the table, beside whatever is live already, or
+    take it out of play.
 
     Args:
         name: The note's name, or its path when the name is shared.
+        live: False to take the note out of play.
         campaign: A campaign name; defaults to the one open in the app.
     """
     index, _ctx, error = await _campaign_index(campaign)
@@ -1196,12 +1281,13 @@ async def add_to_live_set(name: str, campaign: str | None = None) -> str:
     entry, error = _note(index, name, "note")
     if error:
         return error
-    live = await sidecar.post("/api/command/live/note", {
-        "campaign": index["name"], "note": entry["path"], "live": True,
+    data = await sidecar.post("/api/command/live/note", {
+        "campaign": index["name"], "note": entry["path"], "live": live,
     })
-    if isinstance(live, str):
-        return live
-    return f"{entry['name']} is live: {len(live['notes'])} note(s) in play."
+    if isinstance(data, str):
+        return data
+    state = "live" if live else "out of play"
+    return f"{entry['name']} is {state}: {len(data['notes'])} note(s) in play."
 
 
 @mcp.tool()

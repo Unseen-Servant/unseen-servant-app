@@ -451,7 +451,9 @@ def free_name(campaign: Path, wanted: str) -> str:
 
 def find_notes(campaign: Path, query: str, track: str | None = None, limit: int = 20) -> list[dict]:
     """Notes whose name or text holds ``query`` (case-insensitive): names
-    first, each with a line of context from the text."""
+    first, each with a line of context from the text below the frontmatter:
+    around the match, else the text's opening. The frontmatter is searched
+    too, so a beat holding a note is found by the note's name."""
     q = query.strip().casefold()
     if not q:
         return []
@@ -465,10 +467,14 @@ def find_notes(campaign: Path, query: str, track: str | None = None, limit: int 
         except UnicodeDecodeError:
             text = ""
         at = text.casefold().find(q)
-        snippet = ""
-        if at >= 0:
-            start = max(0, at - 60)
-            snippet = " ".join(text[start:at + len(q) + 80].split())
+        fence = _FRONTMATTER.match(text)
+        body = text[fence.end():] if fence else text
+        in_body = body.casefold().find(q)
+        if in_body >= 0:
+            start = max(0, in_body - 60)
+            snippet = " ".join(body[start:in_body + len(q) + 80].split())
+        else:
+            snippet = " ".join(body[:140].split())
         hit = {**asdict(entry), "snippet": snippet}
         if q in entry.name.casefold():
             named.append(hit)

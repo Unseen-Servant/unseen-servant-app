@@ -18,7 +18,7 @@ from command import events, prep
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
-COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend", "connect_cards", "frame_cards", "add_text", "arrange_board"}
+COMMAND = {"campaign_overview", "current_session", "live_set", "read_note", "find_notes", "create_note", "edit_note", "create_beat", "add_to_beat", "set_active_session", "create_session", "plan_beat", "add_to_live_set", "spend", "connect_cards", "frame_cards", "add_text", "arrange_board", "create_track", "move_note"}
 
 
 @pytest.fixture
@@ -158,6 +158,18 @@ def test_read_and_find_notes(strahd):
         "  - Ismark", "  - Ambush", "  - Village of Barovia",
     ]
     assert run(mcp_server.find_notes("zzz")) == 'No note in Strahd mentions "zzz".'
+    assert run(mcp_server.find_notes(" ")) == (
+        "Give find_notes() words to look for. campaign_overview() lists every note by name."
+    )
+
+
+def test_find_notes_says_when_it_lists_only_the_first(strahd, app, monkeypatch):
+    monkeypatch.setattr(mcp_server, "FIND_LIMIT", 2)
+    assert run(mcp_server.find_notes("ismark")).splitlines()[1:] == [
+        "  - Ismark (NPCs/Ismark.md) — Son of the burgomaster. Protects [[Ireena]].",
+        "  - Ambush (Beats/Ambush.md)",
+        "(The first 2 only: narrow the words, or pass track=.)",
+    ]
 
 
 def test_create_note_only_in_a_track(strahd):
@@ -170,6 +182,26 @@ def test_create_note_only_in_a_track(strahd):
         'it\'s there: read_note("NPCs/Doru.md"). Otherwise pick another name.'
     )
     assert run(mcp_server.create_note("NPCs", "Doru/Son")) == "A name can't contain /"
+    assert run(mcp_server.create_note("npcs", "Kasimir")) == "Created NPCs/Kasimir.md in Strahd."
+
+
+def test_create_track_then_move_a_note_onto_it(strahd, app):
+    assert run(mcp_server.create_track("Factions")) == (
+        "Created the track Factions in Strahd. Its tracks: PCs, Secrets, Locations, NPCs, Monsters, Traps, "
+        "Treasures, Factions."
+    )
+    assert run(mcp_server.create_track("factions")) == 'Strahd has a track named "Factions" already.'
+    assert run(mcp_server.create_track("Beats")) == "'Beats' is reserved for Command's own notes"
+    # A link by path follows the note; the beat that holds it still does.
+    village = strahd / "Strahd" / "Locations" / "Village of Barovia.md"
+    village.write_text("Where [[NPCs/Ismark]] waits.\n")
+    assert run(mcp_server.move_note("Ismark", "factions")) == "Moved Ismark to Factions/Ismark.md in Strahd."
+    assert village.read_text() == "Where [[Factions/Ismark]] waits.\n"
+    assert "Ismark (Factions), Village of Barovia (Locations)" in run(mcp_server.current_session())
+    assert run(mcp_server.move_note("Ismark", "Factions")) == "Ismark is in Factions already."
+    assert run(mcp_server.move_note("Ismark", "shelf")) == "Moved Ismark to Shelf/Ismark.md in Strahd."
+    assert run(mcp_server.move_note("Ismark", "Beats")).startswith('Strahd has no track named "Beats"')
+    assert run(mcp_server.move_note("Ambush", "NPCs")).startswith('No note named "Ambush"')
 
 
 def test_create_beat_holds_notes_and_joins_a_plan(strahd):
@@ -324,6 +356,8 @@ def test_play_from_mcp_live_set_and_spend(strahd, app):
     assert run(mcp_server.add_to_live_set("Ireena", campaign="Strahd")).startswith('"Ireena" names more')
     assert run(mcp_server.add_to_live_set("NPCs/Ireena")) == "Ireena is live: 1 note(s) in play."
     assert run(mcp_server.live_set()) == "Live in Strahd:\n\n## Ireena (NPCs/Ireena.md)\nBitten twice."
+    assert run(mcp_server.add_to_live_set("Ismark")) == "Ismark is live: 2 note(s) in play."
+    assert run(mcp_server.add_to_live_set("NPCs/Ireena", live=False)) == "Ireena is out of play: 1 note(s) in play."
     assert run(mcp_server.spend("Ismark")) == "Ismark is spent (2026-10-18)."
     assert run(mcp_server.spend("Ismark", spent=False)) == "Ismark is unspent."
 

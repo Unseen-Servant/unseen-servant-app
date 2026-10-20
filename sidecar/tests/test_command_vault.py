@@ -477,6 +477,10 @@ def test_find_notes_puts_names_before_text_and_quotes_the_text(camp):
     found = vault.find_notes(camp, "ismark")
     assert [n["name"] for n in found] == ["Ismark", "Ambush", "Village of Barovia", "Ireena"]
     assert found[3]["snippet"] == "Sister of [[Ismark]]."
+    # The line comes from the text, though the frontmatter is searched.
+    assert [n["snippet"] for n in vault.find_notes(camp, "ally")] == ["Brother of [[Ireena]]."]
+    assert vault.find_notes(camp, "wachter")[0]["snippet"] == ""
+    assert vault.find_notes(camp, "wolves")[0]["snippet"] == ""
     assert [n["name"] for n in vault.find_notes(camp, "ISMARK", track="Locations")] == ["Village of Barovia"]
     assert vault.find_notes(camp, "  ") == []
 

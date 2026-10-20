@@ -1,6 +1,6 @@
 # Command MCP tools: audit and recommendations (2026-10-18)
 
-**Status:** settled; being built in the order of §5. Step 1, removing the session log, landed in 8dd0673. §1 and §2 record the tools as they were on 2026-10-18.
+**Status:** settled; being built in the order of §5. Step 1, removing the session log, landed in 8dd0673; steps 2–6 followed by 2026-10-20, and step 7, `cite_section`, is last. §1 and §2 record the tools as they were on 2026-10-18.
 
 Draft 1 was by the main session; draft 2 was the critic's revision; this version folds in the owner's answers:
 - **Sessions:** the agent can open a session in the app (`set_active_session`), and `create_session` opens what it creates.
@@ -87,7 +87,7 @@ Dispositions: **KEEP** · **CHANGE** (an existing tool) · **ADD** · **DEFER** 
 
 #### A2. Notes
 - **A2.1 CHANGE** `read_note`: add a `hash:` line under the header. The route already returns the hash, and the tool drops it. `edit_note` needs it.
-- **A2.2 CHANGE** `find_notes`:
+- **A2.2 CHANGE** `find_notes` (built 2026-10-20; a note found by its name alone shows its text's opening):
   - Take the snippet from the body. Matching still covers the frontmatter, which is how `find_notes("Ismark")` finds the beats that hold Ismark.
   - At 20 hits, say the list is cut and to narrow the query.
   - An empty query points to `campaign_overview`. *Fixes E7.*

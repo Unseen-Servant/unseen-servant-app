@@ -501,8 +501,8 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         return {"path": path}
 
     @router.get("/find")
-    def find(campaign: str, query: str, track: str | None = None):
-        return {"notes": vault.find_notes(campaign_path(campaign), query, track)}
+    def find(campaign: str, query: str, track: str | None = None, limit: int = 20):
+        return {"notes": vault.find_notes(campaign_path(campaign), query, track, limit)}
 
     @router.post("/send")
     def send(body: Send):
