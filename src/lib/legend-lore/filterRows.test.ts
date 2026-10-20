@@ -13,11 +13,12 @@ function input(over: Partial<FilterRowsInput> = {}): FilterRowsInput {
 }
 
 describe('computeFilterRows', () => {
-  it('always offers the Hidden-items header and its two unconditional rows', () => {
+  it('always offers the Hidden-items header and its three unconditional rows', () => {
     expect(computeFilterRows(input()).map(r => r.key)).toEqual([
       'sect:view',
       'view:hideUnindexed',
       'view:hideOutOfScope',
+      'view:hideImages',
     ]);
   });
 
@@ -82,6 +83,7 @@ describe('computeFilterRows', () => {
       'view:showHidden',
       'view:hideUnindexed',
       'view:hideOutOfScope',
+      'view:hideImages',
     ]);
   });
 
@@ -137,7 +139,7 @@ describe('computeFilterRows', () => {
 
 describe('stepFilterRow', () => {
   const rows = computeFilterRows(input({ hasHidden: true }));
-  // rows: sect:view, view:showHidden, view:hideUnindexed, view:hideOutOfScope
+  // rows: sect:view, view:showHidden, view:hideUnindexed, view:hideOutOfScope, view:hideImages
 
   it('returns null for an empty row list', () => {
     expect(stepFilterRow([], null, 1)).toBeNull();
@@ -148,7 +150,7 @@ describe('stepFilterRow', () => {
   });
 
   it('enters at the last row when moving up from nothing', () => {
-    expect(stepFilterRow(rows, null, -1)).toBe('view:hideOutOfScope');
+    expect(stepFilterRow(rows, null, -1)).toBe('view:hideImages');
   });
 
   it('moves down one row', () => {
@@ -160,7 +162,7 @@ describe('stepFilterRow', () => {
   });
 
   it('clamps at the bottom rather than wrapping', () => {
-    expect(stepFilterRow(rows, 'view:hideOutOfScope', 1)).toBe('view:hideOutOfScope');
+    expect(stepFilterRow(rows, 'view:hideImages', 1)).toBe('view:hideImages');
   });
 
   it('clamps at the top rather than wrapping', () => {

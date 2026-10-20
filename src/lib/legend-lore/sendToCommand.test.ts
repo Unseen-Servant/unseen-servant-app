@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sentNote } from './sendToCommand';
+import { sentNote, targetsFor } from './sendToCommand';
 import type { SearchResultItem } from './types';
 
 const hit = (over: Partial<SearchResultItem> = {}): SearchResultItem => ({
@@ -37,5 +37,13 @@ describe('sentNote', () => {
     expect(note.name).toBe('Dragonbane Monsters');
     expect(note.source).toBe('file:///Books/Dragonbane%20Monsters.pdf');
     expect(note.cite).toBe('Dragonbane Monsters');
+  });
+});
+
+describe('targetsFor', () => {
+  it('offers a note the note tracks and an image the image tracks', () => {
+    const targets = { campaign: 'Strahd', tracks: ['NPCs', 'Maps', 'Loot'], kinds: { NPCs: 'note', Maps: 'image' } as const };
+    expect(targetsFor(targets, 'note').tracks).toEqual(['NPCs', 'Loot']);
+    expect(targetsFor(targets, 'image').tracks).toEqual(['Maps']);
   });
 });

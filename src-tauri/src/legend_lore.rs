@@ -19,7 +19,22 @@ pub struct FileItem {
     name: String,
     path: String,
     is_dir: bool,
+    /// A picture in the library (images design §6): listed beside the books
+    /// for Send to Command, never indexed.
+    #[serde(default)]
+    is_image: bool,
     children: Option<Vec<FileItem>>,
+}
+
+/// What the tree lists as a picture: the image types Command takes.
+const IMAGE_EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+
+pub(crate) fn is_image_name(name: &str) -> bool {
+    !name.starts_with('.')
+        && Path::new(name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| IMAGE_EXTENSIONS.contains(&e.to_lowercase().as_str()))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -385,12 +400,14 @@ pub fn list_files(folder_path: String) -> Result<Vec<FileItem>, String> {
         let name = entry.file_name().to_string_lossy().into_owned();
         let path = ui_path(&folder.join(&name));
         let is_pdf = !is_dir && name.to_lowercase().ends_with(".pdf");
+        let is_image = !is_dir && is_image_name(&name);
 
-        if is_dir || is_pdf {
+        if is_dir || is_pdf || is_image {
             items.push(FileItem {
                 name,
                 path,
                 is_dir,
+                is_image,
                 children: None,
             });
         }
@@ -1328,7 +1345,14 @@ mod tests {
     #[test]
     fn list_files_puts_folders_first_then_sorts_case_insensitively() {
         let dir = scratch_dir("list-files-order");
-        for f in ["b.PDF", "a.pdf", "notes.txt", ".DS_Store"] {
+        for f in [
+            "b.PDF",
+            "a.pdf",
+            "notes.txt",
+            ".DS_Store",
+            "Map.JPG",
+            ".hidden.png",
+        ] {
             fs::write(dir.join(f), b"").unwrap();
         }
         for d in ["Zeta", "alpha"] {
@@ -1337,14 +1361,20 @@ mod tests {
 
         let items = list_files(dir.to_string_lossy().into_owned()).unwrap();
 
-        let names: Vec<(&str, bool)> = items.iter().map(|i| (i.name.as_str(), i.is_dir)).collect();
+        // Images are listed beside the books, marked; other files and
+        // hidden ones aren't.
+        let names: Vec<(&str, bool, bool)> = items
+            .iter()
+            .map(|i| (i.name.as_str(), i.is_dir, i.is_image))
+            .collect();
         assert_eq!(
             names,
             vec![
-                ("alpha", true),
-                ("Zeta", true),
-                ("a.pdf", false),
-                ("b.PDF", false)
+                ("alpha", true, false),
+                ("Zeta", true, false),
+                ("a.pdf", false, false),
+                ("b.PDF", false, false),
+                ("Map.JPG", false, true)
             ]
         );
         assert_eq!(items[2].path, ui_path(&dir.join("a.pdf")));

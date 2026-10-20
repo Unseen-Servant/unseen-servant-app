@@ -163,9 +163,13 @@ pub struct LiveSet {
 pub struct SendTargets {
     campaign: Option<String>,
     tracks: Vec<String>,
+    /// Each track's kind: a hit goes to a note track, an image to an image
+    /// track (images design §3.2).
+    kinds: std::collections::BTreeMap<String, String>,
 }
 
-/// A hit kept as a note: the campaign it went to and the note's path.
+/// What Send to Command kept, a hit as a note or an image from the tree:
+/// the campaign it went to and its path there.
 #[derive(Serialize, Debug)]
 pub struct Sent {
     campaign: String,
@@ -833,11 +837,13 @@ pub async fn command_send_targets(
     #[derive(Deserialize)]
     struct Tracks {
         tracks: Vec<String>,
+        kinds: std::collections::BTreeMap<String, String>,
     }
     let Some(campaign) = state.campaign() else {
         return Ok(SendTargets {
             campaign: None,
             tracks: Vec::new(),
+            kinds: Default::default(),
         });
     };
     let found: Tracks =
@@ -845,6 +851,7 @@ pub async fn command_send_targets(
     Ok(SendTargets {
         campaign: Some(campaign),
         tracks: found.tracks,
+        kinds: found.kinds,
     })
 }
 
@@ -908,6 +915,30 @@ async fn post_image(
     }
     let added: AtPath = answer(client().post(api_query("/images", &params)?).body(bytes)).await?;
     Ok(added.path)
+}
+
+/// Send an image from Legend Lore's tree to the open campaign (images
+/// design §6): copied into `track`, an image track, or onto its shelf when
+/// there's none, since the campaign is the unit. Like Send to Command for
+/// a hit, the one crossing between the tools' windows (architecture D4).
+#[tauri::command]
+pub async fn command_send_image(
+    state: tauri::State<'_, AppContext>,
+    track: Option<String>,
+    path: String,
+) -> Result<Sent, String> {
+    let campaign = state
+        .campaign()
+        .ok_or_else(|| "Open a campaign in Command first".to_string())?;
+    let file = std::path::Path::new(&path);
+    let name = file
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .filter(|n| crate::legend_lore::is_image_name(n))
+        .ok_or_else(|| format!("{} isn't an image", path))?;
+    let bytes = std::fs::read(file).map_err(|e| format!("Can't read {}: {}", name, e))?;
+    let path = post_image(&campaign, &name, track.as_deref(), bytes).await?;
+    Ok(Sent { campaign, path })
 }
 
 /// Add images to an image track (images design §4), picked with the native

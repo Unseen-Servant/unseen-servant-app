@@ -256,7 +256,7 @@
   }
 
   function entryToFileItem(entry: FileStatusEntry): FileItem {
-    return { name: entry.filename, path: entry.path, is_dir: false, children: null };
+    return { name: entry.filename, path: entry.path, is_dir: false, is_image: false, children: null };
   }
 
   function handleRowClick(

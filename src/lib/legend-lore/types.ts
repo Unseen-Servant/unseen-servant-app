@@ -2,6 +2,9 @@ export interface FileItem {
   name: string;
   path: string;
   is_dir: boolean;
+  /** A picture in the library (images design §6): listed for Send to
+   *  Command, never indexed, scoped or collected. */
+  is_image: boolean;
   children: FileItem[] | null;
 }
 

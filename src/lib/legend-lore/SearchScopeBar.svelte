@@ -25,6 +25,7 @@
   export let showHidden: boolean = false;
   export let hideOutOfScope: boolean = false;
   export let hideUnindexed: boolean = false;
+  export let hideImages: boolean = false;
   export let resultCount: number = 0;
   export let indexedFileCount: number = 0;
   // Master bypass. The row is the readout for what narrows a search, so
@@ -34,7 +35,7 @@
   export let onToggleBypass: () => void = () => {};
 
   // Only the narrowings bypass actually suppresses. The lens chips
-  // (hidden items, focus lens, indexed-only) are display filters that
+  // (hidden items, focus lens, indexed-only, images hidden) are display filters that
   // bypass leaves alone, so they must not summon a switch that would do
   // nothing to them.
   // Bypassed counts as bypassable so the switch can be thrown back — the
@@ -62,6 +63,7 @@
   export let onToggleShowHidden: () => void = () => {};
   export let onToggleHideOutOfScope: () => void = () => {};
   export let onToggleHideUnindexed: () => void = () => {};
+  export let onToggleHideImages: () => void = () => {};
 
   const CURATION_LABELS: Record<CurationKey, string> = {
     collected: 'In a collection',
@@ -309,6 +311,19 @@
         aria-label="Show unindexed items again"
       >
         <span class="chip-label">indexed only</span>
+        <span class="chip-clear" aria-hidden="true">×</span>
+      </button>
+    {/if}
+
+    {#if hideImages}
+      <button
+        type="button"
+        class="chip images-hidden"
+        on:click|stopPropagation={onToggleHideImages}
+        title="Show the library's images again"
+        aria-label="Show the library's images again"
+      >
+        <span class="chip-label">images hidden</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
@@ -561,7 +576,8 @@
      rule rather than a reused class name — "lens-on" would misname the
      unindexed chip, which is not the focus lens. */
   .chip.lens-on,
-  .chip.indexed-only {
+  .chip.indexed-only,
+  .chip.images-hidden {
     border-color: color-mix(in srgb, var(--text-active) 35%, transparent);
     color: var(--text-active);
   }

@@ -94,9 +94,10 @@ export function isIndexedRowOutOfScope(
 // hidden-paths rule (descendants of a hidden ancestor stay hidden unless
 // `showHidden` is on), the "Hide unindexed items" switch (rows the
 // library knows nothing about are skipped when `library.hideUnindexed`
-// is on), and the focus lens (out-of-scope subtrees are skipped entirely
-// when `scope.hideOutOfScope` is on). Order matches the rendered DOM
-// order, so consecutive rows here are visually adjacent.
+// is on), the focus lens (out-of-scope subtrees are skipped entirely
+// when `scope.hideOutOfScope` is on), and "Hide images" (the pictures
+// listed beside the books, skipped when `hideImages` is on). Order matches
+// the rendered DOM order, so consecutive rows here are visually adjacent.
 export function computeVisibleRows(
   files: FileItem[],
   expandedPaths: Set<string>,
@@ -105,11 +106,13 @@ export function computeVisibleRows(
   showHidden: boolean,
   scope: ScopeVisibility | null = null,
   library: LibraryKnowledge | null = null,
+  hideImages = false,
 ): VisibleRow[] {
   const out: VisibleRow[] = [];
 
   function walk(item: FileItem, level: number, parentPath: string | null) {
     if (displayPaths !== null && !displayPaths.has(item.path)) return;
+    if (hideImages && item.is_image) return;
     const hiddenByUser = isPathOrAncestorIn(item.path, hiddenPaths);
     if (hiddenByUser && !showHidden) return;
     if (library?.hideUnindexed && !rowHasLibraryMaterial(item.path, item.is_dir, library)) return;
@@ -143,6 +146,6 @@ export function visibleFileSpan(rows: VisibleRow[], anchor: string, current: str
   if (a === -1 || b === -1) return null;
   return rows
     .slice(Math.min(a, b), Math.max(a, b) + 1)
-    .filter((r) => !r.item.is_dir)
+    .filter((r) => !r.item.is_dir && !r.item.is_image)
     .map((r) => r.path);
 }

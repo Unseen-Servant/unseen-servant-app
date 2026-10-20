@@ -321,7 +321,8 @@ def test_the_context_keeps_the_newest_push(cmd):
 
 
 def test_tracks_find_and_send_over_http(cmd):
-    assert cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()["tracks"][:2] == ["PCs", "Secrets"]
+    tracks = cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()
+    assert tracks["tracks"][:2] == ["PCs", "Secrets"] and tracks["kinds"]["PCs"] == "note"
     made = cmd.post("/api/command/notes", json={
         "campaign": "Strahd", "folder": "NPCs", "name": "Ismark", "content": "Brother of Ireena.\n",
     }).json()

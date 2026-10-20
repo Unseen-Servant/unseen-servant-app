@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { filterTree, filterWords, markName, markPath, nameMatches, pathMatches } from './nameFilter';
 import type { FileItem } from './types';
 
-const file = (path: string): FileItem => ({ name: path.split('/').pop()!, path, is_dir: false, children: null });
-const dir = (path: string, children: FileItem[]): FileItem => ({ name: path.split('/').pop()!, path, is_dir: true, children });
+const file = (path: string): FileItem => ({ name: path.split('/').pop()!, path, is_dir: false, is_image: false, children: null });
+const dir = (path: string, children: FileItem[]): FileItem => ({ name: path.split('/').pop()!, path, is_dir: true, is_image: false, children });
 
 describe('filterWords', () => {
   test('lowercased words, blanks dropped', () => {

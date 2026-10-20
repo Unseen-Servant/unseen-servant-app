@@ -5,11 +5,11 @@ import { computeVisibleRows, indexOfPath, visibleFileSpan, isRowOutOfScope, isIn
 // --- Helpers (mirroring selectionUtils.test.ts style) ---
 
 function file(name: string, parentPath: string): FileItem {
-  return { name, path: `${parentPath}/${name}`, is_dir: false, children: null };
+  return { name, path: `${parentPath}/${name}`, is_dir: false, is_image: /\.(png|jpe?g|gif|webp|svg)$/i.test(name), children: null };
 }
 
 function folder(name: string, parentPath: string, children: FileItem[] | null): FileItem {
-  return { name, path: `${parentPath}/${name}`, is_dir: true, children };
+  return { name, path: `${parentPath}/${name}`, is_dir: true, is_image: false, children };
 }
 
 // --- Test trees ---
@@ -92,6 +92,15 @@ describe('computeVisibleRows', () => {
   it('does not descend into a collapsed folder even if children are loaded', () => {
     const rows = computeVisibleRows(flatTree(), new Set(), null, new Set(), false);
     expect(rows).toHaveLength(1);
+  });
+
+  it('lists the library\'s images beside the books, and leaves them out with Hide images', () => {
+    const tree = [folder('A', '/root', [file('a.pdf', '/root/A'), file('map.png', '/root/A')])];
+    const paths = (hideImages: boolean) =>
+      computeVisibleRows(tree, new Set(['/root/A']), null, new Set(), false, null, null, hideImages).map((r) => r.path);
+    expect(paths(false)).toEqual(['/root/A', '/root/A/a.pdf', '/root/A/map.png']);
+    // The tree as it was before it listed images: the folder stays.
+    expect(paths(true)).toEqual(['/root/A', '/root/A/a.pdf']);
   });
 
   describe('displayPaths filter', () => {
@@ -449,5 +458,13 @@ describe('visibleFileSpan', () => {
   it('returns null when the anchor is no longer visible', () => {
     const rows = computeVisibleRows(flatTree(), expanded, null, new Set(['/root/A/a.pdf']), false);
     expect(visibleFileSpan(rows, '/root/A/a.pdf', '/root/A/c.pdf')).toBeNull();
+  });
+});
+
+describe('visibleFileSpan and images', () => {
+  it('leaves an image out of a shift-range: it is never indexed', () => {
+    const tree = [folder('A', '/root', [file('a.pdf', '/root/A'), file('map.png', '/root/A'), file('c.pdf', '/root/A')])];
+    const rows = computeVisibleRows(tree, new Set(['/root/A']), null, new Set(), false);
+    expect(visibleFileSpan(rows, '/root/A/a.pdf', '/root/A/c.pdf')).toEqual(['/root/A/a.pdf', '/root/A/c.pdf']);
   });
 });

@@ -1,6 +1,6 @@
 # Command images (2026-10-20)
 
-**Status:** settled 2026-10-20 (§12). Steps 1–3 built 2026-10-20 (#407, images as clips, image tracks); step 4 to come. Extends [#407](https://github.com/Unseen-Servant/unseen-servant-app/issues/407), phase 3b of the [Command design](2026-10-11-command-design.md) (§9), and lifts two of its exclusions (§8).
+**Status:** settled 2026-10-20 (§12). Steps 1–4 built 2026-10-20 (#407, images as clips, image tracks, Legend Lore's images). Extends [#407](https://github.com/Unseen-Servant/unseen-servant-app/issues/407), phase 3b of the [Command design](2026-10-11-command-design.md) (§9), and lifts two of its exclusions (§8).
 
 ## 0. TL;DR
 
@@ -98,15 +98,15 @@ Curse of Strahd/
   - never dimmed out of scope (`isRowOutOfScope` already asks for indexed material).
 - **Opening:** a double-click opens it in the system viewer, as a PDF opens.
 - **Its menu** keeps what acts on the file itself, and adds Send to Command. Indexing, stats, collections and system tags don't show.
-- **Send to Command** is a hit's submenu: Shelf, then the open campaign's tracks. Rust's `command_send_image(track, path)` asks the sidecar's `POST /send-image`, which copies the file (image types only, numbered on a clash with `free_name`) and answers with its path. Command hears of it from the watcher.
+- **Send to Command** is a hit's submenu: Shelf, then the open campaign's tracks of the matching kind, image tracks for an image and note tracks for a hit (§3.2). *As built:* Rust's `command_send_image(track, path)` reads the file (image types only) and posts its bytes to the sidecar's `POST /images`, the route a Finder drop uses, which copies it in, numbered on a clash. Command hears of it from the watcher.
 - **No thumbnails** in the tree, so the asset protocol's scope stays the campaigns folder, and the library is never served to the webview.
 - **Hide images**, a row in the filter panel's *Hidden items* section after *Hide out-of-scope items*, takes them out of the tree, for a library whose token packs would bury the books. It's a lens checkbox like its neighbours:
   - Off by default, so images show.
   - Kept in the panel's store as `hideImages`, beside `hideUnindexed`.
   - It lights the section's lamp while folded, and the panel's reset clears it.
-  - It's a row for J/K (`view:hideImages` in `filterRows.ts`).
-  - A folder holding only images hides with them.
-- ***Hide unindexed items* leaves images alone.** An image is never indexed, so that switch would otherwise hide every one. It goes on meaning books the library knows nothing about, and *Hide images* alone hides images. A folder holding images stays while they show.
+  - It's a row for J/K (`view:hideImages` in `filterRows.ts`), and the scope bar shows an *images hidden* chip while it's on, as it does for the other view switches.
+  - *As built, simplified:* it hides image rows and nothing else, so with it on the tree is as it was before it listed images. Hiding a folder that holds only images would need the whole library walked, which the tree does only for the `/` filter.
+- ***Hide unindexed items* hides images too**, as built: an image is never indexed, so it's an unindexed item. *Hide images* hides them alone. (The design had the switch leave images alone, which needs the same walk to know which folders hold images.)
 
 ## 7. MCP
 

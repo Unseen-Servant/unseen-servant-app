@@ -11,11 +11,11 @@ import {
 // --- Helpers ---
 
 function file(name: string, parentPath: string): FileItem {
-  return { name, path: `${parentPath}/${name}`, is_dir: false, children: null };
+  return { name, path: `${parentPath}/${name}`, is_dir: false, is_image: /\.(png|jpe?g|gif|webp|svg)$/i.test(name), children: null };
 }
 
 function folder(name: string, parentPath: string, children: FileItem[] | null): FileItem {
-  return { name, path: `${parentPath}/${name}`, is_dir: true, children };
+  return { name, path: `${parentPath}/${name}`, is_dir: true, is_image: false, children };
 }
 
 // --- Test trees ---
@@ -97,6 +97,12 @@ describe('areAllDescendantsSelected', () => {
     const f = flatFolder();
     const selected = new Set(['/root/A/a.pdf', '/root/A/b.pdf', '/root/A/c.pdf']);
     expect(areAllDescendantsSelected(f, selected)).toBe(true);
+  });
+
+  it('counts a folder whole without its images, which are never indexed', () => {
+    const f = folder('A', '/root', [file('a.pdf', '/root/A'), file('map.png', '/root/A')]);
+    expect(areAllDescendantsSelected(f, new Set(['/root/A/a.pdf']))).toBe(true);
+    expect(hasSelectableDescendants(folder('M', '/root', [file('map.png', '/root/M')]))).toBe(false);
   });
 
   it('returns false when subfolder is fully selected but sibling file is not', () => {

@@ -70,6 +70,12 @@
       folders here (<strong>R</strong>) to keep their index; outside the app,
       a moved book or a renamed folder has to be indexed again.
     </p>
+    <p class="field-desc">
+      Images in it (maps, handouts) show in the tree too, never indexed:
+      right-click one and <em>Send to Command</em> copies it into the open
+      campaign. <em>Hide images</em> in the filters takes them out of the
+      tree.
+    </p>
     {#if !folderSelected}
       <button class="btn-link" on:click={onSelectFolder}>choose folder</button>
     {/if}

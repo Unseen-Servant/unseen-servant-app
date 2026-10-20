@@ -70,6 +70,7 @@ export function computeFilterRows(input: FilterRowsInput): FilterRow[] {
     if (input.hasHidden) row('view:showHidden', 'view');
     row('view:hideUnindexed', 'view');
     row('view:hideOutOfScope', 'view');
+    row('view:hideImages', 'view');
   }
 
   return rows;

@@ -16,6 +16,9 @@ export function areAllDescendantsSelected(
   for (const child of folder.children) {
     if (child.is_dir) {
       if (!areAllDescendantsSelected(child, selected, filter)) return false;
+    } else if (child.is_image) {
+      // A picture is never indexed, so a folder is whole without it.
+      continue;
     } else if (!filter || filter.has(child.path)) {
       if (!selected.has(child.path)) return false;
     }
@@ -36,7 +39,7 @@ export function hasSelectableDescendants(
   for (const child of folder.children) {
     if (child.is_dir) {
       if (hasSelectableDescendants(child, filter)) return true;
-    } else if (!filter || filter.has(child.path)) {
+    } else if (!child.is_image && (!filter || filter.has(child.path))) {
       return true;
     }
   }

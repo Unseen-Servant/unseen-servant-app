@@ -5,7 +5,7 @@
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
   import { pdfFileUrl } from './pdfUrl';
-  import { sendTargets, sendToCommand, type SendTargets } from './sendToCommand';
+  import { sendImage, sendTargets, sendToCommand, targetsFor, type SendTargets } from './sendToCommand';
   import { load } from '@tauri-apps/plugin-store';
   import type { FileItem, FileStatusEntry, IndexStatusResult, SyncResult, KnownGameSystem, KnownGameSystemsResult, StatsResult, CollectionInfo, CollectionsResult, CollectionMutationResult, SearchResultItem, SearchResponse, SyncPreferences, PromptCounts, SyncAction } from './types';
   import { decideSyncAction } from './syncPolicy';
@@ -195,7 +195,8 @@
     isIndexed: boolean;
     initialSubmenu: 'collection' | null;
     hideState: { directlyHidden: boolean; inheritedHidden: boolean };
-    /** Set when the menu is a search hit's: it can go to Command. */
+    /** Set when the menu is a search hit's: it can go to Command, as a
+     *  library image's can (images design §6). */
     result?: SearchResultItem;
     sendTargets?: SendTargets | 'loading';
   } | null = null;
@@ -285,6 +286,9 @@
   // not a narrowing, so it lives beside showHidden rather than in the
   // scope console (and survives [clear all], as the focus lens does).
   let hideUnindexed = false;
+  // "Hide images": the pictures the tree lists beside the books (images
+  // design §6), for a library whose token packs would bury them.
+  let hideImages = false;
 
   // View mode for the file tree area. 'tree' = directory hierarchy (default),
   // 'systems' = flat list grouped by game system. Forced to 'tree' in
@@ -833,6 +837,10 @@
       if (savedHideUnindexed !== undefined) {
         hideUnindexed = savedHideUnindexed;
       }
+      const savedHideImages = parseBoolean(await store.get('hideImages'));
+      if (savedHideImages !== undefined) {
+        hideImages = savedHideImages;
+      }
       const savedViewMode = parseEnum(
         await store.get('viewMode'),
         ['tree', 'systems'] as const,
@@ -1172,6 +1180,7 @@
     showHidden = false;
     hideOutOfScope = false;
     hideUnindexed = false;
+    hideImages = false;
     persistScopeConsole();
     persistHidden();
     if (committedQuery) runSearch(committedQuery);
@@ -1202,7 +1211,8 @@
     scopeNarrowingEngaged ||
     showHidden ||
     hideOutOfScope ||
-    hideUnindexed;
+    hideUnindexed ||
+    hideImages;
 
   // Header lamps split scopeNarrowingEngaged by the panel that throws each
   // term: the collections transport (play, mute, arm) on one key, the
@@ -1229,6 +1239,7 @@
       await store.set('hiddenPaths', Array.from(hiddenPaths));
       await store.set('showHidden', showHidden);
       await store.set('hideUnindexed', hideUnindexed);
+      await store.set('hideImages', hideImages);
       await store.save();
     } catch (e) {
       console.log('Could not persist hidden state:', e);
@@ -1301,6 +1312,11 @@
   // the tree shows is already library material.
   function toggleHideUnindexed() {
     hideUnindexed = !hideUnindexed;
+    persistHidden();
+  }
+
+  function toggleHideImages() {
+    hideImages = !hideImages;
     persistHidden();
   }
 
@@ -1506,6 +1522,8 @@
   }
 
   async function toogleSelection(path: string, isDir: boolean, item: FileItem, shiftKey: boolean = false) {
+    // A picture in the library is listed, never indexed.
+    if (item.is_image) return;
     if (shiftKey && !isDir && lastIndexClickedPath) {
       const ok = applyRangeToggle(selectedPaths, lastIndexClickedPath, path, false);
       if (ok) {
@@ -1555,7 +1573,7 @@
       for (const child of folder.children) {
         if (child.is_dir) {
           await setFolderSelection(child, shouldSelect);
-        } else {
+        } else if (!child.is_image) {
           // It's a PDF file
           if (shouldSelect) {
             selectedPaths.add(child.path);
@@ -1587,7 +1605,7 @@
       for (const child of folder.children) {
         if (child.is_dir) {
           await setFolderSelection(child, select);
-        } else {
+        } else if (!child.is_image) {
           if (select) {
             selectedPaths.add(child.path);
           } else {
@@ -1829,7 +1847,7 @@
     scopeBrightPaths, indexedFolderPaths, indexedPaths, hideOutOfScope,
   }, {
     indexedPaths, indexedFolderPaths, selectedPaths, foldersWithSelections, hideUnindexed,
-  });
+  }, hideImages);
 
   function buildGameSystemMap(status: IndexStatusResult | null): Map<string, string[]> {
     const map = new Map<string, string[]>();
@@ -2689,28 +2707,22 @@
   // takes — `source` is the index's absolute path, so the context menu,
   // the drag payload, and the scope toggles all work on it unchanged.
   function resultToFileItem(result: SearchResultItem): FileItem {
-    return { name: result.filename, path: result.source, is_dir: false, children: null };
+    return { name: result.filename, path: result.source, is_dir: false, is_image: false, children: null };
   }
 
   function handleResultContextMenu(event: MouseEvent, result: SearchResultItem) {
     handleContextMenu(event, resultToFileItem(result));
     if (!contextMenu) return;
-    contextMenu = { ...contextMenu, result, sendTargets: 'loading' };
-    sendTargets()
-      .then((targets) => {
-        if (contextMenu?.result === result) contextMenu = { ...contextMenu, sendTargets: targets };
-      })
-      .catch(() => {
-        if (contextMenu?.result === result) contextMenu = { ...contextMenu, sendTargets: { campaign: null, tracks: [] } };
-      });
+    contextMenu = { ...contextMenu, result };
+    loadSendTargets();
   }
 
   async function handleSendToCommand(track: string | null) {
-    const result = contextMenu?.result;
+    const menu = contextMenu;
     contextMenu = null;
-    if (!result) return;
+    if (!menu || (!menu.result && !menu.item.is_image)) return;
     try {
-      const sent = await sendToCommand(result, track);
+      const sent = menu.result ? await sendToCommand(menu.result, track) : await sendImage(menu.item.path, track);
       const name = sent.path.split('/').pop()?.replace(/\.md$/, '') ?? sent.path;
       jobNotification.show({ type: 'success', message: `Sent to Command: ${name} in ${sent.campaign} › ${track ?? 'Shelf'}`, duration: 4000 });
     } catch (e) {
@@ -2753,6 +2765,29 @@
         inheritedHidden: !directlyHidden && isPathHidden(item.path),
       },
     };
+    if (item.is_image) loadSendTargets();
+  }
+
+  /** Send to Command's targets for the menu just opened, a hit's or a
+   *  library image's, fetched as it opens. */
+  function loadSendTargets() {
+    const item = contextMenu?.item;
+    if (!item) return;
+    contextMenu = { ...contextMenu!, sendTargets: 'loading' };
+    const settle = (targets: SendTargets) => {
+      if (contextMenu?.item === item) contextMenu = { ...contextMenu, sendTargets: targets };
+    };
+    sendTargets()
+      .then(settle)
+      .catch(() => settle({ campaign: null, tracks: [], kinds: {} }));
+  }
+
+  /** What the open menu may send to: a hit to the shelf or a note track,
+   *  an image to the shelf or an image track. Nothing for a book. */
+  function menuSendTargets(menu: NonNullable<typeof contextMenu>): SendTargets | 'loading' | null {
+    if (!menu.result && !menu.item.is_image) return null;
+    const targets = menu.sendTargets ?? 'loading';
+    return targets === 'loading' ? targets : targetsFor(targets, menu.item.is_image ? 'image' : 'note');
   }
 
   async function handleContextOpen() {
@@ -3796,6 +3831,8 @@
             onToggleHideOutOfScope={toggleHideOutOfScope}
             {hideUnindexed}
             onToggleHideUnindexed={toggleHideUnindexed}
+            {hideImages}
+            onToggleHideImages={toggleHideImages}
             showCollectionFilter={collectionFilterAvailable && curationFilterRelevant}
             {collectedCount}
             {uncollectedCount}
@@ -3835,6 +3872,7 @@
           {showHidden}
           {hideOutOfScope}
           {hideUnindexed}
+          {hideImages}
           resultCount={searchResults.length}
           indexedFileCount={searchableFileCount}
           isLoading={isSearching}
@@ -3850,6 +3888,7 @@
           onToggleShowHidden={toggleShowHidden}
           onToggleHideOutOfScope={toggleHideOutOfScope}
           onToggleHideUnindexed={toggleHideUnindexed}
+          onToggleHideImages={toggleHideImages}
         />
       {/snippet}
       {#if searchViewOpen}
@@ -3990,6 +4029,7 @@
             {indexedFolderPaths}
             {hideOutOfScope}
             {hideUnindexed}
+            {hideImages}
             {ribbonIndex}
             arm={armState}
             {onToggleMembership}
@@ -4040,7 +4080,7 @@
       directlyHidden={contextMenu.hideState.directlyHidden}
       inheritedHidden={contextMenu.hideState.inheritedHidden}
       onToggleHidden={handleContextToggleHidden}
-      sendTargets={contextMenu.result ? (contextMenu.sendTargets ?? 'loading') : null}
+      sendTargets={menuSendTargets(contextMenu)}
       onSendToCommand={handleSendToCommand}
       canRename={!searchViewOpen}
       onClose={() => { contextMenu = null; }}

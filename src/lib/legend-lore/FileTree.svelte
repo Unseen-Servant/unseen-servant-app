@@ -97,6 +97,8 @@
   // neither in the index nor selected for it. Tree only; SystemsView
   // renders indexStatus entries and holds nothing unindexed to hide.
   export let hideUnindexed: boolean = false;
+  // "Hide images": the pictures listed beside the books (images design §6).
+  export let hideImages: boolean = false;
 
   $: isSoloedScope = soloedScopePaths.has(item.path);
   $: isMutedHere = mutedScopePaths.has(item.path);
@@ -119,7 +121,8 @@
   $: hidden = (displayPaths !== null && !displayPaths.has(item.path)) ||
               (isHiddenItem && !showHidden) ||
               (outOfScope && hideOutOfScope) ||
-              outsideLibrary;
+              outsideLibrary ||
+              (hideImages && item.is_image);
 
   $: isExpanded = item.is_dir && expandedPaths.has(item.path);
   let tagMenu: SystemTagMenu | undefined;
@@ -281,6 +284,11 @@
     {:else}
       <span class="icon gutter" aria-hidden="true"></span>
     {/if}
+    {#if item.is_image}
+      <!-- A picture is listed, never indexed or collected: its box's place
+           stays, empty, so the column of boxes stays even. -->
+      <span class="app-checkbox row-checkbox no-box" aria-hidden="true"></span>
+    {:else}
     <button
       class="app-checkbox row-checkbox"
       class:collecting={arm !== null}
@@ -290,6 +298,7 @@
       aria-label={arm ? `Add ${item.name} to ${arm.name}` : `Select ${item.name} for indexing`}
       aria-checked={boxMixed ? 'mixed' : boxOn}
     ></button>
+    {/if}
 
     <!-- Grabbed by .row, not .row-container: the checkbox and the S/M
          buttons are siblings, so no drag can start from them. Never while
@@ -310,6 +319,15 @@
                carries expand state, mirroring the systems view's headers -->
           <svg viewBox="0 0 512 512" fill="currentColor">
             <path d="M64 480H448c35.3 0 64-28.7 64-64V160c0-35.3-28.7-64-64-64H288c-10.1 0-19.6-4.7-25.6-12.8L243.2 57.6C231.1 41.5 212.1 32 192 32H64C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64z"/>
+          </svg>
+        </span>
+      {:else if item.is_image}
+        <span class="icon type-icon file-glyph" aria-hidden="true">
+          <!-- Font Awesome Free 7.3.1 "image", src/lib/ui/icons/image-solid.svg:
+               its 448\u00d7512 box set in the 640 square the book is drawn in, so
+               the two read at one size -->
+          <svg viewBox="-96 -64 640 640" fill="currentColor">
+            <path d="M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zm64 80a48 48 0 1 1 0 96 48 48 0 1 1 0-96zM272 224c8.4 0 16.1 4.4 20.5 11.5l88 144c4.5 7.4 4.7 16.7 .5 24.3S368.7 416 360 416L88 416c-8.9 0-17.2-5-21.3-12.9s-3.5-17.5 1.6-24.8l56-80c4.5-6.4 11.8-10.2 19.7-10.2s15.2 3.8 19.7 10.2l26.4 37.8 61.4-100.5c4.4-7.1 12.1-11.5 20.5-11.5z"/>
           </svg>
         </span>
       {:else}
@@ -433,6 +451,7 @@
           {indexedFolderPaths}
           {hideOutOfScope}
           {hideUnindexed}
+          {hideImages}
           {ribbonIndex}
           {arm}
           {onToggleMembership}
@@ -463,6 +482,10 @@
   .row-checkbox {
     margin-right: 0.5rem;
     margin-left: 0.2rem;
+  }
+  /* An image's place in the column of boxes: the box's size, unseen. */
+  .row-checkbox.no-box {
+    visibility: hidden;
   }
   /* Hidden via the user's hide flag — only rendered when "Show hidden" is on.
      Italicized + dimmed so it reads as "explicitly suppressed". */

@@ -12,6 +12,9 @@ import type { SearchResultItem } from './types';
 export interface SendTargets {
   campaign: string | null;
   tracks: string[];
+  /** Each track's kind: a hit goes to a note track, an image to an image
+   *  track (images design §3.2). */
+  kinds: Record<string, 'note' | 'image'>;
 }
 
 export interface Sent {
@@ -20,6 +23,12 @@ export interface Sent {
 }
 
 export const sendTargets = () => invoke<SendTargets>('command_send_targets');
+
+/** The targets a note, or an image, may go to: the shelf, which holds
+ *  both, then the tracks of its kind, as Live keeps audio off MIDI tracks. */
+export function targetsFor(targets: SendTargets, kind: 'note' | 'image'): SendTargets {
+  return { ...targets, tracks: targets.tracks.filter((t) => (targets.kinds[t] ?? 'note') === kind) };
+}
 
 /** The note a hit becomes: named after its section, holding the section's
  *  text, with its book and page as the source a card opens. */
@@ -32,6 +41,12 @@ export function sentNote(result: SearchResultItem) {
     source: pdfFileUrl(result.source, result.page_start > 0 ? result.page_start : null),
     cite: pages ? `${title}, ${pages}` : title,
   };
+}
+
+/** Copy an image from the library into `track`, an image track, or onto
+ *  the campaign's shelf when it's null (images design §6). */
+export function sendImage(path: string, track: string | null): Promise<Sent> {
+  return invoke<Sent>('command_send_image', { track, path });
 }
 
 /** Keep the hit in `track`, or on the campaign's shelf when it's null. */

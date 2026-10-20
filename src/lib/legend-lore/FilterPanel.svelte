@@ -64,6 +64,10 @@
   // speak about, sibling to per-item hide.
   export let hideUnindexed: boolean = false;
   export let onToggleHideUnindexed: () => void = () => {};
+  // "Hide images": the pictures the tree lists beside the books (images
+  // design §6), out of the way when token packs would bury them.
+  export let hideImages: boolean = false;
+  export let onToggleHideImages: () => void = () => {};
 
   // Where this pane's caret is. null means no cursor is drawn — which is now
   // distinct from not holding the keyboard, see `active`.
@@ -299,7 +303,7 @@
   $: sectionEngaged = {
     curation: curationSolos.size > 0 || curationMutes.size > 0,
     system: soloedSystems.size > 0 || excludedSystems.size > 0,
-    view: (showHidden && hasHidden) || hideUnindexed || hideOutOfScope,
+    view: (showHidden && hasHidden) || hideUnindexed || hideOutOfScope || hideImages,
   } satisfies Record<FilterSection, boolean>;
   $: curationRows = [
     { key: 'collected' as CurationKey, name: 'In a collection', count: collectedCount },
@@ -581,6 +585,29 @@
         aria-label="Hide out-of-scope items"
         data-fm-action
         on:click|stopPropagation={onToggleHideOutOfScope}
+      ></button>
+    </div>
+
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div
+      class="row lens-row"
+      class:kb-focused={focusedRow === 'view:hideImages'}
+      class:hovered={$hoverLive && hoveredRow === 'view:hideImages'}
+      title="Hide the images the tree lists beside the books"
+      data-fm-key="view:hideImages"
+      on:click={() => clickRow('view:hideImages')}
+      on:pointerenter={() => enterRow('view:hideImages')}
+      on:pointerleave={() => leaveRow('view:hideImages')}
+    >
+      <span class="row-name muted-name">Hide images</span>
+      <button
+        type="button"
+        class="app-checkbox lens-checkbox"
+        role="checkbox"
+        aria-checked={hideImages}
+        aria-label="Hide images"
+        data-fm-action
+        on:click|stopPropagation={onToggleHideImages}
       ></button>
     </div>
     {/if}

@@ -438,7 +438,10 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.get("/tracks")
     def get_tracks(campaign: str):
-        return {"tracks": vault.track_order(campaign_path(campaign))}
+        """The tracks in order, with each one's kind, so Send to Command
+        offers a note's the note tracks and an image's the image tracks."""
+        camp = campaign_path(campaign)
+        return {"tracks": vault.track_order(camp), "kinds": vault.track_kinds(camp)}
 
     @router.post("/tracks")
     def create_track(body: TrackCreate):
