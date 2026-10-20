@@ -279,19 +279,23 @@ def write_text(campaign: Path, rel: str, text: str, base_hash: str) -> str:
 # Gathering: the shelf, material sent from Legend Lore (design §3.6, §8)
 # ---------------------------------------------------------------------------
 
+def cited(text: str, source: str, cite: str) -> str:
+    """A note's text with ``source`` (where it came from: a PDF page's file
+    URL) in its frontmatter and a link back, named ``cite``, under it."""
+    link = source.replace("(", "%28").replace(")", "%29")
+    body = text.strip()
+    return fm.set_key("", "source", source) + (f"{body}\n\n" if body else "") + f"[{cite.strip() or 'Source'}]({link})\n"
+
+
 def receive(campaign: Path, track: str | None, name: str, text: str, source: str, cite: str) -> str:
     """A new note in ``track`` — on the shelf when there's none — holding
-    ``text``, with ``source`` (where it came from: a PDF page's file URL)
-    in its frontmatter and a link back under the text. Named after
-    ``name``, made free if it's taken."""
+    ``text``, cited (``cited``). Named after ``name``, made free if it's
+    taken."""
     if track is None:
         track = reserved_folder(campaign, SHELF)
     elif track not in vault.track_order(campaign):
         raise vault.NotFound(f"No track named {track!r}")
-    link = source.replace("(", "%28").replace(")", "%29")
-    body = text.strip()
-    content = fm.set_key("", "source", source) + (f"{body}\n\n" if body else "") + f"[{cite.strip() or 'Source'}]({link})\n"
-    return vault.create_note(campaign, track, vault.free_name(campaign, name), content)
+    return vault.create_note(campaign, track, vault.free_name(campaign, name), cited(text, source, cite))
 
 
 def copy_in(campaign: Path, source: Path, rel: str) -> str:

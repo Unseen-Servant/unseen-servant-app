@@ -69,7 +69,7 @@
     {
       group: 'Command · writes',
       tools: [
-        ['create_note', 'Write a new note on a track or the shelf'],
+        ['create_note', 'Write a new note on a track or the shelf, citing its book'],
         ['edit_note', "Replace a note's text, keeping its frontmatter"],
         ['create_track', 'Make a new track at the end of the tracks'],
         ['move_note', 'Move a note to another track or the shelf'],

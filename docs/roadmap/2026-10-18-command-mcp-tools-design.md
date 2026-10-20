@@ -1,6 +1,6 @@
 # Command MCP tools: audit and recommendations (2026-10-18)
 
-**Status:** settled; being built in the order of §5. Step 1, removing the session log, landed in 8dd0673; steps 2–6 followed by 2026-10-20, and step 7, `cite_section`, is last. §1 and §2 record the tools as they were on 2026-10-18.
+**Status:** settled; being built in the order of §5. Step 1, removing the session log, landed in 8dd0673; steps 2–7 followed, the last on 2026-10-20. §1 and §2 record the tools as they were on 2026-10-18.
 
 Draft 1 was by the main session; draft 2 was the critic's revision; this version folds in the owner's answers:
 - **Sessions:** the agent can open a session in the app (`set_active_session`), and `create_session` opens what it creates.
@@ -95,7 +95,7 @@ Dispositions: **KEEP** · **CHANGE** (an existing tool) · **ADD** · **DEFER** 
   - Match the track case-insensitively, as the Shelf and note names already are.
   - Add `cite_section=<id from search_library>`. The tool reads `GET /api/section/{id}` for the PDF's path and first page, and the note gets the `source` and cite link that Send to Command writes. *Fixes E5.*
     - Route change: `POST /notes` takes optional `source` and `cite`, and builds them as `prep.receive` does. It keeps `/notes`' rules: a name clash or a bad character is refused. `/send` would rename silently instead: it numbers a clash and swaps bad characters for spaces.
-    - The cite names PDF pages (owner's call: they're the more accurate). Send to Command cites printed pages, so the two kinds of note cite differently; the book key opens the same page either way.
+    - The cite names PDF pages (owner's call: they're the more accurate). As built (2026-10-20), it reads *Book, PDF pp.120–121*, so it isn't taken for printed pages. Send to Command cites printed pages, so the two kinds of note cite differently; the book key opens the same page either way.
 - **A2.4 ADD** `edit_note(name, content, hash)`: replace a note's text, hash-checked. *Fixes E3.*
   - Any note, the GM's included (owner's call).
   - `content` is the text below the frontmatter. The frontmatter is kept, so a beat's `notes`, a session's `beats` and `date`, `spent` and `source` stay with their own tools (B2.1).

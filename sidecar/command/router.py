@@ -74,6 +74,10 @@ class NoteCreate(BaseModel):
     folder: str
     name: str
     content: str = ""
+    # Where it came from, as Send to Command cites it (prep.cited); MCP's
+    # create_note(cite_section=).
+    source: str | None = None
+    cite: str = ""
 
 
 class NoteSave(BaseModel):
@@ -484,8 +488,9 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     @router.post("/notes")
     def create_note(body: NoteCreate):
         camp = campaign_path(body.campaign)
+        content = prep.cited(body.content, body.source, body.cite) if body.source else body.content
         with write_lock:
-            return {"path": vault.create_note(camp, shelf_or(camp, body.folder), body.name, body.content)}
+            return {"path": vault.create_note(camp, shelf_or(camp, body.folder), body.name, content)}
 
     @router.post("/notes/copy")
     def copy_note(body: CopyIn):

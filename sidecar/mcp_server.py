@@ -272,7 +272,9 @@ mcp = MCPServer(
         "describing them — never invent what a note says.\n"
         "- create_note() writes new material into a track, or onto the shelf "
         "when it isn't clear where it belongs, and edit_note() corrects a "
-        "note's text with the hash read_note() shows. move_note() files a "
+        "note's text with the hash read_note() shows. Pass create_note() the "
+        "cite_section= of the search_library() result a note draws on, so it "
+        "cites the book and its card opens it. move_note() files a "
         "note on another track, and create_track() makes a track for a kind "
         "of material the campaign will keep using.\n"
         "- To prep a session: create_session() starts the next one and opens "
@@ -974,8 +976,27 @@ async def find_notes(query: str, campaign: str | None = None, track: str | None 
     return "\n".join(lines)
 
 
+def _citation(section: dict) -> tuple[str, str]:
+    """The source and cite a note keeps for a library section, as Send to
+    Command writes them, but naming the PDF's pages: the file's own page
+    numbers, which the source URL opens at."""
+    start, end = section.get("page_start"), section.get("page_end")
+    url = Path(section["source"]).as_uri() + (f"#page={start}" if start and start > 0 else "")
+    title = re.sub(r"\.pdf$", "", section["filename"], flags=re.I)
+    if not start or start <= 0:
+        return url, title
+    pages = f"p.{start}" if not end or end == start else f"pp.{start}\u2013{end}"
+    return url, f"{title}, PDF {pages}"
+
+
 @mcp.tool()
-async def create_note(track: str, name: str, content: str = "", campaign: str | None = None) -> str:
+async def create_note(
+    track: str,
+    name: str,
+    content: str = "",
+    cite_section: str | None = None,
+    campaign: str | None = None,
+) -> str:
     """Write a new note into one of the campaign's tracks, or onto its shelf.
     When no track fits, create_track() makes one for a kind of material
     the campaign will keep using; else use the shelf.
@@ -986,6 +1007,10 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
         name: The note's name, which links reach it by; no other note's
               (a beat's may be the same).
         content: Its Markdown text. Link other notes as [[Name]].
+        cite_section: The id of the library section it draws on, from a
+                      search_library result. The note then cites the book
+                      and its pages, and its card in Play opens the book
+                      there.
         campaign: A campaign name; defaults to the one open in the app.
     """
     index, _ctx, error = await _campaign_index(campaign)
@@ -996,12 +1021,19 @@ async def create_note(track: str, name: str, content: str = "", campaign: str | 
         return error
     if taken := _taken(index, name, "note"):
         return taken
+    source = cite = None
+    if cite_section:
+        section = await sidecar.get(f"/api/section/{quote(cite_section.strip(), safe='')}")
+        if isinstance(section, str):
+            return f"{section}. search_library() gives a section's id."
+        source, cite = _citation(section)
     made = await sidecar.post("/api/command/notes", {
         "campaign": index["name"], "folder": folder, "name": name, "content": content,
+        **({"source": source, "cite": cite} if source else {}),
     })
     if isinstance(made, str):
         return made
-    return f"Created {made['path']} in {index['name']}."
+    return f"Created {made['path']} in {index['name']}" + (f", citing {cite}." if cite else ".")
 
 
 @mcp.tool()

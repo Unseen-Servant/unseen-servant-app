@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 import mcp_server
 from command import events, prep
+from legend_lore.granularity import ParentDoc
 from server import create_app
 
 LEGEND_LORE = {"list_collections", "search_library", "get_section", "get_pages", "list_sources", "list_game_systems"}
@@ -183,6 +184,27 @@ def test_create_note_only_in_a_track(strahd):
     )
     assert run(mcp_server.create_note("NPCs", "Doru/Son")) == "A name can't contain /"
     assert run(mcp_server.create_note("npcs", "Kasimir")) == "Created NPCs/Kasimir.md in Strahd."
+
+
+def test_create_note_cites_a_library_section(strahd, app, test_store):
+    book = "/corpus/Curse of Strahd.pdf"
+    test_store.replace_document(book, "unknown", (), [], [], [], parents=[ParentDoc(
+        parent_id="p-k", text="Kasimir Velikov, a dusk elf.", section_heading="Kasimir", chunk_type="prose",
+        source_pdf=book, page_start=120, page_end=121, section_id="s_k", section_path="s_k",
+    )])
+    assert run(mcp_server.create_note("NPCs", "Kasimir", "A dusk elf.\n", cite_section="s_k")) == (
+        "Created NPCs/Kasimir.md in Strahd, citing Curse of Strahd, PDF pp.120–121."
+    )
+    url = "file:///corpus/Curse%20of%20Strahd.pdf#page=120"
+    assert (strahd / "Strahd" / "NPCs" / "Kasimir.md").read_text() == (
+        f'---\nsource: "{url}"\n---\nA dusk elf.\n\n[Curse of Strahd, PDF pp.120–121]({url})\n'
+    )
+    index = app.get("/api/command/campaign", params={"name": "Strahd"}).json()
+    assert next(n for n in index["notes"] if n["name"] == "Kasimir")["source"] == url
+    assert run(mcp_server.create_note("NPCs", "Doru", cite_section="s_zz")) == (
+        "Section not found: s_zz. search_library() gives a section's id."
+    )
+    assert not (strahd / "Strahd" / "NPCs" / "Doru.md").exists()
 
 
 def test_create_track_then_move_a_note_onto_it(strahd, app):

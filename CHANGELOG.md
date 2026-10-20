@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Arrange a board by beat.** The key at the foot of the board's toolbar gives each planned beat a frame with its notes, in plan order, and puts the notes several beats share in a frame named Throughout. Launching a beat then shows its frame. A board you haven't touched already lays its cards out by beat instead of by track
 - **Claude can work on a board.** `arrange_board` frames a session's planned beats as the Arrange key does, `frame_cards` gathers notes into a named frame, `connect_cards` draws a labelled line between two notes' cards, and `add_text` puts a text card beside a note or under the board. The cards you see stay where they are
 - **Claude can file notes.** `create_track` makes a track and `move_note` moves a note to another track or the shelf. `create_note` takes a track's name in any case, `find_notes` quotes each note's text rather than its frontmatter and says when it lists only the first 20, and `add_to_live_set` can take a note out of play
+- **Claude's notes cite their book.** `create_note` takes the id of the search result a note draws on, and the note cites the book and its PDF pages, so its card in Play opens the book there, as a note sent from Legend Lore does
 
 ### Removed
 
