@@ -9,7 +9,7 @@
   import { chord, chordHint, isBareKeyChord, isDeleteChord, jumpEdge, keyShortcut, slotChord } from '../shell/keybindings';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
-  import { childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
+  import { CHILD_SEP, childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
   import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from '../ui/menuGeometry';
@@ -93,11 +93,33 @@
 
   // Disclosure state — which collections show their file rows.
   let expandedNames = new Set<string>();
+  // The ghost track's focus key, selected by a click as a row is. A lone
+  // separator: no collection is named '' (collectionsNav.ts CHILD_SEP).
+  const NEW_ROW_KEY = CHILD_SEP;
 
   function toggleExpand(name: string) {
     if (expandedNames.has(name)) expandedNames.delete(name);
     else expandedNames.add(name);
     expandedNames = expandedNames;
+  }
+
+  // A click on the selected row opens or closes it once the double-click
+  // time has passed with no second click, as Finder waits before a slow
+  // click renames: a double-click renames, and mustn't open the row on its
+  // way. Under macOS's default double-click time (0.5s), so the open
+  // doesn't drag, yet past most double-clicks' second click.
+  const DOUBLE_CLICK_MS = 350;
+  let pendingToggle: ReturnType<typeof setTimeout> | null = null;
+  function cancelToggle() {
+    if (pendingToggle) clearTimeout(pendingToggle);
+    pendingToggle = null;
+  }
+  function toggleAfterClick(name: string) {
+    cancelToggle();
+    pendingToggle = setTimeout(() => {
+      pendingToggle = null;
+      if (focusedName === name) toggleExpand(name);
+    }, DOUBLE_CLICK_MS);
   }
 
   // Which rows reveal their hover-summoned controls: a collection's
@@ -479,6 +501,21 @@
       return;
     }
 
+    // The selected ghost track sits below the rows, out of the j/k order:
+    // ↑ climbs back onto the last row, R names the next collection there.
+    if (focusedName === NEW_ROW_KEY) {
+      if (isUp || isDown) {
+        event.preventDefault();
+        if (isUp && navEntries.length > 0) onFocusCollection(navEntries[navEntries.length - 1].key);
+        return;
+      }
+      if (bareLetter && lk === 'r') {
+        event.preventDefault();
+        onCreate();
+        return;
+      }
+    }
+
     // Active with no caret (the pane was claimed by a chrome click): the
     // first arrow places the caret rather than stepping, so it lands *on*
     // the restored row instead of one past it.
@@ -514,7 +551,7 @@
       return;
     }
 
-    const parsed = focusedName === null ? null : parseNavKey(focusedName);
+    const parsed = focusedName === null || focusedName === NEW_ROW_KEY ? null : parseNavKey(focusedName);
     if (parsed === null) return;
 
     // A child row answers with the file verbs; the collection verbs stay
@@ -632,6 +669,7 @@
   onDestroy(() => {
     releaseMenuSlot(closeSortMenu);
     releaseMenuSlot(closeContextMenu);
+    cancelToggle();
   });
 
   function handleWindowClick(event: MouseEvent) {
@@ -784,13 +822,20 @@
           on:dragend={handleDragEnd}
           on:click={(e) => {
             if (isRenamingRow) return;
-            onFocusCollection(col.name);
-            // The row is the disclosure: a click opens or closes its books.
-            // Only the first click of a double-click toggles, so the second
-            // doesn't undo it on the way into rename.
-            if (e.detail <= 1) toggleExpand(col.name);
+            // A click selects, as a row in Command does. A later click on
+            // the selected row opens or closes its books, unless a second
+            // click makes it a double-click, on its way into rename.
+            if (e.detail > 1) {
+              cancelToggle();
+              return;
+            }
+            if (focusedName === col.name) toggleAfterClick(col.name);
+            else onFocusCollection(col.name);
           }}
-          on:dblclick={() => { if (!isRenamingRow) startRename(col.name); }}
+          on:dblclick={() => {
+            cancelToggle();
+            if (!isRenamingRow) startRename(col.name);
+          }}
           on:contextmenu={(e) => openContextMenu(e, col.name)}
         >
           {#if col.color}
@@ -916,9 +961,10 @@
        geometry with no name, the way a DAW leaves an empty lane below its
        last track, and as Command's lists end on an empty row. Outside the
        scroll container, so it trails the last row while the list is short
-       and stays in view once it overflows. Click, ⌘N, a drop or a folder's
-       "New collection" all turn it into the row it will become, in place;
-       nothing exists until that's committed, so Esc costs nothing. -->
+       and stays in view once it overflows. A click selects it, as a row;
+       a double-click or R on it, ⌘N, a drop or a folder's "New collection"
+       turn it into the row it will become, in place; nothing exists until
+       that's committed, so Esc costs nothing. -->
   {#if creating !== null}
     <div class="row-container ghost naming">
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -943,11 +989,14 @@
     <button
       class="row-container ghost"
       class:drop-into={dropIntoNew}
-      on:click={onCreate}
+      class:kb-focused={focusedName === NEW_ROW_KEY}
+      data-cp-row={NEW_ROW_KEY}
+      on:click={() => onFocusCollection(NEW_ROW_KEY)}
+      on:dblclick={() => onCreate()}
       on:dragover={handleNewDragOver}
       on:dragleave={handlePathDragLeave}
       on:drop={handleNewDrop}
-      title={`New collection${chordHint('collections.new')} — or drop books here`}
+      title={`New collection${chordHint('collections.new')} — double-click to name it, or drop books here`}
       aria-label="New collection"
       aria-keyshortcuts={keyShortcut('collections.new') || undefined}
     >
