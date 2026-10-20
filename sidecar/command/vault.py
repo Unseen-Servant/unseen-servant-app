@@ -334,6 +334,61 @@ def save_track_pigment(campaign: Path, track: str, pigment: str | None) -> dict[
     return pigments
 
 
+# What a track holds, as Ableton's MIDI and audio tracks (images design §3.2).
+_KINDS = ("note", "image")
+
+
+def _saved_kinds(campaign: Path) -> dict[str, str]:
+    raw = _presentation(campaign).get("kinds", {})
+    if not isinstance(raw, dict):
+        return {}
+    return {t: k for t, k in raw.items() if k in _KINDS}
+
+
+def track_kinds(campaign: Path, notes: list[NoteEntry] | None = None) -> dict[str, str]:
+    """Each track's kind: what the GM chose, else images for a folder
+    holding images and no notes, else notes, so a folder of maps filled in
+    Finder reads right and an empty track holds notes. It decides what the
+    column makes, never which files it lists (images design §3.2).
+    ``notes`` is the campaign's scan, when the caller has it."""
+    saved = _saved_kinds(campaign)
+    if notes is None:
+        notes = [_entry(campaign, p) for p in _walk_clips(campaign)]
+    held: dict[str, set[str]] = {}
+    for n in notes:
+        if n.track is not None:
+            held.setdefault(n.track, set()).add(n.type)
+    return {t: saved.get(t) or ("image" if held.get(t) == {"image"} else "note") for t in track_order(campaign)}
+
+
+def save_track_kind(campaign: Path, track: str, kind: str) -> dict[str, str]:
+    """Make ``track`` hold notes or images; other tracks' are kept. Every
+    track's kind, after."""
+    if track not in _track_folders(campaign):
+        raise NotFound(f"No track named {track!r}")
+    if kind not in _KINDS:
+        raise Invalid(f"A track holds {' or '.join(_KINDS)}s")
+    _save_list(campaign, "kinds", {**_saved_kinds(campaign), track: kind})
+    return track_kinds(campaign)
+
+
+def _check_fits(campaign: Path, folder: Path, image: bool, src: Path | None = None) -> None:
+    """Refuse to put an image in a note track, or a note in an image track,
+    as Live keeps audio clips off MIDI tracks; one put there in Finder still
+    shows (images design §3.2). The shelf holds both, and moving within the
+    track it's already in makes nothing new."""
+    parts = folder.relative_to(campaign).parts
+    track = parts[0] if parts else None
+    if track is None or _is_reserved(track):
+        return
+    if src is not None and src.relative_to(campaign).parts[0] == track:
+        return
+    kind = track_kinds(campaign).get(track)
+    if kind is not None and kind != ("image" if image else "note"):
+        clip = "an image" if image else "a note"
+        raise Invalid(f"{track} is {'an image' if kind == 'image' else 'a note'} track: {clip} goes in {clip} track or on the shelf")
+
+
 def track_order(campaign: Path) -> list[str]:
     """Tracks in display order: the saved order for tracks it knows, then any
     other track folder alphabetically. Saved names with no folder drop out."""
@@ -362,6 +417,7 @@ def scan(campaign: Path) -> dict:
         "note_order": note_order(campaign),
         "pigments": track_pigments(campaign),
         "ambiguous": [n.path for n in notes if seen[key(n)] > 1],
+        "kinds": track_kinds(campaign, notes),
         # Wherever they sit, since Obsidian's attachment folder is the
         # GM's choice: the app resolves a note's embeds against these.
         "images": [_rel(campaign, p) for p in _walk(campaign, _is_image_file)],
@@ -436,7 +492,9 @@ def create_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
         raise Invalid(f"Not an image: {name!r}")
     if name.casefold() in _image_names(campaign):
         raise Conflict(f"An image named {name!r} already exists in this campaign")
-    path = _folder(campaign, folder) / name
+    parent = _folder(campaign, folder)
+    _check_fits(campaign, parent, image=True)
+    path = parent / name
     atomic_write(path, data)
     return _rel(campaign, path)
 
@@ -522,6 +580,7 @@ def _folder(campaign: Path, folder: str) -> Path:
 def create_note(campaign: Path, folder: str, name: str, content: str = "") -> str:
     name = validate_name(name)
     parent = _folder(campaign, folder)
+    _check_fits(campaign, parent, image=False)
     of = kind(_rel(campaign, parent / f"{name}.md"))
     if name.casefold() in _names_in_use(campaign, of):
         raise Conflict(f"A {of} named {name!r} already exists in this campaign")
@@ -938,6 +997,7 @@ def move_note(campaign: Path, rel: str, folder: str, order: list[str] | None = N
     to = kind(_rel(campaign, dst))
     if _is_image_file(src.name) and to != "note":
         raise Invalid(f"An image goes in a track or on the shelf, not in {folder}/")
+    _check_fits(campaign, parent, _is_image_file(src.name), src)
     if to != kind(_rel(campaign, src)) and _name(src.name).casefold() in _names_in_use(campaign, to):
         raise Conflict(f"A {to} named {_name(src.name)!r} already exists in this campaign")
     if dst.exists():
@@ -976,6 +1036,7 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
 
     notes = note_order(campaign)
     pigments = track_pigments(campaign)
+    kinds = _saved_kinds(campaign)
     moves = _relocate(campaign, campaign / name, campaign / new_name)
     _save_order(campaign, order)
     # Its notes keep their order, a subfolder's too.
@@ -984,6 +1045,9 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
     # And it keeps its pigment.
     if name in pigments:
         _save_list(campaign, "pigments", {new_name if t == name else t: hex for t, hex in pigments.items()})
+    # And its kind.
+    if name in kinds:
+        _save_list(campaign, "kinds", {new_name if t == name else t: k for t, k in kinds.items()})
     return _rewrite_campaign(campaign, moves)
 
 

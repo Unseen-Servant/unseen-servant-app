@@ -54,6 +54,12 @@ export const commandApi = {
   /** A track's pigment, or none; answers with every track's. */
   pigmentTrack: (campaign: string, track: string, pigment: string | null) =>
     invoke<Record<string, string>>('command_pigment_track', { campaign, track, pigment }),
+  /** Whether a track holds notes or images; answers with every track's. */
+  kindTrack: (campaign: string, track: string, kind: 'note' | 'image') =>
+    invoke<Record<string, 'note' | 'image'>>('command_kind_track', { campaign, track, kind }),
+  /** Images picked with the native picker, copied into `track`: their
+   *  paths, none when the GM cancels. */
+  pickImages: (campaign: string, track: string) => invoke<string[]>('command_pick_images', { campaign, track }),
   /** A folder's notes by name, in the order the GM dragged them. */
   orderNotes: (campaign: string, folder: string, order: string[]) =>
     invoke<string[]>('command_order_notes', { campaign, folder, order }),
@@ -78,9 +84,14 @@ export const commandApi = {
   /** An image dropped from Finder, copied onto the campaign's shelf: the
    *  copy's path. The bytes go raw, not as JSON; the names ride in headers,
    *  URI-encoded since a header is ASCII. */
-  addImage: (campaign: string, name: string, bytes: ArrayBuffer) =>
+  addImage: (campaign: string, name: string, bytes: ArrayBuffer, track: string | null = null) =>
     invoke<string>('command_add_image', new Uint8Array(bytes), {
-      headers: { campaign: encodeURIComponent(campaign), name: encodeURIComponent(name) },
+      headers: {
+        campaign: encodeURIComponent(campaign),
+        name: encodeURIComponent(name),
+        // Into an image track; without one, onto the shelf.
+        ...(track ? { track: encodeURIComponent(track) } : {}),
+      },
     }),
   createBeat: (campaign: string, name: string, notes: string[], session: string | null) =>
     invoke<string>('command_create_beat', { campaign, name, notes, session }),

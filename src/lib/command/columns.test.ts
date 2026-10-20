@@ -27,6 +27,7 @@ const index: CampaignIndex = {
   ].map(note),
   note_order: {},
   pigments: {},
+  kinds: {},
   ambiguous: ['NPCs/Barovia/Doru.md'],
   beats: [],
   sessions: [],

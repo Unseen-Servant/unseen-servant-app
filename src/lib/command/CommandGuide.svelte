@@ -90,6 +90,17 @@
       beat, play it, and its card shows it. Double-click it to see it in
       the inspector. An image isn't spent: spend the beat that shows it.
     </p>
+    <p class="field-desc">
+      A track holds notes or images, chosen when you insert it:
+      <em>+ track</em>, or a track's right-click, offers <em>Insert note
+      track</em> (<strong>&#8984;T</strong>) and <em>Insert image track</em>
+      (<strong>&#8679;&#8984;T</strong>). An image track's empty row is
+      <em>+ image</em>, which copies pictures from your Mac into it, as
+      does dropping them on it from Finder; dropped on the shelf, they land
+      there. An image goes only in an image track, and a note only in a note
+      track; the shelf holds both. A folder of images you fill in Finder is
+      an image track already.
+    </p>
   </section>
 
   <section class="field">

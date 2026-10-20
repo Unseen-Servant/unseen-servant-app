@@ -59,7 +59,7 @@
     type Line,
     type Tool,
   } from './board';
-  import { IMAGE } from './embeds';
+  import { carriesFiles, droppedImages } from './embeds';
   import type { BoardOp, CampaignIndex, Side } from './types';
 
   export let cards: Card[];
@@ -241,11 +241,6 @@
 
   // -- images dropped from Finder (#407) -----------------------------------
 
-  /** Only a drag carrying files lands here: Finder's. The app's own drags
-   *  carry none, and native drag and drop stays off, so this is the page's
-   *  own drop. */
-  const carriesFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
-
   function dragOver(e: DragEvent) {
     if (!carriesFiles(e)) return;
     e.preventDefault();
@@ -255,7 +250,7 @@
   function drop(e: DragEvent) {
     if (!carriesFiles(e)) return;
     e.preventDefault();
-    const files = [...(e.dataTransfer?.files ?? [])].filter((f) => IMAGE.test(f.name));
+    const files = droppedImages(e);
     if (files.length) onDropImages(files, toBoard({ x: e.clientX, y: e.clientY }));
   }
 

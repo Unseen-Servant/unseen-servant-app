@@ -338,6 +338,14 @@
       return;
     }
     if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    // ⌘T, ⇧⌘T: insert a note or an image track, as Live inserts an audio
+    // or a MIDI one, after the selected note's track.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 't' && mode === 'prep' && index) {
+      e.preventDefault();
+      const track = index.notes.find((n) => n.path === selected)?.track ?? null;
+      grid?.insertTrack(e.shiftKey ? 'image' : 'note', track && index.tracks.includes(track) ? track : null);
+      return;
+    }
     // ? or ⌘/: the shortcut sheet, as in Legend Lore. Not from the editor,
     // where ⌘/ is CodeMirror's comment.
     const mod = e.metaKey || e.ctrlKey;
@@ -772,9 +780,17 @@
 
   // -- tracks -------------------------------------------------------------
 
-  function createTrack(name: string) {
+  /** A track holding notes or images, its kind kept so it doesn't follow
+   *  what's put in it (images design §3.2), after `after` or at the end. */
+  function createTrack(name: string, kind: 'note' | 'image', after: string | null) {
     run(async () => {
-      await commandApi.createTrack(campaign!, name);
+      const made = await commandApi.createTrack(campaign!, name);
+      await commandApi.kindTrack(campaign!, made, kind);
+      if (after && index) {
+        const order = index.tracks.filter((t) => t !== made);
+        order.splice(order.indexOf(after) + 1, 0, made);
+        await commandApi.orderTracks(campaign!, order);
+      }
       await refreshIndex();
     });
   }
@@ -811,6 +827,30 @@
     run(async () => {
       await commandApi.pigmentTrack(campaign!, track, pigment);
       await refreshIndex();
+    });
+  }
+
+  /** Images just copied in, picked or dropped: into the armed beat if
+   *  there is one, as a note started then would be, the last selected. */
+  async function imagesAdded(paths: string[]) {
+    if (!paths.length) return;
+    if (armedBeat) for (const path of paths) await commandApi.setMember(campaign!, armedBeat, path, true);
+    await refreshIndex();
+    selected = paths[paths.length - 1];
+  }
+
+  /** Images picked for an image track, copied into it. */
+  function addImages(track: string) {
+    run(async () => imagesAdded(await commandApi.pickImages(campaign!, track)));
+  }
+
+  /** Images dropped from Finder on an image track, or on the shelf (no
+   *  track), copied in: the campaign keeps what it uses. */
+  function dropImages(files: File[], track: string | null) {
+    run(async () => {
+      const paths: string[] = [];
+      for (const file of files) paths.push(await commandApi.addImage(campaign!, file.name, await file.arrayBuffer(), track));
+      await imagesAdded(paths);
     });
   }
 
@@ -1165,6 +1205,7 @@
             onRename={renameNote}
             onSpent={setSpent}
             onMove={moveNote}
+            onDropImages={(files) => dropImages(files, null)}
             onReveal={(note) => reveal(note.path)}
             onTrash={(note) => trashNote(note)}
             onCopy={copyNote}
@@ -1177,6 +1218,7 @@
             bind:this={grid}
             {cols}
             pigments={index.pigments}
+            kinds={index.kinds}
             openPath={shown}
             selectedPath={selected}
             onSelect={(note) => (selected = note.path)}
@@ -1199,6 +1241,8 @@
             onTrashTrack={trashTrack}
             onReorderTracks={orderTracks}
             onPigmentTrack={pigmentTrack}
+            onAddImages={addImages}
+            onDropImages={dropImages}
             onReorderNotes={orderNotes}
             onRevealTrack={(track) => reveal(track)}
           />

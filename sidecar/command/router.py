@@ -64,6 +64,12 @@ class TrackPigment(BaseModel):
     pigment: str | None
 
 
+class TrackKind(BaseModel):
+    campaign: str
+    track: str
+    kind: str
+
+
 class NoteOrder(BaseModel):
     campaign: str
     folder: str
@@ -466,6 +472,13 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         with write_lock:
             return {"pigments": vault.save_track_pigment(campaign_path(body.campaign), body.track, body.pigment)}
 
+    @router.put("/tracks/kind")
+    def kind_track(body: TrackKind):
+        """Whether a track holds notes or images (images design §3.2), kept
+        with the campaign's presentation. Every track's kind, after."""
+        with write_lock:
+            return {"kinds": vault.save_track_kind(campaign_path(body.campaign), body.track, body.kind)}
+
     # -- notes -------------------------------------------------------------
 
     @router.put("/notes/order")
@@ -520,16 +533,19 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
         return {"path": path}
 
     @router.post("/images")
-    async def add_image(request: Request, campaign: str, name: str):
-        """An image dropped on a board from Finder, copied onto the
-        campaign's shelf (#407), since the campaign is the unit. The body
+    async def add_image(request: Request, campaign: str, name: str, track: str | None = None):
+        """An image copied into the campaign, since the campaign is the
+        unit: into ``track``, picked for an image track (images design §4),
+        else onto the shelf, dropped on a board from Finder (#407). The body
         is the file's bytes; the answer, the copy's path."""
         data = await request.body()
 
         def write() -> str:
             camp = campaign_path(campaign)
+            if track is not None and track not in vault.track_order(camp):
+                raise vault.NotFound(f"No track named {track!r}")
             with write_lock:
-                return vault.add_image(camp, shelf_or(camp, prep.SHELF), name, data)
+                return vault.add_image(camp, track or shelf_or(camp, prep.SHELF), name, data)
 
         return {"path": await run_in_threadpool(write)}
 

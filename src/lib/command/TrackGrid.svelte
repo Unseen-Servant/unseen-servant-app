@@ -21,8 +21,9 @@
   import { hoverLive } from '../ui/inputModality';
   import { grab } from '../ui/grab';
   import CommandMenu from './CommandMenu.svelte';
-  import { action, divider, keyed, picks, submenu, type OpenMenu } from './menu';
+  import { action, divider, keyed, picks, submenu, type MenuItem, type OpenMenu } from './menu';
   import { PIGMENTS } from '../legend-lore/palette';
+  import { carriesFiles, droppedImages } from './embeds';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import { CARET_RIGHT } from '../ui/iconPaths';
@@ -32,6 +33,8 @@
   export let cols: Column[];
   /** Each track's pigment, by name. */
   export let pigments: Record<string, string>;
+  /** What each track makes, by name: notes, or images (images design §3.2). */
+  export let kinds: Record<string, 'note' | 'image'>;
   export let openPath: string | null;
   /** Notes in the focused beat. */
   export let members: Set<string>;
@@ -58,13 +61,19 @@
   export let onMoveNote: (note: NoteEntry, folder: string, order?: string[]) => void;
   export let onTrashNote: (note: NoteEntry) => void;
   export let onRevealNote: (note: NoteEntry) => void;
-  export let onCreateTrack: (name: string) => void;
+  /** A new track named, holding notes or images, after the track `after`
+   *  or, with none, at the end. */
+  export let onCreateTrack: (name: string, kind: 'note' | 'image', after: string | null) => void;
   export let onRenameTrack: (track: string, name: string) => Promise<string | null>;
   export let onTrashTrack: (column: Column) => void;
   export let onRevealTrack: (track: string) => void;
   /** The tracks by name, in the order they were dragged into. */
   export let onReorderTracks: (order: string[]) => void;
   export let onPigmentTrack: (track: string, pigment: string | null) => void;
+  /** Images picked with the native picker, copied into the track. */
+  export let onAddImages: (track: string) => void;
+  /** Images dropped from Finder on an image track, copied into it. */
+  export let onDropImages: (files: File[], track: string) => void;
   /** A folder's notes by name, in the order they were dragged into. */
   export let onReorderNotes: (folder: string, names: string[]) => void;
 
@@ -74,7 +83,33 @@
   );
 
   let creatingIn: string | null = null;
-  let creatingTrack = false;
+  /** A track being named: what it holds, and the track it goes after (null:
+   *  at the end). */
+  let inserting: { kind: 'note' | 'image'; after: string | null } | null = null;
+  /** Where its column stands: after that track, or in the ghost column at
+   *  the end when it goes last. */
+  $: insertAfter =
+    inserting?.after && inserting.after !== cols[cols.length - 1]?.track && cols.some((c) => c.track === inserting!.after)
+      ? inserting.after
+      : null;
+
+  /** Insert a track holding notes or images, named in place: Ableton's
+   *  Insert Audio and MIDI Track (images design §3.2). Its kind is chosen
+   *  here, as a Live track's is. */
+  export function insertTrack(kind: 'note' | 'image', after: string | null = null) {
+    inserting = { kind, after };
+  }
+
+  const insertItems = (after: string | null): MenuItem[] => [
+    keyed('Insert note track', 'command.insertNoteTrack', () => insertTrack('note', after)),
+    keyed('Insert image track', 'command.insertImageTrack', () => insertTrack('image', after)),
+  ];
+
+  /** `+ track`: which kind, in a menu under the key. */
+  function trackKey(e: MouseEvent) {
+    const key = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu = { x: key.left, y: key.bottom, items: insertItems(null) };
+  }
   let renamingPath: string | null = null;
   let renamingTrack: string | null = null;
   let menu: OpenMenu | null = null;
@@ -113,9 +148,14 @@
 
   // A right-click selects the row, as it focuses one in Legend Lore, so the
   // menu's keys act on what it opened on.
+  /** Whether a note, or an image, files onto `track`: only onto a track of
+   *  its kind, as Live keeps audio clips off MIDI tracks (images design
+   *  §3.2). The shelf takes both. */
+  const fits = (note: NoteEntry, track: string) => (kinds[track] ?? 'note') === note.type;
+
   function noteMenu(e: MouseEvent, note: NoteEntry) {
     onSelect(note);
-    const others = cols.map((c) => c.track).filter((t) => t !== note.track);
+    const others = cols.map((c) => c.track).filter((t) => t !== note.track && fits(note, t));
     menu = {
       x: e.clientX,
       y: e.clientY,
@@ -155,6 +195,8 @@
   let dropAt: number | null = null;
   /** The track a dragged note would move to. */
   let noteInto: string | null = null;
+  /** The image track images dragged from Finder would be copied into. */
+  let filesInto: string | null = null;
 
   /** Where a note dragged among a group's rows lands: before row `at`, or
    *  after the last. */
@@ -179,6 +221,7 @@
     draggingTrack = null;
     dropAt = null;
     noteInto = null;
+    filesInto = null;
     noteSlot = null;
     stopScrolling();
   }
@@ -255,7 +298,7 @@
    *  that's not where the note already is. */
   function noteTarget(note: NoteEntry | null, x: number): string | null {
     const track = cols[columnAt(x)]?.track ?? null;
-    return note && track !== note.track ? track : null;
+    return note && track !== null && track !== note.track && fits(note, track) ? track : null;
   }
 
   /** The rows' list of column `i`; none past the last track. */
@@ -268,6 +311,9 @@
     const i = columnAt(x);
     const list = listOf(i);
     if (!note || !list) return null;
+    // Another track takes it only if it's of its kind; its own takes it
+    // back whatever it is, as Finder may have left it.
+    if (cols[i].track !== note.track && !fits(note, cols[i].track)) return null;
     // Rows scrolled out of the list still have boxes, under the nameplate.
     const shown = list.getBoundingClientRect();
     if (y < shown.top || y >= shown.bottom) return null;
@@ -303,6 +349,15 @@
   }
 
   function overGrid(e: DragEvent) {
+    // Images from Finder: onto an image track, copied into it.
+    if (carriesFiles(e)) {
+      const over = cols[columnAt(e.clientX)]?.track ?? null;
+      filesInto = over !== null && kinds[over] === 'image' ? over : null;
+      if (filesInto === null) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      return;
+    }
     const track = !!draggingTrack && isTrackDrag(e);
     if (!track && !(isNoteDrag(e) && draggedNote())) return;
     pointerX = e.clientX;
@@ -315,6 +370,15 @@
   }
 
   function dropOnGrid(e: DragEvent) {
+    if (carriesFiles(e)) {
+      const into = filesInto;
+      endDrag();
+      if (into === null) return;
+      e.preventDefault();
+      const files = droppedImages(e);
+      if (files.length) onDropImages(files, into);
+      return;
+    }
     const dragged = draggingTrack;
     const note = isNoteDrag(e) ? draggedNote() : null;
     const slot = noteSlotAt(note, e.clientX, e.clientY);
@@ -359,16 +423,23 @@
     if (x > box.left && x < box.right && y > box.top && y < box.bottom) return;
     dropAt = null;
     noteInto = null;
+    filesInto = null;
     noteSlot = null;
     stopScrolling();
   }
 
   function trackMenu(e: MouseEvent, column: Column) {
+    const kind = kinds[column.track] ?? 'note';
     menu = {
       x: e.clientX,
       y: e.clientY,
       items: [
-        action('New note', () => (creatingIn = column.track)),
+        kind === 'image'
+          ? action('Add images…', () => onAddImages(column.track))
+          : action('New note', () => (creatingIn = column.track)),
+        divider,
+        // After this track, as Live inserts after the one clicked.
+        ...insertItems(column.track),
         divider,
         action('Rename', () => (renamingTrack = column.track)),
         action('Show in Finder', () => onRevealTrack(column.track)),
@@ -389,6 +460,23 @@
     };
   }
 </script>
+
+{#snippet namingTrack(number: number)}
+  <span class="plate-name">
+    <span class="track-number" aria-hidden="true">{number}</span>
+    <InlineName
+      bare
+      placeholder={inserting?.kind === 'image' ? 'Image track name…' : 'Track name…'}
+      label={inserting?.kind === 'image' ? 'New image track' : 'New track'}
+      onCommit={(name) => {
+        const { kind, after } = inserting!;
+        inserting = null;
+        onCreateTrack(name, kind, after);
+      }}
+      onCancel={() => (inserting = null)}
+    />
+  </span>
+{/snippet}
 
 {#snippet noteRow(note: NoteEntry, grouped: boolean)}
   {@const renaming = renamingPath === note.path}
@@ -480,7 +568,7 @@
       class:dragging={draggingTrack === column.track}
       class:drop-before={dropAt === i}
       class:drop-after={dropAt === cols.length && i === cols.length - 1}
-      class:drop-into={noteInto === column.track}
+      class:drop-into={noteInto === column.track || filesInto === column.track}
       aria-label={column.track}
     >
       <header
@@ -539,7 +627,19 @@
           {/each}
         {/each}
 
-        {#if creatingIn === column.track}
+        {#if kinds[column.track] === 'image'}
+          <!-- An image track's empty row adds images from the Mac (images
+               design §4), copied in, as the campaign keeps what it uses. -->
+          <button
+            type="button"
+            class="ghost-row add-images"
+            title={`Add images to ${column.track}`}
+            on:click={() => onAddImages(column.track)}
+          >
+            <span class="slot" aria-hidden="true"></span>
+            <span class="ghost-label">+ image</span>
+          </button>
+        {:else if creatingIn === column.track}
           <div class="row-edit naming">
             <span class="slot" aria-hidden="true"></span>
             <InlineName
@@ -591,29 +691,22 @@
         {/if}
       </div>
     </section>
+    {#if inserting && insertAfter === column.track}
+      <section class="column ghost-column naming" aria-label="New track">
+        <header class="nameplate">{@render namingTrack(i + 2)}</header>
+      </section>
+    {/if}
   {/each}
 
   <!-- Naming a track, the ghost column dresses as the track it becomes, as
        a new note's row does: a track's width, its number, its plate's
        lettering, with no field of its own. -->
-  <section class="column ghost-column" class:naming={creatingTrack} aria-label="New track">
+  <section class="column ghost-column" class:naming={inserting && insertAfter === null} aria-label="New track">
     <header class="nameplate">
-      {#if creatingTrack}
-        <span class="plate-name">
-          <span class="track-number" aria-hidden="true">{cols.length + 1}</span>
-          <InlineName
-            bare
-            placeholder="Track name…"
-            label="New track"
-            onCommit={(name) => {
-              creatingTrack = false;
-              onCreateTrack(name);
-            }}
-            onCancel={() => (creatingTrack = false)}
-          />
-        </span>
+      {#if inserting && insertAfter === null}
+        {@render namingTrack(cols.length + 1)}
       {:else}
-        <button type="button" class="ghost-track ledger-label" on:click={() => (creatingTrack = true)}>+ track</button>
+        <button type="button" class="ghost-track ledger-label" aria-haspopup="menu" on:click={trackKey}>+ track</button>
       {/if}
     </header>
   </section>
@@ -1062,6 +1155,16 @@
   .note-row.selected,
   .ghost-row.selected {
     box-shadow: var(--ring-focus);
+  }
+
+  /* `+ image` in the tertiary grey of `+ track`, brightening on hover as
+     a key does. */
+  .ghost-row.add-images {
+    color: var(--text-tertiary);
+  }
+
+  .ghost-row.add-images:hover {
+    color: var(--text-primary);
   }
 
   /* The note in the inspector: content on show, so the parchment wash

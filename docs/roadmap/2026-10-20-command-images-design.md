@@ -1,6 +1,6 @@
 # Command images (2026-10-20)
 
-**Status:** settled 2026-10-20 (§12). Step 1 (#407) and step 2, images as clips, built 2026-10-20; steps 3 and 4 to come. Extends [#407](https://github.com/Unseen-Servant/unseen-servant-app/issues/407), phase 3b of the [Command design](2026-10-11-command-design.md) (§9), and lifts two of its exclusions (§8).
+**Status:** settled 2026-10-20 (§12). Steps 1–3 built 2026-10-20 (#407, images as clips, image tracks); step 4 to come. Extends [#407](https://github.com/Unseen-Servant/unseen-servant-app/issues/407), phase 3b of the [Command design](2026-10-11-command-design.md) (§9), and lifts two of its exclusions (§8).
 
 ## 0. TL;DR
 
@@ -51,8 +51,9 @@ Curse of Strahd/
 
 - `command.json` gains `kinds`, `{track: "image" | "note"}`, beside `pigments`. A track rename carries its kind, as it carries its pigment (`rename_track`).
 - **The default:** with no entry, a track whose folder holds images and no notes is an image track, and any other is a note track. A `Maps/` folder filled in Finder reads right with nothing saved, and an empty track is a note track until the GM says otherwise.
-- **Choosing it:** the track's menu gains a *Kind* pick row above *Pigment*, with two picks: Notes and Images. A pick writes the entry. A new image track is `+ track`, then Images.
+- **Choosing it:** the track's menu gains a *Kind* pick row above *Pigment*, with two picks: Notes and Images. A pick writes the entry. A new image track is `+ track`, then Images. *As built, revised the same day:* the kind is chosen when a track is inserted, as a Live track's is: `+ track` opens *Insert note track* (⌘T) and *Insert image track* (⇧⌘T), and a track's menu offers the same, inserting after that track; the keys insert after the selected note's track, else at the end. A track's kind isn't changed afterwards in the app, as a Live track's isn't. In an image track the menu's *New note* is *Add images…*.
 - **What it changes:** what the column makes, not what it holds. An image track's empty row is `+ image` (§4); a note track's names a new note, as today.
+- **Filing follows the kind** (2026-10-20): Command puts an image only in an image track and a note only in a note track, as Live keeps audio clips off MIDI tracks. A row's *Move to* lists the tracks of its kind, a dragged row lights only those columns, and the sidecar refuses a move, a new note or an added image that would mismatch, so MCP can't make one either. The shelf holds both, as Live's browser does. A mismatch made in Finder still shows, and moves within its own track.
 
 *Rejected:*
 - A kind that decides membership, so an image track lists only images. Files would go missing from the grid, the first failure of the earlier apps (design §1).
@@ -75,6 +76,7 @@ Curse of Strahd/
 - **The inspector:** a selected image opens under the inspector plate: track, group › name as the rename field, `[close]`. Below the plate, the image is fitted to the panel's width on the vellum. There's no `[read]`/`[edit]` and no save state.
 - **Adding images:**
   - An image track's empty row is `+ image`. A click opens the native picker (images only, several at once) and copies the files into the track, numbering any clash.
+  - Images dropped from Finder on an image track's column are copied into it, and on the shelf onto the shelf (2026-10-20); a note track's column takes none. Added images, picked or dropped, join the armed beat if there is one, as a note started then does.
   - Send to Command from Legend Lore (§6), and #407's drop from Finder onto the board.
 - **The shelf sidebar** lists its images. *Copy from* lists another campaign's images, and a place's, and copies their bytes onto the shelf, as it copies notes.
 
@@ -156,7 +158,6 @@ Each step updates the Command design (§3, §5), Help → Guides (Command, and L
   - Maps inside PDFs: a page's embedded image, or the page rendered, through PyMuPDF. Passed on 2026-10-20 (§12).
   - Sizing a card to its image.
   - Thumbnails in the grid's rows or the tree.
-  - Dropping from Finder onto a Prep column.
   - A player-facing display (design §11).
 - **Not doing:**
   - Spending images (rule 4).

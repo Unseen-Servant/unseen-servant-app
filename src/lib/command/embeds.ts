@@ -47,6 +47,14 @@ export function relativeImage(images: string[], from: string, path: string): str
   return images.find((i) => i.toLowerCase() === rel) ?? null;
 }
 
+/** Whether a drag carries files from outside the app: Finder's. The app's
+ *  own drags carry none, and native drag and drop stays off, so a drop of
+ *  them is the page's own (#407). */
+export const carriesFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+
+/** The images among a drop's files. */
+export const droppedImages = (e: DragEvent) => [...(e.dataTransfer?.files ?? [])].filter((f) => IMAGE.test(f.name));
+
 /** Where a card or the reader gets the URL the webview loads an image
  *  from; null when nothing in the campaign answers. */
 export interface ImageSource {

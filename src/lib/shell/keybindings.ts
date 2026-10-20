@@ -159,6 +159,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // In Prep and Play, on the row or card under the pointer, as Legend Lore's
   // A shelves a collection. No `match`, as R.
   { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer spent, or unspent', scope: 'command' },
+  // In Prep: Live's Insert Audio and MIDI Track, as a note or an image
+  // track, after the selected note's track, else at the end.
+  { id: 'command.insertNoteTrack',  keys: { mac: '⌘T',  other: 'Ctrl+T' },       label: 'Insert a note track', scope: 'command' },
+  { id: 'command.insertImageTrack', keys: { mac: '⇧⌘T', other: 'Ctrl+Shift+T' }, label: 'Insert an image track', scope: 'command' },
   // In Prep and Play, from the editor too: Obsidian's reading-view key.
   { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
   // In Prep and Play, from the editor and the jot bar too.

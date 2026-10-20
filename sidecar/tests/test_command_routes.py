@@ -372,6 +372,17 @@ def test_an_image_dropped_on_a_board_lands_on_the_shelf(cmd, campaign_root):
     assert refused.status_code == 422
 
 
+def test_an_image_track_takes_the_images_picked_for_it(cmd, campaign_root):
+    made = cmd.post("/api/command/tracks", json={"campaign": "Strahd", "name": "Maps"})
+    assert made.status_code == 200
+    kinds = cmd.put("/api/command/tracks/kind", json={"campaign": "Strahd", "track": "Maps", "kind": "image"}).json()["kinds"]
+    assert kinds["Maps"] == "image" and kinds["NPCs"] == "note"
+    params = {"campaign": "Strahd", "name": "Barovia.png", "track": "Maps"}
+    assert cmd.post("/api/command/images", params=params, content=b"\x89PNG").json() == {"path": "Maps/Barovia.png"}
+    assert cmd.post("/api/command/images", params={**params, "track": "Beats"}, content=b"x").status_code == 404
+    assert cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()["kinds"]["Maps"] == "image"
+
+
 def test_the_shelf_copies_from_a_folder_the_gm_added(cmd, campaign_root, tmp_path):
     vault = tmp_path / "Old vault"
     (vault / "NPCs" / "Vallaki").mkdir(parents=True)

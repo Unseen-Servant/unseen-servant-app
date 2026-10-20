@@ -484,6 +484,26 @@ def test_a_track_rename_carries_the_links_that_spell_an_image(camp):
     assert (camp / "Overview.md").read_text() == "![[Places/map.png|300]] ![[map.png]] [[Places/Village of Barovia]]"
 
 
+def test_a_tracks_kind_is_chosen_or_read_from_its_folder(camp):
+    # Images design §3.2: a folder of images reads as an image track, an
+    # empty one or one with notes as a note track, until the GM chooses.
+    (camp / "Maps").mkdir()
+    write(camp / "Maps" / "Barovia.png", "", raw=b"")
+    (camp / "Handouts").mkdir()
+    assert vault.scan(camp)["kinds"] == {"Handouts": "note", "Locations": "note", "Maps": "image", "NPCs": "note"}
+    assert vault.save_track_kind(camp, "Handouts", "image")["Handouts"] == "image"
+    assert vault.save_track_kind(camp, "Maps", "note")["Maps"] == "note"
+    # The kind follows a rename, as the pigment does, and lists nothing:
+    # the image is still in the scan.
+    vault.rename_track(camp, "Handouts", "Props")
+    assert vault.track_kinds(camp)["Props"] == "image"
+    assert any(n["path"] == "Maps/Barovia.png" for n in vault.scan(camp)["notes"])
+    with pytest.raises(Invalid):
+        vault.save_track_kind(camp, "Maps", "audio")
+    with pytest.raises(NotFound):
+        vault.save_track_kind(camp, "Beats", "image")
+
+
 def test_an_image_renames_and_moves_as_a_note_does_keeping_its_extension(camp):
     write(camp / "Overview.md", "![[map.png|300]] and [[Locations/map.png]]")
     # The field edits the stem; the whole name with its extension works too.
@@ -499,21 +519,44 @@ def test_an_image_renames_and_moves_as_a_note_does_keeping_its_extension(camp):
     with pytest.raises(Conflict):
         vault.rename_note(camp, "NPCs/Ireena.png", "ismark")
     assert vault.rename_note(camp, "Shelf/Ismark.png", "Ismark portrait")[0] == "Shelf/Ismark portrait.png"
-    moved, _ = vault.move_note(camp, "Locations/Old map.png", "NPCs")
-    assert moved == "NPCs/Old map.png"
+    write(camp / "Maps" / "Crest.png", "", raw=b"")
+    moved, _ = vault.move_note(camp, "Locations/Old map.png", "Maps")
+    assert moved == "Maps/Old map.png"
     # An image goes in a track or on the shelf.
     with pytest.raises(Invalid):
         vault.move_note(camp, moved, "Beats")
 
 
-def test_add_image_names_it_after_the_file_and_numbers_a_clash(camp):
-    assert vault.add_image(camp, "Locations", "Map.PNG", b"\x89PNG") == "Locations/Map 2.PNG"
-    assert vault.add_image(camp, "NPCs", "Ismark: portrait?.webp", b"x") == "NPCs/Ismark portrait.webp"
-    assert (camp / "Locations" / "Map 2.PNG").read_bytes() == b"\x89PNG"
-    # A name can't reach out of the folder, nor hide the file.
-    assert vault.add_image(camp, "NPCs", "../../.evil.png", b"x") == "NPCs/evil.png"
+def test_command_files_an_image_or_a_note_only_with_its_kind(camp):
+    # Images design §3.2: as Live keeps audio off MIDI tracks. The shelf
+    # takes both, and a mismatch made in Finder still shows and moves
+    # within its own track.
+    write(camp / "Maps" / "Barovia.png", "", raw=b"")
+    with pytest.raises(Invalid, match="Maps is an image track: a note goes in a note track"):
+        vault.create_note(camp, "Maps", "Legend")
+    with pytest.raises(Invalid, match="NPCs is a note track: an image goes in an image track"):
+        vault.add_image(camp, "NPCs", "Ismark.png", b"x")
     with pytest.raises(Invalid):
-        vault.add_image(camp, "NPCs", "notes.md", b"x")
+        vault.move_note(camp, "Maps/Barovia.png", "NPCs")
+    with pytest.raises(Invalid):
+        vault.move_note(camp, "NPCs/Ireena.md", "Maps")
+    (camp / "Shelf").mkdir()
+    assert vault.move_note(camp, "Maps/Barovia.png", "Shelf")[0] == "Shelf/Barovia.png"
+    # map.png sits in Locations, a note track, as Finder left it: it still
+    # moves among Locations' own folders.
+    (camp / "Locations" / "Old").mkdir()
+    assert vault.move_note(camp, "Locations/map.png", "Locations/Old")[0] == "Locations/Old/map.png"
+
+
+def test_add_image_names_it_after_the_file_and_numbers_a_clash(camp):
+    (camp / "Shelf").mkdir()
+    assert vault.add_image(camp, "Shelf", "Map.PNG", b"\x89PNG") == "Shelf/Map 2.PNG"
+    assert vault.add_image(camp, "Shelf", "Ismark: portrait?.webp", b"x") == "Shelf/Ismark portrait.webp"
+    assert (camp / "Shelf" / "Map 2.PNG").read_bytes() == b"\x89PNG"
+    # A name can't reach out of the folder, nor hide the file.
+    assert vault.add_image(camp, "Shelf", "../../.evil.png", b"x") == "Shelf/evil.png"
+    with pytest.raises(Invalid):
+        vault.add_image(camp, "Shelf", "notes.md", b"x")
 
 
 def test_rename_campaign_rewrites_only_links_that_spell_it(root, camp):

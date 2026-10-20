@@ -13,6 +13,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { grab } from '../ui/grab';
   import { commandApi } from './api';
+  import { carriesFiles, droppedImages } from './embeds';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
   import { nameParts, newRowKey } from './columns';
@@ -43,6 +44,8 @@
   export let onRename: (note: NoteEntry, name: string) => Promise<string | null>;
   export let onSpent: (note: NoteEntry, spent: boolean) => void;
   export let onMove: (note: NoteEntry, track: string) => void;
+  /** Images dropped from Finder on the shelf, copied onto it. */
+  export let onDropImages: (files: File[]) => void;
   export let onReveal: (note: NoteEntry) => void;
   export let onTrash: (note: NoteEntry) => void;
   export let onCopy: (from: CopySource, note: NoteEntry) => void;
@@ -170,6 +173,15 @@
   };
 
   function overShelf(e: DragEvent) {
+    // Images from Finder land on the shelf, which holds notes and images
+    // alike (images design §4).
+    if (carriesFiles(e)) {
+      dropInto = !source;
+      if (!dropInto) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      return;
+    }
     dropInto = target(e) !== null;
     if (!dropInto) return;
     e.preventDefault();
@@ -177,6 +189,14 @@
   }
 
   function dropOnShelf(e: DragEvent) {
+    if (carriesFiles(e)) {
+      dropInto = false;
+      if (source) return;
+      e.preventDefault();
+      const files = droppedImages(e);
+      if (files.length) onDropImages(files);
+      return;
+    }
     const note = target(e);
     dropInto = false;
     if (!note) return;
@@ -207,16 +227,18 @@
   // A right-click selects the row, as the grid's does.
   function noteMenu(e: MouseEvent, note: NoteEntry) {
     onSelect(note);
+    const fitting = index.tracks.filter((t) => (index.kinds[t] ?? 'note') === note.type);
     const groups = [
       // An image isn't spent (images design §2).
       note.type === 'image' ? [] : [keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent))],
       // The grid's Move to flyout, in the columns' order: the shelf at the
-      // left, for a loose note, then the tracks.
-      index.tracks.length || note.track === null
+      // left, for a loose note, then the tracks of its kind, as Live keeps
+      // audio clips off MIDI tracks (images design §3.2).
+      fitting.length || note.track === null
         ? [
             submenu('Move to', [
               ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
-              ...index.tracks.map((t) => action(t, () => onMove(note, t))),
+              ...fitting.map((t) => action(t, () => onMove(note, t))),
             ]),
           ]
         : [],

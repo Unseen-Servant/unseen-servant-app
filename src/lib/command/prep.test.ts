@@ -8,6 +8,7 @@ const index: CampaignIndex = {
   images: [],
   note_order: {},
   pigments: {},
+  kinds: {},
   ambiguous: [],
   notes: [],
   beats: [

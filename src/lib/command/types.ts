@@ -50,6 +50,9 @@ export interface CampaignIndex {
   /** Each track's pigment, a hex from Legend Lore's palette (palette.ts);
    *  a track it doesn't name has none. */
   pigments: Record<string, string>;
+  /** What each track makes, as the GM chose it or its folder says: notes,
+   *  or images (images design §3.2). It never hides a file. */
+  kinds: Record<string, 'note' | 'image'>;
   /** The notes sharing their name with another of their kind (a beat may
    *  share a note's), by path. */
   ambiguous: string[];

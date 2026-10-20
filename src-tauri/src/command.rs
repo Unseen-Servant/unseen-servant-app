@@ -99,6 +99,9 @@ pub struct CampaignIndex {
     /// Every image in the campaign, by path, for notes' embeds (#407).
     #[serde(default)]
     images: Vec<String>,
+    /// Each track's kind, "note" or "image" (images design §3.2).
+    #[serde(default)]
+    kinds: std::collections::BTreeMap<String, String>,
 }
 
 /// A place's notes, as a campaign's index lists them.
@@ -872,10 +875,77 @@ pub async fn command_send(
     })
 }
 
-/// Copy an image dropped on a board from Finder onto the campaign's shelf
-/// (#407). The body is the file's bytes, raw rather than JSON; the
-/// campaign and the file's name come in headers, URI-encoded since a
-/// header is ASCII. Returns the copy's path.
+#[tauri::command]
+pub async fn command_kind_track(
+    campaign: String,
+    track: String,
+    kind: String,
+) -> Result<std::collections::BTreeMap<String, String>, String> {
+    #[derive(Deserialize)]
+    struct Kinds {
+        kinds: std::collections::BTreeMap<String, String>,
+    }
+    answer::<Kinds>(
+        client()
+            .put(api("/tracks/kind"))
+            .json(&serde_json::json!({ "campaign": campaign, "track": track, "kind": kind })),
+    )
+    .await
+    .map(|k| k.kinds)
+}
+
+/// Copy an image's bytes into the campaign: into `track`, or onto the
+/// shelf. Returns the copy's path, numbered when the name was taken.
+async fn post_image(
+    campaign: &str,
+    name: &str,
+    track: Option<&str>,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let mut params = vec![("campaign", campaign), ("name", name)];
+    if let Some(track) = track {
+        params.push(("track", track));
+    }
+    let added: AtPath = answer(client().post(api_query("/images", &params)?).body(bytes)).await?;
+    Ok(added.path)
+}
+
+/// Add images to an image track (images design §4), picked with the native
+/// picker, several at once, and copied in. Their paths; none when the GM
+/// cancels.
+#[tauri::command]
+pub async fn command_pick_images(
+    app: AppHandle,
+    campaign: String,
+    track: String,
+) -> Result<Vec<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let picked = app
+        .dialog()
+        .file()
+        .set_title(format!("Add images to {}", track))
+        .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "svg"])
+        .blocking_pick_files()
+        .unwrap_or_default();
+    let mut added = Vec::new();
+    for file in picked {
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .ok_or_else(|| format!("{} has no file name", path.display()))?;
+        let bytes = std::fs::read(&path).map_err(|e| format!("Can't read {}: {}", name, e))?;
+        added.push(post_image(&campaign, &name, Some(&track), bytes).await?);
+    }
+    Ok(added)
+}
+
+/// Copy an image dropped from Finder into the campaign: onto the shelf,
+/// from a board (#407) or the shelf, or into the image track it was dropped
+/// on, named in a `track` header (images design §4). The body is the
+/// file's bytes, raw rather than JSON; the names come in headers,
+/// URI-encoded since a header is ASCII. Returns the copy's path.
 #[tauri::command]
 pub async fn command_add_image(request: tauri::ipc::Request<'_>) -> Result<String, String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
@@ -888,19 +958,11 @@ pub async fn command_add_image(request: tauri::ipc::Request<'_>) -> Result<Strin
             .and_then(|v| v.to_str().ok())
             .and_then(|v| percent_encoding::percent_decode_str(v).decode_utf8().ok())
             .map(|v| v.into_owned())
-            .ok_or_else(|| format!("The image came without its {}", key))
     };
-    let (campaign, name) = (header("campaign")?, header("name")?);
-    let added: AtPath = answer(
-        client()
-            .post(api_query(
-                "/images",
-                &[("campaign", &campaign), ("name", &name)],
-            )?)
-            .body(bytes.clone()),
-    )
-    .await?;
-    Ok(added.path)
+    let needed =
+        |key: &str| header(key).ok_or_else(|| format!("The image came without its {}", key));
+    let (campaign, name) = (needed("campaign")?, needed("name")?);
+    post_image(&campaign, &name, header("track").as_deref(), bytes.clone()).await
 }
 
 /// Copy another campaign's note, or a place's, onto this campaign's
@@ -1066,6 +1128,7 @@ mod tests {
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
                           "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}]}],
             "images": ["Maps/Barovia.png"],
+            "kinds": {"Maps": "image", "NPCs": "note"},
         });
         let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
         assert_eq!(serde_json::to_value(index).unwrap(), sidecar);
