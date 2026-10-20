@@ -392,4 +392,5 @@ Open:
 - [2026-09-24-unseen-servant-workstation-architecture.md](2026-09-24-unseen-servant-workstation-architecture.md) — D2–D6 and §4 Q4, which this doc builds on.
 - [2026-10-18-command-mcp-tools-design.md](2026-10-18-command-mcp-tools-design.md) — the MCP tools' audit and the plan that extends §8.
 - [2026-10-19-command-board-toolbar-design.md](2026-10-19-command-board-toolbar-design.md) — the board's creation toolbar, after Miro's, which extends §5.2.
+- [2026-10-20-command-images-design.md](2026-10-20-command-images-design.md) — images as clips, image tracks and Legend Lore's images, which extends phase 3b (§9).
 - `src/lib/shell/PANELS.md` — the panel contract Command's UI follows.
