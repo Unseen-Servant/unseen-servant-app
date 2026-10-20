@@ -42,7 +42,7 @@ Solo dev project on the GitHub Pro tier: **3000 billable minutes/month**. macOS 
 1. **No macOS/Windows jobs on PR or push-to-main.** If you're tempted to add one, the question is "what will this catch that Linux + the next release tag won't?" — and the answer needs to justify the billable-min cost.
 2. **Estimate billable minutes before adding any job.** Include the multiplier. Note it in the commit message.
 3. **Release-time regressions are acceptable.** If a cross-platform bug only surfaces at tag push, fix forward and bump the patch version. Re-tagging an unpublished draft once is fine; if a second fix lands, bump the patch.
-4. **Local validation is the dev's responsibility.** Before tagging a release that touches build config, `src-tauri/`, sidecar deps, or the build scripts, run `npm run tauri build` and `bash scripts/build-sidecar.sh` locally.
+4. **Local validation is the dev's responsibility.** Before tagging a release that touches build config, `src-tauri/`, sidecar deps, or the build scripts, run `npm run build:local` (the sidecar binaries, then the app) locally.
 
 ### Commit workflow
 

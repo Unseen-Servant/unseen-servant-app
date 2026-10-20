@@ -242,10 +242,10 @@ for the corpus setup and how to record baselines.
 ## Building for Production
 
 ```bash
-chmod +x scripts/build-sidecar.sh
-./scripts/build-sidecar.sh   # Bundle Python sidecar into standalone binaries
-npm run tauri build           # Build Tauri app (includes sidecar binaries)
+npm run build:local   # Bundle the Python sidecar, then build the Tauri app around it
 ```
+
+`npm run tauri build` alone bundles whatever is already in `src-tauri/binaries/`, so a sidecar change since the last `scripts/build-sidecar.sh` ships stale.
 
 Output: `src-tauri/target/release/bundle/` — `dmg/*.dmg` (macOS), `nsis/*.exe` (Windows).
 
