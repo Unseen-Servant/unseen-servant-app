@@ -56,11 +56,9 @@
   isVisible={selected}
   onResizeEnd={(_, frame) => actions.frame(card, frame)}
 />
-{#if card.kind !== 'group'}
-  {#each SIDES as [id, position] (id)}
-    <Handle type="source" {id} {position} />
-  {/each}
-{/if}
+{#each SIDES as [id, position] (id)}
+  <Handle type="source" {id} {position} />
+{/each}
 {#if data.linking}
   <Handle type="source" id="whole" position={Position.Top} class="whole" />
 {/if}
