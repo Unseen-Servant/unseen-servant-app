@@ -444,6 +444,19 @@
   .slot.keyed {
     border-color: var(--border-frame-keyed);
   }
+  /* The box has no top edge of its own — the tool's header plate closes it
+     in the frame's grey — so the keyed frame paints its top as a strip
+     over the plate, no layout shift. The filled slot draws a real top edge
+     (above), coloured by the rule before, so it needs none. */
+  .slot.keyed:not(.filled)::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--border-frame-keyed);
+    z-index: 1;
+    pointer-events: none;
+  }
 
   .window-key {
     display: flex;
