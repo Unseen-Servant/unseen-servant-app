@@ -1,10 +1,11 @@
 // Single source of truth for app keybindings.
 //
-// The global handler in +page.svelte hardcodes the chord checks for speed
-// and clarity, but every binding is also registered here so tooltips and
-// the `?` help overlay can stay in sync. When you add a chord
-// to the handler, add (or update) its entry here and reuse `chordHint(id)`
-// in the corresponding button's `title` attribute.
+// The handlers hardcode the chord checks for speed and clarity — keys.ts
+// for the chords that work whichever tool has the keyboard, each tool's
+// own window listener for the rest — but every binding is also registered
+// here so tooltips and the `?` help overlay can stay in sync. When you add
+// a chord to a handler, add (or update) its entry here and reuse
+// `chordHint(id)` in the corresponding button's `title` attribute.
 
 export type KeyScope =
   | 'global'

@@ -14,7 +14,6 @@
   import RenameField from '../ui/RenameField.svelte';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
-  import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
   import { dialogOpen, isTyping } from '../shell/focus';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { chordHint } from '../shell/keybindings';
@@ -125,8 +124,6 @@
   let grid: TrackGrid | undefined;
   let shelf: ShelfSidebar | undefined;
   let beats: BeatColumn | undefined;
-  /** The shortcut sheet, Legend Lore's. */
-  let showHelp = false;
   let bufState: BufferState = { path: null, status: 'empty', error: null };
   // A note just opened takes the caret to the top; a reload keeps it.
   let freshOpen = false;
@@ -347,14 +344,7 @@
       grid?.insertTrack(e.shiftKey ? 'image' : 'note', track && index.tracks.includes(track) ? track : null);
       return;
     }
-    // ? or ⌘/: the shortcut sheet, as in Legend Lore. Not from the editor,
-    // where ⌘/ is CodeMirror's comment.
     const mod = e.metaKey || e.ctrlKey;
-    if ((e.key === '?' && !mod && !e.altKey) || (mod && !e.altKey && e.key === '/')) {
-      e.preventDefault();
-      showHelp = true;
-      return;
-    }
     // Tab: Prep ⇄ Play, Live's key for its two views, as Legend Lore's
     // tree ⇄ systems. ⇧Tab too: with two views, direction means nothing.
     if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && index) {
@@ -1437,8 +1427,6 @@
 {#if menu}
   <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
 {/if}
-
-<KeyboardHelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
 
 <style>
   .command {

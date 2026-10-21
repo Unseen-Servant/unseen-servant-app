@@ -15,8 +15,7 @@
   import PanelView from './PanelView.svelte';
   import RackBar from './RackBar.svelte';
   import StatusBar from './StatusBar.svelte';
-  import { dialogOpen, isTyping } from './focus';
-  import { menuSlotHeld } from './menuSlot';
+  import { bindKeys, dispatchKey, hostKeys, type KeyContext } from './keys';
   import { isPanelId, panelTitle, type PanelId } from './panels';
   import {
     RACK_TOOLS,
@@ -34,7 +33,7 @@
     type Rail,
     type RackView,
   } from './rack';
-  import { dock, openSettings, popOut, poppedPanels } from './shellState';
+  import { dock, onShowPanel, openSettings, popOut, poppedPanels } from './shellState';
 
   /** The private type a tool's key carries into the rack. */
   const CARRY = 'application/x-unseen-rack-tool';
@@ -122,12 +121,12 @@
   }
 
   // Rust asks for a tool (panels.rs show_panel): the File menu brings
-  // Command forward when it opens a campaign. In this view it takes the
-  // keyboard; otherwise the first view holding it comes up, and failing
-  // that it's mounted here.
-  const unlistenShow = listen<string>('panels://show', (e) => {
-    const id = e.payload;
-    if (!isPanelId(id) || !RACK_TOOLS.some((t) => t.id === id)) return;
+  // Command forward when it opens a campaign. A panel in this window asks
+  // the same way (shellState showPanel) ahead of a chord that changes what
+  // it shows. In this view it takes the keyboard; otherwise the first view
+  // holding it comes up, and failing that it's mounted here.
+  function show(id: PanelId) {
+    if (!RACK_TOOLS.some((t) => t.id === id)) return;
     if (filling !== id) filling = null;
     if (!present.includes(id)) {
       const at = views.findIndex((v) => toolsIn(v.root).includes(id));
@@ -135,8 +134,16 @@
       else commit({ ...view, root: mount(view.root, id) });
     }
     focused = id;
+  }
+  const unlistenShow = listen<string>('panels://show', (e) => {
+    if (isPanelId(e.payload)) show(e.payload);
   });
-  onDestroy(() => void unlistenShow.then((stop) => stop()));
+  const stopShow = onShowPanel(show);
+  onDestroy(() => {
+    void unlistenShow.then((stop) => stop());
+    stopShow();
+    for (const unbind of unbindKeys) unbind();
+  });
 
   // A tool back from its own window takes the keyboard if it's in this view,
   // whether it came back through [dock back] or the window's close button.
@@ -148,16 +155,20 @@
   }
   $: focusDockedBack($poppedPanels.popped);
 
-  // Bare 1–8 bring up a view, unless a field has the caret (the guard
-  // Command's bare keys use), or a dialog or menu is open.
-  function onKey(e: KeyboardEvent) {
-    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing) return;
+  // Bare 1–8 bring up a view, unless a field has the caret or a menu is
+  // open. The window's keys go through the shell's dispatcher (keys.ts),
+  // which already stands down for a dialog.
+  function rackKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing) return false;
     const digit = /^Digit([1-8])$/.exec(e.code);
-    if (!digit || menuSlotHeld() || dialogOpen()) return;
-    if (isTyping(e.target)) return;
-    e.preventDefault();
+    if (!digit || ctx.menu || ctx.typing) return false;
     switchTo(Number(digit[1]) - 1);
+    return true;
   }
+  const unbindKeys = [
+    bindKeys(hostKeys({ settings: () => showSettings('general'), shortcuts: () => (showHelp = true) })),
+    bindKeys(rackKeys),
+  ];
 
   // ---- resizing --------------------------------------------------------------
 
@@ -252,7 +263,7 @@
   }
 </script>
 
-<svelte:window on:keydown={onKey} />
+<svelte:window on:keydown={dispatchKey} />
 
 <div class="host" style={`--rail: ${RAIL}px`}>
   <RackBar

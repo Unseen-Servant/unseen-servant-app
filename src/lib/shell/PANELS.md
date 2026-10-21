@@ -101,6 +101,10 @@ showing the way back to its window.
   false — another panel may own the keyboard, even one on screen beside it.
   Bare 1–8 belong to the rack. It stands down for a dialog and for typing
   through `focus.ts` (`dialogOpen`, `isTyping`), never its own DOM query.
+  A chord that must work whichever tool has the keyboard is the opposite
+  case: it binds through `keys.ts` (`bindKeys`), is not gated on `active`,
+  and if it changes what the panel shows it calls `showPanel` (`shellState.ts`)
+  first so the host brings the panel up.
 - **A size** beyond its `rackMin` in the main window (Legend Lore 560×320,
   Command 420×280), or its window minimum in its own window. Fill the parent
   (`height: 100%`), never the viewport (`100vh`) — the rack bar takes a row,

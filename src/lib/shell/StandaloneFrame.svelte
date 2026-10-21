@@ -3,9 +3,11 @@
   // bar names it, the dock toggle in the panel's header is the way back, and
   // a status bar at its foot carries the lamps and the panel's own status
   // section (PANELS.md).
+  import { onDestroy } from 'svelte';
   import ConfirmDialog from '../ui/ConfirmDialog.svelte';
   import DockToggle from './DockToggle.svelte';
   import KeyboardHelpOverlay from './KeyboardHelpOverlay.svelte';
+  import { bindKeys, dispatchKey, hostKeys } from './keys';
   import PanelView from './PanelView.svelte';
   import StatusBar from './StatusBar.svelte';
   import type { PanelId } from './panels';
@@ -22,7 +24,14 @@
   function showSettings(tab: 'general' | 'help') {
     openSettings(tab).catch((err) => console.error('Failed to open settings:', err));
   }
+
+  // The window's keys go through the shell's dispatcher (keys.ts); the
+  // host answers for the shortcut sheet and settings.
+  const unbindKeys = bindKeys(hostKeys({ settings: () => showSettings('general'), shortcuts: () => (showHelp = true) }));
+  onDestroy(unbindKeys);
 </script>
+
+<svelte:window on:keydown={dispatchKey} />
 
 <div class="frame">
   <div class="panel">

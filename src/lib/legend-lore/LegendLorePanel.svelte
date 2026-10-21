@@ -20,9 +20,8 @@
   import LibraryStatus from './LibraryStatus.svelte';
   import { hoist } from '../shell/hoist';
   import { machinery } from '../shell/machinery';
-  import { OPEN_SETTINGS_EVENT } from '../shell/shellState';
+  import { OPEN_SETTINGS_EVENT, showPanel } from '../shell/shellState';
   import SettingsModal from '../shell/SettingsModal.svelte';
-  import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
   import DocumentStatsModal from './DocumentStatsModal.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
   import { holdLatch } from '../ui/holdLatch';
@@ -53,6 +52,7 @@
   import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
   import { dialogOpen, isTyping } from '../shell/focus';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
+  import { bindKeys, type KeyContext } from '../shell/keys';
   import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { viewFilter } from '../shell/mention';
@@ -315,7 +315,6 @@
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
-  let showHelpOverlay = false;
   // Gates the engage detent (app.css). See where it's set in onMount.
   let motionReady = false;
   let settingsInitialTab: 'general' | 'library' | 'game-systems' | 'help' = 'general';
@@ -991,6 +990,7 @@
     if (autoSyncInterval) clearInterval(autoSyncInterval);
     if (unlistenSidecarFailed) unlistenSidecarFailed();
     if (unlistenOpenSettings) unlistenOpenSettings();
+    unbindKeys();
   });
 
   async function setViewMode(mode: 'tree' | 'systems') {
@@ -2294,6 +2294,109 @@
   //   (modal Esc handled by Modal.svelte; the docked filter panel claims
   //   its own Esc while focus is inside it)
 
+  // The chords that work whichever tool has the keyboard, bound through
+  // the shell's dispatcher (keys.ts) rather than gated on `active`: the
+  // collection transport, sync, and the console's own switches. One that
+  // changes what Legend Lore shows brings it up first, as the File menu
+  // brings Command up, and acts once the host has drawn it.
+  function surface(): Promise<void> {
+    showPanel('legend-lore');
+    return tick();
+  }
+
+  function globalKeys(event: KeyboardEvent, ctx: KeyContext): boolean {
+    const meta = event.metaKey || event.ctrlKey;
+    const lk = event.key.toLowerCase();
+
+    // Cmd/Ctrl+K: focus the search input from anywhere in the app, query
+    // selected so typing replaces it and → edits it. Not ⌘F — that's the
+    // browser/OS find-in-page chord, and here it opens the Filters panel
+    // instead (below). ⌘K is the command-bar convention.
+    if (meta && !event.shiftKey && !event.altKey && lk === 'k') {
+      void surface().then(() => headerComponent?.focusAndSelect());
+      return true;
+    }
+
+    // Cmd/Ctrl + digit. Bare: play only collection N (again stops it) —
+    // track select, the way a DAW numbers its tracks, and live from
+    // anywhere, search input included. ⇧: add N to the mix or take it out.
+    const digit = selectedFolder ? digitChord(event) : null;
+    if (digit) {
+      const name = digit.alt ? undefined : collectionSlots[digit.digit - 1];
+      if (name) {
+        if (digit.shift) togglePlayCollection(name);
+        else playOnlyCollection(name);
+      }
+      return true;
+    }
+
+    // Cmd/Ctrl+R: re-detect changes from disk (the lighter "what changed?"
+    // action). Taken even when this isn't available, to keep the Tauri
+    // webview from reloading the app. Not with ⌥: ⌥⌘R reveals a row.
+    if (meta && !event.shiftKey && !event.altKey && lk === 'r') {
+      if (selectedFolder && !isSyncing) handleManualSync();
+      return true;
+    }
+
+    // Cmd/Ctrl+S: commit selected files to the index — the real sync work
+    // (same handler the "Sync" banner button calls). Standalone chord
+    // because this is the headline action of the app.
+    if (meta && !event.shiftKey && !event.altKey && lk === 's') {
+      if (selectedFolder && !isSyncing) handleSync();
+      return true;
+    }
+
+    // Cmd/Ctrl+F: toggle the Filters panel (docked below the collections panel
+    // in the left pane). F for filter, on the chord everything else spends on
+    // find — the panel is where you narrow what a search covers, so the two
+    // read as a pair with search on ⌘K. It was ⌘⇧F, and before that ⌘E, which
+    // meant nothing mnemonically and collided twice — macOS binds Cmd+E to
+    // "Use Selection for Find" in any text field, and Finder binds it to Eject.
+    if (meta && !event.shiftKey && !event.altKey && lk === 'f' && selectedFolder) {
+      void surface().then(toggleFilterPanel);
+      return true;
+    }
+
+    // Cmd/Ctrl+Shift+.: toggle "Show hidden" (Finder convention).
+    if (meta && event.shiftKey && !event.altKey && (event.key === '.' || event.key === '>') && selectedFolder) {
+      void surface().then(toggleShowHidden);
+      return true;
+    }
+
+    // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
+    // explorer (same handler the status-bar folder button calls). Skipped
+    // when an input has focus.
+    if (meta && event.shiftKey && !event.altKey && lk === 'o' && selectedFolder && !ctx.typing) {
+      revealItemInDir(selectedFolder);
+      return true;
+    }
+
+    // Cmd/Ctrl+N: start a new collection. Auto-opens the sidebar if it's
+    // closed so the draft row is visible immediately.
+    if (meta && !event.shiftKey && !event.altKey && lk === 'n' && selectedFolder && !ctx.typing) {
+      void surface().then(async () => {
+        if (!collectionsPanelOpen) await togglePanel();
+        inlineCreateCollection();
+      });
+      return true;
+    }
+
+    // Master bypass — the console's "hear it raw" switch. Tap latches,
+    // hold is momentary (holdLatch), same as S/M on a row. Deliberately
+    // does not clear anything: the chips and lamps stay lit while the
+    // signal passes through them, so you can see what you're bypassing.
+    if (lk === 'b' && !meta && !event.altKey && !event.shiftKey && !ctx.typing) {
+      // Same gate as the scope bar's switch: nothing to bypass, nothing
+      // to latch — a lit BYPASS lamp over an empty console would be a
+      // no-op wearing a mode light. Bypassed always passes so the key
+      // can throw the switch back.
+      if (!event.repeat && (scopeBypassed || scopeNarrowingEngaged)) holdLatch.press('b', toggleScopeBypass);
+      return true;
+    }
+    return false;
+  }
+  const unbindKeys = bindKeys(globalKeys);
+
   // The release half of every hold. Unconditional on purpose: whatever
   // gating applied when the key went down, the key coming back up must
   // always reach the latch, or a control stays stuck in its held state.
@@ -2376,42 +2479,10 @@
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
 
-    // Cmd/Ctrl+K: focus the search input from anywhere in the app, query
-    // selected so typing replaces it and → edits it. Not ⌘F — that's the
-    // browser/OS find-in-page chord, and here it opens the Filters panel
-    // instead (below). ⌘K is the command-bar convention.
-    if (meta && !event.shiftKey && lk === 'k') {
-      event.preventDefault();
-      headerComponent?.focusAndSelect();
-      return;
-    }
-
-    // Cmd/Ctrl+,: open Settings (always available).
-    if (meta && !event.shiftKey && event.key === ',') {
-      event.preventDefault();
-      settingsInitialTab = 'general';
-      showSettings = true;
-      return;
-    }
-
     // Cmd/Ctrl+B: toggle Collections sidebar.
     if (meta && !event.shiftKey && lk === 'b' && selectedFolder) {
       event.preventDefault();
       togglePanel();
-      return;
-    }
-
-    // Cmd/Ctrl + digit. Bare: play only collection N (again stops it) —
-    // track select, the way a DAW numbers its tracks, and live from
-    // anywhere, search input included. ⇧: add N to the mix or take it out.
-    const digit = selectedFolder ? digitChord(event) : null;
-    if (digit) {
-      event.preventDefault();
-      if (digit.alt) return;
-      const name = collectionSlots[digit.digit - 1];
-      if (!name) return;
-      if (digit.shift) togglePlayCollection(name);
-      else playOnlyCollection(name);
       return;
     }
 
@@ -2472,24 +2543,6 @@
       return;
     }
 
-    // Cmd/Ctrl+R: re-detect changes from disk (the lighter "what changed?"
-    // action). Always preventDefault to keep the Tauri webview from
-    // reloading the app even when this isn't available.
-    if (meta && !event.shiftKey && lk === 'r') {
-      event.preventDefault();
-      if (selectedFolder && !isSyncing) handleManualSync();
-      return;
-    }
-
-    // Cmd/Ctrl+S: commit selected files to the index — the real sync work
-    // (same handler the "Sync" banner button calls). Standalone chord
-    // because this is the headline action of the app.
-    if (meta && !event.shiftKey && lk === 's') {
-      event.preventDefault();
-      if (selectedFolder && !isSyncing) handleSync();
-      return;
-    }
-
     // Cmd/Ctrl+Z is deliberately NOT bound. It used to revert the pending sync
     // selection, but ⌘Z is the most over-learned shortcut there is and it means
     // "undo what I just did" — not "discard the whole staged set". Someone
@@ -2512,80 +2565,6 @@
         statsModalPath = infoPath;
         return;
       }
-    }
-
-    // Cmd/Ctrl+F: toggle the Filters panel (docked below the collections panel
-    // in the left pane). F for filter, on the chord everything else spends on
-    // find — the panel is where you narrow what a search covers, so the two
-    // read as a pair with search on ⌘K. It was ⌘⇧F, and before that ⌘E, which
-    // meant nothing mnemonically and collided twice — macOS binds Cmd+E to
-    // "Use Selection for Find" in any text field, and Finder binds it to Eject.
-    if (meta && !event.shiftKey && lk === 'f' && selectedFolder) {
-      event.preventDefault();
-      toggleFilterPanel();
-      return;
-    }
-
-    // Cmd/Ctrl+Shift+.: toggle "Show hidden" (Finder convention).
-    if (meta && event.shiftKey && (event.key === '.' || event.key === '>') && selectedFolder) {
-      event.preventDefault();
-      toggleShowHidden();
-      return;
-    }
-
-    // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
-    // explorer (same handler the status-bar folder button calls). Skipped
-    // when an input has focus.
-    if (meta && event.shiftKey && lk === 'o' && selectedFolder && !inAnyInput) {
-      event.preventDefault();
-      revealItemInDir(selectedFolder);
-      return;
-    }
-
-    // Cmd/Ctrl+N: start a new collection. Auto-opens the sidebar if it's
-    // closed so the draft row is visible immediately.
-    if (meta && !event.shiftKey && lk === 'n' && selectedFolder && !inAnyInput) {
-      event.preventDefault();
-      (async () => {
-        if (!collectionsPanelOpen) await togglePanel();
-        inlineCreateCollection();
-      })();
-      return;
-    }
-
-    // `?` — show keyboard shortcuts overlay. Match on event.key (the
-    // produced character) rather than Shift+/ so any layout that emits
-    // `?` from a different physical key still triggers. Bare chord, gated
-    // out of inputs so typing a literal `?` works as expected.
-    if (event.key === '?' && !meta && !event.altKey && !inAnyInput) {
-      event.preventDefault();
-      showHelpOverlay = true;
-      return;
-    }
-
-    // Cmd/Ctrl+/: the same sheet (Docs, Slack, Linear). Live inside inputs
-    // too — the one way to reach the sheet from the search bar, where a
-    // bare `?` has to type.
-    if (meta && event.key === '/' && !event.altKey) {
-      event.preventDefault();
-      showHelpOverlay = true;
-      return;
-    }
-
-    // Master bypass — the console's "hear it raw" switch. Tap latches,
-    // hold is momentary (holdLatch), same as S/M on a row. Deliberately
-    // does not clear anything: the chips and lamps stay lit while the
-    // signal passes through them, so you can see what you're bypassing.
-    if (lk === 'b' && !meta && !event.altKey && !event.shiftKey && !inAnyInput) {
-      event.preventDefault();
-      if (event.repeat) return;
-      // Same gate as the scope bar's switch: nothing to bypass, nothing
-      // to latch — a lit BYPASS lamp over an empty console would be a
-      // no-op wearing a mode light. Bypassed always passes so the key
-      // can throw the switch back.
-      if (!scopeBypassed && !scopeNarrowingEngaged) return;
-      holdLatch.press('b', toggleScopeBypass);
-      return;
     }
 
     // ── Tree-row navigation ─────────────────────────────────────────────
@@ -4154,11 +4133,6 @@
     onCopyMcpConfig={handleCopyMcpConfig}
   />
 </div>
-
-<KeyboardHelpOverlay
-  visible={showHelpOverlay}
-  onClose={() => { showHelpOverlay = false; }}
-/>
 
 <style>
   .app-layout {

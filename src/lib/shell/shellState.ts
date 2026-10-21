@@ -53,3 +53,21 @@ export const OPEN_SETTINGS_EVENT = 'shell://open-settings';
 export function openSettings(tab: 'general' | 'help' = 'general'): Promise<void> {
   return emit(OPEN_SETTINGS_EVENT, tab);
 }
+
+/** Asks this window's host to bring a tool forward in the rack, as Rust's
+ *  show_panel does from the File menu: a chord that changes what a tool
+ *  shows calls this before acting, so the change is seen. The main
+ *  window's host answers; a panel in its own window is forward already, so
+ *  there nobody listens and the call is a no-op. */
+const showPanelListeners = new Set<(id: PanelId) => void>();
+
+export function showPanel(id: PanelId): void {
+  for (const listener of showPanelListeners) listener(id);
+}
+
+export function onShowPanel(listener: (id: PanelId) => void): () => void {
+  showPanelListeners.add(listener);
+  return () => {
+    showPanelListeners.delete(listener);
+  };
+}
