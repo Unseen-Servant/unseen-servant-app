@@ -91,17 +91,12 @@
           disabled={!here}
           on:click={() => onLock(tool.id)}
         >
-          {#if held}
-            <!-- Font Awesome "lock" icon (src/lib/ui/icons/lock-solid-full.svg) -->
-            <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-              <path d="M256 160L256 224L384 224L384 160C384 124.7 355.3 96 320 96C284.7 96 256 124.7 256 160zM192 224L192 160C192 89.3 249.3 32 320 32C390.7 32 448 89.3 448 160L448 224C483.3 224 512 252.7 512 288L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 288C128 252.7 156.7 224 192 224z"/>
-            </svg>
-          {:else}
-            <!-- Font Awesome "lock-open" icon (src/lib/ui/icons/lock-open-solid-full.svg) -->
-            <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-              <path d="M416 160C416 124.7 444.7 96 480 96C515.3 96 544 124.7 544 160L544 192C544 209.7 558.3 224 576 224C593.7 224 608 209.7 608 192L608 160C608 89.3 550.7 32 480 32C409.3 32 352 89.3 352 160L352 224L192 224C156.7 224 128 252.7 128 288L128 512C128 547.3 156.7 576 192 576L448 576C483.3 576 512 547.3 512 512L512 288C512 252.7 483.3 224 448 224L416 224L416 160z"/>
-            </svg>
-          {/if}
+          <!-- A latch, LatchKey rule for rule: one glyph, and the lamp
+               alone says whether it's thrown. Font Awesome "lock" icon
+               (src/lib/ui/icons/lock-solid-full.svg). -->
+          <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+            <path d="M256 160L256 224L384 224L384 160C384 124.7 355.3 96 320 96C284.7 96 256 124.7 256 160zM192 224L192 160C192 89.3 249.3 32 320 32C390.7 32 448 89.3 448 160L448 224C483.3 224 512 252.7 512 288L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 288C128 252.7 156.7 224 192 224z"/>
+          </svg>
           <span class="lamp" class:lit={held} aria-hidden="true"></span>
         </button>
       </div>
