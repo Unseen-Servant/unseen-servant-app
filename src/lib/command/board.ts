@@ -328,6 +328,10 @@ export function bodyOf(content: string): string {
   return (m ? content.slice(m[0].length) : content).replace(/^\s+/, '');
 }
 
+/** A note's place among the bodies Play's cards show (CommandPanel keeps
+ *  them): by campaign too, since two campaigns can share a path. */
+export const bodyKey = (campaign: string, path: string) => `${campaign}\n${path}`;
+
 /** Where a followed `[[link]]` points on a card. */
 export const NOTE_HREF = '#note:';
 

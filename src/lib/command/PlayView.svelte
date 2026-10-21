@@ -24,6 +24,7 @@
     CARD_ACTIONS,
     GAP,
     applyOps,
+    bodyKey,
     bodyOf,
     cards as boardCards,
     frameOp,
@@ -62,6 +63,13 @@
   /** Where each session's board was left, by board key: CommandPanel's, so
    *  it outlives Tab. */
   export let boardViews: Map<string, Viewport>;
+  /** Each session's board as last drawn, by board key, the same: Tab back
+   *  draws it at once, and the sidecar's answer follows. */
+  export let boards: Map<string, BoardView>;
+  /** What the note cards show, without frontmatter, by bodyKey:
+   *  CommandPanel's, so Tab back to Play doesn't read every note again. It
+   *  drops what changes on disk. */
+  export let bodies: Map<string, string>;
   /** A note or a beat marked spent, or not. */
   export let onSpent: (note: { name: string; path: string }, spent: boolean) => void;
   /** A line for the session note; resolves whether it was written. */
@@ -94,7 +102,14 @@
     undos = [];
     redos = [];
     editing = null;
+    view = boards.get(boardKey) ?? view;
     void loadBoard();
+  }
+
+  /** Draw the board for `key`, and keep it for Tab back. */
+  function show(key: string, next: BoardView) {
+    view = next;
+    boards.set(key, next);
   }
 
   async function loadBoard() {
@@ -103,7 +118,7 @@
       const loaded = await commandApi.getBoard(campaign, session.path);
       if (boardFor === key && pending === 0) {
         const first = view === null;
-        view = loaded;
+        show(key, loaded);
         boardError = null;
         // Open where the board was left; the first time, on what's in play,
         // readable, and with nothing in play on everything.
@@ -146,12 +161,12 @@
     if (as === 'gesture') redos = [];
     const key = boardKey;
     const path = session.path;
-    view = applyOps(view, ops, campaign);
+    show(key, applyOps(view, ops, campaign));
     pending++;
     void run(async () => {
       try {
         const written = await commandApi.editBoard(campaign, path, ops);
-        if (boardFor === key && pending === 1) view = written;
+        if (boardFor === key && pending === 1) show(key, written);
       } catch (e) {
         if (boardFor === key) void loadBoard();
         throw e;
@@ -176,35 +191,34 @@
 
   // -- what the cards show ------------------------------------------------
 
-  /** Note bodies by path, without frontmatter. */
-  const bodies = new Map<string, string>();
+  /** Bodies being read, by bodyKey. */
   const loading = new Set<string>();
   let bodiesTick = 0;
 
   function loadBodies(cards: Card[]) {
     const missing = cards
       .flatMap((c) => (c.kind === 'note' ? [c.path] : []))
-      .filter((p): p is string => !!p && !bodies.has(p) && !loading.has(p));
+      .filter((p): p is string => !!p && !bodies.has(bodyKey(campaign, p)) && !loading.has(bodyKey(campaign, p)));
     for (const path of missing) {
-      loading.add(path);
+      const key = bodyKey(campaign, path);
+      loading.add(key);
       commandApi
         .readNote(campaign, path)
-        .then((note) => bodies.set(path, bodyOf(note.content)))
-        .catch(() => bodies.set(path, ''))
+        .then((note) => bodies.set(key, bodyOf(note.content)))
+        .catch(() => bodies.set(key, ''))
         .finally(() => {
-          loading.delete(path);
+          loading.delete(key);
           bodiesTick++;
         });
     }
   }
   $: loadBodies(allCards);
 
-  /** Files changed on disk: drop what the cards hold of them, and reload
-   *  the board if it's one of them. */
+  /** Files changed on disk, their bodies already dropped (CommandPanel):
+   *  read again what the cards show, and reload the board if it's one of
+   *  them. */
   export function diskChanged(paths: string[]) {
-    let dropped = false;
-    for (const path of paths) dropped = bodies.delete(path) || dropped;
-    if (dropped) loadBodies(allCards);
+    loadBodies(allCards);
     if (paths.includes(boardPath) && pending === 0) void loadBoard();
   }
 
@@ -374,7 +388,7 @@
         playable: !!note,
         spent: note?.spent ?? null,
         source: note?.source ?? null,
-        body: card.path ? (bodies.get(card.path) ?? null) : null,
+        body: card.path ? (bodies.get(bodyKey(campaign, card.path)) ?? null) : null,
         outlined: !!card.path && card.path === outlined,
         editing: card.id === editingId,
         linking,

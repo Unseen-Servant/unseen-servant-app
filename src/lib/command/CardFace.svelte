@@ -25,8 +25,11 @@
   const images = getContext<ImageSourceStore>(IMAGE_SOURCE);
 
   $: card = data.card;
+  /** The path on its own: any card's change hands every card a new
+   *  `data`, and new plugins would read its Markdown again. */
+  $: path = card.path;
   let plugins: Plugin[];
-  $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeEmbeds, $images, card.path] }];
+  $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeEmbeds, $images, path] }];
   $: missing = card.kind === 'note' && card.path === null;
   $: title = data.name || card.text.split('/').pop()?.replace(/\.md$/i, '') || 'Untitled';
   $: image = card.kind === 'image';

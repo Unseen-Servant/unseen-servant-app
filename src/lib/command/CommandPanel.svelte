@@ -29,6 +29,7 @@
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
+  import { bodyKey } from './board';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, nameParts, type Column } from './columns';
   import { isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { IMAGE, imageSource } from './embeds';
@@ -36,7 +37,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
-  import type { BeatEntry, CampaignIndex, CommandSettings, CopySource, LiveSet, NoteEntry, VaultEvent } from './types';
+  import type { BeatEntry, BoardView, CampaignIndex, CommandSettings, CopySource, LiveSet, NoteEntry, VaultEvent } from './types';
 
   // True while the panel has the keyboard: window-level keys do nothing
   // otherwise (PANELS.md).
@@ -100,6 +101,11 @@
   /** Where each session's board was left in Play, so Tab back to Play finds
    *  it as it was, for the sitting. */
   const boardViews = new Map<string, Viewport>();
+  /** What Play's note cards show, the same, so Tab back to Play doesn't
+   *  read every note again. A change on disk drops it (onVault). */
+  const noteBodies = new Map<string, string>();
+  /** Each session's board as Play last drew it, the same. */
+  const boards = new Map<string, BoardView>();
 
   /** The row clicked last, a note's or a beat's: what R renames. A note's
    *  wears Legend Lore's focus ring. */
@@ -307,9 +313,12 @@
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   function onVault(event: VaultEvent) {
     if (event.campaign === null) {
+      noteBodies.clear();
       run(refreshAll);
       return;
     }
+    // Any campaign's: what was read of one is kept while another is open.
+    for (const path of event.paths) noteBodies.delete(bodyKey(event.campaign, path));
     if (event.campaign !== campaign) return;
     if (bufState.path && event.paths.includes(bufState.path)) void buffer.diskChanged();
     play?.diskChanged(event.paths);
@@ -1348,6 +1357,8 @@
               bind:playerOpen
               bind:trayOpen
               {boardViews}
+              {boards}
+              bodies={noteBodies}
               {expanded}
               onExpand={onFill}
               onLive={applyLive}
