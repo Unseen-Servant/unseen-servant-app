@@ -4,12 +4,14 @@
   // keyboard, takes it out when pressed again, and carries it into the rack
   // by hand; its lamp is lit while the tool is in this view. Which tool has
   // the keyboard shows on its frame in the rack (PanelHost), not here: the
-  // bar's keys are not a picker, both tools are open. The lock beside it holds the
-  // tool in this view: no pop-out, no resizing, no drops onto it. On macOS
+  // bar's keys are not a picker, both tools are open. The lock beside the
+  // view picker holds the view that's showing: no mount or take-out, no
+  // carry, no resize, no pop-out. On macOS
   // the bar is the window's title bar too: the title bar is an overlay
   // (tauri.conf.json), the traffic lights sit at its left end, and its bare
   // plate drags the window.
   import { grab } from '../ui/grab';
+  import LatchKey from '../ui/LatchKey.svelte';
   import { MARK, MARK_VIEWBOX } from '../ui/iconPaths';
   import { panelTitle, type PanelId } from './panels';
   import { RACK_TOOLS, toolsIn, type RackView } from './rack';
@@ -20,7 +22,7 @@
   export let popped: ReadonlySet<PanelId>;
   export let onSwitch: (view: number) => void;
   export let onToggle: (id: PanelId) => void;
-  export let onLock: (id: PanelId) => void;
+  export let onLockView: () => void;
   export let onCarry: (id: PanelId, data: DataTransfer) => void;
   export let onCarryEnd: () => void;
 
@@ -36,9 +38,11 @@
   }
 
   function keyTitle(id: PanelId, title: string): string {
-    if (!present.includes(id)) return `Mount ${title} in this view — or drag it where it should go`;
+    if (!present.includes(id)) {
+      return locked ? `View ${current + 1} is locked: unlock it to mount ${title}` : `Mount ${title} in this view — or drag it where it should go`;
+    }
     if (focused !== id && !popped.has(id)) return `Give ${title} the keyboard`;
-    if (locked.includes(id)) return `${title} is locked in this view`;
+    if (locked) return `${title} stays: view ${current + 1} is locked`;
     if (popped.has(id)) return `${title} is in its own window — press to take it out of this view`;
     return `Take ${title} out of this view — or drag it to move it`;
   }
@@ -52,52 +56,51 @@
   <!-- A picker, like the view switch: one view is always showing, so the
        current key sits raised rather than lit. An empty view's numeral
        steps down to the out-of-scope dim. -->
-  <div class="view-keys" role="group" aria-label="Rack views">
-    {#each views as v, i}
-      <button
-        class="view-key"
-        class:current={i === current}
-        class:empty={!v.root}
-        aria-pressed={i === current}
-        title={viewTitle(v, i)}
-        on:click={() => onSwitch(i)}
-      >{i + 1}</button>
-    {/each}
+  <div class="view-group">
+    <div class="view-keys" role="group" aria-label="Rack views">
+      {#each views as v, i}
+        <button
+          class="view-key"
+          class:current={i === current}
+          class:empty={!v.root}
+          aria-pressed={i === current}
+          title={viewTitle(v, i)}
+          on:click={() => onSwitch(i)}
+        >{i + 1}</button>
+      {/each}
+    </div>
+    <!-- The view's lock, a latch beside the picker reporting the view that
+         shows: lit, its layout holds. A mode, so the lamp alone says it;
+         the key never sits raised. -->
+    <LatchKey
+      lit={locked}
+      title={locked ? `Unlock view ${current + 1}` : `Lock view ${current + 1}: its layout holds — no mount or take-out, no carry, no resize, no pop-out`}
+      label={locked ? `Unlock view ${current + 1}` : `Lock view ${current + 1}`}
+      onClick={onLockView}
+    >
+      <!-- Font Awesome "lock" icon (src/lib/ui/icons/lock-solid-full.svg) -->
+      <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
+        <path d="M256 160L256 224L384 224L384 160C384 124.7 355.3 96 320 96C284.7 96 256 124.7 256 160zM192 224L192 160C192 89.3 249.3 32 320 32C390.7 32 448 89.3 448 160L448 224C483.3 224 512 252.7 512 288L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 288C128 252.7 156.7 224 192 224z"/>
+      </svg>
+    </LatchKey>
   </div>
 
   <div class="tool-wells" role="group" aria-label="Tools" data-tauri-drag-region>
     {#each RACK_TOOLS as tool (tool.id)}
       {@const here = present.includes(tool.id)}
-      {@const held = locked.includes(tool.id)}
       <div class="tool-well">
         <button
           class="key tool-key"
           class:away={popped.has(tool.id)}
           title={keyTitle(tool.id, tool.title)}
           aria-pressed={here}
-          use:grab={!held}
+          use:grab={!locked}
           on:dragstart={(e) => carry(e, tool.id)}
           on:dragend={onCarryEnd}
           on:click={() => onToggle(tool.id)}
         >
           <span class="cell" class:lit={here} aria-hidden="true"></span>
           <span class="tool-name">{tool.title}</span>
-        </button>
-        <button
-          class="key lock-key"
-          title={held ? `Unlock ${tool.title}` : `Lock ${tool.title} in this view: no pop-out, no resizing`}
-          aria-label={held ? `Unlock ${tool.title}` : `Lock ${tool.title}`}
-          aria-pressed={held}
-          disabled={!here}
-          on:click={() => onLock(tool.id)}
-        >
-          <!-- A latch, LatchKey rule for rule: one glyph, and the lamp
-               alone says whether it's thrown. Font Awesome "lock" icon
-               (src/lib/ui/icons/lock-solid-full.svg). -->
-          <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
-            <path d="M256 160L256 224L384 224L384 160C384 124.7 355.3 96 320 96C284.7 96 256 124.7 256 160zM192 224L192 160C192 89.3 249.3 32 320 32C390.7 32 448 89.3 448 160L448 224C483.3 224 512 252.7 512 288L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 288C128 252.7 156.7 224 192 224z"/>
-          </svg>
-          <span class="lamp" class:lit={held} aria-hidden="true"></span>
         </button>
       </div>
     {/each}
@@ -152,6 +155,13 @@
     line-height: 1;
     letter-spacing: 0.01em;
     white-space: nowrap;
+  }
+
+  /* The picker and its lock, closer than the bar's other groups. */
+  .view-group {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
   }
 
   /* Wells cut like Header's view switch. */
@@ -245,30 +255,4 @@
     filter: var(--glow-active);
   }
 
-  /* The lock is a latch, LatchKey rule for rule: the icon over its lamp. */
-  .lock-key {
-    flex-direction: column;
-    gap: 3px;
-    width: 26px;
-  }
-  .lock-key svg {
-    width: 12px;
-    height: 12px;
-  }
-  .lock-key:disabled {
-    opacity: var(--opacity-out-of-scope);
-    cursor: default;
-    pointer-events: none;
-  }
-  .lamp {
-    width: 10px;
-    height: 2px;
-    border-radius: var(--radius-sm);
-    background: var(--border-subtle);
-    transition: background var(--transition-fast);
-  }
-  .lamp.lit {
-    background: var(--text-active);
-    filter: var(--glow-active);
-  }
 </style>

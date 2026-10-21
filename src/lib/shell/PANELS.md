@@ -22,9 +22,11 @@ splits with one tool per slot (`rack.ts`); views start empty, and the user
 builds them by pressing a tool's key (it takes a column on the right) or
 carrying the key onto an edge of a slot (split) or its middle (swap). The
 rails between slots drag to resize, never below a tool's `rackMin`. Each
-view's layout and locks are saved in the settings store (`rackViews`,
-`rackView`). A tool locked in a view can't be popped out, resized, dropped
-onto, carried, or taken out by its key there.
+view's layout and lock are saved in the settings store (`rackViews`,
+`rackView`). The lock key beside the view picker holds the view that shows:
+nothing in it is mounted, taken out, carried, resized or popped out until
+it's unlocked. Asked to show a tool a locked view lacks, the host prefers a
+view holding it, then the first unlocked one.
 
 A tool's key lights its lamp while the tool is in the current view; the
 tool that has the keyboard shows it on its slot's frame, one grey step up
@@ -62,8 +64,8 @@ same from the menu bar.
 - **`windowKey`**, a snippet holding the host's dock toggle (`DockToggle.svelte`):
   unlit in the main window, where it pops the panel out; latched and lit in
   its own window, where it docks it back. A panel with a header renders it
-  there (Legend Lore: right of the search bar). While the panel is locked in
-  the current view the host dims the toggle and makes it inert.
+  there (Legend Lore: right of the search bar). While the current view is
+  locked the host dims the toggle and makes it inert.
 - **`statusSlot`**, an element in the host's status bar (null until the bar
   is drawn). A panel with something to report renders its status section
   under `use:hoist={statusSlot}` (`hoist.ts`), which moves it into the bar:

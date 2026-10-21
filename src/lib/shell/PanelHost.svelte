@@ -105,39 +105,50 @@
   }
 
   // A tool's key: mounts it in this view, or gives it the keyboard as a
-  // click into it does; pressed again it takes the tool out — unless it's
-  // locked here. Under a filled tool, the press lets go of the fill. One in
-  // its own window can't take the keyboard here, so its press takes it out.
+  // click into it does; pressed again it takes the tool out. A locked view
+  // neither mounts nor lets go. Under a filled tool, the press lets go of
+  // the fill. One in its own window can't take the keyboard here, so its
+  // press takes it out.
   function toggle(id: PanelId) {
     if (!present.includes(id)) {
+      if (view.locked) return;
       commit({ ...view, root: mount(view.root, id) });
       focused = id;
     } else if (focused !== id && !popped.has(id)) {
       if (filling !== id) filling = null;
       focused = id;
-    } else if (!view.locked.includes(id)) {
+    } else if (!view.locked) {
       commit({ ...view, root: without(view.root, id) });
     }
   }
 
-  function lock(id: PanelId) {
-    if (!present.includes(id)) return;
-    const held = view.locked.includes(id);
-    commit({ ...view, locked: held ? view.locked.filter((l) => l !== id) : [...view.locked, id] });
+  /** The view's lock: its layout holds — no mount or take-out, no carry,
+   *  no resize, no pop-out — until it's thrown back. */
+  function lockView() {
+    commit({ ...view, locked: !view.locked });
   }
 
   // Rust asks for a tool (panels.rs show_panel): the File menu brings
   // Command forward when it opens a campaign. A panel in this window asks
   // the same way (shellState showPanel) ahead of a chord that changes what
   // it shows. In this view it takes the keyboard; otherwise the first view
-  // holding it comes up, and failing that it's mounted here.
+  // holding it comes up, and failing that it's mounted here — or, this view
+  // being locked, in the first unlocked one, and only here when every view
+  // is locked: asked to show, it shows.
   function show(id: PanelId) {
     if (!RACK_TOOLS.some((t) => t.id === id)) return;
     if (filling !== id) filling = null;
     if (!present.includes(id)) {
       const at = views.findIndex((v) => toolsIn(v.root).includes(id));
       if (at >= 0) switchTo(at);
-      else commit({ ...view, root: mount(view.root, id) });
+      else {
+        const free = view.locked ? views.findIndex((v) => !v.locked) : current;
+        const into = free >= 0 ? free : current;
+        views[into] = { ...views[into], root: mount(views[into].root, id) };
+        filling = null;
+        current = into;
+        void save();
+      }
     }
     focused = id;
   }
@@ -292,7 +303,7 @@
     {popped}
     onSwitch={switchTo}
     onToggle={toggle}
-    onLock={lock}
+    onLockView={lockView}
     onCarry={carry}
     onCarryEnd={endCarry}
   />
@@ -312,7 +323,6 @@
     {#if loaded}
       {#each RACK_TOOLS as tool (tool.id)}
         {@const r = placed.rects.get(tool.id)}
-        {@const locked = view.locked.includes(tool.id)}
         <div
           class="slot"
           class:shown={!!r}
@@ -341,7 +351,7 @@
               onFill={(on) => (filling = on ? tool.id : null)}
             >
               {#snippet windowKey()}
-                <span class="window-key" class:locked inert={locked}><DockToggle id={tool.id} popped={false} /></span>
+                <span class="window-key" class:locked={view.locked} inert={view.locked}><DockToggle id={tool.id} popped={false} /></span>
               {/snippet}
             </PanelView>
           {/if}

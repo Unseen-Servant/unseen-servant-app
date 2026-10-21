@@ -1,6 +1,6 @@
 // The main window's rack (PANELS.md): eight views, each a tree of splits with
-// one tool per leaf, and the tools locked in it. Pure functions over that
-// tree; PanelHost holds the views, renders them and saves them.
+// one tool per leaf, and whether its layout is locked. Pure functions over
+// that tree; PanelHost holds the views, renders them and saves them.
 
 import { PANELS, type PanelId } from './panels';
 import { parseRecord, parseStringArray } from './storeParsers';
@@ -13,10 +13,11 @@ export type RackNode =
 
 type Split = Extract<RackNode, { kind: 'split' }>;
 
-/** One view of the rack: its layout (null while empty) and its locks. */
+/** One view of the rack: its layout (null while empty), and whether it
+ *  holds — no mount or take-out, no carry, no resize, no pop-out. */
 export interface RackView {
   root: RackNode | null;
-  locked: PanelId[];
+  locked: boolean;
 }
 
 export interface Rect {
@@ -36,7 +37,7 @@ export interface Rail {
   rect: Rect;
   /** The split's length less its rails: what its sizes are shares of. */
   span: number;
-  /** A locked tool on either side holds the rail still. */
+  /** A locked view holds every rail still. */
   inert: boolean;
 }
 
@@ -61,13 +62,13 @@ function minOf(id: PanelId): { w: number; h: number } {
 }
 
 export function emptyViews(): RackView[] {
-  return Array.from({ length: VIEW_COUNT }, () => ({ root: null, locked: [] }));
+  return Array.from({ length: VIEW_COUNT }, () => ({ root: null, locked: false }));
 }
 
 /** First launch: each tool on the view its tab used to be. */
 export function defaultViews(): RackView[] {
   const views = emptyViews();
-  RACK_TOOLS.forEach((t, i) => (views[i] = { root: { kind: 'tool', id: t.id }, locked: [] }));
+  RACK_TOOLS.forEach((t, i) => (views[i] = { root: { kind: 'tool', id: t.id }, locked: false }));
   return views;
 }
 
@@ -79,14 +80,14 @@ export function toolsIn(node: RackNode | null): PanelId[] {
 // ---- layout -----------------------------------------------------------------
 
 /** Each tool's rect and each rail, in a rack of w × h. */
-export function layout(root: RackNode | null, w: number, h: number, locked: readonly PanelId[]) {
+export function layout(root: RackNode | null, w: number, h: number, locked: boolean) {
   const rects = new Map<PanelId, Rect>();
   const rails: Rail[] = [];
-  if (root && w > 0 && h > 0) place(root, { x: 0, y: 0, w, h }, [], rects, rails, new Set(locked));
+  if (root && w > 0 && h > 0) place(root, { x: 0, y: 0, w, h }, [], rects, rails, locked);
   return { rects, rails };
 }
 
-function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect>, rails: Rail[], locked: Set<PanelId>) {
+function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect>, rails: Rail[], locked: boolean) {
   if (node.kind === 'tool') {
     rects.set(node.id, r);
     return;
@@ -102,14 +103,13 @@ function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect
     place(child, row ? { ...r, x: at, w: len } : { ...r, y: at, h: len }, [...path, i], rects, rails, locked);
     at += len;
     if (i === n - 1) return;
-    const held = (c: RackNode) => toolsIn(c).some((id) => locked.has(id));
     rails.push({
       path,
       index: i,
       dir: node.dir,
       rect: row ? { ...r, x: at, w: RAIL } : { ...r, y: at, h: RAIL },
       span,
-      inert: held(child) || held(node.children[i + 1]),
+      inert: locked,
     });
     at += RAIL;
   });
@@ -280,15 +280,18 @@ function halfOf(r: Rect, zone: Zone): Rect {
 
 /** What carrying `id` to (x, y) in a w × h rack would do. On an edge it
  *  splits that slot; in the middle it swaps with that tool, or takes its
- *  place when `id` isn't in the view. A locked tool takes no drops, and
+ *  place when `id` isn't in the view. A locked view takes no drops, and
  *  neither tool may end up under its minimum. Null outside every slot. */
 export function landing(view: RackView, id: PanelId, x: number, y: number, w: number, h: number): Landing | null {
-  if (!view.root) return { ok: true, root: { kind: 'tool', id }, rect: { x: 0, y: 0, w, h } };
+  if (!view.root) {
+    const rect = { x: 0, y: 0, w, h };
+    return view.locked ? { ok: false, reason: 'locked', rect } : { ok: true, root: { kind: 'tool', id }, rect };
+  }
   const { rects } = layout(view.root, w, h, view.locked);
   for (const [target, r] of rects) {
     if (x < r.x || x >= r.x + r.w || y < r.y || y >= r.y + r.h) continue;
     if (target === id) return { ok: false, reason: 'self', rect: r };
-    if (view.locked.includes(target)) return { ok: false, reason: 'locked', rect: r };
+    if (view.locked) return { ok: false, reason: 'locked', rect: r };
     const zone = zoneAt(r, x, y);
     const rest = without(view.root, id)!;
     const root =
@@ -336,7 +339,9 @@ function parseView(raw: unknown): RackView | null {
   const ids = toolsIn(root);
   // A tool lives once per view.
   if (new Set(ids).size !== ids.length) return null;
-  const locked = (parseStringArray(rec.locked) ?? []).filter((id): id is PanelId => (ids as string[]).includes(id));
+  // Settings from before the view lock held a list of locked tools: any
+  // lock then locks the view now.
+  const locked = rec.locked === true || (parseStringArray(rec.locked) ?? []).length > 0;
   return { root, locked };
 }
 
