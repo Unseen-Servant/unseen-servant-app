@@ -148,7 +148,11 @@ table, not here.
    (finding 6). *Done.*
 2. `⌘O` / `⌘J` / `⇧⌘J`, `↵`, `⌘N` / `⇧⌘N`, `E`, `X`, `⌘⌫`, `⌥⌘R`, `⇧F10`,
    `A`'s fallback: the Prep verbs on the existing selection. No new state.
+   *Done, 8baf638.*
 3. Prep navigation (`↓↑ J K`, `→←`, `Home End`) with per-list remembered
    rows, then Command regions, `⌘⌥←→` inside Command, and the sheet's
-   Command block split by view.
-4. Play's `⌘B`, `⌥3`, `⇧⌘F`, editor Esc.
+   Command block split by view. *Done, ee89387.*
+4. Play's `⌘B`, `⌥3`, `⇧⌘F`, editor Esc. *Done.*
+
+All four shipped 2026-10-21. Still open from §2: a "next beat" key, and
+the chords dead in the main window while Legend Lore is popped out.

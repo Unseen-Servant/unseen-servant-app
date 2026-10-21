@@ -65,7 +65,7 @@ const isMac =
 export const KEYBINDINGS: KeybindingEntry[] = [
   // Global
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open settings',               scope: 'global' },
-  { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle the sidebar: collections, shelf', scope: 'tool' },
+  { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle the sidebars: collections; the shelf, or in Play the player and the tray', scope: 'tool' },
   { id: 'focus.dock',            keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Focus left: the dock, then the tool beside', scope: 'global' },
   { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Focus right: the file pane, then the tool beside', scope: 'global' },
   { id: 'focus.dockDown',        keys: { mac: '⌘⌥↓',  other: 'Ctrl+Alt+↓' },    label: 'Dock: Collections → Filters, then the tool below', scope: 'global' },
@@ -198,6 +198,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // the editor and the jot bar too; ⌘O is the selection's, as in the tree.
   { id: 'command.jot',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Write a line to the session note: the jot bar', scope: 'commandPlay' },
   { id: 'command.sessionNote',   keys: { mac: '⇧⌘J',  other: 'Ctrl+Shift+J' },  label: 'Open the session note in the inspector', scope: 'command' },
+  { id: 'command.editorEscape',  keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave the note editor for the lists, the note kept open', scope: 'command' },
   // In Play, on the session player, as Legend Lore's collections take them.
   { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'commandPlay' },
   { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'commandPlay' },
@@ -218,6 +219,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.boardDuplicate', keys: { mac: '⌘D',  other: 'Ctrl+D' },        label: 'Board: duplicate the selected text cards, stickies and frames', scope: 'commandPlay' },
   { id: 'command.boardFitAll',   keys: { mac: '⌥1',   other: 'Alt+1' },         label: 'Board: fit the whole board in view', scope: 'commandPlay' },
   { id: 'command.boardFitSelection', keys: { mac: '⌥2', other: 'Alt+2' },      label: 'Board: fit the selection in view', scope: 'commandPlay' },
+  { id: 'command.boardFitLive',  keys: { mac: '⌥3',   other: 'Alt+3' },         label: 'Board: fit the live cards in view', scope: 'commandPlay' },
+  { id: 'command.boardFill',     keys: { mac: '⇧⌘F',  other: 'Ctrl+Shift+F' },  label: 'Fill the rack with the board, and back', scope: 'commandPlay' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },

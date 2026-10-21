@@ -104,7 +104,7 @@
     const playing = beat.path === liveBeat;
     const items: MenuItem[] = [
       keyed(playing ? 'Stop' : 'Launch', 'command.play', () => toggle(beat)),
-      action(playing ? 'Frame the live cards' : 'Frame its cards', () => onFrame(beat)),
+      playing ? keyed('Frame the live cards', 'command.boardFitLive', () => onFrame(beat)) : action('Frame its cards', () => onFrame(beat)),
       divider,
       keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
       keyed('Edit beat', 'command.open', () => onEdit(beat)),

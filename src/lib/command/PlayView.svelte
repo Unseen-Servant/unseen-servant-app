@@ -309,12 +309,22 @@
       board?.duplicate();
       return true;
     }
-    // By the key's place: ⌥ turns "1" into "¡" on a Mac.
-    if (e.altKey && !mod && !e.shiftKey && (e.code === 'Digit1' || e.code === 'Digit2')) {
+    // ⇧⌘F fills the rack with the board, and brings the view back. F for
+    // fill; ⌘F stays Legend Lore's filters.
+    if (mod && !e.altKey && e.shiftKey && key === 'f') {
+      onExpand(!expanded);
+      return true;
+    }
+    // By the key's place: ⌥ turns "1" into "¡" on a Mac. ⌥1 the whole
+    // board, ⌥2 the selection, ⌥3 the live cards — the beat's frame when
+    // it has one, as launching it shows.
+    if (e.altKey && !mod && !e.shiftKey && /^Digit[123]$/.test(e.code)) {
       if (e.code === 'Digit1') fitAll();
-      else {
+      else if (e.code === 'Digit2') {
         const ids = board?.selectedIds() ?? [];
         if (ids.length) frame = { ids };
+      } else if (live) {
+        frameBeat(index.beats.find((b) => b.path === live?.beat), live.notes);
       }
       return true;
     }
@@ -555,7 +565,7 @@
       <LatchKey
         open={expanded}
         lit={expanded}
-        title={expanded ? 'Back to the normal view' : 'Expand the board to fill the view'}
+        title={(expanded ? 'Back to the normal view' : 'Expand the board to fill the view') + chordHint('command.boardFill')}
         label={expanded ? 'Leave the expanded board' : 'Expand the board'}
         onClick={() => onExpand(!expanded)}
       >

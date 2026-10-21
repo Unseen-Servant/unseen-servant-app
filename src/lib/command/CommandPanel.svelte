@@ -352,6 +352,13 @@
       play?.focusJot();
       return true;
     }
+    // Esc in the note editor hands the keys back to the lists, the note
+    // kept open, as Esc leaves Legend Lore's search bar for its rows. Not
+    // when the editor took it for itself (a selection simplified).
+    if (e.key === 'Escape' && ctx.editor && !e.defaultPrevented) {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      return true;
+    }
     if (ctx.typing) return false;
     // The selection, as the lists keep it: a note, a beat, or one of their
     // empty rows (a new-row key), which R names a new note or beat in.
@@ -441,9 +448,16 @@
       mode = mode === 'prep' ? 'play' : 'prep';
       return true;
     }
-    // ⌘B: the shelf, as it is Legend Lore's collections sidebar.
-    if (mod && !e.altKey && key === 'b' && index && mode === 'prep') {
-      shelfOpen = !shelfOpen;
+    // ⌘B: the view's sidebars, as it is Legend Lore's collections one —
+    // the shelf in Prep; in Play the session player and the card tray
+    // together, folded if either shows, else both unfolded.
+    if (mod && !e.altKey && !e.shiftKey && key === 'b' && index) {
+      if (mode === 'prep') shelfOpen = !shelfOpen;
+      else {
+        const open = !(playerOpen || trayOpen);
+        playerOpen = open;
+        trayOpen = open;
+      }
       return true;
     }
     // R: the selected row is renamed where it stands, as Legend Lore's R

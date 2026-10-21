@@ -74,7 +74,10 @@
       Select a sticky, a text card, a frame or a line to colour it from the bar
       over it; a line's bar also sets its arrowheads. <strong>&#8984;D</strong>
       duplicates text cards, stickies and frames. <strong>&#8997;1</strong>
-      shows the whole board and <strong>&#8997;2</strong> the selection.
+      shows the whole board, <strong>&#8997;2</strong> the selection and
+      <strong>&#8997;3</strong> the live cards; <strong>&#8679;&#8984;F</strong> fills the
+      view with the board, and <strong>&#8984;B</strong> folds the player and the
+      tray out of its way.
     </p>
     <p class="field-desc">
       The key at the toolbar's foot arranges the board by beat: a frame for
