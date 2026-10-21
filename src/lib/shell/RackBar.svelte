@@ -70,9 +70,10 @@
       {/each}
     </div>
     <!-- The view's lock, a latch beside the picker reporting the view that
-         shows: lit, its layout holds. A mode, so the lamp alone says it;
-         the key never sits raised. -->
+         shows: locked, it comes up on the raised fill with its lamp lit,
+         as the gem does with its panel open and engaged. -->
     <LatchKey
+      open={locked}
       lit={locked}
       title={locked ? `Unlock view ${current + 1}` : `Lock view ${current + 1}: its layout holds — no mount or take-out, no carry, no resize, no pop-out`}
       label={locked ? `Unlock view ${current + 1}` : `Lock view ${current + 1}`}
