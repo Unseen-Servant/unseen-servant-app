@@ -364,7 +364,6 @@
   let selectedResultIndex = 0;
   let headerComponent: Header | undefined;
   let searchResultsComponent: SearchResults | undefined;
-  let searchInspectorComponent: SearchInspector | undefined;
   let systemsViewComponent: SystemsView | undefined;
   let collectionsPanelComponent: CollectionsPanel | undefined;
   let filterPanelComponent: FilterPanel | undefined;
@@ -2659,9 +2658,6 @@
           lk === 's' ? toggleScopeSolo(item) : toggleScopeMute(item),
         );
       }
-    } else if (bareLetter && inList && lk === 'g') {
-      // G brings the preview back to the match after reading around it.
-      searchInspectorComponent?.returnToMatch();
     } else if (bareLetter && inList && lk === 'x' && armState) {
       // X files the selected result into the armed collection — "tick
       // the box you can see", the key both browse views spend on it.
@@ -3915,7 +3911,6 @@
           </div>
           <div class="search-inspector-pane">
             <SearchInspector
-              bind:this={searchInspectorComponent}
               result={selectedResult}
               query={committedQuery}
               onOpenResult={handleOpenResult}

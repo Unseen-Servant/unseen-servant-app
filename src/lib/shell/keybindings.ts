@@ -240,7 +240,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'results.solo',          keys: { mac: 'S',    other: 'S' },             label: 'Solo: search only this', scope: 'searchResults' },
   { id: 'results.mute',          keys: { mac: 'M',    other: 'M' },             label: 'Mute: drop from search', scope: 'searchResults' },
   { id: 'results.toggleSelect',  keys: { mac: 'X',    other: 'X' },             label: "Tick the row's checkbox", scope: 'searchResults', switch: true },
-  { id: 'results.toMatch',       keys: { mac: 'G',    other: 'G' },             label: 'Back to the match in the preview', scope: 'searchResults' },
   { id: 'results.info',          keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info', scope: 'searchResults' },
   { id: 'results.exit',          keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave the search', scope: 'searchResults' },
 

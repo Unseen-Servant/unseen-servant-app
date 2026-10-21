@@ -6,7 +6,6 @@
   import { bookTitle, pageCitation } from './pdfUrl';
   import { findMatchedRange, splitAround, type MatchedParts } from './matchedSpan';
   import { queryTerms, rehypeMarkTerms } from './snippetHits';
-  import { chordHint } from '../shell/keybindings';
 
   // No header of its own: the selected row names the book and system, and
   // the InspectorPlate above the pane carries the section path and [open].
@@ -181,7 +180,7 @@
           type="button"
           class="match-mark"
           style="top: {mark.top}px; height: {mark.height}px"
-          title={`Back to the match${chordHint('results.toMatch')}`}
+          title="Back to the match"
           aria-label="Back to the match"
           on:click={returnToMatch}
         ></button>
