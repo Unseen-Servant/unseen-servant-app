@@ -55,7 +55,11 @@ function takesText(el: Element, data: DataTransfer): boolean {
 }
 
 /** The source as its drag image: a copy at its place and size, stripped of
- *  what other code finds rows by, letting the pointer through. */
+ *  what other code finds rows by, letting the pointer through. A snapshot:
+ *  it moves as the pointer does, not on the source's hover transition (a
+ *  key's `transition: all` had it swimming behind the hand), and its text
+ *  never reflows — set to its measured width, WebKit can still break a
+ *  line a hair short of it. */
 function ghostOf(source: HTMLElement): HTMLElement {
   const box = source.getBoundingClientRect();
   const ghost = source.cloneNode(true) as HTMLElement;
@@ -72,6 +76,8 @@ function ghostOf(source: HTMLElement): HTMLElement {
     height: `${box.height}px`,
     margin: '0',
     boxSizing: 'border-box',
+    whiteSpace: 'nowrap',
+    transition: 'none',
     opacity: GHOST_OPACITY,
     pointerEvents: 'none',
     zIndex: '10000',
