@@ -19,6 +19,8 @@
     'searchResults',
     'filterPanel',
     'command',
+    'commandPrep',
+    'commandPlay',
     'contextMenu',
   ];
 
@@ -32,6 +34,8 @@
     searchResults: 'Search results',
     filterPanel: 'Filters panel',
     command: 'Command',
+    commandPrep: 'Command: Prep',
+    commandPlay: 'Command: Play',
     contextMenu: 'Context menu',
     modal: 'Modal',
   };

@@ -367,7 +367,8 @@ describe('liveScopes', () => {
     expect(liveScopes({ tool: 'legend-lore', region: 'collections' })).toEqual(new Set([...base, 'collections']));
     expect(liveScopes({ tool: 'legend-lore', region: 'filters' })).toEqual(new Set([...base, 'filterPanel']));
   });
-  test("Command: either tool's and its own", () => {
-    expect(liveScopes({ tool: 'command', region: null })).toEqual(new Set(['global', 'tool', 'command']));
+  test("Command: either tool's, its own, and its view's", () => {
+    expect(liveScopes({ tool: 'command', region: 'grid' })).toEqual(new Set(['global', 'tool', 'command', 'commandPrep']));
+    expect(liveScopes({ tool: 'command', region: 'play' })).toEqual(new Set(['global', 'tool', 'command', 'commandPlay']));
   });
 });

@@ -20,7 +20,10 @@ export type KeyScope =
   | 'searchInput'
   | 'searchResults'
   | 'filterPanel'
+  // Command in either view, then in Prep's lists, then in Play.
   | 'command'
+  | 'commandPrep'
+  | 'commandPlay'
   | 'contextMenu'
   | 'modal';
 
@@ -162,50 +165,59 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // Command, in Prep (on the selected row). No `match`: Command's menus show
   // the hint without taking the key, as the collections menu does, and 'r'
   // is tree.rename's.
-  { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
+  { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'commandPrep' },
   // The list grammar, on the selection (keybindings audit §4): what the
   // tree's rows answer, Command's answer too.
-  { id: 'command.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open the selected note or beat in the inspector', scope: 'command' },
-  { id: 'command.newNote',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: "New note in the selected note's track, or on the shelf, ready to name", scope: 'command' },
-  { id: 'command.newBeat',       keys: { mac: '⇧⌘N',  other: 'Ctrl+Shift+N' },  label: 'New beat, armed, ready to name', scope: 'command' },
-  { id: 'command.arm',           keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm the selected beat', scope: 'command', switch: true },
-  { id: 'command.tick',          keys: { mac: 'X',    other: 'X' },             label: 'Put the selected note in the armed beat, or take it out', scope: 'command' },
-  { id: 'command.delete',        keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Move the selected note or beat to Trash', scope: 'command' },
-  { id: 'command.reveal',        keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal the selected note or beat in the OS file explorer', scope: 'command' },
-  { id: 'command.contextMenu',   keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: "Open the selection's menu", scope: 'command' },
+  { id: 'command.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open the selected note or beat in the inspector', scope: 'commandPrep' },
+  { id: 'command.newNote',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: "New note in the selected note's track, or on the shelf, ready to name", scope: 'commandPrep' },
+  { id: 'command.newBeat',       keys: { mac: '⇧⌘N',  other: 'Ctrl+Shift+N' },  label: 'New beat, armed, ready to name', scope: 'commandPrep' },
+  { id: 'command.arm',           keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm the selected beat', scope: 'commandPrep', switch: true },
+  { id: 'command.tick',          keys: { mac: 'X',    other: 'X' },             label: 'Put the selected note in the armed beat, or take it out', scope: 'commandPrep' },
+  { id: 'command.delete',        keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Move the selected note or beat to Trash', scope: 'commandPrep' },
+  { id: 'command.reveal',        keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal the selected note or beat in the OS file explorer', scope: 'commandPrep' },
+  { id: 'command.contextMenu',   keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: "Open the selection's menu", scope: 'commandPrep' },
+  // Prep's lists — the shelf, the tracks, the beats — are its regions:
+  // the arrows step the one the selection is in, or the one last clicked
+  // into, and ⌘⌥←/→ walk between them. The vi letters are free here.
+  { id: 'command.listNext',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Select the next row in the list', scope: 'commandPrep' },
+  { id: 'command.listPrev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Select the previous row', scope: 'commandPrep' },
+  { id: 'command.listHome',      keys: { mac: 'Home / ⌥↑', other: 'Home' },     label: 'Select the first row', scope: 'commandPrep' },
+  { id: 'command.listEnd',       keys: { mac: 'End / ⌥↓', other: 'End' },       label: 'Select the last row', scope: 'commandPrep' },
+  { id: 'command.trackAcross',   keys: { mac: '→ ← / L H', other: '→ ← / L H' }, label: 'The same row in the next or previous track', scope: 'commandPrep' },
+  { id: 'command.lists',         keys: { mac: '⌘⌥← →', other: 'Ctrl+Alt+← →' }, label: 'Shelf ⇄ tracks ⇄ beats, then the tool beside', scope: 'commandPrep' },
   // In Prep and Play, on the row or card under the pointer, else the
   // selected one, as Legend Lore's A shelves a collection. No `match`, as R.
   { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer, else the selected one, spent or unspent', scope: 'command' },
   // In Prep: Live's Insert Audio and MIDI Track, as a note or an image
   // track, after the selected note's track, else at the end.
-  { id: 'command.insertNoteTrack',  keys: { mac: '⌘T',  other: 'Ctrl+T' },       label: 'Insert a note track', scope: 'command' },
-  { id: 'command.insertImageTrack', keys: { mac: '⇧⌘T', other: 'Ctrl+Shift+T' }, label: 'Insert an image track', scope: 'command' },
+  { id: 'command.insertNoteTrack',  keys: { mac: '⌘T',  other: 'Ctrl+T' },       label: 'Insert a note track', scope: 'commandPrep' },
+  { id: 'command.insertImageTrack', keys: { mac: '⇧⌘T', other: 'Ctrl+Shift+T' }, label: 'Insert an image track', scope: 'commandPrep' },
   // In Prep and Play, from the editor too: Obsidian's reading-view key.
   { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
   // In Play: the jot bar, from the editor too. ⇧⌘J in Prep and Play, from
   // the editor and the jot bar too; ⌘O is the selection's, as in the tree.
-  { id: 'command.jot',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Write a line to the session note: the jot bar', scope: 'command' },
+  { id: 'command.jot',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Write a line to the session note: the jot bar', scope: 'commandPlay' },
   { id: 'command.sessionNote',   keys: { mac: '⇧⌘J',  other: 'Ctrl+Shift+J' },  label: 'Open the session note in the inspector', scope: 'command' },
   // In Play, on the session player, as Legend Lore's collections take them.
-  { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'command' },
-  { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'command' },
-  { id: 'command.play',          keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Launch or stop the focused beat', scope: 'command', switch: true },
+  { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'commandPlay' },
+  { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'commandPlay' },
+  { id: 'command.play',          keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Launch or stop the focused beat', scope: 'commandPlay', switch: true },
   // In Play, on the board: the toolbar's tools on Miro's letters (board
   // toolbar design §3.5). A tool that makes something hands back to Select.
-  { id: 'command.boardSelect',   keys: { mac: 'V',    other: 'V' },             label: 'Board: select and move cards', scope: 'command' },
-  { id: 'command.boardHand',     keys: { mac: 'H',    other: 'H' },             label: 'Board: pan, over the cards too', scope: 'command' },
-  { id: 'command.boardNote',     keys: { mac: 'D',    other: 'D' },             label: 'Board: place a note where you click', scope: 'command' },
-  { id: 'command.boardText',     keys: { mac: 'T',    other: 'T' },             label: 'Board: a text card where you click', scope: 'command' },
-  { id: 'command.boardSticky',   keys: { mac: 'N',    other: 'N' },             label: 'Board: a sticky where you click', scope: 'command' },
-  { id: 'command.boardLine',     keys: { mac: 'L',    other: 'L' },             label: 'Board: a line from one card to another', scope: 'command' },
-  { id: 'command.boardFrame',    keys: { mac: 'F',    other: 'F' },             label: 'Board: a frame, clicked or dragged to size', scope: 'command' },
-  { id: 'command.boardGroup',    keys: { mac: '⌘G',   other: 'Ctrl+G' },        label: 'Board: frame the selected cards', scope: 'command' },
-  { id: 'command.boardUngroup',  keys: { mac: '⇧⌘G',  other: 'Ctrl+Shift+G' },  label: 'Board: remove the selected frames, keeping their cards', scope: 'command' },
-  { id: 'command.boardUndo',     keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Board: undo', scope: 'command' },
-  { id: 'command.boardRedo',     keys: { mac: '⇧⌘Z',  other: 'Ctrl+Shift+Z' },  label: 'Board: redo', scope: 'command' },
-  { id: 'command.boardDuplicate', keys: { mac: '⌘D',  other: 'Ctrl+D' },        label: 'Board: duplicate the selected text cards, stickies and frames', scope: 'command' },
-  { id: 'command.boardFitAll',   keys: { mac: '⌥1',   other: 'Alt+1' },         label: 'Board: fit the whole board in view', scope: 'command' },
-  { id: 'command.boardFitSelection', keys: { mac: '⌥2', other: 'Alt+2' },      label: 'Board: fit the selection in view', scope: 'command' },
+  { id: 'command.boardSelect',   keys: { mac: 'V',    other: 'V' },             label: 'Board: select and move cards', scope: 'commandPlay' },
+  { id: 'command.boardHand',     keys: { mac: 'H',    other: 'H' },             label: 'Board: pan, over the cards too', scope: 'commandPlay' },
+  { id: 'command.boardNote',     keys: { mac: 'D',    other: 'D' },             label: 'Board: place a note where you click', scope: 'commandPlay' },
+  { id: 'command.boardText',     keys: { mac: 'T',    other: 'T' },             label: 'Board: a text card where you click', scope: 'commandPlay' },
+  { id: 'command.boardSticky',   keys: { mac: 'N',    other: 'N' },             label: 'Board: a sticky where you click', scope: 'commandPlay' },
+  { id: 'command.boardLine',     keys: { mac: 'L',    other: 'L' },             label: 'Board: a line from one card to another', scope: 'commandPlay' },
+  { id: 'command.boardFrame',    keys: { mac: 'F',    other: 'F' },             label: 'Board: a frame, clicked or dragged to size', scope: 'commandPlay' },
+  { id: 'command.boardGroup',    keys: { mac: '⌘G',   other: 'Ctrl+G' },        label: 'Board: frame the selected cards', scope: 'commandPlay' },
+  { id: 'command.boardUngroup',  keys: { mac: '⇧⌘G',  other: 'Ctrl+Shift+G' },  label: 'Board: remove the selected frames, keeping their cards', scope: 'commandPlay' },
+  { id: 'command.boardUndo',     keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Board: undo', scope: 'commandPlay' },
+  { id: 'command.boardRedo',     keys: { mac: '⇧⌘Z',  other: 'Ctrl+Shift+Z' },  label: 'Board: redo', scope: 'commandPlay' },
+  { id: 'command.boardDuplicate', keys: { mac: '⌘D',  other: 'Ctrl+D' },        label: 'Board: duplicate the selected text cards, stickies and frames', scope: 'commandPlay' },
+  { id: 'command.boardFitAll',   keys: { mac: '⌥1',   other: 'Alt+1' },         label: 'Board: fit the whole board in view', scope: 'commandPlay' },
+  { id: 'command.boardFitSelection', keys: { mac: '⌥2', other: 'Alt+2' },      label: 'Board: fit the selection in view', scope: 'commandPlay' },
 
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'contextMenu' },
@@ -243,12 +255,15 @@ const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
 
 // The scopes the sheet shows as live for a focus path (focus.ts): global
 // always, either tool's while one has the keyboard, Legend Lore's bar
-// whenever it does, and the scope of the region that does. A menu can't be open under the sheet, so its scope
+// whenever it does, the scope of the region that does, and Command's view. A menu can't be open under the sheet, so its scope
 // never is; the modal one isn't on the sheet.
 export function liveScopes(path: FocusPath): Set<KeyScope> {
   const live = new Set<KeyScope>(['global']);
   if (path.tool === 'command' || path.tool === 'legend-lore') live.add('tool');
-  if (path.tool === 'command') live.add('command');
+  if (path.tool === 'command') {
+    live.add('command');
+    live.add(path.region === 'play' ? 'commandPlay' : 'commandPrep');
+  }
   if (path.tool === 'legend-lore') {
     live.add('searchInput');
     const region: Record<string, KeyScope> = {

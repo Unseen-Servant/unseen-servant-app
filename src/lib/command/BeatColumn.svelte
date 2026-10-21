@@ -316,6 +316,19 @@
     creating = true;
   }
 
+  /** The rows' keys as rendered: the plan's beats and its empty row while
+   *  it's unfolded, then the spare and the spent beats while theirs are. A
+   *  plan entry naming a beat nobody has written yet isn't a row to land
+   *  on. */
+  export function order(): string[] {
+    return [
+      ...(planOpen ? rows.flatMap((r) => (r.beat ? [r.beat.path] : [])) : []),
+      ...(planOpen ? [NEW_BEAT] : []),
+      ...(spareOpen ? shown.map((b) => b.path) : []),
+      ...(spentOpen ? spent.map((b) => b.path) : []),
+    ];
+  }
+
   /** ⇧F10 on the selected beat: its menu, at its row, if the column shows
    *  it — the plan row's, with its order, or the spare beat's. */
   export function menuFor(path: string): boolean {
@@ -496,7 +509,7 @@
   </button>
 {/snippet}
 
-<section class="beats" aria-label="Session planner" bind:this={beatsEl}>
+<section class="beats" aria-label="Session planner" data-region="beats" bind:this={beatsEl}>
   <header class="nameplate">
     <span class="ledger-label title">session planner</span>
   </header>
@@ -579,6 +592,7 @@
           class:drop-before={dropSlot === rows.length}
           class:drop-into={incoming !== null}
           title="New beat — double-click to name it, or drop a note here"
+          data-path={NEW_BEAT}
           aria-label="New beat"
           on:click={() => onSelectNew(NEW_BEAT)}
           on:dblclick={() => (creating = true)}

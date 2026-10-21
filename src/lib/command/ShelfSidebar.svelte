@@ -234,6 +234,14 @@
     if (!source) creating = true;
   }
 
+  /** The rows' keys as rendered — the shelf's notes, the empty row, the
+   *  loose notes — while the shelf is its own campaign's; none while it
+   *  browses another's to copy from. */
+  export function order(): string[] {
+    if (source) return [];
+    return [...shelf.map((n) => n.path), newRowKey(SHELF_FOLDER), ...loose.map((n) => n.path)];
+  }
+
   /** ⇧F10 on the selected note: its menu, at its row, if the shelf shows
    *  it. */
   export function menuFor(path: string): boolean {
@@ -347,6 +355,7 @@
   class="shelf"
   class:drop-into={dropInto}
   aria-label="Shelf"
+  data-region="shelf"
   bind:this={shelfEl}
   on:dragenter={overShelf}
   on:dragover={overShelf}
@@ -388,6 +397,7 @@
         <button
           type="button"
           class="ghost-row"
+          data-path={newRowKey(SHELF_FOLDER)}
           data-row
           class:selected={selectedPath === newRowKey(SHELF_FOLDER)}
           title="New note — double-click to name it"

@@ -31,7 +31,10 @@
       the session planner, on the right, to name one, or press <strong>&#8679;&#8984;N</strong>;
       it starts armed (&#9679;), so clicking notes puts them in it, and
       <strong>Esc</strong> disarms it. The selected row answers the keys a
-      Legend Lore row does: <strong>E</strong> arms a beat, <strong>X</strong> puts
+      Legend Lore row does: <strong>&#8595;</strong> and <strong>&#8593;</strong> walk
+      its list and <strong>&#8594;</strong> and <strong>&#8592;</strong> the tracks,
+      <strong>&#8984;&#8997;&#8592;</strong> and <strong>&#8594;</strong> move between the shelf,
+      the tracks and the beats, <strong>E</strong> arms a beat, <strong>X</strong> puts
       a note in the armed one, <strong>&#8629;</strong> opens it,
       <strong>R</strong> renames it, <strong>&#8984;N</strong> starts a note in its
       track, <strong>&#8984;&#9003;</strong> moves it to the Trash.

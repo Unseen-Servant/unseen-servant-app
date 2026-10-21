@@ -14,7 +14,8 @@
   import RenameField from '../ui/RenameField.svelte';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
-  import { focusPath } from '../shell/focus';
+  import { focusPath, setRegion } from '../shell/focus';
+  import { materializeKey } from '../shell/paneFocus';
   import { bindKeys, type KeyContext } from '../shell/keys';
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
@@ -29,7 +30,7 @@
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, nameParts, type Column } from './columns';
-  import { isDeleteChord } from '../shell/keybindings';
+  import { isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { IMAGE, imageSource } from './embeds';
   import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { hoverLive } from '../ui/inputModality';
@@ -103,6 +104,16 @@
   /** The row clicked last, a note's or a beat's: what R renames. A note's
    *  wears Legend Lore's focus ring. */
   let selected: string | null = null;
+  /** Prep's three lists are its regions (focus.ts): the one the selection
+   *  is in, or the one last clicked into, answers the arrows. Each keeps
+   *  the row the selection last stood on, so ⌘⌥←/→ and the first arrow
+   *  into a list land where it was left, as Legend Lore's panes do. */
+  type Region = 'shelf' | 'grid' | 'beats';
+  let region: Region = 'grid';
+  const remembered: Record<Region, string | null> = { shelf: null, grid: null, beats: null };
+  $: if (selected) remembered[region] = selected;
+  // Play is one region to the path; Prep reports the list.
+  $: setRegion('command', mode === 'play' ? 'play' : region);
   /** The panel's element: A takes the row under the pointer inside it. */
   let root: HTMLElement | undefined;
   /** False from a spend by A until the pointer moves again. A key hands
@@ -358,6 +369,27 @@
     // The list grammar on the selection (keybindings audit §4), in Prep,
     // where the lists are: the keys the tree's rows answer.
     if (mode === 'prep' && index) {
+      // ⌘⌥←/→ walk the regions; ↑/↓ are nobody's here, so the host
+      // crosses the rail on them.
+      if (mod && e.altKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        return stepRegion(e.key === 'ArrowRight' ? 1 : -1);
+      }
+      // Home/End (⌥↑/↓ on a Mac) jump to the region's ends, ahead of the
+      // plain arrows that would otherwise swallow the ⌥ ones.
+      const edge = jumpEdge(e);
+      if (edge) {
+        const cols = columnsOf(region);
+        const rows = cols.find((c) => selected !== null && c.includes(selected)) ?? cols.find((c) => c.length);
+        if (rows?.length) land(region, rows[edge === 'first' ? 0 : rows.length - 1]);
+        return true;
+      }
+      // ↓/↑ and J/K step the region's rows; →/← and L/H step the grid's
+      // tracks. The vi letters are free here: the board's H and L are
+      // Play's.
+      if (bare && (e.key === 'ArrowDown' || key === 'j')) return stepSelection(1);
+      if (bare && (e.key === 'ArrowUp' || key === 'k')) return stepSelection(-1);
+      if (bare && (e.key === 'ArrowRight' || key === 'l')) return stepAcross(1);
+      if (bare && (e.key === 'ArrowLeft' || key === 'h')) return stepAcross(-1);
       // ↵ / ⌘O open the selection in the inspector, as a double-click does.
       // Not ↵ on a real button, which keeps its own activation.
       if (entry && ((e.key === 'Enter' && bare && !target?.closest('button, a[href]')) || (mod && !e.altKey && !e.shiftKey && key === 'o'))) {
@@ -660,7 +692,12 @@
    *  a menu, or the editor, where the open note is worked on. */
   function releaseSelection(e: MouseEvent) {
     if (mode !== 'prep') return;
-    if ((e.target as HTMLElement | null)?.closest('[data-row], input, [role="menu"], .inspector')) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('[data-row], input, [role="menu"], .inspector')) return;
+    // The list clicked into answers the arrows, as a Legend Lore pane's
+    // chrome hands it the keyboard without ringing a row.
+    const at = target?.closest<HTMLElement>('[data-region]')?.dataset.region;
+    if (at === 'shelf' || at === 'grid' || at === 'beats') region = at;
     selected = null;
   }
 
@@ -680,16 +717,23 @@
     armed = !!path && arm;
   }
 
+  /** A row picked in a list: the selection, and the list the arrows
+   *  answer to. */
+  function select(at: Region, key: string) {
+    region = at;
+    selected = key;
+  }
+
   /** A click on a beat focuses it; on the focused beat, it lets go. */
   function selectBeat(beat: BeatEntry) {
-    selected = beat.path;
+    select('beats', beat.path);
     focusBeat(focusedBeat === beat.path ? null : beat.path);
   }
 
   /** A right-click focuses without letting go, so the menu and the keys
    *  act on the beat it shows. An armed beat stays armed. */
   function focusOn(beat: BeatEntry) {
-    selected = beat.path;
+    select('beats', beat.path);
     if (focusedBeat !== beat.path) focusBeat(beat.path);
   }
 
@@ -698,9 +742,77 @@
     // editor waits for a double-click.
     if (armedBeat === beat.path) armed = false;
     else {
-      selected = beat.path;
+      select('beats', beat.path);
       focusBeat(beat.path, true);
     }
+  }
+
+  /** The lists' rows in their rendered order, for the arrows: the grid's
+   *  as columns, the others as one column. */
+  function columnsOf(at: Region): string[][] {
+    if (at === 'shelf') return shelfOpen ? [shelf?.order() ?? []] : [];
+    if (at === 'beats') return [beats?.order() ?? []];
+    return grid?.orders() ?? [];
+  }
+
+  /** Prep's regions in their order across the window: the shelf when it's
+   *  showing, the grid, the beats. */
+  function regions(): Region[] {
+    return shelfOpen ? ['shelf', 'grid', 'beats'] : ['grid', 'beats'];
+  }
+
+  /** The selection moved by a key: picked, then brought into view. */
+  function land(at: Region, key: string) {
+    select(at, key);
+    void tick().then(() => root?.querySelector(`[data-path="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' }));
+  }
+
+  /** ↓/↑ in the region: a step, clamped at the ends as the tree's is;
+   *  with no selection in it, the first arrow lands on the row left there,
+   *  else at the end it's heading away from (paneFocus.ts). */
+  function stepSelection(delta: 1 | -1): boolean {
+    const cols = columnsOf(region);
+    const col = cols.find((c) => selected !== null && c.includes(selected)) ?? null;
+    if (col) {
+      const at = col.indexOf(selected!);
+      const next = col[Math.max(0, Math.min(col.length - 1, at + delta))];
+      if (next !== selected) land(region, next);
+      return true;
+    }
+    const first = cols.find((c) => c.length);
+    if (!first) return false;
+    const key = materializeKey(first, remembered[region], delta);
+    if (key) land(region, key);
+    return true;
+  }
+
+  /** →/← in the grid: the same row in the next or previous track, the
+   *  last when it has fewer, as Live's session view steps across clips. */
+  function stepAcross(delta: 1 | -1): boolean {
+    if (region !== 'grid' || !selected) return false;
+    const cols = columnsOf('grid');
+    const c = cols.findIndex((col) => col.includes(selected!));
+    if (c < 0) return false;
+    const to = cols[c + delta];
+    if (!to?.length) return true;
+    land('grid', to[Math.min(to.length - 1, cols[c].indexOf(selected))]);
+    return true;
+  }
+
+  /** ⌘⌥←/→: the next region across, landing on the row the selection
+   *  last stood on there, else its first. False at the ends, where the
+   *  chord is the host's, which crosses the rail (PanelHost). */
+  function stepRegion(delta: 1 | -1): boolean {
+    const all = regions();
+    const to = all[all.indexOf(region) + delta];
+    if (!to) return false;
+    const rows = columnsOf(to).flat();
+    if (!rows.length) {
+      region = to;
+      return true;
+    }
+    land(to, materializeKey(rows, remembered[to], 1)!);
+    return true;
   }
 
   function toggleMember(note: NoteEntry) {
@@ -1246,8 +1358,8 @@
             {index}
             openPath={shown}
             selectedPath={selected}
-            onSelect={(note) => (selected = note.path)}
-            onSelectNew={(key) => (selected = key)}
+            onSelect={(note) => select('shelf', note.path)}
+            onSelectNew={(key) => select('shelf', key)}
             {members}
             {inSession}
             {armed}
@@ -1274,8 +1386,8 @@
             kinds={index.kinds}
             openPath={shown}
             selectedPath={selected}
-            onSelect={(note) => (selected = note.path)}
-            onSelectNew={(key) => (selected = key)}
+            onSelect={(note) => select('grid', note.path)}
+            onSelectNew={(key) => select('grid', key)}
             {members}
             litBeatName={beatAt(focusedBeat)?.name ?? null}
             {inSession}
@@ -1310,7 +1422,7 @@
             focusedPath={focusedBeat}
             armedPath={armedBeat}
             selectedPath={selected}
-            onSelectNew={(key) => (selected = key)}
+            onSelectNew={(key) => select('beats', key)}
             onSelect={selectBeat}
             onFocus={focusOn}
             onOpen={(beat) => openPath(beat.path)}

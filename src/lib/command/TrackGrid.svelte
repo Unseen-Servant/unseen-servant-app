@@ -165,6 +165,17 @@
     else creatingIn = track;
   }
 
+  /** The rows' keys in each column, in the columns' order, as rendered:
+   *  the notes, the empty row, then the spent foot when it's open. The
+   *  panel steps the selection by it (keys.ts, the list grammar). */
+  export function orders(): string[][] {
+    return cols.map((c) => [
+      ...c.groups.flatMap((g) => g.notes.map((n) => n.path)),
+      newRowKey(c.track),
+      ...(openSpent.has(c.track) ? c.spent.map((n) => n.path) : []),
+    ]);
+  }
+
   /** ⇧F10 on the selected note: its menu, at its row, if it's the grid's. */
   export function menuFor(path: string): boolean {
     const note = cols.flatMap((c) => [...c.groups.flatMap((g) => g.notes), ...c.spent]).find((n) => n.path === path);
@@ -581,6 +592,7 @@
 <div
   class="grid"
   role="presentation"
+  data-region="grid"
   bind:this={gridEl}
   on:dragenter={overGrid}
   on:dragover={overGrid}
@@ -661,6 +673,7 @@
           <button
             type="button"
             class="ghost-row"
+            data-path={newRowKey(column.track)}
             data-row
             class:selected={selectedPath === newRowKey(column.track)}
             title="Add images — double-click to choose them"
@@ -688,6 +701,7 @@
           <button
             type="button"
             class="ghost-row"
+            data-path={newRowKey(column.track)}
             data-row
             class:selected={selectedPath === newRowKey(column.track)}
             title="New note — double-click to name it"
