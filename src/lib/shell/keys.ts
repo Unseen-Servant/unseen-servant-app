@@ -1,17 +1,24 @@
 // The window's one key listener. The hosts hang dispatchKey on the window,
-// and whatever wants a key binds a handler here. Handlers are tried in
-// binding order; the first to take the key ends the dispatch, with the
+// and whatever wants a key binds a handler here, at a place:
+//
+//   overlay   a menu or an inline edit, over everything while it's open
+//   region    a pane's rows, while that region of that tool has the keyboard
+//   tool      a tool's own chords, while it has the keyboard
+//   global    whichever tool has it: the hosts' and the app's transport
+//
+// Handlers are tried a place at a time in that order, in binding order
+// within a place, and a region's or a tool's only while it is on the focus
+// path (focus.ts). The first to take the key ends the dispatch, with the
 // default prevented. Nothing runs while a dialog is up: its keys bubble
 // here past the inerted page, and they are the dialog's.
 //
-// What binds here are the chords that work whichever tool has the
-// keyboard: the hosts' own (the shortcut sheet, settings, the rack's
-// views) and the ones that make Legend Lore the app's transport. A tool's
-// and a pane's own keys still hang on their own window listeners, gated on
-// `active` (PANELS.md), until they move here.
+// Legend Lore's own chords and Command's still hang on their own window
+// listeners, gated on `active` (PANELS.md), until they move here.
 
-import { dialogOpen, inEditor, isTyping } from './focus';
+import { get } from 'svelte/store';
+import { dialogOpen, focusPath, inEditor, isTyping, type FocusPath } from './focus';
 import { menuSlotHeld } from './menuSlot';
+import type { PanelId } from './panels';
 
 export interface KeyContext {
   /** The keystroke belongs to a field (focus.ts). */
@@ -25,15 +32,38 @@ export interface KeyContext {
 /** Returns true to take the key. */
 export type KeyHandler = (event: KeyboardEvent, ctx: KeyContext) => boolean;
 
-const handlers = new Set<KeyHandler>();
+/** Where a handler is bound: a tool's region, a tool, or over or under
+ *  them all. */
+export type KeyPlace = 'overlay' | 'global' | { tool: PanelId; region?: string };
+
+interface Binding {
+  at: KeyPlace;
+  handler: KeyHandler;
+}
+
+const bindings: Binding[] = [];
 
 /** Bind a handler for the window's life, or until the returned function
  *  is called. */
-export function bindKeys(handler: KeyHandler): () => void {
-  handlers.add(handler);
+export function bindKeys(handler: KeyHandler, at: KeyPlace = 'global'): () => void {
+  const binding = { at, handler };
+  bindings.push(binding);
   return () => {
-    handlers.delete(handler);
+    const i = bindings.indexOf(binding);
+    if (i >= 0) bindings.splice(i, 1);
   };
+}
+
+// The order places are tried in; a region before its tool.
+function rank(at: KeyPlace): number {
+  if (at === 'overlay') return 0;
+  if (at === 'global') return 3;
+  return at.region === undefined ? 2 : 1;
+}
+
+function onPath(at: KeyPlace, path: FocusPath): boolean {
+  if (typeof at === 'string') return true;
+  return at.tool === path.tool && (at.region === undefined || at.region === path.region);
 }
 
 export function dispatchKey(event: KeyboardEvent): void {
@@ -43,10 +73,14 @@ export function dispatchKey(event: KeyboardEvent): void {
     editor: inEditor(event.target),
     menu: menuSlotHeld(),
   };
-  for (const handler of handlers) {
-    if (handler(event, ctx)) {
-      event.preventDefault();
-      return;
+  const path = get(focusPath);
+  for (let place = 0; place <= 3; place++) {
+    for (const { at, handler } of bindings) {
+      if (rank(at) !== place || !onPath(at, path)) continue;
+      if (handler(event, ctx)) {
+        event.preventDefault();
+        return;
+      }
     }
   }
 }

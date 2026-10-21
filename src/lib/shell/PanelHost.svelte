@@ -15,6 +15,7 @@
   import PanelView from './PanelView.svelte';
   import RackBar from './RackBar.svelte';
   import StatusBar from './StatusBar.svelte';
+  import { setFocusedTool } from './focus';
   import { bindKeys, dispatchKey, hostKeys, type KeyContext } from './keys';
   import { isPanelId, panelTitle, type PanelId } from './panels';
   import {
@@ -63,6 +64,9 @@
   // in the view, or is in its own window, the view's first tool takes it.
   $: focusable = filled ? [filled] : present.filter((id) => !popped.has(id));
   $: if (!focused || !focusable.includes(focused)) focused = focusable[0] ?? null;
+  // The tool on the focus path (focus.ts), which keys.ts runs tools' and
+  // regions' handlers by.
+  $: setFocusedTool(focused);
 
   onMount(async () => {
     try {

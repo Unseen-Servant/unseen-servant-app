@@ -10,8 +10,8 @@
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { CHILD_SEP, childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
-  import { dialogOpen, isTyping } from '../shell/focus';
-  import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
+  import { bindKeys, type KeyContext } from '../shell/keys';
+  import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from '../ui/menuGeometry';
   import { grab } from '../ui/grab';
@@ -24,7 +24,6 @@
   // This panel owns the arrow keys. Independent of focusedName: a click on
   // the panel's chrome activates it without ringing a row, and the first
   // arrow then materializes the caret.
-  export let active = false;
   export let onActivate: () => void = () => {};
   // Where that first arrow lands — the page remembers the last row this pane
   // held, so pointing at the panel doesn't throw away the user's position.
@@ -465,29 +464,28 @@
     return !(event.target as HTMLElement | null)?.closest('button, a[href], [role="button"]');
   }
 
-  function handleWindowKey(event: KeyboardEvent) {
-    // The context menu claims Esc before anything else.
-    if (ctxMenu && event.key === 'Escape') {
-      event.preventDefault();
+  // The inline menus' Esc, over every region: the sort menu can be open
+  // with no rows for the pane to have claimed the keyboard with.
+  function menuKeys(event: KeyboardEvent): boolean {
+    if (event.key !== 'Escape') return false;
+    if (ctxMenu) {
       closeContextMenu();
-      return;
+      return true;
     }
-    if (sortMenuOpen && event.key === 'Escape') {
-      event.preventDefault();
+    if (sortMenuOpen) {
       closeSortMenu();
-      return;
+      return true;
     }
-    if (!active) return;
+    return false;
+  }
+
+  // The pane's keys, dispatched while it is the region with the keyboard
+  // (keys.ts), which also stands down for a dialog.
+  function paneKeys(event: KeyboardEvent, ctx: KeyContext): boolean {
     // Yield to inline renames, the sort menu, the context menu, and any
     // other popover that may be claiming keys.
-    if (renamingName !== null || creating !== null || sortMenuOpen || ctxMenu) return;
-    if (menuSlotHeld()) return;
-    // Yield to any open <dialog> — the browser inerts the page but
-    // window-level keydown still bubbles, so we'd otherwise navigate
-    // collections behind the modal.
-    if (dialogOpen()) return;
-    const target = event.target as HTMLElement | null;
-    if (isTyping(target)) return;
+    if (renamingName !== null || creating !== null || sortMenuOpen || ctxMenu) return false;
+    if (ctx.menu || ctx.typing) return false;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
@@ -497,23 +495,20 @@
 
     const edge = jumpEdge(event);
     if (edge && navEntries.length > 0) {
-      event.preventDefault();
       onFocusCollection(navEntries[edge === 'first' ? 0 : navEntries.length - 1].key);
-      return;
+      return true;
     }
 
     // The selected ghost track sits below the rows, out of the j/k order:
     // ↑ climbs back onto the last row, R names the next collection there.
     if (focusedName === NEW_ROW_KEY) {
       if (isUp || isDown) {
-        event.preventDefault();
         if (isUp && navEntries.length > 0) onFocusCollection(navEntries[navEntries.length - 1].key);
-        return;
+        return true;
       }
       if (bareLetter && lk === 'r') {
-        event.preventDefault();
         onCreate();
-        return;
+        return true;
       }
     }
 
@@ -521,39 +516,35 @@
     // first arrow places the caret rather than stepping, so it lands *on*
     // the restored row instead of one past it.
     if (focusedName === null && (isDown || isUp)) {
-      event.preventDefault();
       const entry = materializeKey(navEntries.map((e) => e.key), lastFocusedName, isDown ? 1 : -1);
       if (entry) onFocusCollection(entry);
-      return;
+      return true;
     }
 
     if (isDown) {
-      event.preventDefault();
       const next = stepNavKey(navEntries, focusedName, 1);
       if (next) onFocusCollection(next);
-      return;
+      return true;
     }
     if (isUp) {
-      event.preventDefault();
       const prev = stepNavKey(navEntries, focusedName, -1);
       if (prev) onFocusCollection(prev);
-      return;
+      return true;
     }
 
     // Handled before the idx-out-of-range early return so Esc still works
     // with the caret nowhere in particular.
     if (event.key === 'Escape') {
-      event.preventDefault();
       // Leaving the arm comes before releasing focus: the mode has
       // rewired what a click in the tree does, so it's the louder thing
       // Esc should undo.
       if (armedName !== null) onArm(armedName);
       else onFocusCollection(null);
-      return;
+      return true;
     }
 
     const parsed = focusedName === null || focusedName === NEW_ROW_KEY ? null : parseNavKey(focusedName);
-    if (parsed === null) return;
+    if (parsed === null) return false;
 
     // A child row answers with the file verbs; the collection verbs stay
     // on its head row. ⌘⌫ mirrors the hover × (membership only — the
@@ -561,42 +552,36 @@
     // tree's ← climbs to the parent.
     if (parsed.path !== null) {
       if (isDeleteChord(event)) {
-        event.preventDefault();
         removeChildRow(parsed.name, parsed.path);
-        return;
+        return true;
       }
       if ((meta && !event.shiftKey && !event.altKey && lk === 'o') || isPlainEnter(event)) {
-        event.preventDefault();
         onOpenFile(parsed.path);
-        return;
+        return true;
       }
       if (bareLetter && (event.key === 'ArrowLeft' || lk === 'h')) {
-        event.preventDefault();
         onFocusCollection(parsed.name);
-        return;
+        return true;
       }
-      return;
+      return false;
     }
 
     const col = rows.find((r) => r.name === parsed.name);
-    if (!col) return;
+    if (!col) return false;
 
     // ⌘⌫ / Del — the same chord the file tree spends on deleting a row.
     // Raises the confirm dialog; nothing goes until it's answered.
     if (isDeleteChord(event)) {
-      event.preventDefault();
       onDelete(col.name);
-      return;
+      return true;
     }
 
     // Enter folds the head row either way, as it does a tree folder.
     if (isPlainEnter(event)) {
-      event.preventDefault();
       toggleExpand(col.name);
-      return;
+      return true;
     }
     if (bareLetter && (event.key === 'ArrowRight' || lk === 'l')) {
-      event.preventDefault();
       if (!expandedNames.has(col.name)) {
         toggleExpand(col.name);
       } else {
@@ -605,46 +590,45 @@
         const firstChild = navEntries.find((e) => e.name === col.name && e.path !== null);
         if (firstChild) onFocusCollection(firstChild.key);
       }
-      return;
+      return true;
     }
     if (bareLetter && (event.key === 'ArrowLeft' || lk === 'h') && expandedNames.has(col.name)) {
-      event.preventDefault();
       toggleExpand(col.name);
-      return;
+      return true;
     }
     if (bareLetter) {
       // E for edit, not F: F reads as find/filter everywhere, and this app
       // already spends ⌘F on the Filters panel — one modifier apart from an
       // unrelated meaning is worse than no mnemonic at all. Not R either: R is
       // rename one pane over.
-      if (lk === 'r') { event.preventDefault(); startRename(col.name); return; }
+      if (lk === 'r') { startRename(col.name); return true; }
       // Arm is inert on a shelved track, same as play: neither the row's
       // button strip nor the context menu offers it there.
       if (lk === 'e') {
-        event.preventDefault();
         if (!col.archived) onArm(col.name);
-        return;
+        return true;
       }
       // P or Space toggle the transport — Space is the DAW play/stop
       // convention. A shelved track has no transport, so both are inert
       // until unarchived (Space still swallowed so the list doesn't scroll).
       if (lk === 'p' || lk === ' ') {
-        event.preventDefault();
-        if (event.repeat) return;
+        if (event.repeat) return true;
         // Keyed on lk, not 'p': Space is the other way to fire this, and
         // the release has to match whichever one is physically held.
         if (!col.archived) holdLatch.press(lk, () => onTogglePlay(col.name));
-        return;
+        return true;
       }
       if (lk === 'm') {
-        event.preventDefault();
-        if (event.repeat) return;
+        if (event.repeat) return true;
         holdLatch.press('m', () => onToggleMute(col.name));
-        return;
+        return true;
       }
-      if (lk === 'a') { event.preventDefault(); onToggleArchived(col.name, !col.archived); return; }
+      if (lk === 'a') { onToggleArchived(col.name, !col.archived); return true; }
     }
+    return false;
   }
+  const unbindKeys = [bindKeys(menuKeys, 'overlay'), bindKeys(paneKeys, { tool: 'legend-lore', region: 'collections' })];
+  onDestroy(() => unbindKeys.forEach((unbind) => unbind()));
 
   function toggleSortMenu() {
     if (sortMenuOpen) {
@@ -720,7 +704,7 @@
   }
 </script>
 
-<svelte:window on:click={handleWindowClick} on:keydown={handleWindowKey} />
+<svelte:window on:click={handleWindowClick} />
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 <aside

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, onDestroy } from 'svelte';
   import { openPath } from '@tauri-apps/plugin-opener';
   import type { FileItem, FileStatusEntry } from './types';
   import { isPathOrAncestorIn } from './selectionUtils';
@@ -7,8 +7,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
-  import { dialogOpen, isTyping } from '../shell/focus';
-  import { menuSlotHeld } from '../shell/menuSlot';
+  import { bindKeys, type KeyContext } from '../shell/keys';
   import { jumpEdge, systemsRowScopeKey } from '../shell/keybindings';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
   import { groupMemberState, type MemberState } from './collectionMembership';
@@ -108,10 +107,7 @@
   export let libraryRoot: string = '';
 
   export let focusedFilePath: string | null = null;
-  // The file region owns the arrow keys. False while a dock pane holds them,
-  // so ↓/↑ doesn't move the systems cursor too.
-  export let active = false;
-  // Where the caret lands when this pane is active but has none yet.
+  // Where the caret lands when this view has the keyboard but no caret yet.
   export let lastFocusedPath: string | null = null;
   export let onFocusFile: (path: string | null) => void = () => {};
   export let onContextMenu: (event: MouseEvent, item: FileItem) => void = () => {};
@@ -448,26 +444,17 @@
     setFocusedIdx(Math.max(0, Math.min(navRows.length - 1, cur + delta)));
   }
 
-  function handleWindowKey(event: KeyboardEvent) {
-    // IME composition — belt-and-braces ahead of the input-target check
-    // below; keybindings.ts's dispatch helpers can't see composition
-    // state themselves.
-    if (event.isComposing) return;
+  // The view's keys, dispatched while it is the region with the keyboard
+  // (keys.ts), which also stands down for a dialog.
+  function viewKeys(event: KeyboardEvent, ctx: KeyContext): boolean {
+    // IME composition — belt-and-braces ahead of the typing check;
+    // keybindings.ts's dispatch helpers can't see composition state.
+    if (event.isComposing) return false;
     // Yield to the context menu via state — DOM checks for `.context-menu`
     // are racy because Svelte's reactive DOM updates flush in a microtask
     // after the synchronous handler chain. State is the source of truth.
-    if (contextMenuOpen) return;
-    // Yield to inputs, popovers, and any rename in flight elsewhere.
-    if (menuSlotHeld()) return;
-    // Yield to any open <dialog> — modal inerting doesn't suppress
-    // window-level keydown listeners, so without this we'd nav behind it.
-    if (dialogOpen()) return;
-    const target = event.target as HTMLElement | null;
-    if (isTyping(target)) return;
-    // Yield whenever a dock pane owns the arrows. Gating on the pane rather
-    // than on a collection token also stops ↓ stealing the caret out of the
-    // filter panel, which the old check never considered.
-    if (!active) return;
+    if (contextMenuOpen) return false;
+    if (ctx.menu || ctx.typing) return false;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
@@ -481,40 +468,37 @@
 
     const edge = jumpEdge(event);
     if (edge && navRows.length > 0) {
-      event.preventDefault();
       setFocusedIdx(edge === 'first' ? 0 : navRows.length - 1);
-      return;
+      return true;
     }
 
-    if (isDown) { event.preventDefault(); moveFocus(1);  return; }
-    if (isUp)   { event.preventDefault(); moveFocus(-1); return; }
+    if (isDown) { moveFocus(1);  return true; }
+    if (isUp)   { moveFocus(-1); return true; }
 
-    // Esc clears focus when a systems entry is focused. Skip otherwise so
-    // we don't fight the page's Esc ladder (search, modals, etc.).
-    if (event.key === 'Escape' && focusedIdx !== null) {
-      event.preventDefault();
-      setFocusedIdx(null);
-      return;
+    // Esc clears the caret and passes on: the page's ladder goes on from
+    // here (a / filter funnels to the bar), as it does with no caret.
+    if (event.key === 'Escape') {
+      if (focusedIdx !== null) setFocusedIdx(null);
+      return false;
     }
 
-    if (focusedIdx === null) return;
+    if (focusedIdx === null) return false;
     const focused = navRows[focusedIdx];
-    if (!focused) return;
+    if (!focused) return false;
 
     // ←/→ walk groups the way the tree walks folders: on a header, ← folds
     // it and → unfolds it and steps onto its first file; on a file, ←
     // climbs to its group's header.
     if (isLeft || isRight) {
-      event.preventDefault();
       const tag = focused.tag;
       const headIdx = () => navRows.findIndex((v) => v.entry === null && v.tag === tag);
       if (focused.entry !== null) {
         if (isLeft) setFocusedIdx(headIdx());
-        return;
+        return true;
       }
       if (isLeft) {
         if (!collapsed.has(tag)) toggleSection(tag);
-        return;
+        return true;
       }
       const enter = () => {
         const i = headIdx();
@@ -529,7 +513,7 @@
       } else {
         enter();
       }
-      return;
+      return true;
     }
 
     // On a header, S/M act on the group itself — bare or shifted, the way
@@ -538,23 +522,22 @@
     if (focused.entry === null) {
       const tag = focused.tag;
       if (!meta && !event.altKey && (lk === 's' || lk === 'm')) {
-        event.preventDefault();
-        if (event.repeat) return;
+        if (event.repeat) return true;
         if (lk === 's') {
           if (tag !== 'Untagged') holdLatch.press('s', () => onToggleSystemSolo(tag));
         } else {
           holdLatch.press('m', () => onToggleSystemFilter(tag === 'Untagged' ? UNTAGGED_KEY : tag));
         }
-        return;
+        return true;
       }
       if (!meta && !event.altKey && lk === 'x' && curating) {
-        event.preventDefault();
         handleGroupCheckboxClick(
           { stopPropagation: () => {} } as MouseEvent,
           groups.find((g) => g.tag === tag)?.entries ?? [],
         );
+        return true;
       }
-      return;
+      return false;
     }
     const entry = focused.entry;
 
@@ -565,8 +548,7 @@
     // there — while bare S still solos the untagged file itself.
     const scopeAction = systemsRowScopeKey(event, focused.tag === 'Untagged');
     if (scopeAction) {
-      event.preventDefault();
-      if (event.repeat) return;
+      if (event.repeat) return true;
       const latchId = scopeAction.kind === 'solo' ? 's' : 'm';
       if (scopeAction.axis === 'file') {
         const item = entryToFileItem(entry);
@@ -580,7 +562,7 @@
         const key = focused.tag === 'Untagged' ? UNTAGGED_KEY : focused.tag;
         holdLatch.press(latchId, () => onToggleSystemFilter(key));
       }
-      return;
+      return true;
     }
 
     // X ticks the row's checkbox — the tree spends the same key on its
@@ -589,16 +571,18 @@
     // unhandled when there's no box to tick. Space is unbound here; Enter
     // and ⌘O open the focused file (the page's handler) and R renames it.
     if (!meta && !event.altKey && lk === 'x' && curating) {
-      event.preventDefault();
       handleCheckboxClick(
         { shiftKey: event.shiftKey, stopPropagation: () => {} } as MouseEvent,
         entry,
         focused.tag,
         groups.find((g) => g.tag === focused.tag)?.entries ?? []
       );
-      return;
+      return true;
     }
+    return false;
   }
+  const unbindKeys = bindKeys(viewKeys, { tool: 'legend-lore', region: 'systems' });
+  onDestroy(unbindKeys);
 
   function relativeParent(absPath: string): string {
     const i = absPath.lastIndexOf('/');
@@ -652,7 +636,6 @@
   }
 </script>
 
-<svelte:window on:keydown={handleWindowKey} />
 
 {#if groups.length === 0}
   <div class="empty">No indexed files match the current view.</div>

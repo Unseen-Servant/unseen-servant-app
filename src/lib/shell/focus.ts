@@ -1,8 +1,9 @@
 // What every window-level key handler asks before it acts, answered once
 // for both tools so they agree: is the user typing, and is a dialog up.
 
-import { get } from 'svelte/store';
+import { get, writable, type Readable } from 'svelte/store';
 import { openDialogs } from './dialogStack';
+import type { PanelId } from './panels';
 
 // A text field, a select, or an editor: CodeMirror's content is
 // contenteditable, and its wrapper is matched too for keys that land on
@@ -35,4 +36,36 @@ export function inEditor(target: EventTarget | null): boolean {
  *  from the DOM, which flushes a microtask behind the state. */
 export function dialogOpen(): boolean {
   return get(openDialogs) > 0;
+}
+
+/** Where the keyboard is: the tool that has it (the host's `focused`) and
+ *  the region in it that answers the arrows (Legend Lore's `activePane`).
+ *  Each tool keeps its own region, so the keyboard coming back to a tool
+ *  finds the region it left. keys.ts runs a region's and a tool's handlers
+ *  only while they are on the path. */
+export interface FocusPath {
+  tool: PanelId | null;
+  region: string | null;
+}
+
+let focusedTool: PanelId | null = null;
+const regions = new Map<PanelId, string>();
+const path = writable<FocusPath>({ tool: null, region: null });
+
+function publish(): void {
+  path.set({ tool: focusedTool, region: focusedTool === null ? null : (regions.get(focusedTool) ?? null) });
+}
+
+export const focusPath: Readable<FocusPath> = { subscribe: path.subscribe };
+
+/** The host's: which tool has the keyboard, or none. */
+export function setFocusedTool(id: PanelId | null): void {
+  focusedTool = id;
+  publish();
+}
+
+/** A tool's: which of its regions answers the arrows. */
+export function setRegion(id: PanelId, region: string): void {
+  regions.set(id, region);
+  publish();
 }

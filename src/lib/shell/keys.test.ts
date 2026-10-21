@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { openDialogs } from './dialogStack';
+import { setFocusedTool, setRegion } from './focus';
 import { bindKeys, dispatchKey, hostKeys, type KeyContext } from './keys';
 
 function key(
@@ -75,6 +76,63 @@ describe('dispatchKey', () => {
     dispatchKey(key('x'));
     expect(ctx).toMatchObject({ typing: false, editor: false });
     unbind();
+  });
+});
+
+describe('dispatchKey places', () => {
+  test('tries the overlay, then the region, then the tool, then global, whatever the binding order', () => {
+    const seen: string[] = [];
+    const unbind = [
+      bindKeys(() => (seen.push('global'), false)),
+      bindKeys(() => (seen.push('tool'), false), { tool: 'legend-lore' }),
+      bindKeys(() => (seen.push('region'), false), { tool: 'legend-lore', region: 'collections' }),
+      bindKeys(() => (seen.push('overlay'), false), 'overlay'),
+    ];
+    setRegion('legend-lore', 'collections');
+    setFocusedTool('legend-lore');
+    dispatchKey(key('x'));
+    expect(seen).toEqual(['overlay', 'region', 'tool', 'global']);
+    unbind.forEach((u) => u());
+    setFocusedTool(null);
+  });
+
+  test("a region's and a tool's handlers run only while they are on the path", () => {
+    const seen: string[] = [];
+    const unbind = [
+      bindKeys(() => (seen.push('ll:collections'), false), { tool: 'legend-lore', region: 'collections' }),
+      bindKeys(() => (seen.push('ll:filters'), false), { tool: 'legend-lore', region: 'filters' }),
+      bindKeys(() => (seen.push('ll'), false), { tool: 'legend-lore' }),
+      bindKeys(() => (seen.push('command'), false), { tool: 'command' }),
+    ];
+    setRegion('legend-lore', 'filters');
+    setFocusedTool('legend-lore');
+    dispatchKey(key('x'));
+    expect(seen).toEqual(['ll:filters', 'll']);
+    seen.length = 0;
+    setFocusedTool('command');
+    dispatchKey(key('x'));
+    expect(seen).toEqual(['command']);
+    seen.length = 0;
+    setFocusedTool(null);
+    dispatchKey(key('x'));
+    expect(seen).toEqual([]);
+    unbind.forEach((u) => u());
+  });
+
+  test('a region taking the key keeps it from the tool and from global', () => {
+    const tool = vi.fn(() => true);
+    const unbind = [
+      bindKeys(tool),
+      bindKeys(() => true, { tool: 'legend-lore', region: 'collections' }),
+    ];
+    setRegion('legend-lore', 'collections');
+    setFocusedTool('legend-lore');
+    const e = key('x');
+    dispatchKey(e);
+    expect(tool).not.toHaveBeenCalled();
+    expect(e.preventDefault).toHaveBeenCalledOnce();
+    unbind.forEach((u) => u());
+    setFocusedTool(null);
   });
 });
 

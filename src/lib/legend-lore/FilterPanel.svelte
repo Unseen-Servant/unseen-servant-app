@@ -6,12 +6,11 @@
   // and clearing a chip resets the row. Unlike the old dropdown console,
   // S/M are hover-revealed like the tree's folder rows — the panel is
   // furniture, not a popover.
-  import { afterUpdate, tick } from 'svelte';
+  import { afterUpdate, tick, onDestroy } from 'svelte';
   import { computeFilterRows, sectionHeaderKey, stepFilterRow } from './filterRows';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
-  import { dialogOpen, isTyping } from '../shell/focus';
-  import { menuSlotHeld } from '../shell/menuSlot';
+  import { bindKeys, type KeyContext } from '../shell/keys';
   import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
   import type { CurationKey } from './searchScope';
@@ -70,14 +69,12 @@
   export let hideImages: boolean = false;
   export let onToggleHideImages: () => void = () => {};
 
-  // Where this pane's caret is. null means no cursor is drawn — which is now
-  // distinct from not holding the keyboard, see `active`.
+  // Where this pane's caret is. null means no cursor is drawn — which is
+  // distinct from not holding the keyboard (the focus path, focus.ts).
   export let focusedRow: string | null = null;
-  // This panel owns the arrow keys. A click anywhere in it activates the pane
-  // without ringing a row; the first arrow then materializes the caret. Until
-  // this existed the panel had no mouse entry point at all — Cmd+Alt+↓ was
-  // the only way in.
-  export let active = false;
+  // A click anywhere in the panel activates the pane without ringing a row;
+  // the first arrow then materializes the caret. Until this existed the panel
+  // had no mouse entry point at all — Cmd+Alt+↓ was the only way in.
   export let onActivate: () => void = () => {};
   // Where that first arrow lands, remembered by the page.
   export let lastFocusedRow: string | null = null;
@@ -186,16 +183,10 @@
     onFocusRow(target);
   }
 
-  // Window-level and gated on the token — the same shape CollectionsPanel
-  // uses, so exactly one pane responds to a keystroke.
-  function handleWindowKey(event: KeyboardEvent) {
-    if (!active) return;
-    if (event.isComposing) return;
-    // Yield to popovers and modals that own the keyboard while open.
-    if (menuSlotHeld()) return;
-    if (dialogOpen()) return;
-    const target = event.target as HTMLElement | null;
-    if (isTyping(target)) return;
+  // The pane's keys, dispatched while it is the region with the keyboard
+  // (keys.ts), which also stands down for a dialog.
+  function paneKeys(event: KeyboardEvent, ctx: KeyContext): boolean {
+    if (event.isComposing || ctx.menu || ctx.typing) return false;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
@@ -211,54 +202,48 @@
       // Release the pane. Not a close — the panel is docked furniture whose
       // open state is persisted, and the header toggle is its close
       // affordance. Matches CollectionsPanel's onFocusCollection(null).
-      event.preventDefault();
       onFocusRow(null);
-      return;
+      return true;
     }
     const edge = jumpEdge(event);
     if (edge && rows.length > 0) {
-      event.preventDefault();
       onFocusRow(rows[edge === 'first' ? 0 : rows.length - 1].key);
-      return;
+      return true;
     }
     // Active with no caret (the pane was claimed by a click on its chrome):
     // the first arrow places the caret rather than stepping, so it lands *on*
     // the restored row instead of one past it.
     if (focusedRow === null && (isDown || isUp)) {
-      event.preventDefault();
       onFocusRow(materializeKey(rows.map((r) => r.key), lastFocusedRow, isDown ? 1 : -1));
-      return;
+      return true;
     }
     if (isDown) {
-      event.preventDefault();
       onFocusRow(stepFilterRow(rows, focusedRow, 1));
-      return;
+      return true;
     }
     if (isUp) {
-      event.preventDefault();
       onFocusRow(stepFilterRow(rows, focusedRow, -1));
-      return;
+      return true;
     }
 
     // Everything below acts on the caret's row, which the branches above are
     // the only way to create. Escape stays above so it can still release an
     // active pane that never grew one.
-    if (focusedRow === null) return;
+    if (focusedRow === null) return false;
 
     // ←/→ walk sections the way the tree walks folders: on a header, ← folds
     // it and → unfolds it and steps onto its first row; on a row, ← climbs
     // to the header.
     if (isLeft || isRight) {
-      event.preventDefault();
       const row = rows.find((r) => r.key === focusedRow);
-      if (!row) return;
+      if (!row) return true;
       if (row.kind !== 'header') {
         if (isLeft) onFocusRow(sectionHeaderKey(row.section));
-        return;
+        return true;
       }
       if (isLeft) {
         if (!collapsed.has(row.section)) toggleSection(row.section);
-        return;
+        return true;
       }
       const enter = () => {
         if (focusedRow !== row.key) return;
@@ -272,26 +257,28 @@
       } else {
         enter();
       }
-      return;
+      return true;
     }
 
     // X ticks the focused row's checkbox, the same key both file views
     // spend on theirs. Channel rows carry S/M instead of a checkbox and
     // are reached through those. Space and Enter are unbound here.
     if (bareLetter && lk === 'x') {
-      event.preventDefault();
       rowElByKey(focusedRow)?.querySelector<HTMLElement>('[data-fm-action]')?.click();
-      return;
+      return true;
     }
     if (bareLetter && (lk === 's' || lk === 'm')) {
-      event.preventDefault();
-      if (event.repeat) return;
+      if (event.repeat) return true;
       // Capture the button, not the row: focus may move before release.
       const btn = rowElByKey(focusedRow)
         ?.querySelector<HTMLElement>(lk === 's' ? '[data-sm-s]' : '[data-sm-m]');
       if (btn) holdLatch.press(lk, () => btn.click());
+      return true;
     }
+    return false;
   }
+  const unbindKeys = bindKeys(paneKeys, { tool: 'legend-lore', region: 'filters' });
+  onDestroy(unbindKeys);
 
   $: hasHidden = hiddenCount > 0;
 
@@ -312,7 +299,6 @@
   ];
 </script>
 
-<svelte:window on:keydown={handleWindowKey} />
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 <aside

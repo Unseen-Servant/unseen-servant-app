@@ -96,15 +96,18 @@ showing the way back to its window.
 
 - **Where it is.** No reading the window label, URL or route, no `goto`, no
   branching on docked vs standalone.
-- **That it has the keyboard.** Any window-level listener (`<svelte:window>`,
-  `document` handlers, global shortcuts) must do nothing while `active` is
-  false — another panel may own the keyboard, even one on screen beside it.
-  Bare 1–8 belong to the rack. It stands down for a dialog and for typing
-  through `focus.ts` (`dialogOpen`, `isTyping`), never its own DOM query.
-  A chord that must work whichever tool has the keyboard is the opposite
-  case: it binds through `keys.ts` (`bindKeys`), is not gated on `active`,
-  and if it changes what the panel shows it calls `showPanel` (`shellState.ts`)
-  first so the host brings the panel up.
+- **That it has the keyboard.** Keys go through the shell's dispatcher
+  (`keys.ts`): a pane binds its handler at its region (`bindKeys(handler,
+  { tool, region })`), a tool at itself, and the dispatcher runs them only
+  while that region or tool is on the focus path (`focus.ts`) — the host
+  reports the tool, the panel its region with `setRegion`. The dispatcher
+  stands down for a dialog and tells handlers about typing and open menus;
+  a handler never queries the DOM for those. A chord that must work
+  whichever tool has the keyboard binds at `'global'`, and if it changes
+  what the panel shows it calls `showPanel` (`shellState.ts`) first so the
+  host brings the panel up. Any window-level listener a panel still keeps
+  must do nothing while `active` is false — another panel may own the
+  keyboard, even one on screen beside it. Bare 1–8 belong to the rack.
 - **A size** beyond its `rackMin` in the main window (Legend Lore 560×320,
   Command 420×280), or its window minimum in its own window. Fill the parent
   (`height: 100%`), never the viewport (`100vh`) — the rack bar takes a row,

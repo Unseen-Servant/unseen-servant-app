@@ -50,7 +50,7 @@
   import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
   import { renameNavKey } from './collectionsNav';
   import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { dialogOpen, isTyping } from '../shell/focus';
+  import { dialogOpen, isTyping, setRegion } from '../shell/focus';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { bindKeys, type KeyContext } from '../shell/keys';
   import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
@@ -123,6 +123,9 @@
   // 'files' is simply the name for what used to be spelled "no token
   // anywhere".
   let activePane: 'files' | 'collections' | 'filters' = 'files';
+  // The region on the focus path (focus.ts), which keys.ts runs the panes'
+  // handlers by. The file region is three regions there, by what it shows.
+  $: setRegion('legend-lore', activePane === 'files' ? (searchViewOpen ? 'search' : viewMode) : activePane);
 
   // File focus & context menu
   let focusedFilePath: string | null = null;
@@ -3784,7 +3787,6 @@
             onReorder={reorderCollections}
             focusedName={focusedCollectionName}
             lastFocusedName={lastFocusedCollectionName}
-            active={active && activePane === 'collections'}
             onActivate={() => pointAtEmpty('collections')}
             onFocusCollection={setFocusedCollectionName}
             pickQuery={mentionQuery}
@@ -3823,7 +3825,6 @@
             canReset={scopeConsoleEngaged}
             focusedRow={focusedFilterRow}
             lastFocusedRow={lastFocusedFilterRow}
-            active={active && activePane === 'filters'}
             onActivate={() => pointAtEmpty('filters')}
             onFocusRow={setFocusedFilterRow}
           />
@@ -3957,7 +3958,6 @@
           libraryRoot={selectedFolder}
           {focusedFilePath}
           lastFocusedPath={lastFocusedFilePath}
-          active={active && activePane === 'files'}
           onFocusFile={setFocusedFilePath}
           onContextMenu={handleContextMenu}
           {renamingFilePath}

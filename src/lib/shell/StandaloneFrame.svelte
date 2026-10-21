@@ -7,6 +7,7 @@
   import ConfirmDialog from '../ui/ConfirmDialog.svelte';
   import DockToggle from './DockToggle.svelte';
   import KeyboardHelpOverlay from './KeyboardHelpOverlay.svelte';
+  import { setFocusedTool } from './focus';
   import { bindKeys, dispatchKey, hostKeys } from './keys';
   import PanelView from './PanelView.svelte';
   import StatusBar from './StatusBar.svelte';
@@ -24,6 +25,9 @@
   function showSettings(tab: 'general' | 'help') {
     openSettings(tab).catch((err) => console.error('Failed to open settings:', err));
   }
+
+  // The one tool here has the keyboard for the window's life (focus.ts).
+  setFocusedTool(id);
 
   // The window's keys go through the shell's dispatcher (keys.ts); the
   // host answers for the shortcut sheet and settings.
