@@ -2,8 +2,9 @@
   // The main window's bar: the rack's eight views, then one well per tool
   // (PANELS.md). A tool's key mounts it in the current view or gives it the
   // keyboard, takes it out when pressed again, and carries it into the rack
-  // by hand; its lamp is lit while the tool is in this view, and the raised
-  // fill marks the one that has the keyboard. The lock beside it holds the
+  // by hand; its lamp is lit while the tool is in this view. Which tool has
+  // the keyboard shows on its frame in the rack (PanelHost), not here: the
+  // bar's keys are not a picker, both tools are open. The lock beside it holds the
   // tool in this view: no pop-out, no resizing, no drops onto it. On macOS
   // the bar is the window's title bar too: the title bar is an overlay
   // (tauri.conf.json), the traffic lights sit at its left end, and its bare
@@ -71,7 +72,6 @@
       <div class="tool-well">
         <button
           class="key tool-key"
-          class:open={focused === tool.id}
           class:away={popped.has(tool.id)}
           title={keyTitle(tool.id, tool.title)}
           aria-pressed={here}
@@ -222,11 +222,6 @@
     align-items: center;
     justify-content: center;
   }
-  .key.open {
-    background: var(--bg-header);
-    color: var(--text-primary);
-  }
-
   .tool-key {
     gap: 0.4rem;
     padding: 0 0.6rem 0 0.5rem;
@@ -250,11 +245,7 @@
     background: var(--border-subtle);
     transition: background var(--transition-fast);
   }
-  .key.open .cell {
-    background: var(--bg-app);
-  }
-  .cell.lit,
-  .key.open .cell.lit {
+  .cell.lit {
     background: var(--text-active);
     filter: var(--glow-active);
   }

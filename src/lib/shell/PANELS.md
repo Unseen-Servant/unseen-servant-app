@@ -26,8 +26,9 @@ view's layout and locks are saved in the settings store (`rackViews`,
 `rackView`). A tool locked in a view can't be popped out, resized, dropped
 onto, carried, or taken out by its key there.
 
-A tool's key lights its lamp while the tool is in the current view and sits
-raised while the tool has the keyboard. Pressing the key of a tool in the
+A tool's key lights its lamp while the tool is in the current view; the
+tool that has the keyboard shows it on its slot's frame, one grey step up
+(`--border-frame-keyed`). Pressing the key of a tool in the
 view gives it the keyboard, as a click into it does; pressed again, the key
 takes it out. Each docked tool is mounted once and
 laid over its slot, so switching views moves it without remounting; a tool

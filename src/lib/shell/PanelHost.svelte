@@ -316,6 +316,7 @@
         <div
           class="slot"
           class:shown={!!r}
+          class:keyed={focused === tool.id}
           class:filled={filled === tool.id}
           style={r ? `left: ${r.x}px; top: ${r.y}px; width: ${r.w}px; height: ${r.h}px` : undefined}
           on:pointerdown|capture={() => (focused = tool.id)}
@@ -436,6 +437,12 @@
      over the top too. */
   .slot.filled {
     border-top: 3px solid var(--bg-header);
+  }
+  /* The tool with the keyboard: its frame one grey step up, the DAW's
+     focused panel, where the eye is. Not a raised key in the bar — both
+     tools are open, and the keyboard isn't a pick. */
+  .slot.keyed {
+    border-color: var(--border-frame-keyed);
   }
 
   .window-key {
