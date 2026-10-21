@@ -15,6 +15,7 @@
   import PanelView from './PanelView.svelte';
   import RackBar from './RackBar.svelte';
   import StatusBar from './StatusBar.svelte';
+  import { dialogOpen, isTyping } from './focus';
   import { menuSlotHeld } from './menuSlot';
   import { isPanelId, panelTitle, type PanelId } from './panels';
   import {
@@ -152,8 +153,8 @@
   function onKey(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing) return;
     const digit = /^Digit([1-8])$/.exec(e.code);
-    if (!digit || menuSlotHeld() || document.querySelector('dialog[open]')) return;
-    if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    if (!digit || menuSlotHeld() || dialogOpen()) return;
+    if (isTyping(e.target)) return;
     e.preventDefault();
     switchTo(Number(digit[1]) - 1);
   }

@@ -15,6 +15,7 @@
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
   import KeyboardHelpOverlay from '../shell/KeyboardHelpOverlay.svelte';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
@@ -320,7 +321,7 @@
     if (!active || menu || menuSlotHeld()) return;
     // An open dialog's keys still bubble here past the inert page; they're
     // the dialog's, as in Legend Lore.
-    if (document.querySelector('dialog[open]')) return;
+    if (dialogOpen()) return;
     const target = e.target as HTMLElement | null;
     // ⌘E: read the open note or edit it, as Obsidian's, from the editor
     // too, but not while a name is typed.
@@ -337,7 +338,7 @@
       openPath(session.path);
       return;
     }
-    if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    if (isTyping(target)) return;
     // ⌘T, ⇧⌘T: insert a note or an image track, as Live inserts an audio
     // or a MIDI one, after the selected note's track.
     if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 't' && mode === 'prep' && index) {

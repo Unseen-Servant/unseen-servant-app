@@ -16,7 +16,9 @@
   import CommandMenu from './CommandMenu.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { chord, chordHint } from '../shell/keybindings';
+  import { menuSlotHeld } from '../shell/menuSlot';
   import { commandApi } from './api';
   import {
     CARD,
@@ -294,9 +296,9 @@
    *  player's, so Esc puts down an armed tool before it lets go of a beat. */
   function boardKeys(e: KeyboardEvent) {
     if (!active || menu || e.isComposing) return;
-    if (document.querySelector('dialog[open], [role="menu"]')) return;
+    if (dialogOpen() || menuSlotHeld()) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    if (isTyping(target)) return;
     const mod = e.metaKey || e.ctrlKey;
     const key = e.key.toLowerCase();
     if (mod && !e.altKey && (key === 'z' || key === 'g')) {

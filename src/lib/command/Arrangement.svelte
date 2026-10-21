@@ -9,6 +9,7 @@
   // down to the live beat.
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { menuSlotHeld } from '../shell/menuSlot';
   import CommandMenu from './CommandMenu.svelte';
   import SpendKey from './SpendKey.svelte';
@@ -68,10 +69,10 @@
 
   function onKeydown(e: KeyboardEvent) {
     if (!active || menu || menuSlotHeld()) return;
-    if (document.querySelector('dialog[open]')) return;
+    if (dialogOpen()) return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('input, textarea, select, [contenteditable], .cm-editor')) return;
+    if (isTyping(target)) return;
     const lk = e.key.toLowerCase();
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || lk === 'j' || lk === 'k') {
       e.preventDefault();

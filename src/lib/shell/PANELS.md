@@ -99,7 +99,8 @@ showing the way back to its window.
 - **That it has the keyboard.** Any window-level listener (`<svelte:window>`,
   `document` handlers, global shortcuts) must do nothing while `active` is
   false — another panel may own the keyboard, even one on screen beside it.
-  Bare 1–8 belong to the rack.
+  Bare 1–8 belong to the rack. It stands down for a dialog and for typing
+  through `focus.ts` (`dialogOpen`, `isTyping`), never its own DOM query.
 - **A size** beyond its `rackMin` in the main window (Legend Lore 560×320,
   Command 420×280), or its window minimum in its own window. Fill the parent
   (`height: 100%`), never the viewport (`100vh`) — the rack bar takes a row,

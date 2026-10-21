@@ -10,6 +10,7 @@
   import { computeFilterRows, sectionHeaderKey, stepFilterRow } from './filterRows';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { jumpEdge } from '../shell/keybindings';
   import { UNTAGGED_KEY } from './searchScope';
@@ -192,9 +193,9 @@
     if (event.isComposing) return;
     // Yield to popovers and modals that own the keyboard while open.
     if (menuSlotHeld()) return;
-    if (document.querySelector('dialog[open]')) return;
+    if (dialogOpen()) return;
     const target = event.target as HTMLElement | null;
-    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+    if (isTyping(target)) return;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();

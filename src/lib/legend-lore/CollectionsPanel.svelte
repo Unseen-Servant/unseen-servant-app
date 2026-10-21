@@ -10,6 +10,7 @@
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
   import { CHILD_SEP, childNavKey, computeCollectionNav, parseNavKey, stepNavKey } from './collectionsNav';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { claimMenuSlot, menuSlotHeld, releaseMenuSlot } from '../shell/menuSlot';
   import { isTreePathsDrag, getTreePathsPayload, clearTreePathsPayload } from './dragPayload';
   import { clampToViewport } from '../ui/menuGeometry';
@@ -484,9 +485,9 @@
     // Yield to any open <dialog> — the browser inerts the page but
     // window-level keydown still bubbles, so we'd otherwise navigate
     // collections behind the modal.
-    if (document.querySelector('dialog[open]')) return;
+    if (dialogOpen()) return;
     const target = event.target as HTMLElement | null;
-    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+    if (isTyping(target)) return;
 
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();

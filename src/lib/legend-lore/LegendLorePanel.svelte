@@ -51,6 +51,7 @@
   import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
   import { renameNavKey } from './collectionsNav';
   import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
   import { menuSlotHeld } from '../shell/menuSlot';
@@ -2309,12 +2310,11 @@
     // Cmd+Alt+←/→, Esc ladder, tree-nav letters, etc.) don't run
     // behind the modal. The dialog has its own handlers for what it
     // needs (Esc → cancel, Enter → submit, Tab cycles inside).
-    if (document.querySelector('dialog[open]')) return;
+    if (dialogOpen()) return;
 
     const target = event.target as HTMLElement | null;
     const inSearchInput = target?.classList.contains('search-input') === true;
-    const inAnyInput =
-      target?.matches('input, textarea, [contenteditable="true"]') === true;
+    const inAnyInput = isTyping(target);
 
     if (event.key === 'Escape') {
       // Yield to ContextMenu's own Esc handler — it knows about submenu

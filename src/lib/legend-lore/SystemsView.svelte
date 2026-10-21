@@ -7,6 +7,7 @@
   import { UNTAGGED_KEY } from './searchScope';
   import { materializeKey } from '../shell/paneFocus';
   import { holdLatch } from '../ui/holdLatch';
+  import { dialogOpen, isTyping } from '../shell/focus';
   import { menuSlotHeld } from '../shell/menuSlot';
   import { jumpEdge, systemsRowScopeKey } from '../shell/keybindings';
   import { splitRibbons, EMPTY_RIBBONS, type Ribbon } from './collectionRibbons';
@@ -460,9 +461,9 @@
     if (menuSlotHeld()) return;
     // Yield to any open <dialog> — modal inerting doesn't suppress
     // window-level keydown listeners, so without this we'd nav behind it.
-    if (document.querySelector('dialog[open]')) return;
+    if (dialogOpen()) return;
     const target = event.target as HTMLElement | null;
-    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+    if (isTyping(target)) return;
     // Yield whenever a dock pane owns the arrows. Gating on the pane rather
     // than on a collection token also stops ↓ stealing the caret out of the
     // filter panel, which the old check never considered.

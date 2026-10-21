@@ -60,6 +60,7 @@
     type Tool,
   } from './board';
   import { carriesFiles, droppedImages } from './embeds';
+  import { isTyping } from '../shell/focus';
   import type { BoardOp, CampaignIndex, Side } from './types';
 
   export let cards: Card[];
@@ -410,7 +411,7 @@
    *  "go back". */
   function keepBackspace(e: KeyboardEvent) {
     const target = e.target as HTMLElement | null;
-    if (e.key === 'Backspace' && !target?.closest('input, textarea, [contenteditable]')) e.preventDefault();
+    if (e.key === 'Backspace' && !isTyping(target)) e.preventDefault();
   }
 </script>
 
