@@ -1,60 +1,106 @@
 <script lang="ts">
   import Modal from './Modal.svelte';
   import { focusPath } from './focus';
-  import { KEYBINDINGS, chord, liveScopes, type KeyScope } from './keybindings';
+  import {
+    KEYBINDINGS,
+    chord,
+    liveScopes,
+    type KeybindingEntry,
+    type KeyScope,
+  } from './keybindings';
 
   export let visible = false;
   export let onClose: () => void;
 
-  // Order chosen to match the spec: most-used scopes first, modal-internal
-  // chords last. `modal` scope intentionally omitted — those chords live
+  // The sheet is laid out by place, not by the dispatcher's scopes: the
+  // window and the transport, the search bar, then the lists — what every
+  // list answers, what Legend Lore's lists share, and only then each view
+  // with what is its own — and the menus last. The order is fixed so the
+  // sheet reads the same every time. `modal` is omitted: those chords live
   // inside dialogs and aren't useful in a global cheat sheet.
-  const SCOPE_ORDER: KeyScope[] = [
-    'global',
-    'tool',
-    'fileTree',
-    'systemsView',
-    'collections',
-    'searchInput',
-    'searchResults',
-    'filterPanel',
-    'command',
-    'commandPrep',
-    'commandPlay',
-    'contextMenu',
+  type SectionKey = 'window' | 'transport' | 'anyList' | 'llLists' | 'board' | KeyScope;
+  const SECTIONS: { key: SectionKey; label: string }[] = [
+    { key: 'window', label: 'Window' },
+    { key: 'transport', label: 'Transport, from anywhere' },
+    { key: 'searchInput', label: 'Search bar' },
+    { key: 'anyList', label: 'Any list' },
+    { key: 'llLists', label: 'Legend Lore lists' },
+    { key: 'fileTree', label: 'File tree' },
+    { key: 'systemsView', label: 'Systems view' },
+    { key: 'collections', label: 'Collections' },
+    { key: 'filterPanel', label: 'Filters' },
+    { key: 'searchResults', label: 'Search results' },
+    { key: 'command', label: 'Command' },
+    { key: 'commandPrep', label: 'Prep' },
+    { key: 'commandPlay', label: 'Play' },
+    { key: 'board', label: 'Board' },
+    { key: 'contextMenu', label: 'Menus' },
   ];
 
-  const SCOPE_LABELS: Record<KeyScope, string> = {
-    global: 'Global',
-    tool: 'Either tool',
-    fileTree: 'File tree',
-    systemsView: 'Systems view',
-    collections: 'Collections',
-    searchInput: 'Search input',
-    searchResults: 'Search results',
-    filterPanel: 'Filters panel',
-    command: 'Command',
-    commandPrep: 'Command: Prep',
-    commandPlay: 'Command: Play',
-    contextMenu: 'Context menu',
-    modal: 'Modal',
-  };
+  // Legend Lore's transport works from anywhere, so it is registered
+  // global; on the sheet it is its own block, apart from the window's keys.
+  const TRANSPORT = new Set([
+    'collections.slot', 'collections.slotMix', 'collections.new',
+    'sync.run', 'sync.commit', 'search.focus', 'filter.toggle',
+    'filter.toggleHidden', 'library.reveal', 'scope.bypass', 'scope.peek',
+  ]);
 
-  // The scopes the keyboard can reach from where it is (focus.ts) keep
-  // their rank; the others step down the text ramp, in their usual place,
-  // so the sheet reads the same every time and says which part is live.
+  const LISTS = new Set<KeyScope>([
+    'fileTree', 'systemsView', 'collections', 'filterPanel', 'searchResults',
+    'commandPrep', 'commandPlay', 'contextMenu',
+  ]);
+  const COMMAND_LISTS = new Set<KeyScope>(['commandPrep', 'commandPlay']);
+
+  // A chord that reads the same in two lists is one row, filed under the
+  // lists it spans: "Any list" when Command's are among them, "Legend Lore
+  // lists" otherwise. The merge is by chord and label, so a list that words
+  // a key differently keeps its own row — the registry's wording is what
+  // decides whether a key is shared, and the sheet shows that decision.
+  interface Row {
+    entry: KeybindingEntry;
+    scopes: KeyScope[];
+  }
+  const rows: Row[] = [];
+  const merged = new Map<string, Row>();
+  for (const entry of KEYBINDINGS) {
+    if (!LISTS.has(entry.scope)) {
+      rows.push({ entry, scopes: [entry.scope] });
+      continue;
+    }
+    const key = `${entry.keys.mac}|${entry.keys.other}|${entry.label}`;
+    const row = merged.get(key);
+    if (row) {
+      row.scopes.push(entry.scope);
+    } else {
+      const fresh = { entry, scopes: [entry.scope] };
+      merged.set(key, fresh);
+      rows.push(fresh);
+    }
+  }
+
+  function sectionOf({ entry, scopes }: Row): SectionKey | null {
+    if (entry.scope === 'modal') return null;
+    if (entry.scope === 'global') return TRANSPORT.has(entry.id) ? 'transport' : 'window';
+    if (entry.scope === 'tool') return 'window';
+    if (entry.id.startsWith('command.board')) return 'board';
+    if (scopes.length > 1) return scopes.some(s => COMMAND_LISTS.has(s)) ? 'anyList' : 'llLists';
+    return entry.scope;
+  }
+
+  const grouped = SECTIONS
+    .map(section => ({ ...section, rows: rows.filter(r => sectionOf(r) === section.key) }))
+    .filter(section => section.rows.length > 0);
+
+  // The rows the keyboard can reach from where it is (focus.ts) keep their
+  // rank; the others step down the text ramp, in their usual place, so the
+  // sheet says which part is live. A merged row is live from any list it
+  // spans; a section's heading steps down only when every row has.
   $: live = liveScopes($focusPath);
-  $: grouped = SCOPE_ORDER
-    .map(scope => ({
-      scope,
-      label: SCOPE_LABELS[scope],
-      entries: KEYBINDINGS.filter(k => k.scope === scope),
-      away: !live.has(scope),
-    }))
-    .filter(g => g.entries.length > 0);
+  $: isLive = (row: Row) => row.scopes.some(s => live.has(s));
 
   // One cap per alternative (`↓ / J` is two keys, not one), with the peek
-  // line's leading "hold" kept as a word rather than capped.
+  // line's leading "hold" kept as a word rather than capped; its `S/M/P/B`
+  // is one cap, any of four keys, so the row stays one line.
   function caps(id: string): { prefix: string; keys: string[] } {
     const c = chord(id);
     const prefix = c.startsWith('hold ') ? 'hold' : '';
@@ -73,24 +119,25 @@
 >
   <div class="legend-body">
     <div class="legend-cols">
-      {#each grouped as group (group.scope)}
-        <section class="lgroup" class:away={group.away}>
-          <h3 class="ledger-label">{group.label}</h3>
+      {#each grouped as section (section.key)}
+        <section class="lgroup" class:away={!section.rows.some(isLive)}>
+          <h3 class="ledger-label">{section.label}</h3>
           <dl class="bindings">
-            {#each group.entries as entry (entry.id)}
-              {@const c = caps(entry.id)}
-              <dt class="keys">
+            {#each section.rows as row (row.entry.id)}
+              {@const c = caps(row.entry.id)}
+              {@const away = !isLive(row)}
+              <dt class="keys" class:away>
                 <!-- Each cap carries its trailing slash (and the first, the
                      "hold"), so a wrapped chord breaks after a slash. -->
                 {#each c.keys as key, i}
                   <span class="alt">
                     {#if i === 0 && c.prefix}<span class="word">{c.prefix}</span>{/if}
-                    <span class="keycap" class:switch-key={entry.switch}>{key}</span>
+                    <span class="keycap" class:switch-key={row.entry.switch}>{key}</span>
                     {#if i < c.keys.length - 1}<span class="word">/</span>{/if}
                   </span>
                 {/each}
               </dt>
-              <dd class="desc">{entry.label}</dd>
+              <dd class="desc" class:away>{row.entry.label}</dd>
             {/each}
           </dl>
         </section>
@@ -119,12 +166,11 @@
     column-rule: 1px solid var(--border-subtle);
   }
 
-  /* Scopes are independent blocks, so multi-column does the whole job — the
-     groups flow and stay intact, halving a sheet that ran five screens. The
-     gap below a group is padding, not margin: WebKit carries a trailing
-     margin across a column break, so the group that ended column one pushed
-     the top of column two down by exactly that much. Padding sits inside the
-     unbreakable box and stays with it. */
+  /* Sections are independent blocks, so multi-column does the whole job — the
+     groups flow and stay intact. The gap below a group is padding, not margin:
+     WebKit carries a trailing margin across a column break, so the group that
+     ended column one pushed the top of column two down by exactly that much.
+     Padding sits inside the unbreakable box and stays with it. */
   .lgroup {
     break-inside: avoid;
     margin: 0;
@@ -135,42 +181,56 @@
   .lgroup > .ledger-label {
     margin: 0 0 0.4rem;
   }
-  /* A scope the keyboard can't reach from where it is: one step down the
-     ramp, heading, labels and caps alike, never faded. */
+  /* A row the keyboard can't reach from where it is: one step down the
+     ramp, label and caps alike, never faded. The heading follows when the
+     whole section is out of reach. */
   .lgroup.away > .ledger-label,
-  .lgroup.away .desc {
+  .desc.away {
     color: var(--text-tertiary);
   }
-  .lgroup.away .keycap {
+  .keys.away .keycap {
     color: var(--text-secondary);
   }
-  .lgroup.away .keycap.switch-key {
+  .keys.away .keycap.switch-key {
     color: var(--text-secondary);
-    border-color: var(--border-subtle);
+    border-color: color-mix(in srgb, var(--text-active) 20%, transparent);
   }
 
   /* The <dl> *is* the grid: a shortcut sheet is the one screen whose whole job
      is conveying term/definition pairs, so the pairing stays programmatic and
-     the two-column layout costs no wrapper. The key column is one fixed width
-     across every group, so each section's labels start at the same indent;
-     sized for the common chords, with the rare long one (`hold S / M / P / B`,
-     `Shift+F10 / Menu`) wrapping onto a second line inside its cell rather
-     than spilling out of it, as the old unwrapped 9rem column did. */
+     the two-column layout costs no wrapper. The label leads and the chord
+     sits at the row's end, as a menu lays its accelerators out — you look
+     for what you want to do, then read the key — so the <dt> is placed in
+     the second column and the <dd> in the first. Dense packing is what puts
+     a term and its definition on the same row: sparse auto-placement would
+     drop the <dd> a row down, since its column is left of the cursor. The
+     key column is fit-content: sized per section to its widest chord, up
+     to a cap that keeps a long chord from squeezing every label beside it
+     (minmax would take the cap outright whenever there is room). */
   .bindings {
     margin: 0;
     display: grid;
-    grid-template-columns: 5.5rem 1fr;
+    grid-template-columns: 1fr fit-content(6rem);
+    grid-auto-flow: dense;
     column-gap: 0.65rem;
     row-gap: 0.1rem;
     align-items: center;
   }
   .keys {
+    grid-column: 2;
     margin: 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 2px 3px;
     align-items: center;
+  }
+  .desc {
+    grid-column: 1;
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
   }
   .alt {
     display: inline-flex;
@@ -181,12 +241,6 @@
     font-size: 0.76rem;
     color: var(--text-tertiary);
     white-space: nowrap;
-  }
-  .desc {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    line-height: 1.3;
   }
 
   /* Every key reads as a cap; a single letter stays square, a chord grows
