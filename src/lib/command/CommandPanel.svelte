@@ -14,6 +14,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
+  import { focusPath } from '../shell/focus';
   import { bindKeys, type KeyContext } from '../shell/keys';
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
@@ -985,7 +986,9 @@
   </svg>
 {/snippet}
 
-<section class="command" bind:this={root}>
+<!-- Off the focus path, the selection stays but its ring steps down
+     (--ring-dormant), as Legend Lore's carets do. -->
+<section class="command" bind:this={root} class:dormant={$focusPath.tool !== 'command'}>
   <!-- Set aside, not unmounted, while the board fills the space: the keys
        come back as they were. -->
   <header class="bar" class:away={expanded}>
@@ -1423,6 +1426,9 @@
 {/if}
 
 <style>
+  .command.dormant {
+    --ring-focus: var(--ring-dormant);
+  }
   .command {
     height: 100%;
     display: flex;

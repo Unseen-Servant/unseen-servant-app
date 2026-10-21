@@ -99,6 +99,11 @@
      no room for that rule's 2px offset. A ring rather than a fill so it
      composes over the engaged wash instead of competing with it. */
   --ring-focus: inset 0 0 0 1px var(--text-accent);
+  /* The same ring on a tool that doesn't have the keyboard (focus.ts): one
+     step down the ramp, so its caret still shows where it was left but the
+     ring that's listening is the parchment one. A tool swaps --ring-focus
+     for this on its root while it's off the focus path. */
+  --ring-dormant: inset 0 0 0 1px var(--text-secondary);
   /* A rename field's ring once the name is refused: the focus ring with
      danger's hue swapped in. */
   --ring-refused: inset 0 0 0 1px var(--text-danger);

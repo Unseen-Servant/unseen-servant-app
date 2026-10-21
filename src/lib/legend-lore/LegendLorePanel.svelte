@@ -50,7 +50,7 @@
   import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
   import { renameNavKey } from './collectionsNav';
   import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { setRegion } from '../shell/focus';
+  import { focusPath, setRegion } from '../shell/focus';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { bindKeys, type KeyContext } from '../shell/keys';
   import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
@@ -2497,33 +2497,44 @@
     // the last-focused row in the target region if it's still visible,
     // else lands on the first visible row. During search the chords keep
     // working — the console must stay reachable while the mix is audible —
-    // but ← first blurs the input or result row so the dock's window
-    // handlers stop yielding to it, and → means "back to the results".
+    // but ← first blurs the input or result row so the dock's handlers
+    // stop yielding to it, and → means "back to the results". At the
+    // edge — ← with the dock already holding the arrows, → with the file
+    // pane — the chord is left for the host, which crosses the rail to
+    // the tool beside (PanelHost).
     if (meta && event.altKey && !event.shiftKey && selectedFolder
         && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       if (event.key === 'ArrowLeft') {
+        if (activePane !== 'files') return false;
         if (searchViewOpen) (document.activeElement as HTMLElement | null)?.blur?.();
         void focusDockRegion();
-      } else if (searchViewOpen) {
-        setActivePane('files');
-        if (searchResults.length > 0) searchResultsComponent?.focusRow(selectedResultIndex);
-        else headerComponent?.focus();
       } else {
-        focusFileRegion();
+        if (activePane === 'files') return false;
+        if (searchViewOpen) {
+          setActivePane('files');
+          if (searchResults.length > 0) searchResultsComponent?.focusRow(selectedResultIndex);
+          else headerComponent?.focus();
+        } else {
+          focusFileRegion();
+        }
       }
       return true;
     }
 
     // Cmd+Alt+↑/↓: move between the two panels stacked in the left dock.
+    // Past its ends, or outside it, the chord is the host's, as ←/→ are.
     if (meta && event.altKey && !event.shiftKey && selectedFolder
         && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       if (event.key === 'ArrowDown') {
         // Collections sits above Filters.
-        if (activePane === 'collections') { setFocusedCollectionName(null); focusFilterRegion(); }
-      } else if (activePane === 'filters' && collectionsPanelOpen) {
+        if (activePane !== 'collections' || !filterPanelOpen) return false;
+        setFocusedCollectionName(null);
+        focusFilterRegion();
+      } else {
         // Guarded on the panel being open: focusCollectionsRegion force-opens
         // it, and a dock-navigation chord must skip a closed panel rather
         // than open one — the down direction already does.
+        if (activePane !== 'filters' || !collectionsPanelOpen) return false;
         setFocusedFilterRow(null);
         void focusCollectionsRegion();
       }
@@ -3694,7 +3705,10 @@
 />
 
 
-<main class="app-layout" class:motion-ready={motionReady}>
+<!-- Off the focus path, the carets stay where they were left but their
+     ring steps down (--ring-dormant): the parchment ring is the one that
+     is listening. -->
+<main class="app-layout" class:motion-ready={motionReady} class:dormant={$focusPath.tool !== 'legend-lore'}>
   <Header
     bind:this={headerComponent}
     bind:searchQuery
@@ -4112,6 +4126,9 @@
 </div>
 
 <style>
+  .app-layout.dormant {
+    --ring-focus: var(--ring-dormant);
+  }
   .app-layout {
     display: flex;
     flex-direction: column;

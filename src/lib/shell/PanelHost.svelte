@@ -26,6 +26,7 @@
     landing,
     layout,
     mount,
+    neighbour,
     parseViews,
     resize,
     toolsIn,
@@ -33,6 +34,7 @@
     type Landing,
     type Rail,
     type RackView,
+    type Side,
   } from './rack';
   import { dock, onShowPanel, openSettings, popOut, poppedPanels } from './shellState';
 
@@ -159,11 +161,24 @@
   }
   $: focusDockedBack($poppedPanels.popped);
 
-  // Bare 1–8 bring up a view, unless a field has the caret or a menu is
-  // open. The window's keys go through the shell's dispatcher (keys.ts),
-  // which already stands down for a dialog.
+  const SIDES: Record<string, Side> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+
+  // The rack's keys, after the tools' (keys.ts, which already stands down
+  // for a dialog). Bare 1–8 bring up a view, unless a field has the caret
+  // or a menu is open. ⌘⌥ arrows cross the rail: a tool takes the chord
+  // first while it has somewhere to go inside (Legend Lore's dock and file
+  // pane), and leaves it here at its edge, where the keyboard goes to the
+  // tool beside it in the view's layout.
   function rackKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
-    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing) return false;
+    if (e.isComposing) return false;
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && e.altKey && !e.shiftKey && SIDES[e.key] && focused) {
+      const to = neighbour(placed.rects, focusable, focused, SIDES[e.key]);
+      if (!to) return false;
+      focused = to;
+      return true;
+    }
+    if (meta || e.altKey || e.shiftKey) return false;
     const digit = /^Digit([1-8])$/.exec(e.code);
     if (!digit || ctx.menu || ctx.typing) return false;
     switchTo(Number(digit[1]) - 1);

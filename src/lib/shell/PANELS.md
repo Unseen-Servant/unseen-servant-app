@@ -107,7 +107,11 @@ showing the way back to its window.
   a handler never queries the DOM for those. A chord that must work
   whichever tool has the keyboard binds at `'global'`, and if it changes
   what the panel shows it calls `showPanel` (`shellState.ts`) first so the
-  host brings the panel up. Any window-level listener a panel keeps for
+  host brings the panel up. The ⌘⌥ arrows walk a tool's regions and, left
+  untaken at its edge, cross the rail to the tool beside (`neighbour` in
+  `rack.ts`). Off the path a panel swaps `--ring-focus` for `--ring-dormant`
+  on its root, so its carets stay but only the listening tool's ring is
+  parchment. Any window-level listener a panel keeps for
   something other than keys must do nothing while `active` is false —
   another panel may own the keyboard, even one on screen beside it. Bare
   1–8 belong to the rack.

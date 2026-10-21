@@ -5,6 +5,7 @@ import {
   landing,
   layout,
   mount,
+  neighbour,
   parseViews,
   resize,
   toolsIn,
@@ -152,4 +153,31 @@ describe('parseViews', () => {
 
 test('first launch puts each tool on its own view, where its tab was', () => {
   expect(defaultViews().map((v) => toolsIn(v.root))).toEqual([['legend-lore'], ['command'], [], [], [], [], [], []]);
+});
+
+describe('neighbour', () => {
+  const both = ['legend-lore', 'command'] as const;
+
+  test('side by side: right and left cross, up and down find nothing', () => {
+    const { rects } = layout(row(0.6, LL, CMD), 1280, 760, []);
+    expect(neighbour(rects, both, 'legend-lore', 'right')).toBe('command');
+    expect(neighbour(rects, both, 'command', 'left')).toBe('legend-lore');
+    expect(neighbour(rects, both, 'legend-lore', 'left')).toBeNull();
+    expect(neighbour(rects, both, 'command', 'right')).toBeNull();
+    expect(neighbour(rects, both, 'legend-lore', 'up')).toBeNull();
+    expect(neighbour(rects, both, 'legend-lore', 'down')).toBeNull();
+  });
+
+  test('stacked: down and up cross', () => {
+    const { rects } = layout(col(0.5, LL, CMD), 1280, 760, []);
+    expect(neighbour(rects, both, 'legend-lore', 'down')).toBe('command');
+    expect(neighbour(rects, both, 'command', 'up')).toBe('legend-lore');
+    expect(neighbour(rects, both, 'legend-lore', 'right')).toBeNull();
+  });
+
+  test('a tool that cannot take the keyboard is not a neighbour, nor is one with no slot', () => {
+    const { rects } = layout(row(0.6, LL, CMD), 1280, 760, []);
+    expect(neighbour(rects, ['legend-lore'], 'legend-lore', 'right')).toBeNull();
+    expect(neighbour(rects, both, 'servant', 'right')).toBeNull();
+  });
 });

@@ -116,6 +116,43 @@ function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect
 }
 
 /** The least length a subtree can be given along `dir`. */
+export type Side = 'left' | 'right' | 'up' | 'down';
+
+/** The tool beside `from` on a side, among the tools that can take the
+ *  keyboard: the nearest whose box lies past that edge of from's and shares
+ *  its span across the other axis, so a diagonal neighbour doesn't count.
+ *  Null at the rack's edge. The ⌘⌥ arrows cross the rail by it once a tool
+ *  has nowhere further to go inside. */
+export function neighbour(rects: Map<PanelId, Rect>, among: readonly PanelId[], from: PanelId, side: Side): PanelId | null {
+  const f = rects.get(from);
+  if (!f) return null;
+  const horizontal = side === 'left' || side === 'right';
+  let best: PanelId | null = null;
+  let bestGap = Infinity;
+  let bestOverlap = 0;
+  for (const id of among) {
+    if (id === from) continue;
+    const r = rects.get(id);
+    if (!r) continue;
+    const gap =
+      side === 'right' ? r.x - (f.x + f.w)
+      : side === 'left' ? f.x - (r.x + r.w)
+      : side === 'down' ? r.y - (f.y + f.h)
+      : f.y - (r.y + r.h);
+    if (gap < 0) continue;
+    const overlap = horizontal
+      ? Math.min(f.y + f.h, r.y + r.h) - Math.max(f.y, r.y)
+      : Math.min(f.x + f.w, r.x + r.w) - Math.max(f.x, r.x);
+    if (overlap <= 0) continue;
+    if (gap < bestGap || (gap === bestGap && overlap > bestOverlap)) {
+      best = id;
+      bestGap = gap;
+      bestOverlap = overlap;
+    }
+  }
+  return best;
+}
+
 export function minAlong(node: RackNode, dir: Dir): number {
   if (node.kind === 'tool') return dir === 'row' ? minOf(node.id).w : minOf(node.id).h;
   const mins = node.children.map((c) => minAlong(c, dir));
