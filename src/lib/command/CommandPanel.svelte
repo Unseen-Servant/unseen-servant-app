@@ -182,8 +182,11 @@
   $: shown = openImage ?? bufState.path;
   $: inspecting = openImage !== null || bufState.status !== 'empty';
   $: openEntry = index?.notes.find((n) => n.path === shown) ?? null;
-  /** Where notes' embedded images load from (#407). */
-  $: images = imageSource(settings?.root ?? null, campaign ?? '', index?.images ?? []);
+  /** Where notes' embedded images load from (#407): made again only when
+   *  the campaign's images change, as a string compares, since a new one
+   *  has every Play card read its Markdown again. */
+  $: imageList = JSON.stringify(index?.images ?? []);
+  $: images = imageSource(settings?.root ?? null, campaign ?? '', JSON.parse(imageList));
   $: openName = openEntry?.name ?? (shown ? stem(shown) : '');
   // An image renames when a track or the shelf holds it, and only its stem.
   $: renamable = openImage !== null ? !!openEntry : bufState.status !== 'conflict' && bufState.status !== 'unreadable';
