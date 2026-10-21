@@ -92,9 +92,10 @@
   /* Borders & shadows */
   --border-subtle: #34322f;
   /* The rack's frame round the tool that has the keyboard (PanelHost): the
-     slot edge one grey step up from --bg-header, where the eye is, rather
-     than a raised key in the bar. */
-  --border-frame-keyed: #3c3936;
+     slot edge stepped up from --bg-header, where the eye is, rather than a
+     raised key in the bar. Grey, never a hue — the keyboard isn't a mode —
+     but a full step: at 3px a near-neighbour of the frame can't be seen. */
+  --border-frame-keyed: #4a4642;
   --border-accent: rgb(182, 159, 129);
   --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
