@@ -358,14 +358,15 @@ describe('liveScopes', () => {
   test('global alone with no tool on the path', () => {
     expect([...liveScopes({ tool: null, region: null })]).toEqual(['global']);
   });
-  test("Legend Lore: the bar, plus the region's scope", () => {
-    expect(liveScopes({ tool: 'legend-lore', region: 'tree' })).toEqual(new Set(['global', 'searchInput', 'fileTree']));
-    expect(liveScopes({ tool: 'legend-lore', region: 'systems' })).toEqual(new Set(['global', 'searchInput', 'systemsView']));
-    expect(liveScopes({ tool: 'legend-lore', region: 'search' })).toEqual(new Set(['global', 'searchInput', 'searchResults']));
-    expect(liveScopes({ tool: 'legend-lore', region: 'collections' })).toEqual(new Set(['global', 'searchInput', 'collections']));
-    expect(liveScopes({ tool: 'legend-lore', region: 'filters' })).toEqual(new Set(['global', 'searchInput', 'filterPanel']));
+  test("Legend Lore: either tool's, the bar, plus the region's scope", () => {
+    const base = ['global', 'tool', 'searchInput'];
+    expect(liveScopes({ tool: 'legend-lore', region: 'tree' })).toEqual(new Set([...base, 'fileTree']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'systems' })).toEqual(new Set([...base, 'systemsView']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'search' })).toEqual(new Set([...base, 'searchResults']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'collections' })).toEqual(new Set([...base, 'collections']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'filters' })).toEqual(new Set([...base, 'filterPanel']));
   });
-  test('Command: its one scope', () => {
-    expect(liveScopes({ tool: 'command', region: null })).toEqual(new Set(['global', 'command']));
+  test("Command: either tool's and its own", () => {
+    expect(liveScopes({ tool: 'command', region: null })).toEqual(new Set(['global', 'tool', 'command']));
   });
 });

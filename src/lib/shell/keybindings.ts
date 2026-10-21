@@ -11,6 +11,9 @@ import type { FocusPath } from './focus';
 
 export type KeyScope =
   | 'global'
+  // Either tool's, on the one that has the keyboard: the same chord, each
+  // tool's own meaning for it.
+  | 'tool'
   | 'fileTree'
   | 'systemsView'
   | 'collections'
@@ -59,18 +62,17 @@ const isMac =
 export const KEYBINDINGS: KeybindingEntry[] = [
   // Global
   { id: 'settings.open',         keys: { mac: '⌘,',   other: 'Ctrl+,' },        label: 'Open settings',               scope: 'global' },
-  { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle the sidebar: collections, shelf', scope: 'global' },
+  { id: 'sidebar.toggle',        keys: { mac: '⌘B',   other: 'Ctrl+B' },        label: 'Toggle the sidebar: collections, shelf', scope: 'tool' },
   { id: 'focus.dock',            keys: { mac: '⌘⌥←',  other: 'Ctrl+Alt+←' },    label: 'Focus left: the dock, then the tool beside', scope: 'global' },
   { id: 'focus.files',           keys: { mac: '⌘⌥→',  other: 'Ctrl+Alt+→' },    label: 'Focus right: the file pane, then the tool beside', scope: 'global' },
   { id: 'focus.dockDown',        keys: { mac: '⌘⌥↓',  other: 'Ctrl+Alt+↓' },    label: 'Dock: Collections → Filters, then the tool below', scope: 'global' },
   { id: 'focus.dockUp',          keys: { mac: '⌘⌥↑',  other: 'Ctrl+Alt+↑' },    label: 'Dock: Filters → Collections, then the tool above', scope: 'global' },
-  { id: 'view.toggle',           keys: { mac: 'Tab',  other: 'Tab' },           label: 'Switch views: tree ⇄ systems, Prep ⇄ Play', scope: 'global' },
+  { id: 'view.toggle',           keys: { mac: 'Tab',  other: 'Tab' },           label: 'Switch views: tree ⇄ systems, Prep ⇄ Play', scope: 'tool' },
   { id: 'rack.view',             keys: { mac: '1–8',  other: '1–8' },           label: 'Bring up rack view N',        scope: 'global' },
   { id: 'collections.slot',      keys: { mac: '⌘1–9', other: 'Ctrl+1–9' },      label: 'Play only collection N (again stops it)', scope: 'global' },
   { id: 'collections.slotMix',   keys: { mac: '⌘⇧1–9', other: 'Ctrl+Shift+1–9' }, label: 'Add collection N to the mix, or take it out', scope: 'global' },
   { id: 'sync.run',              keys: { mac: '⌘R',   other: 'Ctrl+R' },        label: 'Re-detect changes from disk', scope: 'global' },
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync selected files to index', scope: 'global' },
-  { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'global', match: 'meta+i' },
   { id: 'search.focus',          keys: { mac: '⌘K',   other: 'Ctrl+K' },        label: 'Focus search input, query selected', scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Toggle Filters panel',        scope: 'global' },
   { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Toggle show hidden items',    scope: 'global' },
@@ -109,6 +111,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Toggle hidden state',          scope: 'fileTree', match: '.' },
   { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Collection (opens menu)',     scope: 'fileTree', match: 'c' },
   { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Delete focused row (to Trash)', scope: 'fileTree' },
+  { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'fileTree', match: 'meta+i' },
 
   // Systems view (when a row is focused)
   { id: 'systems.expand',        keys: { mac: '→ / L', other: '→ / L' },        label: 'Expand system / first file',   scope: 'systemsView' },
@@ -121,6 +124,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'systems.mute',          keys: { mac: 'M',    other: 'M' },             label: 'Mute focused row (drop from search)',    scope: 'systemsView', switch: true },
   { id: 'systems.soloGroup',     keys: { mac: '⇧S',   other: 'Shift+S' },       label: "Solo the row's system",        scope: 'systemsView', switch: true },
   { id: 'systems.muteGroup',     keys: { mac: '⇧M',   other: 'Shift+M' },       label: "Mute the row's system",        scope: 'systemsView', switch: true },
+  { id: 'systems.info',          keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info for focused file',   scope: 'systemsView' },
 
   // Collections panel (when a row is focused)
   { id: 'collections.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Move focus down',              scope: 'collections' },
@@ -226,11 +230,12 @@ export const KEYBINDINGS: KeybindingEntry[] = [
 const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
 
 // The scopes the sheet shows as live for a focus path (focus.ts): global
-// always, Legend Lore's bar whenever it has the keyboard, and the scope of
-// the region that does. A menu can't be open under the sheet, so its scope
+// always, either tool's while one has the keyboard, Legend Lore's bar
+// whenever it does, and the scope of the region that does. A menu can't be open under the sheet, so its scope
 // never is; the modal one isn't on the sheet.
 export function liveScopes(path: FocusPath): Set<KeyScope> {
   const live = new Set<KeyScope>(['global']);
+  if (path.tool === 'command' || path.tool === 'legend-lore') live.add('tool');
   if (path.tool === 'command') live.add('command');
   if (path.tool === 'legend-lore') {
     live.add('searchInput');

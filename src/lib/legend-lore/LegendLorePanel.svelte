@@ -2332,16 +2332,18 @@
 
     // Cmd/Ctrl+R: re-detect changes from disk (the lighter "what changed?"
     // action). Taken even when this isn't available, to keep the Tauri
-    // webview from reloading the app. Not with ⌥: ⌥⌘R reveals a row.
+    // webview from reloading the app — from the note editor too, where
+    // it does nothing else. Not with ⌥: ⌥⌘R reveals a row.
     if (meta && !event.shiftKey && !event.altKey && lk === 'r') {
-      if (selectedFolder && !isSyncing) handleManualSync();
+      if (selectedFolder && !isSyncing && !ctx.editor) handleManualSync();
       return true;
     }
 
     // Cmd/Ctrl+S: commit selected files to the index — the real sync work
     // (same handler the "Sync" banner button calls). Standalone chord
-    // because this is the headline action of the app.
-    if (meta && !event.shiftKey && !event.altKey && lk === 's') {
+    // because this is the headline action of the app. Not from the note
+    // editor, where ⌘S is the hand's reflex to save what it's writing.
+    if (meta && !event.shiftKey && !event.altKey && lk === 's' && !ctx.editor) {
       if (selectedFolder && !isSyncing) handleSync();
       return true;
     }
@@ -2352,7 +2354,8 @@
     // read as a pair with search on ⌘K. It was ⌘⇧F, and before that ⌘E, which
     // meant nothing mnemonically and collided twice — macOS binds Cmd+E to
     // "Use Selection for Find" in any text field, and Finder binds it to Eject.
-    if (meta && !event.shiftKey && !event.altKey && lk === 'f' && selectedFolder) {
+    // Not from the note editor, where ⌘F means find.
+    if (meta && !event.shiftKey && !event.altKey && lk === 'f' && selectedFolder && !ctx.editor) {
       void surface().then(toggleFilterPanel);
       return true;
     }

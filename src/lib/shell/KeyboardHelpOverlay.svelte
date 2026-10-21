@@ -11,6 +11,7 @@
   // inside dialogs and aren't useful in a global cheat sheet.
   const SCOPE_ORDER: KeyScope[] = [
     'global',
+    'tool',
     'fileTree',
     'systemsView',
     'collections',
@@ -23,6 +24,7 @@
 
   const SCOPE_LABELS: Record<KeyScope, string> = {
     global: 'Global',
+    tool: 'Either tool',
     fileTree: 'File tree',
     systemsView: 'Systems view',
     collections: 'Collections',
