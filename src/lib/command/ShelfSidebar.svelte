@@ -19,6 +19,10 @@
   import { nameParts, newRowKey } from './columns';
   import type { CampaignIndex, CopySource, NoteEntry } from './types';
 
+  /** Where a menu opened from the keyboard sits: in from the row's edge,
+   *  under it, where a right-click would land. */
+  const MENU_INSET = 16;
+
   export let campaign: string;
   export let campaigns: string[];
   /** Folders the shelf copies from (CommandSettings.places). */
@@ -224,8 +228,29 @@
     if (!source && [...shelf, ...loose].some((n) => n.path === path)) renamingPath = path;
   }
 
+  /** ⌘N with the shelf, or nothing, selected: a new note named in the
+   *  shelf's empty row, when the shelf is its own campaign's. */
+  export function create() {
+    if (!source) creating = true;
+  }
+
+  /** ⇧F10 on the selected note: its menu, at its row, if the shelf shows
+   *  it. */
+  export function menuFor(path: string): boolean {
+    const note = !source ? [...shelf, ...loose].find((n) => n.path === path) : undefined;
+    const row = shelfEl?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+    if (!note || !row) return false;
+    const box = row.getBoundingClientRect();
+    noteMenuAt(box.left + MENU_INSET, box.bottom, note);
+    return true;
+  }
+
   // A right-click selects the row, as the grid's does.
   function noteMenu(e: MouseEvent, note: NoteEntry) {
+    noteMenuAt(e.clientX, e.clientY, note);
+  }
+
+  function noteMenuAt(x: number, y: number, note: NoteEntry) {
     onSelect(note);
     const fitting = index.tracks.filter((t) => (index.kinds[t] ?? 'note') === note.type);
     const groups = [
@@ -244,13 +269,13 @@
         : [],
       [
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
-        action('Show in Finder', () => onReveal(note)),
-        action('Move to Trash', () => onTrash(note), true),
+        keyed('Show in Finder', 'command.reveal', () => onReveal(note)),
+        keyed('Move to Trash', 'command.delete', () => onTrash(note), true),
       ],
     ].filter((g) => g.length);
     menu = {
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
       items: groups.flatMap((g, i) => (i ? [divider, ...g] : g)),
     };
   }

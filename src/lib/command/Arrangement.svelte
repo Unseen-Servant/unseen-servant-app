@@ -82,6 +82,12 @@
       if (beat) toggle(beat);
       return true;
     }
+    // ↵ opens the focused beat in the inspector, as the tree's ↵ opens.
+    if (e.key === 'Enter' && focused) {
+      const beat = beats.find((b) => b.path === focused);
+      if (beat) onEdit(beat);
+      return true;
+    }
     if (e.key === 'Escape' && focused) {
       focused = null;
       return true;
@@ -101,7 +107,7 @@
       action(playing ? 'Frame the live cards' : 'Frame its cards', () => onFrame(beat)),
       divider,
       keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
-      action('Edit beat', () => onEdit(beat)),
+      keyed('Edit beat', 'command.open', () => onEdit(beat)),
     ];
     menu = { x: e.clientX, y: e.clientY, items };
   }

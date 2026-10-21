@@ -28,8 +28,13 @@
     <h3 class="field-title section-title">Beats and sessions</h3>
     <p class="field-desc">
       A beat is a scene: the notes it needs. Double-click the empty row of
-      the session planner, on the right, to name one; it starts armed (&#9679;), so clicking
-      notes puts them in it, and <strong>Esc</strong> disarms it.
+      the session planner, on the right, to name one, or press <strong>&#8679;&#8984;N</strong>;
+      it starts armed (&#9679;), so clicking notes puts them in it, and
+      <strong>Esc</strong> disarms it. The selected row answers the keys a
+      Legend Lore row does: <strong>E</strong> arms a beat, <strong>X</strong> puts
+      a note in the armed one, <strong>&#8629;</strong> opens it,
+      <strong>R</strong> renames it, <strong>&#8984;N</strong> starts a note in its
+      track, <strong>&#8984;&#9003;</strong> moves it to the Trash.
       <em>New session</em> in the bar starts a session; drag beats into its
       plan.
     </p>
@@ -109,7 +114,7 @@
     <h3 class="field-title section-title">Session notes</h3>
     <p class="field-desc">
       The bar in the board's corner writes a line into the session note, and
-      <strong>&#8984;O</strong> opens the note.
+      <strong>&#8984;J</strong> puts the caret in it, and <strong>&#8679;&#8984;J</strong> opens the note.
     </p>
   </section>
 </div>

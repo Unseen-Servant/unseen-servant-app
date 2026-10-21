@@ -163,17 +163,29 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   // the hint without taking the key, as the collections menu does, and 'r'
   // is tree.rename's.
   { id: 'command.rename',        keys: { mac: 'R',    other: 'R' },             label: 'Rename the selected note or beat', scope: 'command' },
-  // In Prep and Play, on the row or card under the pointer, as Legend Lore's
-  // A shelves a collection. No `match`, as R.
-  { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer spent, or unspent', scope: 'command' },
+  // The list grammar, on the selection (keybindings audit §4): what the
+  // tree's rows answer, Command's answer too.
+  { id: 'command.open',          keys: { mac: '↵ / ⌘O', other: 'Enter / Ctrl+O' }, label: 'Open the selected note or beat in the inspector', scope: 'command' },
+  { id: 'command.newNote',       keys: { mac: '⌘N',   other: 'Ctrl+N' },        label: "New note in the selected note's track, or on the shelf, ready to name", scope: 'command' },
+  { id: 'command.newBeat',       keys: { mac: '⇧⌘N',  other: 'Ctrl+Shift+N' },  label: 'New beat, armed, ready to name', scope: 'command' },
+  { id: 'command.arm',           keys: { mac: 'E',    other: 'E' },             label: 'Arm / disarm the selected beat', scope: 'command', switch: true },
+  { id: 'command.tick',          keys: { mac: 'X',    other: 'X' },             label: 'Put the selected note in the armed beat, or take it out', scope: 'command' },
+  { id: 'command.delete',        keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Move the selected note or beat to Trash', scope: 'command' },
+  { id: 'command.reveal',        keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal the selected note or beat in the OS file explorer', scope: 'command' },
+  { id: 'command.contextMenu',   keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: "Open the selection's menu", scope: 'command' },
+  // In Prep and Play, on the row or card under the pointer, else the
+  // selected one, as Legend Lore's A shelves a collection. No `match`, as R.
+  { id: 'command.spend',         keys: { mac: 'A',    other: 'A' },             label: 'Mark the note or beat under the pointer, else the selected one, spent or unspent', scope: 'command' },
   // In Prep: Live's Insert Audio and MIDI Track, as a note or an image
   // track, after the selected note's track, else at the end.
   { id: 'command.insertNoteTrack',  keys: { mac: '⌘T',  other: 'Ctrl+T' },       label: 'Insert a note track', scope: 'command' },
   { id: 'command.insertImageTrack', keys: { mac: '⇧⌘T', other: 'Ctrl+Shift+T' }, label: 'Insert an image track', scope: 'command' },
   // In Prep and Play, from the editor too: Obsidian's reading-view key.
   { id: 'command.read',          keys: { mac: '⌘E',   other: 'Ctrl+E' },        label: 'Read the open note rendered, or edit it', scope: 'command' },
-  // In Prep and Play, from the editor and the jot bar too.
-  { id: 'command.sessionNote',   keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open the session note in the inspector', scope: 'command' },
+  // In Play: the jot bar, from the editor too. ⇧⌘J in Prep and Play, from
+  // the editor and the jot bar too; ⌘O is the selection's, as in the tree.
+  { id: 'command.jot',           keys: { mac: '⌘J',   other: 'Ctrl+J' },        label: 'Write a line to the session note: the jot bar', scope: 'command' },
+  { id: 'command.sessionNote',   keys: { mac: '⇧⌘J',  other: 'Ctrl+Shift+J' },  label: 'Open the session note in the inspector', scope: 'command' },
   // In Play, on the session player, as Legend Lore's collections take them.
   { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Focus the next beat in the session player', scope: 'command' },
   { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Focus the previous beat in the session player', scope: 'command' },

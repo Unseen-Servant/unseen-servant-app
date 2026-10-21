@@ -35,11 +35,12 @@ export const action = (label: string, run: () => void, danger = false): MenuItem
 });
 /** An action the selected row also takes from a key, as Legend Lore's
  *  menus carry their rows' keys. */
-export const keyed = (label: string, chord: string, run: () => void): MenuItem => ({
+export const keyed = (label: string, chord: string, run: () => void, danger = false): MenuItem => ({
   kind: 'action',
   label,
   action: run,
   chord,
+  danger,
 });
 export const heading = (label: string): MenuItem => ({ kind: 'heading', label });
 export const choice = (label: string, on: boolean, run: () => void): MenuItem => ({

@@ -29,6 +29,7 @@
   import TrackGrid from './TrackGrid.svelte';
   import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, nameParts, type Column } from './columns';
+  import { isDeleteChord } from '../shell/keybindings';
   import { IMAGE, imageSource } from './embeds';
   import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from './menu';
   import { hoverLive } from '../ui/inputModality';
@@ -326,21 +327,82 @@
       toggleReading();
       return true;
     }
-    // ⌘O: the session note in the inspector, from anywhere: the jot bar
-    // writes to it.
-    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'o' && session) {
-      openPath(session.path);
+    const mod = e.metaKey || e.ctrlKey;
+    const key = e.key.toLowerCase();
+    // ⇧⌘J: the session note in the inspector, from anywhere: the jot bar
+    // writes to it. ⌘J: the jot bar itself, in Play, from the editor too,
+    // but not from a name being typed.
+    if (mod && !e.altKey && key === 'j' && session) {
+      if (e.shiftKey) {
+        openPath(session.path);
+        return true;
+      }
+      if (mode !== 'play' || target?.closest('input, textarea')) return false;
+      play?.focusJot();
       return true;
     }
     if (ctx.typing) return false;
+    // The selection, as the lists keep it: a note, a beat, or one of their
+    // empty rows (a new-row key), which R names a new note or beat in.
+    const bare = !mod && !e.altKey && !e.shiftKey;
+    const selectedNote = index?.notes.find((n) => n.path === selected);
+    const selectedBeat = beatAt(selected);
+    const entry = selectedNote ?? selectedBeat;
     // ⌘T, ⇧⌘T: insert a note or an image track, as Live inserts an audio
     // or a MIDI one, after the selected note's track.
-    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 't' && mode === 'prep' && index) {
+    if (mod && !e.altKey && key === 't' && mode === 'prep' && index) {
       const track = index.notes.find((n) => n.path === selected)?.track ?? null;
       grid?.insertTrack(e.shiftKey ? 'image' : 'note', track && index.tracks.includes(track) ? track : null);
       return true;
     }
-    const mod = e.metaKey || e.ctrlKey;
+    // The list grammar on the selection (keybindings audit §4), in Prep,
+    // where the lists are: the keys the tree's rows answer.
+    if (mode === 'prep' && index) {
+      // ↵ / ⌘O open the selection in the inspector, as a double-click does.
+      // Not ↵ on a real button, which keeps its own activation.
+      if (entry && ((e.key === 'Enter' && bare && !target?.closest('button, a[href]')) || (mod && !e.altKey && !e.shiftKey && key === 'o'))) {
+        openPath(entry.path);
+        return true;
+      }
+      // ⌘N: a note named in the selected note's track's empty row — on the
+      // shelf when the shelf's row, a beat, or nothing is selected — or in
+      // the selected empty row itself. ⇧⌘N: a beat, armed, named in the
+      // plan's. Both as Legend Lore's ⌘N makes a collection ready to name.
+      if (mod && !e.altKey && key === 'n') {
+        if (e.shiftKey) beats?.create();
+        else if (selected && isNewRowKey(selected)) for (const list of [grid, shelf]) list?.rename(selected);
+        else if (selectedNote?.track && index.tracks.includes(selectedNote.track)) grid?.create(selectedNote.track);
+        else shelf?.create();
+        return true;
+      }
+      // E arms the selected beat, or disarms it, as it arms a collection.
+      if (bare && key === 'e' && selectedBeat) {
+        if (!e.repeat) armBeat(selectedBeat);
+        return true;
+      }
+      // X puts the selected note in the armed beat, or takes it out, as a
+      // click on it does while the beat is armed.
+      if (bare && key === 'x' && selectedNote && armedBeat) {
+        if (!e.repeat) toggleMember(selectedNote);
+        return true;
+      }
+      // ⌘⌫: the selection to the Trash, behind the confirm, as a row's is.
+      if (isDeleteChord(e) && entry) {
+        trashNote(entry, selectedBeat ? 'Beat' : 'Note');
+        return true;
+      }
+      // ⌥⌘R reveals the selection in the OS file explorer. event.code:
+      // Option rewrites event.key to a symbol on macOS layouts.
+      if (mod && e.altKey && !e.shiftKey && e.code === 'KeyR' && entry) {
+        reveal(entry.path);
+        return true;
+      }
+      // ⇧F10 / Menu: the selection's menu, from whichever list shows it.
+      if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && selected) {
+        for (const list of [grid, shelf, beats]) if (list?.menuFor(selected)) return true;
+        return false;
+      }
+    }
     // Tab: Prep ⇄ Play, Live's key for its two views, as Legend Lore's
     // tree ⇄ systems. ⇧Tab too: with two views, direction means nothing.
     if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && index) {
@@ -348,27 +410,30 @@
       return true;
     }
     // ⌘B: the shelf, as it is Legend Lore's collections sidebar.
-    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'b' && index && mode === 'prep') {
+    if (mod && !e.altKey && key === 'b' && index && mode === 'prep') {
       shelfOpen = !shelfOpen;
       return true;
     }
     // R: the selected row is renamed where it stands, as Legend Lore's R
     // renames the focused one. Kept from the field it opens, or the R types
     // over the name.
-    if (e.key.toLowerCase() === 'r' && !mod && !e.altKey && !e.shiftKey && !e.isComposing && selected && mode === 'prep') {
+    if (key === 'r' && bare && !e.isComposing && selected && mode === 'prep') {
       if (!e.repeat) for (const list of [grid, shelf, beats]) list?.rename(selected);
       return true;
     }
     // A: the note or beat under the pointer, a row or a card, is spent or
     // unspent, as Legend Lore's A shelves a collection. After one, the next
     // waits for the pointer to move: a spent note leaves its rows, and the
-    // one sliding under the pointer isn't the one pointed at.
-    if (e.key.toLowerCase() === 'a' && !mod && !e.altKey && !e.shiftKey && !e.isComposing && index) {
-      const path = pathUnderPointer();
+    // one sliding under the pointer isn't the one pointed at. With the
+    // keyboard driving (hover dark), or nothing under the pointer, it's the
+    // selection's, in Prep, where the selection shows.
+    if (key === 'a' && bare && !e.isComposing && index) {
+      const under = $hoverLive ? pathUnderPointer() : null;
+      const path = under ?? (mode === 'prep' ? selected : null);
       const note = index.notes.find((n) => n.path === path) ?? index.beats.find((b) => b.path === path);
       if (note && !('type' in note && note.type === 'image')) {
-        if (e.repeat || !pointed) return true;
-        pointed = false;
+        if (e.repeat || (under && !pointed)) return true;
+        if (under) pointed = false;
         setSpent(note, !note.spent);
         return true;
       }

@@ -480,6 +480,11 @@
     if (!(await onJot(text)) && !jot) jot = text;
   }
 
+  /** ⌘J: the caret in the bar, from the editor too. */
+  export function focusJot() {
+    jotEl?.focus();
+  }
+
   function jotKey(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
     if (e.key === 'Escape') e.currentTarget.blur();
     // Enter sends: a jot is one line, however it wraps.
@@ -576,8 +581,8 @@
       {/if}
     </div>
 
-    <!-- The jot bar, in the board's bottom corner: a line at the end of
-         the session note, which the key beside it (and ⌘O) opens. -->
+    <!-- The jot bar, in the board's bottom corner (⌘J): a line at the end
+         of the session note, which the key beside it (and ⇧⌘J) opens. -->
     <div class="jot">
       <textarea
         class="jot-bar"

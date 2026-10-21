@@ -272,6 +272,7 @@ describe('switch bindings', () => {
     expect(ids).toContain('tree.mute');
     expect(ids).toContain('collections.play');
     expect(ids).toContain('collections.arm');
+    expect(ids).toContain('command.arm');
     expect(ids).toContain('scope.bypass');
     expect(ids).toContain('systems.solo');
     expect(ids).toContain('systems.mute');

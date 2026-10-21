@@ -21,6 +21,11 @@
   import type { BeatEntry, NoteEntry } from './types';
   import { grab } from '../ui/grab';
 
+  /** Where a menu opened from the keyboard sits: in from the row's edge,
+   *  under it, where a right-click would land. */
+  const MENU_INSET = 16;
+  let beatsEl: HTMLElement | undefined;
+
   export let rows: PlanRow[];
   /** Beats no plan of the session holds, spent ones included. */
   export let spare: BeatEntry[];
@@ -275,7 +280,7 @@
   // launch; the live beat can still be stopped.
   function transportItems(beat: BeatEntry): MenuItem[] {
     return [
-      action(beat.path === armedPath ? 'Disarm' : 'Arm', () => onArm(beat)),
+      keyed(beat.path === armedPath ? 'Disarm' : 'Arm', 'command.arm', () => onArm(beat)),
       ...(beat.path === liveBeat ? [action('Stop', onStop)] : []),
     ];
   }
@@ -285,8 +290,8 @@
       keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
       divider,
       keyed('Rename', 'command.rename', () => (renamingPath = beat.path)),
-      action('Show in Finder', () => onReveal(beat)),
-      action('Move to Trash', () => onTrash(beat), true),
+      keyed('Show in Finder', 'command.reveal', () => onReveal(beat)),
+      keyed('Move to Trash', 'command.delete', () => onTrash(beat), true),
     ];
   }
 
@@ -302,7 +307,34 @@
     if (planned || unplanned) renamingPath = path;
   }
 
+  /** ⇧⌘N: a new beat named in the plan's empty row, unfolded if need be. */
+  export function create() {
+    if (!planOpen) {
+      folded.delete('plan');
+      folded = folded;
+    }
+    creating = true;
+  }
+
+  /** ⇧F10 on the selected beat: its menu, at its row, if the column shows
+   *  it — the plan row's, with its order, or the spare beat's. */
+  export function menuFor(path: string): boolean {
+    const row = beatsEl?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+    if (!row) return false;
+    const box = row.getBoundingClientRect();
+    const planned = planOpen ? rows.find((r) => r.beat?.path === path) : undefined;
+    const spare = [...(spareOpen ? shown : []), ...(spentOpen ? spent : [])].find((b) => b.path === path);
+    if (planned) rowMenuAt(box.left + MENU_INSET, box.bottom, planned);
+    else if (spare) spareMenuAt(box.left + MENU_INSET, box.bottom, spare);
+    else return false;
+    return true;
+  }
+
   function rowMenu(e: MouseEvent, row: PlanRow) {
+    rowMenuAt(e.clientX, e.clientY, row);
+  }
+
+  function rowMenuAt(x: number, y: number, row: PlanRow) {
     if (row.beat) onFocus(row.beat);
     const order: MenuItem[] = [
       ...(row.at > 0 ? [action('Move up', () => onMove(row, row.at - 1))] : []),
@@ -312,14 +344,18 @@
     const items = row.beat
       ? [...transportItems(row.beat), divider, ...order, divider, ...beatItems(row.beat)]
       : [...order, divider, action('Write this beat', () => onWrite(row))];
-    menu = { x: e.clientX, y: e.clientY, items };
+    menu = { x, y, items };
   }
 
   function spareMenu(e: MouseEvent, beat: BeatEntry) {
+    spareMenuAt(e.clientX, e.clientY, beat);
+  }
+
+  function spareMenuAt(x: number, y: number, beat: BeatEntry) {
     onFocus(beat);
     menu = {
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
       items: [
         ...transportItems(beat),
         divider,
@@ -460,7 +496,7 @@
   </button>
 {/snippet}
 
-<section class="beats" aria-label="Session planner">
+<section class="beats" aria-label="Session planner" bind:this={beatsEl}>
   <header class="nameplate">
     <span class="ledger-label title">session planner</span>
   </header>

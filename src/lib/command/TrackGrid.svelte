@@ -30,6 +30,10 @@
   import { folderOrder, nameParts, newRowKey, type Column, type NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
+  /** Where a menu opened from the keyboard sits: in from the row's edge,
+   *  under it, where a right-click would land. */
+  const MENU_INSET = 16;
+
   export let cols: Column[];
   /** Each track's pigment, by name. */
   export let pigments: Record<string, string>;
@@ -154,12 +158,33 @@
    *  §3.2). The shelf takes both. */
   const fits = (note: NoteEntry, track: string) => (kinds[track] ?? 'note') === note.type;
 
+  /** ⌘N on a note of the grid: a new one named in its track's empty row;
+   *  an image track asks for pictures, as its row does. */
+  export function create(track: string) {
+    if (kinds[track] === 'image') onAddImages(track);
+    else creatingIn = track;
+  }
+
+  /** ⇧F10 on the selected note: its menu, at its row, if it's the grid's. */
+  export function menuFor(path: string): boolean {
+    const note = cols.flatMap((c) => [...c.groups.flatMap((g) => g.notes), ...c.spent]).find((n) => n.path === path);
+    const row = gridEl?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+    if (!note || !row) return false;
+    const box = row.getBoundingClientRect();
+    noteMenuAt(box.left + MENU_INSET, box.bottom, note);
+    return true;
+  }
+
   function noteMenu(e: MouseEvent, note: NoteEntry) {
+    noteMenuAt(e.clientX, e.clientY, note);
+  }
+
+  function noteMenuAt(x: number, y: number, note: NoteEntry) {
     onSelect(note);
     const others = cols.map((c) => c.track).filter((t) => t !== note.track && fits(note, t));
     menu = {
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
       items: [
         // An image isn't spent (images design §2).
         ...(note.type === 'image' ? [] : [keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)), divider]),
@@ -170,8 +195,8 @@
         ]),
         divider,
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
-        action('Show in Finder', () => onRevealNote(note)),
-        action('Move to Trash', () => onTrashNote(note), true),
+        keyed('Show in Finder', 'command.reveal', () => onRevealNote(note)),
+        keyed('Move to Trash', 'command.delete', () => onTrashNote(note), true),
       ],
     };
   }
