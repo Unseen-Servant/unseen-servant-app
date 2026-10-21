@@ -11,6 +11,7 @@ import {
   matchKey,
   systemsRowScopeKey,
   type ChordEvent,
+  liveScopes,
 } from './keybindings';
 
 const ev = (over: Partial<ChordEvent>): ChordEvent => ({
@@ -350,5 +351,21 @@ describe('digitChord', () => {
     expect(digitChord(ev({ key: '0', code: 'Digit0', metaKey: true }))).toBeNull();
     expect(digitChord(ev({ key: '1', code: 'Numpad1', metaKey: true }))).toBeNull();
     expect(digitChord(ev({ key: 'p', code: 'KeyP', metaKey: true }))).toBeNull();
+  });
+});
+
+describe('liveScopes', () => {
+  test('global alone with no tool on the path', () => {
+    expect([...liveScopes({ tool: null, region: null })]).toEqual(['global']);
+  });
+  test("Legend Lore: the bar, plus the region's scope", () => {
+    expect(liveScopes({ tool: 'legend-lore', region: 'tree' })).toEqual(new Set(['global', 'searchInput', 'fileTree']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'systems' })).toEqual(new Set(['global', 'searchInput', 'systemsView']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'search' })).toEqual(new Set(['global', 'searchInput', 'searchResults']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'collections' })).toEqual(new Set(['global', 'searchInput', 'collections']));
+    expect(liveScopes({ tool: 'legend-lore', region: 'filters' })).toEqual(new Set(['global', 'searchInput', 'filterPanel']));
+  });
+  test('Command: its one scope', () => {
+    expect(liveScopes({ tool: 'command', region: null })).toEqual(new Set(['global', 'command']));
   });
 });

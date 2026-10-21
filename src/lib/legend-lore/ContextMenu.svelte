@@ -3,6 +3,7 @@
   import type { FileItem, CollectionInfo, KnownGameSystem } from './types';
   import { menuMemberState, type MemberState } from './collectionMembership';
   import { chord, matchKey, eventMatchKey, isBareKeyChord, keyShortcut } from '../shell/keybindings';
+  import { bindKeys } from '../shell/keys';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
   import { CARET_RIGHT, GEM } from '../ui/iconPaths';
@@ -189,7 +190,11 @@
     positioned = true;
     refreshItemsAndFocus({ initial: true });
     claimMenuSlot(closeSelf);
-    return () => releaseMenuSlot(closeSelf);
+    const unbindKeys = bindKeys(menuKeys, 'overlay');
+    return () => {
+      releaseMenuSlot(closeSelf);
+      unbindKeys();
+    };
   });
   afterUpdate(() => refreshItemsAndFocus());
 
@@ -218,7 +223,9 @@
     refreshItemsAndFocus();
   }
 
-  function handleKeydown(event: KeyboardEvent) {
+  // The menu's keys, over every region while it's open (keys.ts). What it
+  // doesn't take falls through to handlers that yield to an open menu.
+  function menuKeys(event: KeyboardEvent): boolean {
     const meta = event.metaKey || event.ctrlKey;
     const lk = event.key.toLowerCase();
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
@@ -230,38 +237,35 @@
     const isLeft  = event.key === 'ArrowLeft'  || (bareLetter && lk === 'h');
 
     if (isDown) {
-      event.preventDefault();
       if (inSub) focusedSubmenuIdx = Math.min(submenuItems.length - 1, (focusedSubmenuIdx ?? -1) + 1);
       else       { focusedIdx = Math.min(mainItems.length - 1, focusedIdx + 1); openSubmenu = null; }
       refreshItemsAndFocus();
-      return;
+      return true;
     }
     if (isUp) {
-      event.preventDefault();
       if (inSub) focusedSubmenuIdx = Math.max(0, (focusedSubmenuIdx ?? 0) - 1);
       else       { focusedIdx = Math.max(0, focusedIdx - 1); openSubmenu = null; }
       refreshItemsAndFocus();
-      return;
+      return true;
     }
     if (isRight && !inSub) {
       const item = mainItems[focusedIdx];
       const which = item?.dataset.submenu as Submenu | undefined;
       if (item?.dataset.mi === 'submenu-trigger' && which) {
-        event.preventDefault();
         openSubmenu = which;
         focusedSubmenuIdx = 0;
+        return true;
       }
-      return;
+      return false;
     }
     if (isLeft && inSub) {
-      event.preventDefault();
       openSubmenu = null;
       focusedSubmenuIdx = null;
-      return;
+      return true;
     }
     // Accelerators: the same chords that work on a focused tree row, live
-    // inside the menu. The page's fileActionGate switches them off while a
-    // context menu is open (+page.svelte), so nothing else claims them here.
+    // inside the menu. Legend Lore's fileActionGate switches them off while a
+    // context menu is open, so nothing else claims them here.
     // Resolved against the rendered rows rather than a second dispatch table,
     // so a chord can only fire when its row actually exists — Solo/Mute only
     // render under canScope, Hide under its own condition.
@@ -269,7 +273,6 @@
       const mk = eventMatchKey(event);
       const hit = mk ? mainItems.find((el) => el.dataset.chord === mk) : undefined;
       if (hit) {
-        event.preventDefault();
         const sub = hit.dataset.submenu as Submenu | undefined;
         if (hit.dataset.mi === 'submenu-trigger' && sub) {
           // The ArrowRight path gets this for free — the user had already
@@ -281,24 +284,24 @@
         } else {
           hit.click();
         }
-        return;
+        return true;
       }
     }
     if (event.key === 'Enter') {
-      event.preventDefault();
       const target = inSub ? submenuItems[focusedSubmenuIdx!] : mainItems[focusedIdx];
       target?.click();
-      return;
+      return true;
     }
     if (event.key === 'Escape') {
-      event.preventDefault();
       if (inSub) {
         openSubmenu = null;
         focusedSubmenuIdx = null;
       } else {
         onClose();
       }
+      return true;
     }
+    return false;
   }
 
   // Position is bound on first render then measured-and-shifted in onMount
@@ -356,7 +359,7 @@
 
 </script>
 
-<svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} on:keydown={handleKeydown} />
+<svelte:window on:click={onClose} on:mousedown={handleOutsideMouseDown} />
 
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 <div

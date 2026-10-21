@@ -1,6 +1,7 @@
 <script lang="ts">
   import Modal from './Modal.svelte';
-  import { KEYBINDINGS, chord, type KeyScope } from './keybindings';
+  import { focusPath } from './focus';
+  import { KEYBINDINGS, chord, liveScopes, type KeyScope } from './keybindings';
 
   export let visible = false;
   export let onClose: () => void;
@@ -33,11 +34,16 @@
     modal: 'Modal',
   };
 
+  // The scopes the keyboard can reach from where it is (focus.ts) keep
+  // their rank; the others step down the text ramp, in their usual place,
+  // so the sheet reads the same every time and says which part is live.
+  $: live = liveScopes($focusPath);
   $: grouped = SCOPE_ORDER
     .map(scope => ({
       scope,
       label: SCOPE_LABELS[scope],
       entries: KEYBINDINGS.filter(k => k.scope === scope),
+      away: !live.has(scope),
     }))
     .filter(g => g.entries.length > 0);
 
@@ -62,7 +68,7 @@
   <div class="legend-body">
     <div class="legend-cols">
       {#each grouped as group (group.scope)}
-        <section class="lgroup">
+        <section class="lgroup" class:away={group.away}>
           <h3 class="ledger-label">{group.label}</h3>
           <dl class="bindings">
             {#each group.entries as entry (entry.id)}
@@ -122,6 +128,19 @@
      and dropping to the nameplate voice is a change of dress, not of outline. */
   .lgroup > .ledger-label {
     margin: 0 0 0.4rem;
+  }
+  /* A scope the keyboard can't reach from where it is: one step down the
+     ramp, heading, labels and caps alike, never faded. */
+  .lgroup.away > .ledger-label,
+  .lgroup.away .desc {
+    color: var(--text-tertiary);
+  }
+  .lgroup.away .keycap {
+    color: var(--text-secondary);
+  }
+  .lgroup.away .keycap.switch-key {
+    color: var(--text-secondary);
+    border-color: var(--border-subtle);
   }
 
   /* The <dl> *is* the grid: a shortcut sheet is the one screen whose whole job

@@ -4,6 +4,7 @@
   // clamped to the window, and holding the one menu slot while open.
   import { onDestroy, onMount, tick } from 'svelte';
   import { chord, isBareKeyChord } from '../shell/keybindings';
+  import { bindKeys } from '../shell/keys';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import { clampToViewport } from '../ui/menuGeometry';
@@ -67,13 +68,13 @@
     subMeasured = true;
   }
 
-  function onWindowKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-    }
+  // Esc closes, over every region while the menu is open (keys.ts).
+  function menuKeys(e: KeyboardEvent): boolean {
+    if (e.key !== 'Escape') return false;
+    close();
+    return true;
   }
+  const unbindKeys = bindKeys(menuKeys, 'overlay');
 
   onMount(async () => {
     claimMenuSlot(close);
@@ -87,10 +88,13 @@
     measured = true;
   });
 
-  onDestroy(() => releaseMenuSlot(close));
+  onDestroy(() => {
+    releaseMenuSlot(close);
+    unbindKeys();
+  });
 </script>
 
-<svelte:window on:mousedown={onWindowMousedown} on:keydown={onWindowKeydown} on:blur={close} />
+<svelte:window on:mousedown={onWindowMousedown} on:blur={close} />
 
 <div class="command-menu" class:measured bind:this={el} style:left="{pos.x}px" style:top="{pos.y}px" role="menu">
   {#each items as item, i (i)}

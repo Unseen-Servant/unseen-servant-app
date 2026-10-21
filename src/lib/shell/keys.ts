@@ -12,8 +12,9 @@
 // default prevented. Nothing runs while a dialog is up: its keys bubble
 // here past the inerted page, and they are the dialog's.
 //
-// The menus still hang on their own window listeners, ahead of this, for
-// their Esc and arrows.
+// Esc is a ladder these places make: a menu closes first, then a region
+// lets go of its caret (a pane) or its arm, then a tool steps its own view
+// back, and nothing below sees a key a place above took.
 
 import { get } from 'svelte/store';
 import { dialogOpen, focusPath, inEditor, isTyping, type FocusPath } from './focus';

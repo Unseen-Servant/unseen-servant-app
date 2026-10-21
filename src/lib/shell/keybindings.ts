@@ -7,6 +7,8 @@
 // a chord to a handler, add (or update) its entry here and reuse
 // `chordHint(id)` in the corresponding button's `title` attribute.
 
+import type { FocusPath } from './focus';
+
 export type KeyScope =
   | 'global'
   | 'fileTree'
@@ -222,6 +224,27 @@ export const KEYBINDINGS: KeybindingEntry[] = [
 ];
 
 const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
+
+// The scopes the sheet shows as live for a focus path (focus.ts): global
+// always, Legend Lore's bar whenever it has the keyboard, and the scope of
+// the region that does. A menu can't be open under the sheet, so its scope
+// never is; the modal one isn't on the sheet.
+export function liveScopes(path: FocusPath): Set<KeyScope> {
+  const live = new Set<KeyScope>(['global']);
+  if (path.tool === 'command') live.add('command');
+  if (path.tool === 'legend-lore') {
+    live.add('searchInput');
+    const region: Record<string, KeyScope> = {
+      tree: 'fileTree',
+      systems: 'systemsView',
+      search: 'searchResults',
+      collections: 'collections',
+      filters: 'filterPanel',
+    };
+    if (path.region && region[path.region]) live.add(region[path.region]);
+  }
+  return live;
+}
 
 export function chord(id: string): string {
   const entry = BY_ID.get(id);

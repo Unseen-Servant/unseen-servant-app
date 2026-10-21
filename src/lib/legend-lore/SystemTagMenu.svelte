@@ -1,6 +1,7 @@
 <script lang="ts">
   import { afterUpdate, onDestroy } from 'svelte';
   import type { KnownGameSystem } from './types';
+  import { bindKeys } from '../shell/keys';
   import { claimMenuSlot, releaseMenuSlot } from '../shell/menuSlot';
   import { clampToViewport } from '../ui/menuGeometry';
   import SystemTagRows from './SystemTagRows.svelte';
@@ -70,16 +71,21 @@
 
   // A tree row can be unmounted (folder collapsed, filter changed) with its
   // dropdown still open — don't leave a dead menu holding the slot.
-  onDestroy(() => releaseMenuSlot(closeDropdown));
+  onDestroy(() => {
+    releaseMenuSlot(closeDropdown);
+    unbindKeys();
+  });
 
-  function handleWindowKeydown(event: KeyboardEvent) {
-    if (showDropdown && event.key === 'Escape') {
-      closeDropdown();
-    }
+  // Esc closes the dropdown, over every region while it's open (keys.ts).
+  function menuKeys(event: KeyboardEvent): boolean {
+    if (!showDropdown || event.key !== 'Escape') return false;
+    closeDropdown();
+    return true;
   }
+  const unbindKeys = bindKeys(menuKeys, 'overlay');
 </script>
 
-<svelte:window on:click={closeDropdown} on:keydown={handleWindowKeydown} />
+<svelte:window on:click={closeDropdown} />
 
 {#if showDropdown}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
