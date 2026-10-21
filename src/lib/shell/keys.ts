@@ -12,8 +12,8 @@
 // default prevented. Nothing runs while a dialog is up: its keys bubble
 // here past the inerted page, and they are the dialog's.
 //
-// Legend Lore's own chords and Command's still hang on their own window
-// listeners, gated on `active` (PANELS.md), until they move here.
+// The menus still hang on their own window listeners, ahead of this, for
+// their Esc and arrows.
 
 import { get } from 'svelte/store';
 import { dialogOpen, focusPath, inEditor, isTyping, type FocusPath } from './focus';

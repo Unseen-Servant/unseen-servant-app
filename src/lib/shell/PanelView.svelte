@@ -22,7 +22,7 @@
 </script>
 
 {#if id === 'legend-lore'}
-  <LegendLorePanel {active} {windowKey} {statusSlot} />
+  <LegendLorePanel {windowKey} {statusSlot} />
 {:else if id === 'command'}
   <CommandPanel {active} {windowKey} {statusSlot} {filled} {onFill} />
 {:else}

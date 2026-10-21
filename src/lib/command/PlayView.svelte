@@ -5,7 +5,7 @@
   // plays one note. The board's file and the jot bar's lines in the
   // session note are the only things written — what's live is the
   // sidecar's.
-  import { onDestroy, onMount, setContext, tick } from 'svelte';
+  import { onDestroy, setContext, tick } from 'svelte';
   import { writable } from 'svelte/store';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import type { Viewport } from '@xyflow/svelte';
@@ -16,9 +16,8 @@
   import CommandMenu from './CommandMenu.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
-  import { dialogOpen, isTyping } from '../shell/focus';
+  import { bindKeys, type KeyContext } from '../shell/keys';
   import { chord, chordHint } from '../shell/keybindings';
-  import { menuSlotHeld } from '../shell/menuSlot';
   import { commandApi } from './api';
   import {
     CARD,
@@ -292,53 +291,46 @@
     }
   }
 
-  /** The board's keys, Miro's letters (§3.5). Taken before the session
-   *  player's, so Esc puts down an armed tool before it lets go of a beat. */
-  function boardKeys(e: KeyboardEvent) {
-    if (!active || menu || e.isComposing) return;
-    if (dialogOpen() || menuSlotHeld()) return;
-    const target = e.target as HTMLElement | null;
-    if (isTyping(target)) return;
+  /** The board's keys, Miro's letters (§3.5), dispatched while Command has
+   *  the keyboard (keys.ts). Bound ahead of the session player's, which
+   *  this view mounts after binding, so Esc puts down an armed tool before
+   *  it lets go of a beat. */
+  function boardKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
+    if (menu || e.isComposing || ctx.menu || ctx.typing) return false;
     const mod = e.metaKey || e.ctrlKey;
     const key = e.key.toLowerCase();
     if (mod && !e.altKey && (key === 'z' || key === 'g')) {
-      e.preventDefault();
       if (key === 'z') (e.shiftKey ? redo : undo)();
       else if (e.shiftKey) board?.unframeSelection();
       else board?.frameSelection();
-      return;
+      return true;
     }
     if (mod && !e.altKey && !e.shiftKey && key === 'd') {
-      e.preventDefault();
       board?.duplicate();
-      return;
+      return true;
     }
     // By the key's place: ⌥ turns "1" into "¡" on a Mac.
     if (e.altKey && !mod && !e.shiftKey && (e.code === 'Digit1' || e.code === 'Digit2')) {
-      e.preventDefault();
       if (e.code === 'Digit1') fitAll();
       else {
         const ids = board?.selectedIds() ?? [];
         if (ids.length) frame = { ids };
       }
-      return;
+      return true;
     }
-    if (mod || e.altKey || e.shiftKey) return;
+    if (mod || e.altKey || e.shiftKey) return false;
     if (e.key === 'Escape' && tool !== 'select') {
-      e.preventDefault();
-      e.stopPropagation();
       tool = 'select';
-      return;
+      return true;
     }
     const next = TOOL_KEYS[key];
-    if (next && !e.repeat) {
-      e.preventDefault();
-      tool = next;
-    }
+    if (!next) return false;
+    if (!e.repeat) tool = next;
+    return true;
   }
 
-  onMount(() => window.addEventListener('keydown', boardKeys, true));
-  onDestroy(() => window.removeEventListener('keydown', boardKeys, true));
+  const unbindKeys = bindKeys(boardKeys, { tool: 'command' });
+  onDestroy(unbindKeys);
   // The tray's cards ask what the board's do.
   setContext(CARD_ACTIONS, actions);
   // The board's cards and the tray's find their images here.
@@ -542,7 +534,6 @@
       <Arrangement
         rows={planRows(index, session)}
         bind:open={playerOpen}
-        {active}
         liveBeat={live?.beat ?? null}
         onLaunch={launch}
         onStop={stop}

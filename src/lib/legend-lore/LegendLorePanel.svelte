@@ -50,11 +50,10 @@
   import { createCommitScheduler, mergeArmedCollection } from './collectionCommit';
   import { renameNavKey } from './collectionsNav';
   import { setTreePathsPayload, type TreePathsPayload } from './dragPayload';
-  import { dialogOpen, isTyping, setRegion } from '../shell/focus';
+  import { setRegion } from '../shell/focus';
   import { chord, digitChord, isDeleteChord, jumpEdge } from '../shell/keybindings';
   import { bindKeys, type KeyContext } from '../shell/keys';
   import { filterByQuery, playOnly, stepPick, transportNames } from './collectionOrder';
-  import { menuSlotHeld } from '../shell/menuSlot';
   import { viewFilter } from '../shell/mention';
   import { filterTree, filterWords, nameMatches } from './nameFilter';
   import {
@@ -66,9 +65,6 @@
   import { parseScopeConsoleState } from './scopeConsole';
   import type { ScopeConsoleState } from './scopeConsole';
 
-  /** False while another panel has the keyboard (PANELS.md), even one on
-   *  screen beside this one. */
-  export let active = true;
   // The host's dock toggle, drawn at the right end of the header (PANELS.md).
   export let windowKey: Snippet | undefined = undefined;
   // The host's slot for this panel in its status bar (PANELS.md).
@@ -994,6 +990,7 @@
     if (unlistenSidecarFailed) unlistenSidecarFailed();
     if (unlistenOpenSettings) unlistenOpenSettings();
     unbindKeys();
+    unbindToolKeys();
   });
 
   async function setViewMode(mode: 'tree' | 'systems') {
@@ -2407,20 +2404,13 @@
     holdLatch.release(event.key.toLowerCase());
   }
 
-  function handleGlobalKeydown(event: KeyboardEvent) {
-    if (!active) return;
-    // When a native <dialog> is open via showModal(), the browser inerts
-    // the rest of the page (clicks, focus, screen-readers all skip), but
-    // window-level keydown listeners still fire because keydown bubbles
-    // through the focused dialog. Bail here so app-wide chords (Cmd+B,
-    // Cmd+Alt+←/→, Esc ladder, tree-nav letters, etc.) don't run
-    // behind the modal. The dialog has its own handlers for what it
-    // needs (Esc → cancel, Enter → submit, Tab cycles inside).
-    if (dialogOpen()) return;
-
+  // The tool's own keys, dispatched while it has the keyboard (keys.ts)
+  // after the region's — the dock panes', the systems view's — and ahead
+  // of the app-wide chords. The dispatcher stands down for a dialog.
+  function toolKeys(event: KeyboardEvent, ctx: KeyContext): boolean {
     const target = event.target as HTMLElement | null;
     const inSearchInput = target?.classList.contains('search-input') === true;
-    const inAnyInput = isTyping(target);
+    const inAnyInput = ctx.typing;
 
     if (event.key === 'Escape') {
       // Yield to ContextMenu's own Esc handler — it knows about submenu
@@ -2428,53 +2418,51 @@
       // before closing the whole thing. Closing here would skip that
       // step and slam the menu shut. focusedFilePath is intentionally
       // left intact across menu open/close.
-      if (contextMenu) return;
-      if (renamingFilePath) { renamingFilePath = null; return; }
+      if (contextMenu) return false;
+      if (renamingFilePath) { renamingFilePath = null; return true; }
       // A competing popover (sort menu / dropdown / the collections
       // panel's context menu) handles its own Esc. Don't reach the
       // branches below — that would close the search view or wipe the
       // tree highlight as a side effect of closing a menu. Every popover
       // claims the menu slot at open, so the slot is the one authority.
-      if (menuSlotHeld()) return;
+      if (ctx.menu) return false;
       // Escape mid-IME-composition just cancels the composition — never
       // step the ladder on it.
-      if (event.isComposing) return;
+      if (event.isComposing) return false;
       // Search view: Esc from the bar or the results steps straight out
       // to the browse view — the bar is reached only with ⌘K (or a click),
       // never on the way out. The query is never cleared here — × is the
       // only clear, and it isn't an exit.
       if (searchViewOpen) {
         if (inSearchInput || activePane === 'files') {
-          event.preventDefault();
           searchViewOpen = false;
           (document.activeElement as HTMLElement | null)?.blur?.();
           // The browse view isn't in the DOM until Svelte flushes the
           // swap; focusFileRegion queries rows / the SystemsView binding.
           void tick().then(() => focusFileRegion());
+          return true;
         }
-        // An active dock pane keeps its own Esc semantics (its window
-        // handler clears the highlight and releases the arrows); the next
-        // Esc leaves the search view.
-        return;
+        // An active dock pane keeps its own Esc semantics (its handler
+        // clears the highlight and releases the arrows); the next Esc
+        // leaves the search view.
+        return false;
       }
       // The bar outside the search view. A / filter goes first, the way an
       // @-word does; then focus goes back to the rows the bar sits above.
       if (inSearchInput) {
-        event.preventDefault();
         if (nameFilter !== null) {
           searchQuery = '';
-          return;
+          return true;
         }
         (target as HTMLInputElement).blur();
         focusFileRegion();
-        return;
+        return true;
       }
       // Rows under a / filter funnel to the bar — the filter is edited,
       // and ended, there.
       if (nameFilter !== null && activePane === 'files' && !inAnyInput) {
-        event.preventDefault();
         headerComponent?.focus();
-        return;
+        return true;
       }
       if (focusedFilePath) { focusedFilePath = null; }
     }
@@ -2484,9 +2472,8 @@
 
     // Cmd/Ctrl+B: toggle Collections sidebar.
     if (meta && !event.shiftKey && lk === 'b' && selectedFolder) {
-      event.preventDefault();
       togglePanel();
-      return;
+      return true;
     }
 
     // Tab: flip between the tree and the systems view — Ableton's
@@ -2500,10 +2487,9 @@
     // library folder too: the switch is on screen, so its key works.
     const tabFlips = inSearchInput ? !event.isComposing : !searchViewOpen && !inAnyInput;
     if (event.key === 'Tab' && !meta && !event.altKey && tabFlips
-        && !contextMenu && !renamingFilePath && !menuSlotHeld()) {
-      event.preventDefault();
+        && !contextMenu && !renamingFilePath && !ctx.menu) {
       void setViewMode(viewMode === 'tree' ? 'systems' : 'tree');
-      return;
+      return true;
     }
 
     // Cmd/Ctrl+Alt+←/→: jump keyboard focus between the collections panel
@@ -2515,7 +2501,6 @@
     // handlers stop yielding to it, and → means "back to the results".
     if (meta && event.altKey && !event.shiftKey && selectedFolder
         && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
-      event.preventDefault();
       if (event.key === 'ArrowLeft') {
         if (searchViewOpen) (document.activeElement as HTMLElement | null)?.blur?.();
         void focusDockRegion();
@@ -2526,13 +2511,12 @@
       } else {
         focusFileRegion();
       }
-      return;
+      return true;
     }
 
     // Cmd+Alt+↑/↓: move between the two panels stacked in the left dock.
     if (meta && event.altKey && !event.shiftKey && selectedFolder
         && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-      event.preventDefault();
       if (event.key === 'ArrowDown') {
         // Collections sits above Filters.
         if (activePane === 'collections') { setFocusedCollectionName(null); focusFilterRegion(); }
@@ -2543,7 +2527,7 @@
         setFocusedFilterRow(null);
         void focusCollectionsRegion();
       }
-      return;
+      return true;
     }
 
     // Cmd/Ctrl+Z is deliberately NOT bound. It used to revert the pending sync
@@ -2564,9 +2548,8 @@
         ? searchResults[selectedResultIndex]?.source
         : focusedFilePath;
       if (infoPath && indexedPaths.has(infoPath)) {
-        event.preventDefault();
         statsModalPath = infoPath;
-        return;
+        return true;
       }
     }
 
@@ -2575,7 +2558,7 @@
     // menu/rename is open. Every popover claims the menu slot at open,
     // so the slot is the state-based answer to "is a menu open?" — no
     // DOM query, no race with Svelte's microtask flush.
-    const competingMenuOpen = menuSlotHeld();
+    const competingMenuOpen = ctx.menu;
 
     // Action keys (R/S/./M/C, Cmd+O reveal, Shift+F10/ContextMenu) work
     // on the focused file in both tree and systems modes. Runs ahead of
@@ -2584,14 +2567,14 @@
     const fileActionGate =
       selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath &&
       !competingMenuOpen && activePane === 'files' && !inAnyInput;
-    if (fileActionGate && handleFocusedFileActionKey(event)) return;
+    if (fileActionGate && handleFocusedFileActionKey(event)) return true;
 
     // Tree-row arrow navigation. Systems view owns its own arrow nav,
     // so this block is gated to tree mode only. Gating on activePane rather
     // than on a null collection token also stops ↓ stealing the caret out of
     // the filter panel, which the old check never considered.
     if (selectedFolder && !searchViewOpen && !contextMenu && !renamingFilePath && !competingMenuOpen && activePane === 'files' && viewMode === 'tree') {
-      if (!inAnyInput && handleTreeNavKey(event)) return;
+      if (!inAnyInput && handleTreeNavKey(event)) return true;
     }
 
     // ↓ from the bar outside the search view drops into the browse view's
@@ -2602,17 +2585,16 @@
         && (event.key === 'ArrowDown' || (event.key === 'Enter' && nameFilter !== null))
         && !meta && !event.altKey && !event.shiftKey && !event.isComposing
         && activePane === 'files') {
-      event.preventDefault();
       (target as HTMLInputElement).blur();
       if (nameFilter !== null) focusFirstMatch();
       else focusFileRegion();
-      return;
+      return true;
     }
 
     // Gate on the view being on screen, not on the committed query —
     // after exiting, query and results persist while tree/systems is
     // visible, and the list's keys must not act on rows that aren't rendered.
-    if (!searchViewOpen || searchResults.length === 0) return;
+    if (!searchViewOpen || searchResults.length === 0) return false;
 
     const inList = target?.closest('.search-results') !== null;
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
@@ -2620,7 +2602,7 @@
     // While a dock pane holds the arrows (⌘⌥← mid-search), the list's
     // keys stand down — the pane's window handler owns the keyboard
     // until Esc, ⌘⌥→, or a click on the search side hands it back.
-    if (activePane !== 'files') return;
+    if (activePane !== 'files') return false;
 
     // Enter in the bar lands focus on the first result (handleSearchSubmit);
     // the arrows never cross between bar and list — ↑ on the first row
@@ -2631,28 +2613,23 @@
     const isUp = inList && (event.key === 'ArrowUp' || (bareLetter && lk === 'k'));
     const edge = inList ? jumpEdge(event) : null;
     if (edge) {
-      event.preventDefault();
       selectedResultIndex = edge === 'first' ? 0 : searchResults.length - 1;
       searchResultsComponent?.focusRow(selectedResultIndex);
     } else if (isDown) {
-      event.preventDefault();
       selectedResultIndex = Math.min(searchResults.length - 1, selectedResultIndex + 1);
       searchResultsComponent?.focusRow(selectedResultIndex);
     } else if (isUp) {
-      event.preventDefault();
       if (selectedResultIndex > 0) {
         selectedResultIndex -= 1;
         searchResultsComponent?.focusRow(selectedResultIndex);
       }
     } else if (event.key === 'Enter' && inList) {
-      event.preventDefault();
       const sel = searchResults[selectedResultIndex];
       if (sel) handleOpenResult(sel.source, sel.filename, sel.page_start);
     } else if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
       // ⌘O opens the selection from anywhere in the search view — the
       // input included — matching the browse views' "open the focused
       // thing" muscle memory.
-      event.preventDefault();
       const sel = searchResults[selectedResultIndex];
       if (sel) handleOpenResult(sel.source, sel.filename, sel.page_start);
     } else if (bareLetter && inList && (lk === 's' || lk === 'm')) {
@@ -2660,8 +2637,7 @@
       // row-you're-on grammar the tree and systems rows follow, on the
       // same hold latch, so a held M peeks the search without the book
       // and release restores it.
-      event.preventDefault();
-      if (event.repeat) return;
+      if (event.repeat) return true;
       const sel = searchResults[selectedResultIndex];
       if (sel) {
         const item = resultToFileItem(sel);
@@ -2671,19 +2647,21 @@
       }
     } else if (bareLetter && inList && lk === 'g') {
       // G brings the preview back to the match after reading around it.
-      event.preventDefault();
       searchInspectorComponent?.returnToMatch();
     } else if (bareLetter && inList && lk === 'x' && armState) {
       // X files the selected result into the armed collection — "tick
       // the box you can see", the key both browse views spend on it.
-      event.preventDefault();
       const sel = searchResults[selectedResultIndex];
       if (sel) {
         if (armState.paths.has(sel.source)) curationRemove([sel.source]);
         else curationAdd([sel.source]);
       }
+    } else {
+      return false;
     }
+    return true;
   }
+  const unbindToolKeys = bindKeys(toolKeys, { tool: 'legend-lore' });
 
   // A search hit resolved to the row shape every file affordance already
   // takes — `source` is the index's absolute path, so the context menu,
@@ -3710,7 +3688,6 @@
      live here, at window level, because the press can come from any pane
      and focus may have moved by the time the key comes back up. -->
 <svelte:window
-  on:keydown={handleGlobalKeydown}
   on:keyup={handleGlobalKeyup}
   on:blur={() => holdLatch.cancel()}
   on:contextmenu|preventDefault

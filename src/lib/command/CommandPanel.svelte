@@ -14,8 +14,7 @@
   import RenameField from '../ui/RenameField.svelte';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { confirmPrompt } from '../shell/confirmStore';
-  import { dialogOpen, isTyping } from '../shell/focus';
-  import { menuSlotHeld } from '../shell/menuSlot';
+  import { bindKeys, type KeyContext } from '../shell/keys';
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
   import { hoist } from '../shell/hoist';
@@ -314,58 +313,50 @@
     if (bufState.path === path) await buffer.flush();
   }
 
-  function onKeydown(e: KeyboardEvent) {
-    if (!active || menu || menuSlotHeld()) return;
-    // An open dialog's keys still bubble here past the inert page; they're
-    // the dialog's, as in Legend Lore.
-    if (dialogOpen()) return;
+  // The tool's own keys, dispatched while it has the keyboard (keys.ts),
+  // which also stands down for a dialog.
+  function toolKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
+    if (menu || ctx.menu) return false;
     const target = e.target as HTMLElement | null;
     // ⌘E: read the open note or edit it, as Obsidian's, from the editor
     // too, but not while a name is typed.
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'e' && bufState.status !== 'empty') {
-      if (target?.closest('input, textarea')) return;
-      e.preventDefault();
+      if (target?.closest('input, textarea')) return false;
       toggleReading();
-      return;
+      return true;
     }
     // ⌘O: the session note in the inspector, from anywhere: the jot bar
     // writes to it.
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'o' && session) {
-      e.preventDefault();
       openPath(session.path);
-      return;
+      return true;
     }
-    if (isTyping(target)) return;
+    if (ctx.typing) return false;
     // ⌘T, ⇧⌘T: insert a note or an image track, as Live inserts an audio
     // or a MIDI one, after the selected note's track.
     if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 't' && mode === 'prep' && index) {
-      e.preventDefault();
       const track = index.notes.find((n) => n.path === selected)?.track ?? null;
       grid?.insertTrack(e.shiftKey ? 'image' : 'note', track && index.tracks.includes(track) ? track : null);
-      return;
+      return true;
     }
     const mod = e.metaKey || e.ctrlKey;
     // Tab: Prep ⇄ Play, Live's key for its two views, as Legend Lore's
     // tree ⇄ systems. ⇧Tab too: with two views, direction means nothing.
     if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && index) {
-      e.preventDefault();
       mode = mode === 'prep' ? 'play' : 'prep';
-      return;
+      return true;
     }
     // ⌘B: the shelf, as it is Legend Lore's collections sidebar.
     if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'b' && index && mode === 'prep') {
-      e.preventDefault();
       shelfOpen = !shelfOpen;
-      return;
+      return true;
     }
     // R: the selected row is renamed where it stands, as Legend Lore's R
     // renames the focused one. Kept from the field it opens, or the R types
     // over the name.
     if (e.key.toLowerCase() === 'r' && !mod && !e.altKey && !e.shiftKey && !e.isComposing && selected && mode === 'prep') {
-      e.preventDefault();
-      if (e.repeat) return;
-      for (const list of [grid, shelf, beats]) list?.rename(selected);
-      return;
+      if (!e.repeat) for (const list of [grid, shelf, beats]) list?.rename(selected);
+      return true;
     }
     // A: the note or beat under the pointer, a row or a card, is spent or
     // unspent, as Legend Lore's A shelves a collection. After one, the next
@@ -375,11 +366,10 @@
       const path = pathUnderPointer();
       const note = index.notes.find((n) => n.path === path) ?? index.beats.find((b) => b.path === path);
       if (note && !('type' in note && note.type === 'image')) {
-        e.preventDefault();
-        if (e.repeat || !pointed) return;
+        if (e.repeat || !pointed) return true;
         pointed = false;
         setSpent(note, !note.spent);
-        return;
+        return true;
       }
     }
     // Esc undoes the louder thing first, as in Legend Lore: the arm, then
@@ -387,9 +377,13 @@
     if (e.key === 'Escape' && mode === 'prep') {
       if (armed) armed = false;
       else if (focusedBeat) focusBeat(null);
-      else selected = null;
+      else if (selected) selected = null;
+      else return false;
+      return true;
     }
+    return false;
   }
+  const unbindKeys = bindKeys(toolKeys, { tool: 'command' });
 
   onMount(() => {
     unlisten = onVaultChange(onVault);
@@ -398,6 +392,7 @@
   });
 
   onDestroy(() => {
+    unbindKeys();
     if (refreshTimer) clearTimeout(refreshTimer);
     void unlisten?.then((stop) => stop());
     void unlistenLive?.then((stop) => stop());
@@ -982,7 +977,6 @@
   };
 </script>
 
-<svelte:window on:keydown={onKeydown} />
 
 {#snippet dropCaret()}
   <!-- Font Awesome caret-right, turned down by .drop-caret -->

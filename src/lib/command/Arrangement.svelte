@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   // Play's arrangement (design §5.2), named the session player: a box over
   // the board's corner holding the session's plan, worked as Legend Lore's
   // collections panel: a click focuses a beat, ↑↓ or J/K move the focus,
@@ -9,8 +10,7 @@
   // down to the live beat.
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
-  import { dialogOpen, isTyping } from '../shell/focus';
-  import { menuSlotHeld } from '../shell/menuSlot';
+  import { bindKeys, type KeyContext } from '../shell/keys';
   import CommandMenu from './CommandMenu.svelte';
   import SpendKey from './SpendKey.svelte';
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
@@ -20,8 +20,6 @@
   export let rows: PlanRow[];
   /** The list unfolded. Folded, only the live beat's row shows. */
   export let open: boolean;
-  /** True while the panel is visible: keys do nothing otherwise (PANELS.md). */
-  export let active: boolean;
   /** The beat the live set was launched from. */
   export let liveBeat: string | null;
   export let onLaunch: (beat: BeatEntry) => void;
@@ -67,26 +65,31 @@
     }
   }
 
-  function onKeydown(e: KeyboardEvent) {
-    if (!active || menu || menuSlotHeld()) return;
-    if (dialogOpen()) return;
-    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const target = e.target as HTMLElement | null;
-    if (isTyping(target)) return;
+  // The player's keys, dispatched while Command has the keyboard
+  // (keys.ts), after the board's.
+  function playerKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
+    if (menu || ctx.menu || ctx.typing) return false;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
     const lk = e.key.toLowerCase();
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || lk === 'j' || lk === 'k') {
-      e.preventDefault();
       step(e.key === 'ArrowDown' || lk === 'j' ? 1 : -1);
-    } else if (lk === 'p' || lk === ' ') {
+      return true;
+    }
+    if (lk === 'p' || lk === ' ') {
       // Space is the DAW's play/stop, as in Legend Lore's collections.
-      e.preventDefault();
-      if (e.repeat) return;
+      if (e.repeat) return true;
       const beat = beats.find((b) => b.path === focused);
       if (beat) toggle(beat);
-    } else if (e.key === 'Escape' && focused) {
-      focused = null;
+      return true;
     }
+    if (e.key === 'Escape' && focused) {
+      focused = null;
+      return true;
+    }
+    return false;
   }
+  const unbindKeys = bindKeys(playerKeys, { tool: 'command' });
+  onDestroy(unbindKeys);
 
   // The transport first, as a collection's menu has it. A right-click
   // focuses, so the menu and Space act on the same beat.
@@ -103,8 +106,6 @@
     menu = { x: e.clientX, y: e.clientY, items };
   }
 </script>
-
-<svelte:window on:keydown={onKeydown} />
 
 <section class="arrangement" aria-label="Session player">
   <!-- The plate folds the list, as a group's title does in Prep. -->

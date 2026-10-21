@@ -50,8 +50,10 @@ same from the menu bar.
   view that was last clicked into (or the view's first). A visible panel can
   be inactive, beside the one that has the keyboard; panels with no slot in
   the view stay mounted (hidden), so their state survives view switches.
-  A panel with no window-level listeners may leave it undeclared;
-  `PanelView.svelte` passes it to those that take it.
+  Keys never need it (the dispatcher runs a tool's handlers only while it
+  is on the focus path), so a panel may leave it undeclared;
+  `PanelView.svelte` passes it to those that take it — Command, for the
+  board's own delete and selection keys.
 - **The shell context**, read through `shellState.ts`: `appContext` (active
   campaign and session, both optional). It mirrors Rust and updates in every
   window when any window changes it.
@@ -105,9 +107,10 @@ showing the way back to its window.
   a handler never queries the DOM for those. A chord that must work
   whichever tool has the keyboard binds at `'global'`, and if it changes
   what the panel shows it calls `showPanel` (`shellState.ts`) first so the
-  host brings the panel up. Any window-level listener a panel still keeps
-  must do nothing while `active` is false — another panel may own the
-  keyboard, even one on screen beside it. Bare 1–8 belong to the rack.
+  host brings the panel up. Any window-level listener a panel keeps for
+  something other than keys must do nothing while `active` is false —
+  another panel may own the keyboard, even one on screen beside it. Bare
+  1–8 belong to the rack.
 - **A size** beyond its `rackMin` in the main window (Legend Lore 560×320,
   Command 420×280), or its window minimum in its own window. Fill the parent
   (`height: 100%`), never the viewport (`100vh`) — the rack bar takes a row,
