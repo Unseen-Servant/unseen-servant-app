@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-21
+
+**Command fills out, and Legend Lore stands up to a bad day.** Images on tracks and boards, a toolbar for Play's board, a card tray, keys for every row, and sixteen MCP tools so Claude can prep a session end to end. Help is back in the status bar, and Ollama down, a scanned PDF or a slow sidecar start now say what happened instead of failing quietly. Nothing needs re-indexing.
+
 ### Added
 
 - **Images on the board.** A note's embedded images (`![[map.png]]`, as Obsidian writes them, with `|300` for a width) show on its card in Play and when you read it in the inspector; one naming no image in the campaign shows its name, dashed. Drop an image from Finder on a board to put it there: it's copied into the campaign's `Shelf/` folder, so the campaign keeps everything it uses. An image Obsidian Canvas put on a board shows as itself, and renaming its track or the campaign keeps it on the board
@@ -13,6 +17,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Image tracks.** A track can hold images instead of notes, as Ableton has audio tracks beside MIDI ones. `+ track`, or a track's right-click, offers *Insert note track* (`⌘T`) and *Insert image track* (`⇧⌘T`); from a track's menu, or with a note selected, the new track goes after it. Double-click an image track's empty row to copy pictures from your Mac into it, several at once; so does dropping them on it from Finder, and dropped on the shelf they land there. An image goes only in an image track and a note only in a note track, as Live keeps audio off MIDI tracks; the shelf holds both. A folder of images filled in Finder reads as an image track by itself. A track's kind is kept with the campaign's layout and never hides a file: a note in an image track still shows
 - **A new campaign starts with Maps**, an image track, after the checklist's note tracks, and each default track's kind is saved with it. In a campaign made before, PCs, Secrets and the other checklist tracks stay note tracks whatever is put in them
 - **Legend Lore's tree lists your library's images.** Maps and handouts beside your books show in the tree with a picture glyph, never indexed, scoped or collected; double-click one to open it. Right-click one and *Send to Command* copies it onto the open campaign's shelf or into one of its image tracks. *Hide images*, in the filters' *Hidden items*, takes them out of the tree, and *Hide unindexed items* hides them too. A search hit's *Send to Command* now offers only note tracks
+- **A card tray under Play's board** holds the live set as a hand of cards, as a deckbuilder's hand sits under its table: readable whatever the board's zoom, overlapping evenly past what fits, the card under the pointer brought to the front and its board card outlined. Click a card to select it, `[spread]` to lay the selected cards side by side with the rest as spines, `[gather]` to put them back. The plate folds the tray to nameplates, and `⌘B` in Play folds the tray and the session player together
+- **Help is a key away.** A help key in the status bar, and on macOS Help → Unseen Servant Help, open Settings at Help → Guides. Guides gains *Using Command* (campaigns folder, tracks and notes, beats and sessions, Play, session notes) and *Servant*, the AI agent setup, which spans both tools and names no particular client. A *Troubleshooting* page lists each problem in the GM's words, the messages the app shows for it, and what to do, down to a `[reveal data folder]` key and the support address. Reference gains a glossary of the console's and the table's words. Guides and Reference say what the app does in fewer words, and the first-run page goes: with no library folder, Legend Lore draws its console bare, with one box where the books would be and `[choose library folder]`
+- **The shelf copies from folders you add.** *Copy from* lists the other campaigns, then places, folders outside the campaigns folder you add with the native picker, as Live's browser keeps added Places. A place's notes sit under their folders and a click copies one onto the shelf, spent left behind. Places are the machine's, never a campaign's
+- **Command's lists answer the keys Legend Lore's rows do.** In Prep, `↓`/`↑` (`J`/`K`) step the selection through the list it's in, `→`/`←` (`L`/`H`) step across the tracks to the same row, and `Home`/`End` jump to the ends; `⌘⌥←`/`→` walk shelf, tracks and beats. `↵` or `⌘O` opens the selected note or beat in the inspector, `⌘N` names a note in the selected track's empty row and `⇧⌘N` an armed beat in the plan's, `E` arms the selected beat, `X` puts the selected note in the armed beat or takes it out, `A` spends the selection, `⌘⌫` moves it to the Trash behind the confirm, and `⇧F10` opens its menu. In Play, `⇧Space` launches the next beat, `P` and `Space` stop the live beat from anywhere, `⌥3` fits the live cards in view, `⇧⌘F` fills the rack with the board, and `Esc` in the note editor hands the keys back to the lists with the note kept open
+- **The app-wide chords reach Command.** `⌘K`, `⌘,`, `⌘1`–`9`, `⌘R`, `⌘S`, `⌘F`, `⌘N` and `B` work with Command holding the keyboard, bringing Legend Lore up first when they change what it shows. `⌘⌥` arrows cross the rail from one tool to the next once they have nowhere further to go inside, and a tool without the keyboard keeps its carets on a dimmer ring
+- **One shortcut sheet** (`?`, `⌘/`) per window, laid out by place: window, transport, search bar, the lists, then each view with only what is its own, menus last. A chord shared by several lists is one row. Every label leads with a verb and the key sits at the row's end, and the parts of the app the keyboard can't reach from where it is step down the text ramp, so the sheet says what is live
 
 ### Changed
 
@@ -28,6 +38,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Claude can file notes.** `create_track` makes a track and `move_note` moves a note to another track or the shelf. `create_note` takes a track's name in any case, `find_notes` quotes each note's text rather than its frontmatter and says when it lists only the first 20, and `add_to_live_set` can take a note out of play
 - **Claude's notes cite their book.** `create_note` takes the id of the search result a note draws on, and the note cites the book and its PDF pages, so its card in Play opens the book there, as a note sent from Legend Lore does
 - **Lists are ledgers, and end on an empty row.** The session planner and Legend Lore's collections are ruled as the tracks are, and each ends on a blank row where the next one goes. Double-click one, or select it and press `R`, to name a beat or a collection there, as a track's empty row names a note; `⌘N` still names a collection at once. A collection row now selects on a click, as a Command row does, and a later click on the selected row opens or closes its books. An image track's empty row is blank too, and a double-click opens the picker. The tree's `+ tag` is a plain key, as `+ track` is
+- **The keyboard shows on the tool's frame.** The rack bar no longer raises the key of the tool that has the keyboard; the slot's frame steps up one grey around it instead, as a DAW marks its focused panel
+- **The lock is the view's.** One latch beside the view picker holds the view that shows: locked, the view neither mounts nor lets go of a tool on its key, refuses every carry, holds the rails still, and keeps the pop-out key inert. The per-tool lock keys leave the bar; a tool locked before locks its view
+- **The campaigns folder is picked like the library folder**, in its own Settings section with a read-only path field and the folder glyph
+- **Keys moved or dropped after a shortcut review.** The session note opens with `⇧⌘J` and `⌘J` puts the caret in the jot bar, so `⌘O` means open everywhere. `G` (back to the match), `⌘⇧O` (reveal the library folder), `⌥⌘R` (reveal on disk), `⌘⇧.` (show hidden items) and `C` (the row's collection menu) go; each sat on a menu item or key already, which stays. `⌘S` and `⌘F` stand down in the note editor
+- **The MCP server is Unseen Servant's.** The copied config's entry is now *Unseen Servant*, and what the server tells an agent names the app, not Legend Lore. An entry pasted before keeps working; pasting the new one replaces it rather than running the server twice
 
 ### Removed
 
@@ -35,7 +50,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
-- **The card tray** no longer brings up its last card when the pointer is over the tray's empty end
+- **Legend Lore with Ollama down or without bge-m3.** A search names the missing model and says to pull it, in place of a raw 500; a sync asks the embedder once before extracting, so ticking books with the embedder down fails them at once instead of extracting each for minutes; and a down sidecar reads as *SIDECAR · NOT RUNNING*, not as Ollama missing
+- **A scanned PDF** with no text to extract is unticked after its failed add, instead of being offered again at every check. Tick it again to retry
+- **Cancelling the library folder dialog** no longer shows an error
+- **The sidecar gets a minute to start**, and a crash ends the wait with its log tail instead of leaving search, indexing and Command offline for the session
+- **An orphaned sidecar** no longer outlives a crashed or force-quit app and holds the library store open beside the next launch's
+- **The reranker's model lives in the data folder.** It was cached in the system temp folder, which macOS purges after three days unused, after which every search ranked by vector order alone while the splash said done. The first launch after this update downloads the model again (about 23 MB), and a failed load now shows on the lamp
+- **A card moved on Play's board moves alone**, instead of shifting every card nobody had placed
+- **Tab back to Play draws the board and its notes at once**, instead of reading every card's note again
+- **A drag's ghost** no longer lags behind the hand or wraps its text
+- **Tab switches the tree and systems views** with no library folder too
 
 ## [4.0.0] - 2026-10-17
 
