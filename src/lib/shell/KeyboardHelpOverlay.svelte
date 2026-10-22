@@ -52,14 +52,17 @@
   const COMMAND_LISTS = new Set<KeyScope>(['commandPrep', 'commandPlay']);
 
   // What a section says in a line rather than a row: input syntax and a
-  // modifier's behaviour are not chords, so they carry no cap.
+  // modifier's behaviour are not chords. The keys they name are capped in
+  // the line, marked with backticks.
   const NOTES: Partial<Record<SectionKey, string[]>> = {
-    transport: ['Hold S, M, P or B rather than tapping it: on only while held.'],
+    transport: ['Hold `S`, `M`, `P` or `B` rather than tapping it: on only while held.'],
     searchInput: [
-      'Lead with @ to pick a collection to play: ↵ plays it alone, ⇧↵ adds it to the mix.',
-      'Lead with / to filter the view by name: ↓ or ↵ jumps to the first match.',
+      'Lead with `@` to pick a collection to play: `↵` plays it alone, `⇧↵` adds it to the mix.',
+      'Lead with `/` to filter the view by name: `↓` or `↵` jumps to the first match.',
     ],
   };
+  // Odd parts are the keys.
+  const noteParts = (note: string): string[] => note.split('`');
 
   // A chord that reads the same in two lists is one row, filed under the
   // lists it spans: "Any list" when Command's are among them, "Legend Lore
@@ -144,7 +147,11 @@
             {/each}
           </dl>
           {#each NOTES[section.key] ?? [] as note (note)}
-            <p class="note">{note}</p>
+            <p class="note">
+              {#each noteParts(note) as part, i (i)}
+                {#if i % 2}<span class="keycap">{part}</span>{:else}{part}{/if}
+              {/each}
+            </p>
           {/each}
         </section>
       {/each}
@@ -239,12 +246,16 @@
     line-height: 1.3;
   }
   /* A note reads a step under the labels: it is the section's aside, not
-     a row of it. */
+     a row of it. Its caps sit in the line, so the line is tall enough to
+     hold one without opening up. */
   .note {
     margin: 0.35rem 0 0;
     font-size: 0.78rem;
-    line-height: 1.3;
+    line-height: 1.5;
     color: var(--text-tertiary);
+  }
+  .note .keycap {
+    vertical-align: middle;
   }
   .alt {
     display: inline-flex;
