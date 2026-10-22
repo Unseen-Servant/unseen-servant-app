@@ -2,6 +2,7 @@
   import type { KnownGameSystem, SyncPreferences } from '../legend-lore/types';
   import { DEFAULT_SYNC_PREFERENCES } from '../legend-lore/types';
   import Modal from './Modal.svelte';
+  import { m } from '../paraglide/messages';
   import GameSystemsSettings from '../legend-lore/GameSystemsSettings.svelte';
   import GeneralSettings from '../legend-lore/GeneralSettings.svelte';
   import LibrarySettings from '../legend-lore/LibrarySettings.svelte';
@@ -52,35 +53,35 @@
   }
 
   const tabs = [
-    { id: 'general' as const, label: 'General' },
-    { id: 'library' as const, label: 'Library' },
-    { id: 'game-systems' as const, label: 'Game Systems' },
-    { id: 'command' as const, label: 'Command' },
-    { id: 'help' as const, label: 'Help' },
+    { id: 'general' as const, label: m.settings_general },
+    { id: 'library' as const, label: m.settings_library },
+    { id: 'game-systems' as const, label: m.settings_game_systems },
+    { id: 'command' as const, label: m.settings_command },
+    { id: 'help' as const, label: m.settings_help },
   ];
 
   const helpSubTabs = [
-    { id: 'guides' as const, label: 'Guides' },
-    { id: 'troubleshooting' as const, label: 'Troubleshooting' },
-    { id: 'reference' as const, label: 'Reference' },
-    { id: 'about' as const, label: 'About' },
+    { id: 'guides' as const, label: m.help_guides },
+    { id: 'troubleshooting' as const, label: m.help_troubleshooting },
+    { id: 'reference' as const, label: m.help_reference },
+    { id: 'about' as const, label: m.help_about },
   ];
 </script>
 
-<Modal {visible} {onClose} title="Settings" size="lg" height="min(486px, 80vh)" autofocus={false} escapeWord="close">
+<Modal {visible} {onClose} title={m.settings_title()} size="lg" height="min(486px, 80vh)" autofocus={false} escapeWord="close">
   <!-- The picker rides the rail beside the nameplate, the way the header
        carries its view switch: which section you are in is part of the unit's
        identity, not the first row of its contents. -->
   <svelte:fragment slot="rail">
     <span class="rail-rule" aria-hidden="true"></span>
-    <nav class="seg" aria-label="Settings sections">
+    <nav class="seg" aria-label={m.settings_sections()}>
       {#each tabs as tab}
         <button
           class="seg-btn"
           class:current={activeTab === tab.id}
           aria-current={activeTab === tab.id ? 'page' : undefined}
           on:click={() => { activeTab = tab.id; }}
-        >{tab.label}</button>
+        >{tab.label()}</button>
       {/each}
     </nav>
   </svelte:fragment>
@@ -115,14 +116,14 @@
       />
     {:else if activeTab === 'help'}
       <div class="help-pane">
-        <nav class="seg subtab-seg" aria-label="Help sections">
+        <nav class="seg subtab-seg" aria-label={m.help_sections()}>
           {#each helpSubTabs as sub}
             <button
               class="seg-btn"
               class:current={activeHelpSubTab === sub.id}
               aria-current={activeHelpSubTab === sub.id ? 'page' : undefined}
               on:click={() => { activeHelpSubTab = sub.id; }}
-            >{sub.label}</button>
+            >{sub.label()}</button>
           {/each}
         </nav>
         <div class="subtab-body">

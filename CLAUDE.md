@@ -69,6 +69,7 @@ Tokens live in `src/app.css` `:root`; the app code is the source of truth (the c
 - **Glow, hover, press:** glows (`--glow-active`, `--glow-accent`) mark activated states only. Hover never glows or adds a hue — it brightens or fills a grey step. Press is a 0.97 scale tick.
 - **No filled-rectangle buttons:** actions are text or icons that gain color, glow, or brackets.
 - **Bracket labels are lowercase:** `[sync]`, `[copy MCP config]` — proper nouns and acronyms keep their capitals, so write the label lowercase rather than `text-transform` it.
+- **Copy lives in `messages/en.json`** (Paraglide, compiled to the git-ignored `src/lib/paraglide`): components call `m.key()`; tables hold the message function (`label: m.key`) and call it at render; inline emphasis is message markup (`{#em}…{/em}`) rendered with `ParaglideMessage`. Tool names, the wordmark, key names and `console` logs stay in code. Migrated so far: `src/lib/shell/`.
 - **Type:** serif throughout — Crimson Text body, Almendra headings — with `--font-mono` for code-flavored affordances. Titles and labels take a header voice (`.section-title`, `.ledger-label`, `.readout-label`, `.micro-label`) rather than a new size. Numeric readouts use `tabular-nums`.
 - **One row height:** every plate and clickable list row is 1.65rem, in every tool.
 - **Drags:** the row is the handle (no ⠿ grips), and drag sources use `use:grab` (`src/lib/ui/grab.ts`), never `draggable`.

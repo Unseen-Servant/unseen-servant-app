@@ -8,12 +8,13 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "check": "svelte-kit sync && npm run messages && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && npm run messages && svelte-check --tsconfig ./tsconfig.json --watch",
+    "messages": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --silent",
     "lint:css": "stylelint \"src/lib/**/*.svelte\"",
     "tauri": "tauri",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "npm run messages && vitest run",
+    "test:watch": "npm run messages && vitest"
   },
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
@@ -33,6 +34,9 @@
     "svelte-exmarkdown": "^5.0.2"
   },
   "devDependencies": {
+    "@inlang/paraglide-js": "^2.29.1",
+    "@inlang/paraglide-js-svelte": "^1.0.4",
+    "@inlang/plugin-message-format": "^4.5.5",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.70.2",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",

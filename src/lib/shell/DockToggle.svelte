@@ -3,6 +3,7 @@
   // Docked, it pops the panel out into its own window; popped out, it is
   // latched and lit, and pressing it docks the panel back into its tab.
   import LatchKey from '../ui/LatchKey.svelte';
+  import { m } from '../paraglide/messages';
   import { panelTitle, type PanelId } from './panels';
   import { dock, popOut } from './shellState';
 
@@ -20,8 +21,8 @@
 <LatchKey
   open={popped}
   lit={popped}
-  title={popped ? `Dock ${title} back into the main window` : `Pop ${title} out into its own window`}
-  label={popped ? `Dock ${title}` : `Pop ${title} out`}
+  title={popped ? m.dock_back_title({ tool: title }) : m.dock_pop_title({ tool: title })}
+  label={popped ? m.dock_back_label({ tool: title }) : m.dock_pop_label({ tool: title })}
   onClick={toggle}
 >
   <!-- Font Awesome "arrow-up-right-from-square" icon (src/lib/ui/icons/arrow-up-right-from-square-solid-full.svg) -->

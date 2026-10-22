@@ -7,6 +7,7 @@
   // under the rack carries the lamps and every docked tool's section.
   import { onDestroy, onMount } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
   import { load } from '@tauri-apps/plugin-store';
   import ActionButton from '../ui/ActionButton.svelte';
   import ConfirmDialog from '../ui/ConfirmDialog.svelte';
@@ -15,6 +16,7 @@
   import PanelView from './PanelView.svelte';
   import RackBar from './RackBar.svelte';
   import StatusBar from './StatusBar.svelte';
+  import { m } from '../paraglide/messages';
   import { setFocusedTool } from './focus';
   import { bindKeys, dispatchKey, hostKeys, type KeyContext } from './keys';
   import { isPanelId, panelTitle, type PanelId } from './panels';
@@ -334,10 +336,14 @@
         >
           {#if popped.has(tool.id)}
             <div class="away-note">
-              <p><em>{tool.title}</em> is in its own window.</p>
+              <p>
+                <ParaglideMessage message={m.rack_away} inputs={{ tool: tool.title }}>
+                  {#snippet em({ children })}<em>{@render children?.()}</em>{/snippet}
+                </ParaglideMessage>
+              </p>
               <div class="away-actions">
-                <ActionButton label="focus" onClick={() => report(popOut(tool.id), `focus ${tool.title}`)} />
-                <ActionButton label="dock back" onClick={() => report(dock(tool.id), `dock ${tool.title}`)} />
+                <ActionButton label={m.rack_away_focus()} onClick={() => report(popOut(tool.id), `focus ${tool.title}`)} />
+                <ActionButton label={m.rack_away_dock_back()} onClick={() => report(dock(tool.id), `dock ${tool.title}`)} />
               </div>
             </div>
           {:else}
@@ -372,8 +378,8 @@
 
       {#if !view.root}
         <div class="empty-rack">
-          <p class="ledger-label">View {current + 1} is empty</p>
-          <p class="lede">Press a tool's key to mount it, or carry the key here.</p>
+          <p class="ledger-label">{m.rack_view_empty({ n: current + 1 })}</p>
+          <p class="lede">{m.rack_view_empty_lede()}</p>
         </div>
       {/if}
 
@@ -383,7 +389,7 @@
           class:refused={!target.ok}
           style={`left: ${target.rect.x}px; top: ${target.rect.y}px; width: ${target.rect.w}px; height: ${target.rect.h}px`}
         >
-          <span class="ledger-label">{target.ok ? panelTitle(carried) : target.reason === 'locked' ? 'locked' : 'no room'}</span>
+          <span class="ledger-label">{target.ok ? panelTitle(carried) : target.reason === 'locked' ? m.rack_drop_locked() : m.rack_drop_no_room()}</span>
         </div>
       {/if}
     {/if}

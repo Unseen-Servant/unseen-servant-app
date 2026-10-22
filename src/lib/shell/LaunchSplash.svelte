@@ -1,6 +1,7 @@
 <script lang="ts">
   import { statusLine, STEP_COPY, TOOL_GROUPS, type BootSnapshot, type BootStep } from './bootSteps';
   import { MARK, MARK_VIEWBOX } from '../ui/iconPaths';
+  import { m } from '../paraglide/messages';
 
   export let snapshot: BootSnapshot | null = null;
   export let version: string = '';
@@ -9,8 +10,8 @@
   $: line = statusLine(snapshot);
 
   function lampTitle(id: string, step: BootStep | undefined): string {
-    const name = STEP_COPY[id].name;
-    return step?.detail ? `${name}: ${step.detail}` : name;
+    const name = STEP_COPY[id].name();
+    return step?.detail ? m.boot_lamp_title({ step: name, detail: step.detail }) : name;
   }
 </script>
 
@@ -24,9 +25,9 @@
     <!-- The cold start as a console self-test: one lamp per step, grouped
          under the tool it serves. The status bar's lamps take over after. -->
     <div class="rack">
-      {#each TOOL_GROUPS as group (group.name)}
+      {#each TOOL_GROUPS as group (group.id)}
         <div class="group">
-          <span class="ledger-label">{group.name}</span>
+          <span class="ledger-label">{group.name()}</span>
           <div class="lamps">
             {#each group.steps as id (id)}
               {@const step = steps.get(id)}

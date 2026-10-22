@@ -4,6 +4,8 @@
   // dark, amber, or half-lit for a part that answers but isn't whole, as the
   // status bar's embedder lamp is. `state` says it in words, for the tooltip
   // and screen readers.
+  import { m } from '../../paraglide/messages';
+
   export let lit: boolean = false;
   export let half: boolean = false;
   export let state: string;
@@ -16,7 +18,7 @@
   role="img"
   aria-label={state}
   title={state}
-><span class="led"></span>Ready</span>
+><span class="led"></span>{m.guides_ready()}</span>
 
 <style>
   .tag {

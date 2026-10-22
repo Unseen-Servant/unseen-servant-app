@@ -13,6 +13,7 @@
   import { grab } from '../ui/grab';
   import LatchKey from '../ui/LatchKey.svelte';
   import { MARK, MARK_VIEWBOX } from '../ui/iconPaths';
+  import { m } from '../paraglide/messages';
   import { panelTitle, type PanelId } from './panels';
   import { RACK_TOOLS, toolsIn, type RackView } from './rack';
 
@@ -34,17 +35,17 @@
 
   function viewTitle(v: RackView, i: number): string {
     const tools = toolsIn(v.root).map(panelTitle);
-    return `View ${i + 1} — ${tools.length ? tools.join(' · ') : 'empty'} (${i + 1})`;
+    return m.rack_view_title({ n: i + 1, tools: tools.length ? tools.join(' · ') : m.rack_view_title_empty() });
   }
 
   function keyTitle(id: PanelId, title: string): string {
     if (!present.includes(id)) {
-      return locked ? `View ${current + 1} is locked: unlock it to mount ${title}` : `Mount ${title} in this view — or drag it where it should go`;
+      return locked ? m.rack_key_mount_locked({ n: current + 1, tool: title }) : m.rack_key_mount({ tool: title });
     }
-    if (focused !== id && !popped.has(id)) return `Give ${title} the keyboard`;
-    if (locked) return `${title} stays: view ${current + 1} is locked`;
-    if (popped.has(id)) return `${title} is in its own window — press to take it out of this view`;
-    return `Take ${title} out of this view — or drag it to move it`;
+    if (focused !== id && !popped.has(id)) return m.rack_key_keyboard({ tool: title });
+    if (locked) return m.rack_key_stays({ tool: title, n: current + 1 });
+    if (popped.has(id)) return m.rack_key_popped({ tool: title });
+    return m.rack_key_take_out({ tool: title });
   }
 
   function carry(e: DragEvent, id: PanelId) {
@@ -52,12 +53,12 @@
   }
 </script>
 
-<nav class="rack-bar" class:overlaid aria-label="Rack" data-tauri-drag-region>
+<nav class="rack-bar" class:overlaid aria-label={m.rack_label()} data-tauri-drag-region>
   <!-- A picker, like the view switch: one view is always showing, so the
        current key sits raised rather than lit. An empty view's numeral
        steps down to the out-of-scope dim. -->
   <div class="view-group">
-    <div class="view-keys" role="group" aria-label="Rack views">
+    <div class="view-keys" role="group" aria-label={m.rack_views()}>
       {#each views as v, i}
         <button
           class="view-key"
@@ -75,8 +76,8 @@
     <LatchKey
       open={locked}
       lit={locked}
-      title={locked ? `Unlock view ${current + 1}` : `Lock view ${current + 1}: its layout holds — no mount or take-out, no carry, no resize, no pop-out`}
-      label={locked ? `Unlock view ${current + 1}` : `Lock view ${current + 1}`}
+      title={locked ? m.rack_unlock({ n: current + 1 }) : m.rack_lock_title({ n: current + 1 })}
+      label={locked ? m.rack_unlock({ n: current + 1 }) : m.rack_lock_label({ n: current + 1 })}
       onClick={onLockView}
     >
       <!-- Font Awesome "lock" icon (src/lib/ui/icons/lock-solid-full.svg) -->
@@ -86,7 +87,7 @@
     </LatchKey>
   </div>
 
-  <div class="tool-wells" role="group" aria-label="Tools" data-tauri-drag-region>
+  <div class="tool-wells" role="group" aria-label={m.rack_tools()} data-tauri-drag-region>
     {#each RACK_TOOLS as tool (tool.id)}
       {@const here = present.includes(tool.id)}
       <div class="tool-well">

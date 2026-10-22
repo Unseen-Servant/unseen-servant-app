@@ -55,6 +55,8 @@ jobs:
             frontend:
               - 'src/**'
               - 'static/**'
+              - 'messages/**'
+              - 'project.inlang/**'
               - 'package.json'
               - 'package-lock.json'
               - '.stylelintrc.json'

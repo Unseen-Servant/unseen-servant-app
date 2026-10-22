@@ -7,6 +7,8 @@
  * while a step runs.
  */
 
+import { m } from '../paraglide/messages';
+
 export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 
 export interface BootStep {
@@ -24,25 +26,25 @@ export interface BootSnapshot {
 interface StepCopy {
   /** Three letters under the lamp, the way a console labels its channels. */
   lamp: string;
-  name: string;
-  running: string;
+  name: () => string;
+  running: () => string;
 }
 
 export const STEP_COPY: Record<string, StepCopy> = {
-  settings: { lamp: 'CFG', name: 'Settings', running: 'Reading settings' },
-  sidecar: { lamp: 'SDC', name: 'Sidecar', running: 'Starting the sidecar' },
-  store: { lamp: 'STO', name: 'Library store', running: 'Opening the library store' },
-  embedder: { lamp: 'EMB', name: 'Embedder', running: 'Waking the embedder' },
-  reranker: { lamp: 'RRK', name: 'Reranker', running: 'Loading the reranker' },
-  spelling: { lamp: 'SPL', name: 'Spelling vocabulary', running: 'Building the spelling vocabulary' },
-  library: { lamp: 'LIB', name: 'Library folder', running: 'Checking the library folder' },
+  settings: { lamp: 'CFG', name: m.boot_settings, running: m.boot_settings_running },
+  sidecar: { lamp: 'SDC', name: m.boot_sidecar, running: m.boot_sidecar_running },
+  store: { lamp: 'STO', name: m.boot_store, running: m.boot_store_running },
+  embedder: { lamp: 'EMB', name: m.boot_embedder, running: m.boot_embedder_running },
+  reranker: { lamp: 'RRK', name: m.boot_reranker, running: m.boot_reranker_running },
+  spelling: { lamp: 'SPL', name: m.boot_spelling, running: m.boot_spelling_running },
+  library: { lamp: 'LIB', name: m.boot_library, running: m.boot_library_running },
 };
 
 /** Lamps grouped by the tool they serve, in lamp order. Core is the app
  *  itself; each tool that joins the suite adds a group. */
-export const TOOL_GROUPS: { name: string; steps: string[] }[] = [
-  { name: 'Core', steps: ['settings', 'sidecar', 'store'] },
-  { name: 'Legend Lore', steps: ['embedder', 'reranker', 'spelling', 'library'] },
+export const TOOL_GROUPS: { id: string; name: () => string; steps: string[] }[] = [
+  { id: 'core', name: m.boot_group_core, steps: ['settings', 'sidecar', 'store'] },
+  { id: 'legend-lore', name: () => 'Legend Lore', steps: ['embedder', 'reranker', 'spelling', 'library'] },
 ];
 
 export interface StatusLine {
@@ -53,17 +55,16 @@ export interface StatusLine {
 export function statusLine(snap: BootSnapshot | null): StatusLine {
   if (snap?.finished) {
     const failed = snap.steps.filter((s) => s.state === 'failed');
-    if (failed.length === 0) return { text: 'Ready', tone: 'ready' };
+    if (failed.length === 0) return { text: m.boot_ready(), tone: 'ready' };
     const first = failed[0];
-    const text = first.detail ?? `${STEP_COPY[first.id]?.name ?? first.id} failed`;
-    const more = failed.length > 1 ? ` (+${failed.length - 1} more)` : '';
-    return { text: text + more, tone: 'warning' };
+    const text = first.detail ?? m.boot_failed({ step: STEP_COPY[first.id]?.name() ?? first.id });
+    return { text: failed.length > 1 ? m.boot_failed_more({ text, count: failed.length - 1 }) : text, tone: 'warning' };
   }
   const running = snap?.steps.find((s) => s.state === 'running');
-  if (!running) return { text: 'Starting…', tone: 'running' };
+  if (!running) return { text: m.boot_starting(), tone: 'running' };
   const group = TOOL_GROUPS.find((g) => g.steps.includes(running.id));
-  const prefix = group && group.name !== 'Core' ? `${group.name} · ` : '';
-  return { text: `${prefix}${STEP_COPY[running.id]?.running ?? running.id}…`, tone: 'running' };
+  const prefix = group && group.id !== 'core' ? `${group.name()} · ` : '';
+  return { text: `${prefix}${STEP_COPY[running.id]?.running() ?? running.id}…`, tone: 'running' };
 }
 
 /** The splash pulls a snapshot on mount while updates are already being

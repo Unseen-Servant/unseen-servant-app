@@ -14,6 +14,7 @@
 <script lang="ts">
   import { tick, onDestroy } from 'svelte';
   import { openDialogs } from './dialogStack';
+  import { m } from '../paraglide/messages';
 
   export let visible = false;
   export let onClose: () => void;
@@ -181,7 +182,7 @@
          ⌘⌫ is its prompt's. An activation switch's Enter is the browser's own
          <button> activation, so that one stays undeclared. -->
     <button type="button" class="modal-escape" on:click={onClose} aria-keyshortcuts="Escape">
-      <span class="k" aria-hidden="true">esc</span>{escapeWord}
+      <span class="k" aria-hidden="true">esc</span>{escapeWord === 'cancel' ? m.modal_cancel() : m.modal_close()}
     </button>
   </div>
   <slot />

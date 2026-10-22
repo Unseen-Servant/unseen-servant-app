@@ -1,94 +1,99 @@
 <script lang="ts">
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
+  import { m } from '../../paraglide/messages';
+
+  type Copy = () => string;
+
   // The words the app uses that a newcomer meets without a definition.
-  const GLOSSARY: { group: string; terms: [term: string, meaning: string][] }[] = [
+  const GLOSSARY: { group: Copy; terms: [term: Copy, meaning: Copy][] }[] = [
     {
-      group: 'Legend Lore',
+      group: () => 'Legend Lore',
       terms: [
-        ['Collection', 'A named set of books'],
-        ['Play', 'Search covers only the playing collections (P)'],
-        ['Mix', 'Several collections playing together'],
-        ['Arm', 'While a collection or a beat is armed (●), clicks file things in or out'],
-        ['Solo', 'Narrow search to a book, folder or game system (S)'],
-        ['Mute', 'Leave a book, folder, game system or collection out of search (M)'],
-        ['Bypass', 'Set every play, solo and mute aside without clearing them (B)'],
-        ['Strong · Good · Weak', 'How closely a result matches; weak ones fade'],
-        ['Sync', 'Index the ticked books (⌘S)'],
+        [m.glossary_collection, m.glossary_collection_desc],
+        [m.glossary_play, m.glossary_play_desc],
+        [m.glossary_mix, m.glossary_mix_desc],
+        [m.glossary_arm, m.glossary_arm_desc],
+        [m.glossary_solo, m.glossary_solo_desc],
+        [m.glossary_mute, m.glossary_mute_desc],
+        [m.glossary_bypass, m.glossary_bypass_desc],
+        [m.glossary_strength, m.glossary_strength_desc],
+        [m.glossary_sync, m.glossary_sync_desc],
       ],
     },
     {
-      group: 'Command',
+      group: () => 'Command',
       terms: [
-        ['Campaign', 'A folder in the campaigns folder, holding all it uses'],
-        ['Track', 'A folder in a campaign, shown as a column: NPCs, Secrets…'],
-        ['Note', 'A Markdown file; [[Name]] links to one'],
-        ['Shelf', 'Notes gathered but not filed on a track yet'],
-        ['Beat', 'A scene: the notes it needs'],
-        ['Session', 'The beats planned for one game'],
-        ['Prep · Play', 'Arranging and running, switched with Tab'],
-        ['Launch', 'Put a beat or a note in play (P)'],
-        ['Live set', 'The notes in play right now'],
-        ['Spent', 'Used up at the table, and dimmed from then on (A)'],
-        ['Board', "Play's cards, one board per session"],
-        ['Card tray', 'The live set as a hand of cards, under the board'],
+        [m.glossary_campaign, m.glossary_campaign_desc],
+        [m.glossary_track, m.glossary_track_desc],
+        [m.glossary_note, m.glossary_note_desc],
+        [m.glossary_shelf, m.glossary_shelf_desc],
+        [m.glossary_beat, m.glossary_beat_desc],
+        [m.glossary_session, m.glossary_session_desc],
+        [m.glossary_prep_play, m.glossary_prep_play_desc],
+        [m.glossary_launch, m.glossary_launch_desc],
+        [m.glossary_live_set, m.glossary_live_set_desc],
+        [m.glossary_spent, m.glossary_spent_desc],
+        [m.glossary_board, m.glossary_board_desc],
+        [m.glossary_card_tray, m.glossary_card_tray_desc],
       ],
     },
     {
-      group: 'Machinery',
+      group: m.reference_machinery,
       terms: [
-        ['Sidecar', "Indexes and searches in the background; the status bar's first lamp"],
-        ['Embedder', 'Ollama with bge-m3, reading text for meaning; the second lamp'],
-        ['MCP', 'How an AI agent reaches the library and campaigns; the third lamp'],
-        ['Rack', "The main window's tools, laid out in views; 1–8 switch views"],
+        [m.glossary_sidecar, m.glossary_sidecar_desc],
+        [m.glossary_embedder, m.glossary_embedder_desc],
+        [m.glossary_mcp, m.glossary_mcp_desc],
+        [m.glossary_rack, m.glossary_rack_desc],
       ],
     },
   ];
 
   // The tools sidecar/mcp_server.py registers. Keep in step with it.
-  const MCP_TOOLS: { group: string; tools: [name: string, what: string][] }[] = [
+  const MCP_TOOLS: { group: Copy; tools: [name: string, what: Copy][] }[] = [
     {
-      group: 'Library',
+      group: m.reference_mcp_library,
       tools: [
-        ['search_library', 'Search by meaning, optionally within a source, game system or collection'],
-        ['get_section', 'Read a whole section from a search result'],
-        ['get_pages', 'Read up to 20 pages of a PDF as text'],
-        ['list_sources', 'List the indexed PDFs'],
-        ['list_collections', 'List the collections'],
-        ['list_game_systems', 'List the game systems in the library'],
+        ['search_library', m.mcp_search_library],
+        ['get_section', m.mcp_get_section],
+        ['get_pages', m.mcp_get_pages],
+        ['list_sources', m.mcp_list_sources],
+        ['list_collections', m.mcp_list_collections],
+        ['list_game_systems', m.mcp_list_game_systems],
       ],
     },
     {
-      group: 'Command · reads',
+      group: m.reference_mcp_reads,
       tools: [
-        ['campaign_overview', "The campaigns, then the open one's tracks, notes, beats and sessions"],
-        ['current_session', "A session's plan of beats, and what's live"],
-        ['live_set', 'The notes in play, in full'],
-        ['read_note', 'Read one note, with the hash an edit needs'],
-        ['find_notes', 'Find notes by name or text'],
+        ['campaign_overview', m.mcp_campaign_overview],
+        ['current_session', m.mcp_current_session],
+        ['live_set', m.mcp_live_set],
+        ['read_note', m.mcp_read_note],
+        ['find_notes', m.mcp_find_notes],
       ],
     },
     {
-      group: 'Command · writes',
+      group: m.reference_mcp_writes,
       tools: [
-        ['create_note', 'Write a new note on a track or the shelf, citing its book'],
-        ['edit_note', "Replace a note's text, keeping its frontmatter"],
-        ['create_track', 'Make a new track at the end of the tracks'],
-        ['move_note', 'Move a note to another track or the shelf'],
-        ['create_beat', 'Make a beat from notes, with its scene, optionally in a session'],
-        ['add_to_beat', 'Put a note in a beat, or take it out'],
-        ['create_session', 'Start the next session and open it in the app'],
-        ['set_active_session', 'Open a session in the app'],
-        ['plan_beat', "Put a beat in a session's plan, move it, or take it out"],
-        ['add_to_live_set', 'Put a note in play, or take it out'],
-        ['spend', 'Mark a note spent or unspent'],
+        ['create_note', m.mcp_create_note],
+        ['edit_note', m.mcp_edit_note],
+        ['create_track', m.mcp_create_track],
+        ['move_note', m.mcp_move_note],
+        ['create_beat', m.mcp_create_beat],
+        ['add_to_beat', m.mcp_add_to_beat],
+        ['create_session', m.mcp_create_session],
+        ['set_active_session', m.mcp_set_active_session],
+        ['plan_beat', m.mcp_plan_beat],
+        ['add_to_live_set', m.mcp_add_to_live_set],
+        ['spend', m.mcp_spend],
       ],
     },
     {
-      group: 'Command · board',
+      group: m.reference_mcp_board,
       tools: [
-        ['arrange_board', "Frame a session's planned beats on its board, as Arrange does"],
-        ['frame_cards', 'Gather notes into a named frame'],
-        ['connect_cards', "Draw a line between two notes' cards, with a label"],
-        ['add_text', 'Put a text card beside a note, or under the board'],
+        ['arrange_board', m.mcp_arrange_board],
+        ['frame_cards', m.mcp_frame_cards],
+        ['connect_cards', m.mcp_connect_cards],
+        ['add_text', m.mcp_add_text],
       ],
     },
   ];
@@ -96,22 +101,23 @@
 
 <div class="pane">
   <section class="block">
-    <h3 class="block-title section-title">Keyboard shortcuts</h3>
+    <h3 class="block-title section-title">{m.sheet_title()}</h3>
     <p class="block-desc">
-      Press <code class="kbd">?</code> outside a text field, or click the
-      keyboard key in the status bar, to see every shortcut.
+      <ParaglideMessage message={m.reference_shortcuts}>
+        {#snippet kbd({ children })}<code class="kbd">{@render children?.()}</code>{/snippet}
+      </ParaglideMessage>
     </p>
   </section>
 
   <section class="block">
-    <h3 class="block-title section-title">Glossary</h3>
+    <h3 class="block-title section-title">{m.reference_glossary()}</h3>
     {#each GLOSSARY as group (group.group)}
       <section class="tool-group">
-        <h4 class="tool-group-title ledger-label">{group.group}</h4>
+        <h4 class="tool-group-title ledger-label">{group.group()}</h4>
         <dl class="terms">
           {#each group.terms as [term, meaning] (term)}
-            <dt class="term">{term}</dt>
-            <dd class="what">{meaning}</dd>
+            <dt class="term">{term()}</dt>
+            <dd class="what">{meaning()}</dd>
           {/each}
         </dl>
       </section>
@@ -119,31 +125,25 @@
   </section>
 
   <section class="block">
-    <h3 class="block-title section-title">Game system keywords</h3>
+    <h3 class="block-title section-title">{m.reference_keywords()}</h3>
     <p class="block-desc">
-      A book gets a game system when one of that system's keywords appears in
-      its path (folders and filename) or, failing that, near the start of its
-      text. Case, spaces, accents and punctuation don't count, and
-      <em>&amp;</em> reads as <em>n</em>: <em>d&amp;d 5e</em>,
-      <em>dnd-5e</em> and <em>DnD 5E</em> all match. Keep keywords to four
-      characters or more; shorter ones turn up inside unrelated words.
+      <ParaglideMessage message={m.reference_keywords_desc}>
+        {#snippet em({ children })}<em>{@render children?.()}</em>{/snippet}
+      </ParaglideMessage>
     </p>
-    <p class="block-desc">Name a system in a search and its books come first.</p>
+    <p class="block-desc">{m.reference_keywords_search()}</p>
   </section>
 
   <section class="block">
-    <h3 class="block-title section-title">MCP tools</h3>
-    <p class="block-desc">
-      What an AI agent connected through MCP can do. Command tools work on the
-      campaign open in the app unless the agent names another.
-    </p>
+    <h3 class="block-title section-title">{m.reference_mcp()}</h3>
+    <p class="block-desc">{m.reference_mcp_desc()}</p>
     {#each MCP_TOOLS as group (group.group)}
       <section class="tool-group">
-        <h4 class="tool-group-title ledger-label">{group.group}</h4>
+        <h4 class="tool-group-title ledger-label">{group.group()}</h4>
         <dl class="tools">
           {#each group.tools as [name, what] (name)}
             <dt class="tool">{name}</dt>
-            <dd class="what">{what}</dd>
+            <dd class="what">{what()}</dd>
           {/each}
         </dl>
       </section>

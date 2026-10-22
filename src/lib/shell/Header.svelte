@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import LatchKey from '../ui/LatchKey.svelte';
+  import { m } from '../paraglide/messages';
   import { chord, chordHint } from './keybindings';
   import { holdsQuery, mentionAt, removeMention, searchText, viewFilter, type Mention } from './mention';
 
@@ -147,12 +148,12 @@
       <!-- Panel keys — hardware latches in their own well. Open is the
            raised fill the view switch uses (a view, not a mode); the LED
            under each icon is the only purple, and it answers for the mix. -->
-      <div class="panel-keys" role="group" aria-label="Panels">
+      <div class="panel-keys" role="group" aria-label={m.header_panels()}>
         <LatchKey
           open={panelOpen}
           lit={collectionsEngaged}
-          title={(panelOpen ? 'Hide collections panel' : 'Show collections panel') + chordHint('sidebar.toggle')}
-          label="Toggle collections panel"
+          title={(panelOpen ? m.header_collections_hide() : m.header_collections_show()) + chordHint('sidebar.toggle')}
+          label={m.header_collections_toggle()}
           onClick={onTogglePanel}
         >
           <!-- Font Awesome "gem" icon (src/lib/ui/icons/gem-solid-full.svg) -->
@@ -163,8 +164,8 @@
         <LatchKey
           open={filterPanelOpen}
           lit={filtersEngaged}
-          title={(filterPanelOpen ? 'Hide filter panel' : 'Show filter panel') + chordHint('filter.toggle')}
-          label="Toggle filter panel"
+          title={(filterPanelOpen ? m.header_filters_hide() : m.header_filters_show()) + chordHint('filter.toggle')}
+          label={m.header_filters_toggle()}
           onClick={onToggleFilterPanel}
         >
           <!-- Font Awesome "filter" icon (src/lib/ui/icons/filter-solid-full.svg) -->
@@ -179,14 +180,14 @@
            current segment sits on a raised fill instead of lighting purple.
            Repeating the tree action collapses the whole tree. While the
            search view is up the current segment dims and both act as exits. -->
-      <div class="view-switch" role="group" aria-label="Library view">
+      <div class="view-switch" role="group" aria-label={m.header_library_view()}>
         <button
           class="view-segment"
           class:current={viewMode === 'tree'}
           class:dimmed={searchViewOpen}
           on:click={() => (repeatsTree ? onCollapseAll() : onSetViewMode('tree'))}
-          title={repeatsTree ? `Tree view — again collapses all${chordHint('tree.collapseAll')}` : `Tree view${chordHint('view.toggle')}`}
-          aria-label="Tree view"
+          title={repeatsTree ? m.header_tree_view_again() + chordHint('tree.collapseAll') : m.header_tree_view() + chordHint('view.toggle')}
+          aria-label={m.header_tree_view()}
           aria-pressed={viewMode === 'tree'}
         >
           <!-- Font Awesome "folder-tree" icon (src/lib/ui/icons/folder-tree-solid-full.svg) -->
@@ -199,8 +200,8 @@
           class:current={viewMode === 'systems'}
           class:dimmed={searchViewOpen}
           on:click={() => { if (!repeatsSystems) onSetViewMode('systems'); }}
-          title={'Shelve by system' + chordHint('view.toggle')}
-          aria-label="Shelve by system"
+          title={m.header_shelve_by_system() + chordHint('view.toggle')}
+          aria-label={m.header_shelve_by_system()}
           aria-pressed={viewMode === 'systems'}
         >
           <!-- Font Awesome "layer-group" icon (src/lib/ui/icons/layer-group-solid-full.svg) -->
@@ -225,7 +226,7 @@
       bind:value={searchQuery}
       class="search-input"
       type="text"
-      placeholder="Search the library, @ a collection, / to filter…"
+      placeholder={m.header_search_placeholder()}
       {disabled}
       on:input={handleInput}
       on:keydown={handleKeydown}
@@ -233,7 +234,7 @@
       on:click={syncMention}
       on:focus={() => { focused = true; onFocus(); if (holdsQuery(searchQuery)) onQuery(); syncMention(); }}
       on:blur={() => { focused = false; syncMention(); }}
-      aria-label="Search library"
+      aria-label={m.header_search_label()}
     />
     <!-- One trailing slot, and a query outranks the hint: × shows whenever
          there is something to clear, focused or not, so a query left behind
@@ -246,7 +247,7 @@
         class="clear-btn"
         type="button"
         on:click={handleClear}
-        aria-label="Clear search"
+        aria-label={m.header_clear_search()}
       >&times;</button>
     {:else if !focused && !disabled}
       <span class="search-chord" aria-hidden="true">{chord('search.focus')}</span>

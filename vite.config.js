@@ -1,11 +1,18 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [sveltekit()],
+  plugins: [
+    // The app's copy: messages/{locale}.json, compiled into src/lib/paraglide
+    // (generated, git-ignored). `npm run messages` is the same compile for
+    // svelte-check and vitest, which run without this plugin.
+    paraglideVitePlugin({ project: "./project.inlang", outdir: "./src/lib/paraglide", strategy: ["baseLocale"] }),
+    sveltekit(),
+  ],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

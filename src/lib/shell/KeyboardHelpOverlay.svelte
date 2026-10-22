@@ -1,5 +1,6 @@
 <script lang="ts">
   import Modal from './Modal.svelte';
+  import { m } from '../paraglide/messages';
   import { focusPath } from './focus';
   import {
     KEYBINDINGS,
@@ -19,22 +20,22 @@
   // sheet reads the same every time. `modal` is omitted: those chords live
   // inside dialogs and aren't useful in a global cheat sheet.
   type SectionKey = 'window' | 'transport' | 'anyList' | 'llLists' | 'board' | KeyScope;
-  const SECTIONS: { key: SectionKey; label: string }[] = [
-    { key: 'window', label: 'Window' },
-    { key: 'transport', label: 'Transport, from anywhere' },
-    { key: 'searchInput', label: 'Search bar' },
-    { key: 'anyList', label: 'Any list' },
-    { key: 'llLists', label: 'Legend Lore lists' },
-    { key: 'fileTree', label: 'File tree' },
-    { key: 'systemsView', label: 'Systems view' },
-    { key: 'collections', label: 'Collections' },
-    { key: 'filterPanel', label: 'Filters' },
-    { key: 'searchResults', label: 'Search results' },
-    { key: 'command', label: 'Command' },
-    { key: 'commandPrep', label: 'Prep' },
-    { key: 'commandPlay', label: 'Play' },
-    { key: 'board', label: 'Board' },
-    { key: 'contextMenu', label: 'Menus' },
+  const SECTIONS: { key: SectionKey; label: () => string }[] = [
+    { key: 'window', label: m.sheet_window },
+    { key: 'transport', label: m.sheet_transport },
+    { key: 'searchInput', label: m.sheet_search_bar },
+    { key: 'anyList', label: m.sheet_any_list },
+    { key: 'llLists', label: m.sheet_legend_lore_lists },
+    { key: 'fileTree', label: m.sheet_file_tree },
+    { key: 'systemsView', label: m.sheet_systems_view },
+    { key: 'collections', label: m.sheet_collections },
+    { key: 'filterPanel', label: m.sheet_filters },
+    { key: 'searchResults', label: m.sheet_search_results },
+    { key: 'command', label: m.sheet_command },
+    { key: 'commandPrep', label: m.sheet_prep },
+    { key: 'commandPlay', label: m.sheet_play },
+    { key: 'board', label: m.sheet_board },
+    { key: 'contextMenu', label: m.sheet_menus },
   ];
 
   // Legend Lore's transport works from anywhere, so it is registered
@@ -54,12 +55,9 @@
   // What a section says in a line rather than a row: input syntax and a
   // modifier's behaviour are not chords. The keys they name are capped in
   // the line, marked with backticks.
-  const NOTES: Partial<Record<SectionKey, string[]>> = {
-    transport: ['Hold `S`, `M`, `P` or `B` rather than tapping it: on only while held.'],
-    searchInput: [
-      'Lead with `@` to pick a collection to play: `↵` plays it alone, `⇧↵` adds it to the mix.',
-      'Lead with `/` to filter the view by name: `↓` or `↵` jumps to the first match.',
-    ],
+  const NOTES: Partial<Record<SectionKey, (() => string)[]>> = {
+    transport: [m.sheet_note_hold],
+    searchInput: [m.sheet_note_mention, m.sheet_note_filter],
   };
   // Odd parts are the keys.
   const noteParts = (note: string): string[] => note.split('`');
@@ -80,7 +78,7 @@
       rows.push({ entry, scopes: [entry.scope] });
       continue;
     }
-    const key = `${entry.keys.mac}|${entry.keys.other}|${entry.label}`;
+    const key = `${entry.keys.mac}|${entry.keys.other}|${entry.label()}`;
     const row = merged.get(key);
     if (row) {
       row.scopes.push(entry.scope);
@@ -118,7 +116,7 @@
 <Modal
   {visible}
   {onClose}
-  title="Keyboard shortcuts"
+  title={m.sheet_title()}
   size="lg"
   height="min(640px, 80vh)"
   autofocus={false}
@@ -128,7 +126,7 @@
     <div class="legend-cols">
       {#each grouped as section (section.key)}
         <section class="lgroup" class:away={!section.rows.some(isLive)}>
-          <h3 class="ledger-label">{section.label}</h3>
+          <h3 class="ledger-label">{section.label()}</h3>
           <dl class="bindings">
             {#each section.rows as row (row.entry.id)}
               {@const keys = caps(row.entry.id)}
@@ -143,12 +141,12 @@
                   </span>
                 {/each}
               </dt>
-              <dd class="desc" class:away>{row.entry.label}</dd>
+              <dd class="desc" class:away>{row.entry.label()}</dd>
             {/each}
           </dl>
           {#each NOTES[section.key] ?? [] as note (note)}
             <p class="note">
-              {#each noteParts(note) as part, i (i)}
+              {#each noteParts(note()) as part, i (i)}
                 {#if i % 2}<span class="keycap">{part}</span>{:else}{part}{/if}
               {/each}
             </p>

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { m } from '../../paraglide/messages';
 
   export let dataDir: string = '';
   export let onOpenDataDir: () => void = () => {};
@@ -28,41 +29,38 @@
 <div class="pane">
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title section-title">About Unseen Servant</h3>
-      <p class="block-desc">
-        Local-first, AI-augmented toolkit for tabletop RPG Gamemasters.
-        Distributed by Unseen Servant Games.
-      </p>
+      <h3 class="block-title section-title">{m.about_title()}</h3>
+      <p class="block-desc">{m.about_desc()}</p>
     </header>
 
     <dl class="meta">
-      <dt class="meta-label readout-label">Version</dt>
+      <dt class="meta-label readout-label">{m.about_version()}</dt>
       <dd class="meta-value">{appVersion ? `v${appVersion}` : '—'}</dd>
 
-      <dt class="meta-label readout-label">Data directory</dt>
+      <dt class="meta-label readout-label">{m.about_data_dir()}</dt>
       <dd class="meta-value path-cell">
-        <span class="path" title={dataDir}>{dataDir || 'Resolving…'}</span>
+        <span class="path" title={dataDir}>{dataDir || m.about_resolving()}</span>
         <button
           type="button"
           class="btn-link"
           on:click={onOpenDataDir}
           disabled={!dataDir}
-        >reveal</button>
+        >{m.about_reveal()}</button>
       </dd>
     </dl>
   </section>
 
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title section-title">Links</h3>
+      <h3 class="block-title section-title">{m.about_links()}</h3>
     </header>
     <ul class="link-list">
       <li>
         <button class="btn-link" on:click={() => open(HOMEPAGE_URL)}>Unseen Servant</button>
-        <span class="link-desc">project homepage</span>
+        <span class="link-desc">{m.about_homepage()}</span>
       </li>
       <li>
-        <button class="btn-link" on:click={() => open(LICENSE_URL)}>software license</button>
+        <button class="btn-link" on:click={() => open(LICENSE_URL)}>{m.about_license()}</button>
         <span class="link-desc">Unseen Servant Games Software License</span>
       </li>
     </ul>
@@ -70,12 +68,12 @@
 
   <section class="block">
     <header class="block-head">
-      <h3 class="block-title section-title">Credits</h3>
+      <h3 class="block-title section-title">{m.about_credits()}</h3>
     </header>
     <ul class="link-list">
       <li>
         <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7.2.0</button>
-        <span class="link-desc">icons &copy; Fonticons, Inc. — CC BY 4.0</span>
+        <span class="link-desc">{m.about_icons()}</span>
       </li>
     </ul>
   </section>
