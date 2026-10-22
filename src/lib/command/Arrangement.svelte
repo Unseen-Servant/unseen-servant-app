@@ -91,9 +91,11 @@
       return true;
     }
     if (lk === 'p' || lk === ' ') {
-      // Space is the DAW's play/stop, as in Legend Lore's collections.
+      // Space is the DAW's play/stop, as in Legend Lore's collections. With
+      // no caret it takes the live beat, so it stops the set from anywhere
+      // in Play — the board, the folded player — as ⇧Space walks on from it.
       if (e.repeat) return true;
-      const beat = beats.find((b) => b.path === focused);
+      const beat = beats.find((b) => b.path === (focused ?? liveBeat));
       if (beat) toggle(beat);
       return true;
     }
