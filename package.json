@@ -17,6 +17,9 @@
     "test:watch": "npm run messages && vitest"
   },
   "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=22.12"
+  },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.1",
