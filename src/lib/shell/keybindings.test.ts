@@ -209,9 +209,9 @@ describe('keyShortcut', () => {
 
   test('a binding with no accelerator has no shortcut to assert', () => {
     // collections.* chords are shown as hints but are not live in that menu,
-    // nor is Command's R in its menus, and Reveal's ⌥⌘R carries a modifier
-    // eventMatchKey rejects — none of them may claim aria-keyshortcuts.
-    expect(keyShortcut('tree.openExternal')).toBe('');
+    // nor is Command's R in its menus, and the delete chord cannot round-trip
+    // through eventMatchKey — none of them may claim aria-keyshortcuts.
+    expect(keyShortcut('tree.delete')).toBe('');
     expect(keyShortcut('collections.rename')).toBe('');
     expect(keyShortcut('command.rename')).toBe('');
     expect(keyShortcut('collections.archive')).toBe('');
@@ -234,7 +234,7 @@ describe('isBareKeyChord', () => {
 
   test('a modifier chord is not bare — the glyph already reads as a key', () => {
     expect(isBareKeyChord('info.show')).toBe(false); // ⌘I / Ctrl+I
-    expect(isBareKeyChord('tree.openExternal')).toBe(false); // ⌥⌘R / Ctrl+Alt+R
+    expect(isBareKeyChord('tree.delete')).toBe(false); // ⌘⌫ / Del
   });
 
   test('a binding advertising several keys is not bare', () => {
@@ -251,8 +251,8 @@ describe('isBareKeyChord', () => {
     // length would frame itself on one platform and not the other. None of the
     // menu-rendered bindings may do that.
     const rendered = [
-      'info.show', 'tree.openExternal', 'tree.rename', 'tree.solo',
-      'tree.mute', 'tree.hide', 'tree.addToCollection', 'tree.delete',
+      'info.show', 'tree.rename', 'tree.solo',
+      'tree.mute', 'tree.hide', 'tree.delete',
       'collections.rename', 'collections.arm', 'collections.archive',
       'collections.play', 'collections.mute', 'collections.delete',
       'command.rename',

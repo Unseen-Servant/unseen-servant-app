@@ -290,7 +290,7 @@
       keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
       divider,
       keyed('Rename', 'command.rename', () => (renamingPath = beat.path)),
-      keyed('Show in Finder', 'command.reveal', () => onReveal(beat)),
+      action('Show in Finder', () => onReveal(beat)),
       keyed('Move to Trash', 'command.delete', () => onTrash(beat), true),
     ];
   }

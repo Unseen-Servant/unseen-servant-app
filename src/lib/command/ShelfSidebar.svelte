@@ -277,7 +277,7 @@
         : [],
       [
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
-        keyed('Show in Finder', 'command.reveal', () => onReveal(note)),
+        action('Show in Finder', () => onReveal(note)),
         keyed('Move to Trash', 'command.delete', () => onTrash(note), true),
       ],
     ].filter((g) => g.length);

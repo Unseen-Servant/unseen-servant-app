@@ -42,7 +42,7 @@
   const TRANSPORT = new Set([
     'collections.slot', 'collections.slotMix', 'collections.new',
     'sync.run', 'sync.commit', 'search.focus', 'filter.toggle',
-    'filter.toggleHidden', 'library.reveal', 'scope.bypass', 'scope.peek',
+    'scope.bypass',
   ]);
 
   const LISTS = new Set<KeyScope>([
@@ -50,6 +50,16 @@
     'commandPrep', 'commandPlay', 'contextMenu',
   ]);
   const COMMAND_LISTS = new Set<KeyScope>(['commandPrep', 'commandPlay']);
+
+  // What a section says in a line rather than a row: input syntax and a
+  // modifier's behaviour are not chords, so they carry no cap.
+  const NOTES: Partial<Record<SectionKey, string[]>> = {
+    transport: ['Hold S, M, P or B rather than tapping it: on only while held.'],
+    searchInput: [
+      'Lead with @ to pick a collection to play: ↵ plays it alone, ⇧↵ adds it to the mix.',
+      'Lead with / to filter the view by name: ↓ or ↵ jumps to the first match.',
+    ],
+  };
 
   // A chord that reads the same in two lists is one row, filed under the
   // lists it spans: "Any list" when Command's are among them, "Legend Lore
@@ -98,14 +108,8 @@
   $: live = liveScopes($focusPath);
   $: isLive = (row: Row) => row.scopes.some(s => live.has(s));
 
-  // One cap per alternative (`↓ / J` is two keys, not one), with the peek
-  // line's leading "hold" kept as a word rather than capped; its `S/M/P/B`
-  // is one cap, any of four keys, so the row stays one line.
-  function caps(id: string): { prefix: string; keys: string[] } {
-    const c = chord(id);
-    const prefix = c.startsWith('hold ') ? 'hold' : '';
-    return { prefix, keys: (prefix ? c.slice(5) : c).split(' / ') };
-  }
+  // One cap per alternative: `↓ / J` is two keys, not one.
+  const caps = (id: string): string[] => chord(id).split(' / ');
 </script>
 
 <Modal
@@ -124,22 +128,24 @@
           <h3 class="ledger-label">{section.label}</h3>
           <dl class="bindings">
             {#each section.rows as row (row.entry.id)}
-              {@const c = caps(row.entry.id)}
+              {@const keys = caps(row.entry.id)}
               {@const away = !isLive(row)}
               <dt class="keys" class:away>
-                <!-- Each cap carries its trailing slash (and the first, the
-                     "hold"), so a wrapped chord breaks after a slash. -->
-                {#each c.keys as key, i}
+                <!-- Each cap carries its trailing slash, so a wrapped chord
+                     breaks after a slash. -->
+                {#each keys as key, i}
                   <span class="alt">
-                    {#if i === 0 && c.prefix}<span class="word">{c.prefix}</span>{/if}
                     <span class="keycap" class:switch-key={row.entry.switch}>{key}</span>
-                    {#if i < c.keys.length - 1}<span class="word">/</span>{/if}
+                    {#if i < keys.length - 1}<span class="word">/</span>{/if}
                   </span>
                 {/each}
               </dt>
               <dd class="desc" class:away>{row.entry.label}</dd>
             {/each}
           </dl>
+          {#each NOTES[section.key] ?? [] as note (note)}
+            <p class="note">{note}</p>
+          {/each}
         </section>
       {/each}
     </div>
@@ -231,6 +237,14 @@
     font-size: 0.82rem;
     color: var(--text-secondary);
     line-height: 1.3;
+  }
+  /* A note reads a step under the labels: it is the section's aside, not
+     a row of it. */
+  .note {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    color: var(--text-tertiary);
   }
   .alt {
     display: inline-flex;

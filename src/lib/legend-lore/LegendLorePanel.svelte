@@ -2180,15 +2180,7 @@
     const lk = event.key.toLowerCase();
     const bareLetter = !meta && !event.shiftKey && !event.altKey;
 
-    // Cmd/Ctrl+O opens the file, which is what Cmd+O means everywhere. Reveal
-    // moves to Alt+Cmd+R, matching VS Code's "Reveal in Finder". event.code
-    // because Option rewrites event.key to a symbol on macOS layouts (⌥R → ®).
-    if (meta && event.altKey && event.code === 'KeyR') {
-      event.preventDefault();
-      revealItemInDir(focused.path);
-      return true;
-    }
-
+    // Cmd/Ctrl+O opens the file, which is what Cmd+O means everywhere.
     if (meta && !event.shiftKey && !event.altKey && lk === 'o') {
       event.preventDefault();
       if (!focused.item.is_dir) openPath(focused.path);
@@ -2251,7 +2243,6 @@
         holdLatch.press('m', () => toggleScopeMute(item));
         return true;
       }
-      if (lk === 'c') { event.preventDefault(); openContextMenuAtFocusedRow('collection'); return true; }
       if (event.key === '.' || event.code === 'NumpadDecimal') {
         event.preventDefault();
         toggleHidden(focused.item);
@@ -2356,20 +2347,6 @@
     // Not from the note editor, where ⌘F means find.
     if (meta && !event.shiftKey && !event.altKey && lk === 'f' && selectedFolder && !ctx.editor) {
       void surface().then(toggleFilterPanel);
-      return true;
-    }
-
-    // Cmd/Ctrl+Shift+.: toggle "Show hidden" (Finder convention).
-    if (meta && event.shiftKey && !event.altKey && (event.key === '.' || event.key === '>') && selectedFolder) {
-      void surface().then(toggleShowHidden);
-      return true;
-    }
-
-    // Cmd/Ctrl+Shift+O: reveal the library root folder in the OS file
-    // explorer (same handler the status-bar folder button calls). Skipped
-    // when an input has focus.
-    if (meta && event.shiftKey && !event.altKey && lk === 'o' && selectedFolder && !ctx.typing) {
-      revealItemInDir(selectedFolder);
       return true;
     }
 

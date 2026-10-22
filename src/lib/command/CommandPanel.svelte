@@ -442,12 +442,6 @@
         trashNote(entry, selectedBeat ? 'Beat' : 'Note');
         return true;
       }
-      // ⌥⌘R reveals the selection in the OS file explorer. event.code:
-      // Option rewrites event.key to a symbol on macOS layouts.
-      if (mod && e.altKey && !e.shiftKey && e.code === 'KeyR' && entry) {
-        reveal(entry.path);
-        return true;
-      }
       // ⇧F10 / Menu: the selection's menu, from whichever list shows it.
       if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && selected) {
         for (const list of [grid, shelf, beats]) if (list?.menuFor(selected)) return true;

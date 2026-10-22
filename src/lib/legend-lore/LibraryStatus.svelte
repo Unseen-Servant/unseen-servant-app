@@ -60,7 +60,7 @@
     <span>{selectedCount} book{selectedCount === 1 ? '' : 's'} selected</span>
   {/if}
   <span class="rule" aria-hidden="true"></span>
-  <button class="icon-btn" on:click={onOpenFolder} aria-label="Reveal library folder" title={`Reveal library folder${chordHint('library.reveal')}`}>
+  <button class="icon-btn" on:click={onOpenFolder} aria-label="Reveal library folder" title="Reveal library folder">
     <svg class="btn-icon" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
       <path class="folder-shut" d={FOLDER}/>
       <path class="folder-opened" d={FOLDER_OPEN}/>

@@ -69,7 +69,22 @@
   // (keys.ts), after the board's.
   function playerKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
     if (menu || ctx.menu || ctx.typing) return false;
-    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    // ⇧Space launches the next beat: J then P as one key for the table.
+    // Next after the focused beat, else after the live one, else the
+    // plan's first — over the whole plan, so it walks on while the player
+    // is folded down to the live beat and J/K have only that row.
+    if (e.shiftKey && e.key === ' ') {
+      if (e.repeat) return true;
+      const all = rows.flatMap((r) => (r.beat ? [r.beat] : []));
+      const next = all[all.findIndex((b) => b.path === (focused ?? liveBeat)) + 1];
+      if (next) {
+        focused = next.path;
+        if (next.path !== liveBeat) onLaunch(next);
+      }
+      return true;
+    }
+    if (e.shiftKey) return false;
     const lk = e.key.toLowerCase();
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || lk === 'j' || lk === 'k') {
       step(e.key === 'ArrowDown' || lk === 'j' ? 1 : -1);

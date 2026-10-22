@@ -206,7 +206,7 @@
         ]),
         divider,
         keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
-        keyed('Show in Finder', 'command.reveal', () => onRevealNote(note)),
+        action('Show in Finder', () => onRevealNote(note)),
         keyed('Move to Trash', 'command.delete', () => onTrashNote(note), true),
       ],
     };

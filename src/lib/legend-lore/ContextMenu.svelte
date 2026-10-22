@@ -379,13 +379,8 @@
       <span class="menu-chord" class:bare={isBareKeyChord('tree.open')} aria-hidden="true">{chord('tree.open')}</span>
     </button>
   {/if}
-  <!-- Reveal shows its chord but does not claim it: ⌥⌘R carries a modifier
-       eventMatchKey deliberately rejects, so it isn't dispatchable from an open
-       menu. Display-only, like the Collections rows — no data-chord, and no
-       aria-keyshortcuts promising something this row won't honour. -->
   <button class="menu-row" data-mi="item" role="menuitem" on:click={onReveal}>
     Reveal in folder
-    <span class="menu-chord" class:bare={isBareKeyChord('tree.openExternal')} aria-hidden="true">{chord('tree.openExternal')}</span>
   </button>
   <!-- Get info rides with the other two ways of looking at the file; its
        sibling Re-index is an action and sits down with Rename. -->
@@ -457,14 +452,12 @@
       class:open={openSubmenu === 'collection'}
       data-mi="submenu-trigger"
       data-submenu="collection"
-      data-chord={matchKey('tree.addToCollection')} aria-keyshortcuts={keyShortcut('tree.addToCollection')}
       role="menuitem"
       tabindex="-1"
       aria-haspopup="menu"
       aria-expanded={openSubmenu === 'collection'}
     >
       <span>Collection</span>
-      <span class="menu-chord" class:bare={isBareKeyChord('tree.addToCollection')} aria-hidden="true">{chord('tree.addToCollection')}</span>
       <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if openSubmenu === 'collection'}
         <div class="submenu" role="menu">
@@ -593,11 +586,6 @@
     font-size: 0.7rem;
     opacity: 0.6;
     margin-left: auto;
-  }
-  /* The chord already claims the row's free space; a second auto margin
-     would split it and strand the chord mid-row. */
-  .menu-chord + .submenu-caret {
-    margin-left: 0;
   }
   .submenu-icon {
     width: 11px;

@@ -78,19 +78,14 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'sync.commit',           keys: { mac: '⌘S',   other: 'Ctrl+S' },        label: 'Sync the ticked files', scope: 'global' },
   { id: 'search.focus',          keys: { mac: '⌘K',   other: 'Ctrl+K' },        label: 'Search', scope: 'global' },
   { id: 'filter.toggle',         keys: { mac: '⌘F',   other: 'Ctrl+F' },        label: 'Filters panel', scope: 'global' },
-  { id: 'filter.toggleHidden',   keys: { mac: '⌘⇧.',  other: 'Ctrl+Shift+.' },  label: 'Show hidden items', scope: 'global' },
-  { id: 'library.reveal',        keys: { mac: '⌘⇧O',  other: 'Ctrl+Shift+O' },  label: 'Reveal the library on disk', scope: 'global' },
   { id: 'scope.bypass',          keys: { mac: 'B',    other: 'B' },             label: 'Bypass the scope console', scope: 'global', switch: true },
   // Not a chord of its own — one line teaching the idiom every transport
   // key shares, so the sheet doesn't have to repeat it on eight labels.
-  { id: 'scope.peek',            keys: { mac: 'hold S/M/P/B', other: 'hold S/M/P/B' }, label: 'Hold: on only while held', scope: 'global' },
   { id: 'help.overlay',          keys: { mac: '? / ⌘/', other: '? / Ctrl+/' },  label: 'This sheet', scope: 'global' },
   { id: 'app.escape',            keys: { mac: 'Esc',  other: 'Esc' },           label: 'Cancel, close, step back', scope: 'global' },
 
   // Search input
   { id: 'search.submit',         keys: { mac: '↵',    other: 'Enter' },         label: 'Search; focus on the first result', scope: 'searchInput' },
-  { id: 'search.mention',        keys: { mac: '@',    other: '@' },             label: 'Play a collection: ↵ alone, ⇧↵ into the mix', scope: 'searchInput' },
-  { id: 'search.filter',         keys: { mac: '/',    other: '/' },             label: 'Filter by name; ↵ to the first match', scope: 'searchInput' },
   { id: 'search.intoBrowse',     keys: { mac: '↓',    other: '↓' },             label: 'Down into the view', scope: 'searchInput' },
   { id: 'search.exit',           keys: { mac: 'Esc',  other: 'Esc' },           label: 'Leave the search', scope: 'searchInput' },
 
@@ -108,12 +103,10 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.open',             keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: 'Open the file', scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: 'Rename', scope: 'fileTree', match: 'r' },
   { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Move to Trash', scope: 'fileTree' },
-  { id: 'tree.openExternal',     keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal on disk', scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: "Open the row's menu", scope: 'fileTree' },
   { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: 'Solo: search only this', scope: 'fileTree', match: 's', switch: true },
   { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: 'Mute: drop from search', scope: 'fileTree', match: 'm', switch: true },
   { id: 'tree.hide',             keys: { mac: '.',    other: '.' },             label: 'Hide, or unhide', scope: 'fileTree', match: '.' },
-  { id: 'tree.addToCollection',  keys: { mac: 'C',    other: 'C' },             label: 'Add to a collection, from a menu', scope: 'fileTree', match: 'c' },
   { id: 'info.show',             keys: { mac: '⌘I',   other: 'Ctrl+I' },        label: 'Show info', scope: 'fileTree', match: 'meta+i' },
 
   // Systems view (when a row is focused)
@@ -174,7 +167,6 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.arm',           keys: { mac: 'E',    other: 'E' },             label: 'Arm, or disarm, the beat', scope: 'commandPrep', switch: true },
   { id: 'command.tick',          keys: { mac: 'X',    other: 'X' },             label: 'Into the armed beat, or out of it', scope: 'commandPrep' },
   { id: 'command.delete',        keys: { mac: '⌘⌫',   other: 'Del' },           label: 'Move to Trash', scope: 'commandPrep' },
-  { id: 'command.reveal',        keys: { mac: '⌥⌘R',  other: 'Ctrl+Alt+R' },    label: 'Reveal on disk', scope: 'commandPrep' },
   { id: 'command.contextMenu',   keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: "Open the row's menu", scope: 'commandPrep' },
   // Prep's lists — the shelf, the tracks, the beats — are its regions:
   // the arrows step the one the selection is in, or the one last clicked
@@ -203,6 +195,8 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.next',          keys: { mac: '↓ / J', other: '↓ / J' },        label: 'Down a row', scope: 'commandPlay' },
   { id: 'command.prev',          keys: { mac: '↑ / K', other: '↑ / K' },        label: 'Up a row', scope: 'commandPlay' },
   { id: 'command.play',          keys: { mac: 'P / Space', other: 'P / Space' }, label: 'Launch, or stop, the beat', scope: 'commandPlay', switch: true },
+  { id: 'command.nextBeat',      keys: { mac: '⇧Space', other: 'Shift+Space' }, label: 'Launch the next beat', scope: 'commandPlay' },
+  { id: 'command.playerOpen',    keys: { mac: '↵',     other: 'Enter' },         label: 'Open the beat in the inspector', scope: 'commandPlay' },
   // In Play, on the board: the toolbar's tools on Miro's letters (board
   // toolbar design §3.5). A tool that makes something hands back to Select.
   { id: 'command.boardSelect',   keys: { mac: 'V',    other: 'V' },             label: 'Select and move cards', scope: 'commandPlay' },
@@ -217,6 +211,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.boardUndo',     keys: { mac: '⌘Z',   other: 'Ctrl+Z' },        label: 'Undo', scope: 'commandPlay' },
   { id: 'command.boardRedo',     keys: { mac: '⇧⌘Z',  other: 'Ctrl+Shift+Z' },  label: 'Redo', scope: 'commandPlay' },
   { id: 'command.boardDuplicate', keys: { mac: '⌘D',  other: 'Ctrl+D' },        label: 'Duplicate the selection', scope: 'commandPlay' },
+  { id: 'command.boardDelete',   keys: { mac: '⌫',    other: 'Backspace / Del' }, label: 'Delete the selected cards', scope: 'commandPlay' },
   { id: 'command.boardFitAll',   keys: { mac: '⌥1',   other: 'Alt+1' },         label: 'Fit the whole board', scope: 'commandPlay' },
   { id: 'command.boardFitSelection', keys: { mac: '⌥2', other: 'Alt+2' },      label: 'Fit the selection', scope: 'commandPlay' },
   { id: 'command.boardFitLive',  keys: { mac: '⌥3',   other: 'Alt+3' },         label: 'Fit the live cards', scope: 'commandPlay' },
