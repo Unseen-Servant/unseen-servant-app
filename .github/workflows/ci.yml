@@ -61,7 +61,8 @@ jobs:
               - 'package-lock.json'
               - '.stylelintrc.json'
               - 'svelte.config.js'
-              - 'vite.config.ts'
+              - 'vite.config.js'
+              - 'vitest.config.ts'
               - 'tsconfig.json'
 
   # Pure Python tests against a temp-dir library store. Fast,
