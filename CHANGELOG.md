@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+Each release opens with one paragraph that says what the release is for. Under
+it, one line per change: a bold lead and one clause, in the voice of the release
+notes. The how-to belongs in Help → Guides, not here.
+
 ## [Unreleased]
 
 ## [4.1.0] - 2026-10-21

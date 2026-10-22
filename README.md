@@ -140,5 +140,5 @@ The AGPL covers the code, not the Unseen Servant name or logo: they are
 trademarks of Unseen Servant Games (AGPL §7(e)), so a fork must use its own
 name and logo.
 
-Contributions require the [Contributor License Agreement](CLA.md); the CLA
-Assistant bot asks you to sign it on your first pull request.
+The project is not taking code contributions yet; bug reports are welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md).

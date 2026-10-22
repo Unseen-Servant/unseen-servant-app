@@ -1,30 +1,25 @@
 # Contributing to Unseen Servant
 
-Thank you for helping. Unseen Servant is open so you can read it, fix it, run it
-on your machine and build on it, but it has one designer, and its direction
-stays with its maintainer. That decides which help goes furthest.
+Unseen Servant is published so you can read it, build it and run it. It is not
+taking code contributions yet: the design is still moving fast, and reviewing
+patches costs more than it saves at this stage. Bug reports are welcome and
+read. Pull requests will be closed with thanks until this changes.
 
 ## What helps most
 
-- **Bug reports:** crashes, wrong results, anything that broke after an update.
-- **Stability fixes:** hangs, failed launches, state that doesn't survive a
-  restart.
-- **Portability:** Windows, Intel Macs, Linux, odd PDFs, network shares, slow
-  disks. The maintainer works on an Apple Silicon Mac, CI runs on Linux, and
-  macOS and Windows builds happen only at release, so your platform catches
-  what nothing else does.
-- **Performance** on large libraries, from hundreds to thousands of PDFs.
+Reports from machines and libraries the maintainer doesn't have:
 
-## What needs a conversation first
+- Crashes, wrong results, anything that broke after an update.
+- Windows, Intel Macs, Linux, odd PDFs, network shares, slow disks. The
+  maintainer works on an Apple Silicon Mac, CI runs on Linux, and macOS and
+  Windows builds happen only at release, so your platform catches what nothing
+  else does.
+- Performance on large libraries, from hundreds to thousands of PDFs.
 
-New features, interface or design changes, and new dependencies. Open an issue
-that describes the problem before writing code. Most feature ideas will be
-declined to keep the tool small, and a pull request that arrives unannounced
-may be closed without review. That's no judgement on the work.
+Feature ideas go in an issue that describes the problem, not the solution. Most
+will be declined to keep the tool small, and two things won't change:
 
-Two rules aren't up for discussion:
-
-- **Local-first.** Indexing and search run on the user's machine. No change may
+- **Local-first.** Indexing and search run on the user's machine. Nothing may
   make them depend on a remote service; downloading a model once is the only
   exception.
 - **Plain files.** Campaigns stay Markdown and JSON Canvas that other tools can
@@ -46,11 +41,10 @@ issue.
 
 ## Contributor License Agreement
 
-Before your first pull request can merge, you sign the
-[Contributor License Agreement](CLA.md). The CLA Assistant bot asks for it on
-the pull request, and once covers every later contribution. You keep the
-copyright in your work; the agreement lets Unseen Servant Games license it,
-including under terms other than the AGPL.
+When code contributions open, they will come with a contributor licence
+agreement: you keep the copyright in your work and license it to Unseen Servant
+Games, including under terms other than the AGPL. There is nothing to sign
+today.
 
 ## Build from source
 
@@ -146,12 +140,3 @@ app:
 ```bash
 uv run --frozen --project sidecar --group build python scripts/acknowledgements.py
 ```
-
-## Pull requests
-
-- One fix per pull request, kept small. Say what was broken, how you tested the
-  fix, and on which OS.
-- Match the code around your change. Interface changes follow the design
-  conventions in [AGENTS.md](AGENTS.md).
-- Commit messages follow the history's style: `fix(sidecar): …`,
-  `feat(command): …`.
