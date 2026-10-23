@@ -8,7 +8,6 @@
   export let onOpenDataDir: () => void = () => {};
 
   const HOMEPAGE_URL = 'https://unseenservant.games';
-  const LICENSE_URL = 'https://unseenservant.games/license';
   const FONTAWESOME_LICENSE_URL = 'https://fontawesome.com/license/free';
 
   let appVersion = '';
@@ -25,10 +24,10 @@
     openUrl(url).catch(() => {});
   }
 
-  // Bundled beside LICENSE (tauri.conf.json resources), written by
-  // scripts/acknowledgements.py.
-  function openAcknowledgements() {
-    resolveResource('ACKNOWLEDGEMENTS.txt').then(openPath).catch(() => {});
+  // Both bundled as tauri.conf.json resources; ACKNOWLEDGEMENTS.txt is
+  // written by scripts/acknowledgements.py.
+  function openResource(name: string) {
+    resolveResource(name).then(openPath).catch(() => {});
   }
 </script>
 
@@ -69,7 +68,7 @@
         <span class="link-desc">project homepage</span>
       </li>
       <li>
-        <button class="btn-link" on:click={() => open(LICENSE_URL)}>software license</button>
+        <button class="btn-link" on:click={() => openResource('LICENSE.txt')}>software license</button>
         <span class="link-desc">GNU AGPL v3.0 or later</span>
       </li>
     </ul>
@@ -81,11 +80,11 @@
     </header>
     <ul class="link-list">
       <li>
-        <button class="btn-link" on:click={openAcknowledgements}>acknowledgements</button>
+        <button class="btn-link" on:click={() => openResource('ACKNOWLEDGEMENTS.txt')}>acknowledgements</button>
         <span class="link-desc">third-party software and its licences</span>
       </li>
       <li>
-        <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7.2.0</button>
+        <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7</button>
         <span class="link-desc">icons &copy; Fonticons, Inc. — CC BY 4.0</span>
       </li>
     </ul>

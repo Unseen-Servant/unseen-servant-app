@@ -56,7 +56,7 @@
       "entitlements": "entitlements.plist"
     },
     "resources": {
-      "../LICENSE": "LICENSE",
+      "../LICENSE": "LICENSE.txt",
       "../ACKNOWLEDGEMENTS.txt": "ACKNOWLEDGEMENTS.txt"
     },
     "externalBin": [
