@@ -41,6 +41,10 @@ FONT_AWESOME = (
     "Font Awesome Free 7 icons, by Fonticons, Inc. "
     "CC BY 4.0, https://fontawesome.com/license/free"
 )
+MCP_LOGO = (
+    "Model Context Protocol logo, by the MCP project. MIT, "
+    "https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg"
+)
 
 
 def licence_files(directory: Path) -> list[Path]:
@@ -183,6 +187,7 @@ def main() -> None:
         f"  Crimson Text  OFL-1.1  {refs('Crimson Text', [fonts])}",
         f"  Almendra  OFL-1.1  {refs('Almendra', [fonts])}",
         f"  {FONT_AWESOME}",
+        f"  {MCP_LOGO}",
         "",
         *section("Bundled Python interpreter", [python_interpreter()]),
         *section("Rust crates (the app)", rust_crates()),

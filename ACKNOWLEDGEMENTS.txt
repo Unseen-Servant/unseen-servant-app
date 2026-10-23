@@ -12,6 +12,7 @@ Fonts and icons
   Crimson Text  OFL-1.1  [1]
   Almendra  OFL-1.1  [1]
   Font Awesome Free 7 icons, by Fonticons, Inc. CC BY 4.0, https://fontawesome.com/license/free
+  Model Context Protocol logo, by the MCP project. MIT, https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg
 
 Bundled Python interpreter
 

@@ -9,6 +9,7 @@
 
   const HOMEPAGE_URL = 'https://unseenservant.games';
   const FONTAWESOME_LICENSE_URL = 'https://fontawesome.com/license/free';
+  const MCP_LOGO_URL = 'https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg';
 
   let appVersion = '';
 
@@ -86,6 +87,10 @@
       <li>
         <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7</button>
         <span class="link-desc">icons &copy; Fonticons, Inc. — CC BY 4.0</span>
+      </li>
+      <li>
+        <button class="btn-link" on:click={() => open(MCP_LOGO_URL)}>Model Context Protocol logo</button>
+        <span class="link-desc">MCP project — MIT</span>
       </li>
     </ul>
   </section>
