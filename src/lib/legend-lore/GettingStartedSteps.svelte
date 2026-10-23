@@ -1,6 +1,9 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
   import ReadyTag from '../shell/help/ReadyTag.svelte';
+  import { m } from '../paraglide/messages';
 
   export let sidecarConnected: boolean = true;
   export let ollamaRunning: boolean = false;
@@ -11,10 +14,10 @@
 
   // What the Ollama lamp means in words (ReadyTag).
   const OLLAMA_STATE = {
-    unknown: "Unknown: the sidecar isn't running",
-    ready: 'Ready',
-    model: 'Model missing',
-    missing: 'Not detected',
+    unknown: m.lore_start_ollama_unknown,
+    ready: m.lore_start_ready,
+    model: m.lore_start_ollama_model,
+    missing: m.lore_start_ollama_missing,
   };
 
   // Ollama is probed through the sidecar: with the sidecar down its state is
@@ -29,6 +32,9 @@
         : 'missing';
 </script>
 
+{#snippet em({ children }: { children?: Snippet })}<em>{@render children?.()}</em>{/snippet}
+{#snippet strong({ children }: { children?: Snippet })}<strong>{@render children?.()}</strong>{/snippet}
+
 <!-- Each step leads with what to do; its lamp reads the live state. -->
 <div class="manual">
   <section class="field">
@@ -37,19 +43,17 @@
       <ReadyTag
         lit={ollamaState === 'ready'}
         half={ollamaState === 'model'}
-        state={OLLAMA_STATE[ollamaState]}
+        state={OLLAMA_STATE[ollamaState]()}
       />
     </div>
     <p class="field-desc">
-      Runs the model that lets search find passages by meaning, on this
-      machine.
+      {m.lore_start_ollama_desc()}
       {#if ollamaState === 'unknown'}
-        The sidecar isn't running, so Ollama can't be checked. Quit Unseen
-        Servant and open it again.
+        {m.lore_start_ollama_desc_unknown()}
       {:else if ollamaState === 'missing'}
-        Install Ollama and open it.
+        {m.lore_start_ollama_desc_missing()}
       {:else if ollamaState === 'model'}
-        Pull its model once, in a terminal:
+        {m.lore_start_ollama_desc_model()}
       {/if}
     </p>
     {#if ollamaState === 'missing'}
@@ -61,56 +65,34 @@
 
   <section class="field">
     <div class="field-title-row">
-      <h3 class="field-title section-title">Library folder</h3>
-      <ReadyTag lit={folderSelected} state={folderSelected ? 'Ready' : 'No folder chosen'} />
+      <h3 class="field-title section-title">{m.lore_start_folder()}</h3>
+      <ReadyTag lit={folderSelected} state={folderSelected ? m.lore_start_ready() : m.lore_start_folder_none()} />
     </div>
-    <p class="field-desc">
-      The folder that holds your PDFs. They are read where they are, nothing
-      is uploaded or copied, and subfolders become the tree. Rename books and
-      folders here (<strong>R</strong>) to keep their index; outside the app,
-      a moved book or a renamed folder has to be indexed again.
-    </p>
-    <p class="field-desc">
-      Images in it (maps, handouts) show in the tree too, never indexed:
-      right-click one and <em>Send to Command</em> copies it into the open
-      campaign. <em>Hide images</em> in the filters takes them out of the
-      tree.
-    </p>
+    <p class="field-desc"><ParaglideMessage message={m.lore_start_folder_desc} {strong} /></p>
+    <p class="field-desc"><ParaglideMessage message={m.lore_start_folder_images} {em} /></p>
     {#if !folderSelected}
-      <button class="btn-link" on:click={onSelectFolder}>choose folder</button>
+      <button class="btn-link" on:click={onSelectFolder}>{m.lore_start_choose_folder()}</button>
     {/if}
   </section>
 
   <section class="field">
     <div class="field-title-row">
-      <h3 class="field-title section-title">Index</h3>
-      <ReadyTag lit={filesIndexed} state={filesIndexed ? 'Ready' : 'Nothing indexed yet'} />
+      <h3 class="field-title section-title">{m.lore_start_index()}</h3>
+      <ReadyTag lit={filesIndexed} state={filesIndexed ? m.lore_start_ready() : m.lore_start_index_none()} />
     </div>
-    <p class="field-desc">
-      Tick books or folders in the tree; the status bar then offers
-      <em>sync</em> (<strong>&#8984;S</strong>). Later syncs index only the
-      books that changed.
-    </p>
+    <p class="field-desc"><ParaglideMessage message={m.lore_start_index_desc} {em} {strong} /></p>
   </section>
 
   <section class="field">
     <div class="field-title-row">
       <h3 class="field-title section-title">
-        Collections <span class="opt">(optional)</span>
+        <ParaglideMessage message={m.lore_start_collections}>
+          {#snippet opt({ children })}<span class="opt">{@render children?.()}</span>{/snippet}
+        </ParaglideMessage>
       </h3>
     </div>
-    <p class="field-desc">
-      Named sets of books. Play one (&#9654; or <strong>P</strong>) and search
-      covers only its books; play several to search them together. Without a
-      collection, solo (<strong>S</strong>) or mute (<strong>M</strong>) books
-      and folders in the tree.
-    </p>
-    <p class="field-desc">
-      <strong>&#8984;N</strong> starts one, armed (&#9679;): click books in the
-      tree to file them in it, then disarm it with its &#9679; or
-      <strong>E</strong>. Dropping a book or folder on a collection files it
-      too.
-    </p>
+    <p class="field-desc"><ParaglideMessage message={m.lore_start_collections_desc} {strong} /></p>
+    <p class="field-desc"><ParaglideMessage message={m.lore_start_collections_arm} {strong} /></p>
   </section>
 </div>
 

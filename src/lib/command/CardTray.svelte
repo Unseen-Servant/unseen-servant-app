@@ -12,6 +12,7 @@
   import { CARET_RIGHT } from '../ui/iconPaths';
   import CardFace from './CardFace.svelte';
   import { handStep, type Card, type CardData } from './board';
+  import { m } from '../paraglide/messages';
 
   /** The hand: the board's cards for the live set (handOf). */
   export let cards: Card[];
@@ -97,12 +98,12 @@
   }
 </script>
 
-<section class="tray" aria-label="Card tray">
+<section class="tray" aria-label={m.command_tray_label()}>
   <div class="nameplate">
     <!-- The plate's label is the fold's key, as the session player's is. -->
     <button type="button" class="fold" aria-expanded={open} on:click={() => (open = !open)}>
       <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-      <span class="ledger-label">in play</span>
+      <span class="ledger-label">{m.command_tray_title()}</span>
     </button>
     <span class="row-count">{cards.length}</span>
     {#if open}
@@ -112,9 +113,9 @@
         type="button"
         class="plate-btn"
         disabled={!picked.length}
-        title={spread ? 'Put the cards back in the hand' : 'Lay the picked cards side by side'}
+        title={spread ? m.command_tray_deselect_title() : m.command_tray_select_title()}
         on:click={() => (selecting = !spread)}
-      >{spread ? 'deselect' : 'select'}</button>
+      >{spread ? m.command_tray_deselect() : m.command_tray_select()}</button>
     {:else}
       <!-- Folded: a nameplate per card in its track's pigment, as Prep's
            track plates wear it. -->

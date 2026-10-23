@@ -43,6 +43,7 @@
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
   import { beatGroups, memberPaths, planRows, sessionNotePaths } from './prep';
   import type { BeatEntry, BoardOp, BoardView, CampaignIndex, LiveSet, NoteEntry, SessionEntry } from './types';
+  import { m } from '../paraglide/messages';
 
   export let active: boolean;
   export let campaign: string;
@@ -261,11 +262,9 @@
    *  board is shown. */
   async function arrange() {
     const go = await confirmPrompt.request({
-      title: 'Arrange by beat',
-      message:
-        'Each planned beat gets a frame, in plan order, with its notes in it; notes several beats share go in Throughout. ' +
-        `Your other cards stay where they are, and ${chord('command.boardUndo')} puts it all back.`,
-      confirmLabel: 'Arrange',
+      title: m.command_play_arrange_title(),
+      message: m.command_play_arrange_message({ frame: 'Throughout', undo: chord('command.boardUndo') }),
+      confirmLabel: m.command_play_arrange_confirm(),
     });
     if (!go) return;
     void run(async () => {
@@ -457,22 +456,22 @@
       const playing = liveNotes.has(note.path);
       const image = note.type === 'image';
       items.push(
-        action(image ? 'Show image' : 'Edit note', () => onEdit(note.path)),
-        action(playing ? 'Take out of play' : 'Play', () => setLive(note.path, !playing)),
+        action(image ? m.command_play_show_image() : m.command_play_edit_note(), () => onEdit(note.path)),
+        action(playing ? m.command_play_take_out() : m.command_play_play(), () => setLive(note.path, !playing)),
       );
       // An image isn't spent (images design §2).
-      if (!image) items.push(keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)));
+      if (!image) items.push(keyed(note.spent ? m.command_play_mark_unspent() : m.command_play_mark_spent(), 'command.spend', () => onSpent(note, !note.spent)));
       const source = note.source;
-      if (source) items.push(action('Open source', () => void openUrl(source).catch(() => {})));
+      if (source) items.push(action(m.command_play_open_source(), () => void openUrl(source).catch(() => {})));
     }
-    if (card.kind === 'text') items.push(action('Edit text', () => (editing = card.id)));
-    if (card.kind === 'group') items.push(action('Rename frame', () => (editing = card.id)));
+    if (card.kind === 'text') items.push(action(m.command_play_edit_text(), () => (editing = card.id)));
+    if (card.kind === 'group') items.push(action(m.command_play_rename_frame(), () => (editing = card.id)));
     if (card.kind === 'text' || card.kind === 'group') {
-      items.push(keyed('Duplicate', 'command.boardDuplicate', () => board?.duplicate([card.id])));
+      items.push(keyed(m.command_play_duplicate(), 'command.boardDuplicate', () => board?.duplicate([card.id])));
     }
     if (card.placed && removable(card)) {
       if (items.length) items.push(divider);
-      const label = card.kind === 'group' ? 'Remove frame' : 'Remove from board';
+      const label = card.kind === 'group' ? m.command_play_remove_frame() : m.command_play_remove_card();
       items.push(action(label, () => apply([{ op: 'remove', id: card.id }]), true));
     }
     if (items.length) menu = { x: e.clientX, y: e.clientY, items };
@@ -483,9 +482,9 @@
       x: e.clientX,
       y: e.clientY,
       items: [
-        action('Label', () => (editing = id)),
+        action(m.command_play_line_label(), () => (editing = id)),
         divider,
-        action('Remove line', () => apply([{ op: 'remove', id }]), true),
+        action(m.command_play_remove_line(), () => apply([{ op: 'remove', id }]), true),
       ],
     };
   }
@@ -579,8 +578,8 @@
       <LatchKey
         open={expanded}
         lit={expanded}
-        title={(expanded ? 'Back to the normal view' : 'Expand the board to fill the view') + chordHint('command.boardFill')}
-        label={expanded ? 'Leave the expanded board' : 'Expand the board'}
+        title={(expanded ? m.command_play_expand_back() : m.command_play_expand_title()) + chordHint('command.boardFill')}
+        label={expanded ? m.command_play_expand_leave() : m.command_play_expand()}
         onClick={() => onExpand(!expanded)}
       >
         <!-- Font Awesome "up-right-and-down-left-from-center" icon
@@ -613,16 +612,16 @@
         rows="1"
         bind:this={jotEl}
         bind:value={jot}
-        placeholder="Write to session notes…"
-        aria-label="Add a line to the session note"
+        placeholder={m.command_play_jot_placeholder()}
+        aria-label={m.command_play_jot_label()}
         spellcheck="false"
         on:keydown={jotKey}
       ></textarea>
       <button
         type="button"
         class="note-key"
-        title={'Open the session note' + chordHint('command.sessionNote')}
-        aria-label="Open the session note"
+        title={m.command_play_open_note() + chordHint('command.sessionNote')}
+        aria-label={m.command_play_open_note()}
         on:click={() => onEdit(session.path)}
       >
         <!-- Font Awesome "pen-to-square" icon (src/lib/ui/icons/pen-to-square-solid-full.svg):

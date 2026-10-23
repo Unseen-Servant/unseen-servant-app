@@ -8,6 +8,7 @@
   import { onMount, tick } from 'svelte';
   import { placeableNotes } from './columns';
   import type { CampaignIndex } from './types';
+  import { m } from '../paraglide/messages';
 
   export let index: CampaignIndex;
   /** Where the field opens, in px from the board's corner. */
@@ -65,8 +66,8 @@
   <input
     class="name"
     bind:this={input}
-    placeholder="Note name…"
-    aria-label="The note to place"
+    placeholder={m.command_notefield_placeholder()}
+    aria-label={m.command_notefield_label()}
     spellcheck="false"
     autocomplete="off"
     on:input={(e) => {
@@ -77,7 +78,7 @@
     on:blur={() => finish(null)}
   />
   {#if offered.length}
-    <ul class="offers" role="listbox" aria-label="Notes" bind:this={list}>
+    <ul class="offers" role="listbox" aria-label={m.command_notefield_notes()} bind:this={list}>
       {#each offered as n, i (n.path)}
         {@const at = n.name.toLowerCase().indexOf(q)}
         <!-- The field keeps the keyboard: a row takes the pointer only. -->

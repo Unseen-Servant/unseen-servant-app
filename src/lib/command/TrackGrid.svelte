@@ -27,6 +27,7 @@
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import { CARET_RIGHT } from '../ui/iconPaths';
+  import { m } from '../paraglide/messages';
   import { folderOrder, nameParts, newRowKey, type Column, type NoteGroup } from './columns';
   import type { NoteEntry } from './types';
 
@@ -105,8 +106,8 @@
   }
 
   const insertItems = (after: string | null): MenuItem[] => [
-    keyed('Insert note track', 'command.insertNoteTrack', () => insertTrack('note', after)),
-    keyed('Insert image track', 'command.insertImageTrack', () => insertTrack('image', after)),
+    keyed(m.command_tracks_insert_note(), 'command.insertNoteTrack', () => insertTrack('note', after)),
+    keyed(m.command_tracks_insert_image(), 'command.insertImageTrack', () => insertTrack('image', after)),
   ];
 
   /** `+ track`: which kind, in a menu under the key. */
@@ -198,16 +199,16 @@
       y,
       items: [
         // An image isn't spent (images design §2).
-        ...(note.type === 'image' ? [] : [keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent)), divider]),
+        ...(note.type === 'image' ? [] : [keyed(note.spent ? m.command_tracks_mark_unspent() : m.command_tracks_mark_spent(), 'command.spend', () => onSpent(note, !note.spent)), divider]),
         // In the columns' order: the shelf at the left, then the tracks.
-        submenu('Move to', [
-          action('Shelf', () => onMoveNote(note, 'Shelf')),
+        submenu(m.command_tracks_move_to(), [
+          action(m.command_tracks_shelf(), () => onMoveNote(note, 'Shelf')),
           ...others.map((t) => action(t, () => onMoveNote(note, t))),
         ]),
         divider,
-        keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
-        action('Show in Finder', () => onRevealNote(note)),
-        keyed('Move to Trash', 'command.delete', () => onTrashNote(note), true),
+        keyed(m.command_tracks_rename(), 'command.rename', () => (renamingPath = note.path)),
+        action(m.command_tracks_show_in_finder(), () => onRevealNote(note)),
+        keyed(m.command_tracks_move_to_trash(), 'command.delete', () => onTrashNote(note), true),
       ],
     };
   }
@@ -472,27 +473,27 @@
       y: e.clientY,
       items: [
         kind === 'image'
-          ? action('Add images…', () => onAddImages(column.track))
-          : action('New note', () => (creatingIn = column.track)),
+          ? action(m.command_tracks_add_images(), () => onAddImages(column.track))
+          : action(m.command_tracks_new_note(), () => (creatingIn = column.track)),
         divider,
         // After this track, as Live inserts after the one clicked.
         ...insertItems(column.track),
         divider,
-        action('Rename', () => (renamingTrack = column.track)),
-        action('Show in Finder', () => onRevealTrack(column.track)),
+        action(m.command_tracks_rename(), () => (renamingTrack = column.track)),
+        action(m.command_tracks_show_in_finder(), () => onRevealTrack(column.track)),
         divider,
         // Legend Lore's palette, as a collection's gem takes it.
-        picks('Pigment', [
+        picks(m.command_tracks_pigment(), [
           ...PIGMENTS.map((p) => ({
             label: p.name,
             swatch: p.hex,
             on: pigments[column.track] === p.hex,
             action: () => onPigmentTrack(column.track, p.hex),
           })),
-          { label: 'None', swatch: null, on: !pigments[column.track], action: () => onPigmentTrack(column.track, null) },
+          { label: m.command_tracks_pigment_none(), swatch: null, on: !pigments[column.track], action: () => onPigmentTrack(column.track, null) },
         ]),
         divider,
-        action('Move to Trash', () => onTrashTrack(column), true),
+        action(m.command_tracks_move_to_trash(), () => onTrashTrack(column), true),
       ],
     };
   }
@@ -503,8 +504,8 @@
     <span class="track-number" aria-hidden="true">{number}</span>
     <InlineName
       bare
-      placeholder={inserting?.kind === 'image' ? 'Image track name…' : 'Track name…'}
-      label={inserting?.kind === 'image' ? 'New image track' : 'New track'}
+      placeholder={inserting?.kind === 'image' ? m.command_tracks_image_track_name() : m.command_tracks_track_name()}
+      label={inserting?.kind === 'image' ? m.command_tracks_new_image_track() : m.command_tracks_new_track()}
       onCommit={(name) => {
         const { kind, after } = inserting!;
         inserting = null;
@@ -540,9 +541,9 @@
     class:drop-after={lineAfter === note.path}
     aria-pressed={armed ? members.has(note.path) : undefined}
     title={ambiguous(note.path)
-      ? `Another note is also named “${note.name}”, so links to it are ambiguous`
+      ? m.command_tracks_ambiguous({ name: note.name })
       : note.spent
-        ? `${note.name} — spent ${note.spent}`
+        ? m.command_tracks_spent_title({ name: note.name, spent: note.spent })
         : note.name}
     use:grab={!renaming}
     on:dragstart={(e) => startNoteDrag(e, note)}
@@ -568,7 +569,7 @@
     {#if renaming}
       <RenameField
         value={nameParts(note).stem}
-        label="Rename note"
+        label={m.command_tracks_rename_note()}
         onCommit={async (name) => {
           const refusal = await onRenameNote(note, name);
           if (!refusal) renamingPath = null;
@@ -629,7 +630,7 @@
           {#if renamingTrack === column.track}
             <RenameField
               value={column.track}
-              label="Rename track"
+              label={m.command_tracks_rename_track()}
               onCommit={async (name) => {
                 const refusal = await onRenameTrack(column.track, name);
                 if (!refusal) renamingTrack = null;
@@ -641,7 +642,7 @@
             <button
               type="button"
               class="track-name ledger-label"
-              title={`${column.track} — drag to reorder, double-click to rename`}
+              title={m.command_tracks_track_title({ track: column.track })}
               on:dblclick={() => (renamingTrack = column.track)}
             >
               {column.track}
@@ -649,7 +650,7 @@
           {/if}
         </span>
         {#if lit}
-          <span class="count in-beat" title={`${lit} of ${column.count} in ${litBeatName}`}>{lit}</span>
+          <span class="count in-beat" title={m.command_tracks_in_beat({ lit, total: column.count, beat: litBeatName ?? '' })}>{lit}</span>
         {:else}
           <span class="count">{column.count}</span>
         {/if}
@@ -676,8 +677,8 @@
             data-path={newRowKey(column.track)}
             data-row
             class:selected={selectedPath === newRowKey(column.track)}
-            title="Add images — double-click to choose them"
-            aria-label={`Add images to ${column.track}`}
+            title={m.command_tracks_add_images_title()}
+            aria-label={m.command_tracks_add_images_to({ track: column.track })}
             on:click={() => onSelectNew(newRowKey(column.track))}
             on:dblclick={() => onAddImages(column.track)}
           >
@@ -688,8 +689,8 @@
             <span class="slot" aria-hidden="true"></span>
             <InlineName
               bare
-              placeholder="Note name…"
-              label={`New note in ${column.track}`}
+              placeholder={m.command_tracks_note_name()}
+              label={m.command_tracks_new_note_in({ track: column.track })}
               onCommit={(name) => {
                 creatingIn = null;
                 onCreateNote(column.track, name);
@@ -704,8 +705,8 @@
             data-path={newRowKey(column.track)}
             data-row
             class:selected={selectedPath === newRowKey(column.track)}
-            title="New note — double-click to name it"
-            aria-label={`New note in ${column.track}`}
+            title={m.command_tracks_new_note_title()}
+            aria-label={m.command_tracks_new_note_in({ track: column.track })}
             on:click={() => onSelectNew(newRowKey(column.track))}
             on:dblclick={() => (creatingIn = column.track)}
           >
@@ -724,7 +725,7 @@
           on:click={() => toggleSpent(column.track)}
         >
           <svg class="caret" class:open={openSpent.has(column.track)} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-          <span class="ledger-label">spent</span>
+          <span class="ledger-label">{m.command_tracks_spent()}</span>
           <span class="spent-count">{column.spent.length}</span>
         </button>
         {#if openSpent.has(column.track) && column.spent.length}
@@ -737,7 +738,7 @@
       </div>
     </section>
     {#if inserting && insertAfter === column.track}
-      <section class="column ghost-column naming" aria-label="New track">
+      <section class="column ghost-column naming" aria-label={m.command_tracks_new_track()}>
         <header class="nameplate">{@render namingTrack(i + 2)}</header>
       </section>
     {/if}
@@ -746,12 +747,12 @@
   <!-- Naming a track, the ghost column dresses as the track it becomes, as
        a new note's row does: a track's width, its number, its plate's
        lettering, with no field of its own. -->
-  <section class="column ghost-column" class:naming={inserting && insertAfter === null} aria-label="New track">
+  <section class="column ghost-column" class:naming={inserting && insertAfter === null} aria-label={m.command_tracks_new_track()}>
     <header class="nameplate">
       {#if inserting && insertAfter === null}
         {@render namingTrack(cols.length + 1)}
       {:else}
-        <button type="button" class="ghost-track ledger-label" aria-haspopup="menu" on:click={trackKey}>+ track</button>
+        <button type="button" class="ghost-track ledger-label" aria-haspopup="menu" on:click={trackKey}>{m.command_tracks_add_track()}</button>
       {/if}
     </header>
   </section>

@@ -10,6 +10,7 @@
   import { getContext } from 'svelte';
   import RenameField from '../ui/RenameField.svelte';
   import { CARD_ACTIONS, linkify, paint, type CardActions, type CardData } from './board';
+  import { m } from '../paraglide/messages';
 
   export let data: CardData;
   export let selected: boolean = false;
@@ -76,8 +77,8 @@
       <div class="group-label nodrag">
         <RenameField
           value={card.text}
-          label="Frame name"
-          placeholder="Frame name…"
+          label={m.command_frame_name()}
+          placeholder={m.command_frame_name_placeholder()}
           onCommit={(label) => actions.finish(card.id, { label })}
           onCancel={() => actions.finish(card.id)}
         />
@@ -91,7 +92,7 @@
       <textarea
         class="text-field nodrag nowheel"
         value={card.text}
-        aria-label="The card's text"
+        aria-label={m.command_frame_text()}
         spellcheck="false"
         use:focus
         on:keydown={textKey}

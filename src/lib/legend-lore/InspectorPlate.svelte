@@ -4,6 +4,7 @@
   import { breadcrumbSegments, isAllCaps } from './breadcrumb';
   import { displaySystem, UNTAGGED_KEY } from './searchScope';
   import { SHIELD } from '../ui/iconPaths';
+  import { m } from '../paraglide/messages';
 
   export let result: SearchResultItem | null = null;
   export let onOpenResult: (source: string, filename: string, page?: number | null) => void = () => {};
@@ -44,7 +45,7 @@
       {/if}
     </span>
     <span class="rule" aria-hidden="true"></span>
-    <nav class="path" aria-label="Section path" title={segments.join(' › ') || undefined}>
+    <nav class="path" aria-label={m.lore_plate_section_path()} title={segments.join(' › ') || undefined}>
       <!-- One line, and the title keeps its full width: only the
            ancestors give way, each taking its own ellipsis. A title wider
            than the plate fills it with its own and the ancestors drop out.
@@ -66,8 +67,8 @@
       type="button"
       class="plate-btn"
       on:click={() => result && onOpenResult(result.source, result.filename, result.page_start)}
-      title={span && cite !== span ? `Open PDF at ${span}` : undefined}
-    >{cite ? `open ${cite}` : 'open'}</button>
+      title={span && cite !== span ? m.lore_plate_open_pdf_at({ span }) : undefined}
+    >{cite ? m.lore_plate_open_at({ cite }) : m.lore_plate_open()}</button>
   {/if}
 </div>
 

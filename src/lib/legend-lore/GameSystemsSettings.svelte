@@ -1,11 +1,13 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
   import type { KnownGameSystem } from './types';
   import { SHIELD } from '../ui/iconPaths';
   import Modal from '../shell/Modal.svelte';
   import ActionButton from '../ui/ActionButton.svelte';
   import CommitSwitch from '../ui/CommitSwitch.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
+  import { m } from '../paraglide/messages';
 
   export let knownSystems: KnownGameSystem[] = [];
   export let onSystemsChanged: () => void = () => {};
@@ -103,7 +105,7 @@
 
   async function handleSave() {
     const tag = modalTag.trim();
-    if (!tag) { modalError = 'Tag is required'; return; }
+    if (!tag) { modalError = m.lore_gamesystems_tag_required(); return; }
     const keywords = parseKeywords(modalKeywords);
     const color = modalColor || null;
 
@@ -117,7 +119,7 @@
       closeModal();
       onSystemsChanged();
     } catch (e: any) {
-      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to save';
+      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || m.lore_gamesystems_save_failed();
     }
   }
 
@@ -131,13 +133,13 @@
     // by carrying a value; when the value would be a sentence, it is a
     // sentence.
     const confirmed = await confirmPrompt.request({
-      title: 'Delete game system',
+      title: m.lore_gamesystems_delete_title(),
       rows: [
-        { label: 'Tag', value: editOriginalTag },
-        { label: 'Keywords', value: modalKeywords || '—' },
+        { label: m.lore_gamesystems_tag(), value: editOriginalTag },
+        { label: m.lore_gamesystems_keywords(), value: modalKeywords || '—' },
       ],
-      message: 'Files already tagged with it are not changed, and you can add the tag again at any time.',
-      confirmLabel: 'Delete',
+      message: m.lore_gamesystems_delete_message(),
+      confirmLabel: m.lore_gamesystems_delete_confirm(),
       danger: true,
     });
     if (!confirmed) return;
@@ -146,7 +148,7 @@
       closeModal();
       onSystemsChanged();
     } catch (e: any) {
-      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to delete';
+      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || m.lore_gamesystems_delete_failed();
     }
   }
 
@@ -155,13 +157,13 @@
     // become the built-in set again. The tag itself is identity and survives,
     // so it has no `to`.
     const confirmed = await confirmPrompt.request({
-      title: 'Reset to defaults',
+      title: m.lore_gamesystems_reset_title(),
       rows: [
-        { label: 'Tag', value: editOriginalTag },
-        { label: 'Keywords', value: modalKeywords || '—', to: 'built-in set' },
+        { label: m.lore_gamesystems_tag(), value: editOriginalTag },
+        { label: m.lore_gamesystems_keywords(), value: modalKeywords || '—', to: m.lore_gamesystems_to_builtin() },
       ],
-      message: 'Your changes to this system are discarded.',
-      confirmLabel: 'Reset',
+      message: m.lore_gamesystems_reset_message(),
+      confirmLabel: m.lore_gamesystems_reset_confirm(),
       danger: true,
     });
     if (!confirmed) return;
@@ -170,7 +172,7 @@
       closeModal();
       onSystemsChanged();
     } catch (e: any) {
-      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || 'Failed to reset';
+      modalError = e?.toString()?.replace(/^.*?:\s*/, '') || m.lore_gamesystems_reset_failed();
     }
   }
 </script>
@@ -179,9 +181,9 @@
 
 <div class="game-systems-settings">
   <div class="list-header">
-    <button class="col-header col-tag ledger-label" on:click={toggleSort}>Tag</button>
-    <span class="col-header col-keywords ledger-label">Keywords</span>
-    <button class="add-btn" title="Add custom system" on:click={openAddModal}>+</button>
+    <button class="col-header col-tag ledger-label" on:click={toggleSort}>{m.lore_gamesystems_tag()}</button>
+    <span class="col-header col-keywords ledger-label">{m.lore_gamesystems_keywords()}</span>
+    <button class="add-btn" title={m.lore_gamesystems_add_custom()} on:click={openAddModal}>+</button>
   </div>
   <div class="systems-list">
     {#each sorted as sys}
@@ -197,9 +199,9 @@
         <span class="system-keywords">{(sys.keywords || []).slice(0, 3).join(', ')}{(sys.keywords || []).length > 3 ? '...' : ''}</span>
         <div class="system-labels">
           {#if sys.is_builtin}
-            <span class="label readout-label builtin-label">{sys.is_customized ? 'customized' : 'built-in'}</span>
+            <span class="label readout-label builtin-label">{sys.is_customized ? m.lore_gamesystems_customized() : m.lore_gamesystems_builtin()}</span>
           {:else}
-            <span class="label readout-label custom-label">custom</span>
+            <span class="label readout-label custom-label">{m.lore_gamesystems_custom()}</span>
           {/if}
         </div>
       </div>
@@ -210,37 +212,38 @@
 <Modal
   visible={showModal}
   onClose={closeModal}
-  title={modalMode === 'add' ? 'Add game system' : 'Edit game system'}
+  title={modalMode === 'add' ? m.lore_gamesystems_add_title() : m.lore_gamesystems_edit_title()}
   size="sm"
   escapeWord="close"
 >
   <div class="modal-bays">
     <div class="modal-bay">
-      <span class="ledger-label">Tag</span>
+      <span class="ledger-label">{m.lore_gamesystems_tag()}</span>
       <input
         id="sys-tag"
         type="text"
         class="input"
         bind:value={modalTag}
-        placeholder="e.g. Cairn"
+        placeholder={m.lore_gamesystems_tag_placeholder()}
       />
     </div>
 
     <div class="modal-bay">
-      <span class="ledger-label">Keywords</span>
+      <span class="ledger-label">{m.lore_gamesystems_keywords()}</span>
       <input
         id="sys-keywords"
         type="text"
         class="input"
         bind:value={modalKeywords}
-        placeholder="e.g. cairn, cairn rpg"
+        placeholder={m.lore_gamesystems_keywords_placeholder()}
       />
       <!-- The one sentence here that changes what you type. How matching
            normalises case and punctuation is true, useful once, and re-read
            never — it lives in Help → Reference now. -->
       <p class="hint">
-        Comma-separated. A folder named &ldquo;<em>{modalTag.trim() || 'Cairn'}</em>&rdquo;
-        beats a match found inside the PDF.
+        <ParaglideMessage message={m.lore_gamesystems_keywords_hint} inputs={{ tag: modalTag.trim() || 'Cairn' }}>
+          {#snippet em({ children })}<em>{@render children?.()}</em>{/snippet}
+        </ParaglideMessage>
       </p>
     </div>
 
@@ -260,13 +263,13 @@
           <div class="modal-well-row action-row">
             <span class="row-text">
               {editIsBuiltin
-                ? 'Discard your changes and restore the built-in keywords.'
-                : 'Remove this tag and its keywords. Files already tagged are not changed.'}
+                ? m.lore_gamesystems_reset_desc()
+                : m.lore_gamesystems_delete_desc()}
             </span>
             {#if editIsBuiltin}
-              <ActionButton danger label="reset to defaults" onClick={handleReset} />
+              <ActionButton danger label={m.lore_gamesystems_reset_key()} onClick={handleReset} />
             {:else}
-              <ActionButton danger label="delete" onClick={handleDelete} />
+              <ActionButton danger label={m.lore_gamesystems_delete_key()} onClick={handleDelete} />
             {/if}
           </div>
         </div>
@@ -281,7 +284,7 @@
        focus. The face is only honest because all three paths exist. -->
   <svelte:fragment slot="commit">
     <CommitSwitch
-      label={modalMode === 'add' ? 'Add' : 'Save'}
+      label={modalMode === 'add' ? m.lore_gamesystems_add() : m.lore_gamesystems_save()}
       onClick={handleSave}
       disabled={!canSave}
     />

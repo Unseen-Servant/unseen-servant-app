@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import Modal from '../shell/Modal.svelte';
   import { displaySystem } from './searchScope';
+  import { m } from '../paraglide/messages';
 
   export let path: string;
   export let onClose: () => void;
@@ -31,29 +32,26 @@
 
   function formatBytes(bytes: number | null): string {
     if (bytes == null) return '—';
-    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024) return m.lore_stats_size_b({ size: bytes });
     const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    if (kb < 1024) return m.lore_stats_size_kb({ size: kb.toFixed(1) });
     const mb = kb / 1024;
-    if (mb < 1024) return `${mb.toFixed(1)} MB`;
-    return `${(mb / 1024).toFixed(2)} GB`;
+    if (mb < 1024) return m.lore_stats_size_mb({ size: mb.toFixed(1) });
+    return m.lore_stats_size_gb({ size: (mb / 1024).toFixed(2) });
   }
 
   function formatRelative(iso: string | null): string {
-    if (!iso) return 'Unknown';
+    if (!iso) return m.lore_stats_unknown();
     const date = new Date(iso);
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 30) return 'just now';
-    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 30) return m.lore_stats_just_now();
+    if (seconds < 60) return m.lore_stats_seconds_ago({ seconds });
     const minutes = Math.floor(seconds / 60);
-    if (minutes === 1) return '1 minute ago';
-    if (minutes < 60) return `${minutes} minutes ago`;
+    if (minutes < 60) return m.lore_stats_minutes_ago({ count: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours === 1) return '1 hour ago';
-    if (hours < 24) return `${hours} hours ago`;
+    if (hours < 24) return m.lore_stats_hours_ago({ count: hours });
     const days = Math.floor(hours / 24);
-    if (days === 1) return '1 day ago';
-    return `${days} days ago`;
+    return m.lore_stats_days_ago({ count: days });
   }
 
   $: indexedAbsolute = stats?.indexed_at ? new Date(stats.indexed_at).toLocaleString() : '';
@@ -62,56 +60,56 @@
 <!-- The filename leaves the title: as a rail nameplate it would truncate at
      ~48 characters, and as the first readout row it gets the full 560px in the
      same mono column as everything else about the file. -->
-<Modal visible={true} {onClose} title="Document" size="md" escapeWord="close">
+<Modal visible={true} {onClose} title={m.lore_stats_title()} size="md" escapeWord="close">
   <svelte:fragment slot="rail">
     <span class="rail-rule" aria-hidden="true"></span>
     <span class="lamp" class:live={!!stats?.indexed_at} aria-hidden="true"></span>
-    <span class="rail-note">{stats?.indexed_at ? 'indexed' : 'not indexed'}</span>
+    <span class="rail-note">{stats?.indexed_at ? m.lore_stats_indexed() : m.lore_stats_not_indexed()}</span>
   </svelte:fragment>
 
   <div class="modal-bays">
     {#if error}
-      <p class="error">Could not load stats: {error}</p>
+      <p class="error">{m.lore_stats_error({ error })}</p>
     {:else if !stats}
-      <p class="loading">Loading…</p>
+      <p class="loading">{m.lore_stats_loading()}</p>
     {:else}
       <div class="modal-bay">
         <div class="modal-well">
           <div class="modal-well-row">
-            <span class="ledger-label">File</span>
+            <span class="ledger-label">{m.lore_stats_file()}</span>
             <span class="modal-readout" title={stats.filename}>{stats.filename}</span>
           </div>
           <div class="modal-well-row">
-            <span class="ledger-label">Path</span>
+            <span class="ledger-label">{m.lore_stats_path()}</span>
             <span class="modal-readout" title={stats.source}>{stats.source}</span>
           </div>
           <!-- Wrapped, not ellipsised: a multi-system file joins its tags into
                a string with no length limit, and the tail is as much the answer
                as the head. -->
           <div class="modal-well-row">
-            <span class="ledger-label">System</span>
+            <span class="ledger-label">{m.lore_stats_system()}</span>
             <span class="modal-readout wrap">{(stats.game_systems && stats.game_systems.length > 0) ? stats.game_systems.join(', ') : displaySystem(stats.game_system || 'unknown')}</span>
           </div>
         </div>
       </div>
 
       <div class="modal-bay">
-        <span class="ledger-label">Index</span>
+        <span class="ledger-label">{m.lore_stats_index()}</span>
         <div class="modal-well">
           <div class="modal-well-row">
-            <span class="ledger-label">Chunks</span>
+            <span class="ledger-label">{m.lore_stats_chunks()}</span>
             <span class="modal-readout">{stats.chunks.toLocaleString()}</span>
           </div>
           <div class="modal-well-row">
-            <span class="ledger-label">Pages</span>
+            <span class="ledger-label">{m.lore_stats_pages()}</span>
             <span class="modal-readout">{stats.pages > 0 ? stats.pages.toLocaleString() : '—'}</span>
           </div>
           <div class="modal-well-row">
-            <span class="ledger-label">Size</span>
+            <span class="ledger-label">{m.lore_stats_size()}</span>
             <span class="modal-readout">{formatBytes(stats.file_size_bytes)}</span>
           </div>
           <div class="modal-well-row">
-            <span class="ledger-label">Indexed</span>
+            <span class="ledger-label">{m.lore_stats_indexed_label()}</span>
             <span class="modal-readout">{formatRelative(stats.indexed_at)}<span class="stamp">{indexedAbsolute}</span></span>
           </div>
         </div>

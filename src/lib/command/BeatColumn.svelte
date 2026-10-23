@@ -20,6 +20,8 @@
   import { memberPaths, planMoveTo, type PlanRow } from './prep';
   import type { BeatEntry, NoteEntry } from './types';
   import { grab } from '../ui/grab';
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
+  import { m } from '../paraglide/messages';
 
   /** Where a menu opened from the keyboard sits: in from the row's edge,
    *  under it, where a right-click would land. */
@@ -280,18 +282,18 @@
   // launch; the live beat can still be stopped.
   function transportItems(beat: BeatEntry): MenuItem[] {
     return [
-      keyed(beat.path === armedPath ? 'Disarm' : 'Arm', 'command.arm', () => onArm(beat)),
-      ...(beat.path === liveBeat ? [action('Stop', onStop)] : []),
+      keyed(beat.path === armedPath ? m.command_beats_disarm() : m.command_beats_arm(), 'command.arm', () => onArm(beat)),
+      ...(beat.path === liveBeat ? [action(m.command_beats_stop(), onStop)] : []),
     ];
   }
 
   function beatItems(beat: BeatEntry): MenuItem[] {
     return [
-      keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
+      keyed(beat.spent ? m.command_beats_mark_unspent() : m.command_beats_mark_spent(), 'command.spend', () => onSpent(beat, !beat.spent)),
       divider,
-      keyed('Rename', 'command.rename', () => (renamingPath = beat.path)),
-      action('Show in Finder', () => onReveal(beat)),
-      keyed('Move to Trash', 'command.delete', () => onTrash(beat), true),
+      keyed(m.command_beats_rename(), 'command.rename', () => (renamingPath = beat.path)),
+      action(m.command_beats_reveal(), () => onReveal(beat)),
+      keyed(m.command_beats_trash(), 'command.delete', () => onTrash(beat), true),
     ];
   }
 
@@ -350,13 +352,13 @@
   function rowMenuAt(x: number, y: number, row: PlanRow) {
     if (row.beat) onFocus(row.beat);
     const order: MenuItem[] = [
-      ...(row.at > 0 ? [action('Move up', () => onMove(row, row.at - 1))] : []),
-      ...(row.at < rows.length - 1 ? [action('Move down', () => onMove(row, row.at + 1))] : []),
-      action(`Remove from ${sessionName}`, () => onRemove(row)),
+      ...(row.at > 0 ? [action(m.command_beats_move_up(), () => onMove(row, row.at - 1))] : []),
+      ...(row.at < rows.length - 1 ? [action(m.command_beats_move_down(), () => onMove(row, row.at + 1))] : []),
+      action(m.command_beats_remove_from({ session: sessionName ?? '' }), () => onRemove(row)),
     ];
     const items = row.beat
       ? [...transportItems(row.beat), divider, ...order, divider, ...beatItems(row.beat)]
-      : [...order, divider, action('Write this beat', () => onWrite(row))];
+      : [...order, divider, action(m.command_beats_write(), () => onWrite(row))];
     menu = { x, y, items };
   }
 
@@ -372,7 +374,7 @@
       items: [
         ...transportItems(beat),
         divider,
-        ...(sessionName ? [action(`Add to ${sessionName}`, () => onAddToPlan(beat)), divider] : []),
+        ...(sessionName ? [action(m.command_beats_add_to({ session: sessionName }), () => onAddToPlan(beat)), divider] : []),
         ...beatItems(beat),
       ],
     };
@@ -419,7 +421,7 @@
     {#if renaming}
       <RenameField
         value={beat.name}
-        label="Rename beat"
+        label={m.command_beats_rename_label()}
         onCommit={async (name) => {
           const refusal = await onRename(beat, name);
           if (!refusal) renamingPath = null;
@@ -431,7 +433,7 @@
       <button
         type="button"
         class="beat-name"
-        title={beat.spent ? `${beat.name} — spent ${beat.spent}` : beat.name}
+        title={beat.spent ? m.command_beats_name_spent({ name: beat.name, spent: beat.spent }) : beat.name}
         on:click={(e) => {
           // Only a double-click's first click: the second mustn't put out
           // what the first lit on the way into the editor.
@@ -454,7 +456,7 @@
             type="button"
             class="tr-btn playing"
             aria-pressed="true"
-            title={`Stop ${beat.name}`}
+            title={m.command_beats_stop_beat({ name: beat.name })}
             on:click={(e) => e.detail <= 1 && onStop()}
           >
             <span class="stop-mark" aria-hidden="true"></span>
@@ -465,7 +467,7 @@
           class="tr-btn"
           class:armed
           aria-pressed={armed}
-          title={armed ? `Disarm ${beat.name} (Esc)` : `Arm ${beat.name}: click notes to put them in it`}
+          title={armed ? m.command_beats_disarm_beat({ name: beat.name }) : m.command_beats_arm_beat({ name: beat.name })}
           on:click={(e) => e.detail <= 1 && onArm(beat)}
         >
           <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true">
@@ -503,15 +505,15 @@
     <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
     <span class="ledger-label">{label}</span>
     {#if !open && lit}
-      <span class="sect-lamp" role="img" aria-label="A beat in here is armed or live" title="A beat in here is armed or live"></span>
+      <span class="sect-lamp" role="img" aria-label={m.command_beats_group_lit()} title={m.command_beats_group_lit()}></span>
     {/if}
     <span class="count">{count}</span>
   </button>
 {/snippet}
 
-<section class="beats" aria-label="Session planner" data-region="beats" bind:this={beatsEl}>
+<section class="beats" aria-label={m.command_beats_label()} data-region="beats" bind:this={beatsEl}>
   <header class="nameplate">
-    <span class="ledger-label title">session planner</span>
+    <span class="ledger-label title">{m.command_beats_title()}</span>
   </header>
 
   <div class="list" role="presentation" on:dragover={overList} on:dragleave={leaveList}>
@@ -533,7 +535,7 @@
             class:hovered={$hoverLive && hovered === row.link}
             class:dragging={dragging === row}
             class:drop-before={dropSlot === row.at}
-            title={`No beat is named “${row.link}” yet — click to write it`}
+            title={m.command_beats_missing({ link: row.link })}
             use:grab
             on:dragstart={(e) => startBeatDrag(e, row, row.link)}
             on:dragend={endBeatDrag}
@@ -558,8 +560,8 @@
         <div class="beat-row ghost naming">
           <InlineName
             bare
-            placeholder={seed ? `Beat with ${seed.name}…` : 'Beat name…'}
-            label="New beat"
+            placeholder={seed ? m.command_beats_new_with_placeholder({ name: seed.name }) : m.command_beats_new_placeholder()}
+            label={m.command_beats_new()}
             onCommit={(name) => {
               creating = false;
               onCreate(name, seed ? [seed.path] : []);
@@ -591,9 +593,9 @@
           class:selected={selectedPath === NEW_BEAT}
           class:drop-before={dropSlot === rows.length}
           class:drop-into={incoming !== null}
-          title="New beat — double-click to name it, or drop a note here"
+          title={m.command_beats_new_title()}
           data-path={NEW_BEAT}
-          aria-label="New beat"
+          aria-label={m.command_beats_new()}
           on:click={() => onSelectNew(NEW_BEAT)}
           on:dblclick={() => (creating = true)}
           on:dragover={overGhost}
@@ -603,7 +605,9 @@
                label throughout: swapping the element under the pointer
                mid-drag detaches the drag's target, and WebKit then refuses
                the drop. -->
-          <span class="ghost-label">{#if incoming}New beat with <em>{incoming.name}</em>{/if}</span>
+          <span class="ghost-label">{#if incoming}<ParaglideMessage message={m.command_beats_new_with} inputs={{ name: incoming.name }}>
+                {#snippet em({ children })}<em>{@render children?.()}</em>{/snippet}
+              </ParaglideMessage>{/if}</span>
           {#if incoming}<span class="row-count">1</span>{/if}
         </button>
       {/if}
@@ -613,7 +617,7 @@
          beats under it: dropped on it, the entry leaves the plan. -->
     {#if shown.length || draggingEntry}
       {#if sessionName}
-        {@render groupHead('spare', 'not in this session', shown.length, spareLit)}
+        {@render groupHead('spare', m.command_beats_group_spare(), shown.length, spareLit)}
       {/if}
       {#if spareOpen}
         {#each shown as beat (beat.path)}
@@ -625,7 +629,7 @@
     <!-- Spent beats no plan holds: still here, folded until asked for, so
          no beat ever leaves the column. -->
     {#if spent.length}
-      {@render groupHead('spent', 'spent', spent.length, spentLit)}
+      {@render groupHead('spent', m.command_beats_group_spent(), spent.length, spentLit)}
       {#if spentOpen}
         {#each spent as beat (beat.path)}
           {@render beatRow(beat, null, (e) => spareMenu(e, beat))}

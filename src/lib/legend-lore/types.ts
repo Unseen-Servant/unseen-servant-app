@@ -1,3 +1,5 @@
+import { m } from '../paraglide/messages';
+
 export interface FileItem {
   name: string;
   path: string;
@@ -182,12 +184,12 @@ export type BucketPolicy = 'silent' | 'ask';
 // 0 = never check in the background. Other values are seconds.
 export type BackgroundCheckInterval = 0 | 15 | 30 | 60 | 300;
 
-export const BACKGROUND_CHECK_OPTIONS: { value: BackgroundCheckInterval; label: string }[] = [
-  { value: 15, label: 'Every 15 seconds' },
-  { value: 30, label: 'Every 30 seconds' },
-  { value: 60, label: 'Every minute' },
-  { value: 300, label: 'Every 5 minutes' },
-  { value: 0, label: 'Never' },
+export const BACKGROUND_CHECK_OPTIONS: { value: BackgroundCheckInterval; label: () => string }[] = [
+  { value: 15, label: m.lore_types_check_15s },
+  { value: 30, label: m.lore_types_check_30s },
+  { value: 60, label: m.lore_types_check_1m },
+  { value: 300, label: m.lore_types_check_5m },
+  { value: 0, label: m.lore_types_check_never },
 ];
 
 export interface SyncPreferences {

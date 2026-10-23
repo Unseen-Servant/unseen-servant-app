@@ -18,6 +18,7 @@
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
   import { nameParts, newRowKey } from './columns';
   import type { CampaignIndex, CopySource, NoteEntry } from './types';
+  import { m } from '../paraglide/messages';
 
   /** Where a menu opened from the keyboard sits: in from the row's edge,
    *  under it, where a right-click would land. */
@@ -147,16 +148,16 @@
       x: box.left,
       y: box.bottom + 4,
       items: [
-        action(`${campaign}'s shelf`, () => (source = null)),
+        action(m.command_shelf_own({ campaign }), () => (source = null)),
         divider,
-        submenu('Copy from', [
+        submenu(m.command_shelf_copy_from(), [
           ...others.map((c) => action(c, () => (source = { kind: 'campaign', name: c }))),
           ...(others.length && places.length ? [divider] : []),
           ...places.map((p) => action(placeName(p), () => (source = { kind: 'place', path: p }))),
           ...(others.length || places.length ? [divider] : []),
-          action('Add folder…', () => void addPlace()),
+          action(m.command_shelf_add_folder(), () => void addPlace()),
         ]),
-        ...(browsing?.kind === 'place' ? [action('Forget this folder', () => onForgetPlace(browsing.path))] : []),
+        ...(browsing?.kind === 'place' ? [action(m.command_shelf_forget_folder(), () => onForgetPlace(browsing.path))] : []),
       ],
     };
   }
@@ -263,22 +264,22 @@
     const fitting = index.tracks.filter((t) => (index.kinds[t] ?? 'note') === note.type);
     const groups = [
       // An image isn't spent (images design §2).
-      note.type === 'image' ? [] : [keyed(note.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(note, !note.spent))],
+      note.type === 'image' ? [] : [keyed(note.spent ? m.command_shelf_mark_unspent() : m.command_shelf_mark_spent(), 'command.spend', () => onSpent(note, !note.spent))],
       // The grid's Move to flyout, in the columns' order: the shelf at the
       // left, for a loose note, then the tracks of its kind, as Live keeps
       // audio clips off MIDI tracks (images design §3.2).
       fitting.length || note.track === null
         ? [
-            submenu('Move to', [
+            submenu(m.command_shelf_move_to(), [
               ...(note.track === null ? [action('Shelf', () => onMove(note, 'Shelf'))] : []),
               ...fitting.map((t) => action(t, () => onMove(note, t))),
             ]),
           ]
         : [],
       [
-        keyed('Rename', 'command.rename', () => (renamingPath = note.path)),
-        action('Show in Finder', () => onReveal(note)),
-        keyed('Move to Trash', 'command.delete', () => onTrash(note), true),
+        keyed(m.command_shelf_rename(), 'command.rename', () => (renamingPath = note.path)),
+        action(m.command_shelf_reveal(), () => onReveal(note)),
+        keyed(m.command_shelf_trash(), 'command.delete', () => onTrash(note), true),
       ],
     ].filter((g) => g.length);
     menu = {
@@ -308,7 +309,7 @@
     class:spent={!!note.spent}
     class:arming={armed}
     aria-pressed={armed ? members.has(note.path) : undefined}
-    title={note.spent ? `${note.name} — spent ${note.spent}` : note.name}
+    title={note.spent ? m.command_shelf_name_spent({ name: note.name, spent: note.spent }) : note.name}
     use:grab={!renaming}
     on:dragstart={(e) => startNoteDrag(e, note)}
     on:dragend={() => {
@@ -330,7 +331,7 @@
     {#if renaming}
       <RenameField
         value={nameParts(note).stem}
-        label="Rename note"
+        label={m.command_shelf_rename_label()}
         onCommit={async (name) => {
           const refusal = await onRename(note, name);
           if (!refusal) renamingPath = null;
@@ -354,7 +355,7 @@
 <aside
   class="shelf"
   class:drop-into={dropInto}
-  aria-label="Shelf"
+  aria-label={m.command_shelf_label()}
   data-region="shelf"
   bind:this={shelfEl}
   on:dragenter={overShelf}
@@ -363,8 +364,8 @@
   on:drop={dropOnShelf}
 >
   <header class="nameplate">
-    <button type="button" class="source-key" title="This shelf, or another campaign to copy from" on:click={pickSource}>
-      <span class="ledger-label">{source ? `from ${sourceName(source)}` : 'shelf'}</span>
+    <button type="button" class="source-key" title={m.command_shelf_source_title()} on:click={pickSource}>
+      <span class="ledger-label">{source ? m.command_shelf_from({ name: sourceName(source) }) : m.command_shelf_title()}</span>
       <span class="drop" aria-hidden="true">▾</span>
     </button>
     {#if !source}<span class="count">{shelf.length}</span>{/if}
@@ -376,7 +377,7 @@
         {@render row(note)}
       {:else}
         {#if !creating}
-          <p class="quiet">Nothing gathered yet. Send hits here from Legend Lore, or start a note.</p>
+          <p class="quiet">{m.command_shelf_empty()}</p>
         {/if}
       {/each}
       {#if creating}
@@ -384,8 +385,8 @@
           <span class="slot" aria-hidden="true"></span>
           <InlineName
             bare
-            placeholder="Note name…"
-            label="New note on the shelf"
+            placeholder={m.command_shelf_new_placeholder()}
+            label={m.command_shelf_new()}
             onCommit={(name) => {
               creating = false;
               onCreate(name);
@@ -400,8 +401,8 @@
           data-path={newRowKey(SHELF_FOLDER)}
           data-row
           class:selected={selectedPath === newRowKey(SHELF_FOLDER)}
-          title="New note — double-click to name it"
-          aria-label="New note on the shelf"
+          title={m.command_shelf_new_title()}
+          aria-label={m.command_shelf_new()}
           on:click={() => onSelectNew(newRowKey(SHELF_FOLDER))}
           on:dblclick={() => (creating = true)}
         >
@@ -410,7 +411,7 @@
       {/if}
 
       {#if loose.length}
-        <div class="ledger-label section-head" title="Notes directly in the campaign folder, on no track">loose</div>
+        <div class="ledger-label section-head" title={m.command_shelf_loose_title()}>{m.command_shelf_loose()}</div>
         {#each loose as note (note.path)}
           {@render row(note)}
         {/each}
@@ -425,15 +426,15 @@
           <button
             type="button"
             class="note-row copy-row"
-            title={`Copy ${note.name} onto ${campaign}'s shelf`}
+            title={m.command_shelf_copy_title({ name: note.name, campaign })}
             on:click={() => onCopy(source!, note)}
           >
             <span class="label">{name.stem}{#if name.ext}<span class="ext">{name.ext}</span>{/if}</span>
-            <span class="copy-hint" aria-hidden="true">copy</span>
+            <span class="copy-hint" aria-hidden="true">{m.command_shelf_copy_hint()}</span>
           </button>
         {/each}
       {:else}
-        <p class="quiet">{source && sourceName(source)} has no notes to copy.</p>
+        <p class="quiet">{m.command_shelf_none_to_copy({ name: source ? sourceName(source) : '' })}</p>
       {/each}
     {/if}
   </div>

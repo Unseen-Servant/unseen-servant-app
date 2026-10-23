@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { KnownGameSystem } from './types';
   import { SHIELD } from '../ui/iconPaths';
+  import { m } from '../paraglide/messages';
 
   // The rows behind both game-system pickers: the tree row's context-menu
   // submenu and the standalone SystemTagMenu. Rendered straight into the
@@ -38,7 +39,7 @@
 {/if}
 {#if tags.length > 0}
   <button class="menu-row danger" data-mi="item" role="menuitem" on:click={onClear}>
-    Clear tags
+    {m.lore_systemtag_clear()}
   </button>
 {/if}
 

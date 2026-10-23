@@ -17,6 +17,7 @@
   import SystemBadge from './SystemBadge.svelte';
   import SystemTagMenu from './SystemTagMenu.svelte';
   import { grab } from '../ui/grab';
+  import { m } from '../paraglide/messages';
 
   export let item: FileItem;
   export let level: number = 0;
@@ -295,7 +296,7 @@
       disabled={arm !== null && !canArm}
       on:click|stopPropagation={handleCheckboxChange}
       role="checkbox"
-      aria-label={arm ? `Add ${item.name} to ${arm.name}` : `Select ${item.name} for indexing`}
+      aria-label={arm ? m.lore_tree_add_to({ name: item.name, collection: arm.name }) : m.lore_tree_select({ name: item.name })}
       aria-checked={boxMixed ? 'mixed' : boxOn}
     ></button>
     {/if}
@@ -344,7 +345,7 @@
              menu. -->
         <RenameField
           value={item.is_dir ? item.name : item.name.replace(/\.[^.]+$/, '')}
-          label={`Rename ${item.name}`}
+          label={m.lore_tree_rename({ name: item.name })}
           onCommit={commitRename}
           onCancel={onRenameCancel}
         />
@@ -361,7 +362,7 @@
           class:solo-on={isSoloedScope}
           on:click|stopPropagation={() => onToggleScopeSolo(item)}
           aria-pressed={isSoloedScope}
-          title={isSoloedScope ? `Stop soloing ${item.name} (S)` : `Solo ${item.name} (S)`}
+          title={isSoloedScope ? m.lore_tree_stop_solo({ name: item.name }) : m.lore_tree_solo({ name: item.name })}
         >S</button>
         <button
           type="button"
@@ -369,14 +370,14 @@
           class:mute-on={isMutedHere}
           on:click|stopPropagation={() => onToggleScopeMute(item)}
           aria-pressed={isMutedHere}
-          title={isMutedHere ? `Unmute ${item.name} (M)` : `Mute ${item.name} (M)`}
+          title={isMutedHere ? m.lore_tree_unmute({ name: item.name }) : m.lore_tree_mute({ name: item.name })}
         >M</button>
       </span>
     {/if}
 
     {#if hasTag}
       <div class="badge-wrapper">
-        <button class="badge-cluster" on:click={(e) => tagMenu?.toggle(e)} aria-label="Edit game system tags">
+        <button class="badge-cluster" on:click={(e) => tagMenu?.toggle(e)} aria-label={m.lore_tree_edit_tags()}>
           {#each visibleTags as tag}
             <SystemBadge {tag} />
           {/each}
@@ -387,7 +388,7 @@
       </div>
     {:else if canTag}
       <div class="badge-wrapper">
-        <button class="add-tag-btn" on:click={(e) => tagMenu?.toggle(e)}>+ tag</button>
+        <button class="add-tag-btn" on:click={(e) => tagMenu?.toggle(e)}>{m.lore_tree_add_tag()}</button>
       </div>
     {/if}
 

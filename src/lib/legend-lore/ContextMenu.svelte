@@ -10,6 +10,7 @@
   import { hoverLive } from '../ui/inputModality';
   import SystemTagRows from './SystemTagRows.svelte';
   import type { SendTargets } from './sendToCommand';
+  import { m } from '../paraglide/messages';
 
   type Submenu = 'collection' | 'tag' | 'command';
 
@@ -375,18 +376,18 @@
 >
   {#if !item.is_dir}
     <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.open')} aria-keyshortcuts={keyShortcut('tree.open')} on:click={onOpen}>
-      Open file
+      {m.lore_menu_open_file()}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.open')} aria-hidden="true">{chord('tree.open')}</span>
     </button>
   {/if}
   <button class="menu-row" data-mi="item" role="menuitem" on:click={onReveal}>
-    Reveal in folder
+    {m.lore_menu_reveal()}
   </button>
   <!-- Get info rides with the other two ways of looking at the file; its
        sibling Re-index is an action and sits down with Rename. -->
   {#if !item.is_dir && isIndexed}
     <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('info.show')} aria-keyshortcuts={keyShortcut('info.show')} on:click={onShowStats}>
-      Get info
+      {m.lore_menu_get_info()}
       <span class="menu-chord" class:bare={isBareKeyChord('info.show')} aria-hidden="true">{chord('info.show')}</span>
     </button>
   {/if}
@@ -404,19 +405,19 @@
       aria-haspopup="menu"
       aria-expanded={openSubmenu === 'command'}
     >
-      <span>Send to Command</span>
+      <span>{m.lore_menu_send_to_command()}</span>
       <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if openSubmenu === 'command'}
         <div class="submenu" role="menu">
           {#if sendTargets === 'loading'}
             <span class="submenu-note">…</span>
           {:else if !sendTargets.campaign}
-            <span class="submenu-note">Open a campaign in Command first</span>
+            <span class="submenu-note">{m.lore_menu_no_campaign()}</span>
           {:else}
             <span class="submenu-note micro-label" title={sendTargets.campaign}>{sendTargets.campaign}</span>
             <!-- The shelf first: where a clipping goes until it has a track. -->
             <button class="menu-row" data-mi="item" role="menuitem" on:click={() => onSendToCommand(null)}>
-              <span class="submenu-name">Shelf</span>
+              <span class="submenu-name">{m.lore_menu_shelf()}</span>
             </button>
             {#if sendTargets.tracks.length}<hr class="menu-divider" />{/if}
             {#each sendTargets.tracks as track (track)}
@@ -432,11 +433,11 @@
   {#if canScope}
     <hr class="menu-divider" />
     <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.solo')} aria-keyshortcuts={keyShortcut('tree.solo')} on:click={onToggleSolo}>
-      {isSoloed ? 'Stop soloing' : 'Solo'} {item.is_dir ? 'folder' : 'file'}
+      {isSoloed ? (item.is_dir ? m.lore_menu_stop_solo_folder() : m.lore_menu_stop_solo_file()) : (item.is_dir ? m.lore_menu_solo_folder() : m.lore_menu_solo_file())}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.solo')} aria-hidden="true">{chord('tree.solo')}</span>
     </button>
     <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.mute')} aria-keyshortcuts={keyShortcut('tree.mute')} on:click={onToggleMute}>
-      {isMuted ? 'Unmute' : 'Mute'} {item.is_dir ? 'folder' : 'file'}
+      {isMuted ? (item.is_dir ? m.lore_menu_unmute_folder() : m.lore_menu_unmute_file()) : (item.is_dir ? m.lore_menu_mute_folder() : m.lore_menu_mute_file())}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.mute')} aria-hidden="true">{chord('tree.mute')}</span>
     </button>
   {/if}
@@ -457,7 +458,7 @@
       aria-haspopup="menu"
       aria-expanded={openSubmenu === 'collection'}
     >
-      <span>Collection</span>
+      <span>{m.lore_menu_collection()}</span>
       <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if openSubmenu === 'collection'}
         <div class="submenu" role="menu">
@@ -489,7 +490,7 @@
             <hr class="menu-divider" />
           {/if}
           <button class="menu-row" data-mi="item" role="menuitem" on:click={onAddToNewCollection}>
-            New collection
+            {m.lore_menu_new_collection()}
           </button>
         </div>
       {/if}
@@ -506,7 +507,7 @@
       aria-haspopup="menu"
       aria-expanded={openSubmenu === 'tag'}
     >
-      <span>Game system</span>
+      <span>{m.lore_menu_game_system()}</span>
       <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>
       {#if openSubmenu === 'tag'}
         <div class="submenu" role="menu">
@@ -528,7 +529,7 @@
   {#if !inheritedHidden && (item.is_dir || directlyHidden || !isIndexed)}
     <hr class="menu-divider" />
     <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.hide')} aria-keyshortcuts={keyShortcut('tree.hide')} on:click={onToggleHidden}>
-      {directlyHidden ? 'Unhide' : 'Hide'} {item.is_dir ? 'folder' : 'file'}
+      {directlyHidden ? (item.is_dir ? m.lore_menu_unhide_folder() : m.lore_menu_unhide_file()) : (item.is_dir ? m.lore_menu_hide_folder() : m.lore_menu_hide_file())}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.hide')} aria-hidden="true">{chord('tree.hide')}</span>
     </button>
   {/if}
@@ -538,12 +539,12 @@
   {/if}
   {#if canRename}
     <button class="menu-row" data-mi="item" role="menuitem" data-chord={matchKey('tree.rename')} aria-keyshortcuts={keyShortcut('tree.rename')} on:click={onRename}>
-      Rename {item.is_dir ? 'folder' : 'file'}
+      {item.is_dir ? m.lore_menu_rename_folder() : m.lore_menu_rename_file()}
       <span class="menu-chord" class:bare={isBareKeyChord('tree.rename')} aria-hidden="true">{chord('tree.rename')}</span>
     </button>
   {/if}
   {#if !item.is_dir && isIndexed}
-    <button class="menu-row" data-mi="item" role="menuitem" on:click={onReindex}>Re-index file</button>
+    <button class="menu-row" data-mi="item" role="menuitem" on:click={onReindex}>{m.lore_menu_reindex_file()}</button>
   {/if}
 
   <!-- Delete stands alone: a divider between it and the other write actions
@@ -552,7 +553,7 @@
   <!-- Display-only, like Reveal above: ⌘⌫ is a named key eventMatchKey can't
        resolve, so the row hints the chord without claiming it. -->
   <button class="menu-row danger" data-mi="item" role="menuitem" on:click={onDelete}>
-    Delete {item.is_dir ? 'folder' : 'file'}
+    {item.is_dir ? m.lore_menu_delete_folder() : m.lore_menu_delete_file()}
     <span class="menu-chord" class:bare={isBareKeyChord('tree.delete')} aria-hidden="true">{chord('tree.delete')}</span>
   </button>
 </div>

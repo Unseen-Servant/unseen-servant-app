@@ -10,6 +10,7 @@
   import BoardBar from './BoardBar.svelte';
   import { BAR_LINE, CARD_ACTIONS, arrowhead, paint, type CardActions } from './board';
   import type { Side } from './types';
+  import { m } from '../paraglide/messages';
 
   export let id: string;
   export let sourceX: number;
@@ -92,8 +93,8 @@
     <input
       class="line-name"
       value={label ?? ''}
-      placeholder="Label…"
-      aria-label="The line's label"
+      placeholder={m.command_boardline_placeholder()}
+      aria-label={m.command_boardline_label()}
       spellcheck="false"
       use:focus
       on:keydown={key}

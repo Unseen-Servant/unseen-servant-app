@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { jobNotification } from '../shell/notificationStore';
 import { progressLabel, type JobSummary } from './syncMessages';
+import { m } from '../paraglide/messages';
 
 export interface SyncProgressPayload {
   files_done: number;
@@ -75,7 +76,7 @@ export async function runSyncJob<TResult>(
     if (msg.includes('sync-busy:')) {
       jobNotification.show({
         type: 'info',
-        message: 'Another sync is already running.',
+        message: m.lore_syncjob_busy(),
         duration: 4000,
       });
     } else {

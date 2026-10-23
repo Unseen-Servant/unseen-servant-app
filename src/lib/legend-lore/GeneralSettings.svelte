@@ -7,6 +7,7 @@
     RERANK_POOL_PRESETS,
     normalizeSearchSettings,
   } from './searchSettings';
+  import { m } from '../paraglide/messages';
 
   // App-side display preference, persisted by the page — not a sidecar
   // setting, so it renders whatever state the pipeline section is in.
@@ -71,16 +72,15 @@
 <div class="general-settings">
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title section-title">Search results</h3>
-      <p class="field-desc">How the result list presents what search found.</p>
+      <h3 class="field-title section-title">{m.lore_general_results()}</h3>
+      <p class="field-desc">{m.lore_general_results_desc()}</p>
     </div>
 
     <div class="setting-row">
       <div class="setting-row-head">
-        <div class="setting-row-title">Dim weak matches</div>
+        <div class="setting-row-title">{m.lore_general_dim()}</div>
         <div class="setting-row-desc">
-          Weak matches stay in the list but fade back, so the strong ones
-          stand out.
+          {m.lore_general_dim_desc()}
         </div>
       </div>
       <select
@@ -88,8 +88,8 @@
         value={dimWeakResults ? 'on' : 'off'}
         on:change={(e) => onDimWeakResultsChange(e.currentTarget.value === 'on')}
       >
-        <option value="on">On</option>
-        <option value="off">Off</option>
+        <option value="on">{m.lore_general_on()}</option>
+        <option value="off">{m.lore_general_off()}</option>
       </select>
     </div>
   </section>
@@ -97,31 +97,28 @@
   {#if loadError}
     <section class="field">
       <div class="field-head">
-        <h3 class="field-title section-title">Search pipeline</h3>
+        <h3 class="field-title section-title">{m.lore_general_pipeline()}</h3>
         <p class="field-desc error-text">
-          Could not load search settings — is the sidecar running? ({loadError})
+          {m.lore_general_load_error({ error: loadError })}
         </p>
       </div>
     </section>
   {:else if !settings}
-    <p class="field-desc">Loading…</p>
+    <p class="field-desc">{m.lore_general_loading()}</p>
   {:else}
     <section class="field">
       <div class="field-head">
-        <h3 class="field-title section-title">Search pipeline</h3>
+        <h3 class="field-title section-title">{m.lore_general_pipeline()}</h3>
         <p class="field-desc">
-          How search ranks results. Applies to the app's search bar 
-	  and MCP calls alike.
+          {m.lore_general_pipeline_desc()}
         </p>
       </div>
 
       <div class="setting-row">
         <div class="setting-row-head">
-          <div class="setting-row-title">Re-rank results</div>
+          <div class="setting-row-title">{m.lore_general_rerank()}</div>
           <div class="setting-row-desc">
-            Rescores the top candidates with a cross-encoder for a more
-            accurate ordering. Strong impact on relevance, but also performance.
-	    Turn off if search is deemed too slow.
+            {m.lore_general_rerank_desc()}
           </div>
         </div>
         <select
@@ -129,17 +126,16 @@
           value={settings.rerank ? 'on' : 'off'}
           on:change={setBool('rerank')}
         >
-          <option value="on">On</option>
-          <option value="off">Off</option>
+          <option value="on">{m.lore_general_on()}</option>
+          <option value="off">{m.lore_general_off()}</option>
         </select>
       </div>
 
       <div class="setting-row" class:dimmed={!settings.rerank}>
         <div class="setting-row-head">
-          <div class="setting-row-title">Re-rank pool size</div>
+          <div class="setting-row-title">{m.lore_general_pool()}</div>
           <div class="setting-row-desc">
-            How many candidates the re-ranker rescores. Deeper reaches
-            further into the library but slows every search down.
+            {m.lore_general_pool_desc()}
           </div>
         </div>
         <select
@@ -150,12 +146,12 @@
         >
           {#if poolIsCustom}
             <option value={String(settings.rerank_candidates)}>
-              Custom ({settings.rerank_candidates})
+              {m.lore_general_pool_custom({ size: settings.rerank_candidates })}
             </option>
           {/if}
           {#each RERANK_POOL_PRESETS as preset}
             <option value={String(preset.value)}>
-              {preset.label} ({preset.value})
+              {m.lore_general_pool_preset({ label: preset.label(), size: preset.value })}
             </option>
           {/each}
         </select>
@@ -163,10 +159,9 @@
 
       <div class="setting-row">
         <div class="setting-row-head">
-          <div class="setting-row-title">Spell correction</div>
+          <div class="setting-row-title">{m.lore_general_spell()}</div>
           <div class="setting-row-desc">
-            Fixes typos against your library's own vocabulary before
-            searching.
+            {m.lore_general_spell_desc()}
           </div>
         </div>
         <select
@@ -174,17 +169,16 @@
           value={settings.spell_correction ? 'on' : 'off'}
           on:change={setBool('spell_correction')}
         >
-          <option value="on">On</option>
-          <option value="off">Off</option>
+          <option value="on">{m.lore_general_on()}</option>
+          <option value="off">{m.lore_general_off()}</option>
         </select>
       </div>
 
       <div class="setting-row">
         <div class="setting-row-head">
-          <div class="setting-row-title">Hybrid keyword search</div>
+          <div class="setting-row-title">{m.lore_general_hybrid()}</div>
           <div class="setting-row-desc">
-            Adds exact-keyword (BM25) matches to semantic results. Helps
-            rare names and exact terms.
+            {m.lore_general_hybrid_desc()}
           </div>
         </div>
         <select
@@ -192,19 +186,19 @@
           value={settings.hybrid ? 'on' : 'off'}
           on:change={setBool('hybrid')}
         >
-          <option value="on">On</option>
-          <option value="off">Off</option>
+          <option value="on">{m.lore_general_on()}</option>
+          <option value="off">{m.lore_general_off()}</option>
         </select>
       </div>
 
       <fieldset class="experimental-group">
-        <legend class="experimental-legend readout-label">Experimental</legend>
+        <legend class="experimental-legend readout-label">{m.lore_general_experimental()}</legend>
 
         <div class="setting-row">
           <div class="setting-row-head">
-            <div class="setting-row-title">Spacing-variant expansion</div>
+            <div class="setting-row-title">{m.lore_general_variants()}</div>
             <div class="setting-row-desc">
-              Searches spacing variants ("chainmail" / "chain mail").
+              {m.lore_general_variants_desc()}
             </div>
           </div>
           <select
@@ -212,19 +206,19 @@
             value={settings.variant_expansion ? 'on' : 'off'}
             on:change={setBool('variant_expansion')}
           >
-            <option value="on">On</option>
-            <option value="off">Off</option>
+            <option value="on">{m.lore_general_on()}</option>
+            <option value="off">{m.lore_general_off()}</option>
           </select>
         </div>
       </fieldset>
 
       {#if saveError}
-        <p class="field-desc error-text">Could not save: {saveError}</p>
+        <p class="field-desc error-text">{m.lore_general_save_error({ error: saveError })}</p>
       {/if}
 
       <div class="meta-row">
         <button type="button" class="btn-link" on:click={restoreDefaults}>
-          restore defaults
+          {m.lore_general_restore()}
         </button>
       </div>
     </section>

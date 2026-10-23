@@ -17,6 +17,7 @@
   import type { FilterSection } from './filterRows';
   import { CARET_RIGHT, GEM, GEM_OUTLINE, SHIELD } from '../ui/iconPaths';
   import { hoverLive } from '../ui/inputModality';
+  import { m } from '../paraglide/messages';
 
   // DAW-style filter state for game systems.
   //   - excludedSystems: muted rows (M lit). Empty = nothing muted.
@@ -294,8 +295,8 @@
     view: (showHidden && hasHidden) || hideUnindexed || hideOutOfScope || hideImages,
   } satisfies Record<FilterSection, boolean>;
   $: curationRows = [
-    { key: 'collected' as CurationKey, name: 'In a collection', count: collectedCount },
-    { key: 'loose' as CurationKey, name: 'Loose', count: uncollectedCount },
+    { key: 'collected' as CurationKey, name: m.lore_filters_collected, count: collectedCount },
+    { key: 'loose' as CurationKey, name: m.lore_filters_loose, count: uncollectedCount },
   ];
 </script>
 
@@ -308,8 +309,8 @@
   on:pointerleave={() => (hoveredRow = null)}
 >
   <header class="panel-head nameplate">
-    <span class="panel-name ledger-label">Filters</span>
-    <button class="plate-btn" on:click={onClearAll} disabled={!canReset}>reset</button>
+    <span class="panel-name ledger-label">{m.lore_filters_title()}</span>
+    <button class="plate-btn" on:click={onClearAll} disabled={!canReset}>{m.lore_filters_reset()}</button>
   </header>
 
   <div class="panel-body">
@@ -321,7 +322,7 @@
         aria-expanded={!collapsed.has('curation')}
         data-fm-key="sect:curation"
         on:click={() => clickHeader('curation')}
-      ><svg class="caret sect-arrow" class:open={!collapsed.has('curation')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>Curation{#if collapsed.has('curation') && sectionEngaged.curation}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
+      ><svg class="caret sect-arrow" class:open={!collapsed.has('curation')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>{m.lore_filters_curation()}{#if collapsed.has('curation') && sectionEngaged.curation}<span class="sect-lamp" role="img" aria-label={m.lore_filters_section_active()} title={m.lore_filters_section_active()}></span>{/if}</button>
       {#if !collapsed.has('curation')}
       {#each curationRows as ch (ch.key)}
         {@const soloed = curationSolos.has(ch.key)}
@@ -359,7 +360,7 @@
           >
             <path d={ch.key === 'loose' ? GEM_OUTLINE : GEM}/>
           </svg>
-          <span class="row-name">{ch.name}</span>
+          <span class="row-name">{ch.name()}</span>
           <span class="sm" class:engaged={soloed || muted}>
             <button
               type="button"
@@ -369,8 +370,8 @@
               on:click|stopPropagation={() => onToggleCurationSolo(ch.key)}
               aria-pressed={soloed}
               title={ch.key === 'collected'
-                ? (soloed ? 'Stop soloing collected files' : 'Solo collected files (show only collection)')
-                : (soloed ? 'Stop soloing loose files' : 'Solo loose files (show only loose)')}
+                ? (soloed ? m.lore_filters_unsolo_collected() : m.lore_filters_solo_collected())
+                : (soloed ? m.lore_filters_unsolo_loose() : m.lore_filters_solo_loose())}
             >S</button>
             <button
               type="button"
@@ -380,8 +381,8 @@
               on:click|stopPropagation={() => onToggleCurationMute(ch.key)}
               aria-pressed={muted}
               title={ch.key === 'collected'
-                ? (muted ? 'Unmute collected files' : 'Mute collected files')
-                : (muted ? 'Unmute loose files' : 'Mute loose files')}
+                ? (muted ? m.lore_filters_unmute_collected() : m.lore_filters_mute_collected())
+                : (muted ? m.lore_filters_unmute_loose() : m.lore_filters_mute_loose())}
             >M</button>
           </span>
           <span class="row-count">{ch.count}</span>
@@ -398,7 +399,7 @@
         aria-expanded={!collapsed.has('system')}
         data-fm-key="sect:system"
         on:click={() => clickHeader('system')}
-      ><svg class="caret sect-arrow" class:open={!collapsed.has('system')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>Game systems{#if collapsed.has('system') && sectionEngaged.system}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}</button>
+      ><svg class="caret sect-arrow" class:open={!collapsed.has('system')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>{m.lore_filters_game_systems()}{#if collapsed.has('system') && sectionEngaged.system}<span class="sect-lamp" role="img" aria-label={m.lore_filters_section_active()} title={m.lore_filters_section_active()}></span>{/if}</button>
       {#if collapsed.has('system')}
         <!-- Folded shut: nothing below renders. -->
       {:else if systems.length > 0}
@@ -431,8 +432,8 @@
                 data-sm-s
                 on:click|stopPropagation={() => onToggleSolo(name)}
                 aria-pressed={soloed}
-                aria-label={soloed ? `Stop soloing ${name}` : `Solo ${name}`}
-                title={soloed ? `Stop soloing ${name} (S)` : `Solo ${name} (S)`}
+                aria-label={soloed ? m.lore_filters_unsolo_system({ name }) : m.lore_filters_solo_system({ name })}
+                title={(soloed ? m.lore_filters_unsolo_system({ name }) : m.lore_filters_solo_system({ name })) + ' (S)'}
               >S</button>
               <button
                 type="button"
@@ -441,8 +442,8 @@
                 data-sm-m
                 on:click|stopPropagation={() => onToggleSystem(name)}
                 aria-pressed={muted}
-                aria-label={muted ? `Unmute ${name}` : `Mute ${name}`}
-                title={muted ? `Unmute ${name} (M)` : `Mute ${name} (M)`}
+                aria-label={muted ? m.lore_filters_unmute_system({ name }) : m.lore_filters_mute_system({ name })}
+                title={(muted ? m.lore_filters_unmute_system({ name }) : m.lore_filters_mute_system({ name })) + ' (M)'}
               >M</button>
             </span>
             <span class="row-count">{count}</span>
@@ -456,7 +457,7 @@
             class:dimmed={muted}
             class:kb-focused={focusedRow === `system:${UNTAGGED_KEY}`}
             class:hovered={$hoverLive && hoveredRow === `system:${UNTAGGED_KEY}`}
-            title="Files with no game-system tag"
+            title={m.lore_filters_untagged_title()}
             data-fm-key="system:{UNTAGGED_KEY}"
             on:click={() => clickRow(`system:${UNTAGGED_KEY}`)}
             on:pointerenter={() => enterRow(`system:${UNTAGGED_KEY}`)}
@@ -466,7 +467,7 @@
             <svg class="row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="3.2 2.4" aria-hidden="true">
               <path d={SHIELD}/>
             </svg>
-            <span class="row-name">Untagged</span>
+            <span class="row-name">{m.lore_filters_untagged()}</span>
             <span class="sm" class:engaged={muted}>
               <span class="sm-spacer" aria-hidden="true"></span>
               <button
@@ -476,15 +477,15 @@
                 data-sm-m
                 on:click|stopPropagation={() => onToggleSystem(UNTAGGED_KEY)}
                 aria-pressed={muted}
-                aria-label={muted ? 'Unmute untagged files' : 'Mute untagged files'}
-                title={muted ? 'Unmute untagged files (M)' : 'Mute untagged files (M)'}
+                aria-label={muted ? m.lore_filters_unmute_untagged() : m.lore_filters_mute_untagged()}
+                title={(muted ? m.lore_filters_unmute_untagged() : m.lore_filters_mute_untagged()) + ' (M)'}
               >M</button>
             </span>
             <span class="row-count">{untaggedCount}</span>
           </div>
         {/if}
       {:else}
-        <div class="empty">No game systems detected yet. Index some files first.</div>
+        <div class="empty">{m.lore_filters_no_systems()}</div>
       {/if}
     {/if}
 
@@ -496,10 +497,10 @@
         class="sect sect-toggle ledger-label"
         aria-expanded={!collapsed.has('view')}
         on:click={() => clickHeader('view')}
-      ><svg class="caret sect-arrow" class:open={!collapsed.has('view')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>Hidden items</button>
-      {#if collapsed.has('view') && sectionEngaged.view}<span class="sect-lamp" role="img" aria-label="Filters active in this section" title="Filters active in this section"></span>{/if}
+      ><svg class="caret sect-arrow" class:open={!collapsed.has('view')} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT}/></svg>{m.lore_filters_hidden_items()}</button>
+      {#if collapsed.has('view') && sectionEngaged.view}<span class="sect-lamp" role="img" aria-label={m.lore_filters_section_active()} title={m.lore_filters_section_active()}></span>{/if}
       {#if hasHidden}
-        <button class="reset-link" on:click={onClearHidden}>Clear</button>
+        <button class="reset-link" on:click={onClearHidden}>{m.lore_filters_clear_hidden()}</button>
       {/if}
     </div>
     {#if !collapsed.has('view')}
@@ -509,20 +510,20 @@
       class:row-disabled={!hasHidden}
       class:kb-focused={focusedRow === 'view:showHidden'}
       class:hovered={$hoverLive && hoveredRow === 'view:showHidden'}
-      title={hasHidden ? 'Reveal hidden files and folders in the tree' : 'Right-click any file or folder to hide it'}
+      title={hasHidden ? m.lore_filters_show_hidden_title() : m.lore_filters_show_hidden_none()}
       data-fm-key="view:showHidden"
       on:click={() => clickRow('view:showHidden')}
       on:pointerenter={() => enterRow('view:showHidden')}
       on:pointerleave={() => leaveRow('view:showHidden')}
     >
-      <span class="row-name muted-name">Show hidden items</span>
+      <span class="row-name muted-name">{m.lore_filters_show_hidden()}</span>
       <span class="row-count">{hiddenCount}</span>
       <button
         type="button"
         class="app-checkbox"
         role="checkbox"
         aria-checked={showHidden}
-        aria-label="Show hidden items"
+        aria-label={m.lore_filters_show_hidden()}
         disabled={!hasHidden}
         data-fm-action
         on:click|stopPropagation={onToggleShowHidden}
@@ -534,19 +535,19 @@
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideUnindexed'}
       class:hovered={$hoverLive && hoveredRow === 'view:hideUnindexed'}
-      title="Hide files and folders the library knows nothing about — not indexed, not selected for indexing"
+      title={m.lore_filters_hide_unindexed_title()}
       data-fm-key="view:hideUnindexed"
       on:click={() => clickRow('view:hideUnindexed')}
       on:pointerenter={() => enterRow('view:hideUnindexed')}
       on:pointerleave={() => leaveRow('view:hideUnindexed')}
     >
-      <span class="row-name muted-name">Hide unindexed items</span>
+      <span class="row-name muted-name">{m.lore_filters_hide_unindexed()}</span>
       <button
         type="button"
         class="app-checkbox lens-checkbox"
         role="checkbox"
         aria-checked={hideUnindexed}
-        aria-label="Hide unindexed items"
+        aria-label={m.lore_filters_hide_unindexed()}
         data-fm-action
         on:click|stopPropagation={onToggleHideUnindexed}
       ></button>
@@ -557,19 +558,19 @@
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideOutOfScope'}
       class:hovered={$hoverLive && hoveredRow === 'view:hideOutOfScope'}
-      title="Hide dimmed out-of-scope rows in the tree and systems view"
+      title={m.lore_filters_hide_out_of_scope_title()}
       data-fm-key="view:hideOutOfScope"
       on:click={() => clickRow('view:hideOutOfScope')}
       on:pointerenter={() => enterRow('view:hideOutOfScope')}
       on:pointerleave={() => leaveRow('view:hideOutOfScope')}
     >
-      <span class="row-name muted-name">Hide out-of-scope items</span>
+      <span class="row-name muted-name">{m.lore_filters_hide_out_of_scope()}</span>
       <button
         type="button"
         class="app-checkbox lens-checkbox"
         role="checkbox"
         aria-checked={hideOutOfScope}
-        aria-label="Hide out-of-scope items"
+        aria-label={m.lore_filters_hide_out_of_scope()}
         data-fm-action
         on:click|stopPropagation={onToggleHideOutOfScope}
       ></button>
@@ -580,19 +581,19 @@
       class="row lens-row"
       class:kb-focused={focusedRow === 'view:hideImages'}
       class:hovered={$hoverLive && hoveredRow === 'view:hideImages'}
-      title="Hide the images the tree lists beside the books"
+      title={m.lore_filters_hide_images_title()}
       data-fm-key="view:hideImages"
       on:click={() => clickRow('view:hideImages')}
       on:pointerenter={() => enterRow('view:hideImages')}
       on:pointerleave={() => leaveRow('view:hideImages')}
     >
-      <span class="row-name muted-name">Hide images</span>
+      <span class="row-name muted-name">{m.lore_filters_hide_images()}</span>
       <button
         type="button"
         class="app-checkbox lens-checkbox"
         role="checkbox"
         aria-checked={hideImages}
-        aria-label="Hide images"
+        aria-label={m.lore_filters_hide_images()}
         data-fm-action
         on:click|stopPropagation={onToggleHideImages}
       ></button>

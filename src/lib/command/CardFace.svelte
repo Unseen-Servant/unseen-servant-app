@@ -15,6 +15,7 @@
   import type { Plugin } from 'svelte-exmarkdown';
   import { CARD_ACTIONS, NOTE_HREF, linkify, type CardActions, type CardData } from './board';
   import { IMAGE_SOURCE, embedImages, rehypeEmbeds, type ImageSourceStore } from './embeds';
+  import { m } from '../paraglide/messages';
 
   export let data: CardData;
   /** In the card tray, where every card is live: it doesn't light, and the
@@ -31,7 +32,7 @@
   let plugins: Plugin[];
   $: plugins = [gfmPlugin(), { rehypePlugin: [rehypeEmbeds, $images, path] }];
   $: missing = card.kind === 'note' && card.path === null;
-  $: title = data.name || card.text.split('/').pop()?.replace(/\.md$/i, '') || 'Untitled';
+  $: title = data.name || card.text.split('/').pop()?.replace(/\.md$/i, '') || m.command_card_untitled();
   $: image = card.kind === 'image';
   $: src = image && card.path ? $images.file(card.path) : null;
   /** The webview couldn't load the picture: gone meanwhile, or outside
@@ -71,8 +72,8 @@
       <button
         type="button"
         class="source-key nodrag"
-        title="Open the source at its page"
-        aria-label="Open the source"
+        title={m.command_card_source_title()}
+        aria-label={m.command_card_source_label()}
         on:click|stopPropagation={() => void openUrl(source).catch(() => {})}
       >
         <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={BOOK} /></svg>
@@ -84,7 +85,7 @@
         class="play-key nodrag"
         class:playing={data.live}
         aria-pressed={data.live}
-        title={data.live ? `Take ${title} out of play` : `Play ${title}`}
+        title={data.live ? m.command_card_unplay({ name: title }) : m.command_card_play({ name: title })}
         on:click|stopPropagation={() => actions.launch(card, !data.live)}
       >
         {#if data.live}
@@ -104,14 +105,14 @@
       {#if src && !failed}
         <img {src} alt={title} draggable="false" on:error={() => (failed = true)} />
       {:else}
-        <p class="note-missing">Nothing is at {card.path} any more.</p>
+        <p class="note-missing">{m.command_card_missing({ path: card.path ?? '' })}</p>
       {/if}
     </div>
   {:else}
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="card-body nowheel" on:click={click}>
       {#if missing}
-        <p class="note-missing">Nothing is at {card.text} any more.</p>
+        <p class="note-missing">{m.command_card_missing({ path: card.text })}</p>
       {:else if data.body !== null}
         <Markdown md={linkify(embedImages(data.body))} {plugins} />
       {/if}

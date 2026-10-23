@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
   import ReadyTag from '../shell/help/ReadyTag.svelte';
+  import { m } from '../paraglide/messages';
 
   export let mcpConnected: boolean = false;
   export let onCopyMcpConfig: () => void;
@@ -12,25 +14,20 @@
   <section class="field">
     <div class="field-title-row">
       <h3 class="field-title section-title">
-        AI agent <span class="opt">(optional)</span>
+        <ParaglideMessage message={m.servant_guide_agent}>
+          {#snippet opt({ children })}<span class="opt">{@render children?.()}</span>{/snippet}
+        </ParaglideMessage>
       </h3>
-      <ReadyTag lit={mcpConnected} state={mcpConnected ? 'Connected' : 'Not detected'} />
+      <ReadyTag lit={mcpConnected} state={mcpConnected ? m.servant_guide_connected() : m.servant_guide_not_detected()} />
     </div>
+    <p class="field-desc">{m.servant_guide_intro()}</p>
+    <button class="btn-link" on:click={onCopyMcpConfig}>{m.servant_guide_copy()}</button>
     <p class="field-desc">
-      An AI agent that speaks MCP can search your Legend Lore library and read
-      and write your Command campaigns. Help &rarr; Reference lists its tools.
+      <ParaglideMessage message={m.servant_guide_paste}>
+        {#snippet em({ children })}<em>{@render children?.()}</em>{/snippet}
+      </ParaglideMessage>
     </p>
-    <button class="btn-link" on:click={onCopyMcpConfig}>copy MCP config</button>
-    <p class="field-desc">
-      Paste it into the agent's MCP settings (inside its <em>mcpServers</em> if
-      others are listed) and restart the agent. Keep Unseen Servant running;
-      closing its window doesn't quit it.
-    </p>
-    <p class="field-desc">
-      The agent searches the whole library unless it names a collection: what
-      plays here doesn't scope it. What its tools return goes to the agent's
-      model, which may run in the cloud; the PDFs themselves stay here.
-    </p>
+    <p class="field-desc">{m.servant_guide_scope()}</p>
   </section>
 </div>
 

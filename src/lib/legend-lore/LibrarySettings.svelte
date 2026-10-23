@@ -4,6 +4,7 @@
   import { FOLDER, FOLDER_OPEN } from '../ui/iconPaths';
   import ActionButton from '../ui/ActionButton.svelte';
   import { confirmPrompt } from '../shell/confirmStore';
+  import { m } from '../paraglide/messages';
 
   export let selectedFolder: string = '';
   export let indexedFileCount: number = 0;
@@ -27,28 +28,28 @@
   type PolicyKey = 'diskEventsPolicy' | 'selectionPolicy' | 'deselectionPolicy' | 'modificationPolicy';
   const policyGroups: Array<{
     key: PolicyKey;
-    title: string;
-    desc: string;
+    title: () => string;
+    desc: () => string;
   }> = [
     {
       key: 'diskEventsPolicy',
-      title: 'Renames, missing files, and stale selections',
-      desc: 'Same content, but the filename or location changed — or the file is no longer there.',
+      title: m.lore_library_policy_disk,
+      desc: m.lore_library_policy_disk_desc,
     },
     {
       key: 'selectionPolicy',
-      title: 'New files you select',
-      desc: 'Embedding work; defaults to asking so you can batch.',
+      title: m.lore_library_policy_select,
+      desc: m.lore_library_policy_select_desc,
     },
     {
       key: 'deselectionPolicy',
-      title: 'Files you deselect',
-      desc: 'Drops chunks. Re-selecting later requires re-embedding.',
+      title: m.lore_library_policy_deselect,
+      desc: m.lore_library_policy_deselect_desc,
     },
     {
       key: 'modificationPolicy',
-      title: 'Files modified on disk',
-      desc: 'Same filename, but the contents are different — needs re-indexing.',
+      title: m.lore_library_policy_modified,
+      desc: m.lore_library_policy_modified_desc,
     },
   ];
 
@@ -78,13 +79,13 @@
     // the delete prompt below states the same figure the same way. A readout
     // column holds figures; the unit belongs to the label.
     if (!(await confirmPrompt.request({
-      title: 'Re-index all files',
+      title: m.lore_library_reindex_title(),
       rows: [
-        { label: 'Files', value: String(indexedFileCount), to: 'reprocessed' },
-        { label: 'Chunks', value: totalChunks.toLocaleString(), to: 'rebuilt' },
+        { label: m.lore_library_row_files(), value: String(indexedFileCount), to: m.lore_library_to_reprocessed() },
+        { label: m.lore_library_row_chunks(), value: totalChunks.toLocaleString(), to: m.lore_library_to_rebuilt() },
       ],
-      message: 'Every file is re-extracted and re-embedded. Nothing is deleted.',
-      confirmLabel: 'Re-index all',
+      message: m.lore_library_reindex_message(),
+      confirmLabel: m.lore_library_reindex_confirm(),
     }))) return;
     onReindexAll();
   }
@@ -94,31 +95,31 @@
     // A removal, and the one prompt in the app whose readout is the whole
     // argument: three figures going to zero, and a fourth that does not move.
     if (!(await confirmPrompt.request({
-      title: 'Delete the index',
+      title: m.lore_library_delete_title(),
       rows: [
-        { label: 'Files', value: String(indexedFileCount), to: '0' },
-        { label: 'Chunks', value: totalChunks.toLocaleString(), to: '0' },
+        { label: m.lore_library_row_files(), value: String(indexedFileCount), to: '0' },
+        { label: m.lore_library_row_chunks(), value: totalChunks.toLocaleString(), to: '0' },
         // Dropped rather than shown as "0 B → 0 B" when the store reports
         // nothing: storageBytes can be 0 with files still indexed, and a row
         // whose before and after are the same figure states nothing. The
         // Database section guards the same value the same way.
         ...(storageBytes > 0
-          ? [{ label: 'Storage', value: formatSize(storageBytes), to: '0 B' }]
+          ? [{ label: m.lore_library_storage(), value: formatSize(storageBytes), to: m.lore_library_size_b({ size: 0 }) }]
           : []),
-        { label: 'PDFs', value: String(indexedFileCount), to: 'untouched', unchanged: true },
+        { label: m.lore_library_row_pdfs(), value: String(indexedFileCount), to: m.lore_library_to_untouched(), unchanged: true },
       ],
-      message: 'Your library folder is not touched. The index rebuilds on the next sync.',
-      confirmLabel: 'Delete index',
+      message: m.lore_library_delete_message(),
+      confirmLabel: m.lore_library_delete_confirm(),
       danger: true,
     }))) return;
     onDeleteIndex();
   }
 
   function formatSize(bytes: number): string {
-    if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
-    if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB';
-    if (bytes >= 1_024) return (bytes / 1_024).toFixed(0) + ' KB';
-    return bytes + ' B';
+    if (bytes >= 1_073_741_824) return m.lore_library_size_gb({ size: (bytes / 1_073_741_824).toFixed(1) });
+    if (bytes >= 1_048_576) return m.lore_library_size_mb({ size: (bytes / 1_048_576).toFixed(1) });
+    if (bytes >= 1_024) return m.lore_library_size_kb({ size: (bytes / 1_024).toFixed(0) });
+    return m.lore_library_size_b({ size: bytes });
   }
 
   $: coveragePct = totalFilesFound > 0
@@ -126,19 +127,16 @@
     : 0;
 
   function formatRelative(date: Date | null): string {
-    if (!date) return 'Never';
+    if (!date) return m.lore_library_never();
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 30) return 'just now';
-    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 30) return m.lore_library_just_now();
+    if (seconds < 60) return m.lore_library_seconds_ago({ seconds });
     const minutes = Math.floor(seconds / 60);
-    if (minutes === 1) return '1 minute ago';
-    if (minutes < 60) return `${minutes} minutes ago`;
+    if (minutes < 60) return m.lore_library_minutes_ago({ count: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours === 1) return '1 hour ago';
-    if (hours < 24) return `${hours} hours ago`;
+    if (hours < 24) return m.lore_library_hours_ago({ count: hours });
     const days = Math.floor(hours / 24);
-    if (days === 1) return '1 day ago';
-    return `${days} days ago`;
+    return m.lore_library_days_ago({ count: days });
   }
 
   $: lastSyncRelative = formatRelative(lastSyncTime);
@@ -148,37 +146,36 @@
 <div class="library-settings">
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title section-title">Library stats</h3>
+      <h3 class="field-title section-title">{m.lore_library_stats()}</h3>
     </div>
 
     {#if indexedFileCount > 0 || totalFilesFound > 0}
-      <div class="stat-block" role="group" aria-label="Library stats">
+      <div class="stat-block" role="group" aria-label={m.lore_library_stats()}>
         <div class="stat-cell">
-          <div class="readout-label">INDEXED</div>
+          <div class="readout-label">{m.lore_library_stat_indexed()}</div>
           <div class="stat-value">
             {indexedFileCount.toLocaleString()}{#if totalFilesFound > 0}&nbsp;<span class="stat-muted">/&nbsp;{totalFilesFound.toLocaleString()}</span>&nbsp;<span class="stat-pct">{coveragePct.toFixed(1)}%</span>{/if}
           </div>
         </div>
         <div class="stat-cell">
-          <div class="readout-label">CHUNKS</div>
+          <div class="readout-label">{m.lore_library_stat_chunks()}</div>
           <div class="stat-value">{totalChunks.toLocaleString()}</div>
         </div>
         <div class="stat-cell">
-          <div class="readout-label">SYS</div>
+          <div class="readout-label">{m.lore_library_stat_sys()}</div>
           <div class="stat-value">{gameSystemCount}</div>
         </div>
       </div>
     {:else}
-      <p class="field-desc">No files indexed yet.</p>
+      <p class="field-desc">{m.lore_library_none_indexed()}</p>
     {/if}
   </section>
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title section-title">Library folder</h3>
+      <h3 class="field-title section-title">{m.lore_library_folder()}</h3>
       <p class="field-desc">
-        Legend Lore indexes PDFs from this folder. Changing the folder doesn't
-        remove anything that's already indexed — use Re-index all below to rebuild.
+        {m.lore_library_folder_desc()}
       </p>
     </div>
 
@@ -188,7 +185,7 @@
         class="path-input"
         readonly
         value={selectedFolder}
-        placeholder="No folder selected"
+        placeholder={m.lore_library_folder_none()}
         title={selectedFolder}
       />
       <button
@@ -196,8 +193,8 @@
         class="btn-icon"
         on:click={onSelectFolder}
         disabled={isSyncing}
-        title="Change library folder"
-        aria-label="Change library folder"
+        title={m.lore_library_folder_change()}
+        aria-label={m.lore_library_folder_change()}
       >
         <svg class="btn-icon-svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
           <path class="folder-shut" d={FOLDER}/>
@@ -213,9 +210,9 @@
           class="btn-link"
           on:click={onDeselectFolder}
           disabled={isSyncing}
-          title="Clear the library folder and return to the Getting Started screen"
+          title={m.lore_library_deselect_title()}
         >
-          deselect folder
+          {m.lore_library_deselect()}
         </button>
       </div>
     {/if}
@@ -223,18 +220,17 @@
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title section-title">Sync behavior</h3>
+      <h3 class="field-title section-title">{m.lore_library_sync()}</h3>
       <p class="field-desc">
-        How Legend Lore keeps the index in sync with your library folder.
+        {m.lore_library_sync_desc()}
       </p>
     </div>
 
     <div class="setting-row">
       <div class="setting-row-head">
-        <div class="setting-row-title">Check for changes</div>
+        <div class="setting-row-title">{m.lore_library_check()}</div>
         <div class="setting-row-desc">
-          How often to scan the library folder. "Never" means the index only
-          updates when you click Sync.
+          {m.lore_library_check_desc()}
         </div>
       </div>
       <select
@@ -243,54 +239,54 @@
         on:change={(e) => setCheckInterval(Number(e.currentTarget.value) as BackgroundCheckInterval)}
       >
         {#each BACKGROUND_CHECK_OPTIONS as opt}
-          <option value={opt.value}>{opt.label}</option>
+          <option value={opt.value}>{opt.label()}</option>
         {/each}
       </select>
     </div>
 
     <fieldset class="policy-group" disabled={syncPreferences.backgroundCheckInterval === 0}>
-      <legend class="policy-legend readout-label">When changes are detected</legend>
+      <legend class="policy-legend readout-label">{m.lore_library_policy_legend()}</legend>
 
       {#each policyGroups as group}
         <div class="setting-row">
           <div class="setting-row-head">
-            <div class="setting-row-title">{group.title}</div>
-            <div class="setting-row-desc">{group.desc}</div>
+            <div class="setting-row-title">{group.title()}</div>
+            <div class="setting-row-desc">{group.desc()}</div>
           </div>
           <select
             class="setting-select"
             value={syncPreferences[group.key]}
             on:change={(e) => setPolicy(group.key, e.currentTarget.value as BucketPolicy)}
           >
-            <option value="silent">Apply silently</option>
-            <option value="ask">Show a notification</option>
+            <option value="silent">{m.lore_library_policy_silent()}</option>
+            <option value="ask">{m.lore_library_policy_ask()}</option>
           </select>
         </div>
       {/each}
     </fieldset>
 
     <div class="meta-row">
-      <span class="meta-label readout-label">Last checked</span>
+      <span class="meta-label readout-label">{m.lore_library_last_checked()}</span>
       <span class="meta-value" title={lastSyncAbsolute}>
-        {isSyncing ? 'Syncing…' : lastSyncRelative}
+        {isSyncing ? m.lore_library_syncing() : lastSyncRelative}
       </span>
       <button
         type="button"
         class="btn-link"
         on:click={onSync}
         disabled={isSyncing}
-        title="Check the library folder for changes"
+        title={m.lore_library_sync_title()}
       >
-        sync
+        {m.lore_library_sync_key()}
       </button>
     </div>
   </section>
 
   <section class="field">
     <div class="field-head">
-      <h3 class="field-title section-title">Database</h3>
+      <h3 class="field-title section-title">{m.lore_library_database()}</h3>
       <p class="field-desc">
-        Where the index is stored on disk, and how much space it takes.
+        {m.lore_library_database_desc()}
       </p>
     </div>
 
@@ -300,7 +296,7 @@
         class="path-input"
         readonly
         value={dataDir}
-        placeholder="Resolving…"
+        placeholder={m.lore_library_resolving()}
         title={dataDir}
       />
       <button
@@ -308,8 +304,8 @@
         class="btn-icon"
         on:click={onOpenDataDir}
         disabled={!dataDir}
-        title="Open database folder"
-        aria-label="Open database folder"
+        title={m.lore_library_database_open()}
+        aria-label={m.lore_library_database_open()}
       >
         <svg class="btn-icon-svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
           <path class="folder-shut" d={FOLDER}/>
@@ -319,7 +315,7 @@
     </div>
 
     <div class="meta-row">
-      <span class="meta-label readout-label">Storage</span>
+      <span class="meta-label readout-label">{m.lore_library_storage()}</span>
       <span class="meta-value">
         {storageBytes > 0 ? formatSize(storageBytes) : '—'}
       </span>
@@ -335,36 +331,33 @@
        activation and takes the confirm accent, deleting is a removal and takes
        danger. Only the frame and the caption say "this bay is where the heavy
        levers live". -->
-  <section class="modal-bay" aria-label="Danger zone">
-    <span class="ledger-label danger-caption">Danger zone</span>
+  <section class="modal-bay" aria-label={m.lore_library_danger()}>
+    <span class="ledger-label danger-caption">{m.lore_library_danger()}</span>
     <div class="modal-well danger-bay">
       <div class="modal-well-row action-row">
         <span class="row-text">
-          <span class="row-title">Re-index all files</span>
-          Re-extracts and re-embeds every file in your index. Use after the
-          extractor has been upgraded, or if search results look stale.
+          <span class="row-title">{m.lore_library_reindex_title()}</span>
+          {m.lore_library_reindex_desc()}
           {#if outdatedFileCount > 0}
             <span class="row-note">
-              {outdatedFileCount} {outdatedFileCount === 1 ? 'file was' : 'files were'} indexed
-              with an older pipeline — re-index to pick up the current one.
+              {m.lore_library_outdated({ count: outdatedFileCount })}
             </span>
           {/if}
         </span>
         <ActionButton
-          label={isSyncing ? 'sync in progress…' : 're-index all'}
+          label={isSyncing ? m.lore_library_sync_in_progress() : m.lore_library_reindex_key()}
           onClick={handleReindexClick}
           disabled={isSyncing || indexedFileCount === 0}
         />
       </div>
       <div class="modal-well-row action-row">
         <span class="row-text">
-          <span class="row-title">Delete the index</span>
-          Removes every chunk and embedding. Your PDFs are untouched; the
-          index is rebuilt from scratch on the next sync.
+          <span class="row-title">{m.lore_library_delete_title()}</span>
+          {m.lore_library_delete_desc()}
         </span>
         <ActionButton
           danger
-          label="delete index"
+          label={m.lore_library_delete_key()}
           onClick={handleDeleteClick}
           disabled={isSyncing || indexedFileCount === 0}
         />

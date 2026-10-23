@@ -3,6 +3,8 @@
 // (app search bar and MCP), with explicit per-request fields still winning.
 // See docs/retrieval/2026-07-11-search-settings-design.md.
 
+import { m } from '../paraglide/messages';
+
 export interface SearchSettings {
   rerank: boolean;
   rerank_candidates: number;
@@ -25,12 +27,12 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
 // Preset pool sizes offered by the General tab. The API accepts any
 // clamped 10-200 value (e.g. set directly over HTTP); the dropdown adds a
 // "Custom (N)" entry for such values rather than silently rewriting them.
-export const RERANK_POOL_PRESETS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 10, label: 'Fastest' },
-  { value: 25, label: 'Fast' },
-  { value: 50, label: 'Balanced' },
-  { value: 100, label: 'Thorough' },
-  { value: 200, label: 'Exhaustive' },
+export const RERANK_POOL_PRESETS: ReadonlyArray<{ value: number; label: () => string }> = [
+  { value: 10, label: m.lore_searchsettings_pool_fastest },
+  { value: 25, label: m.lore_searchsettings_pool_fast },
+  { value: 50, label: m.lore_searchsettings_pool_balanced },
+  { value: 100, label: m.lore_searchsettings_pool_thorough },
+  { value: 200, label: m.lore_searchsettings_pool_exhaustive },
 ];
 
 export function clampPoolSize(value: number): number {

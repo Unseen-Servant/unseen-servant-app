@@ -5,6 +5,7 @@
   import { FOLDER, FOLDER_OPEN } from '../ui/iconPaths';
   import { commandApi } from './api';
   import type { CommandSettings } from './types';
+  import { m } from '../paraglide/messages';
 
   let settings: CommandSettings | null = null;
   let loadError: string | null = null;
@@ -45,15 +46,12 @@
 
 <div class="command-settings">
   {#if loadError}
-    <p class="field-desc error-text">Could not load Command's settings — is the sidecar running? ({loadError})</p>
+    <p class="field-desc error-text">{m.command_settings_load_error({ error: loadError })}</p>
   {:else if settings}
     <section class="field">
       <div class="field-head">
-        <h3 class="field-title section-title">Campaigns folder</h3>
-        <p class="field-desc">
-          Each campaign is a folder in here. Changing the folder closes the open
-          campaign and opens a fresh Untitled in the new one — nothing is moved.
-        </p>
+        <h3 class="field-title section-title">{m.command_settings_folder()}</h3>
+        <p class="field-desc">{m.command_settings_folder_desc()}</p>
       </div>
 
       <!-- Legend Lore's library folder row (LibrarySettings.svelte), copied. -->
@@ -63,15 +61,15 @@
           class="path-input"
           readonly
           value={settings.root ?? ''}
-          placeholder="No folder selected"
+          placeholder={m.command_settings_no_folder()}
           title={settings.root ?? ''}
         />
         <button
           type="button"
           class="btn-icon"
           on:click={chooseRoot}
-          title="Change campaigns folder"
-          aria-label="Change campaigns folder"
+          title={m.command_settings_change_folder()}
+          aria-label={m.command_settings_change_folder()}
         >
           <svg class="btn-icon-svg" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
             <path class="folder-shut" d={FOLDER}/>
@@ -83,31 +81,28 @@
 
     <section class="field">
       <div class="field-head">
-        <h3 class="field-title section-title">Play</h3>
-        <p class="field-desc">How Command keeps track of a session at the table.</p>
+        <h3 class="field-title section-title">{m.command_settings_play()}</h3>
+        <p class="field-desc">{m.command_settings_play_desc()}</p>
       </div>
 
       <div class="setting-row">
         <div class="setting-row-head">
-          <div class="setting-row-title">Spend beats on launch</div>
-          <div class="setting-row-desc">
-            Launching a beat marks it spent, so later sessions find it among the spent beats, not those still to play. Off, you tick
-            beats off by hand.
-          </div>
+          <div class="setting-row-title">{m.command_settings_spend()}</div>
+          <div class="setting-row-desc">{m.command_settings_spend_desc()}</div>
         </div>
         <select
           class="setting-select"
           value={settings.spend_on_launch ? 'on' : 'off'}
           on:change={(e) => setSpendOnLaunch(e.currentTarget.value === 'on')}
         >
-          <option value="on">On</option>
-          <option value="off">Off</option>
+          <option value="on">{m.command_settings_on()}</option>
+          <option value="off">{m.command_settings_off()}</option>
         </select>
       </div>
     </section>
     {#if saveError}<p class="field-desc error-text">{saveError}</p>{/if}
   {:else}
-    <p class="field-desc">Loading…</p>
+    <p class="field-desc">{m.command_settings_loading()}</p>
   {/if}
 </div>
 

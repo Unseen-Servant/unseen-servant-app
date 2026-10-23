@@ -5,6 +5,7 @@
   import { confirmPrompt } from '../shell/confirmStore';
   import { isCommitChord } from './confirmKeys';
   import { trackInputModality, type InputModality } from './inputModality';
+  import { m } from '../paraglide/messages';
 
   // Mounted once at page level; the store decides whether it is on screen and
   // what it asks. See confirmStore.ts for the call-site shape.
@@ -112,7 +113,7 @@
 
   <svelte:fragment slot="commit">
     <CommitSwitch
-      label={$confirmPrompt?.confirmLabel ?? 'Confirm'}
+      label={$confirmPrompt?.confirmLabel ?? m.ui_confirm_default()}
       {danger}
       onClick={accept}
       initialFocus={viaKeyboard && !danger}

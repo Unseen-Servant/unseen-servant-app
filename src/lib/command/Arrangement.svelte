@@ -16,6 +16,7 @@
   import { action, divider, keyed, type MenuItem, type OpenMenu } from './menu';
   import { memberPaths, type PlanRow } from './prep';
   import type { BeatEntry } from './types';
+  import { m } from '../paraglide/messages';
 
   export let rows: PlanRow[];
   /** The list unfolded. Folded, only the live beat's row shows. */
@@ -120,21 +121,21 @@
     focused = beat.path;
     const playing = beat.path === liveBeat;
     const items: MenuItem[] = [
-      keyed(playing ? 'Stop' : 'Launch', 'command.play', () => toggle(beat)),
-      playing ? keyed('Frame the live cards', 'command.boardFitLive', () => onFrame(beat)) : action('Frame its cards', () => onFrame(beat)),
+      keyed(playing ? m.command_arrangement_stop() : m.command_arrangement_launch(), 'command.play', () => toggle(beat)),
+      playing ? keyed(m.command_arrangement_frame_live(), 'command.boardFitLive', () => onFrame(beat)) : action(m.command_arrangement_frame_its(), () => onFrame(beat)),
       divider,
-      keyed(beat.spent ? 'Mark unspent' : 'Mark spent', 'command.spend', () => onSpent(beat, !beat.spent)),
-      keyed('Edit beat', 'command.open', () => onEdit(beat)),
+      keyed(beat.spent ? m.command_arrangement_mark_unspent() : m.command_arrangement_mark_spent(), 'command.spend', () => onSpent(beat, !beat.spent)),
+      keyed(m.command_arrangement_edit_beat(), 'command.open', () => onEdit(beat)),
     ];
     menu = { x: e.clientX, y: e.clientY, items };
   }
 </script>
 
-<section class="arrangement" aria-label="Session player">
+<section class="arrangement" aria-label={m.command_arrangement_label()}>
   <!-- The plate folds the list, as a group's title does in Prep. -->
   <button type="button" class="nameplate" aria-expanded={open} on:click={() => (open = !open)}>
     <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-    <span class="ledger-label">session player</span>
+    <span class="ledger-label">{m.command_arrangement_title()}</span>
   </button>
   {#if open || shown.length}
   <div class="plan">
@@ -152,7 +153,7 @@
           class:playing
           class:spent={!!beat.spent}
           class:hovered={$hoverLive && hovered === beat.path}
-          title={beat.spent ? `${beat.name} — spent ${beat.spent}` : beat.name}
+          title={beat.spent ? m.command_arrangement_name_spent({ name: beat.name, spent: beat.spent }) : beat.name}
           on:click={(e) => e.detail <= 1 && (focused = beat.path)}
           on:dblclick={() => onEdit(beat)}
           on:contextmenu|preventDefault={(e) => beatMenu(e, beat)}
@@ -169,7 +170,7 @@
               class="tr-btn"
               class:playing
               aria-pressed={playing}
-              title={`${playing ? 'Stop' : 'Launch'} ${beat.name} (P)`}
+              title={playing ? m.command_arrangement_stop_beat({ name: beat.name }) : m.command_arrangement_launch_beat({ name: beat.name })}
               on:click|stopPropagation={(e) => e.detail <= 1 && toggle(beat)}
             >
               {#if playing}
@@ -181,8 +182,8 @@
             <button
               type="button"
               class="tr-btn"
-              title={playing ? 'Frame the live cards' : `Frame the cards of ${beat.name}`}
-              aria-label={playing ? 'Frame the live cards' : `Frame the cards of ${beat.name}`}
+              title={playing ? m.command_arrangement_frame_live() : m.command_arrangement_frame_beat({ name: beat.name })}
+              aria-label={playing ? m.command_arrangement_frame_live() : m.command_arrangement_frame_beat({ name: beat.name })}
               on:click|stopPropagation={(e) => e.detail <= 1 && onFrame(beat)}
             >
               <!-- Font Awesome "expand" icon (src/lib/ui/icons/expand-solid-full.svg),
@@ -203,12 +204,12 @@
           <span class="row-count">{memberPaths(beat).size}</span>
         </div>
       {:else}
-        <div class="beat-row missing" title={`No beat is named “${row.link}” yet`}>
+        <div class="beat-row missing" title={m.command_arrangement_missing({ link: row.link })}>
           <span class="beat-name">{row.link}</span>
         </div>
       {/if}
     {:else}
-      <p class="quiet">Nothing planned. Beats added to the session in Prep show here.</p>
+      <p class="quiet">{m.command_arrangement_empty()}</p>
     {/each}
   </div>
   {/if}

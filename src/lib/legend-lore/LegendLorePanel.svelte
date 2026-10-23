@@ -64,6 +64,7 @@
   } from '../shell/storeParsers';
   import { parseScopeConsoleState } from './scopeConsole';
   import type { ScopeConsoleState } from './scopeConsole';
+  import { m } from '../paraglide/messages';
 
   // The host's dock toggle, drawn at the right end of the header (PANELS.md).
   export let windowKey: Snippet | undefined = undefined;
@@ -700,7 +701,7 @@
     if (!path) {
       jobNotification.show({
         type: 'error',
-        message: `Could not locate "${filename}" on disk.`,
+        message: m.lore_panel_open_missing({ filename }),
         duration: 4000,
       });
       return;
@@ -718,7 +719,7 @@
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Failed to open ${filename}: ${e}`,
+        message: m.lore_panel_open_failed({ filename, error: String(e) }),
         duration: 4000,
       });
     }
@@ -740,7 +741,7 @@
     function showSidecarFailure(payload: { log_path: string; message: string }) {
       jobNotification.show({
         type: 'error',
-        message: `Indexer failed to start. See log: ${payload.log_path}`,
+        message: m.lore_panel_sidecar_failed({ path: payload.log_path }),
         duration: null,
       });
     }
@@ -783,7 +784,7 @@
           // folder), via dismissIf below.
           missingFolderToastId = jobNotification.show({
             type: 'error',
-            message: `Library folder is no longer accessible: ${savedFolder}`,
+            message: m.lore_panel_library_missing({ folder: savedFolder }),
             duration: null,
           });
         }
@@ -1403,7 +1404,7 @@
     pendingNotification.show({
       type: 'action',
       message,
-      actionLabel: isSyncing ? 'sync queued' : 'sync',
+      actionLabel: isSyncing ? m.lore_panel_sync_queued() : m.lore_panel_sync(),
       actionDisabled: isSyncing,
       onAction: isSyncing ? undefined : handleSync,
       onDismiss: revertToSyncedPaths,
@@ -1697,7 +1698,7 @@
   })();
 
   $: topGameSystem = gameSystemStats.length > 0
-    ? `Top system: ${gameSystemStats[0].name} with ${gameSystemStats[0].count} file${gameSystemStats[0].count === 1 ? '' : 's'}`
+    ? m.lore_panel_top_system({ system: gameSystemStats[0].name, count: gameSystemStats[0].count })
     : '';
 
   // Collection mode derived state
@@ -2671,9 +2672,9 @@
     try {
       const sent = menu.result ? await sendToCommand(menu.result, track) : await sendImage(menu.item.path, track);
       const name = sent.path.split('/').pop()?.replace(/\.md$/, '') ?? sent.path;
-      jobNotification.show({ type: 'success', message: `Sent to Command: ${name} in ${sent.campaign} › ${track ?? 'Shelf'}`, duration: 4000 });
+      jobNotification.show({ type: 'success', message: m.lore_panel_send_done({ name, campaign: sent.campaign, track: track ?? m.lore_panel_send_shelf() }), duration: 4000 });
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Couldn't send to Command: ${e}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: m.lore_panel_send_failed({ error: String(e) }), duration: 5000 });
     }
   }
 
@@ -2682,7 +2683,7 @@
     try {
       await openPath(path);
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Failed to open file: ${String(e)}`, duration: 4000 });
+      jobNotification.show({ type: 'error', message: m.lore_panel_open_file_failed({ error: String(e) }), duration: 4000 });
     }
   }
 
@@ -2765,17 +2766,17 @@
     // Not danger: rebuilding chunks destroys nothing, so the prompt focuses
     // Confirm and Enter rips straight through it.
     const confirmed = await confirmPrompt.request({
-      title: 'Re-index file',
-      message: `Re-index "${item.name}"? This rebuilds its chunks.`,
-      confirmLabel: 'Re-index',
+      title: m.lore_panel_reindex_title(),
+      message: m.lore_panel_reindex_message({ name: item.name }),
+      confirmLabel: m.lore_panel_reindex_confirm(),
     });
     if (!confirmed) return;
     try {
       await invoke('reindex_file', { path: item.path });
       await refreshIndexStatus();
-      jobNotification.show({ type: 'success', message: `Re-indexed ${item.name}`, duration: 3000 });
+      jobNotification.show({ type: 'success', message: m.lore_panel_reindex_done({ name: item.name }), duration: 3000 });
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Re-index failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: m.lore_panel_reindex_failed({ error: String(e) }), duration: 5000 });
     }
   }
 
@@ -2839,11 +2840,10 @@
   // and the ⌘⌫ / Del chord on the focused row — both act on a single item,
   // never on the checkbox selection.
   async function deleteItem(item: FileItem) {
-    const label = item.is_dir ? 'folder' : 'file';
     const confirmed = await confirmPrompt.request({
-      title: `Delete ${label}`,
-      message: `Move "${item.name}" to Trash?`,
-      confirmLabel: 'Delete',
+      title: item.is_dir ? m.lore_panel_delete_folder_title() : m.lore_panel_delete_file_title(),
+      message: m.lore_panel_delete_message({ name: item.name }),
+      confirmLabel: m.lore_panel_delete_confirm(),
       danger: true,
     });
     if (!confirmed) return;
@@ -2870,7 +2870,7 @@
       if (selectedFolder) await loadFiles(selectedFolder);
       refreshIndexStatus();
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: m.lore_panel_delete_failed({ error: String(e) }), duration: 5000 });
     }
   }
 
@@ -2962,7 +2962,7 @@
       const msg = String(e);
       const isMissing = msg === 'File not found' || msg === 'Folder not found';
       return isMissing
-        ? `${msg} — the ${isDir ? 'folder' : 'file'} may have been moved or renamed outside the app. Press ${chord('sync.run')} to refresh and try again.`
+        ? (isDir ? m.lore_panel_rename_missing_folder : m.lore_panel_rename_missing_file)({ reason: msg, chord: chord('sync.run') })
         : msg;
     }
   }
@@ -3019,7 +3019,7 @@
       armedCollection = null;
       jobNotification.show({
         type: 'error',
-        message: `Could not save "${name}" — reverted to the last saved state. ${String(err)}`,
+        message: m.lore_panel_collection_save_failed({ name, error: String(err) }),
         duration: 8000,
       });
     },
@@ -3100,7 +3100,7 @@
         await loadCollections();
         jobNotification.show({
           type: 'error',
-          message: `Could not update "${name}": ${String(e)}`,
+          message: m.lore_panel_collection_update_failed({ name, error: String(e) }),
           duration: 5000,
         });
         return null;
@@ -3133,10 +3133,10 @@
       added > 0
         ? {
             type: 'success',
-            message: `Added ${added} file${added === 1 ? '' : 's'} to "${name}"`,
+            message: m.lore_panel_collection_added({ count: added, name }),
             duration: 4000,
           }
-        : { type: 'info', message: `Already in "${name}"`, duration: 3000 }
+        : { type: 'info', message: m.lore_panel_collection_already({ name }), duration: 3000 }
     );
   }
 
@@ -3150,7 +3150,7 @@
     if (removed) {
       jobNotification.show({
         type: 'success',
-        message: `Removed 1 file from "${name}"`,
+        message: m.lore_panel_collection_removed({ count: 1, name }),
         duration: 3000,
       });
     }
@@ -3232,14 +3232,14 @@
       if (paths.length > 0) {
         jobNotification.show({
           type: 'success',
-          message: `Created "${name}" with ${paths.length} file${paths.length === 1 ? '' : 's'}`,
+          message: m.lore_panel_collection_created({ count: paths.length, name }),
           duration: 4000,
         });
       }
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not create "${name}": ${String(e)}`,
+        message: m.lore_panel_collection_create_failed({ name, error: String(e) }),
         duration: 5000,
       });
     }
@@ -3276,17 +3276,17 @@
     // rather than reading `undefined`.
     const info = collections[name];
     const confirmed = await confirmPrompt.request({
-      title: 'Delete collection',
+      title: m.lore_panel_collection_delete_title(),
       rows: [
-        { label: 'Track', value: name },
+        { label: m.lore_panel_collection_delete_track(), value: name },
         ...(info
           ? [
-              { label: 'Files', value: String(info.file_count), to: 'Loose', unchanged: true },
+              { label: m.lore_panel_collection_delete_files(), value: String(info.file_count), to: m.lore_panel_collection_delete_loose(), unchanged: true },
             ]
           : []),
       ],
-      message: 'The track goes; its books stay in your library.',
-      confirmLabel: 'Delete',
+      message: m.lore_panel_collection_delete_message(),
+      confirmLabel: m.lore_panel_delete_confirm(),
       danger: true,
     });
     if (!confirmed) return;
@@ -3311,9 +3311,9 @@
       }
       await loadCollections();
       if ((wasPlaying || wasMuted) && committedQuery) runSearch(committedQuery);
-      jobNotification.show({ type: 'success', message: `Deleted "${name}"`, duration: 4000 });
+      jobNotification.show({ type: 'success', message: m.lore_panel_collection_deleted({ name }), duration: 4000 });
     } catch (e) {
-      jobNotification.show({ type: 'error', message: `Delete failed: ${String(e)}`, duration: 5000 });
+      jobNotification.show({ type: 'error', message: m.lore_panel_delete_failed({ error: String(e) }), duration: 5000 });
     }
   }
 
@@ -3328,7 +3328,7 @@
     if (candidates.length === 0) {
       jobNotification.show({
         type: 'info',
-        message: `No indexed PDFs under "${item.name}"`,
+        message: m.lore_panel_collection_none_indexed({ name: item.name }),
         duration: 4000,
       });
       return;
@@ -3339,7 +3339,7 @@
     if (added === 0) {
       jobNotification.show({
         type: 'info',
-        message: `Already in "${name}"`,
+        message: m.lore_panel_collection_already({ name }),
         duration: 3000,
       });
       return;
@@ -3353,13 +3353,13 @@
       await loadCollections();
       jobNotification.show({
         type: 'success',
-        message: `Added ${added} file${added === 1 ? '' : 's'} to "${name}"`,
+        message: m.lore_panel_collection_added({ count: added, name }),
         duration: 4000,
       });
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not add to "${name}": ${String(e)}`,
+        message: m.lore_panel_collection_add_failed({ name, error: String(e) }),
         duration: 5000,
       });
     }
@@ -3381,13 +3381,13 @@
       await loadCollections();
       jobNotification.show({
         type: 'success',
-        message: `Removed ${removed} file${removed === 1 ? '' : 's'} from "${name}"`,
+        message: m.lore_panel_collection_removed({ count: removed, name }),
         duration: 4000,
       });
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not remove from "${name}": ${String(e)}`,
+        message: m.lore_panel_collection_remove_failed({ name, error: String(e) }),
         duration: 5000,
       });
     }
@@ -3401,7 +3401,7 @@
     if (candidates.length === 0) {
       jobNotification.show({
         type: 'info',
-        message: `No indexed PDFs under "${item.name}"`,
+        message: m.lore_panel_collection_none_indexed({ name: item.name }),
         duration: 4000,
       });
       return;
@@ -3515,7 +3515,7 @@
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not set gem: ${String(e)}`,
+        message: m.lore_panel_collection_gem_failed({ error: String(e) }),
         duration: 5000,
       });
     }
@@ -3537,13 +3537,13 @@
       await loadCollections();
       jobNotification.show({
         type: 'success',
-        message: archived ? `Archived "${name}"` : `Unarchived "${name}"`,
+        message: archived ? m.lore_panel_collection_archived({ name }) : m.lore_panel_collection_unarchived({ name }),
         duration: 3000,
       });
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Could not ${archived ? 'archive' : 'unarchive'} "${name}": ${String(e)}`,
+        message: (archived ? m.lore_panel_collection_archive_failed : m.lore_panel_collection_unarchive_failed)({ name, error: String(e) }),
         duration: 5000,
       });
     }
@@ -3556,13 +3556,13 @@
       await writeText(config);
       jobNotification.show({
         type: 'success',
-        message: 'MCP config copied to clipboard!',
+        message: m.lore_panel_mcp_copied(),
         duration: 4000,
       });
     } catch (e) {
       jobNotification.show({
         type: 'error',
-        message: `Copy failed: ${String(e)}`,
+        message: m.lore_panel_mcp_copy_failed({ error: String(e) }),
         duration: 5000,
       });
     }
@@ -3585,8 +3585,8 @@
       const result = await runSyncJob<SyncResult>({
         command: 'sync_index',
         args: { paths: Array.from(selectedPaths) },
-        startMessage: 'Starting sync...',
-        errorPrefix: 'Sync failed',
+        startMessage: m.lore_panel_job_sync_start(),
+        errorPrefix: m.lore_panel_job_sync_error(),
         streamsProgress: true,
         buildResultMessage: syncSummary,
         onComplete: async (r) => {
@@ -3639,8 +3639,8 @@
     try {
       const result = await runSyncJob<SyncResult>({
         command: 'reindex_all',
-        startMessage: 'Starting re-index...',
-        errorPrefix: 'Re-index failed',
+        startMessage: m.lore_panel_job_reindex_start(),
+        errorPrefix: m.lore_panel_job_reindex_error(),
         streamsProgress: true,
         buildResultMessage: reindexSummary,
       }, refreshIndexAndCollections);
@@ -3658,8 +3658,8 @@
     try {
       await runSyncJob<{ removed_files: number; removed_chunks: number }>({
         command: 'delete_index',
-        startMessage: 'Clearing index...',
-        errorPrefix: 'Delete failed',
+        startMessage: m.lore_panel_job_clear_start(),
+        errorPrefix: m.lore_panel_job_clear_error(),
         streamsProgress: false,
         buildResultMessage: clearSummary,
       }, refreshIndexAndCollections);
@@ -3896,10 +3896,10 @@
         </div>
       {:else if !selectedFolder}
         <div class="library-invite" role="note">
-          <div class="nameplate"><span class="ledger-label">library</span></div>
+          <div class="nameplate"><span class="ledger-label">{m.lore_panel_invite_library()}</span></div>
           <div class="invite-body">
-            <p>Legend Lore reads the PDFs in a folder.</p>
-            <ActionButton label="choose library folder" onClick={handleSelectFolder} />
+            <p>{m.lore_panel_invite_lede()}</p>
+            <ActionButton label={m.lore_panel_invite_choose()} onClick={handleSelectFolder} />
           </div>
         </div>
       {:else if viewMode === 'systems'}
@@ -3939,11 +3939,11 @@
         />
       {:else}
         {#if hideOutOfScope && scopeBrightPaths !== null && scopeBrightPaths.size === 0}
-          <div class="scope-empty">Everything is out of scope.</div>
+          <div class="scope-empty">{m.lore_panel_tree_out_of_scope()}</div>
         {:else if hideUnindexed && indexedPaths.size === 0 && selectedPaths.size === 0}
-          <div class="scope-empty">Nothing in the library yet.</div>
+          <div class="scope-empty">{m.lore_panel_tree_empty()}</div>
         {:else if treeFilter && treeFilter.show.size === 0}
-          <div class="scope-empty">No folder or file name matches.</div>
+          <div class="scope-empty">{m.lore_panel_tree_no_match()}</div>
         {/if}
         {#each treeRoots as file (file.path)}
           <FileTree
@@ -3988,7 +3988,7 @@
   </div>
 
   {#if error}
-    <div class="error-banner">Error: {error}</div>
+    <div class="error-banner">{m.lore_panel_error({ error })}</div>
   {/if}
 
   {#if contextMenu}

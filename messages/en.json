@@ -319,5 +319,1137 @@
   "about_acknowledgements": "acknowledgements",
   "about_acknowledgements_desc": "third-party software and its licences",
   "about_icons": "icons © Fonticons, Inc. — CC BY 4.0",
-  "about_mcp_logo": "MCP project — MIT"
+  "about_mcp_logo": "MCP project — MIT",
+  "lore_panel_open_missing": "Could not locate \"{filename}\" on disk.",
+  "lore_panel_open_failed": "Failed to open {filename}: {error}",
+  "lore_panel_sidecar_failed": "Indexer failed to start. See log: {path}",
+  "lore_panel_library_missing": "Library folder is no longer accessible: {folder}",
+  "lore_panel_sync_queued": "sync queued",
+  "lore_panel_sync": "sync",
+  "lore_panel_top_system": [
+    {
+      "declarations": [
+        "input count",
+        "input system",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Top system: {system} with {count} file",
+        "countPlural=*": "Top system: {system} with {count} files"
+      }
+    }
+  ],
+  "lore_panel_send_done": "Sent to Command: {name} in {campaign} › {track}",
+  "lore_panel_send_shelf": "Shelf",
+  "lore_panel_send_failed": "Couldn't send to Command: {error}",
+  "lore_panel_open_file_failed": "Failed to open file: {error}",
+  "lore_panel_reindex_title": "Re-index file",
+  "lore_panel_reindex_message": "Re-index \"{name}\"? This rebuilds its chunks.",
+  "lore_panel_reindex_confirm": "Re-index",
+  "lore_panel_reindex_done": "Re-indexed {name}",
+  "lore_panel_reindex_failed": "Re-index failed: {error}",
+  "lore_panel_delete_folder_title": "Delete folder",
+  "lore_panel_delete_file_title": "Delete file",
+  "lore_panel_delete_message": "Move \"{name}\" to Trash?",
+  "lore_panel_delete_confirm": "Delete",
+  "lore_panel_delete_failed": "Delete failed: {error}",
+  "lore_panel_rename_missing_folder": "{reason} — the folder may have been moved or renamed outside the app. Press {chord} to refresh and try again.",
+  "lore_panel_rename_missing_file": "{reason} — the file may have been moved or renamed outside the app. Press {chord} to refresh and try again.",
+  "lore_panel_collection_save_failed": "Could not save \"{name}\" — reverted to the last saved state. {error}",
+  "lore_panel_collection_update_failed": "Could not update \"{name}\": {error}",
+  "lore_panel_collection_added": [
+    {
+      "declarations": [
+        "input count",
+        "input name",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Added {count} file to \"{name}\"",
+        "countPlural=*": "Added {count} files to \"{name}\""
+      }
+    }
+  ],
+  "lore_panel_collection_already": "Already in \"{name}\"",
+  "lore_panel_collection_removed": [
+    {
+      "declarations": [
+        "input count",
+        "input name",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Removed {count} file from \"{name}\"",
+        "countPlural=*": "Removed {count} files from \"{name}\""
+      }
+    }
+  ],
+  "lore_panel_collection_created": [
+    {
+      "declarations": [
+        "input count",
+        "input name",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Created \"{name}\" with {count} file",
+        "countPlural=*": "Created \"{name}\" with {count} files"
+      }
+    }
+  ],
+  "lore_panel_collection_create_failed": "Could not create \"{name}\": {error}",
+  "lore_panel_collection_delete_title": "Delete collection",
+  "lore_panel_collection_delete_track": "Track",
+  "lore_panel_collection_delete_files": "Files",
+  "lore_panel_collection_delete_loose": "Loose",
+  "lore_panel_collection_delete_message": "The track goes; its books stay in your library.",
+  "lore_panel_collection_deleted": "Deleted \"{name}\"",
+  "lore_panel_collection_none_indexed": "No indexed PDFs under \"{name}\"",
+  "lore_panel_collection_add_failed": "Could not add to \"{name}\": {error}",
+  "lore_panel_collection_remove_failed": "Could not remove from \"{name}\": {error}",
+  "lore_panel_collection_gem_failed": "Could not set gem: {error}",
+  "lore_panel_collection_archived": "Archived \"{name}\"",
+  "lore_panel_collection_unarchived": "Unarchived \"{name}\"",
+  "lore_panel_collection_archive_failed": "Could not archive \"{name}\": {error}",
+  "lore_panel_collection_unarchive_failed": "Could not unarchive \"{name}\": {error}",
+  "lore_panel_mcp_copied": "MCP config copied to clipboard!",
+  "lore_panel_mcp_copy_failed": "Copy failed: {error}",
+  "lore_panel_job_sync_start": "Starting sync...",
+  "lore_panel_job_sync_error": "Sync failed",
+  "lore_panel_job_reindex_start": "Starting re-index...",
+  "lore_panel_job_reindex_error": "Re-index failed",
+  "lore_panel_job_clear_start": "Clearing index...",
+  "lore_panel_job_clear_error": "Delete failed",
+  "lore_panel_invite_library": "library",
+  "lore_panel_invite_lede": "Legend Lore reads the PDFs in a folder.",
+  "lore_panel_invite_choose": "choose library folder",
+  "lore_panel_tree_out_of_scope": "Everything is out of scope.",
+  "lore_panel_tree_empty": "Nothing in the library yet.",
+  "lore_panel_tree_no_match": "No folder or file name matches.",
+  "lore_panel_error": "Error: {error}",
+  "lore_collections_sort_custom": "Custom order",
+  "lore_collections_sort_name": "Name",
+  "lore_collections_sort_size": "File count",
+  "lore_collections_sort_created": "Recently added",
+  "lore_collections_title": "Collections",
+  "lore_collections_sort_title": "Sort collections",
+  "lore_collections_sort": "sort",
+  "lore_collections_show_archived": "Show archived",
+  "lore_collections_all_archived": "All archived",
+  "lore_collections_rename_label": "Rename {name}",
+  "lore_collections_disarm": "Disarm {name}",
+  "lore_collections_arm": "Arm {name}",
+  "lore_collections_stop": "Stop {name}",
+  "lore_collections_play": "Play {name}",
+  "lore_collections_unmute": "Unmute {name}",
+  "lore_collections_mute": "Mute {name}",
+  "lore_collections_remove_file": "Remove {file} from {collection}",
+  "lore_collections_no_files": "No files yet",
+  "lore_collections_name_placeholder": "Collection name…",
+  "lore_collections_name_label": "Name the new collection",
+  "lore_collections_new_title": "New collection{chord} — double-click to name it, or drop books here",
+  "lore_collections_new": "New collection",
+  "lore_collections_new_from": "New collection from {#em}{label}{/em}",
+  "lore_collections_menu_disarm": "Disarm",
+  "lore_collections_menu_arm": "Arm",
+  "lore_collections_menu_stop": "Stop",
+  "lore_collections_menu_play": "Play",
+  "lore_collections_menu_unmute": "Unmute",
+  "lore_collections_menu_mute": "Mute",
+  "lore_collections_menu_gem": "Gem",
+  "lore_collections_menu_gem_none": "None",
+  "lore_collections_menu_rename": "Rename collection",
+  "lore_collections_menu_unarchive": "Unarchive collection",
+  "lore_collections_menu_archive": "Archive collection",
+  "lore_collections_menu_delete": "Delete collection",
+  "lore_systems_no_match": "No indexed files match the current view.",
+  "lore_systems_untagged_files": "untagged files",
+  "lore_systems_select_all": "Select all in {system}",
+  "lore_systems_unsolo": "Stop soloing {name}",
+  "lore_systems_solo": "Solo {name}",
+  "lore_systems_unmute": "Unmute {name}",
+  "lore_systems_mute": "Mute {name}",
+  "lore_systems_add_to_collection": "Add {name} to collection",
+  "lore_systems_rename": "Rename {name}",
+  "lore_systems_all_out_of_scope": "Everything is out of scope.",
+  "lore_filters_collected": "In a collection",
+  "lore_filters_loose": "Loose",
+  "lore_filters_title": "Filters",
+  "lore_filters_reset": "reset",
+  "lore_filters_section_active": "Filters active in this section",
+  "lore_filters_curation": "Curation",
+  "lore_filters_unsolo_collected": "Stop soloing collected files",
+  "lore_filters_solo_collected": "Solo collected files (show only collection)",
+  "lore_filters_unsolo_loose": "Stop soloing loose files",
+  "lore_filters_solo_loose": "Solo loose files (show only loose)",
+  "lore_filters_unmute_collected": "Unmute collected files",
+  "lore_filters_mute_collected": "Mute collected files",
+  "lore_filters_unmute_loose": "Unmute loose files",
+  "lore_filters_mute_loose": "Mute loose files",
+  "lore_filters_game_systems": "Game systems",
+  "lore_filters_unsolo_system": "Stop soloing {name}",
+  "lore_filters_solo_system": "Solo {name}",
+  "lore_filters_unmute_system": "Unmute {name}",
+  "lore_filters_mute_system": "Mute {name}",
+  "lore_filters_untagged_title": "Files with no game-system tag",
+  "lore_filters_untagged": "Untagged",
+  "lore_filters_unmute_untagged": "Unmute untagged files",
+  "lore_filters_mute_untagged": "Mute untagged files",
+  "lore_filters_no_systems": "No game systems detected yet. Index some files first.",
+  "lore_filters_hidden_items": "Hidden items",
+  "lore_filters_clear_hidden": "Clear",
+  "lore_filters_show_hidden_title": "Reveal hidden files and folders in the tree",
+  "lore_filters_show_hidden_none": "Right-click any file or folder to hide it",
+  "lore_filters_show_hidden": "Show hidden items",
+  "lore_filters_hide_unindexed_title": "Hide files and folders the library knows nothing about — not indexed, not selected for indexing",
+  "lore_filters_hide_unindexed": "Hide unindexed items",
+  "lore_filters_hide_out_of_scope_title": "Hide dimmed out-of-scope rows in the tree and systems view",
+  "lore_filters_hide_out_of_scope": "Hide out-of-scope items",
+  "lore_filters_hide_images_title": "Hide the images the tree lists beside the books",
+  "lore_filters_hide_images": "Hide images",
+  "lore_systemtag_clear": "Clear tags",
+  "lore_results_label": "Search results",
+  "lore_results_no_sidecar": "The sidecar isn’t running. Quit Unseen Servant and open it again to search.",
+  "lore_results_no_ollama": "Ollama isn’t running. Start it to search.",
+  "lore_results_searching": "Searching…",
+  "lore_results_no_indexed": "No indexed files.",
+  "lore_results_nothing_in_scope": "Nothing in scope.",
+  "lore_results_none_for": "0 results for “{query}”",
+  "lore_results_type_to_search": "Type to search your library.",
+  "lore_results_all_weak": "No strong matches — the content may be outside the current scope.",
+  "lore_results_add_to_collection": "Add {name} to collection",
+  "lore_results_hidden_title": "This file is hidden in the tree.",
+  "lore_results_hidden": "hidden",
+  "lore_results_edit_tags": "Edit game system tags for {book}",
+  "lore_results_editions": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "+{count} edition",
+        "countPlural=*": "+{count} editions"
+      }
+    }
+  ],
+  "lore_results_loading_more": "loading more…",
+  "lore_tree_add_to": "Add {name} to {collection}",
+  "lore_tree_select": "Select {name} for indexing",
+  "lore_tree_rename": "Rename {name}",
+  "lore_tree_stop_solo": "Stop soloing {name} (S)",
+  "lore_tree_solo": "Solo {name} (S)",
+  "lore_tree_unmute": "Unmute {name} (M)",
+  "lore_tree_mute": "Mute {name} (M)",
+  "lore_tree_edit_tags": "Edit game system tags",
+  "lore_tree_add_tag": "+ tag",
+  "lore_menu_open_file": "Open file",
+  "lore_menu_reveal": "Reveal in folder",
+  "lore_menu_get_info": "Get info",
+  "lore_menu_send_to_command": "Send to Command",
+  "lore_menu_no_campaign": "Open a campaign in Command first",
+  "lore_menu_shelf": "Shelf",
+  "lore_menu_stop_solo_folder": "Stop soloing folder",
+  "lore_menu_stop_solo_file": "Stop soloing file",
+  "lore_menu_solo_folder": "Solo folder",
+  "lore_menu_solo_file": "Solo file",
+  "lore_menu_unmute_folder": "Unmute folder",
+  "lore_menu_unmute_file": "Unmute file",
+  "lore_menu_mute_folder": "Mute folder",
+  "lore_menu_mute_file": "Mute file",
+  "lore_menu_collection": "Collection",
+  "lore_menu_new_collection": "New collection",
+  "lore_menu_game_system": "Game system",
+  "lore_menu_unhide_folder": "Unhide folder",
+  "lore_menu_unhide_file": "Unhide file",
+  "lore_menu_hide_folder": "Hide folder",
+  "lore_menu_hide_file": "Hide file",
+  "lore_menu_rename_folder": "Rename folder",
+  "lore_menu_rename_file": "Rename file",
+  "lore_menu_reindex_file": "Re-index file",
+  "lore_menu_delete_folder": "Delete folder",
+  "lore_menu_delete_file": "Delete file",
+  "lore_library_policy_disk": "Renames, missing files, and stale selections",
+  "lore_library_policy_disk_desc": "Same content, but the filename or location changed — or the file is no longer there.",
+  "lore_library_policy_select": "New files you select",
+  "lore_library_policy_select_desc": "Embedding work; defaults to asking so you can batch.",
+  "lore_library_policy_deselect": "Files you deselect",
+  "lore_library_policy_deselect_desc": "Drops chunks. Re-selecting later requires re-embedding.",
+  "lore_library_policy_modified": "Files modified on disk",
+  "lore_library_policy_modified_desc": "Same filename, but the contents are different — needs re-indexing.",
+  "lore_library_reindex_title": "Re-index all files",
+  "lore_library_row_files": "Files",
+  "lore_library_to_reprocessed": "reprocessed",
+  "lore_library_row_chunks": "Chunks",
+  "lore_library_to_rebuilt": "rebuilt",
+  "lore_library_reindex_message": "Every file is re-extracted and re-embedded. Nothing is deleted.",
+  "lore_library_reindex_confirm": "Re-index all",
+  "lore_library_delete_title": "Delete the index",
+  "lore_library_row_pdfs": "PDFs",
+  "lore_library_to_untouched": "untouched",
+  "lore_library_delete_message": "Your library folder is not touched. The index rebuilds on the next sync.",
+  "lore_library_delete_confirm": "Delete index",
+  "lore_library_size_gb": "{size} GB",
+  "lore_library_size_mb": "{size} MB",
+  "lore_library_size_kb": "{size} KB",
+  "lore_library_size_b": "{size} B",
+  "lore_library_never": "Never",
+  "lore_library_just_now": "just now",
+  "lore_library_seconds_ago": "{seconds}s ago",
+  "lore_library_minutes_ago": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} minute ago",
+        "countPlural=*": "{count} minutes ago"
+      }
+    }
+  ],
+  "lore_library_hours_ago": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} hour ago",
+        "countPlural=*": "{count} hours ago"
+      }
+    }
+  ],
+  "lore_library_days_ago": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} day ago",
+        "countPlural=*": "{count} days ago"
+      }
+    }
+  ],
+  "lore_library_stats": "Library stats",
+  "lore_library_stat_indexed": "INDEXED",
+  "lore_library_stat_chunks": "CHUNKS",
+  "lore_library_stat_sys": "SYS",
+  "lore_library_none_indexed": "No files indexed yet.",
+  "lore_library_folder": "Library folder",
+  "lore_library_folder_desc": "Legend Lore indexes PDFs from this folder. Changing the folder doesn't remove anything that's already indexed — use Re-index all below to rebuild.",
+  "lore_library_folder_none": "No folder selected",
+  "lore_library_folder_change": "Change library folder",
+  "lore_library_deselect_title": "Clear the library folder and return to the Getting Started screen",
+  "lore_library_deselect": "deselect folder",
+  "lore_library_sync": "Sync behavior",
+  "lore_library_sync_desc": "How Legend Lore keeps the index in sync with your library folder.",
+  "lore_library_check": "Check for changes",
+  "lore_library_check_desc": "How often to scan the library folder. \"Never\" means the index only updates when you click Sync.",
+  "lore_library_policy_legend": "When changes are detected",
+  "lore_library_policy_silent": "Apply silently",
+  "lore_library_policy_ask": "Show a notification",
+  "lore_library_last_checked": "Last checked",
+  "lore_library_syncing": "Syncing…",
+  "lore_library_sync_title": "Check the library folder for changes",
+  "lore_library_sync_key": "sync",
+  "lore_library_database": "Database",
+  "lore_library_database_desc": "Where the index is stored on disk, and how much space it takes.",
+  "lore_library_resolving": "Resolving…",
+  "lore_library_database_open": "Open database folder",
+  "lore_library_storage": "Storage",
+  "lore_library_danger": "Danger zone",
+  "lore_library_reindex_desc": "Re-extracts and re-embeds every file in your index. Use after the extractor has been upgraded, or if search results look stale.",
+  "lore_library_outdated": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} file was indexed with an older pipeline — re-index to pick up the current one.",
+        "countPlural=*": "{count} files were indexed with an older pipeline — re-index to pick up the current one."
+      }
+    }
+  ],
+  "lore_library_sync_in_progress": "sync in progress…",
+  "lore_library_reindex_key": "re-index all",
+  "lore_library_delete_desc": "Removes every chunk and embedding. Your PDFs are untouched; the index is rebuilt from scratch on the next sync.",
+  "lore_library_delete_key": "delete index",
+  "lore_scopebar_collected": "In a collection",
+  "lore_scopebar_loose": "Loose",
+  "lore_scopebar_scope": "Scope",
+  "lore_scopebar_bypass_none": "Nothing to bypass yet — solo or mute something first",
+  "lore_scopebar_bypass_restore": "Scope bypassed — every indexed file is in scope. Restore it",
+  "lore_scopebar_bypass": "Bypass the scope — every indexed file back in scope, without clearing anything",
+  "lore_scopebar_resting": "all {count} files",
+  "lore_scopebar_stop": "Stop {name}",
+  "lore_scopebar_play": "play",
+  "lore_scopebar_unmute": "Unmute {name}",
+  "lore_scopebar_mute": "mute",
+  "lore_scopebar_stop_solo": "Stop soloing {name}",
+  "lore_scopebar_solo": "solo",
+  "lore_scopebar_hidden_title": "Hide them again",
+  "lore_scopebar_hidden_label": "Hide hidden items again",
+  "lore_scopebar_hidden": "hidden shown",
+  "lore_scopebar_indexed_only_title": "Show unindexed items again",
+  "lore_scopebar_indexed_only": "indexed only",
+  "lore_scopebar_images_title": "Show the library's images again",
+  "lore_scopebar_images": "images hidden",
+  "lore_scopebar_lens_title": "Show out-of-scope items again",
+  "lore_scopebar_lens": "lens on",
+  "lore_scopebar_searching": "Searching",
+  "lore_scopebar_meter_bypassed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Across all {count} indexed file — the scope is bypassed",
+        "countPlural=*": "Across all {count} indexed files — the scope is bypassed"
+      }
+    }
+  ],
+  "lore_scopebar_meter_scoped": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Across {count} file matching the active scope and filters",
+        "countPlural=*": "Across {count} files matching the active scope and filters"
+      }
+    }
+  ],
+  "lore_scopebar_hits": [
+    {
+      "declarations": [
+        "input count",
+        "input total",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} hit {#of}of {total} files{/of}",
+        "countPlural=*": "{count} hits {#of}of {total} files{/of}"
+      }
+    }
+  ],
+  "lore_gamesystems_tag_required": "Tag is required",
+  "lore_gamesystems_save_failed": "Failed to save",
+  "lore_gamesystems_delete_title": "Delete game system",
+  "lore_gamesystems_tag": "Tag",
+  "lore_gamesystems_keywords": "Keywords",
+  "lore_gamesystems_delete_message": "Files already tagged with it are not changed, and you can add the tag again at any time.",
+  "lore_gamesystems_delete_confirm": "Delete",
+  "lore_gamesystems_delete_failed": "Failed to delete",
+  "lore_gamesystems_reset_title": "Reset to defaults",
+  "lore_gamesystems_to_builtin": "built-in set",
+  "lore_gamesystems_reset_message": "Your changes to this system are discarded.",
+  "lore_gamesystems_reset_confirm": "Reset",
+  "lore_gamesystems_reset_failed": "Failed to reset",
+  "lore_gamesystems_add_custom": "Add custom system",
+  "lore_gamesystems_customized": "customized",
+  "lore_gamesystems_builtin": "built-in",
+  "lore_gamesystems_custom": "custom",
+  "lore_gamesystems_add_title": "Add game system",
+  "lore_gamesystems_edit_title": "Edit game system",
+  "lore_gamesystems_tag_placeholder": "e.g. Cairn",
+  "lore_gamesystems_keywords_placeholder": "e.g. cairn, cairn rpg",
+  "lore_gamesystems_keywords_hint": "Comma-separated. A folder named “{#em}{tag}{/em}” beats a match found inside the PDF.",
+  "lore_gamesystems_reset_desc": "Discard your changes and restore the built-in keywords.",
+  "lore_gamesystems_delete_desc": "Remove this tag and its keywords. Files already tagged are not changed.",
+  "lore_gamesystems_reset_key": "reset to defaults",
+  "lore_gamesystems_delete_key": "delete",
+  "lore_gamesystems_add": "Add",
+  "lore_gamesystems_save": "Save",
+  "lore_general_results": "Search results",
+  "lore_general_results_desc": "How the result list presents what search found.",
+  "lore_general_dim": "Dim weak matches",
+  "lore_general_dim_desc": "Weak matches stay in the list but fade back, so the strong ones stand out.",
+  "lore_general_on": "On",
+  "lore_general_off": "Off",
+  "lore_general_pipeline": "Search pipeline",
+  "lore_general_load_error": "Could not load search settings — is the sidecar running? ({error})",
+  "lore_general_loading": "Loading…",
+  "lore_general_pipeline_desc": "How search ranks results. Applies to the app's search bar and MCP calls alike.",
+  "lore_general_rerank": "Re-rank results",
+  "lore_general_rerank_desc": "Rescores the top candidates with a cross-encoder for a more accurate ordering. Strong impact on relevance, but also performance. Turn off if search is deemed too slow.",
+  "lore_general_pool": "Re-rank pool size",
+  "lore_general_pool_desc": "How many candidates the re-ranker rescores. Deeper reaches further into the library but slows every search down.",
+  "lore_general_pool_custom": "Custom ({size})",
+  "lore_general_pool_preset": "{label} ({size})",
+  "lore_general_spell": "Spell correction",
+  "lore_general_spell_desc": "Fixes typos against your library's own vocabulary before searching.",
+  "lore_general_hybrid": "Hybrid keyword search",
+  "lore_general_hybrid_desc": "Adds exact-keyword (BM25) matches to semantic results. Helps rare names and exact terms.",
+  "lore_general_experimental": "Experimental",
+  "lore_general_variants": "Spacing-variant expansion",
+  "lore_general_variants_desc": "Searches spacing variants (\"chainmail\" / \"chain mail\").",
+  "lore_general_save_error": "Could not save: {error}",
+  "lore_general_restore": "restore defaults",
+  "lore_inspector_empty": "Select a result to preview.",
+  "lore_inspector_also_in": "also in",
+  "lore_inspector_open_twin_at": "Open {book} at {cite}",
+  "lore_inspector_open_twin": "Open {book}",
+  "lore_inspector_twin_cite": "{book} · {cite}",
+  "lore_inspector_back_to_match": "Back to the match",
+  "lore_plate_section_path": "Section path",
+  "lore_plate_open_pdf_at": "Open PDF at {span}",
+  "lore_plate_open_at": "open {cite}",
+  "lore_plate_open": "open",
+  "lore_start_ollama_unknown": "Unknown: the sidecar isn't running",
+  "lore_start_ready": "Ready",
+  "lore_start_ollama_model": "Model missing",
+  "lore_start_ollama_missing": "Not detected",
+  "lore_start_ollama_desc": "Runs the model that lets search find passages by meaning, on this machine.",
+  "lore_start_ollama_desc_unknown": "The sidecar isn't running, so Ollama can't be checked. Quit Unseen Servant and open it again.",
+  "lore_start_ollama_desc_missing": "Install Ollama and open it.",
+  "lore_start_ollama_desc_model": "Pull its model once, in a terminal:",
+  "lore_start_folder": "Library folder",
+  "lore_start_folder_none": "No folder chosen",
+  "lore_start_folder_desc": "The folder that holds your PDFs. They are read where they are, nothing is uploaded or copied, and subfolders become the tree. Rename books and folders here ({#strong}R{/strong}) to keep their index; outside the app, a moved book or a renamed folder has to be indexed again.",
+  "lore_start_folder_images": "Images in it (maps, handouts) show in the tree too, never indexed: right-click one and {#em}Send to Command{/em} copies it into the open campaign. {#em}Hide images{/em} in the filters takes them out of the tree.",
+  "lore_start_choose_folder": "choose folder",
+  "lore_start_index": "Index",
+  "lore_start_index_none": "Nothing indexed yet",
+  "lore_start_index_desc": "Tick books or folders in the tree; the status bar then offers {#em}sync{/em} ({#strong}⌘S{/strong}). Later syncs index only the books that changed.",
+  "lore_start_collections": "Collections {#opt}(optional){/opt}",
+  "lore_start_collections_desc": "Named sets of books. Play one (▶ or {#strong}P{/strong}) and search covers only its books; play several to search them together. Without a collection, solo ({#strong}S{/strong}) or mute ({#strong}M{/strong}) books and folders in the tree.",
+  "lore_start_collections_arm": "{#strong}⌘N{/strong} starts one, armed (●): click books in the tree to file them in it, then disarm it with its ● or {#strong}E{/strong}. Dropping a book or folder on a collection files it too.",
+  "lore_stats_size_b": "{size} B",
+  "lore_stats_size_kb": "{size} KB",
+  "lore_stats_size_mb": "{size} MB",
+  "lore_stats_size_gb": "{size} GB",
+  "lore_stats_unknown": "Unknown",
+  "lore_stats_just_now": "just now",
+  "lore_stats_seconds_ago": "{seconds}s ago",
+  "lore_stats_minutes_ago": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} minute ago",
+        "countPlural=*": "{count} minutes ago"
+      }
+    }
+  ],
+  "lore_stats_hours_ago": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} hour ago",
+        "countPlural=*": "{count} hours ago"
+      }
+    }
+  ],
+  "lore_stats_days_ago": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} day ago",
+        "countPlural=*": "{count} days ago"
+      }
+    }
+  ],
+  "lore_stats_title": "Document",
+  "lore_stats_indexed": "indexed",
+  "lore_stats_not_indexed": "not indexed",
+  "lore_stats_error": "Could not load stats: {error}",
+  "lore_stats_loading": "Loading…",
+  "lore_stats_file": "File",
+  "lore_stats_path": "Path",
+  "lore_stats_system": "System",
+  "lore_stats_index": "Index",
+  "lore_stats_chunks": "Chunks",
+  "lore_stats_pages": "Pages",
+  "lore_stats_size": "Size",
+  "lore_stats_indexed_label": "Indexed",
+  "lore_status_check_last": "Check for changes — last checked {time}",
+  "lore_status_check": "Check for changes",
+  "lore_status_size_gb": "{size} GB",
+  "lore_status_size_mb": "{size} MB",
+  "lore_status_size_kb": "{size} KB",
+  "lore_status_size_b": "{size} B",
+  "lore_status_bypass_title": "Scope bypassed — every indexed file is in scope. B restores it.",
+  "lore_status_bypass": "BYPASS",
+  "lore_status_indexed_title": [
+    {
+      "declarations": [
+        "input count",
+        "input chunks",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} book indexed, {chunks} searchable chunks",
+        "countPlural=*": "{count} books indexed, {chunks} searchable chunks"
+      }
+    }
+  ],
+  "lore_status_books": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} book",
+        "countPlural=*": "{count} books"
+      }
+    }
+  ],
+  "lore_status_systems": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} system",
+        "countPlural=*": "{count} systems"
+      }
+    }
+  ],
+  "lore_status_selected": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} book selected",
+        "countPlural=*": "{count} books selected"
+      }
+    }
+  ],
+  "lore_status_reveal": "Reveal library folder",
+  "lore_status_syncing": "Syncing",
+  "lore_drag_files": [
+    {
+      "declarations": [
+        "input label",
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{label} ({count} file)",
+        "countPlural=*": "{label} ({count} files)"
+      }
+    }
+  ],
+  "lore_scope_untagged": "untagged",
+  "lore_scope_nothing_playing": "Nothing indexed is playing.",
+  "lore_scope_all_muted": "Everything is muted.",
+  "lore_scope_nothing_soloed": "Nothing under the soloed items.",
+  "lore_searchsettings_pool_fastest": "Fastest",
+  "lore_searchsettings_pool_fast": "Fast",
+  "lore_searchsettings_pool_balanced": "Balanced",
+  "lore_searchsettings_pool_thorough": "Thorough",
+  "lore_searchsettings_pool_exhaustive": "Exhaustive",
+  "lore_tiers_strong": "Strong match",
+  "lore_tiers_good": "Good match",
+  "lore_tiers_weak": "Weak match",
+  "lore_tiers_percent": "{percent}% match",
+  "lore_syncjob_busy": "Another sync is already running.",
+  "lore_sync_progress_removing": "Removing {ordinal} of {total}",
+  "lore_sync_progress_moving": "Moving {ordinal} of {total}",
+  "lore_sync_progress_indexing": "Indexing {ordinal} of {total}",
+  "lore_sync_progress_reindexing": "Re-indexing {ordinal} of {total}",
+  "lore_sync_progress_syncing": "Syncing {ordinal} of {total}",
+  "lore_sync_done_failed": "{done} · {failed} failed",
+  "lore_sync_books_failed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} book failed",
+        "countPlural=*": "{count} books failed"
+      }
+    }
+  ],
+  "lore_sync_added_first": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Added {count} book",
+        "countPlural=*": "Added {count} books"
+      }
+    }
+  ],
+  "lore_sync_added_rest": "added {count}",
+  "lore_sync_removed_first": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Removed {count} book",
+        "countPlural=*": "Removed {count} books"
+      }
+    }
+  ],
+  "lore_sync_removed_rest": "removed {count}",
+  "lore_sync_moved_first": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Moved {count} book",
+        "countPlural=*": "Moved {count} books"
+      }
+    }
+  ],
+  "lore_sync_moved_rest": "moved {count}",
+  "lore_sync_updated_first": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Updated {count} book",
+        "countPlural=*": "Updated {count} books"
+      }
+    }
+  ],
+  "lore_sync_updated_rest": "updated {count}",
+  "lore_sync_nothing_to_sync": "Nothing to sync",
+  "lore_sync_books_missing": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} book missing on disk",
+        "countPlural=*": "{count} books missing on disk"
+      }
+    }
+  ],
+  "lore_sync_reindexed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Re-indexed {count} book",
+        "countPlural=*": "Re-indexed {count} books"
+      }
+    }
+  ],
+  "lore_sync_nothing_to_reindex": "Nothing to re-index",
+  "lore_sync_prompt_moved": "{count} moved",
+  "lore_sync_prompt_missing": "{count} missing on disk",
+  "lore_sync_prompt_add": "{count} to add",
+  "lore_sync_prompt_remove": "{count} to remove",
+  "lore_sync_prompt_update": "{count} to update",
+  "lore_sync_prompt_errors": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} error",
+        "countPlural=*": "{count} errors"
+      }
+    }
+  ],
+  "lore_sync_cleared": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Cleared {count} book from the index",
+        "countPlural=*": "Cleared {count} books from the index"
+      }
+    }
+  ],
+  "lore_types_check_15s": "Every 15 seconds",
+  "lore_types_check_30s": "Every 30 seconds",
+  "lore_types_check_1m": "Every minute",
+  "lore_types_check_5m": "Every 5 minutes",
+  "lore_types_check_never": "Never",
+  "command_panel_kind_beat": "Beat",
+  "command_panel_kind_note": "Note",
+  "command_panel_new_note_title": "New note",
+  "command_panel_new_note_message": "Nothing is named “{name}” yet. Start it in {track}?",
+  "command_panel_create": "Create",
+  "command_panel_move_to_trash": "Move to Trash",
+  "command_panel_trash_note_message": "Links to it will show as missing until it comes back.",
+  "command_panel_kind_session": "Session",
+  "command_panel_kind_beats": "Beats",
+  "command_panel_to_kept": "kept",
+  "command_panel_trash_session_message": "The session note and its board go; its beats stay in Beats/.",
+  "command_panel_sessions_heading": "sessions",
+  "command_panel_new_session": "New session",
+  "command_panel_edit_session_note": "Edit session note",
+  "command_panel_show_in_finder": "Show in Finder",
+  "command_panel_kind_track": "Track",
+  "command_panel_kind_notes": "Notes",
+  "command_panel_to_trash": "Trash",
+  "command_panel_trash_track_message": "The folder and every note in it go to the Trash.",
+  "command_panel_kind_campaign": "Campaign",
+  "command_panel_trash_campaign_message": "The campaign folder and everything in it go to the Trash.",
+  "command_panel_new_campaign": "New campaign",
+  "command_panel_name_campaign": "Name campaign",
+  "command_panel_rename_campaign": "Rename campaign",
+  "command_panel_rename": "Rename",
+  "command_panel_status_edited": "edited",
+  "command_panel_status_saving": "saving…",
+  "command_panel_shelf_hide": "Hide the shelf",
+  "command_panel_shelf_show": "Show the shelf",
+  "command_panel_shelf_toggle": "Toggle the shelf",
+  "command_panel_campaign_name": "Campaign name",
+  "command_panel_campaigns": "Campaigns",
+  "command_panel_no_campaign": "no campaign",
+  "command_panel_sessions": "Sessions",
+  "command_panel_add_session": "+ session",
+  "command_panel_view_switch": "{tool} view",
+  "command_panel_prep": "Prep",
+  "command_panel_play": "Play",
+  "command_panel_planner_hide": "Hide the session planner",
+  "command_panel_planner_show": "Show the session planner",
+  "command_panel_planner_toggle": "Toggle the session planner",
+  "command_panel_play_empty": "Play runs a session: its board and what's live.",
+  "command_panel_new_session_action": "new session",
+  "command_panel_note_name": "Note name",
+  "command_panel_rename_note": "Rename note",
+  "command_panel_spent": "spent {spent}",
+  "command_panel_edit_title": "Edit the note",
+  "command_panel_read_title": "Read the note rendered",
+  "command_panel_edit": "edit",
+  "command_panel_read": "read",
+  "command_panel_source_title": "Open the book this came from, at its page",
+  "command_panel_source": "source",
+  "command_panel_close_image": "Close the image",
+  "command_panel_close_note": "Close the note",
+  "command_panel_close": "close",
+  "command_panel_conflict": "Changed on disk while you were editing.",
+  "command_panel_reload": "reload",
+  "command_panel_reload_title": "Take what's on disk",
+  "command_panel_keep_mine": "keep mine",
+  "command_panel_keep_mine_title": "Write your version over it",
+  "command_panel_unreadable": "Can't read this note from disk — your text is still here.",
+  "command_panel_not_saved": "Not saved: {error}",
+  "command_panel_image_failed": "Can't show this image from disk.",
+  "command_panel_dismiss": "dismiss",
+  "command_tracks_insert_note": "Insert note track",
+  "command_tracks_insert_image": "Insert image track",
+  "command_tracks_mark_unspent": "Mark unspent",
+  "command_tracks_mark_spent": "Mark spent",
+  "command_tracks_move_to": "Move to",
+  "command_tracks_shelf": "Shelf",
+  "command_tracks_rename": "Rename",
+  "command_tracks_show_in_finder": "Show in Finder",
+  "command_tracks_move_to_trash": "Move to Trash",
+  "command_tracks_add_images": "Add images…",
+  "command_tracks_new_note": "New note",
+  "command_tracks_pigment": "Pigment",
+  "command_tracks_pigment_none": "None",
+  "command_tracks_image_track_name": "Image track name…",
+  "command_tracks_track_name": "Track name…",
+  "command_tracks_new_image_track": "New image track",
+  "command_tracks_new_track": "New track",
+  "command_tracks_ambiguous": "Another note is also named “{name}”, so links to it are ambiguous",
+  "command_tracks_spent_title": "{name} — spent {spent}",
+  "command_tracks_rename_note": "Rename note",
+  "command_tracks_rename_track": "Rename track",
+  "command_tracks_track_title": "{track} — drag to reorder, double-click to rename",
+  "command_tracks_in_beat": "{lit} of {total} in {beat}",
+  "command_tracks_add_images_title": "Add images — double-click to choose them",
+  "command_tracks_add_images_to": "Add images to {track}",
+  "command_tracks_note_name": "Note name…",
+  "command_tracks_new_note_in": "New note in {track}",
+  "command_tracks_new_note_title": "New note — double-click to name it",
+  "command_tracks_spent": "spent",
+  "command_tracks_add_track": "+ track",
+  "command_beats_disarm": "Disarm",
+  "command_beats_arm": "Arm",
+  "command_beats_stop": "Stop",
+  "command_beats_mark_unspent": "Mark unspent",
+  "command_beats_mark_spent": "Mark spent",
+  "command_beats_rename": "Rename",
+  "command_beats_reveal": "Show in Finder",
+  "command_beats_trash": "Move to Trash",
+  "command_beats_move_up": "Move up",
+  "command_beats_move_down": "Move down",
+  "command_beats_remove_from": "Remove from {session}",
+  "command_beats_write": "Write this beat",
+  "command_beats_add_to": "Add to {session}",
+  "command_beats_rename_label": "Rename beat",
+  "command_beats_name_spent": "{name} — spent {spent}",
+  "command_beats_stop_beat": "Stop {name}",
+  "command_beats_disarm_beat": "Disarm {name} (Esc)",
+  "command_beats_arm_beat": "Arm {name}: click notes to put them in it",
+  "command_beats_group_lit": "A beat in here is armed or live",
+  "command_beats_label": "Session planner",
+  "command_beats_title": "session planner",
+  "command_beats_missing": "No beat is named “{link}” yet — click to write it",
+  "command_beats_new_with_placeholder": "Beat with {name}…",
+  "command_beats_new_placeholder": "Beat name…",
+  "command_beats_new": "New beat",
+  "command_beats_new_title": "New beat — double-click to name it, or drop a note here",
+  "command_beats_new_with": "New beat with {#em}{name}{/em}",
+  "command_beats_group_spare": "not in this session",
+  "command_beats_group_spent": "spent",
+  "command_shelf_own": "{campaign}'s shelf",
+  "command_shelf_copy_from": "Copy from",
+  "command_shelf_add_folder": "Add folder…",
+  "command_shelf_forget_folder": "Forget this folder",
+  "command_shelf_mark_unspent": "Mark unspent",
+  "command_shelf_mark_spent": "Mark spent",
+  "command_shelf_move_to": "Move to",
+  "command_shelf_rename": "Rename",
+  "command_shelf_reveal": "Show in Finder",
+  "command_shelf_trash": "Move to Trash",
+  "command_shelf_name_spent": "{name} — spent {spent}",
+  "command_shelf_rename_label": "Rename note",
+  "command_shelf_label": "Shelf",
+  "command_shelf_source_title": "This shelf, or another campaign to copy from",
+  "command_shelf_from": "from {name}",
+  "command_shelf_title": "shelf",
+  "command_shelf_empty": "Nothing gathered yet. Send hits here from Legend Lore, or start a note.",
+  "command_shelf_new_placeholder": "Note name…",
+  "command_shelf_new": "New note on the shelf",
+  "command_shelf_new_title": "New note — double-click to name it",
+  "command_shelf_loose_title": "Notes directly in the campaign folder, on no track",
+  "command_shelf_loose": "loose",
+  "command_shelf_copy_title": "Copy {name} onto {campaign}'s shelf",
+  "command_shelf_copy_hint": "copy",
+  "command_shelf_none_to_copy": "{name} has no notes to copy.",
+  "command_play_arrange_title": "Arrange by beat",
+  "command_play_arrange_message": "Each planned beat gets a frame, in plan order, with its notes in it; notes several beats share go in {frame}. Your other cards stay where they are, and {undo} puts it all back.",
+  "command_play_arrange_confirm": "Arrange",
+  "command_play_show_image": "Show image",
+  "command_play_edit_note": "Edit note",
+  "command_play_take_out": "Take out of play",
+  "command_play_play": "Play",
+  "command_play_mark_unspent": "Mark unspent",
+  "command_play_mark_spent": "Mark spent",
+  "command_play_open_source": "Open source",
+  "command_play_edit_text": "Edit text",
+  "command_play_rename_frame": "Rename frame",
+  "command_play_duplicate": "Duplicate",
+  "command_play_remove_frame": "Remove frame",
+  "command_play_remove_card": "Remove from board",
+  "command_play_line_label": "Label",
+  "command_play_remove_line": "Remove line",
+  "command_play_expand_back": "Back to the normal view",
+  "command_play_expand_title": "Expand the board to fill the view",
+  "command_play_expand_leave": "Leave the expanded board",
+  "command_play_expand": "Expand the board",
+  "command_play_jot_placeholder": "Write to session notes…",
+  "command_play_jot_label": "Add a line to the session note",
+  "command_play_open_note": "Open the session note",
+  "command_tray_label": "Card tray",
+  "command_tray_title": "in play",
+  "command_tray_deselect_title": "Put the cards back in the hand",
+  "command_tray_select_title": "Lay the picked cards side by side",
+  "command_tray_deselect": "deselect",
+  "command_tray_select": "select",
+  "command_arrangement_stop": "Stop",
+  "command_arrangement_launch": "Launch",
+  "command_arrangement_frame_live": "Frame the live cards",
+  "command_arrangement_frame_its": "Frame its cards",
+  "command_arrangement_mark_unspent": "Mark unspent",
+  "command_arrangement_mark_spent": "Mark spent",
+  "command_arrangement_edit_beat": "Edit beat",
+  "command_arrangement_label": "Session player",
+  "command_arrangement_title": "session player",
+  "command_arrangement_name_spent": "{name} — spent {spent}",
+  "command_arrangement_stop_beat": "Stop {name} (P)",
+  "command_arrangement_launch_beat": "Launch {name} (P)",
+  "command_arrangement_frame_beat": "Frame the cards of {name}",
+  "command_arrangement_missing": "No beat is named “{link}” yet",
+  "command_arrangement_empty": "Nothing planned. Beats added to the session in Prep show here.",
+  "command_boardbar_no_arrowheads": "No arrowheads",
+  "command_boardbar_arrow_end": "An arrowhead at the end",
+  "command_boardbar_arrow_both": "Arrowheads at both ends",
+  "command_boardbar_the_line": "The line",
+  "command_boardbar_selected_cards": "The selected cards",
+  "command_boardbar_colour": "Colour",
+  "command_boardbar_none": "None",
+  "command_boardbar_ends": "Ends",
+  "command_boardbar_label_line": "Label the line",
+  "command_boardline_placeholder": "Label…",
+  "command_boardline_label": "The line's label",
+  "command_notefield_placeholder": "Note name…",
+  "command_notefield_label": "The note to place",
+  "command_notefield_notes": "Notes",
+  "command_tools_select": "Select",
+  "command_tools_hand": "Hand",
+  "command_tools_note": "Note",
+  "command_tools_text": "Text",
+  "command_tools_sticky": "Sticky",
+  "command_tools_line": "Line",
+  "command_tools_frame": "Frame",
+  "command_tools_label": "Board tools",
+  "command_tools_undo": "Undo",
+  "command_tools_redo": "Redo",
+  "command_tools_fit": "Fit the whole board",
+  "command_tools_arrange_title": "Arrange by beat: a frame per planned beat, in plan order",
+  "command_tools_arrange_none": "Arrange by beat: plan beats in Prep first",
+  "command_tools_arrange": "Arrange by beat",
+  "command_card_untitled": "Untitled",
+  "command_card_source_title": "Open the source at its page",
+  "command_card_source_label": "Open the source",
+  "command_card_unplay": "Take {name} out of play",
+  "command_card_play": "Play {name}",
+  "command_card_missing": "Nothing is at {path} any more.",
+  "command_guide_campaigns": "Campaigns folder",
+  "command_guide_campaigns_desc": "Each campaign is a folder in it: {#em}Unseen Servant{/em} in your home folder until you choose another in {#em}Settings → Command{/em}. Command reopens the campaign you used last; its key in the bar switches campaigns or starts a new one.",
+  "command_guide_tracks": "Tracks and notes",
+  "command_guide_tracks_desc": "A campaign's folders are its tracks (PCs, Secrets, Locations, NPCs…), shown as columns, and each note is a Markdown file in one, so Obsidian reads the same folder. {#em}[[Name]]{/em} links one note to another. The shelf ({#strong}⌘B{/strong}) holds what isn't filed yet, such as a Legend Lore result sent with right-click › {#em}Send to Command{/em}.",
+  "command_guide_beats": "Beats and sessions",
+  "command_guide_beats_desc": "A beat is a scene: the notes it needs. Double-click the empty row of the session planner, on the right, to name one, or press {#strong}⇧⌘N{/strong}; it starts armed (●), so clicking notes puts them in it, and {#strong}Esc{/strong} disarms it. The selected row answers the keys a Legend Lore row does: {#strong}↓{/strong} and {#strong}↑{/strong} walk its list and {#strong}→{/strong} and {#strong}←{/strong} the tracks, {#strong}⌘⌥←{/strong} and {#strong}→{/strong} move between the shelf, the tracks and the beats, {#strong}E{/strong} arms a beat, {#strong}X{/strong} puts a note in the armed one, {#strong}↵{/strong} opens it, {#strong}R{/strong} renames it, {#strong}⌘N{/strong} starts a note in its track, {#strong}⌘⌫{/strong} moves it to the Trash. {#em}New session{/em} in the bar starts a session; drag beats into its plan.",
+  "command_guide_play": "Play",
+  "command_guide_play_desc": "{#strong}Tab{/strong} switches to Play, where the board holds the plan's notes as cards. In the session player, {#strong}P{/strong} or ▶ launches the focused beat and lights its cards; a card's ▶ puts one more note in play. The card tray under the board holds what's in play: point at a card to read all of it, or click cards, then {#em}select{/em}, to read them side by side. {#strong}A{/strong} marks the note or beat under the pointer spent (a secret told, an NPC dead), and it stays dimmed in later sessions.",
+  "command_guide_tools": "The board's tools",
+  "command_guide_tools_desc": "The toolbar on the board's right edge arranges it before the session. {#strong}D{/strong} places any note of the campaign where you click, by name. {#strong}T{/strong} adds a text card and {#strong}N{/strong} a sticky where you click. {#strong}F{/strong} draws a frame, which carries the cards inside it when you move it; {#strong}⌘G{/strong} frames the selected cards. {#strong}L{/strong} draws a line from one card to another. Double-click a text card, a frame's name or a line to write in it. {#strong}H{/strong} pans over the cards, {#strong}V{/strong} or {#strong}Esc{/strong} goes back to selecting, and {#strong}⌘Z{/strong} undoes.",
+  "command_guide_tools_select": "Select a sticky, a text card, a frame or a line to colour it from the bar over it; a line's bar also sets its arrowheads. {#strong}⌘D{/strong} duplicates text cards, stickies and frames. {#strong}⌥1{/strong} shows the whole board, {#strong}⌥2{/strong} the selection and {#strong}⌥3{/strong} the live cards; {#strong}⇧⌘F{/strong} fills the view with the board, and {#strong}⌘B{/strong} folds the player and the tray out of its way.",
+  "command_guide_tools_arrange": "The key at the toolbar's foot arranges the board by beat: a frame for each planned beat in plan order, with the notes several beats share in a frame of their own, Throughout. Once a beat has its frame, launching it shows that frame.",
+  "command_guide_images": "Images",
+  "command_guide_images_desc": "A note shows the images it embeds, {#em}![[map.png]]{/em} as Obsidian writes them ({#em}![[map.png|300]]{/em} sets the width), on its card and when you read it. Drop an image from Finder on the board to put it there; it's copied into the campaign's {#em}Shelf{/em} folder, so the campaign keeps everything it uses.",
+  "command_guide_images_beat": "An image in a track or on the shelf works as a note does: put it in a beat, play it, and its card shows it. Double-click it to see it in the inspector. An image isn't spent: spend the beat that shows it.",
+  "command_guide_images_tracks": "A track holds notes or images, chosen when you insert it: {#em}+ track{/em}, or a track's right-click, offers {#em}Insert note track{/em} ({#strong}⌘T{/strong}) and {#em}Insert image track{/em} ({#strong}⇧⌘T{/strong}). Double-clicking an image track's empty row copies pictures from your Mac into it, as does dropping them on it from Finder; dropped on the shelf, they land there. An image goes only in an image track, and a note only in a note track; the shelf holds both. A new campaign starts with {#em}Maps{/em}, an image track, and a folder of images you fill in Finder is an image track already. In Legend Lore's tree, right-click an image and {#em}Send to Command{/em} to copy it in.",
+  "command_guide_session": "Session notes",
+  "command_guide_session_desc": "The bar in the board's corner writes a line into the session note, and {#strong}⌘J{/strong} puts the caret in it, and {#strong}⇧⌘J{/strong} opens the note.",
+  "command_settings_load_error": "Could not load Command's settings — is the sidecar running? ({error})",
+  "command_settings_folder": "Campaigns folder",
+  "command_settings_folder_desc": "Each campaign is a folder in here. Changing the folder closes the open campaign and opens a fresh Untitled in the new one — nothing is moved.",
+  "command_settings_no_folder": "No folder selected",
+  "command_settings_change_folder": "Change campaigns folder",
+  "command_settings_play": "Play",
+  "command_settings_play_desc": "How Command keeps track of a session at the table.",
+  "command_settings_spend": "Spend beats on launch",
+  "command_settings_spend_desc": "Launching a beat marks it spent, so later sessions find it among the spent beats, not those still to play. Off, you tick beats off by hand.",
+  "command_settings_on": "On",
+  "command_settings_off": "Off",
+  "command_settings_loading": "Loading…",
+  "command_frame_name": "Frame name",
+  "command_frame_name_placeholder": "Frame name…",
+  "command_frame_text": "The card's text",
+  "command_session_where": "{campaign} › {session}",
+  "command_session_live": "Live: {beat}",
+  "command_spend_label": "{name} spent",
+  "command_spend_unspend": "{name} — spent {date}: mark unspent",
+  "command_spend_spend": "Mark {name} spent",
+  "ui_confirm_default": "Confirm",
+  "servant_guide_agent": "AI agent {#opt}(optional){/opt}",
+  "servant_guide_connected": "Connected",
+  "servant_guide_not_detected": "Not detected",
+  "servant_guide_intro": "An AI agent that speaks MCP can search your Legend Lore library and read and write your Command campaigns. Help → Reference lists its tools.",
+  "servant_guide_copy": "copy MCP config",
+  "servant_guide_paste": "Paste it into the agent's MCP settings (inside its {#em}mcpServers{/em} if others are listed) and restart the agent. Keep Unseen Servant running; closing its window doesn't quit it.",
+  "servant_guide_scope": "The agent searches the whole library unless it names a collection: what plays here doesn't scope it. What its tools return goes to the agent's model, which may run in the cloud; the PDFs themselves stay here.",
+  "servant_panel_purpose": "An assistant over your library and sessions — not built yet."
 }

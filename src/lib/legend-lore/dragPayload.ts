@@ -13,6 +13,8 @@
  * `dragend` can never strand the wire-level flag.
  */
 
+import { m } from '../paraglide/messages';
+
 /** Lowercase on purpose: browsers lowercase custom types in `.types`. */
 export const TREE_PATHS_MIME = 'application/x-legendlore-tree-paths';
 
@@ -29,7 +31,7 @@ export interface TreePathsPayload {
  */
 export function describeTreePathsDrag(payload: TreePathsPayload): string {
   const n = payload.paths.length;
-  return n === 1 ? payload.label : `${payload.label} (${n} files)`;
+  return n === 1 ? payload.label : m.lore_drag_files({ label: payload.label, count: n });
 }
 
 /** The bits of DataTransfer we touch, so tests can pass a stub. */

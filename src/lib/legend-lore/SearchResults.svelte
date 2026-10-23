@@ -13,6 +13,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { grab } from '../ui/grab';
   import { writeTreePathsTransfer, clearTreePathsPayload, type TreePathsPayload } from './dragPayload';
+  import { m } from '../paraglide/messages';
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
@@ -191,34 +192,34 @@
   class:hover-live={$hoverLive}
   aria-busy={stale && results.length > 0}
   role="listbox"
-  aria-label="Search results"
+  aria-label={m.lore_results_label()}
   on:scroll={handleScroll}
 >
   {#if !sidecarConnected && results.length === 0}
     <div class="state-msg state-warn">
-      The sidecar isn&rsquo;t running. Quit Unseen Servant and open it again to search.
+      {m.lore_results_no_sidecar()}
     </div>
   {:else if !ollamaRunning && results.length === 0}
     <div class="state-msg state-warn">
-      Ollama isn&rsquo;t running. Start it to search.
+      {m.lore_results_no_ollama()}
     </div>
   {:else if isLoading && results.length === 0}
-    <div class="state-msg">Searching&hellip;</div>
+    <div class="state-msg">{m.lore_results_searching()}</div>
   {:else if error}
     <div class="state-msg state-error">{error}</div>
   {:else if results.length === 0 && query}
     {#if indexedFileCount === 0}
-      <div class="state-msg">{libraryEmpty ? 'No indexed files.' : 'Nothing in scope.'}</div>
+      <div class="state-msg">{libraryEmpty ? m.lore_results_no_indexed() : m.lore_results_nothing_in_scope()}</div>
     {:else}
-      <div class="state-msg">0 results for &ldquo;{query}&rdquo;</div>
+      <div class="state-msg">{m.lore_results_none_for({ query })}</div>
     {/if}
   {:else if results.length === 0}
     <!-- Search view opened from an empty bar (first use, or after ×) -->
-    <div class="state-msg">Type to search your library.</div>
+    <div class="state-msg">{m.lore_results_type_to_search()}</div>
   {:else}
     {#if allResultsWeak}
       <div class="weak-callout" role="status">
-        No strong matches &mdash; the content may be outside the current scope.
+        {m.lore_results_all_weak()}
       </div>
     {/if}
     {#each results as result, i (i)}
@@ -268,7 +269,7 @@
             on:mousedown|stopPropagation
             on:dblclick|stopPropagation
             role="checkbox"
-            aria-label="Add {result.filename} to collection"
+            aria-label={m.lore_results_add_to_collection({ name: result.filename })}
             aria-checked={collectionPaths.has(result.source)}
           ></button>
         {/if}
@@ -295,7 +296,7 @@
                brightens on hover. "untagged" stays plain text. -->
           <div class="source-line">
             {#if isPathOrAncestorIn(result.source, hiddenPaths)}
-              <span class="hidden-badge micro-label" title="This file is hidden in the tree.">hidden</span>
+              <span class="hidden-badge micro-label" title={m.lore_results_hidden_title()}>{m.lore_results_hidden()}</span>
             {/if}
             {#if leaf}
               <span class="source-book">{book}</span>
@@ -306,7 +307,7 @@
               <button
                 type="button"
                 class="source-system sys-btn"
-                aria-label="Edit game system tags for {book}"
+                aria-label={m.lore_results_edit_tags({ book })}
                 on:click={(e) => tagMenu?.toggle(e)}
                 on:mousedown|stopPropagation
                 on:dblclick|stopPropagation
@@ -339,8 +340,7 @@
                  the inspector lists and opens them. -->
             <div class="also-row">
               <span class="also-chip" title={result.also_in.map((a) => bookTitle(a.filename)).join(', ')}>
-                +{result.also_in.length}
-                {result.also_in.length === 1 ? 'edition' : 'editions'}
+                {m.lore_results_editions({ count: result.also_in.length })}
               </span>
             </div>
           {/if}
@@ -348,7 +348,7 @@
       </div>
     {/each}
     {#if isLoading && !stale && results.length > 0}
-      <div class="loading-more" aria-live="polite">loading more…</div>
+      <div class="loading-more" aria-live="polite">{m.lore_results_loading_more()}</div>
     {/if}
   {/if}
 </div>

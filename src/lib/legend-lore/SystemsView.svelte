@@ -18,6 +18,7 @@
   import { renameTarget } from './renameTarget';
   import RenameField from '../ui/RenameField.svelte';
   import { grab } from '../ui/grab';
+  import { m } from '../paraglide/messages';
 
   // File path → the collections holding it. Same strip as the file tree.
   export let ribbonIndex: Map<string, Ribbon[]> = new Map();
@@ -638,13 +639,13 @@
 
 
 {#if groups.length === 0}
-  <div class="empty">No indexed files match the current view.</div>
+  <div class="empty">{m.lore_systems_no_match()}</div>
 {:else}
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="systems-view" style="--count-digits: {countDigits}" on:pointerleave={clearHover}>
     {#each groups as group (group.tag)}
       {@const groupState = groupStates.get(group.tag) ?? 'none'}
-      {@const smLabel = group.tag === 'Untagged' ? 'untagged files' : group.tag}
+      {@const smLabel = group.tag === 'Untagged' ? m.lore_systems_untagged_files() : group.tag}
       {@const groupDimmed = isGroupDimmed(group, soloedSystems, scopeBrightPaths, scopeBypassed)}
       {#if !(hideOutOfScope && groupDimmed)}
       <section class="group">
@@ -664,7 +665,7 @@
               class="app-checkbox collecting group-checkbox"
               on:click={(e) => handleGroupCheckboxClick(e, group.entries)}
               role="checkbox"
-              aria-label="Select all in {group.tag}"
+              aria-label={m.lore_systems_select_all({ system: group.tag })}
               aria-checked={groupState === 'some' ? 'mixed' : groupState === 'all'}
             ></button>
           {/if}
@@ -700,7 +701,7 @@
                   class:solo-on={soloedSystems.has(group.tag)}
                   on:click|stopPropagation={() => onToggleSystemSolo(group.tag)}
                   aria-pressed={soloedSystems.has(group.tag)}
-                  title={soloedSystems.has(group.tag) ? `Stop soloing ${group.tag} (⇧S)` : `Solo ${group.tag} (⇧S)`}
+                  title={(soloedSystems.has(group.tag) ? m.lore_systems_unsolo({ name: group.tag }) : m.lore_systems_solo({ name: group.tag })) + ' (⇧S)'}
                 >S</button>
               {/if}
               <button
@@ -709,7 +710,7 @@
                 class:mute-on={group.muted}
                 on:click|stopPropagation={() => onToggleSystemFilter(group.tag === 'Untagged' ? UNTAGGED_KEY : group.tag)}
                 aria-pressed={group.muted}
-                title={group.muted ? `Unmute ${smLabel} (⇧M)` : `Mute ${smLabel} (⇧M)`}
+                title={(group.muted ? m.lore_systems_unmute({ name: smLabel }) : m.lore_systems_mute({ name: smLabel })) + ' (⇧M)'}
               >M</button>
             </span>
             <span class="group-count">{group.entries.length}</span>
@@ -752,7 +753,7 @@
                     on:mousedown|stopPropagation
                     on:dblclick|stopPropagation
                     role="checkbox"
-                    aria-label="Add {entry.filename} to collection"
+                    aria-label={m.lore_systems_add_to_collection({ name: entry.filename })}
                     aria-checked={isChecked}
                   ></button>
                 {/if}
@@ -765,7 +766,7 @@
                 {#if renamingFilePath === entry.path && isFocused(entry, group.tag)}
                   <RenameField
                     value={entry.filename.replace(/\.[^.]+$/, '')}
-                    label={`Rename ${entry.filename}`}
+                    label={m.lore_systems_rename({ name: entry.filename })}
                     onCommit={(typed) => commitRename(entry, typed)}
                     onCancel={onRenameCancel}
                   />
@@ -797,7 +798,7 @@
                     on:mousedown|stopPropagation
                     on:dblclick|stopPropagation
                     aria-pressed={rowSoloed}
-                    title={rowSoloed ? `Stop soloing ${entry.filename} (S)` : `Solo ${entry.filename} (S)`}
+                    title={(rowSoloed ? m.lore_systems_unsolo({ name: entry.filename }) : m.lore_systems_solo({ name: entry.filename })) + ' (S)'}
                   >S</button>
                   <button
                     type="button"
@@ -807,7 +808,7 @@
                     on:mousedown|stopPropagation
                     on:dblclick|stopPropagation
                     aria-pressed={rowMuted}
-                    title={rowMuted ? `Unmute ${entry.filename} (M)` : `Mute ${entry.filename} (M)`}
+                    title={(rowMuted ? m.lore_systems_unmute({ name: entry.filename }) : m.lore_systems_mute({ name: entry.filename })) + ' (M)'}
                   >M</button>
                 </span>
               </li>
@@ -819,7 +820,7 @@
       {/if}
     {/each}
     {#if hideOutOfScope && groups.length > 0 && groups.every((g) => isGroupDimmed(g, soloedSystems, scopeBrightPaths, scopeBypassed))}
-      <div class="empty">Everything is out of scope.</div>
+      <div class="empty">{m.lore_systems_all_out_of_scope()}</div>
     {/if}
   </div>
 {/if}

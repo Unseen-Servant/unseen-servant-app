@@ -20,6 +20,7 @@
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
   import { hoist } from '../shell/hoist';
+  import { m } from '../paraglide/messages';
   import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import NoteEditor from './NoteEditor.svelte';
@@ -439,7 +440,7 @@
       }
       // ⌘⌫: the selection to the Trash, behind the confirm, as a row's is.
       if (isDeleteChord(e) && entry) {
-        trashNote(entry, selectedBeat ? 'Beat' : 'Note');
+        trashNote(entry, selectedBeat ? m.command_panel_kind_beat() : m.command_panel_kind_note());
         return true;
       }
       // ⇧F10 / Menu: the selection's menu, from whichever list shows it.
@@ -583,9 +584,9 @@
     if (!track || !name) return;
     run(async () => {
       const create = await confirmPrompt.request({
-        title: 'New note',
-        message: `Nothing is named “${name}” yet. Start it in ${track}?`,
-        confirmLabel: 'Create',
+        title: m.command_panel_new_note_title(),
+        message: m.command_panel_new_note_message({ name, track }),
+        confirmLabel: m.command_panel_create(),
       });
       if (create) createNote(track, name);
     });
@@ -631,13 +632,13 @@
     });
   }
 
-  function trashNote(note: Named, kind = 'Note') {
+  function trashNote(note: Named, kind = m.command_panel_kind_note()) {
     run(async () => {
       const confirmed = await confirmPrompt.request({
-        title: 'Move to Trash',
+        title: m.command_panel_move_to_trash(),
         rows: [{ label: kind, value: note.name }],
-        message: 'Links to it will show as missing until it comes back.',
-        confirmLabel: 'Move to Trash',
+        message: m.command_panel_trash_note_message(),
+        confirmLabel: m.command_panel_move_to_trash(),
         danger: true,
       });
       if (!confirmed) return;
@@ -925,13 +926,13 @@
     if (!target) return;
     run(async () => {
       const confirmed = await confirmPrompt.request({
-        title: 'Move to Trash',
+        title: m.command_panel_move_to_trash(),
         rows: [
-          { label: 'Session', value: target.name },
-          { label: 'Beats', value: String(target.beats.length), to: 'kept', unchanged: true },
+          { label: m.command_panel_kind_session(), value: target.name },
+          { label: m.command_panel_kind_beats(), value: String(target.beats.length), to: m.command_panel_to_kept(), unchanged: true },
         ],
-        message: 'The session note and its board go; its beats stay in Beats/.',
-        confirmLabel: 'Move to Trash',
+        message: m.command_panel_trash_session_message(),
+        confirmLabel: m.command_panel_move_to_trash(),
         danger: true,
       });
       if (!confirmed) return;
@@ -948,15 +949,15 @@
     const others = [...(index?.sessions ?? [])].reverse().filter((s) => s.path !== session?.path);
     dropMenu(e, 'session', [
       ...(others.length
-        ? [heading('sessions'), ...others.map((s) => action(s.date ? `${s.name} · ${s.date}` : s.name, () => run(() => setSession(s.name)))), divider]
+        ? [heading(m.command_panel_sessions_heading()), ...others.map((s) => action(s.date ? `${s.name} · ${s.date}` : s.name, () => run(() => setSession(s.name)))), divider]
         : []),
-      action('New session', newSession),
+      action(m.command_panel_new_session(), newSession),
       ...(session
         ? [
-            keyed('Edit session note', 'command.sessionNote', () => openPath(session!.path)),
-            action('Show in Finder', () => reveal(session!.path)),
+            keyed(m.command_panel_edit_session_note(), 'command.sessionNote', () => openPath(session!.path)),
+            action(m.command_panel_show_in_finder(), () => reveal(session!.path)),
             divider,
-            action('Move to Trash', trashSession, true),
+            action(m.command_panel_move_to_trash(), trashSession, true),
           ]
         : []),
     ]);
@@ -1053,13 +1054,13 @@
   function trashTrack(column: Column) {
     run(async () => {
       const confirmed = await confirmPrompt.request({
-        title: 'Move to Trash',
+        title: m.command_panel_move_to_trash(),
         rows: [
-          { label: 'Track', value: column.track },
-          { label: 'Notes', value: String(column.count), to: 'Trash' },
+          { label: m.command_panel_kind_track(), value: column.track },
+          { label: m.command_panel_kind_notes(), value: String(column.count), to: m.command_panel_to_trash() },
         ],
-        message: 'The folder and every note in it go to the Trash.',
-        confirmLabel: 'Move to Trash',
+        message: m.command_panel_trash_track_message(),
+        confirmLabel: m.command_panel_move_to_trash(),
         danger: true,
       });
       if (!confirmed) return;
@@ -1106,13 +1107,13 @@
     run(async () => {
       const name = campaign!;
       const confirmed = await confirmPrompt.request({
-        title: 'Move to Trash',
+        title: m.command_panel_move_to_trash(),
         rows: [
-          { label: 'Campaign', value: name },
-          { label: 'Notes', value: String(index?.notes.length ?? 0), to: 'Trash' },
+          { label: m.command_panel_kind_campaign(), value: name },
+          { label: m.command_panel_kind_notes(), value: String(index?.notes.length ?? 0), to: m.command_panel_to_trash() },
         ],
-        message: 'The campaign folder and everything in it go to the Trash.',
-        confirmLabel: 'Move to Trash',
+        message: m.command_panel_trash_campaign_message(),
+        confirmLabel: m.command_panel_move_to_trash(),
         danger: true,
       });
       if (!confirmed) return;
@@ -1131,13 +1132,13 @@
     dropMenu(e, 'campaign', [
       ...campaigns.map((c) => choice(c, c === campaign, () => openCampaign(c))),
       ...(campaigns.length ? [divider] : []),
-      action('New campaign', newCampaign),
+      action(m.command_panel_new_campaign(), newCampaign),
       ...(campaign
         ? [
-            action(untitled ? 'Name campaign' : 'Rename campaign', startRenaming),
-            action('Show in Finder', () => reveal()),
+            action(untitled ? m.command_panel_name_campaign() : m.command_panel_rename_campaign(), startRenaming),
+            action(m.command_panel_show_in_finder(), () => reveal()),
             divider,
-            action('Move to Trash', trashCampaign, true),
+            action(m.command_panel_move_to_trash(), trashCampaign, true),
           ]
         : []),
     ]);
@@ -1159,19 +1160,19 @@
       x: e.clientX,
       y: e.clientY,
       items: [
-        action('Rename', startRenaming),
-        action('Show in Finder', () => reveal()),
+        action(m.command_panel_rename(), startRenaming),
+        action(m.command_panel_show_in_finder(), () => reveal()),
         divider,
-        action('Move to Trash', trashCampaign, true),
+        action(m.command_panel_move_to_trash(), trashCampaign, true),
       ],
     };
   }
 
   // -- the inspector ------------------------------------------------------
 
-  const STATUS_TEXT: Partial<Record<BufferState['status'], string>> = {
-    dirty: 'edited',
-    saving: 'saving…',
+  const STATUS_TEXT: Partial<Record<BufferState['status'], () => string>> = {
+    dirty: m.command_panel_status_edited,
+    saving: m.command_panel_status_saving,
   };
 </script>
 
@@ -1197,8 +1198,8 @@
         <LatchKey
           open={shelfOpen}
           lamp={false}
-          title={(shelfOpen ? 'Hide the shelf' : 'Show the shelf') + chordHint('sidebar.toggle')}
-          label="Toggle the shelf"
+          title={(shelfOpen ? m.command_panel_shelf_hide() : m.command_panel_shelf_show()) + chordHint('sidebar.toggle')}
+          label={m.command_panel_shelf_toggle()}
           onClick={() => (shelfOpen = !shelfOpen)}
         >
           <!-- Font Awesome "book-bookmark" icon (src/lib/ui/icons/book-bookmark-solid-full.svg):
@@ -1220,8 +1221,8 @@
         <span class="key-field" style:width={renameWidth ? `${renameWidth}px` : null}>
           <RenameField
             value={untitled || !campaign ? '' : campaign}
-            placeholder="Campaign name"
-            label={untitled ? 'Name campaign' : 'Rename campaign'}
+            placeholder={m.command_panel_campaign_name()}
+            label={untitled ? m.command_panel_name_campaign() : m.command_panel_rename_campaign()}
             onCommit={async (name) => {
               const refusal = await renameCampaign(name);
               if (!refusal) renaming = false;
@@ -1238,11 +1239,11 @@
           class:untitled
           class:none={!campaign}
           class:open={sunk === 'campaign'}
-          title="Campaigns"
+          title={m.command_panel_campaigns()}
           on:click={campaignMenu}
           on:contextmenu|preventDefault={manageMenu}
         >
-          <span class="key-name">{campaign ?? 'no campaign'}</span>
+          <span class="key-name">{campaign ?? m.command_panel_no_campaign()}</span>
           {@render dropCaret()}
         </button>
       {/if}
@@ -1259,7 +1260,7 @@
             type="button"
             class="key-face session-key"
             class:open={sunk === 'session'}
-            title="Sessions"
+            title={m.command_panel_sessions()}
             on:click={sessionMenu}
           >
             <span class="key-name">{current.name}</span>
@@ -1267,14 +1268,14 @@
           </button>
           <!-- The well's second key starts the next session from the bar;
                the menu keeps New session too. -->
-          <button type="button" class="key-face key-add" title="New session" aria-label="New session" on:click={newSession}>
+          <button type="button" class="key-face key-add" title={m.command_panel_new_session()} aria-label={m.command_panel_new_session()} on:click={newSession}>
             <!-- Font Awesome "plus" icon (src/lib/ui/icons/plus-solid-full.svg) -->
             <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true">
               <path d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z" />
             </svg>
           </button>
         {:else}
-          <button type="button" class="key-face session-key ghost" on:click={newSession}>+ session</button>
+          <button type="button" class="key-face session-key ghost" on:click={newSession}>{m.command_panel_add_session()}</button>
         {/if}
       </div>
     {/if}
@@ -1285,13 +1286,13 @@
            lighting purple. Both glyphs are drawn with viewBox="64 64 512 512",
            the 640 box cropped, so they fill the segment as Legend Lore's
            folder-tree and layer-group do. -->
-      <div class="view-switch" role="group" aria-label="Command view">
+      <div class="view-switch" role="group" aria-label={m.command_panel_view_switch({ tool: 'Command' })}>
         <button
           class="view-segment"
           class:current={mode === 'prep'}
           on:click={() => (mode = 'prep')}
-          title={'Prep' + chordHint('view.toggle')}
-          aria-label="Prep"
+          title={m.command_panel_prep() + chordHint('view.toggle')}
+          aria-label={m.command_panel_prep()}
           aria-pressed={mode === 'prep'}
         >
           <!-- Font Awesome "table-columns" icon (src/lib/ui/icons/table-columns-solid-full.svg) -->
@@ -1303,8 +1304,8 @@
           class="view-segment"
           class:current={mode === 'play'}
           on:click={() => (mode = 'play')}
-          title={'Play' + chordHint('view.toggle')}
-          aria-label="Play"
+          title={m.command_panel_play() + chordHint('view.toggle')}
+          aria-label={m.command_panel_play()}
           aria-pressed={mode === 'play'}
         >
           <svg viewBox="64 64 512 512" fill="currentColor" class="toggle-icon">
@@ -1321,8 +1322,8 @@
         <LatchKey
           open={beatsOpen}
           lit={armed || !!live?.beat}
-          title={beatsOpen ? 'Hide the session planner' : 'Show the session planner'}
-          label="Toggle the session planner"
+          title={beatsOpen ? m.command_panel_planner_hide() : m.command_panel_planner_show()}
+          label={m.command_panel_planner_toggle()}
           onClick={toggleBeats}
         >
           <!-- Font Awesome "list-ol" icon (src/lib/ui/icons/list-ol-solid-full.svg) -->
@@ -1366,8 +1367,8 @@
             />
           {:else}
             <div class="empty">
-              <p class="lede">Play runs a session: its board and what's live.</p>
-              <ActionButton label="new session" onClick={newSession} />
+              <p class="lede">{m.command_panel_play_empty()}</p>
+              <ActionButton label={m.command_panel_new_session_action()} onClick={newSession} />
             </div>
           {/if}
         {:else}
@@ -1459,7 +1460,7 @@
             onRename={renameNote}
             onSpent={setSpent}
             onReveal={(beat) => reveal(beat.path)}
-            onTrash={(beat) => trashNote(beat, 'Beat')}
+            onTrash={(beat) => trashNote(beat, m.command_panel_kind_beat())}
             onDropNote={addToBeat}
             onReorder={orderBeats}
           />
@@ -1501,8 +1502,8 @@
                     <span class="note-name-field">
                       <RenameField
                         value={openEntry ? nameParts(openEntry).stem : openName}
-                        placeholder="Note name"
-                        label="Rename note"
+                        placeholder={m.command_panel_note_name()}
+                        label={m.command_panel_rename_note()}
                         onCommit={async (name) => {
                           const refusal = await renameNote({ name: openName, path }, name);
                           if (!refusal) renamingOpen = false;
@@ -1515,7 +1516,7 @@
                     <button
                       type="button"
                       class="note-name"
-                      title="Rename"
+                      title={m.command_panel_rename()}
                       disabled={!renamable}
                       on:click={() => (renamingOpen = true)}
                     >{openName}</button>
@@ -1523,10 +1524,10 @@
                 </span>
               </div>
               {#if openEntry?.spent}
-                <span class="readout">spent {openEntry.spent}</span>
+                <span class="readout">{m.command_panel_spent({ spent: openEntry.spent })}</span>
               {/if}
               {#if STATUS_TEXT[bufState.status]}
-                <span class="readout">{STATUS_TEXT[bufState.status]}</span>
+                <span class="readout">{STATUS_TEXT[bufState.status]?.()}</span>
               {/if}
               <!-- Names what it switches to, as the plate's other actions
                    name what they do. An image is only shown. -->
@@ -1534,33 +1535,33 @@
                 <button
                   type="button"
                   class="plate-btn"
-                  title={(reading ? 'Edit the note' : 'Read the note rendered') + chordHint('command.read')}
+                  title={(reading ? m.command_panel_edit_title() : m.command_panel_read_title()) + chordHint('command.read')}
                   on:click={toggleReading}
-                >{reading ? 'edit' : 'read'}</button>
+                >{reading ? m.command_panel_edit() : m.command_panel_read()}</button>
               {/if}
               {#if openEntry?.source}
                 {@const source = openEntry.source}
                 <button
                   type="button"
                   class="plate-btn"
-                  title="Open the book this came from, at its page"
+                  title={m.command_panel_source_title()}
                   on:click={() => void openUrl(source).catch((e) => (error = String(e)))}
-                >source</button>
+                >{m.command_panel_source()}</button>
               {/if}
-              <button type="button" class="plate-btn" title={openImage ? 'Close the image' : 'Close the note'} on:click={() => run(closeInspector)}>close</button>
+              <button type="button" class="plate-btn" title={openImage ? m.command_panel_close_image() : m.command_panel_close_note()} on:click={() => run(closeInspector)}>{m.command_panel_close()}</button>
             </div>
             {#if bufState.status === 'conflict'}
               <div class="notice" role="alert">
-                <span>Changed on disk while you were editing.</span>
-                <ActionButton label="reload" title="Take what's on disk" onClick={() => void buffer.reload()} />
-                <ActionButton label="keep mine" title="Write your version over it" onClick={() => void buffer.keepMine()} />
+                <span>{m.command_panel_conflict()}</span>
+                <ActionButton label={m.command_panel_reload()} title={m.command_panel_reload_title()} onClick={() => void buffer.reload()} />
+                <ActionButton label={m.command_panel_keep_mine()} title={m.command_panel_keep_mine_title()} onClick={() => void buffer.keepMine()} />
               </div>
             {:else if bufState.status === 'unreadable'}
               <div class="notice" role="alert">
-                <span>Can't read this note from disk — your text is still here.</span>
+                <span>{m.command_panel_unreadable()}</span>
               </div>
             {:else if bufState.error}
-              <div class="notice" role="alert"><span>Not saved: {bufState.error}</span></div>
+              <div class="notice" role="alert"><span>{m.command_panel_not_saved({ error: bufState.error })}</span></div>
             {/if}
           {/if}
           {#if openImage}
@@ -1568,7 +1569,7 @@
                  (images design §4). -->
             <div class="editor-slot image-view">
               {#if imageFailed}
-                <div class="notice" role="alert"><span>Can't show this image from disk.</span></div>
+                <div class="notice" role="alert"><span>{m.command_panel_image_failed()}</span></div>
               {:else}
                 <img src={images.file(openImage)} alt={openName} on:error={() => (imageFailed = true)} />
               {/if}
@@ -1609,7 +1610,7 @@
   {#if error}
     <div class="error-line" role="alert">
       <span class="error-text">{error}</span>
-      <ActionButton label="dismiss" onClick={() => (error = null)} />
+      <ActionButton label={m.command_panel_dismiss()} onClick={() => (error = null)} />
     </div>
   {/if}
 </section>

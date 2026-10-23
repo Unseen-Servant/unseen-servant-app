@@ -5,11 +5,13 @@
 // bucket explicitly — omitting it silently drops every untagged file
 // (homebrew, indie, French books) the moment any one system is muted.
 
+import { m } from '../paraglide/messages';
+
 export const UNTAGGED_KEY = 'unknown';
 
 /** Display name for the untagged bucket. The backend key stays 'unknown'. */
 export function displaySystem(tag: string): string {
-  return tag === UNTAGGED_KEY ? 'untagged' : tag;
+  return tag === UNTAGGED_KEY ? m.lore_scope_untagged() : tag;
 }
 
 /** Resolve solo/mute state to the backend's `game_systems` include-list.
@@ -213,9 +215,9 @@ export function emptyScopeMessage(args: {
   systemsEmpty: boolean;
   scopeEmpty?: boolean;
 }): string | null {
-  if (args.mixEmpty) return args.anyLivePlaying ? 'Nothing indexed is playing.' : 'Everything is muted.';
-  if (args.pathScopeEmpty) return args.anySolosEngaged ? 'Nothing under the soloed items.' : 'Everything is muted.';
-  if (args.systemsEmpty) return 'Everything is muted.';
-  if (args.scopeEmpty) return args.anySolosEngaged ? 'Nothing under the soloed items.' : 'Everything is muted.';
+  if (args.mixEmpty) return args.anyLivePlaying ? m.lore_scope_nothing_playing() : m.lore_scope_all_muted();
+  if (args.pathScopeEmpty) return args.anySolosEngaged ? m.lore_scope_nothing_soloed() : m.lore_scope_all_muted();
+  if (args.systemsEmpty) return m.lore_scope_all_muted();
+  if (args.scopeEmpty) return args.anySolosEngaged ? m.lore_scope_nothing_soloed() : m.lore_scope_all_muted();
   return null;
 }

@@ -7,6 +7,7 @@
   // card.
   import { PIGMENTS } from '../legend-lore/palette';
   import type { End } from './types';
+  import { m } from '../paraglide/messages';
 
   /** The colour the selection shares, as drawn (board.ts paint): null for
    *  none, undefined when its cards differ. */
@@ -19,23 +20,23 @@
 
   // Font Awesome Free 7.3.1 glyphs, viewBox 0 0 640 640; each from the
   // file named beside it in src/lib/ui/icons/.
-  const ENDS: { name: string; fromEnd: End; toEnd: End; path: string }[] = [
+  const ENDS: { name: () => string; fromEnd: End; toEnd: End; path: string }[] = [
     {
-      name: 'No arrowheads',
+      name: m.command_boardbar_no_arrowheads,
       fromEnd: 'none',
       toEnd: 'none',
       // minus-solid-full.svg
       path: 'M96 320C96 302.3 110.3 288 128 288L512 288C529.7 288 544 302.3 544 320C544 337.7 529.7 352 512 352L128 352C110.3 352 96 337.7 96 320z',
     },
     {
-      name: 'An arrowhead at the end',
+      name: m.command_boardbar_arrow_end,
       fromEnd: 'none',
       toEnd: 'arrow',
       // arrow-right-long-solid-full.svg
       path: 'M598.6 342.6C611.1 330.1 611.1 309.8 598.6 297.3L470.6 169.3C458.1 156.8 437.8 156.8 425.3 169.3C412.8 181.8 412.8 202.1 425.3 214.6L498.7 288L64 288C46.3 288 32 302.3 32 320C32 337.7 46.3 352 64 352L498.7 352L425.3 425.4C412.8 437.9 412.8 458.2 425.3 470.7C437.8 483.2 458.1 483.2 470.6 470.7L598.6 342.7z',
     },
     {
-      name: 'Arrowheads at both ends',
+      name: m.command_boardbar_arrow_both,
       fromEnd: 'arrow',
       toEnd: 'arrow',
       // arrows-left-right-solid-full.svg
@@ -47,15 +48,15 @@
     'M96.5 160L96.5 309.5C96.5 326.5 103.2 342.8 115.2 354.8L307.2 546.8C332.2 571.8 372.7 571.8 397.7 546.8L547.2 397.3C572.2 372.3 572.2 331.8 547.2 306.8L355.2 114.8C343.2 102.7 327 96 310 96L160.5 96C125.2 96 96.5 124.7 96.5 160zM208.5 176C226.2 176 240.5 190.3 240.5 208C240.5 225.7 226.2 240 208.5 240C190.8 240 176.5 225.7 176.5 208C176.5 190.3 190.8 176 208.5 176z';
 </script>
 
-<div class="bar nodrag nopan nowheel" role="toolbar" aria-label={ends ? 'The line' : 'The selected cards'}>
-  <div class="menu-picks" role="radiogroup" aria-label="Colour">
+<div class="bar nodrag nopan nowheel" role="toolbar" aria-label={ends ? m.command_boardbar_the_line() : m.command_boardbar_selected_cards()}>
+  <div class="menu-picks" role="radiogroup" aria-label={m.command_boardbar_colour()}>
     {#each PIGMENTS as p (p.name)}
       <button type="button" class="menu-pick" role="radio" aria-checked={color === p.hex} aria-label={p.name} title={p.name} on:click={() => onColor(p.hex)}>
         <span class="menu-swatch" style:background={p.hex} aria-hidden="true"></span>
         <span class="menu-pip" class:on={color === p.hex} aria-hidden="true"></span>
       </button>
     {/each}
-    <button type="button" class="menu-pick" role="radio" aria-checked={color === null} aria-label="None" title="None" on:click={() => onColor(null)}>
+    <button type="button" class="menu-pick" role="radio" aria-checked={color === null} aria-label={m.command_boardbar_none()} title={m.command_boardbar_none()} on:click={() => onColor(null)}>
       <span class="menu-swatch none" aria-hidden="true"></span>
       <span class="menu-pip" class:on={color === null} aria-hidden="true"></span>
     </button>
@@ -63,7 +64,7 @@
   {#if ends}
     {@const now = ends}
     <span class="rule" aria-hidden="true"></span>
-    <div class="menu-picks" role="radiogroup" aria-label="Ends">
+    <div class="menu-picks" role="radiogroup" aria-label={m.command_boardbar_ends()}>
       {#each ENDS as e (e.name)}
         {@const on = now.fromEnd === e.fromEnd && now.toEnd === e.toEnd}
         <button
@@ -71,8 +72,8 @@
           class="menu-pick"
           role="radio"
           aria-checked={on}
-          aria-label={e.name}
-          title={e.name}
+          aria-label={e.name()}
+          title={e.name()}
           on:click={() => onEnds({ fromEnd: e.fromEnd, toEnd: e.toEnd })}
         >
           <svg class="glyph" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={e.path} /></svg>
@@ -82,7 +83,7 @@
     </div>
     <span class="rule" aria-hidden="true"></span>
     <div class="menu-picks">
-      <button type="button" class="menu-pick" aria-label="Label the line" title="Label the line" on:click={onLabel}>
+      <button type="button" class="menu-pick" aria-label={m.command_boardbar_label_line()} title={m.command_boardbar_label_line()} on:click={onLabel}>
         <svg class="glyph" viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={TAG} /></svg>
         <!-- An action, not a choice: its pip's place, empty, keeps the row level. -->
         <span class="menu-pip unlit" aria-hidden="true"></span>

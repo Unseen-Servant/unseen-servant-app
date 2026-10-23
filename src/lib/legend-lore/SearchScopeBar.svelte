@@ -5,10 +5,12 @@
   // clear-affordance — the whole chip is the button; click to undo that
   // single narrowing without touching the others.
 
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
   import { displaySystem } from './searchScope';
   import { chordHint } from '../shell/keybindings';
   import type { CurationKey } from './searchScope';
   import { GEM, SHIELD } from '../ui/iconPaths';
+  import { m } from '../paraglide/messages';
 
   // Chip glyph = axis (pigment gem = collection, outline gem =
   // curation bucket, monochrome shield = system); chip frame = operation
@@ -65,9 +67,9 @@
   export let onToggleHideUnindexed: () => void = () => {};
   export let onToggleHideImages: () => void = () => {};
 
-  const CURATION_LABELS: Record<CurationKey, string> = {
-    collected: 'In a collection',
-    loose: 'Loose',
+  const CURATION_LABELS: Record<CurationKey, () => string> = {
+    collected: m.lore_scopebar_collected,
+    loose: m.lore_scopebar_loose,
   };
   const CURATION_ORDER: CurationKey[] = ['collected', 'loose'];
 
@@ -94,7 +96,7 @@
          The switch is the same 18px hardware square the S and M buttons
          use, labelled with its own chord: the letter on the switch is the
          key that throws it. -->
-    <span class="scope-name ledger-label">Scope</span>
+    <span class="scope-name ledger-label">{m.lore_scopebar_scope()}</span>
     <button
       type="button"
       class="sm-btn"
@@ -103,27 +105,27 @@
       aria-pressed={scopeBypassed}
       on:click|stopPropagation={onToggleBypass}
       title={!bypassable
-        ? 'Nothing to bypass yet — solo or mute something first'
+        ? m.lore_scopebar_bypass_none()
         : scopeBypassed
-          ? `Scope bypassed — every indexed file is in scope. Restore it${chordHint('scope.bypass')}`
-          : `Bypass the scope — every indexed file back in scope, without clearing anything${chordHint('scope.bypass')}`}
+          ? m.lore_scopebar_bypass_restore() + chordHint('scope.bypass')
+          : m.lore_scopebar_bypass() + chordHint('scope.bypass')}
     >B</button>
     <span class="master-rule" aria-hidden="true"></span>
 
     {#if !bypassable && !searchActive}
       <!-- Only when the meter isn't showing: with a search active and no
            scope engaged, both would report the same total. -->
-      <span class="resting">all {indexedFileCount} files</span>
+      <span class="resting">{m.lore_scopebar_resting({ count: indexedFileCount })}</span>
     {/if}
     {#each collectionPlays as chip (chip.key)}
       <button
         type="button"
         class="chip solo"
         on:click|stopPropagation={() => onClearCollectionPlay(chip.key)}
-        title="Stop {chip.label}"
-        aria-label="Stop {chip.label}"
+        title={m.lore_scopebar_stop({ name: chip.label })}
+        aria-label={m.lore_scopebar_stop({ name: chip.label })}
       >
-        <span class="chip-prefix micro-label">play</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_play()}</span>
         {#if chip.color}
           <!-- Gem — the collection axis keeps its pigment -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -145,10 +147,10 @@
         type="button"
         class="chip exclusion"
         on:click|stopPropagation={() => onClearCollectionTrackMute(chip.key)}
-        title="Unmute {chip.label}"
-        aria-label="Unmute {chip.label}"
+        title={m.lore_scopebar_unmute({ name: chip.label })}
+        aria-label={m.lore_scopebar_unmute({ name: chip.label })}
       >
-        <span class="chip-prefix micro-label">mute</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_mute()}</span>
         {#if chip.color}
           <!-- Gem — the collection keeps its pigment even muted -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -169,10 +171,10 @@
         type="button"
         class="chip solo"
         on:click|stopPropagation={() => onClearCollectionSolo(chip.key)}
-        title="Stop soloing {chip.label}"
-        aria-label="Stop soloing {chip.label}"
+        title={m.lore_scopebar_stop_solo({ name: chip.label })}
+        aria-label={m.lore_scopebar_stop_solo({ name: chip.label })}
       >
-        <span class="chip-prefix micro-label">solo</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_solo()}</span>
         {#if chip.color}
           <!-- Gem — the collection axis keeps its pigment -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -194,17 +196,17 @@
         type="button"
         class="chip solo"
         on:click|stopPropagation={() => onToggleCurationSolo(key)}
-        title="Stop soloing {CURATION_LABELS[key]}"
-        aria-label="Stop soloing {CURATION_LABELS[key]}"
+        title={m.lore_scopebar_stop_solo({ name: CURATION_LABELS[key]() })}
+        aria-label={m.lore_scopebar_stop_solo({ name: CURATION_LABELS[key]() })}
       >
-        <span class="chip-prefix micro-label">solo</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_solo()}</span>
         {#if key === 'collected'}
           <!-- Outline gem — the curation bucket, not a specific collection -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
             <path d={GEM}/>
           </svg>
         {/if}
-        <span class="chip-label">{CURATION_LABELS[key]}</span>
+        <span class="chip-label">{CURATION_LABELS[key]()}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/each}
@@ -214,10 +216,10 @@
         type="button"
         class="chip solo"
         on:click|stopPropagation={() => onToggleSystemSolo(system)}
-        title="Stop soloing {displaySystem(system)}"
-        aria-label="Stop soloing {displaySystem(system)}"
+        title={m.lore_scopebar_stop_solo({ name: displaySystem(system) })}
+        aria-label={m.lore_scopebar_stop_solo({ name: displaySystem(system) })}
       >
-        <span class="chip-prefix micro-label">solo</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_solo()}</span>
         <!-- Shield — monochrome; it marks the axis, the frame marks the operation -->
         <svg class="chip-die" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
           <path d={SHIELD}/>
@@ -232,10 +234,10 @@
         type="button"
         class="chip exclusion"
         on:click|stopPropagation={() => onClearCollectionMute(chip.key)}
-        title="Unmute {chip.label}"
-        aria-label="Unmute {chip.label}"
+        title={m.lore_scopebar_unmute({ name: chip.label })}
+        aria-label={m.lore_scopebar_unmute({ name: chip.label })}
       >
-        <span class="chip-prefix micro-label">mute</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_mute()}</span>
         {#if chip.color}
           <!-- Gem — dims with the chip ("removed, still recognizable") -->
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke={chip.color} stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -257,16 +259,16 @@
         type="button"
         class="chip exclusion"
         on:click|stopPropagation={() => onToggleCurationMute(key)}
-        title="Unmute {CURATION_LABELS[key]}"
-        aria-label="Unmute {CURATION_LABELS[key]}"
+        title={m.lore_scopebar_unmute({ name: CURATION_LABELS[key]() })}
+        aria-label={m.lore_scopebar_unmute({ name: CURATION_LABELS[key]() })}
       >
-        <span class="chip-prefix micro-label">mute</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_mute()}</span>
         {#if key === 'collected'}
           <svg class="chip-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
             <path d={GEM}/>
           </svg>
         {/if}
-        <span class="chip-label">{CURATION_LABELS[key]}</span>
+        <span class="chip-label">{CURATION_LABELS[key]()}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/each}
@@ -276,10 +278,10 @@
         type="button"
         class="chip exclusion"
         on:click|stopPropagation={() => onToggleSystemFilter(system)}
-        title="Unmute {displaySystem(system)}"
-        aria-label="Unmute {displaySystem(system)}"
+        title={m.lore_scopebar_unmute({ name: displaySystem(system) })}
+        aria-label={m.lore_scopebar_unmute({ name: displaySystem(system) })}
       >
-        <span class="chip-prefix micro-label">mute</span>
+        <span class="chip-prefix micro-label">{m.lore_scopebar_mute()}</span>
         <!-- Shield — monochrome; dims with the chip ("removed, still recognizable") -->
         <svg class="chip-die" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
           <path d={SHIELD}/>
@@ -294,10 +296,10 @@
         type="button"
         class="chip hidden-on"
         on:click|stopPropagation={onToggleShowHidden}
-        title="Hide them again"
-        aria-label="Hide hidden items again"
+        title={m.lore_scopebar_hidden_title()}
+        aria-label={m.lore_scopebar_hidden_label()}
       >
-        <span class="chip-label">hidden shown</span>
+        <span class="chip-label">{m.lore_scopebar_hidden()}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
@@ -307,10 +309,10 @@
         type="button"
         class="chip indexed-only"
         on:click|stopPropagation={onToggleHideUnindexed}
-        title="Show unindexed items again"
-        aria-label="Show unindexed items again"
+        title={m.lore_scopebar_indexed_only_title()}
+        aria-label={m.lore_scopebar_indexed_only_title()}
       >
-        <span class="chip-label">indexed only</span>
+        <span class="chip-label">{m.lore_scopebar_indexed_only()}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
@@ -320,10 +322,10 @@
         type="button"
         class="chip images-hidden"
         on:click|stopPropagation={onToggleHideImages}
-        title="Show the library's images again"
-        aria-label="Show the library's images again"
+        title={m.lore_scopebar_images_title()}
+        aria-label={m.lore_scopebar_images_title()}
       >
-        <span class="chip-label">images hidden</span>
+        <span class="chip-label">{m.lore_scopebar_images()}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
@@ -333,10 +335,10 @@
         type="button"
         class="chip lens-on"
         on:click|stopPropagation={onToggleHideOutOfScope}
-        title="Show out-of-scope items again"
-        aria-label="Show out-of-scope items again"
+        title={m.lore_scopebar_lens_title()}
+        aria-label={m.lore_scopebar_lens_title()}
       >
-        <span class="chip-label">lens on</span>
+        <span class="chip-label">{m.lore_scopebar_lens()}</span>
         <span class="chip-clear" aria-hidden="true">×</span>
       </button>
     {/if}
@@ -346,7 +348,7 @@
     <div class="right" role="status" aria-live="polite">
       {#if isLoading}
         <span class="meter searching">
-          Searching<span class="searching-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+          {m.lore_scopebar_searching()}<span class="searching-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
         </span>
       {:else}
         <!-- Under bypass the denominator is the whole library, so the
@@ -354,10 +356,12 @@
         <span
           class="meter"
           title={scopeBypassed
-            ? `Across all ${indexedFileCount} indexed file${indexedFileCount === 1 ? '' : 's'} — the scope is bypassed`
-            : `Across ${indexedFileCount} file${indexedFileCount === 1 ? '' : 's'} matching the active scope and filters`}
+            ? m.lore_scopebar_meter_bypassed({ count: indexedFileCount })
+            : m.lore_scopebar_meter_scoped({ count: indexedFileCount })}
         >
-          {resultCount} {resultCount === 1 ? 'hit' : 'hits'} <span class="meter-of">of {indexedFileCount} files</span>
+          <ParaglideMessage message={m.lore_scopebar_hits} inputs={{ count: resultCount, total: indexedFileCount }}>
+            {#snippet of({ children })}<span class="meter-of">{@render children?.()}</span>{/snippet}
+          </ParaglideMessage>
         </span>
       {/if}
     </div>

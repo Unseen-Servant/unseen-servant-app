@@ -6,6 +6,7 @@
   import { bookTitle, pageCitation } from './pdfUrl';
   import { findMatchedRange, splitAround, type MatchedParts } from './matchedSpan';
   import { queryTerms, rehypeMarkTerms } from './snippetHits';
+  import { m } from '../paraglide/messages';
 
   // No header of its own: the selected row names the book and system, and
   // the InspectorPlate above the pane carries the section path and [open].
@@ -105,7 +106,7 @@
 
 <aside class="inspector">
   {#if !result}
-    <div class="empty">Select a result to preview.</div>
+    <div class="empty">{m.lore_inspector_empty()}</div>
   {:else}
     <div class="body-frame">
       <!-- Wheel, a scrollbar drag or a key hands the scroll to the reader;
@@ -123,7 +124,7 @@
           <!-- Cross-edition twins collapsed into this result (roadmap 2.3).
                Each opens its own book at its own page. -->
           <div class="also-in">
-            <span class="micro-label">also in</span>
+            <span class="micro-label">{m.lore_inspector_also_in()}</span>
             {#each result.also_in as twin, idx (idx)}
               {@const twinCite = pageCitation(
                 twin.page_start,
@@ -134,10 +135,10 @@
               <button
                 type="button"
                 class="also-chip"
-                title={`Open ${bookTitle(twin.filename)}${twinCite ? ` at ${twinCite}` : ''}`}
+                title={twinCite ? m.lore_inspector_open_twin_at({ book: bookTitle(twin.filename), cite: twinCite }) : m.lore_inspector_open_twin({ book: bookTitle(twin.filename) })}
                 on:click={() => onOpenResult(twin.source, twin.filename, twin.page_start)}
               >
-                {bookTitle(twin.filename)}{twinCite ? ` · ${twinCite}` : ''}
+                {twinCite ? m.lore_inspector_twin_cite({ book: bookTitle(twin.filename), cite: twinCite }) : bookTitle(twin.filename)}
               </button>
             {/each}
           </div>
@@ -180,8 +181,8 @@
           type="button"
           class="match-mark"
           style="top: {mark.top}px; height: {mark.height}px"
-          title="Back to the match"
-          aria-label="Back to the match"
+          title={m.lore_inspector_back_to_match()}
+          aria-label={m.lore_inspector_back_to_match()}
           on:click={returnToMatch}
         ></button>
       {/if}

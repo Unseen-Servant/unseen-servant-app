@@ -16,6 +16,8 @@
   import { clampToViewport } from '../ui/menuGeometry';
   import { grab } from '../ui/grab';
   import { orderCollections, transportNames } from './collectionOrder';
+  import { ParaglideMessage } from '@inlang/paraglide-js-svelte';
+  import { m } from '../paraglide/messages';
 
   export let collections: Record<string, CollectionInfo> = {};
   // Keyboard focus is lifted to +page.svelte so it can mutex against
@@ -78,11 +80,11 @@
   export let pickMatches: string[] = [];
   export let pickCursor: string | null = null;
 
-  const SORT_OPTIONS: { value: typeof sortKey; label: string }[] = [
-    { value: 'custom', label: 'Custom order' },
-    { value: 'name', label: 'Name' },
-    { value: 'size', label: 'File count' },
-    { value: 'created', label: 'Recently added' },
+  const SORT_OPTIONS: { value: typeof sortKey; label: () => string }[] = [
+    { value: 'custom', label: m.lore_collections_sort_custom },
+    { value: 'name', label: m.lore_collections_sort_name },
+    { value: 'size', label: m.lore_collections_sort_size },
+    { value: 'created', label: m.lore_collections_sort_created },
   ];
   // Archive is shelving, not deleting: archived rows hide by default and
   // keep pigment, files, and their custom-order slot.
@@ -713,7 +715,7 @@
   on:pointerleave={clearHover}
 >
   <header class="panel-head nameplate">
-    <span class="panel-name ledger-label">Collections</span>
+    <span class="panel-name ledger-label">{m.lore_collections_title()}</span>
     {#if picking}
       <!-- Echo of the bar's @-word: the panel is what it's searching. -->
       <span class="pick-echo" aria-hidden="true">@{pickQuery}</span>
@@ -723,11 +725,11 @@
         class="plate-btn"
         on:click|stopPropagation={toggleSortMenu}
         bind:this={sortBtn}
-        title="Sort collections"
-        aria-label="Sort collections"
+        title={m.lore_collections_sort_title()}
+        aria-label={m.lore_collections_sort_title()}
         aria-haspopup="menu"
         aria-expanded={sortMenuOpen}
-      >sort</button>
+      >{m.lore_collections_sort()}</button>
       {#if sortMenuOpen}
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="sort-menu" role="menu" tabindex="-1" on:click|stopPropagation>
@@ -739,13 +741,13 @@
               on:click={() => pickSort(opt.value)}
             >
               <span class="menu-pip" class:on={sortKey === opt.value} aria-hidden="true"></span>
-              <span>{opt.label}</span>
+              <span>{opt.label()}</span>
             </button>
           {/each}
           {#if archivedCount > 0}
             <hr class="menu-divider" />
             <label class="sort-toggle" role="none">
-              <span>Show archived</span>
+              <span>{m.lore_collections_show_archived()}</span>
               <input
                 class="app-checkbox"
                 type="checkbox"
@@ -765,7 +767,7 @@
        below is the invitation. -->
   {#if !hasNone && rows.length === 0 && creating === null}
     <div class="empty">
-      <span class="ledger-label">All archived</span>
+      <span class="ledger-label">{m.lore_collections_all_archived()}</span>
     </div>
   {/if}
 
@@ -839,7 +841,7 @@
           {#if isRenamingRow}
             <RenameField
               value={col.name}
-              label={`Rename ${col.name}`}
+              label={m.lore_collections_rename_label({ name: col.name })}
               onCommit={(name) => commitRename(col.name, name)}
               onCancel={() => (renamingName = null)}
             />
@@ -858,7 +860,7 @@
                   class:armed
                   on:click|stopPropagation={() => onArm(col.name)}
                   aria-pressed={armed}
-                  title={`${armed ? 'Disarm' : 'Arm'} ${col.name} (E)`}
+                  title={(armed ? m.lore_collections_disarm({ name: col.name }) : m.lore_collections_arm({ name: col.name })) + ' (E)'}
                 >
                   <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true"><path d={armed ? CIRCLE : CIRCLE_RING}/></svg>
                 </button>
@@ -869,7 +871,7 @@
                   class:playing
                   on:click|stopPropagation={() => onTogglePlay(col.name)}
                   aria-pressed={playing}
-                  title={`${playing ? 'Stop' : 'Play'} ${col.name} (P${slotOf.has(col.name) ? ` · ${slotChord(slotOf.get(col.name)!)}` : ''})`}
+                  title={(playing ? m.lore_collections_stop({ name: col.name }) : m.lore_collections_play({ name: col.name })) + ` (P${slotOf.has(col.name) ? ` · ${slotChord(slotOf.get(col.name)!)}` : ''})`}
                 >
                   {#if playing}
                     <span class="stop-mark" aria-hidden="true"></span>
@@ -884,7 +886,7 @@
                 class:mute-on={muted}
                 on:click|stopPropagation={() => onToggleMute(col.name)}
                 aria-pressed={muted}
-                title={muted ? `Unmute ${col.name} (M)` : `Mute ${col.name} (M)`}
+                title={(muted ? m.lore_collections_unmute({ name: col.name }) : m.lore_collections_mute({ name: col.name })) + ' (M)'}
               >M</button>
             </span>
           {/if}
@@ -922,8 +924,8 @@
                 type="button"
                 class="child-remove"
                 class:revealed={($hoverLive && hoveredChildPath === f.path) || focusedName === childKey}
-                title={`Remove ${f.base} from ${col.name}${chordHint('collections.removeFile')}`}
-                aria-label={`Remove ${f.base} from ${col.name}`}
+                title={m.lore_collections_remove_file({ file: f.base, collection: col.name }) + chordHint('collections.removeFile')}
+                aria-label={m.lore_collections_remove_file({ file: f.base, collection: col.name })}
                 on:click|stopPropagation={() => onRemoveFile(col.name, f.path)}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
@@ -935,7 +937,7 @@
           {#if col.file_paths.length === 0}
             <div class="child-row child-empty" class:washed={playing && !muted} class:dimmed={picking ? !pickSet.has(col.name) : muted || (anyPlaying && !playing)}>
               <span class="indent" aria-hidden="true"></span>
-              <span class="child-name">No files yet</span>
+              <span class="child-name">{m.lore_collections_no_files()}</span>
             </div>
           {/if}
         {/if}
@@ -958,8 +960,8 @@
       <input
         class="new-coll-input"
         bind:value={newValue}
-        placeholder="Collection name&hellip;"
-        aria-label="Name the new collection"
+        placeholder={m.lore_collections_name_placeholder()}
+        aria-label={m.lore_collections_name_label()}
         on:keydown={handleCreateKeydown}
         on:blur={commitCreate}
         use:autofocusInput
@@ -981,8 +983,8 @@
       on:dragover={handleNewDragOver}
       on:dragleave={handlePathDragLeave}
       on:drop={handleNewDrop}
-      title={`New collection${chordHint('collections.new')} — double-click to name it, or drop books here`}
-      aria-label="New collection"
+      title={m.lore_collections_new_title({ chord: chordHint('collections.new') })}
+      aria-label={m.lore_collections_new()}
       aria-keyshortcuts={keyShortcut('collections.new') || undefined}
     >
       <svg class="bkm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
@@ -991,7 +993,7 @@
       <!-- Words only under a drag, to say what the drop will make. One
            label throughout, as the session planner's empty row keeps:
            WebKit refuses a drop whose target left mid-drag. -->
-      <span class="ghost-label">{#if dropIntoNew && newDropPreview}New collection from <em>{newDropPreview.label}</em>{/if}</span>
+      <span class="ghost-label">{#if dropIntoNew && newDropPreview}<ParaglideMessage message={m.lore_collections_new_from} inputs={{ label: newDropPreview.label }}>{#snippet em({ children })}<em>{@render children?.()}</em>{/snippet}</ParaglideMessage>{/if}</span>
       {#if dropIntoNew && newDropPreview}<span class="row-count">{newDropPreview.count}</span>{/if}
     </button>
   {/if}
@@ -1013,23 +1015,23 @@
          unarchive to arm or play. Mute stays: it works on archived rows too. -->
     {#if !col?.archived}
       <button class="context-item" role="menuitem" on:click={() => ctxAction(onArm)}>
-        {armedName === ctxMenu.name ? 'Disarm' : 'Arm'}
+        {armedName === ctxMenu.name ? m.lore_collections_menu_disarm() : m.lore_collections_menu_arm()}
         <span class="menu-chord" class:bare={isBareKeyChord('collections.arm')} aria-hidden="true">{chord('collections.arm')}</span>
       </button>
       <button class="context-item" role="menuitem" on:click={() => ctxAction(onTogglePlay)}>
-        {playingNames.has(ctxMenu.name) ? 'Stop' : 'Play'}
+        {playingNames.has(ctxMenu.name) ? m.lore_collections_menu_stop() : m.lore_collections_menu_play()}
         <span class="menu-chord" class:bare={isBareKeyChord('collections.play')} aria-hidden="true">{chord('collections.play')}</span>
       </button>
     {/if}
     <button class="context-item" role="menuitem" on:click={() => ctxAction(onToggleMute)}>
-      {mutedNames.has(ctxMenu.name) ? 'Unmute' : 'Mute'}
+      {mutedNames.has(ctxMenu.name) ? m.lore_collections_menu_unmute() : m.lore_collections_menu_mute()}
       <span class="menu-chord" class:bare={isBareKeyChord('collections.mute')} aria-hidden="true">{chord('collections.mute')}</span>
     </button>
     <hr class="menu-divider" />
     <!-- "Gem" names the glyph the user sees; the palette entries behind
          it stay pigments in code. -->
-    <div class="menu-picks" role="group" aria-label="Gem">
-      {#each [...PIGMENTS, { name: 'None', hex: null }] as pig (pig.name)}
+    <div class="menu-picks" role="group" aria-label={m.lore_collections_menu_gem()}>
+      {#each [...PIGMENTS, { name: m.lore_collections_menu_gem_none(), hex: null }] as pig (pig.name)}
         {@const on = pig.hex ? col?.color === pig.hex : !col?.color}
         <button
           class="menu-pick"
@@ -1049,18 +1051,18 @@
     </div>
     <hr class="menu-divider" />
     <button class="context-item" role="menuitem" on:click={() => ctxAction(startRename)}>
-      Rename collection
+      {m.lore_collections_menu_rename()}
       <span class="menu-chord" class:bare={isBareKeyChord('collections.rename')} aria-hidden="true">{chord('collections.rename')}</span>
     </button>
     <button class="context-item" role="menuitem" on:click={() => ctxAction((name) => onToggleArchived(name, !col?.archived))}>
-      {col?.archived ? 'Unarchive' : 'Archive'} collection
+      {col?.archived ? m.lore_collections_menu_unarchive() : m.lore_collections_menu_archive()}
       <span class="menu-chord" class:bare={isBareKeyChord('collections.archive')} aria-hidden="true">{chord('collections.archive')}</span>
     </button>
     <hr class="menu-divider" />
     <!-- Display-only, like the tree menu's Reveal row: ⌘⌫ is a named key the
          menu's own dispatcher can't match, so it hints without claiming. -->
     <button class="context-item danger" role="menuitem" on:click={() => ctxAction(onDelete)}>
-      Delete collection
+      {m.lore_collections_menu_delete()}
       <span class="menu-chord" class:bare={isBareKeyChord('collections.delete')} aria-hidden="true">{chord('collections.delete')}</span>
     </button>
   </div>

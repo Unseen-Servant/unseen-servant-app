@@ -4,6 +4,7 @@
   // says so, dimmed, and a row keeps the key showing while it's spent. A
   // card shows it always; a row while spent, hovered or focused.
   import { chordHint } from '../shell/keybindings';
+  import { m } from '../paraglide/messages';
 
   /** The date it was spent, or null. */
   export let spent: string | null;
@@ -18,8 +19,8 @@
   type="button"
   class="spend-key nodrag"
   aria-pressed={!!spent}
-  aria-label={`${name} spent`}
-  title={(spent ? `${name} — spent ${spent}: mark unspent` : `Mark ${name} spent`) + chordHint('command.spend')}
+  aria-label={m.command_spend_label({ name })}
+  title={(spent ? m.command_spend_unspend({ name, date: spent }) : m.command_spend_spend({ name })) + chordHint('command.spend')}
   on:click|stopPropagation={(e) => e.detail <= 1 && onToggle()}
   on:dblclick|stopPropagation
 >

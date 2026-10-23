@@ -3,6 +3,8 @@
   // session — and the beat that's live. The panel hoists it into the slot
   // its host keeps in the bar (PANELS.md); the bar's own styles dress the
   // rules.
+  import { m } from '../paraglide/messages';
+
   export let campaign: string | null;
   export let session: string | null;
   export let liveBeat: string | null;
@@ -10,7 +12,7 @@
 
 {#if campaign}
   <span class="rule" aria-hidden="true"></span>
-  <span class="where" title={session ? `${campaign} › ${session}` : campaign}>
+  <span class="where" title={session ? m.command_session_where({ campaign, session }) : campaign}>
     <span class="name">{campaign}</span>
     {#if session}
       <span class="sep" aria-hidden="true">›</span>
@@ -19,7 +21,7 @@
   </span>
   {#if liveBeat}
     <span class="rule" aria-hidden="true"></span>
-    <span class="live" title={`Live: ${liveBeat}`}>
+    <span class="live" title={m.command_session_live({ beat: liveBeat })}>
       <span class="cell" aria-hidden="true"></span>
       <span class="name beat">{liveBeat}</span>
     </span>
