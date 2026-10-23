@@ -5,19 +5,19 @@
   type Copy = () => string;
 
   // The words the app uses that a newcomer meets without a definition.
-  const GLOSSARY: { group: Copy; terms: [term: Copy, meaning: Copy][] }[] = [
+  const GLOSSARY: { group: Copy; terms: [term: Copy, meaning: Copy, key?: string][] }[] = [
     {
       group: () => 'Legend Lore',
       terms: [
         [m.glossary_collection, m.glossary_collection_desc],
-        [m.glossary_play, m.glossary_play_desc],
+        [m.glossary_play, m.glossary_play_desc, 'P'],
         [m.glossary_mix, m.glossary_mix_desc],
         [m.glossary_arm, m.glossary_arm_desc],
-        [m.glossary_solo, m.glossary_solo_desc],
-        [m.glossary_mute, m.glossary_mute_desc],
-        [m.glossary_bypass, m.glossary_bypass_desc],
+        [m.glossary_solo, m.glossary_solo_desc, 'S'],
+        [m.glossary_mute, m.glossary_mute_desc, 'M'],
+        [m.glossary_bypass, m.glossary_bypass_desc, 'B'],
         [m.glossary_strength, m.glossary_strength_desc],
-        [m.glossary_sync, m.glossary_sync_desc],
+        [m.glossary_sync, m.glossary_sync_desc, '⌘S'],
       ],
     },
     {
@@ -30,9 +30,9 @@
         [m.glossary_beat, m.glossary_beat_desc],
         [m.glossary_session, m.glossary_session_desc],
         [m.glossary_prep_play, m.glossary_prep_play_desc],
-        [m.glossary_launch, m.glossary_launch_desc],
+        [m.glossary_launch, m.glossary_launch_desc, 'P'],
         [m.glossary_live_set, m.glossary_live_set_desc],
-        [m.glossary_spent, m.glossary_spent_desc],
+        [m.glossary_spent, m.glossary_spent_desc, 'A'],
         [m.glossary_board, m.glossary_board_desc],
         [m.glossary_card_tray, m.glossary_card_tray_desc],
       ],
@@ -115,9 +115,9 @@
       <section class="tool-group">
         <h4 class="tool-group-title ledger-label">{group.group()}</h4>
         <dl class="terms">
-          {#each group.terms as [term, meaning] (term)}
+          {#each group.terms as [term, meaning, key] (term)}
             <dt class="term">{term()}</dt>
-            <dd class="what">{meaning()}</dd>
+            <dd class="what">{meaning()}{key ? ` (${key})` : ''}</dd>
           {/each}
         </dl>
       </section>

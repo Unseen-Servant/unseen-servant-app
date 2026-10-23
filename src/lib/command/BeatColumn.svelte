@@ -467,7 +467,7 @@
           class="tr-btn"
           class:armed
           aria-pressed={armed}
-          title={armed ? m.command_beats_disarm_beat({ name: beat.name }) : m.command_beats_arm_beat({ name: beat.name })}
+          title={armed ? m.command_beats_disarm_beat({ name: beat.name }) + ' (Esc)' : m.command_beats_arm_beat({ name: beat.name })}
           on:click={(e) => e.detail <= 1 && onArm(beat)}
         >
           <svg class="arm-glyph" viewBox="64 64 512 512" fill="currentColor" aria-hidden="true">

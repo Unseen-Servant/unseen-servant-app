@@ -170,7 +170,7 @@
               class="tr-btn"
               class:playing
               aria-pressed={playing}
-              title={playing ? m.command_arrangement_stop_beat({ name: beat.name }) : m.command_arrangement_launch_beat({ name: beat.name })}
+              title={(playing ? m.command_arrangement_stop_beat({ name: beat.name }) : m.command_arrangement_launch_beat({ name: beat.name })) + ' (P)'}
               on:click|stopPropagation={(e) => e.detail <= 1 && toggle(beat)}
             >
               {#if playing}

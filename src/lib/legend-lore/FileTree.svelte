@@ -362,7 +362,7 @@
           class:solo-on={isSoloedScope}
           on:click|stopPropagation={() => onToggleScopeSolo(item)}
           aria-pressed={isSoloedScope}
-          title={isSoloedScope ? m.lore_tree_stop_solo({ name: item.name }) : m.lore_tree_solo({ name: item.name })}
+          title={(isSoloedScope ? m.lore_tree_stop_solo({ name: item.name }) : m.lore_tree_solo({ name: item.name })) + ' (S)'}
         >S</button>
         <button
           type="button"
@@ -370,7 +370,7 @@
           class:mute-on={isMutedHere}
           on:click|stopPropagation={() => onToggleScopeMute(item)}
           aria-pressed={isMutedHere}
-          title={isMutedHere ? m.lore_tree_unmute({ name: item.name }) : m.lore_tree_mute({ name: item.name })}
+          title={(isMutedHere ? m.lore_tree_unmute({ name: item.name }) : m.lore_tree_mute({ name: item.name })) + ' (M)'}
         >M</button>
       </span>
     {/if}
