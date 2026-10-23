@@ -23,26 +23,25 @@ A TTRPG Gamemaster who:
 
 ## Related repositories
 
-- **unseen-legend-lore-experiments** ('~/code/unseen-legend-lore-experiments') - Research spikes for Legend Lore. _Relationship:_ FINDINGS inform key architectural decision in Legend Lore
+- **unseen-legend-lore-experiments** ('~/code/unseen-legend-lore-experiments', private) - Research spikes for Legend Lore. _Relationship:_ FINDINGS inform key architectural decision in Legend Lore. Docs that cite a spike's FINDINGS carry the outcome themselves; the spike code is not public.
 - **unseen-servant-site** ('~/code/unseen-servant-site') - Landing page of Unseen Servant. _Relationship:_ the app is distributed through the landing page. Product description needs to match actual code and features.
 
 ---
 
 ## Continuous Integration
 
-Solo dev project on the GitHub Pro tier: **3000 billable minutes/month**. macOS jobs bill at 10×, Windows at 2×, Linux at 1× — macOS dominates any budget. CI is structured around this constraint.
+The repo is public, so GitHub Actions minutes are free, macOS and Windows included. CI still keeps the cross-platform builds off the everyday path by choice: they are slow, and Linux plus the next release tag catches what they would.
 
 ### What runs when
 
-- **PR + push to `main` (`ci.yml`):** Linux-only, path-gated on PR. Effective cost: ~free under the included minutes.
+- **PR + push to `main` (`ci.yml`):** Linux-only, path-gated on PR.
 - **Tag push `v*` (`release.yml`):** the macOS + Windows build, codesign, and draft GitHub Release. This _is_ the cross-platform validation — there is none on main. Publishing the draft runs `publish-release.yml`, which copies it to R2.
 
 ### Rules for changing CI
 
-1. **No macOS/Windows jobs on PR or push-to-main.** If you're tempted to add one, the question is "what will this catch that Linux + the next release tag won't?" — and the answer needs to justify the billable-min cost.
-2. **Estimate billable minutes before adding any job.** Include the multiplier. Note it in the commit message.
-3. **Release-time regressions are acceptable.** If a cross-platform bug only surfaces at tag push, fix forward and bump the patch version. Re-tagging an unpublished draft once is fine; if a second fix lands, bump the patch.
-4. **Local validation is the dev's responsibility.** Before tagging a release that touches build config, `src-tauri/`, sidecar deps, or the build scripts, run `npm run tauri build` and `bash scripts/build-sidecar.sh` locally.
+1. **No macOS/Windows jobs on PR or push-to-main.** If you're tempted to add one, the question is "what will this catch that Linux + the next release tag won't?" — and the answer needs to justify slower feedback on every push.
+2. **Release-time regressions are acceptable.** If a cross-platform bug only surfaces at tag push, fix forward and bump the patch version. Re-tagging an unpublished draft once is fine; if a second fix lands, bump the patch.
+3. **Local validation is the dev's responsibility.** Before tagging a release that touches build config, `src-tauri/`, sidecar deps, or the build scripts, run `npm run tauri build` and `bash scripts/build-sidecar.sh` locally.
 
 ### Commit workflow
 

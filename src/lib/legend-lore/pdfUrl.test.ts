@@ -3,36 +3,36 @@ import { pdfFileUrl, pageHint, pageCitation, bookTitle } from './pdfUrl';
 
 describe('pdfFileUrl', () => {
   it('builds a plain file URL for a POSIX path with no page', () => {
-    expect(pdfFileUrl('/Users/jay/Books/SRD.pdf'))
-      .toBe('file:///Users/jay/Books/SRD.pdf');
+    expect(pdfFileUrl('/Users/gm/Books/SRD.pdf'))
+      .toBe('file:///Users/gm/Books/SRD.pdf');
   });
 
   it('appends #page=N when a page is provided', () => {
-    expect(pdfFileUrl('/Users/jay/Books/SRD.pdf', 42))
-      .toBe('file:///Users/jay/Books/SRD.pdf#page=42');
+    expect(pdfFileUrl('/Users/gm/Books/SRD.pdf', 42))
+      .toBe('file:///Users/gm/Books/SRD.pdf#page=42');
   });
 
   it('omits the fragment when page is null/undefined/0/negative', () => {
-    const path = '/Users/jay/Books/SRD.pdf';
-    expect(pdfFileUrl(path, null)).toBe('file:///Users/jay/Books/SRD.pdf');
-    expect(pdfFileUrl(path, undefined)).toBe('file:///Users/jay/Books/SRD.pdf');
-    expect(pdfFileUrl(path, 0)).toBe('file:///Users/jay/Books/SRD.pdf');
-    expect(pdfFileUrl(path, -1)).toBe('file:///Users/jay/Books/SRD.pdf');
+    const path = '/Users/gm/Books/SRD.pdf';
+    expect(pdfFileUrl(path, null)).toBe('file:///Users/gm/Books/SRD.pdf');
+    expect(pdfFileUrl(path, undefined)).toBe('file:///Users/gm/Books/SRD.pdf');
+    expect(pdfFileUrl(path, 0)).toBe('file:///Users/gm/Books/SRD.pdf');
+    expect(pdfFileUrl(path, -1)).toBe('file:///Users/gm/Books/SRD.pdf');
   });
 
   it('percent-encodes spaces and special chars in path segments', () => {
-    expect(pdfFileUrl('/Users/jay/My Books/Black Flag.pdf', 5))
-      .toBe('file:///Users/jay/My%20Books/Black%20Flag.pdf#page=5');
+    expect(pdfFileUrl('/Users/gm/My Books/Black Flag.pdf', 5))
+      .toBe('file:///Users/gm/My%20Books/Black%20Flag.pdf#page=5');
   });
 
   it('handles Windows drive-letter paths with backslashes', () => {
-    expect(pdfFileUrl('C:\\Users\\jay\\SRD.pdf', 12))
-      .toBe('file:///C:/Users/jay/SRD.pdf#page=12');
+    expect(pdfFileUrl('C:\\Users\\gm\\SRD.pdf', 12))
+      .toBe('file:///C:/Users/gm/SRD.pdf#page=12');
   });
 
   it('handles Windows drive-letter paths with forward slashes', () => {
-    expect(pdfFileUrl('C:/Users/jay/SRD.pdf', 12))
-      .toBe('file:///C:/Users/jay/SRD.pdf#page=12');
+    expect(pdfFileUrl('C:/Users/gm/SRD.pdf', 12))
+      .toBe('file:///C:/Users/gm/SRD.pdf#page=12');
   });
 });
 
