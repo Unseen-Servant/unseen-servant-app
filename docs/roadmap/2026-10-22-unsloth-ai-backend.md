@@ -20,6 +20,7 @@
   - the training pipeline to fine-tune bge-m3 and a multilingual reranker on TTRPG data.
   
   That is "Unsloth for everything AI-model related" with none of the runtime costs.
+- **Chat is a slot, not a fixed model** (§4). Embed and rerank are part of the index, so they are pinned and identical on every machine. Chat depends on the hardware, so it comes from a local model sized to the machine's memory, from any OpenAI-compatible URL, or from nowhere (an external MCP client). The Servant is built for the smallest local tier.
 - **What does not change:** embedding stays bge-m3 f16 on `llama-server`, because Unsloth publishes no bge-m3 GGUF. PDF layout stays on the bundled PyMuPDF Layout ONNX.
 
 ## 1. What Unsloth is today (checked 2026-10-22)
@@ -54,9 +55,9 @@ Note: a GitHub org named `unsloth-studio/unsloth-studio` ranks in search results
 
 | Role | Today | With Studio as the runtime (A) | With Unsloth as supplier + trainer (C, recommended) |
 |---|---|---|---|
-| Embed | bge-m3 f16 on the user's Ollama | `/v1/embeddings` on a "loaded embedding GGUF". We would ship or point at a bge-m3 GGUF ourselves; Unsloth has none. Same `llama-server`, so the vectors should match. | #413 unchanged: BAAI bge-m3 converted at a pinned revision, bundled `llama-server --embeddings`. Later, an Unsloth fine-tune of bge-m3 (§4 step 5). |
-| Rerank | MiniLM-L-6 int8 (fastembed, ONNX, 23 MB, English-only), downloaded on first use | **Downloadable from the hub, not servable** (§1.1). Keep fastembed beside it, so two runtimes again. | Keep fastembed, loaded from Resources (#413 step 2). Then a multilingual GGUF reranker on our `llama-server --reranking`: off-the-shelf `bge-reranker-v2-m3` or `Qwen3-Reranker-0.6B` first, an Unsloth fine-tune later (§4 step 5), if the evals pay for it. |
-| Chat (Servant) | none | `/v1/chat/completions` with tool calling; Studio's own server-side tools must be off (`--disable-tools`) or they swallow ours | Unsloth Dynamic GGUF of a tool-calling model, run on the bundled `llama-server`, offered as an optional download (§4 step 4) |
+| Embed | bge-m3 f16 on the user's Ollama | `/v1/embeddings` on a "loaded embedding GGUF". We would ship or point at a bge-m3 GGUF ourselves; Unsloth has none. Same `llama-server`, so the vectors should match. | #413 unchanged: BAAI bge-m3 converted at a pinned revision, bundled `llama-server --embeddings`. Later, an Unsloth fine-tune of bge-m3 (§5 step 5). |
+| Rerank | MiniLM-L-6 int8 (fastembed, ONNX, 23 MB, English-only), downloaded on first use | **Downloadable from the hub, not servable** (§1.1). Keep fastembed beside it, so two runtimes again. | Keep fastembed, loaded from Resources (#413 step 2). Then a multilingual GGUF reranker on our `llama-server --reranking`: off-the-shelf `bge-reranker-v2-m3` or `Qwen3-Reranker-0.6B` first, an Unsloth fine-tune later (§5 step 5), if the evals pay for it. |
+| Chat (Servant) | none | `/v1/chat/completions` with tool calling; Studio's own server-side tools must be off (`--disable-tools`) or they swallow ours | A slot, not a fixed model (§4): a machine-sized Unsloth Dynamic GGUF on a second bundled `llama-server`, any OpenAI-compatible URL, or none |
 | PDF layout | PyMuPDF Layout ONNX, bundled | unchanged | unchanged |
 
 ## 3. The options
@@ -88,27 +89,64 @@ Not viable. It is a Python app with its own venv, an optional torch, and a cmake
   - Unsloth Dynamic GGUF quants for the Servant chat model;
   - the Unsloth training scripts (dev-side, experiments repo) for domain-tuned embed and rerank models, exported to GGUF;
   - Studio as an optional **dev tool**, for trying chat models and running fine-tunes on the Mac.
-- **Optional, for users who already run Studio or LM Studio:** the Servant takes any OpenAI-compatible base URL plus key, beside the bundled model. Build this only if someone asks (ship less).
+- **Users who already run Studio, LM Studio or Ollama** point the Servant at it with an OpenAI-compatible URL (§4).
 
-## 4. Order of work (option C)
+## 4. Chat varies per machine
+
+Embed and rerank run the same everywhere; chat can't. A 4B model on an 8 GB Mac and a mixture-of-experts model on a 64 GB Mac are different products. The two roles have different constraints, so they get different rules.
+
+- **Embed and rerank are fixed.** The index stores bge-m3 vectors, so the model is part of the data (`EMBEDDING_MODEL` is its fingerprint). They are small (~1.2 GB) and run on every machine. Bundled and pinned, no user choice: #413 as written.
+- **Chat is a slot.** Nothing stored depends on which model wrote an answer. The Servant settings offer one choice with three values:
+  1. **Local:** a model from our manifest, sized to the machine, on the bundled runtime.
+  2. **URL:** any OpenAI-compatible endpoint (Unsloth Desktop, LM Studio, Ollama, a GPU box on the network) plus an optional key.
+  3. **None:** the Servant's tools are already MCP tools, so an external MCP client is the brain. The app works fully without local chat.
+
+### 4.1 Local tier by memory
+
+At setup, read total memory, subtract the resident embed and rerank models plus OS headroom, and offer the tier that fits as a download. It is the same fit check the Unsloth Desktop hub runs. Starting rows, to fix with measurements:
+
+| Total memory | Default | Model class |
+|---|---|---|
+| 8 GB | None | a 1–4B model only on request |
+| 16 GB | Local | a 4–8B dense model, 4-bit quant |
+| 32 GB and up | Local | a mixture-of-experts model with few active parameters |
+
+- The tier table is a manifest field (minimum memory per chat row), not code.
+- On Windows we bundle the CPU and Vulkan backends only. CUDA users who want more take the URL choice.
+- The chat model is never in the installer, so the NSIS limit and the download size do not apply to it.
+
+### 4.2 Own process, loaded on demand
+
+- Chat runs in a **second `llama-server` process**, apart from embed and rerank. If it runs out of memory or the machine starts to swap, search stays up.
+- Spawned on the first Servant request, and stopped after an idle time and during bulk indexing.
+- The sidecar owns both processes, like the embed server in #413.
+
+### 4.3 Design for the floor
+
+- The Servant is built and gated on the **smallest local tier**. A larger model gives better answers, never more features.
+- A small tool set, short contexts, and retrieval doing the heavy lifting.
+- Tool calls are constrained to each tool's JSON schema (a `llama-server` grammar), so small models can't send malformed calls. On the URL choice, use the endpoint's structured output where it has one, and otherwise validate the call and retry.
+- Pass/fail is measured on the smallest local tier, through our own MCP tool registry: tool-call validity, refusals, latency.
+
+## 5. Order of work (option C)
 
 Each step ships on its own and is gated by the evals that exist today.
 
 1. **#413 step 1 spike, unchanged** (experiments repo): pinned `llama-server` + bge-m3 f16, measured against the stored vectors and against Ollama on speed, the 8k tail and RSS. Add one check: is `unsloth/bge-m3` byte-identical to `BAAI/bge-m3` at our pinned revision? If yes, nothing changes. Convert from BAAI (upstream), either way.
 2. **#413 step 2: the reranker from Resources.** Proves the manifest, the fetch script and the CI cache on 23 MB.
 3. **#413 step 3: the `llama-server` embedder.** Ollama leaves the sidecar, the UI (~40 references in 8 Svelte files) and the site copy. Re-run both gate baselines.
-4. **Servant chat model.** Starts when the Servant does, not before.
-   - Shortlist two or three Unsloth Dynamic GGUF tool-calling models that fit 16 GB with bge-m3 resident.
-   - Eval them through our own MCP tool registry: tool-call validity, refusals, latency.
-   - Add the winner as one manifest row with "download on demand" (it doesn't fit in NSIS).
-   - Memory policy: chat stays cold during bulk indexing.
+4. **Servant chat slot (§4).** Starts when the Servant does, not before.
+   - Pick one Unsloth Dynamic GGUF per tier, starting with the floor tier, which also gates the Servant.
+   - Add the chat rows to the manifest with a minimum memory and "download on demand".
+   - Add the second `llama-server` process and its load/unload policy.
+   - Add the local / URL / none setting.
 5. **Domain fine-tunes (research, experiments repo).**
    - Unsloth embedding training on (query, section) pairs: bge-m3 first, `bge-reranker-v2-m3` second.
    - Gate on the cued/single/uncued suites and `library_probe.py`, because a harness GO is not enough (see the eval-limits notes).
    - A new embed model bumps `EMBEDDING_MODEL`, so every user reindexes once. That happens at Metal speed after step 3.
    - A multilingual reranker also needs a refit of the score tiers.
 
-## 5. Risks and open questions
+## 6. Risks and open questions
 
 - **Training data and copyright.** Fine-tuning on the dev library's commercial rulebooks, then shipping the weights, clashes with "respectful of authors' copyrights". Build the training pairs from openly licensed text only (SRDs under CC-BY or OGL, our own synthetic queries), and record the source in `manifest.json`.
 - **Where the fine-tune runs.** Studio claims Mac training. Third-party reports from 2026 say Apple Silicon is inference-only. Test it on the M1 Pro before planning around it. The fallback is a rented NVIDIA GPU for a few hours per run.
@@ -116,8 +154,8 @@ Each step ships on its own and is gated by the evals that exist today.
 - **Unsloth GGUF chat models vs grammar-constrained tool calls.** `llama-server`'s native tool-call parser depends on the chat template. Unsloth often ships template fixes, which is a point in their favour. Check this per model.
 - **Licences per model:** Apache/MIT for bge-m3 and bge-reranker-v2-m3; check each chat model (Gemma terms, Llama licence) before bundling or redistributing.
 
-## 6. Not doing
+## 7. Not doing
 
 - No Studio dependency in the shipped app, and no Unsloth Python package in the sidecar.
-- No provider abstraction for "Ollama or Studio or llama-server". `embedder.py` stays the one file that knows the runtime.
+- No provider abstraction for embed or rerank. `embedder.py` stays the one file that knows the runtime. Only chat has a choice of source (§4).
 - No fine-tune before the bundled runtime ships. A model change without Metal-speed reindexing costs users ~1.8 h on CPU.
