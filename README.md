@@ -85,16 +85,17 @@ disk for the search model.
 4. **Search.** **Help → Guides** walks through each tool, and the full manual
    is on [unseenservant.games](https://unseenservant.games).
 
-To build it yourself instead, see [Build from source](CONTRIBUTING.md#build-from-source).
-
 ---
 
-## Contributing
+## Reporting bugs
 
-Bug reports, stability fixes and portability work are the most welcome help.
-New features are not, unless discussed first: Unseen Servant has one designer.
-[CONTRIBUTING.md](CONTRIBUTING.md) covers what's in scope, how to report a bug,
-and how to build from source.
+Unseen Servant is not taking code contributions yet, and pull requests will be
+closed with thanks. Bug reports are welcome: open an issue with the bug report
+template. For search or indexing problems, attach `sidecar.log` (**reveal** next
+to the data directory in **Help → About** opens its folder).
+
+Found a security problem? Email guild@unseenservant.games instead of opening an
+issue.
 
 ---
 
@@ -140,5 +141,4 @@ The AGPL covers the code, not the Unseen Servant name or logo: they are
 trademarks of Unseen Servant Games (AGPL §7(e)), so a fork must use its own
 name and logo.
 
-The project is not taking code contributions yet; bug reports are welcome. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+The project is not taking code contributions yet; bug reports are welcome.
