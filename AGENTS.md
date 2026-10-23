@@ -50,6 +50,8 @@ Solo dev, trunk-based without PRs (since 2026-07-03): commit directly to `main` 
 
 PRs are the exception, not the rule — reserve them for changes that benefit from a review pass or CI-before-merge (e.g. risky CI or build-config changes). When a PR is used, keep it single-purpose and don't stack it on another open PR.
 
+Branches are named `type/short-name`, the type matching the commit's: `feat/`, `fix/`, `hotfix/`, `refactor/`, `ci/`, `chore/`, `docs/` (e.g. `feat/i18n-shell`).
+
 ---
 
 ## Guidelines
