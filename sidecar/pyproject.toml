@@ -5,15 +5,15 @@ description = "PDF indexing and semantic search sidecar for Legend Lore"
 requires-python = ">=3.12"
 dependencies = [
     "pymupdf4llm==1.28.2",
-    "fastapi==0.141.1",
-    "uvicorn==0.52.4",
+    "fastapi==0.142.3",
+    "uvicorn==0.54.0",
     "python-multipart==0.0.32",
-    "mcp==2.2.0",
+    "mcp==2.3.0",
     "httpx==0.28.1",
     "fastembed==0.8.0",
     "symspellpy==6.10.0",
     "sqlite-vec==0.1.9",
-    "numpy==2.5.0",
+    "numpy==2.5.4",
     "watchfiles==1.3.0",
     "pyyaml==6.0.3",
 ]
