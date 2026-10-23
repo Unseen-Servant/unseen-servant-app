@@ -17,7 +17,7 @@
     "git_revision": "31dc506f6f2af5e3188f263aa7be90f9d0430149",
     "index": {
       "mode": "library",
-      "data_dir": "/Users/jay/Library/Application Support/games.unseenservant.app/chroma_db",
+      "data_dir": "~/Library/Application Support/games.unseenservant.app/chroma_db",
       "pipeline_identity": "structure_aware-v3/bge-m3/library-store-v1"
     },
     "skipped_queries": [],

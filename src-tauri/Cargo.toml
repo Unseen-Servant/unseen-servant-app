@@ -3,7 +3,7 @@ name = "unseen-servant"
 version = "4.1.0"
 description = "Local-first, AI-augmented toolkit for tabletop RPG Gamemasters"
 authors = ["Unseen Servant Games <guild@unseenservant.games>"]
-license = "SEE LICENSE IN LICENSE"
+license = "AGPL-3.0-or-later"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

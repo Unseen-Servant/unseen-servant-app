@@ -16,7 +16,7 @@
     "test": "npm run messages && vitest run",
     "test:watch": "npm run messages && vitest"
   },
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "AGPL-3.0-or-later",
   "engines": {
     "node": ">=22.12"
   },

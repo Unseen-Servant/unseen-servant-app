@@ -316,5 +316,8 @@
   "about_homepage": "project homepage",
   "about_license": "software license",
   "about_credits": "Credits",
-  "about_icons": "icons © Fonticons, Inc. — CC BY 4.0"
+  "about_acknowledgements": "acknowledgements",
+  "about_acknowledgements_desc": "third-party software and its licences",
+  "about_icons": "icons © Fonticons, Inc. — CC BY 4.0",
+  "about_mcp_logo": "MCP project — MIT"
 }

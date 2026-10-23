@@ -28,6 +28,22 @@ Markdown, BFRPG ODT). The reference is the machine-checkable ground truth.
 - **The harness refuses to run on any hash/digest drift.** That refusal is the
   guard against the silent ground-truth drift that produced the old 30%-wrong GT.
 
+### Corpus licences
+
+The books are not in git, but tracked files quote short passages from them
+(query anchors, blind-review chunks, extraction and corpus-QA baselines). Each
+system's licence, and the credit it asks for:
+
+| System | Licence | Credit |
+| --- | --- | --- |
+| D&D SRD 5.1 | [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode) | This work includes material taken from the System Reference Document 5.1 ("SRD 5.1") by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode. |
+| D&D SRD 5.2.1 | [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode) | This work includes material from the System Reference Document 5.2.1 ("SRD 5.2.1") by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode. |
+| Basic Fantasy RPG (r142) | [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/) | Basic Fantasy Role-Playing Game, copyright © 2006-2025 Chris Gonnerman, https://basicfantasy.org. |
+| Cairn (1e) | [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/) | Cairn by Yochai Gal, https://github.com/yochaigal/cairn. |
+| OSRIC | OGL 1.0a | Open Game Content; full licence and Section 15 in [OGL-1.0a.txt](OGL-1.0a.txt). OSRIC is a trademark of Matthew Finch and Stuart Marshall. |
+| The Black Hack (1e) | OGL 1.0a | Open Game Content; see [OGL-1.0a.txt](OGL-1.0a.txt). "The Black Hack" is product identity of David Black. |
+| Year Zero Engine SRD | OGL 1.0a (2019 SRD) | Open Game Content; see [OGL-1.0a.txt](OGL-1.0a.txt). The PDF is the 2023 SRD v1.0, under Free League's Year Zero Engine Free Tabletop License. Not affiliated with, sponsored or endorsed by Fria Ligan AB. |
+
 ## Run it
 
 All commands from the repo root, under the sidecar env. Retrieval needs Ollama

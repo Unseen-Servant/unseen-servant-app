@@ -1,15 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
-  import { openUrl } from '@tauri-apps/plugin-opener';
+  import { resolveResource } from '@tauri-apps/api/path';
+  import { openPath, openUrl } from '@tauri-apps/plugin-opener';
   import { m } from '../../paraglide/messages';
 
   export let dataDir: string = '';
   export let onOpenDataDir: () => void = () => {};
 
   const HOMEPAGE_URL = 'https://unseenservant.games';
-  const LICENSE_URL = 'https://unseenservant.games/license';
   const FONTAWESOME_LICENSE_URL = 'https://fontawesome.com/license/free';
+  const MCP_LOGO_URL = 'https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg';
 
   let appVersion = '';
 
@@ -23,6 +24,12 @@
 
   function open(url: string) {
     openUrl(url).catch(() => {});
+  }
+
+  // Both bundled as tauri.conf.json resources; ACKNOWLEDGEMENTS.txt is
+  // written by scripts/acknowledgements.py.
+  function openResource(name: string) {
+    resolveResource(name).then(openPath).catch(() => {});
   }
 </script>
 
@@ -60,8 +67,8 @@
         <span class="link-desc">{m.about_homepage()}</span>
       </li>
       <li>
-        <button class="btn-link" on:click={() => open(LICENSE_URL)}>{m.about_license()}</button>
-        <span class="link-desc">Unseen Servant Games Software License</span>
+        <button class="btn-link" on:click={() => openResource('LICENSE.txt')}>{m.about_license()}</button>
+        <span class="link-desc">GNU AGPL v3.0 or later</span>
       </li>
     </ul>
   </section>
@@ -72,8 +79,16 @@
     </header>
     <ul class="link-list">
       <li>
-        <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7.2.0</button>
+        <button class="btn-link" on:click={() => openResource('ACKNOWLEDGEMENTS.txt')}>{m.about_acknowledgements()}</button>
+        <span class="link-desc">{m.about_acknowledgements_desc()}</span>
+      </li>
+      <li>
+        <button class="btn-link" on:click={() => open(FONTAWESOME_LICENSE_URL)}>Font Awesome Free 7</button>
         <span class="link-desc">{m.about_icons()}</span>
+      </li>
+      <li>
+        <button class="btn-link" on:click={() => open(MCP_LOGO_URL)}>Model Context Protocol logo</button>
+        <span class="link-desc">{m.about_mcp_logo()}</span>
       </li>
     </ul>
   </section>

@@ -1,0 +1,52 @@
+name: Bug report
+description: Something crashed, broke, or gave a wrong result
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: input
+    id: version
+    attributes:
+      label: Unseen Servant version
+      description: Help → About
+      placeholder: v4.0.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 26.1 on Apple Silicon, Windows 11…
+    validations:
+      required: true
+  - type: input
+    id: ollama
+    attributes:
+      label: Ollama version
+      description: "`ollama --version` in a terminal"
+  - type: input
+    id: library
+    attributes:
+      label: Library size
+      description: Roughly how many PDFs are indexed
+  - type: textarea
+    id: log
+    attributes:
+      label: sidecar.log
+      description: >-
+        For search or indexing problems. In Help → About, reveal opens the
+        data folder; copy sidecar.log before reopening the app, since every
+        launch starts a new one, and drag it here.
