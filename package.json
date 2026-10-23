@@ -40,18 +40,18 @@
     "@inlang/paraglide-js": "^2.29.1",
     "@inlang/paraglide-js-svelte": "^1.0.4",
     "@inlang/plugin-message-format": "^4.5.5",
-    "@sveltejs/adapter-static": "^3.0.6",
-    "@sveltejs/kit": "^2.70.2",
-    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@sveltejs/adapter-static": "^4.0.0",
+    "@sveltejs/kit": "^3.1.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.6.5",
     "postcss-html": "^2.0.0",
-    "stylelint": "^17.14.1",
+    "stylelint": "^17.16.0",
     "svelte": "^5.56.8",
-    "svelte-check": "^4.7.5",
-    "typescript": "^6.0.3",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "svelte-check": "^4.7.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
   },
   "overrides": {
     "@types/d3-zoom": "3.0.8"
