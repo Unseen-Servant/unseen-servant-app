@@ -164,7 +164,7 @@ never a PDF. `--suite library --data-dir <app data dir>`; verify with
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
-The v2 reference is `2026-09-26-v2-cue-strip` (hybrid on, which is now the default, as in the app; `--no-hybrid` for dense-only); gate against it. The local library tier's reference is `2026-09-26-v2-library-cue-strip` (`--suite library --data-dir <app data dir>`, app closed).
+The v2 reference is `2026-10-24-v2-cue-strip-llama-server` (hybrid on, which is now the default, as in the app; `--no-hybrid` for dense-only); gate against it. The local library tier's reference is `2026-10-24-v2-library-llama-server` (`--suite library --data-dir <app data dir>`, app closed). Both replaced the 2026-09-26 references when the embedder moved from Ollama to the bundled llama-server: same-day Ollama runs scored the same in every metric (corpus: 65 of 68 top-10 lists identical, the rest near-ties swapped below the hit; library: all 40 identical).
 Every baseline records the corpus fingerprint, Git revision, and explicit query
 knobs. Retrieval baselines always use a fresh temporary index; exploratory
 reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a
