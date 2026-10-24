@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-01
 **Scope:** End-to-end retrieval accuracy and search UX — ingestion → chunking → embedding → query → rank → UI/MCP.
-**Method:** Multi-agent audit of the full pipeline, each finding adversarially code-verified, plus a **live probe against the real index** (6 docs / 13,833 chunks: Dragonbane, OSRIC, 5e SRD, Wight-Box) and a scan of the sibling `unseen-legend-lore-experiments` spikes. 35 findings survived verification; 4 were refuted and dropped (see appendix).
+**Method:** Multi-agent audit of the full pipeline, each finding adversarially code-verified, plus a **live probe against the real index** (6 docs / 13,833 chunks: Dragonbane, OSRIC, 5e SRD, Wight-Box) and a scan of the sibling `unseen-servant-spikes` spikes. 35 findings survived verification; 4 were refuted and dropped (see appendix).
 
 Priority = (impact × frequency × confidence) ÷ effort, with a bias toward **things that are silently wrong or broken right now**. Effort: **S** ≈ hours, **M** ≈ a day or two, **L** ≈ multi-day.
 
@@ -69,7 +69,7 @@ The Dragonbane FALLING rule comes back with sentences interleaved out of order �
 |---|---|---|---|
 | 14 | **Add a `get_pages(filename, start, end)` MCP tool.** Claude can't drill into a hit; multi-page tables/sections are unreachable (stitch budget is 4000 chars). Also trim the verbose `n_results=15` full-parent default (~24k chars/call). | `mcp_server.py`, `parents_store.py` | S–M |
 | 15 | **Pipeline-version staleness signal.** `chunker_version`/`embedding_model` are written but **never read back** — every fix in this doc silently never reaches an already-indexed library. Add a `pipeline_version` to the manifest, compare it in `/api/index-status`, surface "N files indexed with an older pipeline." | `server.py:696`, `server.py:1194`, `LibrarySettings.svelte` | S–M |
-| 16 | **Wire the eval harness into the production repo as a regression gate**, and **add ~15 French queries** (currently *zero* multilingual eval despite it being the #1 confirmed failure mode). This is the meta-enabler for validating items 2, 8, 9 with data instead of vibes. | experiments repo `queries.yaml`, `score_retrieval.py` | M |
+| 16 | **Wire the eval harness into the production repo as a regression gate**, and **add ~15 French queries** (currently *zero* multilingual eval despite it being the #1 confirmed failure mode). This is the meta-enabler for validating items 2, 8, 9 with data instead of vibes. | spikes repo `queries.yaml`, `score_retrieval.py` | M |
 
 ---
 
@@ -124,7 +124,7 @@ These were tested and rejected by the project's own spikes; don't re-propose:
 
 ## Validation note
 
-Any accuracy change above should be run through the experiments-repo harness (`queries.yaml` ground truth + `score_retrieval.py`, MRR@5/recall@5 on **deduped parents**, with blind manual scoring as the real discriminator since the auto-metric saturates). The harness currently lives only in the experiments repo and is **English-only** — item 16 (wire it into production + add French queries) is a prerequisite for trusting the rest.
+Any accuracy change above should be run through the spikes-repo harness (`queries.yaml` ground truth + `score_retrieval.py`, MRR@5/recall@5 on **deduped parents**, with blind manual scoring as the real discriminator since the auto-metric saturates). The harness currently lives only in the spikes repo and is **English-only** — item 16 (wire it into production + add French queries) is a prerequisite for trusting the rest.
 
 ---
 

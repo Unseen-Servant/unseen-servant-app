@@ -1,7 +1,7 @@
 # Pipeline Rebuild Plan — Ingestion & Retrieval v3
 
 **Date:** 2026-08-13
-**Status:** paused 2026-09-28 after Phase 3 and recovery W1; the shipping pipeline stayed v2 ([2026-09-02-v2-retrieval-improvement-roadmap.md](2026-09-02-v2-retrieval-improvement-roadmap.md)), and what v3 taught is that roadmap's §8 "v3 rebuild paused" row. The code (`sidecar-v3/` below) now lives in the experiments repo as `v3_pipeline/`.
+**Status:** paused 2026-09-28 after Phase 3 and recovery W1; the shipping pipeline stayed v2 ([2026-09-02-v2-retrieval-improvement-roadmap.md](2026-09-02-v2-retrieval-improvement-roadmap.md)), and what v3 taught is that roadmap's §8 "v3 rebuild paused" row. The code (`sidecar-v3/` below) now lives in the spikes repo as `v3_pipeline/`.
 **Scope:** Full greenfield rebuild of the PDF ingestion and retrieval pipeline — extraction → structure → chunking → indexing → query → rank → assembly — plus the storage layer and the sidecar's internal architecture.
 **Constraints (locked):** Strictly local — no cloud calls, ever. ONNX-not-PyTorch for anything packaged. Indexing may get slower if quality jumps (target: still under ~15 min for a 400-page book). Search must get much faster *and* much better. **English-first** — the library is predominantly English; French becomes an additive later phase, not a design driver. Queries arrive as **keywords or natural language**, both first-class. The pipeline must serve **small local LLM consumers (Qwen3.5-4B class)** as well as the app UI and Claude.
 **Method:** Built on the 2026-07-01 roadmap's verified findings, the eight completed experiment spikes (the ninth, `marker_docling_spike`, was never run — see §6), the production eval baselines, and a full read of the current sidecar.
@@ -194,7 +194,7 @@ The consumer list is explicitly three: the app UI, Claude Desktop, and **small l
 - **Actually run one blind manual scoring round** (the discriminator that inverted a spike verdict, deferred 3 of 4 times).
 - Gate: current v2 pipeline baselined on the new harness → the number every brick must beat.
 
-**Phase 1 — Foundation bake-offs (≈ 1 week).** Small spikes with hard gates, in the experiments repo per house rules:
+**Phase 1 — Foundation bake-offs (≈ 1 week).** Small spikes with hard gates, in the spikes repo per house rules:
 - Layout model: accuracy on 30 golden pages (columns, tables, furniture) + ≤ 200 ms/page CPU + license + ONNX.
 - In-process embedding: bge-m3 ONNX int8 ≥ 25 units/s, full-context verified by construction, parity vs Ollama vectors on 1 k units (cosine drift < 0.01 or re-baseline).
 - Vector engine: the 50 ms gate above, plus filtered-query correctness.
@@ -254,7 +254,7 @@ Solo-builder total: **7–10 weeks**. If it must shrink: Phase 5 is deferrable, 
 
 No third repo. The two existing repos already map onto the two kinds of work, and the focused space comes from a directory boundary, not a repo boundary:
 
-- **Phase 1 bake-offs → the experiments repo**, as ordinary spikes (`layout_model_spike`, `embed_parity_spike`, `vector_engine_spike`, `rerank_latency_spike`). Its house rules — time-boxed, write-once FINDINGS, no cloud calls — are exactly the discipline these need.
+- **Phase 1 bake-offs → the spikes repo**, as ordinary spikes (`layout_model_spike`, `embed_parity_spike`, `vector_engine_spike`, `rerank_latency_spike`). Its house rules — time-boxed, write-once FINDINGS, no cloud calls — are exactly the discipline these need.
 - **Phase 0 harness + Phases 2–4 → the app repo, in a parallel top-level `sidecar-v3/`** on `main` (strangler pattern), not a long-lived branch: over 7–10 weeks a branch drifts against every v2 hotfix, while a parallel directory never conflicts. `sidecar-v3/` gets its own `pyproject.toml`/uv project, its own test suite and CI job, and its **own `CLAUDE.md`** whose first line points at this plan as the constitution. It is excluded from packaging until Phase 4 cutover, which then becomes a packaging switch + directory swap, not a repo transplant.
 - **The harness is engine-agnostic and lives at top level (`evals/`)**, driving v2 or v3 through the same request shape via a `--engine` flag — required anyway, since Phase 0 must baseline v2 and Phase 4 runs both sides A/B on identical requests. Per-rung baselines commit to `evals/baselines/` as today.
 - **The corpus is never committed** (real-library PDFs are copyrighted). Commit a manifest — path, SHA-256, page count — plus a verify script; the harness refuses to run against a corpus that doesn't match the manifest, which also protects ground truth from silently drifting when a PDF gets re-downloaded.

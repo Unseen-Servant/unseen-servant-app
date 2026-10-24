@@ -2,7 +2,7 @@
 
 Measures production search quality against a fixed ground truth, per the
 [2026-07-09 search-quality goal](../../docs/roadmap/2026-07-09-search-quality-goal.md)
-(Phase 2). Ported from `unseen-legend-lore-experiments/hybrid_retrieval_spike`
+(Phase 2). Ported from `unseen-servant-spikes/hybrid_retrieval_spike`
 (`queries.yaml` + `score_retrieval.py`), regraded from page overlap to the
 specific answer chunk.
 
@@ -21,7 +21,7 @@ Prerequisites:
   repo root once (same as `tauri dev`); the sidecar starts the server itself.
 - **The eval corpus** — three CC-licensed rulebooks, not committed to this
   repo. Default location is
-  `~/code/unseen-legend-lore-experiments/chunker_spike/corpus`; override
+  `~/code/unseen-servant-spikes/chunker_spike/corpus`; override
   with `--corpus DIR`. Expected files:
   - `Basic-Fantasy-RPG-Rules-r142.pdf`
   - `Black-Flag-Roleplaying.pdf`

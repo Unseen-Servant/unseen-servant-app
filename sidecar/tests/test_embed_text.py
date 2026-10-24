@@ -1,7 +1,7 @@
 """Unit tests for _embed_text — heading-prepend at embed time.
 
 Pure-function tests on the helper that produces embedding text from an
-EmbedUnit. Per hybrid_retrieval_spike (sibling experiments repo),
+EmbedUnit. Per hybrid_retrieval_spike (sibling spikes repo),
 prepending the section_heading breadcrumb at embed time delivers
 +0.184 MRR@5 / +0.150 recall@5; storage of the embed unit text remains
 unchanged.

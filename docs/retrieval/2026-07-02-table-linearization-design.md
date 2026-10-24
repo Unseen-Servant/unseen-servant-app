@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-02
 **Issue:** [#327](https://github.com/Unseen-Servant/unseen-legend-lore/issues/327) — roadmap item 8, Tier 2
-**Evidence:** `unseen-legend-lore-experiments/table_retrieval_spike/FINDINGS.md` (verdict 2026-04-27)
+**Evidence:** `unseen-servant-spikes/table_retrieval_spike/FINDINGS.md` (verdict 2026-04-27)
 **Target branch:** `main`
 
 ## Problem

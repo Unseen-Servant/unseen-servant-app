@@ -35,7 +35,7 @@ from server import create_app, open_library_store
 
 QUERIES_PATH = EVALS_DIR / "queries.yaml"
 DEFAULT_DATA_DIR = EVALS_DIR / ".eval_data"
-DEFAULT_CORPUS = Path.home() / "code/unseen-legend-lore-experiments/chunker_spike/corpus"
+DEFAULT_CORPUS = Path.home() / "code/unseen-servant-spikes/chunker_spike/corpus"
 
 # The ground truth in queries.yaml is authored against exactly these books.
 EXPECTED_PDFS = [

@@ -5,7 +5,7 @@ Pure string-in/string-out tests — no IO, no PDFs. The rules run between
 indexed chunk on the affected publishers.
 
 Validated end-to-end in the extraction_quality_spike (sibling repo
-unseen-legend-lore-experiments). These tests pin the contract so future
+unseen-servant-spikes). These tests pin the contract so future
 changes can't silently break it.
 """
 

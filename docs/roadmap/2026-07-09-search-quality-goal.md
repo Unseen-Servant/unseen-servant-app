@@ -35,7 +35,7 @@ ported from `hybrid_retrieval_spike`, now with answer anchors) + `scorer.py`
 + `run_eval.py`, one command (`uv run python -m evals.run_eval`), scorer
 unit-tested in CI (`tests/test_eval_scorer.py`).
 
-- ~~Port the harness (`queries.yaml` ground truth + scorer) from `unseen-legend-lore-experiments` into `sidecar/`~~
+- ~~Port the harness (`queries.yaml` ground truth + scorer) from `unseen-servant-spikes` into `sidecar/`~~
 - ~~Score **nDCG@10, MRR@5, precision@k, recall@k**, reported **per query category** (stat block, table, prose, cross-page, cross-system) — graded on the specific answer chunk, not page overlap, since the page-overlap metric saturates~~
 - ~~Runnable with one command against a defined corpus~~
 - ~~Baseline results committed to the repo~~ — [2026-07-09 baseline](../../sidecar/evals/baselines/2026-07-09-baseline.md): nDCG@10 0.628, MRR@5 0.555, recall@10 0.850 overall (rerank on). Stat blocks are solved (MRR@5 1.000); the weak categories are prose (nDCG 0.459) and cross-system (nDCG 0.514 — three of ten unfiltered queries miss entirely, the gap the game-system soft-boost item targets). Two queries are structural zeros of the corpus, not retrieval failures: Black Flag never states the advantage/disadvantage core rule, and "Cleric saving throws at level 5" needs the p65 class-saves table that search doesn't surface in the top 10.

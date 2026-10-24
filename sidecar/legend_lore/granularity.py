@@ -1,6 +1,6 @@
 """Parent-document retrieval: small embed units, parent generation context.
 
-Validated by chunk_granularity_spike (sibling experiments repo, verdict
+Validated by chunk_granularity_spike (sibling spikes repo, verdict
 2026-04-27). The recipe:
 
   structure_aware chunks

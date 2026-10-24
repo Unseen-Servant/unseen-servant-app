@@ -1,7 +1,7 @@
 # v3 Search — Recovery Strategy After the Phase 3 Roadblock
 
 **Date:** 2026-08-22
-**Status:** W0 and W1 built (W1's native-block reference is `2026-08-29-v3-w1-reference`); W2–W4 superseded by [2026-09-02-v2-retrieval-improvement-roadmap.md](2026-09-02-v2-retrieval-improvement-roadmap.md), which ported them into v2. v3 paused 2026-09-28 and moved to the experiments repo (`v3_pipeline/`) — lessons in that roadmap's §8.
+**Status:** W0 and W1 built (W1's native-block reference is `2026-08-29-v3-w1-reference`); W2–W4 superseded by [2026-09-02-v2-retrieval-improvement-roadmap.md](2026-09-02-v2-retrieval-improvement-roadmap.md), which ported them into v2. v3 paused 2026-09-28 and moved to the spikes repo (`v3_pipeline/`) — lessons in that roadmap's §8.
 **Supersedes nothing.** Amends the execution order of [2026-08-13-pipeline-rebuild-plan.md](2026-08-13-pipeline-rebuild-plan.md) (Phases 2–4) in light of what Phase 3 measured.
 **Objective (unchanged):** a retrieval pipeline that is much faster *and* much more relevant than v2, for the app UI, Claude, and 4B-class local models.
 

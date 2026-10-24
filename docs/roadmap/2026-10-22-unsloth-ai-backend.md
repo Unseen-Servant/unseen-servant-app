@@ -87,7 +87,7 @@ Not viable. It is a Python app with its own venv, an optional torch, and a cmake
 - **Runtime:** the #413 shape. A pinned `llama-server` with Metal, spawned by the sidecar, flags set by us, models in `Resources/models` with a `manifest.json`.
 - **Unsloth's part** is everything around the weights:
   - Unsloth Dynamic GGUF quants for the Servant chat model;
-  - the Unsloth training scripts (dev-side, experiments repo) for domain-tuned embed and rerank models, exported to GGUF;
+  - the Unsloth training scripts (dev-side, spikes repo) for domain-tuned embed and rerank models, exported to GGUF;
   - Studio as an optional **dev tool**, for trying chat models and running fine-tunes on the Mac.
 - **Users who already run Studio, LM Studio or Ollama** point the Servant at it with an OpenAI-compatible URL (§4).
 
@@ -132,7 +132,7 @@ At setup, read total memory, subtract the resident embed and rerank models plus 
 
 Each step ships on its own and is gated by the evals that exist today.
 
-1. **#413 step 1 spike, unchanged** (experiments repo): pinned `llama-server` + bge-m3 f16, measured against the stored vectors and against Ollama on speed, the 8k tail and RSS. Add one check: is `unsloth/bge-m3` byte-identical to `BAAI/bge-m3` at our pinned revision? If yes, nothing changes. Convert from BAAI (upstream), either way.
+1. **#413 step 1 spike, unchanged** (spikes repo): pinned `llama-server` + bge-m3 f16, measured against the stored vectors and against Ollama on speed, the 8k tail and RSS. Add one check: is `unsloth/bge-m3` byte-identical to `BAAI/bge-m3` at our pinned revision? If yes, nothing changes. Convert from BAAI (upstream), either way.
 2. **#413 step 2: the reranker from Resources.** Proves the manifest, the fetch script and the CI cache on 23 MB.
 3. **#413 step 3: the `llama-server` embedder.** Ollama leaves the sidecar, the UI (~40 references in 8 Svelte files) and the site copy. Re-run both gate baselines.
 4. **Servant chat slot (§4).** Starts when the Servant does, not before.
@@ -140,7 +140,7 @@ Each step ships on its own and is gated by the evals that exist today.
    - Add the chat rows to the manifest with a minimum memory and "download on demand".
    - Add the second `llama-server` process and its load/unload policy.
    - Add the local / URL / none setting.
-5. **Domain fine-tunes (research, experiments repo).**
+5. **Domain fine-tunes (research, spikes repo).**
    - Unsloth embedding training on (query, section) pairs: bge-m3 first, `bge-reranker-v2-m3` second.
    - Gate on the cued/single/uncued suites and `library_probe.py`, because a harness GO is not enough (see the eval-limits notes).
    - A new embed model bumps `EMBEDDING_MODEL`, so every user reindexes once. That happens at Metal speed after step 3.

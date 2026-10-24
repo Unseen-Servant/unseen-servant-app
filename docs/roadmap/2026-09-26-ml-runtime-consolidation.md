@@ -25,7 +25,7 @@
 | embed | ✓ GPU (Metal) | ✓ CPU only in a PyInstaller bundle (CoreML EP is partial and fiddly) | ✓ GPU (Metal) |
 | rerank | ✗ no endpoint | ✓ already shipped (fastembed, int8 L-6) | ✓ `/v1/rerank`, GGUF `bge-reranker-v2-m3` (bigger, multilingual, different score scale → tiers refit) |
 | chat + tool calling | ✓ | ✗ | ✓ OpenAI dialect, native tool-call parsing, grammar-constrained JSON |
-| vectors vs today's index | — | parity measured in `embed_parity_spike` (experiments repo) | same GGUF weights → likely near-identical; **verify** (§5) |
+| vectors vs today's index | — | parity measured in `embed_parity_spike` (spikes repo) | same GGUF weights → likely near-identical; **verify** (§5) |
 | model download | user pulls | fp32 2.2 GB or int8 ~570 MB, first launch | bge-m3 GGUF ~1.1 GB f16 / ~600 MB q8, first launch |
 | packaging | none | none (Python deps) | per-platform `llama-server` build, codesign/notarize on the 10× macOS runner; pin a build, flags rename between releases |
 | process model | external daemon we don't control | none | child process we spawn/health-check like the Python sidecar (`lib.rs` already does this) |

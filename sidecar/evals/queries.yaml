@@ -1,6 +1,6 @@
 # Pre-registered retrieval queries — ground truth for the eval harness.
 #
-# Ported from unseen-legend-lore-experiments/hybrid_retrieval_spike/queries.yaml
+# Ported from unseen-servant-spikes/hybrid_retrieval_spike/queries.yaml
 # (30 locked chunker_spike queries + 10 cross-system queries), keeping the
 # GT-fixed page ranges. New in this port: per-query `answer` anchors so the
 # scorer grades on the specific answer chunk instead of page overlap (see

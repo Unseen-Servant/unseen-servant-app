@@ -1,6 +1,6 @@
 """Retrieval eval scorer — relevance judgment and rank metrics.
 
-Ported from unseen-legend-lore-experiments/hybrid_retrieval_spike/score_retrieval.py
+Ported from unseen-servant-spikes/hybrid_retrieval_spike/score_retrieval.py
 per the 2026-07-09 search-quality goal (Phase 2), with the grading rule
 changed from page overlap to the specific answer chunk: a retrieved chunk
 is relevant only if it comes from the expected source, its page range

@@ -59,7 +59,7 @@ equipment tables.
 ### 2.1 What The Two NO-GOs Actually Established
 
 Re-measured on 2026-08-29 against the frozen reference
-`2026-08-29-v3-w1-reference.json` (now in the experiments repo,
+`2026-08-29-v3-w1-reference.json` (now in the spikes repo,
 `v3_pipeline/baselines/`), after two defects were fixed.
 
 **The first PDFium record was an artifact.** `ingest/pdfium_extract.py` sorted
@@ -526,7 +526,7 @@ Two defects invalidated the earlier evidence and are fixed:
    overriding `layout()`'s default, so **every** v3 evaluation run raised
    `TypeError` from commit b7c295d onward. The W1 reference in section 2 had
    therefore never been committed; it is now frozen at
-   `2026-08-29-v3-w1-reference.json` (experiments repo, `v3_pipeline/baselines/`).
+   `2026-08-29-v3-w1-reference.json` (spikes repo, `v3_pipeline/baselines/`).
 
 ## 8. Definition Of Done
 

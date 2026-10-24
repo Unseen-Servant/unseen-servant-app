@@ -6,7 +6,7 @@ a heading stack so each chunk carries a section_heading breadcrumb.
 
 Validated against the prior fixed-window baseline in the chunker spike
 (MRR@5 0.626 vs 0.573 at the 1000-char soft cap):
-https://github.com/Unseen-Servant/unseen-legend-lore-experiments/blob/main/chunker_spike/FINDINGS.md
+https://github.com/Unseen-Servant/unseen-servant-spikes/blob/main/chunker_spike/FINDINGS.md
 """
 from __future__ import annotations
 

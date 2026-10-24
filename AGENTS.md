@@ -23,7 +23,7 @@ A TTRPG Gamemaster who:
 
 ## Related repositories
 
-- **unseen-legend-lore-experiments** ('~/code/unseen-legend-lore-experiments', private) - Research spikes for Legend Lore. _Relationship:_ FINDINGS inform key architectural decision in Legend Lore. Docs that cite a spike's FINDINGS carry the outcome themselves; the spike code is not public.
+- **unseen-servant-spikes** ('~/code/unseen-servant-spikes', private, https://github.com/Unseen-Servant/unseen-servant-spikes) - Research spikes for Unseen Servant. _Relationship:_ FINDINGS inform key architectural decisions in Unseen Servant. Docs that cite a spike's FINDINGS carry the outcome themselves; the spike code is not public.
 - **unseen-servant-site** ('~/code/unseen-servant-site') - Landing page of Unseen Servant. _Relationship:_ the app is distributed through the landing page. Product description needs to match actual code and features.
 
 ---

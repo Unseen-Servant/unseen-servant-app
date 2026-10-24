@@ -1,6 +1,6 @@
 """Heading-hierarchy promotion — flat ``##`` → ``#`` / ``##`` / ``###``.
 
-Ported verbatim from heading_hierarchy_spike (Unseen-Servant/unseen-legend-lore-experiments).
+Ported verbatim from heading_hierarchy_spike (Unseen-Servant/unseen-servant-spikes).
 The spike validated three strategies; production uses ``toc_then_font``:
 
   1. ``font_cluster`` — assign a level to each ``##`` heading by clustering

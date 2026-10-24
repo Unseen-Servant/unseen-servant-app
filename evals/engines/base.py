@@ -1,7 +1,7 @@
 """Engine-agnostic contract for the Phase 0 harness.
 
 An Engine wraps one retrieval pipeline (v2 = today's ``sidecar/``; the
-v3 adapter left with v3 for the experiments repo) behind the same three verbs —
+v3 adapter left with v3 for the spikes repo) behind the same three verbs —
 ``index``, ``warmup``, ``search`` — so the harness, the graders, and the
 baselines never know which pipeline they are talking to. The grading side
 (``evals/retrieval/``) consumes :class:`SearchResponse` only.

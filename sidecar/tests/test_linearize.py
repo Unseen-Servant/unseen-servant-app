@@ -1,7 +1,7 @@
 """Unit tests for linearize — pipe-table row-as-sentence linearizer.
 
 Ported behavior is pinned against the table_retrieval_spike's verified
-cases (see FINDINGS.md in the experiments repo), most importantly the
+cases (see FINDINGS.md in the spikes repo), most importantly the
 title-row heuristic that the spike found load-bearing on BFRPG tables.
 """
 
