@@ -8,9 +8,10 @@ conditions that contains the word "grappled").
 
 Runs entirely locally on CPU via ONNX runtime — same shape as the
 existing bge-m3 embedding pipeline. No PyTorch dependency, no API
-calls; the model weights download once on first use and are then
-cached under ``FASTEMBED_CACHE_PATH``, which the sidecar points into its
-data dir.
+calls. The app ships the default model's files (``BUNDLED_MODELS_DIR``,
+see ``_bundled_dir``); elsewhere the weights download once on first use
+and are then cached under ``FASTEMBED_CACHE_PATH``, which the sidecar
+points into its data dir.
 
 The default is MS-MARCO MiniLM-L-6 with int8 weights (Xenova's
 ``onnx/model_quantized.onnx``, registered below as a fastembed custom
@@ -37,6 +38,7 @@ Configuration via env vars:
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -109,6 +111,7 @@ def _load_quantized(TextCrossEncoder, model_name: str):
     from fastembed.common.model_description import ModelSource
 
     repo, size = _QUANTIZED[model_name]
+    bundled = _bundled_dir(model_name)
     try:
         TextCrossEncoder.add_custom_model(
             model_name,
@@ -118,12 +121,43 @@ def _load_quantized(TextCrossEncoder, model_name: str):
         )
     except ValueError:
         pass  # already registered in this process
+    if bundled:
+        logger.info("Re-ranker files from %s", bundled)
+        return TextCrossEncoder(
+            model_name=model_name,
+            specific_model_path=bundled,
+            local_files_only=True,
+        )
     base = os.getenv("FASTEMBED_CACHE_PATH") or os.path.join(
         tempfile.gettempdir(), "fastembed_cache")
     return TextCrossEncoder(
         model_name=model_name,
         cache_dir=os.path.join(base, "legend-lore-rerank-q8"),
     )
+
+
+def _bundled_dir(model_name: str) -> str | None:
+    """The model's folder among the models shipped with the app, or None.
+
+    ``BUNDLED_MODELS_DIR`` (server.py sets it from ``--models-dir``) holds
+    the files ``models/manifest.json`` lists, placed and checked by
+    ``scripts/fetch-models.mjs``. A folder missing any of them doesn't
+    count, and the model downloads as it does under pytest and the evals.
+    """
+    root = os.getenv("BUNDLED_MODELS_DIR")
+    if not root:
+        return None
+    try:
+        with open(os.path.join(root, "manifest.json"), encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (OSError, ValueError):
+        return None
+    for model in manifest.get("models", []):
+        if model.get("role") == "rerank" and model.get("name") == model_name:
+            path = os.path.join(root, model["dir"])
+            if all(os.path.isfile(os.path.join(path, f["path"])) for f in model["files"]):
+                return path
+    return None
 
 
 def rerank_scores(query: str, docs: list[str]) -> list[float] | None:

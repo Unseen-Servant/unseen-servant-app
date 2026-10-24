@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "node scripts/check-sidecar-fresh.mjs && npm run build",
+    "beforeBuildCommand": "node scripts/check-sidecar-fresh.mjs && node scripts/fetch-models.mjs --check && npm run build",
     "frontendDist": "../build"
   },
   "app": {
@@ -57,7 +57,8 @@
     },
     "resources": {
       "../LICENSE": "LICENSE.txt",
-      "../ACKNOWLEDGEMENTS.txt": "ACKNOWLEDGEMENTS.txt"
+      "../ACKNOWLEDGEMENTS.txt": "ACKNOWLEDGEMENTS.txt",
+      "../models/": "models/"
     },
     "externalBin": [
       "binaries/legend-lore-sidecar",

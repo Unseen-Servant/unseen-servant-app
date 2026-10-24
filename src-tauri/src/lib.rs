@@ -369,7 +369,7 @@ fn sidecar_not_ready_message(log_path: &Path) -> String {
     msg
 }
 
-fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
+fn start_sidecar(data_dir: &Path, models_dir: Option<&Path>) -> Result<Child, String> {
     let (program, base_args): (std::path::PathBuf, Vec<String>) = if cfg!(debug_assertions) {
         // Dev mode: use source-tree Python
         let sidecar_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar");
@@ -419,6 +419,9 @@ fn start_sidecar(data_dir: &Path) -> Result<Child, String> {
         .arg(std::process::id().to_string())
         .stdout(std::process::Stdio::from(log_file))
         .stderr(std::process::Stdio::from(stderr_file));
+    if let Some(dir) = models_dir {
+        cmd.arg("--models-dir").arg(dir);
+    }
 
     // Put sidecar in its own process group so we can kill the entire group on exit
     #[cfg(unix)]
@@ -605,6 +608,13 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir).ok();
 
             let chroma_dir = app_data_dir.join("chroma_db");
+            // The models the sidecar loads from disk: the app's Resources in
+            // a build, the repo's models/ (scripts/fetch-models.mjs) in dev.
+            let models_dir = if cfg!(debug_assertions) {
+                Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("../models"))
+            } else {
+                app.path().resource_dir().ok().map(|dir| dir.join("models"))
+            };
 
             app.manage(SidecarFailureState(Mutex::new(None)));
             app.manage(boot::BootState::new());
@@ -626,7 +636,7 @@ pub fn run() {
 
             // Spawning is quick; waiting for the sidecar to serve is not, so
             // that part runs in the boot thread behind the splash window.
-            let spawned = match start_sidecar(&chroma_dir) {
+            let spawned = match start_sidecar(&chroma_dir, models_dir.as_deref()) {
                 Ok(child) => {
                     println!("Sidecar started (PID: {})", child.id());
                     app.manage(SidecarState(Mutex::new(Some(child))));

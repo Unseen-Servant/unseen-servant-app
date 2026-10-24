@@ -105,6 +105,19 @@ jobs:
           cp sidecar/dist/legend-lore-sidecar "src-tauri/binaries/legend-lore-sidecar-${TRIPLE}"
           cp sidecar/dist/legend-lore-mcp "src-tauri/binaries/legend-lore-mcp-${TRIPLE}"
 
+      # The models tauri build bundles into Resources (models/manifest.json).
+      # The cache holds them by sha256, so each manifest downloads once.
+      - name: Cache models
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/models-cache
+          key: models-${{ runner.os }}-${{ hashFiles('models/manifest.json') }}
+
+      - name: Fetch models
+        env:
+          UNSEEN_MODELS_CACHE: ${{ runner.temp }}/models-cache
+        run: node scripts/fetch-models.mjs
+
       # The bundled ACKNOWLEDGEMENTS.txt lists this platform's Python
       # packages. uv run syncs the sidecar env when the cache hit above
       # skipped it.
@@ -243,6 +256,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path src-tauri\binaries
           Copy-Item sidecar\dist\legend-lore-sidecar.exe "src-tauri\binaries\legend-lore-sidecar-$triple.exe"
           Copy-Item sidecar\dist\legend-lore-mcp.exe "src-tauri\binaries\legend-lore-mcp-$triple.exe"
+
+      # The models tauri build bundles into Resources (models/manifest.json).
+      # The cache holds them by sha256, so each manifest downloads once.
+      - name: Cache models
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/models-cache
+          key: models-${{ runner.os }}-${{ hashFiles('models/manifest.json') }}
+
+      - name: Fetch models
+        env:
+          UNSEEN_MODELS_CACHE: ${{ runner.temp }}/models-cache
+        run: node scripts/fetch-models.mjs
 
       # Lists this platform's Python packages (pywin32 only here).
       - name: Generate acknowledgements

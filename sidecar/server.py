@@ -12,6 +12,7 @@ Usage:
 import argparse
 import os
 import signal
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -54,6 +55,8 @@ def parse_args():
                         help="Directory for the library store (default: ./chroma_db)")
     parser.add_argument("--parent-pid", type=int, default=None,
                         help="Exit when this process ends (default: our parent)")
+    parser.add_argument("--models-dir", type=str, default=None,
+                        help="Models shipped with the app (models/manifest.json)")
     return parser.parse_args()
 
 
@@ -290,6 +293,12 @@ if __name__ == "__main__":
     # which macOS purges of files unused for 3 days: the purge leaves the
     # snapshot's symlinks dangling and fastembed never downloads again.
     os.environ.setdefault("FASTEMBED_CACHE_PATH", str(data_dir / "models"))
+    # Models shipped with the app load from disk (#413). A build has no
+    # reason to reach Hugging Face, so it is told it is offline.
+    if args.models_dir:
+        os.environ.setdefault("BUNDLED_MODELS_DIR", args.models_dir)
+    if getattr(sys, "frozen", False):
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
     # Start parent-death watchdog (daemon thread — won't block exit).
     # POSIX only: on Windows os.kill(pid, 0) sends a CTRL_C_EVENT rather

@@ -1,0 +1,22 @@
+{
+  "models": [
+    {
+      "role": "rerank",
+      "name": "legend-lore/ms-marco-MiniLM-L-6-v2-q8",
+      "dir": "rerank/ms-marco-MiniLM-L-6-v2-q8",
+      "source": {
+        "hf": "Xenova/ms-marco-MiniLM-L-6-v2",
+        "revision": "a09144355adeed5f58c8ed011d209bf8ee5a1fec"
+      },
+      "licence": "Apache-2.0",
+      "credit": "ms-marco-MiniLM-L-6-v2 reranker, by the Sentence Transformers project (cross-encoder/ms-marco-MiniLM-L-6-v2), int8 ONNX export by Xenova. Apache-2.0, https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2",
+      "files": [
+        {"path": "config.json", "size": 824, "sha256": "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"},
+        {"path": "special_tokens_map.json", "size": 125, "sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3"},
+        {"path": "tokenizer.json", "size": 711396, "sha256": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"},
+        {"path": "tokenizer_config.json", "size": 1242, "sha256": "0b29c7bfc889e53b36d9dd3e686dd4300f6525110eaa98c76a5dafceb2029f53"},
+        {"path": "onnx/model_quantized.onnx", "size": 23143499, "sha256": "e9d8ebf845c413e981c175bfe49a3bfa9b3dcce2a3ba54875ee5df5a58639fbe"}
+      ]
+    }
+  ]
+}

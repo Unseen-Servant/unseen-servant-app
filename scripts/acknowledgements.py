@@ -16,6 +16,8 @@ Each ecosystem is read where the build reads it:
 - Python packages: the sidecar's runtime closure from `uv export`, as
   installed on this platform, plus PyInstaller, whose bootloader ships, and
   the interpreter itself.
+- Models: the credit line of each entry in models/manifest.json, the files
+  tauri build bundles.
 
 release.yml runs it on each platform before `tauri build`, so a release
 lists that platform's Python packages (pywin32 only on Windows). The
@@ -45,6 +47,11 @@ MCP_LOGO = (
     "Model Context Protocol logo, by the MCP project. MIT, "
     "https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg"
 )
+
+
+def models() -> list[str]:
+    manifest = json.loads((ROOT / "models" / "manifest.json").read_text(encoding="utf-8"))
+    return [f"  {m['credit']}" for m in manifest["models"]]
 
 
 def licence_files(directory: Path) -> list[Path]:
@@ -188,6 +195,10 @@ def main() -> None:
         f"  Almendra  OFL-1.1  {refs('Almendra', [fonts])}",
         f"  {FONT_AWESOME}",
         f"  {MCP_LOGO}",
+        "",
+        "Models",
+        "",
+        *models(),
         "",
         *section("Bundled Python interpreter", [python_interpreter()]),
         *section("Rust crates (the app)", rust_crates()),

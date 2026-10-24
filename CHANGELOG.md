@@ -10,6 +10,10 @@ notes. The how-to belongs in Help → Guides, not here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The reranker comes with the app.** Search ranks results with it from the first launch, with no download and no network
+
 ## [4.1.0] - 2026-10-21
 
 **Command fills out, and Legend Lore stands up to a bad day.** Images on tracks and boards, a toolbar for Play's board, a card tray, keys for every row, and sixteen MCP tools so Claude can prep a session end to end. Help is back in the status bar, and Ollama down, a scanned PDF or a slow sidecar start now say what happened instead of failing quietly. Nothing needs re-indexing.
