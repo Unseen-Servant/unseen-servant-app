@@ -12,11 +12,11 @@ notes. The how-to belongs in Help → Guides, not here.
 
 ## [4.2.0] - 2026-10-24
 
-Search now works without other software. The app contains the search models and the program that runs them, so you do not install Ollama or download a model. The licence changes to the GNU AGPL 3.0 or later. You do not need to index your books again.
+Search now works without other software. The app contains the search models and the program that runs them, so users do not install Ollama or download a model. The licence changes to the GNU AGPL 3.0 or later. Users do not need to index their books again.
 
 ### Changed
 
-- **Search does not need Ollama.** The app runs the bge-m3 model itself, and your index stays valid
+- **Search does not need Ollama.** The app runs the bge-m3 model itself, and existing indexes stay valid
 - **The reranker is in the app.** Search uses it from the first launch, without a download
 - **The licence is the GNU AGPL 3.0 or later.** Help → About opens the licence file in the app, not the old licence page on the website
 - **The acknowledgements are in the app.** A new row in Help → About opens the list of components the app uses, with their licences
