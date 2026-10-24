@@ -1,0 +1,3 @@
+# Git Bash runs these on the Windows release runner, where checkout would
+# otherwise give them CRLF endings bash can't read.
+*.sh text eol=lf

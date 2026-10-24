@@ -11,8 +11,8 @@ the production ``/api/search`` endpoint (rerank on, production defaults),
 judges each result against the answer-chunk ground truth, and prints
 nDCG@10, MRR@5, precision@k, and recall@k per query category.
 
-Requires Ollama running locally with the ``bge-m3`` model (same as
-production indexing). The corpus is the three CC-licensed rulebooks the
+Embeds with the bundled llama-server (``scripts/build-llama-server.sh`` and
+``scripts/fetch-models.mjs`` once, same as production indexing). The corpus is the three CC-licensed rulebooks the
 ground truth was authored against — see evals/README.md.
 """
 from __future__ import annotations
@@ -78,7 +78,7 @@ def ensure_indexed(client, corpus_dir: Path, data_dir: Path) -> None:
     if not to_index:
         print(f"corpus already indexed ({len(manifest.files)} files)")
         return
-    print(f"indexing {len(to_index)} PDFs with the production pipeline (Ollama bge-m3)...")
+    print(f"indexing {len(to_index)} PDFs with the production pipeline (llama-server bge-m3)...")
     resp = client.post("/api/index-files", json={"paths": to_index})
     resp.raise_for_status()
     body = resp.json()
@@ -92,7 +92,7 @@ def warmup(
     variant_expansion: bool,
 ) -> None:
     """Fire one untimed search so lazy one-time loads (cross-encoder,
-    Ollama embed session, spell-correction vocab) don't pollute the first
+    llama-server model load, spell-correction vocab) don't pollute the first
     query's latency."""
     client.post("/api/search", json={
         "query": "warmup", "n_results": 1,

@@ -1081,9 +1081,9 @@ def warm_search_stack(get_spell_corrector, report=lambda step, state: None) -> N
     Two things in the search path build themselves on first use: the
     cross-encoder (a ~120 MB ONNX model, seconds to load) and the
     spell-correction vocabulary. Whoever searches first after a start
-    pays both — the keep-warm ticker only covers Ollama. Issue #341.
+    pays both. Issue #341.
 
-    Diagnostics-grade error handling, like ``keep_embedder_warm``: a
+    Diagnostics-grade error handling: a
     warm-up that fails must never take the sidecar down at boot, and the
     next real search reports the problem with far better context.
 
@@ -1148,7 +1148,7 @@ def _fts_text(eu: EmbedUnit) -> str:
 # 256 was chosen over the previous 100 to amortize Ollama per-call overhead;
 # bge-m3 embeds each input independently so the 8192 ctx applies per input,
 # not per batch (mean embed-text size ~400 chars / ~100 tokens). Concurrency=3
-# fires up to N embed batches at Ollama in parallel; the book is written to
+# fires up to N embed batches at the embedder in parallel; the book is written to
 # the store once, after every batch has embedded.
 EMBED_BATCH_SIZE = 256
 EMBED_CONCURRENCY = 3
@@ -1181,7 +1181,7 @@ def _is_transient_embed_error(exc: Exception) -> bool:
 def _embed_batch(embed_fn, batch: list[EmbedUnit]) -> list[list[float]]:
     """Heading-prepended embeddings for a batch (no DB writes).
 
-    Retries transient Ollama runner resets so a single dropped connection
+    Retries transient embedder resets so a single dropped connection
     mid-index does not abort the entire file; non-transient failures raise
     immediately.
     """
@@ -1625,7 +1625,7 @@ def compute_diff(
 # ---------------------------------------------------------------------------
 
 # Bound on concurrent searches (issue #344). Each search embeds its query
-# through Ollama and may run the cross-encoder, so an unbounded fan-out
+# through the embedder and may run the cross-encoder, so an unbounded fan-out
 # spikes memory without buying throughput.
 #
 # Chosen by measurement, not intuition — 4 concurrent searches over the
@@ -1684,7 +1684,7 @@ def _search_sync(
     """Parent-document semantic search. Synchronous by nature.
 
     Every expensive step here blocks: the query embeds via a blocking HTTP
-    call to Ollama, the cross-encoder is CPU-bound ONNX, and the
+    call to the embedder, the cross-encoder is CPU-bound ONNX, and the
     manifest/store reads hit disk. It therefore must not run on the
     event loop — ``/api/search`` calls it through ``run_in_threadpool`` so
     one 5-7s search can't stall health polls, MCP heartbeats, or a streaming

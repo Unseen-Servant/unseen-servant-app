@@ -55,7 +55,7 @@
   $: embedderTooltip = embedderReady
     ? m.status_embedder_ready()
     : embedderRunning
-      ? m.status_embedder_no_model()
+      ? m.status_embedder_loading()
       : m.status_embedder_down();
 </script>
 

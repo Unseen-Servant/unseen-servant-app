@@ -34,3 +34,7 @@ sidecar/build/
 
 # Bundled sidecar binaries (built by scripts/build-sidecar.sh)
 src-tauri/binaries/
+
+# Bundled model files (fetched by scripts/fetch-models.mjs)
+/models/*
+!/models/manifest.json

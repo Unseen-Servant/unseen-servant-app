@@ -46,8 +46,9 @@ system's licence, and the credit it asks for:
 
 ## Run it
 
-All commands from the repo root, under the sidecar env. Retrieval needs Ollama
-up (query embedding); extraction does not.
+All commands from the repo root, under the sidecar env. Retrieval embeds with
+the bundled llama-server, which the sidecar starts itself: run
+`bash scripts/build-llama-server.sh` and `node scripts/fetch-models.mjs` once first, as for `tauri dev`. Extraction needs neither.
 
 ```bash
 # Retrieval — scope-aware, MRR@5 headline. Each normal run builds a fresh,
@@ -66,7 +67,7 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --baseline section
 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline <rung> \
     --gate evals/baselines/<last-committed>-v2-<rung>.json
 
-# Extraction QA — no Ollama; grades hand-authored golden pages. --gate fails
+# Extraction QA — no embedding; grades hand-authored golden pages. --gate fails
 # the run (exit 1) if ANY page's metric drops below the reference baseline —
 # the per-page min, not the mean, is what gates an extraction change.
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite extraction \
@@ -87,7 +88,7 @@ uv run --project sidecar python -m evals.extraction.review \
     --doc srd_5_2_1 --pages 30,183 --open
 
 # Breadcrumb QA — every chunk's section_heading graded for markup, split
-# letters, small-caps damage, furniture roots (no Ollama, ~8 min). The gate
+# letters, small-caps damage, furniture roots (no embedding, ~8 min). The gate
 # Phase 1's heading work must clear. Writes evals/baselines/<date>-v2-breadcrumb-qa.*
 # The .md lists the residue — the most frequent flawed headings per book — so
 # a fix can see what it did not catch.
@@ -97,10 +98,6 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb
 # compares raw counts, not rates — denominators move when sections merge).
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa \
     --gate evals/baselines/<last-committed>-v2-breadcrumb-qa.json
-
-# Idle-cliff probe (hand-run against a live sidecar): searches once, sleeps
-# 600 s, searches again, and prints both latencies.
-uv run --project sidecar python -m evals.retrieval.idle_probe
 
 # Harness unit tests (pure, CI-safe).
 uv run --project sidecar pytest evals/tests
@@ -167,7 +164,7 @@ never a PDF. `--suite library --data-dir <app data dir>`; verify with
 ## Baselines & the blind round
 
 `baselines/<date>-<engine>-<rung>.{json,md}` are committed — the numbers to beat.
-The v2 reference is `2026-09-26-v2-cue-strip` (hybrid on, which is now the default, as in the app; `--no-hybrid` for dense-only); gate against it. The local library tier's reference is `2026-09-26-v2-library-cue-strip` (`--suite library --data-dir <app data dir>`, app closed).
+The v2 reference is `2026-10-24-v2-cue-strip-llama-server` (hybrid on, which is now the default, as in the app; `--no-hybrid` for dense-only); gate against it. The local library tier's reference is `2026-10-24-v2-library-llama-server` (`--suite library --data-dir <app data dir>`, app closed). Both replaced the 2026-09-26 references when the embedder moved from Ollama to the bundled llama-server: same-day Ollama runs scored the same in every metric (corpus: 65 of 68 top-10 lists identical, the rest near-ties swapped below the hit; library: all 40 identical).
 Every baseline records the corpus fingerprint, Git revision, and explicit query
 knobs. Retrieval baselines always use a fresh temporary index; exploratory
 reuse requires `--reuse-index --data-dir <path> --no-write` and cannot write a

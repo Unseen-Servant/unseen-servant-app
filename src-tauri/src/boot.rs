@@ -188,9 +188,17 @@ fn run(app: &AppHandle, spawned: Result<(), String>, app_data_dir: &Path) {
         set("embedder", StepState::Running, None);
         let (embedder_tx, embedder_rx) = mpsc::channel();
         std::thread::spawn(move || {
-            let _ = embedder_tx.send(embedder_outcome(
-                fetch::<ModelsStatus>("/api/models/status").as_ref(),
-            ));
+            // llama-server loads bge-m3 behind the splash: wait while it runs
+            // without answering. follow_warmup reports a load past its deadline.
+            let deadline = Instant::now() + WARMUP_DEADLINE;
+            while Instant::now() < deadline {
+                let models = fetch::<ModelsStatus>("/api/models/status");
+                if let Some(outcome) = embedder_outcome(models.as_ref()) {
+                    let _ = embedder_tx.send(outcome);
+                    return;
+                }
+                std::thread::sleep(POLL_INTERVAL);
+            }
         });
         follow_warmup(&boot, &set, embedder_rx);
     } else {
@@ -411,22 +419,16 @@ fn check_library(folder: Option<&Path>) -> (StepState, Option<String>) {
     }
 }
 
-/// Same two states the status bar's embedder lamp tells apart: the runtime
-/// isn't answering, or it answers without the model.
-fn embedder_outcome(models: Option<&ModelsStatus>) -> (StepState, Option<String>) {
+/// The embedder lamp once llama-server has settled: answering, or not
+/// running. None while it runs but is still loading the model.
+fn embedder_outcome(models: Option<&ModelsStatus>) -> Option<(StepState, Option<String>)> {
     match models.and_then(|m| m.models.iter().find(|m| m.role == "embed")) {
-        Some(m) if m.ready => (StepState::Done, None),
-        Some(m) if m.runtime_up => (
-            StepState::Failed,
-            Some(format!(
-                "Embedder is running without {}. Search waits for it",
-                m.model
-            )),
-        ),
-        _ => (
+        Some(m) if m.ready => Some((StepState::Done, None)),
+        Some(m) if m.runtime_up => None,
+        _ => Some((
             StepState::Failed,
             Some("Embedder isn't running. Search waits for it".into()),
-        ),
+        )),
     }
 }
 
@@ -469,7 +471,7 @@ mod tests {
         ModelsStatus {
             models: vec![ModelStatus {
                 role: "embed".into(),
-                runtime: "ollama".into(),
+                runtime: "llama-server".into(),
                 model: "bge-m3".into(),
                 runtime_up,
                 ready,
@@ -511,22 +513,20 @@ mod tests {
     }
 
     #[test]
-    fn embedder_outcome_tells_down_from_missing_model() {
+    fn embedder_outcome_waits_while_the_model_loads() {
         assert_eq!(
-            embedder_outcome(Some(&embed_row(true, true))).0,
+            embedder_outcome(Some(&embed_row(true, true))).unwrap().0,
             StepState::Done
         );
 
-        let (state, detail) = embedder_outcome(Some(&embed_row(true, false)));
-        assert_eq!(state, StepState::Failed);
-        assert!(detail.unwrap().contains("bge-m3"));
+        assert!(embedder_outcome(Some(&embed_row(true, false))).is_none());
 
-        let (state, detail) = embedder_outcome(Some(&embed_row(false, false)));
+        let (state, detail) = embedder_outcome(Some(&embed_row(false, false))).unwrap();
         assert_eq!(state, StepState::Failed);
         assert!(detail.unwrap().contains("isn't running"));
 
         // No answer from the sidecar at all reads the same as a down runtime.
-        assert_eq!(embedder_outcome(None).0, StepState::Failed);
+        assert_eq!(embedder_outcome(None).unwrap().0, StepState::Failed);
     }
 
     #[test]

@@ -45,6 +45,20 @@ for (const file of ['sidecar/pyproject.toml', 'sidecar/uv.lock', 'sidecar/.pytho
   consider(join(root, file));
 }
 
+// build.rs writes an empty placeholder so cargo can compile without it. On
+// Windows it is a folder (tauri.windows.conf.json) and the exe is inside.
+const llama = ext
+  ? join(root, 'src-tauri', 'binaries', 'llama-server', 'llama-server.exe')
+  : join(root, 'src-tauri', 'binaries', `llama-server-${triple}`);
+let llamaSize = 0;
+try {
+  llamaSize = statSync(llama).size;
+} catch {}
+if (!llamaSize) {
+  console.error(`${relative(root, llama)} is missing. Run \`bash scripts/build-llama-server.sh\` before \`tauri build\`.`);
+  process.exit(1);
+}
+
 for (const name of ['legend-lore-sidecar', 'legend-lore-mcp']) {
   const binary = join(root, 'src-tauri', 'binaries', `${name}-${triple}${ext}`);
   let mtime;

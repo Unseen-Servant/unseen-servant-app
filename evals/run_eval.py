@@ -296,7 +296,7 @@ def render_md(meta: dict, result: dict) -> str:
 # ── extraction suite ──────────────────────────────────────────────────────
 
 def run_extraction(engine, corpus) -> dict:
-    """Extract each golden doc once (engine.extract, no Ollama needed) and
+    """Extract each golden doc once (engine.extract, no embedder needed) and
     grade its golden pages against the hand-authored specs."""
     from evals.extraction import grade as xgrade
     from evals.extraction.verify_golden import load_golden

@@ -310,8 +310,7 @@
   $: sidecarConnected = $machinery.sidecarConnected;
   $: mcpConnected = $machinery.mcpConnected;
   $: mcpActive = $machinery.mcpActive;
-  $: ollamaRunning = $machinery.embedderRunning;
-  $: ollamaModelReady = $machinery.embedderReady;
+  $: embedderRunning = $machinery.embedderRunning;
   let lastSyncTime: Date | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   let showSettings = false;
@@ -3864,7 +3863,7 @@
               query={committedQuery}
               error={searchError}
               {sidecarConnected}
-              {ollamaRunning}
+              {embedderRunning}
               indexedFileCount={searchableFileCount}
               libraryEmpty={indexedPaths.size === 0}
               selectedIndex={selectedResultIndex}
@@ -4082,9 +4081,6 @@
     {syncPreferences}
     {dataDir}
     {lastSyncTime}
-    {sidecarConnected}
-    {ollamaRunning}
-    {ollamaModelReady}
     filesIndexed={(indexStatus?.summary?.up_to_date ?? 0) > 0}
     {mcpConnected}
     onSelectFolder={handleSelectFolder}

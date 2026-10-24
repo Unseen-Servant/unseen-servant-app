@@ -3,9 +3,6 @@
   import CommandGuide from '../../command/CommandGuide.svelte';
   import ServantGuide from '../../servant/ServantGuide.svelte';
 
-  export let sidecarConnected: boolean = true;
-  export let ollamaRunning: boolean = false;
-  export let ollamaModelReady: boolean = false;
   export let folderSelected: boolean = false;
   export let filesIndexed: boolean = false;
   export let mcpConnected: boolean = false;
@@ -17,9 +14,6 @@
   <h3 class="pane-title ledger-label">Legend Lore</h3>
 
   <GettingStartedSteps
-    {sidecarConnected}
-    {ollamaRunning}
-    {ollamaModelReady}
     {folderSelected}
     {filesIndexed}
     {onSelectFolder}

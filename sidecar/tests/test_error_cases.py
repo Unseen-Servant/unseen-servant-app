@@ -8,6 +8,9 @@ Your collection has 2,629 PDFs. With that many files, you WILL encounter:
 - Duplicate indexing requests (clicking "Index" twice)
 """
 
+import sys
+from pathlib import Path
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -125,7 +128,7 @@ def test_search_rejects_non_positive_n_results(client, sample_pdf_path, n_result
 
 
 # ---------------------------------------------------------------------------
-# Query-time embedding failure: Ollama down, or bge-m3 not pulled. Search
+# Query-time embedding failure: the embedder down, or missing. Search
 # must answer with an error that says so, not hang or return empty.
 # ---------------------------------------------------------------------------
 
@@ -133,7 +136,7 @@ def test_search_rejects_non_positive_n_results(client, sample_pdf_path, n_result
 @pytest.fixture
 def production_embed_client(test_store, test_embed_fn, tmp_path):
     """Search over an indexed book, with queries embedded by the real
-    Ollama client (embedder.embed) instead of the test model."""
+    production client (embedder.embed) instead of the test model."""
     seed_book(test_store, test_embed_fn, "/lib/bestiary.pdf", [EmbedUnit(
         chunk_id="c0", text="The fire drake breathes flame.", parent_id="p0",
         chunk_type="prose", section_heading="Fire Drake",
@@ -143,9 +146,9 @@ def production_embed_client(test_store, test_embed_fn, tmp_path):
     return TestClient(app)
 
 
-def test_search_reports_ollama_unreachable(production_embed_client, monkeypatch):
+def test_search_reports_the_embedder_unreachable(production_embed_client, monkeypatch):
     # Port 1 on loopback: nothing listens, the connection is refused.
-    monkeypatch.setattr(embedder, "EMBED_BASE_URL", "http://127.0.0.1:1")
+    monkeypatch.setattr(embedder, "_ready", lambda: "http://127.0.0.1:1")
 
     response = production_embed_client.post("/api/search", json={"query": "dragon"})
 
@@ -154,16 +157,15 @@ def test_search_reports_ollama_unreachable(production_embed_client, monkeypatch)
 
 
 def test_search_reports_the_model_missing(production_embed_client, monkeypatch):
-    def not_pulled(url, json, timeout):
-        return httpx.Response(
-            404, json={"error": 'model "bge-m3" not found, try pulling it first'},
-        )
-
-    monkeypatch.setattr(httpx, "post", not_pulled)
+    # Any file stands in for the binary: only the model is missing.
+    monkeypatch.setattr(embedder, "_binary", lambda: Path(sys.executable))
+    monkeypatch.setattr(embedder, "_model", lambda: None)
+    monkeypatch.setattr(embedder, "_proc", None)
 
     response = production_embed_client.post("/api/search", json={"query": "dragon"})
 
     assert response.status_code == 500
     assert response.json()["detail"] == (
-        "Embedder is running without bge-m3. Run `ollama pull bge-m3` and try again."
+        "Embedder not available — the bge-m3 model is missing from the app. "
+        "Reinstall Unseen Servant."
     )

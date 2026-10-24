@@ -3,7 +3,7 @@
 Since roadmap 2.1 the sidecar answers a hit with the assembled section in
 ``text`` and names the unit that matched in ``matched_text``; the adapter
 must carry that through without touching graded text. Driven against a
-stub client so the test needs neither the sidecar env nor Ollama.
+stub client so the test needs neither the sidecar env nor the embedder.
 """
 from evals.engines.base import SearchOptions, SearchResult
 from evals.engines.v2 import V2Engine

@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/legend-lore-sidecar", "binaries/legend-lore-mcp"],
+    "resources": {
+      "binaries/llama-server/": "llama-server/"
+    }
+  }
+}

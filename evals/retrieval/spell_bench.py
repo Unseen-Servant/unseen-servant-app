@@ -1,6 +1,6 @@
 """Spell-correction accuracy on typo'd eval queries (roadmap 3.5).
 
-No Ollama, no ground truth beyond the query itself: every eligible word of
+No embedder, no ground truth beyond the query itself: every eligible word of
 every query in ``evals/retrieval/queries.yaml`` is corrupted ``--samples``
 times by the seeded error model (``typos.py``), the whole query goes
 through the real ``SpellCorrector`` (context included), and the corrupted

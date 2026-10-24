@@ -50,9 +50,8 @@ themselves stay on your machine.
 
 ## Your files stay yours
 
-- **Local-first.** Indexing and search run on your machine, through
-  [Ollama](https://ollama.com). The only download is a 23 MB reranking model,
-  on your first search.
+- **Local-first.** Indexing and search run on your machine, with models that
+  come with the app. Nothing is downloaded after you install it.
 - **No lock-in.** Campaigns are Markdown files and session boards are
   [JSON Canvas](https://jsoncanvas.org), so [Obsidian](https://obsidian.md)
   opens the same folder. Stop using Unseen Servant and everything is still
@@ -62,8 +61,8 @@ themselves stay on your machine.
 
 ## Get started
 
-You need macOS on Apple Silicon or 64-bit Windows 10/11, plus about 1.2 GB of
-disk for the search model.
+You need macOS on Apple Silicon or 64-bit Windows 10/11, and about 1.4 GB of
+disk: the search model comes with the app.
 
 1. **Install Unseen Servant** from [unseenservant.games](https://unseenservant.games)
    or [GitHub Releases](https://github.com/Unseen-Servant/unseen-servant-app/releases).
@@ -71,18 +70,9 @@ disk for the search model.
    - **Windows:** run the `.exe` installer. The installer isn't code-signed
      yet, so SmartScreen may say "Windows protected your PC": choose
      **More info → Run anyway**.
-2. **Install [Ollama](https://ollama.com)** and open it. Then, once, in a
-   terminal:
-
-   ```bash
-   ollama pull bge-m3
-   ```
-
-   In Ollama's settings, set **Context length** to 8k or more, so long sections
-   are searched in full.
-3. **Open Unseen Servant**, choose the folder that holds your PDFs, tick the
+2. **Open Unseen Servant**, choose the folder that holds your PDFs, tick the
    books to index, and sync.
-4. **Search.** **Help → Guides** walks through each tool, and the full manual
+3. **Search.** **Help → Guides** walks through each tool, and the full manual
    is on [unseenservant.games](https://unseenservant.games).
 
 ---
@@ -113,7 +103,7 @@ Unseen Servant borrows its ideas from:
 
 It is built on [Tauri](https://tauri.app), [Svelte](https://svelte.dev),
 [CodeMirror](https://codemirror.net), [Svelte Flow](https://svelteflow.dev),
-[PyMuPDF](https://pymupdf.readthedocs.io), [Ollama](https://ollama.com) with
+[PyMuPDF](https://pymupdf.readthedocs.io), [llama.cpp](https://github.com/ggml-org/llama.cpp) with
 [BGE-M3](https://huggingface.co/BAAI/bge-m3),
 [fastembed](https://github.com/qdrant/fastembed) and
 [ONNX Runtime](https://onnxruntime.ai) with an MS MARCO MiniLM cross-encoder,

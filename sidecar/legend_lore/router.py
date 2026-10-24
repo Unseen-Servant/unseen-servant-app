@@ -128,7 +128,7 @@ def build_router(
 
         Declared as plain ``def`` (not ``async def``) so FastAPI runs the
         body in a worker thread. Indexing does heavy synchronous work
-        (PyMuPDF + Ollama + SQLite); putting it on the event loop would
+        (PyMuPDF + embedder + SQLite); putting it on the event loop would
         block ``/health`` polls and other concurrent requests.
         """
         total = len(request.paths)
@@ -1385,7 +1385,7 @@ def build_router(
         """Parent-document semantic search.
 
         Thin async shell: stamp MCP activity, then hand the real work to a
-        worker thread. The body is fully blocking (Ollama embed, ONNX
+        worker thread. The body is fully blocking (the embed call, ONNX
         rerank, SQLite reads), so running it inline stalls every other
         request for the duration — see ``_search_sync`` and issue #344.
         """

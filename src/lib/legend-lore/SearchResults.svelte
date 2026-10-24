@@ -17,11 +17,11 @@
 
   export let results: SearchResultItem[] = [];
   export let isLoading: boolean = false;
-  // When false, shows a clear "Ollama isn't running" notice instead of
+  // When false, shows a clear "embedder isn't running" notice instead of
   // letting search calls fail with cryptic connection errors. Defaults
   // to true so existing usage isn't affected.
-  export let ollamaRunning: boolean = true;
-  // Ollama is probed through the sidecar, so a down sidecar comes first.
+  export let embedderRunning: boolean = true;
+  // The embedder is probed through the sidecar, so a down sidecar comes first.
   export let sidecarConnected: boolean = true;
   // True only when a fresh search is in flight — i.e., the displayed
   // rows belong to an older query than the one currently committed.
@@ -199,9 +199,9 @@
     <div class="state-msg state-warn">
       {m.lore_results_no_sidecar()}
     </div>
-  {:else if !ollamaRunning && results.length === 0}
+  {:else if !embedderRunning && results.length === 0}
     <div class="state-msg state-warn">
-      {m.lore_results_no_ollama()}
+      {m.lore_results_no_embedder()}
     </div>
   {:else if isLoading && results.length === 0}
     <div class="state-msg">{m.lore_results_searching()}</div>
