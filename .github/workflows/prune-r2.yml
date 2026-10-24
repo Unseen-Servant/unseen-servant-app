@@ -1,0 +1,31 @@
+name: Prune R2
+
+# Deletes all but the two newest app versions from R2 (scripts/prune-r2.sh).
+# publish-release.yml does this after each publish; run this to prune
+# without publishing. Dry run by default: it prints what it would delete.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print what would be deleted"
+        type: boolean
+        default: true
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION:    auto
+      R2_ENDPOINT:           https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      R2_BUCKET:             ${{ secrets.R2_BUCKET }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prune old versions from R2
+        run: bash scripts/prune-r2.sh ${{ inputs.dry_run && '--dryrun' || '' }}

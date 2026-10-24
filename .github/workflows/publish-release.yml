@@ -25,6 +25,8 @@ jobs:
       PUBLIC_BASE:           https://downloads.unseenservant.games/legend-lore
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Resolve version from tag
         run: |
           VERSION="${TAG#v}"
@@ -102,3 +104,8 @@ jobs:
       - name: Trigger Cloudflare Pages rebuild
         run: |
           curl -fsS -X POST "${{ secrets.CLOUDFLARE_PAGES_DEPLOY_HOOK }}"
+
+      # Keeps this version and the one before on R2; prune-r2.yml runs the
+      # same script by hand.
+      - name: Prune old versions from R2
+        run: bash scripts/prune-r2.sh
