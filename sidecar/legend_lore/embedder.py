@@ -86,7 +86,11 @@ def _binary() -> Path | None:
     elif getattr(sys, "frozen", False):
         return None
     else:
-        path = next(iter(sorted((_REPO / "src-tauri" / "binaries").glob("llama-server-*"))), None)
+        # Windows builds a folder, macOS a binary named for its triple.
+        binaries = _REPO / "src-tauri" / "binaries"
+        candidates = [binaries / "llama-server" / "llama-server.exe",
+                      *sorted(binaries.glob("llama-server-*"))]
+        path = next((p for p in candidates if p.is_file()), None)
     # build.rs leaves an empty placeholder until the script has run.
     if path is None or not path.is_file() or path.stat().st_size == 0:
         return None

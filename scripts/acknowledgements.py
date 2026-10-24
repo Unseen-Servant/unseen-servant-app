@@ -18,6 +18,9 @@ Each ecosystem is read where the build reads it:
   the interpreter itself.
 - Models: the credit line of each entry in models/manifest.json, the files
   tauri build bundles.
+- llama.cpp: the tag scripts/build-llama-server.sh pins, with the licence
+  texts it leaves in src-tauri/binaries/llama-server-licenses (llama.cpp's
+  and the code it vendors), so run that script first.
 
 release.yml runs it on each platform before `tauri build`, so a release
 lists that platform's Python packages (pywin32 only on Windows). The
@@ -52,6 +55,13 @@ MCP_LOGO = (
 def models() -> list[str]:
     manifest = json.loads((ROOT / "models" / "manifest.json").read_text(encoding="utf-8"))
     return [f"  {m['credit']}" for m in manifest["models"]]
+
+
+def llama_server():
+    tag = re.search(r"^LLAMA_CPP_TAG=(\S+)", (ROOT / "scripts" / "build-llama-server.sh").read_text(), re.M)
+    licences = ROOT / "src-tauri" / "binaries" / "llama-server-licenses"
+    files = sorted(licences.iterdir()) if licences.is_dir() else []
+    return "llama.cpp (llama-server)", tag.group(1), "MIT", files
 
 
 def licence_files(directory: Path) -> list[Path]:
@@ -204,6 +214,7 @@ def main() -> None:
         *section("Rust crates (the app)", rust_crates()),
         *section("JavaScript packages (the interface)", js_packages()),
         *section("Python packages (the indexing sidecar)", python_packages()),
+        *section("Bundled embedding server", [llama_server()]),
         "Licence texts",
         "",
     ]

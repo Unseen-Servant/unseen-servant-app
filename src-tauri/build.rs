@@ -19,7 +19,15 @@ fn main() {
         ""
     };
 
-    for name in &["legend-lore-sidecar", "legend-lore-mcp", "llama-server"] {
+    // On Windows llama-server is a resource folder (tauri.windows.conf.json),
+    // not an externalBin.
+    let mut names = vec!["legend-lore-sidecar", "legend-lore-mcp"];
+    if target_triple.contains("windows") {
+        std::fs::create_dir_all(binaries_dir.join("llama-server")).ok();
+    } else {
+        names.push("llama-server");
+    }
+    for name in names {
         let path = binaries_dir.join(format!("{}-{}{}", name, target_triple, ext));
         if !path.exists() {
             std::fs::write(&path, "").ok();

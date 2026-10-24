@@ -45,8 +45,11 @@ for (const file of ['sidecar/pyproject.toml', 'sidecar/uv.lock', 'sidecar/.pytho
   consider(join(root, file));
 }
 
-// build.rs writes an empty placeholder so cargo can compile without it.
-const llama = join(root, 'src-tauri', 'binaries', `llama-server-${triple}${ext}`);
+// build.rs writes an empty placeholder so cargo can compile without it. On
+// Windows it is a folder (tauri.windows.conf.json) and the exe is inside.
+const llama = ext
+  ? join(root, 'src-tauri', 'binaries', 'llama-server', 'llama-server.exe')
+  : join(root, 'src-tauri', 'binaries', `llama-server-${triple}`);
 let llamaSize = 0;
 try {
   llamaSize = statSync(llama).size;

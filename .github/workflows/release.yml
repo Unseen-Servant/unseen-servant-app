@@ -105,6 +105,20 @@ jobs:
           cp sidecar/dist/legend-lore-sidecar "src-tauri/binaries/legend-lore-sidecar-${TRIPLE}"
           cp sidecar/dist/legend-lore-mcp "src-tauri/binaries/legend-lore-mcp-${TRIPLE}"
 
+      # The llama-server the sidecar embeds with, built from the llama.cpp tag
+      # the script pins (cmake is on the runner). Keyed on the script, which
+      # holds the tag and flags.
+      - name: Cache llama-server
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/llama-cache
+          key: llama-server-${{ runner.os }}-${{ hashFiles('scripts/build-llama-server.sh') }}
+
+      - name: Build llama-server
+        env:
+          UNSEEN_LLAMA_CACHE: ${{ runner.temp }}/llama-cache
+        run: bash scripts/build-llama-server.sh
+
       # The models tauri build bundles into Resources (models/manifest.json).
       # The cache holds them by sha256, so each manifest downloads once.
       - name: Cache models
@@ -175,7 +189,8 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    # An uncached llama-server (Vulkan and every CPU variant) adds ~20 min.
+    timeout-minutes: 60
     permissions:
       contents: write
 
@@ -256,6 +271,35 @@ jobs:
           New-Item -ItemType Directory -Force -Path src-tauri\binaries
           Copy-Item sidecar\dist\legend-lore-sidecar.exe "src-tauri\binaries\legend-lore-sidecar-$triple.exe"
           Copy-Item sidecar\dist\legend-lore-mcp.exe "src-tauri\binaries\legend-lore-mcp-$triple.exe"
+
+      # The llama-server the sidecar embeds with, in llama.cpp's own Windows
+      # layout: the exe and its backend DLLs. Keyed on the script, which
+      # holds the tag and flags.
+      - name: Cache llama-server
+        id: llama-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/llama-cache
+          key: llama-server-${{ runner.os }}-${{ hashFiles('scripts/build-llama-server.sh') }}
+
+      # ggml-vulkan compiles its shaders with the SDK's glslc. The version is
+      # the one llama.cpp's own release of the pinned tag builds with.
+      - name: Install Vulkan SDK
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        env:
+          VULKAN_VERSION: 1.4.357.0
+        run: |
+          curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
+
+      - name: Build llama-server
+        shell: bash
+        env:
+          UNSEEN_LLAMA_CACHE: ${{ runner.temp }}/llama-cache
+        run: bash scripts/build-llama-server.sh
 
       # The models tauri build bundles into Resources (models/manifest.json).
       # The cache holds them by sha256, so each manifest downloads once.
