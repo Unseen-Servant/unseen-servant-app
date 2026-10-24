@@ -3,15 +3,18 @@
 // tauri build bundles models/ into the app's Resources, so the sidecar loads
 // its models from disk and never touches the network. Downloads go through a
 // shared cache keyed by sha256 (~/.cache/unseen-servant/models, or
-// UNSEEN_MODELS_CACHE), so each worktree copies instead of downloading again.
+// UNSEEN_MODELS_CACHE), so each worktree links or copies instead of
+// downloading again.
 // Sources are Hugging Face repos pinned to a revision.
 //
 //   node scripts/fetch-models.mjs          fetch what is missing or wrong
 //   node scripts/fetch-models.mjs --check  only verify (tauri build's hook)
 import { createHash } from 'node:crypto';
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -39,11 +42,23 @@ async function download(model, file, dest) {
   const url = `https://huggingface.co/${hf}/resolve/${revision}/${file.path}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  const body = Buffer.from(await res.arrayBuffer());
-  const got = createHash('sha256').update(body).digest('hex');
-  if (got !== file.sha256) throw new Error(`${url}: sha256 ${got}, manifest says ${file.sha256}`);
   const partial = `${dest}.partial`;
-  writeFileSync(partial, body);
+  const hash = createHash('sha256');
+  await pipeline(
+    Readable.fromWeb(res.body),
+    async function* (chunks) {
+      for await (const chunk of chunks) {
+        hash.update(chunk);
+        yield chunk;
+      }
+    },
+    createWriteStream(partial),
+  );
+  const got = hash.digest('hex');
+  if (got !== file.sha256) {
+    rmSync(partial);
+    throw new Error(`${url}: sha256 ${got}, manifest says ${file.sha256}`);
+  }
   renameSync(partial, dest);
 }
 
@@ -64,7 +79,13 @@ for (const model of manifest.models) {
       await download(model, file, cached);
     }
     mkdirSync(dirname(target), { recursive: true });
-    copyFileSync(cached, target);
+    rmSync(target, { force: true });
+    // A hard link costs no space; across volumes, copy.
+    try {
+      linkSync(cached, target);
+    } catch {
+      copyFileSync(cached, target);
+    }
     console.log(`Placed ${relative(root, target)}`);
   }
 }

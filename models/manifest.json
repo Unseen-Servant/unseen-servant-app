@@ -1,6 +1,20 @@
 {
   "models": [
     {
+      "role": "embed",
+      "name": "bge-m3",
+      "dir": "embed/bge-m3-f16",
+      "source": {
+        "hf": "gpustack/bge-m3-GGUF",
+        "revision": "2d48f1737679ad900d5c26c5aad5410e9c70fdca"
+      },
+      "licence": "MIT",
+      "credit": "bge-m3 embedding model, by BAAI (BAAI/bge-m3), F16 GGUF conversion by GPUStack. MIT, https://huggingface.co/BAAI/bge-m3",
+      "files": [
+        {"path": "bge-m3-FP16.gguf", "size": 1157671200, "sha256": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"}
+      ]
+    },
+    {
       "role": "rerank",
       "name": "legend-lore/ms-marco-MiniLM-L-6-v2-q8",
       "dir": "rerank/ms-marco-MiniLM-L-6-v2-q8",
