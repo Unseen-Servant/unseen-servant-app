@@ -12,14 +12,14 @@ notes. The how-to belongs in Help → Guides, not here.
 
 ## [4.2.0] - 2026-10-24
 
-**Search needs nothing else on your machine, and Unseen Servant is free software.** The app now runs its search models itself: no Ollama to install, no model to pull, no download on first search. It is licensed under the GNU AGPL. Nothing needs re-indexing.
+Search now works without other software. The app contains the search models and the program that runs them, so you do not install Ollama or download a model. The licence changes to the GNU AGPL 3.0 or later. You do not need to index your books again.
 
 ### Changed
 
-- **Search no longer needs Ollama.** The app runs the bge-m3 model itself, so there is nothing to install or pull, and your index stays as it is
-- **The reranker comes with the app.** Search ranks results with it from the first launch, with no download and no network
-- **Unseen Servant is free software.** It is licensed under the GNU AGPL 3.0 or later, and Help → About opens the licence the app ships instead of the old web agreement
-- **Acknowledgements ship with the app.** A new row in Help → About opens the list of every component the app is built on, with their licences
+- **Search does not need Ollama.** The app runs the bge-m3 model itself, and your index stays valid
+- **The reranker is in the app.** Search uses it from the first launch, without a download
+- **The licence is the GNU AGPL 3.0 or later.** Help → About opens the licence file in the app, not the old licence page on the website
+- **The acknowledgements are in the app.** A new row in Help → About opens the list of components the app uses, with their licences
 
 ## [4.1.0] - 2026-10-21
 
