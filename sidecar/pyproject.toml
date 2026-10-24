@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "PDF indexing and semantic search sidecar for Legend Lore"
 requires-python = ">=3.12"
 dependencies = [
-    "pymupdf4llm==1.28.2",
+    "pymupdf4llm==2.0",
     "fastapi==0.159.1",
     "uvicorn==0.54.0",
     "python-multipart==0.0.32",
