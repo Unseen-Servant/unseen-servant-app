@@ -279,8 +279,6 @@ Search is rebuilt, and users must index their library again after this update. L
 - The status bar is on the header plate, and the search bar is set into the panel
 - The empty search bar shows its shortcut, and the view switch marks the view to go back to
 - The Loose curation row shows a dashed ribbon
-- The MCP server uses mcp 2.0, with the same four tools
-- Updated Rust, npm and sidecar dependencies
 
 ### Removed
 
@@ -314,15 +312,13 @@ Search is rebuilt, and users must index their library again after this update. L
 - Space runs the main action of a focused row, X toggles the indexing checkbox, ⌘⇧F opens the Filters panel, and ⌘⌥↑/↓ move in the left dock
 - A "Hide unindexed items" switch, with an indexed-only scope chip
 - The window opens at 1280×800 and remembers its size and position
-- An evaluation harness for search, with answer grading, latency per query and a recorded baseline
 - Experimental search flags, off by default: `hybrid` (BM25) and `variant_expansion`
 
 ### Changed
 
-- Shared header styles, an LED mark instead of the menu checkmark, and menu sizes from design tokens and measurements
+- Menus show an LED mark instead of a checkmark, and headers share one style
 - Game systems have no colour; colour is only for collections, from a palette of manuscript pigments
 - Amethyst is the colour for active states and vermilion for danger. Tertiary text is brighter for WCAG contrast
-- The mono font, corner radii and dialog shadow use design tokens. Stylelint does not allow raw colours in component styles
 - The filter console and collections are panels side by side, with a view picker in the header
 - MCP: a filter value with a typo or a partial name now matches the closest value instead of failing without a message. `list_collections` shows file counts and descriptions, and results include match tiers
 - The sidecar cuts long tables between rows, not in the middle of a row
@@ -342,12 +338,6 @@ Search is rebuilt, and users must index their library again after this update. L
 
 ## [2.0.2] - 2026-07-02
 
-### Changed
-
-- The sidecar uses uv and Python 3.12
-- CI no longer runs cross-platform smoke jobs, and the docs record the billable-minutes policy
-- Updated Rust, npm and sidecar dependencies
-
 ### Fixed
 
 - The MCP client timeout is longer
@@ -355,17 +345,9 @@ Search is rebuilt, and users must index their library again after this update. L
 
 ## [2.0.1] - 2026-05-11
 
-### Changed
-
-- A new publish-release workflow uploads release files to R2
-- R2 download file names include the version
-
 ### Fixed
 
-- The release build includes all of `pymupdf` and `pymupdf4llm` (`--collect-all`), which fixes a sidecar crash at import
-- Sidecar entitlements are applied when the app is bundled
-- Sidecars are bundled with externalBin instead of a resources glob
-- build.rs uses the cargo `TARGET` instead of `TAURI_ENV_TARGET_TRIPLE`
+- The sidecar no longer crashes at start in release builds
 
 ## [2.0.0] - 2026-05-10
 
@@ -394,7 +376,7 @@ Search is rebuilt, and users must index their library again after this update. L
 - Cosine distance is fixed, and relevance scores are limited to [0, 1]
 - The app shows more clearly that a new search is running
 - Filter menu: `S` solos, keys stay in the menu, and curation and narrowing are hidden in tree view
-- Modal and ConfirmDialog use the native `<dialog>` element and fit their content height by default
+- Dialogs fit the height of their content
 - Enter in a text field saves edit dialogs
 - The "+ tag" chip is bigger, and context submenus stay in the window and open upward when there is more space above
 - Onboarding has two steps, the folder and Ollama, in a control-panel layout
@@ -405,8 +387,6 @@ Search is rebuilt, and users must index their library again after this update. L
 - The Ollama embed timeout has a limit, and streaming releases its lock sooner
 - Re-indexing is atomic and stops embeddings cleanly on failure
 - Rename inputs are validated, and collection rename is atomic
-- CI jobs run only for changed paths (sidecar, Rust, frontend) and cancel older runs
-- The PyInstaller sidecar includes PyMuPDF's data files
 
 ### Fixed
 
@@ -424,34 +404,13 @@ Search is rebuilt, and users must index their library again after this update. L
 
 ### Changed
 
-- Old MSI references are removed from the release workflow and docs
 - The app identifier changed
-
-### Fixed
-
-- Pre-release version builds work again, without the MSI bundle target
 
 ## [1.1.4] - 2026-03-14
 
-### Security
-
-- pypdf 6.8.0, which limits the `/Length` of streams and makes the ASCIIHexDecode filter faster
-
-### Added
-
-- Dependabot updates dependencies
-- A CI workflow runs the sidecar tests
-
 ### Changed
 
-- FastAPI 0.135.1 (from 0.134.0)
-- ChromaDB 1.5.5 (from 1.5.2)
-- GitHub Actions: checkout v6, setup-python v6, setup-node v6
 - Updated the license dialog and sync metadata
-
-### Fixed
-
-- The rename detection test uses its own folder and no longer fails at random
 
 ## [1.1.3] - 2026-03-14
 
@@ -463,7 +422,6 @@ Search is rebuilt, and users must index their library again after this update. L
 
 ### Fixed
 
-- Release file names match Tauri's output names
 - The Getting Started dialog title uses the same font as the License dialog
 - The copied MCP config has its `mcpServers` wrapper again
 - The MCP agent searches before it says that a game system is not available
@@ -476,9 +434,7 @@ Search is rebuilt, and users must index their library again after this update. L
 
 ## [1.1.1] - 2026-03-13
 
-### Fixed
-
-- The release workflow has timeouts, so a build cannot run without end
+No changes for users.
 
 ## [1.1.0] - 2026-03-12
 
@@ -489,7 +445,7 @@ Search is rebuilt, and users must index their library again after this update. L
 - A renamed PDF is detected, so it is not indexed again
 - A tooltip shows the space that can be reclaimed, and one click compacts the database
 - Sync runs at an interval, and the status bar has a sync button
-- Apple code signing and Windows builds
+- The macOS app is signed, and a Windows build is available
 
 ### Changed
 
