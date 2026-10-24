@@ -1,7 +1,8 @@
 fn main() {
     // Ensure the binaries directory exists with placeholder files so Tauri's
     // resource glob doesn't fail during development. In production builds,
-    // the real PyInstaller binaries are placed here by scripts/build-sidecar.sh.
+    // the real PyInstaller binaries are placed here by scripts/build-sidecar.sh,
+    // and llama-server by scripts/build-llama-server.sh.
     let binaries_dir = std::path::Path::new("binaries");
     if !binaries_dir.exists() {
         std::fs::create_dir_all(binaries_dir).ok();
@@ -18,7 +19,7 @@ fn main() {
         ""
     };
 
-    for name in &["legend-lore-sidecar", "legend-lore-mcp"] {
+    for name in &["legend-lore-sidecar", "legend-lore-mcp", "llama-server"] {
         let path = binaries_dir.join(format!("{}-{}{}", name, target_triple, ext));
         if !path.exists() {
             std::fs::write(&path, "").ok();

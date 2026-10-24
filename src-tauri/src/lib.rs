@@ -422,6 +422,14 @@ fn start_sidecar(data_dir: &Path, models_dir: Option<&Path>) -> Result<Child, St
     if let Some(dir) = models_dir {
         cmd.arg("--models-dir").arg(dir);
     }
+    // The sidecar starts llama-server to embed. Tauri puts externalBin
+    // binaries beside the app's own, in dev builds as in bundles.
+    match sidecar_binary_path("llama-server") {
+        Ok(path) => {
+            cmd.arg("--llama-server").arg(path);
+        }
+        Err(e) => eprintln!("Warning: {}", e),
+    }
 
     // Put sidecar in its own process group so we can kill the entire group on exit
     #[cfg(unix)]

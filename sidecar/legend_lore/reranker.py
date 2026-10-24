@@ -38,7 +38,6 @@ Configuration via env vars:
 """
 from __future__ import annotations
 
-import json
 import logging
 import math
 import os
@@ -139,25 +138,13 @@ def _load_quantized(TextCrossEncoder, model_name: str):
 def _bundled_dir(model_name: str) -> str | None:
     """The model's folder among the models shipped with the app, or None.
 
-    ``BUNDLED_MODELS_DIR`` (server.py sets it from ``--models-dir``) holds
-    the files ``models/manifest.json`` lists, placed and checked by
-    ``scripts/fetch-models.mjs``. A folder missing any of them doesn't
-    count, and the model downloads as it does under pytest and the evals.
+    ``BUNDLED_MODELS_DIR`` is set by server.py from ``--models-dir``.
+    Without it, as under pytest and the evals, the model downloads.
     """
-    root = os.getenv("BUNDLED_MODELS_DIR")
-    if not root:
-        return None
-    try:
-        with open(os.path.join(root, "manifest.json"), encoding="utf-8") as f:
-            manifest = json.load(f)
-    except (OSError, ValueError):
-        return None
-    for model in manifest.get("models", []):
-        if model.get("role") == "rerank" and model.get("name") == model_name:
-            path = os.path.join(root, model["dir"])
-            if all(os.path.isfile(os.path.join(path, f["path"])) for f in model["files"]):
-                return path
-    return None
+    from legend_lore import bundled
+
+    path = bundled.model_dir(os.getenv("BUNDLED_MODELS_DIR"), "rerank", model_name)
+    return str(path) if path else None
 
 
 def rerank_scores(query: str, docs: list[str]) -> list[float] | None:

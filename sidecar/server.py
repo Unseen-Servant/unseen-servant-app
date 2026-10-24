@@ -27,7 +27,7 @@ from legend_lore.embedder import (
     EMBEDDING_MODEL,
     embed,
     embedder_status,
-    start_background_tasks,
+    start_embedder,
 )
 from legend_lore.library_store import LIBRARY_FILENAME, LibraryStore
 from command.router import build_router as build_command_router
@@ -57,6 +57,8 @@ def parse_args():
                         help="Exit when this process ends (default: our parent)")
     parser.add_argument("--models-dir", type=str, default=None,
                         help="Models shipped with the app (models/manifest.json)")
+    parser.add_argument("--llama-server", type=str, default=None,
+                        help="The llama-server binary that embeds with bge-m3")
     return parser.parse_args()
 
 
@@ -115,7 +117,7 @@ def create_app(
     """Create the FastAPI app, optionally with a pre-configured store.
 
     In production: called with no arguments — opens the library store in
-    the ``--data-dir`` and embeds with Ollama.
+    the ``--data-dir`` and embeds with the bundled llama-server.
     In tests: called with a store in a temp dir and a local embedder.
 
     Args:
@@ -297,6 +299,8 @@ if __name__ == "__main__":
     # reason to reach Hugging Face, so it is told it is offline.
     if args.models_dir:
         os.environ.setdefault("BUNDLED_MODELS_DIR", args.models_dir)
+    if args.llama_server:
+        os.environ.setdefault("LLAMA_SERVER_BIN", args.llama_server)
     if getattr(sys, "frozen", False):
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
@@ -308,14 +312,15 @@ if __name__ == "__main__":
         watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
         watchdog.start()
 
-    # Backend-specific boot helpers (truncation probe, keep-warm ticker).
-    start_background_tasks()
+    # llama-server loads bge-m3 behind the splash. Its log sits beside
+    # sidecar.log, which Rust writes one level above the data dir.
+    start_embedder(log_dir=data_dir.parent)
 
     application = create_app()
 
     # Same deal one layer up: the first search would otherwise load the
     # cross-encoder and build the spell vocabulary itself (issue #341).
-    # Needs the app, so it starts here rather than beside the ticker.
+    # Needs the app, so it starts here rather than beside the embedder.
     threading.Thread(
         target=warm_search_stack,
         args=(application.state.get_spell_corrector, application.state.boot_steps.__setitem__),

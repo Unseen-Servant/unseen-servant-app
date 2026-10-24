@@ -62,7 +62,8 @@
     },
     "externalBin": [
       "binaries/legend-lore-sidecar",
-      "binaries/legend-lore-mcp"
+      "binaries/legend-lore-mcp",
+      "binaries/llama-server"
     ],
     "icon": [
       "icons/32x32.png",

@@ -1,51 +1,44 @@
 """``/api/models/status`` — model readiness for the desktop UI.
 
-The ``/v1/models`` probe is stubbed at ``httpx.get`` so no test needs a
-live runtime; the three states the UI distinguishes (down, up without the
-model, ready) are each covered.
+The process and the ``/health`` probe are stubbed, so no test needs a
+live runtime; the three states the UI distinguishes (not running,
+running while the model loads, ready) are each covered.
 """
 import httpx
 
 from legend_lore import embedder
 
 
-class _Resp:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = payload or {}
-
-    def json(self):
-        return self._payload
+class _Proc:
+    def poll(self):
+        return None
 
 
-def _stub_get(monkeypatch, response=None, exc=None):
-    def fake_get(url, timeout):
-        if exc:
-            raise exc
-        return response
-    monkeypatch.setattr(httpx, "get", fake_get)
+def _stub(monkeypatch, running, health=None):
+    monkeypatch.setattr(embedder, "_proc", _Proc() if running else None)
+    monkeypatch.setattr(embedder, "_base_url", "http://127.0.0.1:9")
+    monkeypatch.setattr(httpx, "get", lambda url, timeout: httpx.Response(health or 503))
 
 
 def test_status_when_runtime_down(monkeypatch):
-    _stub_get(monkeypatch, exc=httpx.ConnectError("refused"))
+    _stub(monkeypatch, running=False)
     status = embedder.embedder_status()
     assert status["runtime_up"] is False
     assert status["ready"] is False
 
 
-def test_status_when_model_missing(monkeypatch):
-    _stub_get(monkeypatch, _Resp(200, {"data": [{"id": "llama3:latest"}]}))
+def test_status_while_the_model_loads(monkeypatch):
+    _stub(monkeypatch, running=True, health=503)
     status = embedder.embedder_status()
     assert status["runtime_up"] is True
     assert status["ready"] is False
 
 
 def test_status_when_ready(monkeypatch):
-    _stub_get(monkeypatch, _Resp(200, {"data": [{"id": "bge-m3:latest"}]}))
-    status = embedder.embedder_status()
-    assert status == {
+    _stub(monkeypatch, running=True, health=200)
+    assert embedder.embedder_status() == {
         "role": "embed",
-        "runtime": "ollama",
+        "runtime": "llama-server",
         "model": embedder.EMBEDDING_MODEL,
         "runtime_up": True,
         "ready": True,
@@ -53,7 +46,7 @@ def test_status_when_ready(monkeypatch):
 
 
 def test_endpoint_lists_embed_role(client, monkeypatch):
-    _stub_get(monkeypatch, exc=httpx.ConnectError("refused"))
+    _stub(monkeypatch, running=False)
     response = client.get("/api/models/status")
     assert response.status_code == 200
     rows = response.json()["models"]
