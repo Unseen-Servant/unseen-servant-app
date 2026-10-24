@@ -15,13 +15,9 @@
      (quoted as the code words them), then what to do. -->
 <div class="pane">
   <section class="entry">
-    <h3 class="entry-title section-title">{m.trouble_ollama()}</h3>
-    <p class="shows">{m.trouble_ollama_shows()}</p>
-    <p class="fix">
-      <ParaglideMessage message={m.trouble_ollama_fix}>
-        {#snippet code({ children })}<code class="inline-code">{@render children?.()}</code>{/snippet}
-      </ParaglideMessage>
-    </p>
+    <h3 class="entry-title section-title">{m.trouble_embedder()}</h3>
+    <p class="shows">{m.trouble_embedder_shows()}</p>
+    <p class="fix"><ParaglideMessage message={m.trouble_embedder_fix} {em} /></p>
   </section>
 
   <section class="entry">
@@ -113,15 +109,6 @@
   }
   .fix em {
     font-style: italic;
-  }
-
-  .inline-code {
-    font-family: var(--font-mono);
-    font-size: 0.85em;
-    padding: 0 0.25em;
-    background: var(--bg-focused);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
   }
 
   .btn-link {

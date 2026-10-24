@@ -33,11 +33,6 @@ body:
     validations:
       required: true
   - type: input
-    id: ollama
-    attributes:
-      label: Ollama version
-      description: "`ollama --version` in a terminal"
-  - type: input
     id: library
     attributes:
       label: Library size

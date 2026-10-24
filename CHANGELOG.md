@@ -13,6 +13,7 @@ notes. The how-to belongs in Help → Guides, not here.
 ### Changed
 
 - **The reranker comes with the app.** Search ranks results with it from the first launch, with no download and no network
+- **Search no longer needs Ollama.** The app runs the bge-m3 model itself, so there is nothing to install or pull, and your index stays as it is
 
 ## [4.1.0] - 2026-10-21
 

@@ -1,20 +1,17 @@
 <script lang="ts">
   // A Guides step's state: a readout in a well that always reads READY, its
   // pilot lamp (the splash's LED, LaunchSplash.svelte) saying whether it is:
-  // dark, amber, or half-lit for a part that answers but isn't whole, as the
-  // status bar's embedder lamp is. `state` says it in words, for the tooltip
-  // and screen readers.
+  // dark or amber. `state` says it in words, for the tooltip and screen
+  // readers.
   import { m } from '../../paraglide/messages';
 
   export let lit: boolean = false;
-  export let half: boolean = false;
   export let state: string;
 </script>
 
 <span
   class="tag readout-label"
   class:lit
-  class:half
   role="img"
   aria-label={state}
   title={state}
@@ -34,8 +31,7 @@
     font-size: 0.62rem;
     color: var(--text-tertiary);
   }
-  .tag.lit,
-  .tag.half {
+  .tag.lit {
     color: var(--text-secondary);
   }
   .led {
@@ -46,8 +42,5 @@
   }
   .tag.lit .led {
     background: var(--text-connected);
-  }
-  .tag.half .led {
-    background: color-mix(in srgb, var(--text-connected) 45%, transparent);
   }
 </style>
