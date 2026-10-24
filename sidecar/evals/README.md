@@ -17,7 +17,8 @@ uv run python -m evals.run_eval --hybrid                 # BM25+RRF ablation (ex
 
 Prerequisites:
 
-- **Ollama** running locally with `bge-m3` (same as production indexing).
+- **The bundled llama-server and bge-m3**: run `bash scripts/build-llama-server.sh` and `node scripts/fetch-models.mjs` from the
+  repo root once (same as `tauri dev`); the sidecar starts the server itself.
 - **The eval corpus** — three CC-licensed rulebooks, not committed to this
   repo. Default location is
   `~/code/unseen-legend-lore-experiments/chunker_spike/corpus`; override
@@ -67,8 +68,8 @@ like with like.
 - **search latency** — per-query `/api/search` wall clock (mean / median /
   p95, nearest-rank), printed after the metrics table and stored per query
   and in baseline meta. Measured in-process through TestClient after one
-  untimed warmup query (which absorbs the lazy cross-encoder / Ollama
-  loads), so it captures embed + retrieval + rerank but not the HTTP
+  untimed warmup query (which absorbs the lazy cross-encoder /
+  llama-server loads), so it captures embed + retrieval + rerank but not the HTTP
   transport the Tauri app or MCP client adds — compare configurations with
   it, don't quote it as end-to-end user latency.
 

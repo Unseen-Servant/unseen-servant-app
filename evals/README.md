@@ -46,8 +46,9 @@ system's licence, and the credit it asks for:
 
 ## Run it
 
-All commands from the repo root, under the sidecar env. Retrieval needs Ollama
-up (query embedding); extraction does not.
+All commands from the repo root, under the sidecar env. Retrieval embeds with
+the bundled llama-server, which the sidecar starts itself: run
+`bash scripts/build-llama-server.sh` and `node scripts/fetch-models.mjs` once first, as for `tauri dev`. Extraction needs neither.
 
 ```bash
 # Retrieval — scope-aware, MRR@5 headline. Each normal run builds a fresh,
@@ -66,7 +67,7 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --baseline section
 uv run --project sidecar python -m evals.run_eval --engine v2 --baseline <rung> \
     --gate evals/baselines/<last-committed>-v2-<rung>.json
 
-# Extraction QA — no Ollama; grades hand-authored golden pages. --gate fails
+# Extraction QA — no embedding; grades hand-authored golden pages. --gate fails
 # the run (exit 1) if ANY page's metric drops below the reference baseline —
 # the per-page min, not the mean, is what gates an extraction change.
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite extraction \
@@ -87,7 +88,7 @@ uv run --project sidecar python -m evals.extraction.review \
     --doc srd_5_2_1 --pages 30,183 --open
 
 # Breadcrumb QA — every chunk's section_heading graded for markup, split
-# letters, small-caps damage, furniture roots (no Ollama, ~8 min). The gate
+# letters, small-caps damage, furniture roots (no embedding, ~8 min). The gate
 # Phase 1's heading work must clear. Writes evals/baselines/<date>-v2-breadcrumb-qa.*
 # The .md lists the residue — the most frequent flawed headings per book — so
 # a fix can see what it did not catch.
@@ -97,10 +98,6 @@ uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb
 # compares raw counts, not rates — denominators move when sections merge).
 uv run --project sidecar python -m evals.run_eval --engine v2 --suite breadcrumb-qa \
     --gate evals/baselines/<last-committed>-v2-breadcrumb-qa.json
-
-# Idle-cliff probe (hand-run against a live sidecar): searches once, sleeps
-# 600 s, searches again, and prints both latencies.
-uv run --project sidecar python -m evals.retrieval.idle_probe
 
 # Harness unit tests (pure, CI-safe).
 uv run --project sidecar pytest evals/tests

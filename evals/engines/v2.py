@@ -1,7 +1,7 @@
 """V2 engine — the production ``sidecar/`` pipeline, driven in-process.
 
 Ports the approach of ``sidecar/evals/run_eval.py``: build the real
-library store + Ollama embedder against a dedicated data dir, call
+library store + llama-server embedder against a dedicated data dir, call
 the production ``create_app()``, and drive it through FastAPI's
 ``TestClient`` — the production ``/api/search`` path with zero HTTP
 transport, so measured latency is the pipeline's own.
@@ -12,8 +12,9 @@ package resolves first::
 
     uv run --project sidecar python -m evals.engines.v2 --help
 
-Requires Ollama running locally with the ``bge-m3`` model, same as
-production indexing.
+Embeds with the llama-server the sidecar starts from the repo's
+``src-tauri/binaries`` and ``models/``: run ``scripts/build-llama-server.sh``
+and ``scripts/fetch-models.mjs`` once first, same as ``tauri dev``.
 
 Standalone smoke test (indexes one small corpus PDF, runs one query)::
 
@@ -155,7 +156,7 @@ class V2Engine:
 
     def extract(self, pdf_path: Path | str) -> list[Page]:
         """v2's real page extraction (pymupdf4llm + heading promotion +
-        furniture stripping) — no store/Ollama needed, just the sidecar env."""
+        furniture stripping) — no store/embedder needed, just the sidecar env."""
         if self._mods is None:
             self._mods = _import_sidecar()
         path = Path(pdf_path).expanduser().resolve()
@@ -166,7 +167,7 @@ class V2Engine:
 
     def chunks(self, pdf_path: Path | str) -> list[dict]:
         """v2's real chunker output for one PDF (pymupdf4llm → promotion →
-        cleanup → structure_aware), no store/Ollama. What breadcrumb-qa
+        cleanup → structure_aware), no store/embedder. What breadcrumb-qa
         grades: the heading each chunk would carry into the embedding."""
         if self._mods is None:
             self._mods = _import_sidecar()
