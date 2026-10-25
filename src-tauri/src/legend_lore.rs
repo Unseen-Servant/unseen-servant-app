@@ -1267,7 +1267,11 @@ pub async fn rename_folder(old_path: String, new_name: String) -> Result<String,
 
 #[tauri::command]
 pub async fn unindex_folder(path: String) -> Result<(), String> {
-    post_unindex("/api/folder-delete", serde_json::json!({ "folder_prefix": path })).await
+    post_unindex(
+        "/api/folder-delete",
+        serde_json::json!({ "folder_prefix": path }),
+    )
+    .await
 }
 
 // Drops index entries only; the files stay on disk.
