@@ -4,12 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-Each release opens with one paragraph that says what the release is for. Under
-it, one line per change: a bold lead and one clause, in Simplified Technical
-English. Say what changed and what it gives users, in plain words: speak of
-users in the third person, and leave out slogans, rationale and inspirations.
-The how-to belongs in Help → Guides, not here.
-
 ## [Unreleased]
 
 ## [4.2.0] - 2026-10-24
@@ -25,41 +19,41 @@ Search now works without other software. The app contains the search models and 
 
 ## [4.1.0] - 2026-10-21
 
-This release adds images, a toolbar for the Play board, a card tray, keys for every list in Command, and sixteen MCP tools that let Claude prepare a session. Help is in the status bar again. Legend Lore now reports problems (Ollama not running, a scanned PDF, a slow sidecar start) instead of failing without a message. Users do not need to index their books again.
+This release adds images, a toolbar for the Play board, a card tray, keys for every list in Command, and sixteen MCP tools that let an AI agent prepare a session. Help is in the status bar again. Legend Lore now reports problems (Ollama not running, a scanned PDF, a slow sidecar start) instead of failing without a message. Users do not need to index their books again.
 
 ### Added
 
 - **Images on the board.** A note's embedded images (`![[map.png]]`, `|300` sets a width) show on its card in Play and in the inspector. An image dropped from Finder on a board is copied into the campaign's `Shelf/` folder, so the campaign keeps every file it uses
-- **Images in tracks and beats.** An image in a track or on the shelf shows in Prep beside the notes. A beat can hold an image, and its card shows the picture on the board and in the tray. Images rename, move and copy like notes, but cannot be spent. Claude can find images by name and put them in beats
-- **Image tracks.** A track holds images or notes, not both; the shelf holds both. *Insert image track* (`⇧⌘T`) and *Insert note track* (`⌘T`) add tracks. A double-click on the empty row, or a drop from Finder, adds pictures. A folder of images made in Finder becomes an image track
+- **Images in tracks and beats.** An image in a track or on the shelf shows in Prep beside the notes. A beat can hold an image, and its card shows the picture on the board and in the tray. Images rename, move and copy like notes, but cannot be spent. An AI agent can find images by name and put them in beats
+- **Image tracks.** A track holds images or notes, not both; the shelf holds both. _Insert image track_ (`⇧⌘T`) and _Insert note track_ (`⌘T`) add tracks. A double-click on the empty row, or a drop from Finder, adds pictures. A folder of images made in Finder becomes an image track
 - **New campaigns start with a Maps image track**, after the checklist's note tracks. In older campaigns, the checklist tracks stay note tracks
-- **The Legend Lore tree shows the library's images.** Maps and handouts show with a picture glyph and are not indexed. *Send to Command* copies an image to the shelf or to an image track. *Hide images*, under *Hidden items* in the filters, removes them from the tree
+- **The Legend Lore tree shows the library's images.** Maps and handouts show with a picture glyph and are not indexed. _Send to Command_ copies an image to the shelf or to an image track. _Hide images_, under _Hidden items_ in the filters, removes them from the tree
 - **A card tray under the Play board** shows the live set as cards that stay readable at any board zoom. `[spread]` shows the selected cards side by side, and `[gather]` puts them back. `⌘B` folds the tray and the session player
-- **Help is in the status bar.** The help key, and Help → Unseen Servant Help on macOS, open Help → Guides. Guides adds *Using Command* and *Servant* (the AI agent setup). A new *Troubleshooting* page lists each problem, the messages the app shows for it, and the fix. Reference adds a glossary. With no library folder, Legend Lore shows an empty console with a `[choose library folder]` key, not a first-run page
-- **The shelf copies from other folders.** *Copy from* lists the other campaigns, then folders outside the campaigns folder that the user adds. These folders belong to the machine, not to a campaign
+- **Help is in the status bar.** The help key, and Help → Unseen Servant Help on macOS, open Help → Guides. Guides adds _Using Command_ and _Servant_ (the AI agent setup). A new _Troubleshooting_ page lists each problem, the messages the app shows for it, and the fix. Reference adds a glossary. With no library folder, Legend Lore shows an empty console with a `[choose library folder]` key, not a first-run page
+- **The shelf copies from other folders.** _Copy from_ lists the other campaigns, then folders outside the campaigns folder that the user adds. These folders belong to the machine, not to a campaign
 - **Command's lists use the same keys as Legend Lore's rows.** The arrows (or `H`/`J`/`K`/`L`) move the selection, `↵` or `⌘O` opens it, `E` arms a beat, `X` puts a note in the armed beat, `A` spends, and `⌘⌫` moves to the Trash. In Play, `⇧Space` launches the next beat, and `P` or `Space` stops the live beat. The shortcut sheet lists all keys
 - **The app-wide shortcuts work in Command.** `⌘K`, `⌘,`, `⌘1`–`9`, `⌘R`, `⌘S`, `⌘F`, `⌘N` and `B` work when Command has the keyboard. At the edge of a tool, `⌘⌥` with an arrow moves to the next tool
 - **One shortcut sheet** (`?`, `⌘/`) per window, grouped by place. Shortcuts that do not work from the current place show in dimmer text
 
 ### Changed
 
-- **`campaign_overview` replaces `list_campaigns`.** Claude gets the campaigns and the open campaign's tracks, notes, shelf, beats and sessions in one call. A refused request now gives only the reason
-- **Claude can edit a note.** `edit_note` replaces a note's text and keeps its frontmatter. It does not overwrite changes that the user made after Claude read the note
-- **Claude can make beats.** `create_beat` makes a beat from existing notes and can add it to a session's plan. `add_to_beat` adds a note to a beat or removes it
-- **Claude can plan sessions.** `create_session` starts the next session, `set_active_session` opens a session, and `plan_beat` adds, moves or removes a beat in a plan. `current_session` reads any session by name
+- **`campaign_overview` replaces `list_campaigns`.** The agent gets the campaigns and the open campaign's tracks, notes, shelf, beats and sessions in one call. A refused request now gives only the reason
+- **An AI agent can edit a note.** `edit_note` replaces a note's text and keeps its frontmatter. It does not overwrite changes that the user made after the agent read the note
+- **An AI agent can make beats.** `create_beat` makes a beat from existing notes and can add it to a session's plan. `add_to_beat` adds a note to a beat or removes it
+- **An AI agent can plan sessions.** `create_session` starts the next session, `set_active_session` opens a session, and `plan_beat` adds, moves or removes a beat in a plan. `current_session` reads any session by name
 - **A beat can have the same name as a note.** A name must be unique only among notes, among beats and among sessions. Where names are shared, Command links the note by its path (`[[Locations/Svalich Road]]`), so Obsidian opens the correct file
 - **The Play board has a toolbar.** It adds notes (`D`), text cards (`T`), stickies (`N`), frames (`F`, or `⌘G` around a selection), lines (`L`) and a pan hand (`H`). `⌘Z` undoes board changes, and a bar over the selection sets colours and arrowheads. The board is saved in Obsidian Canvas format
 - **The board shows arrowheads**, also on lines drawn in Obsidian
 - **A board can be arranged by beat.** A key at the bottom of the toolbar gives each planned beat a frame with its notes, in plan order. Notes that several beats share go in a frame named Throughout. Launching a beat shows its frame
-- **Claude can arrange a board.** `arrange_board` frames the planned beats, `frame_cards` puts notes in a frame, `connect_cards` draws a line between two cards, and `add_text` adds a text card. Cards that the user placed do not move
-- **Claude can file notes.** `create_track` makes a track, and `move_note` moves a note to a track or the shelf. `find_notes` shows note text without frontmatter and tells when it shows only the first 20
-- **Notes from Claude cite their book.** `create_note` takes a search result's id, and the note cites the book and PDF pages, so its card opens the book at that page
+- **An AI agent can arrange a board.** `arrange_board` frames the planned beats, `frame_cards` puts notes in a frame, `connect_cards` draws a line between two cards, and `add_text` adds a text card. Cards that the user placed do not move
+- **An AI agent can file notes.** `create_track` makes a track, and `move_note` moves a note to a track or the shelf. `find_notes` shows note text without frontmatter and tells when it shows only the first 20
+- **Notes from an AI agent cite their book.** `create_note` takes a search result's id, and the note cites the book and PDF pages, so its card opens the book at that page
 - **Lists end on an empty row.** The session planner and Legend Lore's collections end on a blank row, as tracks do. A double-click or `R` on that row names a new beat or collection. A click selects a collection row, and a second click opens its books
 - **The keyboard focus shows on the tool's frame.** The frame of the tool that has the keyboard is one grey lighter. The rack bar no longer raises that tool's key
 - **The lock belongs to the view.** One lock beside the view picker keeps the view's tools in place. It replaces the lock key of each tool
 - **The campaigns folder has its own Settings section**, set like the library folder
 - **Some shortcuts changed after a review.** `⇧⌘J` opens the session note and `⌘J` goes to the jot bar, so `⌘O` always means open. `G`, `⌘⇧O`, `⌥⌘R`, `⌘⇧.` and `C` are removed; their menu items stay. `⌘S` and `⌘F` do not work in the note editor
-- **The MCP server is named Unseen Servant.** The copied config entry is *Unseen Servant*. Old entries continue to work, and the new entry replaces the old one
+- **The MCP server is named Unseen Servant.** The copied config entry is _Unseen Servant_. Old entries continue to work, and the new entry replaces the old one
 
 ### Removed
 
@@ -67,7 +61,7 @@ This release adds images, a toolbar for the Play board, a card tray, keys for ev
 
 ### Fixed
 
-- **Legend Lore with Ollama not running or without bge-m3.** Search names the missing model instead of a server error. A sync checks the embedder first, so it fails at once instead of after minutes. A stopped sidecar shows as *SIDECAR · NOT RUNNING*
+- **Legend Lore with Ollama not running or without bge-m3.** Search names the missing model instead of a server error. A sync checks the embedder first, so it fails at once instead of after minutes. A stopped sidecar shows as _SIDECAR · NOT RUNNING_
 - **A scanned PDF** with no text is unticked after it fails, so the app does not offer it again at each check
 - **Cancelling the library folder dialog** no longer shows an error
 - **The sidecar has one minute to start.** If it crashes, the app shows the end of its log instead of staying offline for the session
@@ -90,8 +84,8 @@ Unseen Servant is now a workstation with two tools. Command, a new tool to prepa
 - **Notes and beats can be spent.** A note or beat is marked spent (`A`) when a secret is revealed, a treasure given or an NPC dies. Spent notes dim and fold at the bottom of their track, and unspent notes stay for the next session. A setting spends a beat when it launches (off by default)
 - **Each campaign has a shelf** (`⌘B`) for material that is not yet on a track. Notes can be copied to it from another campaign
 - **Send to Command** from a search result puts the section's text in a note on the shelf or a track, with a citation of the book and printed page. The note's source key opens the PDF at that page
-- **Campaigns open as they were left.** Command opens the last campaign, or a blank *Untitled* campaign that is removed if it stays empty. The campaign key switches, renames and deletes campaigns. On macOS, the File menu has New Campaign (`⇧⌘N`) and Open Campaign
-- **Claude can follow the session.** The MCP server adds eight Command tools: list campaigns, read the current session and the live set, read and find notes, create a note, add to the live set, and mark spent
+- **Campaigns open as they were left.** Command opens the last campaign, or a blank _Untitled_ campaign that is removed if it stays empty. The campaign key switches, renames and deletes campaigns. On macOS, the File menu has New Campaign (`⇧⌘N`) and Open Campaign
+- **An AI agent can follow the session.** The MCP server adds eight Command tools: list campaigns, read the current session and the live set, read and find notes, create a note, add to the live set, and mark spent
 - **A tool can open in its own window** with the key beside its header, and dock back the same way
 
 ### Changed
@@ -170,7 +164,7 @@ Users must index their library again after this update. The index moves to a new
 
 - Two PDFs with the same file name in different folders no longer share game-system tags, and the status bar counts them as two books
 - A damaged collections, manifest or custom game-systems file no longer stops the sidecar. The app moves it to `<name>.corrupt-<timestamp>` and starts with an empty file. After a manifest is moved, the next sync indexes again
-- When the embedder is not running, search, sync and Claude say "Embedder not running" instead of "[Errno 61] Connection refused"
+- When the embedder is not running, search, sync and the agent say "Embedder not running" instead of "[Errno 61] Connection refused"
 - A sync that the sidecar refuses shows the reason instead of "Sync completed but no result received"
 - Result rows cite the printed page, as the inspector does
 - Renaming a folder keeps it expanded, focused and hidden
@@ -182,7 +176,7 @@ Users must index their library again after this update. The index moves to a new
 
 ## [3.0.0] - 2026-09-24
 
-The app is now named Unseen Servant, and Legend Lore is its PDF search tool. At first launch, the app moves the index and settings to the new data folder. Users must set up MCP again in Getting Started, so that Claude Desktop finds the renamed app.
+The app is now named Unseen Servant, and Legend Lore is its PDF search tool. At first launch, the app moves the index and settings to the new data folder. Users must set up MCP again in Getting Started, so that the AI agent finds the renamed app.
 
 Search is rebuilt, and users must index their library again after this update. Library settings lists the files indexed with the old pipeline. These files work until they are indexed again, but without whole sections, keyword search or printed page numbers.
 
@@ -192,8 +186,8 @@ Search is rebuilt, and users must index their library again after this update. L
 - **Results are whole sections.** A result is the full section, not a 1,000-character piece, so a stat block, spell or table is one result. A section shows only once in the list
 - **Editions show as one result.** When the same passage is in several books (for example the SRD 5.1 and 5.2.1), the app shows one result with a `+1 edition` chip. The inspector lists the other books under "also in"
 - **The inspector goes to the match.** It highlights the matched passage and scrolls to it. Markdown tables show as tables
-- **Citations use the printed page number.** Results and Claude's citations show the number printed on the page first, and the PDF page beside it
-- **Two new tools for Claude.** `get_section` gets a whole section by id, and `get_pages` reads a page range from a book
+- **Citations use the printed page number.** Results and the agent's citations show the number printed on the page first, and the PDF page beside it
+- **Two new tools for AI agents.** `get_section` gets a whole section by id, and `get_pages` reads a page range from a book
 - Year Zero Engine, The Black Hack and Cairn are added to the default game systems
 
 ### Changed
@@ -203,7 +197,7 @@ Search is rebuilt, and users must index their library again after this update. L
 - **Fewer results show as strong matches.** The relevance tiers are calibrated on results that people judged. About a quarter of results are "strong" now, down from more than half
 - **Section titles are clean.** Headings no longer contain markup, spaced small caps ("S P E L L S") or page footers. This also improves search
 - **Spell correction uses the nearby words.** It selects the correction that fits the words around the typo, in the user's books and in common English, with a third to a half fewer wrong corrections. Game-system names are not corrected ("dnd" no longer becomes "and")
-- **Claude's search results are short.** `search_library` returns 8 results with a short passage and a link to the full section, which suits local models. `full_text=True` returns whole sections, up to 8,000 characters
+- **Search results for AI agents are short.** `search_library` returns 8 results with a short passage and a link to the full section, which suits local models. `full_text=True` returns whole sections, up to 8,000 characters
 - The first search after the app is idle is no longer slow
 
 ### Fixed
@@ -482,7 +476,7 @@ No changes for users.
 - Game system tags (D&D 5e, Pathfinder and others), shown as clickable badges
 - Live sync progress with SSE streaming
 - A double-click opens a PDF in the system viewer
-- An MCP server with 7 tools for Claude Desktop
+- An MCP server with 7 tools for AI agents
 - One click copies the MCP config to the clipboard
 - A system tray icon, so the app runs in the background
 - A macOS .dmg on GitHub Releases
