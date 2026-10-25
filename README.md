@@ -1,50 +1,49 @@
-# Unseen Servant
+![Unseen Servant](.github/screenshots/banner.png)
 
-> A local-first desktop workstation for TTRPG Game Masters. It reimagines the
-> VTT experience for live play at the table and invites GMs to embrace
-> improvisation with flexible session prep.
+> Unseen Servant reimagines the VTT experience for live play at the table and
+> invites GMs to embrace improvisation with flexible session prep.
 
-<!-- TODO: hero screenshot — Legend Lore search beside Command's Play board -->
+![Legend Lore searching an OSR collection for goblin stats, above Command's session prep for a campaign](.github/screenshots/legend-lore-and-command.png)
 
-Search every rulebook you own by meaning, prep your sessions as scenes, and run
-them at the table, all from one window. Your PDFs never leave your machine, and
+Search every rulebook you own, prep your sessions as scenes, and run
+them at the table, all from one interface. Your PDFs never leave your machine, and
 your campaigns are plain Markdown files that stay yours.
 
-**Download for macOS and Windows at [unseenservant.games](https://unseenservant.games)**, where the guides live too.
+**Download for macOS and Windows at [unseenservant.games](https://unseenservant.games)**.
 
 ---
 
-## Two tools, one rack
+## A GM workstation's rack and tools
 
-### Legend Lore: your PDF library, searchable
+### Legend Lore: search your PDF library
 
 - Point it at the folder of PDFs you already have and tick the books to index.
-  Nothing is copied or moved.
-- Ask in plain words ("how does grappling work") and land on the passage, with
-  its book and page. Results read **strong / good / weak**, so noise looks like
-  noise.
-- Misspell freely: "owlber" finds the owlbear, corrected against your own
+- Ask questions in plain words ("how does grappling work") and land on the passage, with
+  its book and page.
+- Resolve misspells: "owlber" finds the owlbear, corrected against your own
   library's words.
-- Narrow a search to a game system or a collection of books, open the PDF at the
-  cited page, or send the passage to Command as a note that cites it.
+- Narrow a search to a game system or a collection of books, and send the
+  passage to Command as a new campaign note.
 
 ### Command: prep and run your sessions
 
 - A campaign is a folder of notes sorted into tracks: PCs, Secrets, Locations,
-  NPCs, Monsters, Traps and Treasures to start, all yours to change.
-- Gather notes into beats, the scenes you might run, and plan a session from
-  them. Nothing is a script: whatever you don't use is still there next time.
-- At the table, Play lays the session's notes out as cards on a board. Launch a
-  beat and its cards light up; mark a secret told or an NPC dead as spent.
-- Jot during play into the session note, which also logs every launch and spend.
+  NPCs, Monsters, Traps and Treasures to start, which can be completely changed
+  based on your preferences.
+- Gather notes into story beats and plan a session from them. Adjust those
+  scenes on the fly as the story evolves with your players.
+- At the table, Command's Play lays the session's notes out as cards on a board.
+  Annotate images and connect notes to the story arc as it unfolds.
+- Easily add comments to the session notes during play.
 
-### The Servant: bring your own AI (optional)
+![Command's Play board: a session's notes as cards framed by beat, with the launched beat's cards in the tray below](.github/screenshots/command-play.png)
 
-Connect any AI agent that speaks MCP (Model Context Protocol) and it can search
+### Servant: bring your own AI agent (optional)
+
+Connect any AI agent to Unseen Servant's MCP and it can search
 your library and read and write your campaigns: look up a rule, see what's in
-play, file a new NPC. **Help → Guides → Servant** copies the config. What its
-tools return goes to the agent's model, which may run in the cloud; the PDFs
-themselves stay on your machine.
+play, file a new NPC. **Help → Guides → Servant** copies the MCP config. We
+suggest using local models so that what its tools return stays on your machine.
 
 ---
 
@@ -55,7 +54,7 @@ themselves stay on your machine.
 - **No lock-in.** Campaigns are Markdown files and session boards are
   [JSON Canvas](https://jsoncanvas.org), so [Obsidian](https://obsidian.md)
   opens the same folder. Stop using Unseen Servant and everything is still
-  there, readable.
+  there and readable.
 
 ---
 
@@ -77,28 +76,119 @@ disk: the search model comes with the app.
 
 ---
 
+## Build from source
+
+Development happens on a Mac. CI runs the tests on Linux, and
+[release.yml](.github/workflows/release.yml) builds the macOS and Windows
+installers.
+
+You need:
+
+- [Rust](https://www.rust-lang.org/tools/install) (stable) and
+  [Node.js](https://nodejs.org) 22.12 or later
+- [uv](https://docs.astral.sh/uv/), which installs Python 3.12 for the sidecar
+- [CMake](https://cmake.org) (`brew install cmake`), to build llama-server
+- Xcode Command Line Tools (`xcode-select --install`)
+
+The [Tauri prerequisites](https://tauri.app/start/prerequisites/) have the
+details. Then:
+
+```bash
+git clone https://github.com/Unseen-Servant/unseen-servant-app.git
+cd unseen-servant-app
+npm ci
+(cd sidecar && uv sync)
+bash scripts/build-llama-server.sh   # compiles the pinned llama.cpp server
+node scripts/fetch-models.mjs        # 1.2 GB of models, checked by sha256
+npm run tauri dev
+```
+
+- Use `npm run tauri dev` to launch a dev build.
+- In dev the sidecar runs from `sidecar/.venv`. Its first start compiles
+  bytecode and can outlast the app's wait, so an "Indexer failed to start" on
+  the very first launch only needs a relaunch.
+- A dev build shares the installed app's data folder (the library index and
+  settings). Make sure to run one at a time.
+
+### How it fits together
+
+```text
+Svelte interface ⇄ Rust (Tauri) ⇄ Python sidecar (FastAPI on 127.0.0.1)
+                                    ├─ llama-server + bge-m3: embeddings
+                                    ├─ ONNX Runtime + MiniLM: reranking
+                                    ├─ SQLite + sqlite-vec: the library index
+                                    └─ campaign folders: Markdown + JSON Canvas
+AI agent ⇄ MCP server (stdio) ⇄ Python sidecar
+```
+
+- `src/`: the interface, one folder per tool under `src/lib/` (`legend-lore/`,
+  `command/`, `servant/`) plus the shared `shell/` and `ui/`. Its copy is in
+  `messages/en.json`.
+- `src-tauri/`: the native app, which starts the sidecar and relays the
+  interface's calls to it.
+- `sidecar/`: indexing and search (`legend_lore/`), campaign files
+  (`command/`), and `mcp_server.py`, which an AI agent launches and which finds
+  the running sidecar through `sidecar.port` in the app's data folder.
+- `scripts/`: the builds of the sidecar, llama-server and `models/`.
+- `evals/`: the retrieval eval harness. Its corpus is not in the repo
+  ([evals/README.md](evals/README.md)).
+- `docs/`: design records for the larger features.
+
+[AGENTS.md](AGENTS.md) holds the project's conventions: design rules, CI
+policy and the release-notes voice.
+
+### Checks
+
+CI runs these on Linux for the parts a change touches:
+
+```bash
+npm run check && npm run lint:css && npm test                       # interface
+(cd src-tauri && cargo fmt --all -- --check \
+  && cargo clippy --all-targets -- -D warnings && cargo test --lib)  # Rust
+(cd sidecar && uv run pytest)                                       # sidecar
+uv run --project sidecar pytest evals/tests                         # eval harness
+```
+
+### Build an installer
+
+After the steps above, on a Mac:
+
+```bash
+bash scripts/build-sidecar.sh   # bundles the sidecar with PyInstaller
+npm run tauri build
+```
+
+The `.dmg` lands in `src-tauri/target/release/bundle/dmg/`. `tauri build` stops
+if a sidecar source file is newer than its bundled binary, so rerun
+`build-sidecar.sh` after any sidecar change.
+
+For Windows, follow the `build-windows` job in release.yml: it builds
+llama-server with the Vulkan SDK and runs the same PyInstaller steps in
+PowerShell.
+
+---
+
 ## Reporting bugs
 
-Unseen Servant is not taking code contributions yet, and pull requests will be
-closed with thanks. Bug reports are welcome: open an issue with the bug report
-template. For search or indexing problems, attach `sidecar.log` (**reveal** next
-to the data directory in **Help → About** opens its folder).
+[CHANGELOG.md](CHANGELOG.md) lists what each release changed. I'm not taking
+code contributions yet unfortunately. However, bug reports are welcome: open an
+issue with the bug report template. For search or indexing problems, attach
+`sidecar.log` (log folder **found** next to the data directory in **Help → About**).
 
-Found a security problem? Email guild@unseenservant.games instead of opening an
-issue.
+Email <guild@unseenservant.games> if you want to share feedback on the app!
 
 ---
 
 ## Credits
 
-Unseen Servant borrows its ideas from:
+Unseen Servant is inspired by the following awesome products:
 
 - **[Ableton Live](https://www.ableton.com/live/)**: Command's tracks, beats and
   sessions, and campaigns that open like Live sets.
 - **[Obsidian](https://obsidian.md)** and **[JSON Canvas](https://jsoncanvas.org)**:
   a campaign is a folder of plain files that other tools open too.
 - **The Lazy DM checklist** from [Sly Flourish](https://slyflourish.com)'s
-  *Return of the Lazy Dungeon Master*, by Mike Shea: Command's starting tracks
+  _Return of the Lazy Dungeon Master_, by Mike Shea: Command's default tracks
   follow it.
 
 It is built on [Tauri](https://tauri.app), [Svelte](https://svelte.dev),
@@ -130,5 +220,3 @@ later version. See [LICENSE](LICENSE).
 The AGPL covers the code, not the Unseen Servant name or logo: they are
 trademarks of Unseen Servant Games (AGPL §7(e)), so a fork must use its own
 name and logo.
-
-The project is not taking code contributions yet; bug reports are welcome.
