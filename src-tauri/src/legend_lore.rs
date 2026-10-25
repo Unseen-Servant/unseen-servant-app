@@ -1225,25 +1225,8 @@ pub async fn rename_file(old_path: String, new_name: String) -> Result<String, S
 }
 
 #[tauri::command]
-pub async fn delete_file(path: String) -> Result<(), String> {
-    let p = Path::new(&path);
-    if !p.exists() {
-        return Err("File not found".to_string());
-    }
-    trash::delete(p).map_err(|e| format!("Failed to move to trash: {}", e))?;
-
-    // Best-effort sidecar update — if it fails, the next auto-sync will handle it
-    let client = reqwest::Client::new();
-    let _ = client
-        .post(format!("{}/api/file-delete", sidecar_url()))
-        .json(&serde_json::json!({
-            "path": path,
-        }))
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await;
-
-    Ok(())
+pub async fn unindex_file(path: String) -> Result<(), String> {
+    post_unindex("/api/file-delete", serde_json::json!({ "path": path })).await
 }
 
 #[tauri::command]
@@ -1283,24 +1266,26 @@ pub async fn rename_folder(old_path: String, new_name: String) -> Result<String,
 }
 
 #[tauri::command]
-pub async fn delete_folder(path: String) -> Result<(), String> {
-    let p = Path::new(&path);
-    if !p.exists() || !p.is_dir() {
-        return Err("Folder not found".to_string());
-    }
-    trash::delete(p).map_err(|e| format!("Failed to move to trash: {}", e))?;
+pub async fn unindex_folder(path: String) -> Result<(), String> {
+    post_unindex("/api/folder-delete", serde_json::json!({ "folder_prefix": path })).await
+}
 
-    // Best-effort sidecar update — if it fails, the next auto-sync will handle it
+// Drops index entries only; the files stay on disk.
+async fn post_unindex(route: &str, body: serde_json::Value) -> Result<(), String> {
     let client = reqwest::Client::new();
-    let _ = client
-        .post(format!("{}/api/folder-delete", sidecar_url()))
-        .json(&serde_json::json!({
-            "folder_prefix": path,
-        }))
+    let response = client
+        .post(format!("{}{}", sidecar_url(), route))
+        .json(&body)
         .timeout(std::time::Duration::from_secs(30))
         .send()
-        .await;
+        .await
+        .map_err(|e| format!("Failed to connect to indexer: {}", e))?;
 
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Sidecar error ({}): {}", status, body));
+    }
     Ok(())
 }
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Legend Lore does not delete files.** _Remove from index_ (`⌘⌫`) replaces _Delete file_ and _Delete folder_: the book leaves the index and its collections, and the file stays on disk
+
 ## [4.2.0] - 2026-10-24
 
 Search now works without other software. The app contains the search models and the program that runs them, so users do not install Ollama or download a model. The licence changes to the GNU AGPL 3.0 or later. Users do not need to index their books again.

@@ -2205,10 +2205,11 @@
     }
 
     // ⌘⌫ / Del — the same chord the collections panel spends on deleting a
-    // track. Confirmed before anything moves, like the menu item it mirrors.
+    // track. Confirmed before anything leaves the index, like the menu item
+    // it mirrors.
     if (isDeleteChord(event)) {
       event.preventDefault();
-      deleteItem(focused.item);
+      unindexItem(focused.item);
       return true;
     }
 
@@ -2828,50 +2829,43 @@
     createCollectionFromItem(item);
   }
 
-  async function handleContextDelete() {
+  async function handleContextUnindex() {
     if (!contextMenu) return;
     const item = contextMenu.item;
     contextMenu = null;
-    await deleteItem(item);
+    await unindexItem(item);
   }
 
-  // Confirm-then-trash for one row. Shared by the context menu's Delete item
-  // and the ⌘⌫ / Del chord on the focused row — both act on a single item,
-  // never on the checkbox selection.
-  async function deleteItem(item: FileItem) {
+  // Confirm-then-unindex for one row. Shared by the context menu's Remove
+  // item and the ⌘⌫ / Del chord on the focused row — both act on a single
+  // item, never on the checkbox selection. The file stays on disk; its
+  // boxes are unticked so the next sync doesn't index it again.
+  async function unindexItem(item: FileItem) {
+    if (indexedPathsUnder(item.path, indexedPaths).length === 0) return;
     const confirmed = await confirmPrompt.request({
-      title: item.is_dir ? m.lore_panel_delete_folder_title() : m.lore_panel_delete_file_title(),
-      message: m.lore_panel_delete_message({ name: item.name }),
-      confirmLabel: m.lore_panel_delete_confirm(),
+      title: m.lore_panel_unindex_title(),
+      message: m.lore_panel_unindex_message({ name: item.name }),
+      confirmLabel: m.lore_panel_unindex_confirm(),
       danger: true,
     });
     if (!confirmed) return;
 
     try {
-      if (item.is_dir) {
-        await invoke('delete_folder', { path: item.path });
-        const prefix = item.path + '/';
-        for (const p of selectedPaths) {
-          if (p.startsWith(prefix)) selectedPaths.delete(p);
-        }
-        selectedPaths = selectedPaths;
-        for (const p of syncedPaths) {
-          if (p.startsWith(prefix)) syncedPaths.delete(p);
-        }
-        for (const p of expandedPaths) {
-          if (p.startsWith(prefix) || p === item.path) expandedPaths.delete(p);
-        }
-        expandedPaths = expandedPaths;
-      } else {
-        await invoke('delete_file', { path: item.path });
-        if (focusedFilePath === item.path) focusedFilePath = null;
-      }
-      if (selectedFolder) await loadFiles(selectedFolder);
-      refreshIndexStatus();
+      await invoke(item.is_dir ? 'unindex_folder' : 'unindex_file', { path: item.path });
+      const prefix = item.path + '/';
+      const unticks = (p: string) => p === item.path || p.startsWith(prefix);
+      for (const p of [...selectedPaths]) if (unticks(p)) selectedPaths.delete(p);
+      selectedPaths = selectedPaths;
+      for (const p of [...syncedPaths]) if (unticks(p)) syncedPaths.delete(p);
+      const store = await load('settings.json');
+      await store.set('syncedPaths', Array.from(syncedPaths));
+      await store.save();
+      await refreshIndexAndCollections();
     } catch (e) {
-      jobNotification.show({ type: 'error', message: m.lore_panel_delete_failed({ error: String(e) }), duration: 5000 });
+      jobNotification.show({ type: 'error', message: m.lore_panel_unindex_failed({ error: String(e) }), duration: 5000 });
     }
   }
+
 
   // Path solo/mute migration for renames — like renamePathKeys, the entry
   // keyed exactly at the renamed path moves too, and it also picks up the
@@ -4013,7 +4007,7 @@
       onOpen={handleContextOpen}
       onReveal={handleContextReveal}
       onRename={handleContextRename}
-      onDelete={handleContextDelete}
+      onUnindex={handleContextUnindex}
       onReindex={handleContextReindex}
       onShowStats={handleContextShowStats}
       onToggleSolo={handleContextToggleSolo}
@@ -4027,6 +4021,7 @@
       sendTargets={menuSendTargets(contextMenu)}
       onSendToCommand={handleSendToCommand}
       canRename={!searchViewOpen}
+      canUnindex={indexedPathsUnder(contextMenu.item.path, indexedPaths).length > 0}
       onClose={() => { contextMenu = null; }}
     />
   {/if}

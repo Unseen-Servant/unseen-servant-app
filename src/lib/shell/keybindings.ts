@@ -105,7 +105,7 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'tree.activate',         keys: { mac: '↵',    other: 'Enter' },         label: m.keys_open_file_or_fold_folder, scope: 'fileTree' },
   { id: 'tree.open',             keys: { mac: '⌘O',   other: 'Ctrl+O' },        label: m.keys_open_file, scope: 'fileTree', match: 'meta+o' },
   { id: 'tree.rename',           keys: { mac: 'R',    other: 'R' },             label: m.keys_rename_row, scope: 'fileTree', match: 'r' },
-  { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: m.keys_move_row_to_trash, scope: 'fileTree' },
+  { id: 'tree.delete',           keys: { mac: '⌘⌫',   other: 'Del' },           label: m.keys_remove_row_from_index, scope: 'fileTree' },
   { id: 'tree.contextMenu',      keys: { mac: '⇧F10', other: 'Shift+F10 / Menu' }, label: m.keys_open_row_menu, scope: 'fileTree' },
   { id: 'tree.solo',             keys: { mac: 'S',    other: 'S' },             label: m.keys_solo_row_search_it_alone, scope: 'fileTree', match: 's', switch: true },
   { id: 'tree.mute',             keys: { mac: 'M',    other: 'M' },             label: m.keys_mute_row_drop_it_from, scope: 'fileTree', match: 'm', switch: true },

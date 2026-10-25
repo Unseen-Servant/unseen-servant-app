@@ -39,6 +39,9 @@
   // search result no row can host it, so the item is withheld rather
   // than left to silently no-op.
   export let canRename: boolean = true;
+  // The row holds indexed books: a file that is indexed, or a folder with
+  // one below it. Nothing to take out of the index otherwise.
+  export let canUnindex: boolean = false;
   // Optional initial submenu to open on mount (used by the C tree-row chord
   // in PR 2 of chunk c — for now the prop just exists so callers can land
   // a row directly in the Collection submenu without a follow-up keystroke).
@@ -51,7 +54,7 @@
   export let onOpen: () => void = () => {};
   export let onReveal: () => void = () => {};
   export let onRename: () => void = () => {};
-  export let onDelete: () => void = () => {};
+  export let onUnindex: () => void = () => {};
   export let onReindex: () => void = () => {};
   export let onShowStats: () => void = () => {};
   export let onToggleSolo: () => void = () => {};
@@ -547,15 +550,18 @@
     <button class="menu-row" data-mi="item" role="menuitem" on:click={onReindex}>{m.lore_menu_reindex_file()}</button>
   {/if}
 
-  <!-- Delete stands alone: a divider between it and the other write actions
-       is the only thing between a misaimed click and the wrong row. -->
-  <hr class="menu-divider" />
-  <!-- Display-only, like Reveal above: ⌘⌫ is a named key eventMatchKey can't
-       resolve, so the row hints the chord without claiming it. -->
-  <button class="menu-row danger" data-mi="item" role="menuitem" on:click={onDelete}>
-    {item.is_dir ? m.lore_menu_delete_folder() : m.lore_menu_delete_file()}
-    <span class="menu-chord" class:bare={isBareKeyChord('tree.delete')} aria-hidden="true">{chord('tree.delete')}</span>
-  </button>
+  <!-- Remove stands alone: a divider between it and the other write actions
+       is the only thing between a misaimed click and the wrong row. It
+       touches the index only; Legend Lore never deletes from disk. -->
+  {#if canUnindex}
+    <hr class="menu-divider" />
+    <!-- Display-only, like Reveal above: ⌘⌫ is a named key eventMatchKey can't
+         resolve, so the row hints the chord without claiming it. -->
+    <button class="menu-row danger" data-mi="item" role="menuitem" on:click={onUnindex}>
+      {m.lore_menu_unindex()}
+      <span class="menu-chord" class:bare={isBareKeyChord('tree.delete')} aria-hidden="true">{chord('tree.delete')}</span>
+    </button>
+  {/if}
 </div>
 
 <style>
