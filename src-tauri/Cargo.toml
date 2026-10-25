@@ -1,6 +1,6 @@
 [package]
 name = "unseen-servant"
-version = "4.2.0"
+version = "4.3.0"
 description = "Local-first, AI-augmented toolkit for tabletop RPG Gamemasters"
 authors = ["Unseen Servant Games <guild@unseenservant.games>"]
 license = "AGPL-3.0-or-later"

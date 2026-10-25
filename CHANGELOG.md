@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [4.3.0] - 2026-10-25
+
+Legend Lore no longer deletes library files: it removes books from the index and leaves the files on disk. Users do not need to index their books again.
 
 ### Changed
 
