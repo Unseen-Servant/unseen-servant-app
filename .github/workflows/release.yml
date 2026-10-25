@@ -189,8 +189,9 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    # An uncached llama-server (Vulkan and every CPU variant) adds ~20 min.
-    timeout-minutes: 60
+    # A tag can't restore another tag's caches, so every release builds
+    # llama-server (Vulkan and every CPU variant) and the app cold: 40–60 min.
+    timeout-minutes: 90
     permissions:
       contents: write
 
