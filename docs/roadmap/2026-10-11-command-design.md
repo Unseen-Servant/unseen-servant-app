@@ -20,7 +20,7 @@
 
 ## 1. What the two earlier attempts teach
 
-Two implementations of this tool exist: `~/code/unseen-app-desktop` (Electron + React + Lexical, "Unseen Servant" v0.2–0.3) and `~/code/unseen-command` (Tauri + Svelte + CodeMirror spike, March 2026). Both had the beat model — a beat is the set of active notes, and launching it activates exactly those notes — and the model held up. What failed, and the rule here that answers it:
+Two implementations of this tool exist, both private: an Electron app (Electron + React + Lexical, "Unseen Servant" v0.2–0.3) and a spike (Tauri + Svelte + CodeMirror, March 2026). Both had the beat model — a beat is the set of active notes, and launching it activates exactly those notes — and the model held up. What failed, and the rule here that answers it:
 
 | Failure | Rule here |
 |---|---|

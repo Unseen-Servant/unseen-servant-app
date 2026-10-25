@@ -1,7 +1,7 @@
 # ML runtime consolidation — one provider for embed, rerank and chat
 
 **Date:** 2026-09-26
-**Status:** analysis + prep landed; the Phase 5 runtime *target* is reopened (was in-process ONNX, see `2026-09-02-v2-retrieval-improvement-roadmap.md` §8). Decision waits on the parity/speed numbers in §5.
+**Status:** decided 2026-10-24 on the parity and speed numbers in #413: bge-m3 runs on a bundled `llama-server`, shipped in v4.2.0. The reranker stays on ONNX, and the Servant's chat model is still open.
 **Driver:** the Servant (workstation step 5) needs a local chat model with tool calling. That is a third model role beside embed and rerank, and the roadmap goal is one runtime for all of them with no user-installed prerequisite.
 **Branch:** `claude/ollama-sidecar-runtime-tradeoffs-mxltod` (422a771..ff84dc8), sidecar-only prep that is correct under any runtime choice.
 

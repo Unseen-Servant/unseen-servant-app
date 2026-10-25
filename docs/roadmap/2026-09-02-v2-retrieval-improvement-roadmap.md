@@ -1,7 +1,7 @@
 # v2 Retrieval Improvement Roadmap — the pymupdf4llm baseline
 
 **Date:** 2026-09-02
-**Status:** approved 2026-09-02 (phase order kept). Phase 0 in progress — see §8 for the `phase0b` re-baseline.
+**Status:** done. Phases 0–4 shipped in v3.0.0 (2026-09-24); Phase 5's store swap landed 2026-09-26, and its runtime swap shipped in v4.2.0 (2026-10-24): bge-m3 runs on a bundled `llama-server` (#413), the reranker stays on ONNX. §8 is the decision log.
 **Decision this builds on:** v2 ingestion (pymupdf4llm → Markdown → heading promotion → structure-aware chunking) stays. The v3 layout-model pipeline is closed as research; `sidecar-v3/` becomes a parts bin whose measured query-side bricks are ported into `sidecar/`.
 **Supersedes:** W2–W4 of [2026-08-22-v3-search-recovery-strategy.md](2026-08-22-v3-search-recovery-strategy.md) for the shipping pipeline. The eval harness, the corpus, and the ladder evidence are all kept as-is.
 **Objective:** the same one as the rebuild plan — search that is much faster *and* much more relevant than today's v2, for the app UI, Claude, and 4B-class local models — reached by improving what ships, not by replacing it.

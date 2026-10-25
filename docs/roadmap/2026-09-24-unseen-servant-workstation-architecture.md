@@ -1,7 +1,7 @@
 # Unseen Servant workstation — codebase architecture
 
 **Date:** 2026-09-24
-**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25. 2026-09-26: Phase 5 store swap done ahead of the runtime swap, which waits on its reopened target and a real-library eval tier (§6 order table). 2026-10-03: D3 amended — a tabbed main window hosts every tool as a panel, and any panel pops out into its own window. 2026-10-17: D3 amended again — the tabs become one rack with eight user-built views.
+**Status:** decisions D1–D7 agreed 2026-09-24 and the six open questions in §4 resolved the same day. D1 shipped: product + identifier rename in v3.0.0 (published), repository renamed to `unseen-servant-app`. Step 1 (move-only split) done 2026-09-25. 2026-09-26: Phase 5 store swap done ahead of the runtime swap, which waits on its reopened target and a real-library eval tier (§6 order table). 2026-10-03: D3 amended — a tabbed main window hosts every tool as a panel, and any panel pops out into its own window. 2026-10-17: D3 amended again — the tabs become one rack with eight user-built views. 2026-10-24: the runtime swap shipped in v4.2.0 (bundled `llama-server`, #413).
 **Objective:** grow this repository from one tool (Legend Lore) into the GM workstation — one app, **Unseen Servant**, hosting three tools: Legend Lore (RAG over the PDF library), Command (session manager), and the Servant (assistant) — without a rewrite, a plugin system, or a second repository.
 
 ---
