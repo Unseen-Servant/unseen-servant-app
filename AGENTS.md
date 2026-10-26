@@ -23,9 +23,9 @@ A TTRPG Gamemaster who:
 
 ## Related repositories
 
-Both are private for now.
+unseen-servant-site is private for now.
 
-- **unseen-servant-spikes**: research spikes. Their FINDINGS inform key architectural decisions here. Docs that cite a spike's FINDINGS carry the outcome themselves, because the spike code is not public.
+- **[unseen-servant-spikes](https://github.com/Unseen-Servant/unseen-servant-spikes)**: research spikes. Their FINDINGS inform key architectural decisions here. Docs that cite a spike link its FINDINGS and still state the outcome.
 - **unseen-servant-site**: the landing page, which distributes the app. Its product description must match the app's actual features.
 
 ---
