@@ -496,10 +496,11 @@
   }
 
   /** A right-click on a board card: a note's or an image's stands it up,
-   *  as the tray's do; another's opens its menu. */
+   *  as the tray's do; another's opens its menu, but not with Hand, which
+   *  changes nothing on the board. */
   function boardMenu(card: Card, e: MouseEvent) {
     if (standable(card)) stand(card);
-    else cardMenu(card, e);
+    else if (tool !== 'hand') cardMenu(card, e);
   }
 
   // -- menus --------------------------------------------------------------

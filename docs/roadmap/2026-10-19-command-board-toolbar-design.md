@@ -73,7 +73,7 @@ Each line gives the key, the tool, its Miro equivalent, what it does, and what i
 | Key | Tool | Miro | A click or drag makes | JSON Canvas |
 |---|---|---|---|---|
 | V | **Select** | Select | Click selects; drag a card moves it; drag the empty board pans, as today; Shift+drag draws a marquee, as today. | — |
-| H | **Hand** | Hand | Every drag pans, over cards too, so a crowded board can be moved around without nudging anything. | — |
+| H | **Hand** | Hand | Every drag pans, over cards too, so a crowded board can be moved around without nudging anything. A note's or an image's card still answers its keys, its links, a double-click and a right-click (2026-10-28), so Hand is the board locked for the table; a text card, a sticky, a frame or a line lets the press through. | — |
 | D | **Note** | Card | Click: a name field at that point, with the editor's `[[` completion over the campaign's notes (not its beats or sessions). Enter or a click places that note's card there. A note already on the board moves there (one card per note). | `file` node |
 | T | **Text** | Text | Click: a text card, typed in place, Markdown, unboxed. | `text` node, no colour |
 | N | **Sticky** | Sticky note | Click: a square coloured card, typed in place, in the last colour used (Ochre at first). | `text` node with `color` |

@@ -12,9 +12,10 @@
   // while it's dragged; every gesture's end goes out as card operations,
   // and the cards are re-derived from what comes back. The toolbar's tool
   // (board toolbar design §3) decides what a click or a drag does: Hand
-  // pans over the cards, Note asks for a note to place where the board is
-  // clicked, Text, Sticky and Frame make one there, Line draws from
-  // anywhere on a card. With Select, the selection bar floats over
+  // pans over the cards, moving none, while a note's or an image's card
+  // still answers its keys and its clicks, Note asks for a note to place
+  // where the board is clicked, Text, Sticky and Frame make one there,
+  // Line draws from anywhere on a card. With Select, the selection bar floats over
   // selected text cards, stickies and frames, or over a selected line. A
   // card's right-click goes to Play, which stands a note card up or opens
   // another's menu (PlayView).
@@ -442,6 +443,7 @@
     {edgeTypes}
     nodesDraggable={tool === 'select'}
     elementsSelectable={tool === 'select'}
+    nodesConnectable={tool !== 'hand'}
     connectionMode={ConnectionMode.Loose}
     {initialViewport}
     minZoom={0.2}
@@ -510,15 +512,23 @@
     background: var(--bg-app);
   }
 
-  /* Hand: every drag pans, over the cards and lines too. */
-  .board.hand :global(.svelte-flow__node),
+  /* Hand: every drag pans, over the cards and lines too, and nothing is
+     moved or resized. A note's or an image's card still answers its keys,
+     its links, a double-click and a right-click; a text card, a sticky, a
+     frame or a line lets the press through to the board. */
+  .board.hand :global(.svelte-flow__node-frame),
   .board.hand :global(.svelte-flow__edge),
   .board.hand :global(.svelte-flow__edge-label) {
     pointer-events: none;
   }
 
-  .board.hand :global(.svelte-flow__pane) {
+  .board.hand :global(.svelte-flow__pane),
+  .board.hand :global(.svelte-flow__node-note) {
     cursor: grab;
+  }
+
+  .board.hand :global(.svelte-flow__resize-control) {
+    display: none;
   }
 
   .board.linking :global(.svelte-flow__node) {
@@ -605,7 +615,7 @@
     transition: opacity var(--transition-fast);
   }
 
-  .board :global(.svelte-flow__node:hover .svelte-flow__handle),
+  .board:not(.hand) :global(.svelte-flow__node:hover .svelte-flow__handle),
   .board :global(.svelte-flow__handle.connectingfrom) {
     opacity: 1;
   }

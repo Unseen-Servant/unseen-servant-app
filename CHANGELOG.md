@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Cards stand over the board.** In Play, a right-click on a card in the card tray or on the board shows it in the middle of the dimmed board, in place of its menu; a click on the board puts it back
 - **Tray cards move by drag.** In Play, a drag along the card tray puts a card in a different place in the live set
+- **Cards answer with the hand tool.** On the board, with the hand tool, a note or image card still plays, opens and stands; a drag still pans and moves nothing
 
 ## [4.3.0] - 2026-10-25
 
