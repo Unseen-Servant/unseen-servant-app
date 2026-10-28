@@ -3,15 +3,19 @@
   // docked under the board as a deckbuilder's hand sits under its table.
   // Each card keeps its reading width; past what fits they overlap evenly,
   // so every one stays in view. Pointing at a card brings it to the front,
-  // whole, and outlines its card on the board. Clicking cards picks them,
-  // raised in the hand; [select] lays the picked side by side to read
-  // together, the rest on their side as spines. A new live set clears the
-  // picks. Folded, the tray is its plate, the hand as nameplates that
-  // bring their card up when pointed at.
+  // whole, and outlines its card on the board. A click selects a card, one
+  // at a time: it stays up, whole and raised, with its menu over it, and
+  // a double-click opens its note. A right-click stands the card up over
+  // the dimmed board, the board's height, and folds the tray to its
+  // nameplates, where a right-click stands up more; a right-click on a
+  // standing card puts it back. A click on the board, Esc or a new live set
+  // puts them all back, and the hand comes back. Folded, the tray is its
+  // plate, the hand as nameplates that bring their card up when pointed at.
   import { onDestroy, onMount } from 'svelte';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import CardFace from './CardFace.svelte';
   import { handStep, type Card, type CardData } from './board';
+  import type { OpenMenu } from './menu';
   import { m } from '../paraglide/messages';
 
   /** The hand: the board's cards for the live set (handOf). */
@@ -23,15 +27,20 @@
   export let open: boolean;
   /** The note pointed at, or null: the board outlines its card. */
   export let onPoint: (path: string | null) => void;
-  export let onMenu: (card: Card, e: MouseEvent) => void;
+  export let onMenu: (card: Card, e: MouseEvent, from: Pick<OpenMenu, 'anchor' | 'onPlace' | 'onClose'>) => void;
+  /** The board over the tray, in px: its height, and how far the session
+   *  player or the jot bar, and the rail, reach in from its sides. The
+   *  spread stands between them. */
+  export let stand: { height: number; left: number; right: number };
+  /** Cards stand over the board, or none do: Play dims the board. */
+  export let onStand: (standing: boolean) => void;
 
   $: held = cards.map(dataOf);
 
-  // -- picks and the spread -------------------------------------------------
+  // -- standing cards -------------------------------------------------------
 
+  /** The cards standing over the board. */
   let picked: string[] = [];
-  /** The picked cards laid side by side, the rest as spines. */
-  let selecting = false;
   let setKey: string | null = null;
   $: {
     const key = [beat ?? '', ...cards.map((c) => c.path)].join('\n');
@@ -40,21 +49,93 @@
       picked = [];
     }
   }
-  $: spread = selecting && picked.length > 0;
-  // With nothing left picked, the spread goes back into the hand.
-  $: if (!picked.length) selecting = false;
+  // While cards stand the tray shows folded, whatever `open` says, and the
+  // hand comes back with them.
+  $: spread = picked.length > 0;
+  $: showHand = open && !spread;
+  $: onStand(spread);
+  onDestroy(() => onStand(false));
 
-  /** A click picks a card or puts it back; a double-click's second click
-   *  is the card's, which opens the note. A link or a key keeps its own. */
-  function toggle(path: string, e: MouseEvent) {
-    if (e.detail > 1 || (e.target as HTMLElement).closest('a, button')) return;
+  /** Esc, or a click on the dimmed board, puts every card back. False
+   *  with none standing. */
+  export function putBack(): boolean {
+    if (!spread) return false;
+    picked = [];
+    return true;
+  }
+
+  /** A right-click stands a card up, or puts it back. */
+  function flip(path: string) {
+    deselect();
     picked = picked.includes(path) ? picked.filter((p) => p !== path) : [...picked, path];
   }
 
-  /** A nameplate on the folded plate opens the tray with its card picked. */
-  function unfold(path: string) {
-    open = true;
-    picked = [path];
+  /** The fold key; with cards standing, it puts them back and shows the
+   *  hand. */
+  function fold() {
+    if (putBack()) open = true;
+    else open = !open;
+  }
+
+  // -- the selected card and its menu ---------------------------------------
+
+  /** The card clicked, one at a time: it stays up, whole, raised and in
+   *  the accent rule, with its menu under it at its width, until the menu
+   *  closes. */
+  let selected: string | null = null;
+  /** How far the selected card rises clear of its menu, in px: the window
+   *  has no room under a card in the tray, so the menu takes its foot and
+   *  the card stands on the menu. */
+  let lift = 0;
+  /** Selected at the press: the click closes its menu, as a second click
+   *  on a menu's key does, rather than opening it again. */
+  let wasSelected = false;
+
+  // The menu opens once the double-click time has passed with no second
+  // click, as a click on Legend Lore's selected collection waits
+  // (CollectionsPanel): a double-click opens the note instead.
+  const DOUBLE_CLICK_MS = 350;
+  let pendingMenu: ReturnType<typeof setTimeout> | null = null;
+  function deselect() {
+    if (pendingMenu) clearTimeout(pendingMenu);
+    pendingMenu = null;
+    selected = null;
+    lift = 0;
+  }
+  onDestroy(() => pendingMenu && clearTimeout(pendingMenu));
+
+  /** A link or a key keeps its own click. */
+  function select(card: Card, e: MouseEvent & { currentTarget: HTMLElement }) {
+    if ((e.target as HTMLElement).closest('a, button')) return;
+    const again = wasSelected;
+    deselect();
+    if (e.detail > 1 || again) return;
+    const path = card.path ?? '';
+    selected = path;
+    // The menu goes at the card where it stands, in the hand or over the
+    // board, or at a nameplate's card above it.
+    const at = e.currentTarget;
+    pendingMenu = setTimeout(() => {
+      pendingMenu = null;
+      const face = at.matches('.note-plate') ? (at.parentElement?.querySelector('.peek .card') ?? at) : at;
+      const anchor = face.getBoundingClientRect();
+      onMenu(card, e, {
+        anchor,
+        onPlace: (box) => {
+          if (selected === path) lift = Math.max(0, anchor.bottom + 0.25 * rem - box.top);
+        },
+        onClose: () => {
+          if (selected === path) deselect();
+        },
+      });
+    }, DOUBLE_CLICK_MS);
+  }
+
+  /** While cards stand, a nameplate's click stands its card too, or puts
+   *  it back, as its right-click does; else it selects the card. */
+  function plateClick(card: Card, e: MouseEvent & { currentTarget: HTMLElement }) {
+    if (!spread) select(card, e);
+    else if (e.detail === 1) flip(card.path ?? '');
   }
 
   // -- pointing -------------------------------------------------------------
@@ -80,14 +161,8 @@
   /** The card whose strip is under the pointer, not the one on top there:
    *  a card brought to the front covers its neighbours' strips, and moving
    *  along the hand should still step through them in turn. Past the last
-   *  card's edge is the empty tray, no card's. Spread, the cards don't
-   *  overlap and the one under the pointer is the one. */
+   *  card's edge is the empty tray, no card's. */
   function track(e: PointerEvent & { currentTarget: HTMLElement }) {
-    if (spread) {
-      const slot = (e.target as HTMLElement).closest<HTMLElement>('[data-path]');
-      point(slot?.dataset.path ?? null);
-      return;
-    }
     const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
     if (x > (cards.length - 1) * step + CARD_REM * rem) {
       point(null);
@@ -101,30 +176,29 @@
 <section class="tray" aria-label={m.command_tray_label()}>
   <div class="nameplate">
     <!-- The plate's label is the fold's key, as the session player's is. -->
-    <button type="button" class="fold" aria-expanded={open} on:click={() => (open = !open)}>
-      <svg class="caret" class:open viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+    <button type="button" class="fold" aria-expanded={showHand} on:click={fold}>
+      <svg class="caret" class:open={showHand} viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
       <span class="ledger-label">{m.command_tray_title()}</span>
     </button>
     <span class="row-count">{cards.length}</span>
-    {#if open}
+    {#if showHand}
       {#if beat}<span class="beat" title={beat}>{beat}</span>{/if}
-      <!-- Names what it does, as the inspector's [read]/[edit] does. -->
-      <button
-        type="button"
-        class="plate-btn"
-        disabled={!picked.length}
-        title={spread ? m.command_tray_deselect_title() : m.command_tray_select_title()}
-        on:click={() => (selecting = !spread)}
-      >{spread ? m.command_tray_deselect() : m.command_tray_select()}</button>
     {:else}
-      <!-- Folded: a nameplate per card in its track's pigment, as Prep's
-           track plates wear it. -->
+      <!-- Folded, or under standing cards: a nameplate per card in its
+           track's pigment, as Prep's track plates wear it. A standing
+           card's own isn't brought up: it stands. -->
       <div class="plates">
         {#each held as d, i (d.card.id)}
           {@const path = d.card.path ?? ''}
           <div class="plate-slot" role="presentation" on:pointerenter={() => point(path)} on:pointerleave={() => point(null)}>
-            {#if pointed === path}
-              <div class="peek" class:end={i >= held.length / 2}><CardFace data={d} held /></div>
+            {#if (pointed === path || selected === path) && !picked.includes(path)}
+              <div
+                class="peek"
+                class:end={i >= held.length / 2}
+                style:transform={selected === path && lift ? `translateY(-${lift}px)` : null}
+              >
+                <CardFace data={d} held />
+              </div>
             {/if}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
@@ -134,11 +208,12 @@
               data-path={path}
               class:pigmented={!!d.pigment}
               class:spent={!!d.spent}
-              class:pointed={pointed === path}
+              class:pointed={pointed === path || selected === path}
               style:--pigment={d.pigment}
               title={d.name}
-              on:click={() => unfold(path)}
-              on:contextmenu|preventDefault={(e) => onMenu(d.card, e)}
+              on:mousedown={() => (wasSelected = selected === path)}
+              on:click={(e) => plateClick(d.card, e)}
+              on:contextmenu|preventDefault={() => flip(path)}
             >
               {d.name}
             </div>
@@ -148,11 +223,42 @@
     {/if}
   </div>
 
-  {#if open}
+  {#if spread}
+    <!-- The picked cards stood up over the board, each its note's height
+         up to the board's. -->
+    <div
+      class="stand"
+      style:left="calc({stand.left}px + 0.5rem)"
+      style:right="calc({stand.right}px + 0.5rem)"
+      style:height="calc({stand.height}px - 1rem)"
+    >
+      {#each held as d (d.card.id)}
+        {@const path = d.card.path ?? ''}
+        {#if picked.includes(path)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <div
+            class="standing"
+            role="presentation"
+            data-path={path}
+            style:margin-bottom={selected === path && lift ? `${lift}px` : null}
+            style:max-height={selected === path && lift ? `calc(100% - ${lift}px)` : null}
+            on:pointerenter={() => point(path)}
+            on:pointerleave={() => point(null)}
+            on:mousedown={() => (wasSelected = selected === path)}
+            on:click={(e) => select(d.card, e)}
+            on:contextmenu|preventDefault={() => flip(path)}
+          >
+            <CardFace data={d} held />
+          </div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+
+  {#if showHand}
     <div class="hand">
       <div
         class="cards"
-        class:spread
         role="presentation"
         bind:clientWidth={room}
         on:pointermove={track}
@@ -160,43 +266,25 @@
       >
         {#each held as d, i (d.card.id)}
           {@const path = d.card.path ?? ''}
-          {@const isPicked = picked.includes(path)}
-          {#if spread && !isPicked}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div
-              class="spine"
-              role="button"
-              tabindex="-1"
-              aria-pressed="false"
-              data-path={path}
-              class:spent={!!d.spent}
-              class:pointed={pointed === path}
-              style:--pigment={d.pigment}
-              title={d.name}
-              on:click={(e) => toggle(path, e)}
-              on:contextmenu|preventDefault={(e) => onMenu(d.card, e)}
-            >
-              <span>{d.name}</span>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <div
+            class="slot"
+            role="button"
+            tabindex="-1"
+            data-path={path}
+            class:look={pointed === path || selected === path}
+            class:selected={selected === path}
+            style:left="{i * step}px"
+            style:width="{CARD_REM}rem"
+            style:z-index={selected === path ? held.length + 1 : pointed === path ? held.length : i}
+            on:mousedown={() => (wasSelected = selected === path)}
+            on:click={(e) => select(d.card, e)}
+            on:contextmenu|preventDefault={() => flip(path)}
+          >
+            <div class="lift" style:transform={selected === path && lift ? `translateY(-${lift}px)` : null}>
+              <CardFace data={d} held />
             </div>
-          {:else}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div
-              class="slot"
-              role="button"
-              tabindex="-1"
-              aria-pressed={isPicked}
-              data-path={path}
-              class:picked={isPicked}
-              class:look={pointed === path}
-              style:left={spread ? null : `${i * step}px`}
-              style:width={spread ? null : `${CARD_REM}rem`}
-              style:z-index={spread ? null : pointed === path ? held.length : i}
-              on:click={(e) => toggle(path, e)}
-              on:contextmenu|preventDefault={(e) => onMenu(d.card, e)}
-            >
-              <div class="lift"><CardFace data={d} held /></div>
-            </div>
-          {/if}
+          </div>
         {/each}
       </div>
     </div>
@@ -297,12 +385,6 @@
     color: var(--text-secondary);
   }
 
-  .plate-btn {
-    flex-shrink: 0;
-    margin-left: auto;
-    white-space: nowrap;
-  }
-
   /* -- folded ------------------------------------------------------------ */
 
   .plates {
@@ -364,9 +446,11 @@
 
   /* The pointed nameplate's card, standing on it; the padding bridges the
      gap, so the pointer can go up onto the card. The second half of the
-     plate's cards stand to the left of theirs, clear of the tray's end. */
+     plate's cards stand to the left of theirs, clear of the tray's end,
+     and over the cards standing on the board. */
   .peek {
     position: absolute;
+    z-index: 1;
     left: 0;
     bottom: 100%;
     width: 16rem;
@@ -400,21 +484,10 @@
     height: 100%;
   }
 
-  .cards.spread {
-    display: flex;
-    gap: 0.5rem;
-  }
-
   .slot {
     position: absolute;
     top: 0;
     bottom: 0;
-  }
-
-  .cards.spread .slot {
-    position: relative;
-    flex: 1 1 0;
-    min-width: 0;
   }
 
   .lift {
@@ -433,64 +506,48 @@
 
   /* Looked at: a note longer than the tray grows up over the board until
      all of it shows, or the board's height would. */
+  /* Selected: the board's selected card's accent rule, raised a step, as
+     a card readied to play, then onto its menu (lift). */
+  .slot.selected :global(.card) {
+    border-color: var(--text-accent);
+  }
+
+  .slot.selected .lift {
+    transform: translateY(-0.4rem);
+  }
+
   .slot.look .lift {
     height: auto;
     min-height: 100%;
     max-height: 28rem;
   }
 
-  /* Picked: the board's selected card's accent rule, and in the hand
-     raised a step, as a card readied to play. */
-  .slot.picked :global(.card) {
-    border-color: var(--text-accent);
-  }
+  /* -- spread ------------------------------------------------------------ */
 
-  .cards:not(.spread) .slot.picked .lift {
-    transform: translateY(-0.4rem);
-  }
-
-  /* A card on its side, the pigment its spine, the name read upward. */
-  .spine {
-    flex: 0 0 1.9rem;
-    box-sizing: border-box;
+  /* Over the board from just above the plate to level with the session
+     player's top, the cards standing on its floor side by side. A click
+     between them falls to the dimmed board, which puts them back. */
+  .stand {
+    position: absolute;
+    bottom: calc(100% + 0.5rem);
     display: flex;
-    align-items: center;
-    padding: 0.5rem 0;
-    overflow: hidden;
-    background: var(--pigment, var(--bg-container));
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    cursor: pointer;
+    align-items: flex-end;
+    gap: 0.5rem;
+    pointer-events: none;
   }
 
-  .spine span {
+  /* A reading measure each, narrower when more stand than fit. */
+  .standing {
+    flex: 0 1 28rem;
+    min-width: 0;
     max-height: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-inverse);
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
   }
 
-  /* A track without a pigment: the plain plate's ink. */
-  .spine:not([style*='--pigment']) span {
-    font-weight: 400;
-    color: var(--text-secondary);
-  }
-
-  .spine.spent span {
-    opacity: var(--opacity-out-of-scope);
-  }
-
-  .spine.pointed {
+  .standing :global(.card) {
+    flex: 1 1 auto;
     border-color: var(--text-accent);
-  }
-
-  .spine:active {
-    transform: scale(0.97);
   }
 </style>

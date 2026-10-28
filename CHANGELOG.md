@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+
+- **Tray cards stand over the board.** In Play, a right-click on a card in the card tray shows it at the board's height over the dimmed board and folds the tray; a click on the board brings the tray back, and a click on a card opens its menu under it
+
 ## [4.3.0] - 2026-10-25
 
 Legend Lore no longer deletes library files: it removes books from the index and leaves the files on disk. Users do not need to index their books again.

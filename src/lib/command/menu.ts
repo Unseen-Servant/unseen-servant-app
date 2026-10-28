@@ -25,6 +25,12 @@ export interface OpenMenu {
   x: number;
   y: number;
   items: MenuItem[];
+  /** Opened at a card rather than the pointer (CommandMenu). */
+  anchor?: DOMRect;
+  /** Told where it opened at its card, which the card tray lifts clear. */
+  onPlace?: (box: DOMRect) => void;
+  /** Told when the menu closes, as the card tray's selection is. */
+  onClose?: () => void;
 }
 
 export const action = (label: string, run: () => void, danger = false): MenuItem => ({

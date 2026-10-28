@@ -28,7 +28,7 @@
 
   <section class="field">
     <h3 class="field-title section-title">{m.command_guide_play()}</h3>
-    <p class="field-desc"><ParaglideMessage message={m.command_guide_play_desc} {em} {strong} /></p>
+    <p class="field-desc"><ParaglideMessage message={m.command_guide_play_desc} {strong} /></p>
   </section>
 
   <section class="field">

@@ -306,8 +306,8 @@
 
   /** The board's keys, Miro's letters (§3.5), dispatched while Command has
    *  the keyboard (keys.ts). Bound ahead of the session player's, which
-   *  this view mounts after binding, so Esc puts down an armed tool before
-   *  it lets go of a beat. */
+   *  this view mounts after binding, so Esc puts down an armed tool, then
+   *  the tray's stood-up cards, before it lets go of a beat. */
   function boardKeys(e: KeyboardEvent, ctx: KeyContext): boolean {
     if (menu || e.isComposing || ctx.menu || ctx.typing) return false;
     const mod = e.metaKey || e.ctrlKey;
@@ -346,6 +346,7 @@
       tool = 'select';
       return true;
     }
+    if (e.key === 'Escape' && tray?.putBack()) return true;
     const next = TOOL_KEYS[key];
     if (!next) return false;
     if (!e.repeat) tool = next;
@@ -406,6 +407,24 @@
   let playerWidth = 0;
   $: covered = player && playerWidth ? player.offsetLeft + playerWidth : 0;
 
+  /** The tray's picked cards stand over the board clear of the session
+   *  player and the jot bar under it on the left, and the rail on the
+   *  right. */
+  let tray: CardTray | undefined;
+  /** Cards stand: the board under them is dimmed. */
+  let standing = false;
+  let stageWidth = 0;
+  let stageHeight = 0;
+  let jotBox: HTMLElement | undefined;
+  let jotWidth = 0;
+  let rail: HTMLElement | undefined;
+  let railWidth = 0;
+  $: stand = {
+    height: stageHeight,
+    left: Math.max(covered, jotBox && jotWidth ? jotBox.offsetLeft + jotWidth : 0),
+    right: rail && railWidth ? stageWidth - rail.offsetLeft : 0,
+  };
+
   /** Frame the cards of `paths`, wherever the board has them — or, with
    *  `orAll` and no paths, the whole board. */
   function frameNotes(paths: Iterable<string>, orAll = false) {
@@ -449,7 +468,9 @@
 
   let menu: OpenMenu | null = null;
 
-  function cardMenu(card: Card, e: MouseEvent) {
+  /** A card's menu, at the pointer or, from the card tray, at the card
+   *  (`from`). */
+  function cardMenu(card: Card, e: MouseEvent, from?: Pick<OpenMenu, 'anchor' | 'onPlace' | 'onClose'>) {
     const items: MenuItem[] = [];
     const note = card.path ? notesByPath.get(card.path) : undefined;
     if (note) {
@@ -474,7 +495,8 @@
       const label = card.kind === 'group' ? m.command_play_remove_frame() : m.command_play_remove_card();
       items.push(action(label, () => apply([{ op: 'remove', id: card.id }]), true));
     }
-    if (items.length) menu = { x: e.clientX, y: e.clientY, items };
+    if (items.length) menu = { x: e.clientX, y: e.clientY, items, ...from };
+    else from?.onClose?.();
   }
 
   function lineMenu(id: string, e: MouseEvent) {
@@ -529,7 +551,7 @@
 </script>
 
 <div class="play">
-  <div class="stage">
+  <div class="stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight}>
     {#if view}
       <Board
         cards={allCards}
@@ -557,6 +579,14 @@
       <p class="board-note" role="alert">{boardError}</p>
     {/if}
 
+    {#if standing}
+      <!-- The board under the tray's stood-up cards, dimmed as a sheet
+           dims its window; a click on it puts them back, as Esc does. The
+           session player, the rail and the jot bar stay lit over it. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="scrim" role="presentation" on:click={() => tray?.putBack()}></div>
+    {/if}
+
     <!-- The session player, a box over the board's top-left corner. -->
     <div class="player" bind:this={player} bind:offsetWidth={playerWidth}>
       <Arrangement
@@ -574,7 +604,7 @@
     <!-- The expand key, in the board's top-right corner: latched and lit
          while the board fills the view, and the way back from it. The
          toolbar hangs under it. -->
-    <div class="rail">
+    <div class="rail" bind:this={rail} bind:offsetWidth={railWidth}>
       <LatchKey
         open={expanded}
         lit={expanded}
@@ -606,7 +636,7 @@
 
     <!-- The jot bar, in the board's bottom corner (⌘J): a line at the end
          of the session note, which the key beside it (and ⇧⌘J) opens. -->
-    <div class="jot">
+    <div class="jot" bind:this={jotBox} bind:offsetWidth={jotWidth}>
       <textarea
         class="jot-bar"
         rows="1"
@@ -641,12 +671,25 @@
       bind:open={trayOpen}
       onPoint={(path) => (pointed = path)}
       onMenu={cardMenu}
+      {stand}
+      onStand={(s) => (standing = s)}
+      bind:this={tray}
     />
   {/if}
 </div>
 
 {#if menu}
-  <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
+  <CommandMenu
+    x={menu.x}
+    y={menu.y}
+    items={menu.items}
+    anchor={menu.anchor ?? null}
+    onPlace={menu.onPlace ?? null}
+    onClose={() => {
+      menu?.onClose?.();
+      menu = null;
+    }}
+  />
 {/if}
 
 <style>
@@ -664,6 +707,14 @@
     flex: 1;
     min-width: 0;
     min-height: 0;
+  }
+
+  /* Under the player, the rail and the jot bar. */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: var(--scrim-modal);
   }
 
   /* Centred, clear of the session player in the corner. */
