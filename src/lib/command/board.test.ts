@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handStep, IMAGE_CARD, imageCard, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
+import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handPlace, handShift, handStep, IMAGE_CARD, imageCard, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -167,6 +167,22 @@ describe('the card tray', () => {
     const step = handStep(9, 1248, 234, 8);
     expect(8 * step + 234).toBeCloseTo(1248);
     expect(handStep(1, 100, 234, 8)).toBe(0);
+  });
+
+  it('puts a carried card in the place nearest where it rides', () => {
+    expect(handPlace(10, 3, 242)).toBe(0);
+    expect(handPlace(130, 3, 242)).toBe(1);
+    expect(handPlace(-80, 3, 242)).toBe(0);
+    expect(handPlace(900, 3, 242)).toBe(2);
+    expect(handPlace(40, 1, 0)).toBe(0);
+  });
+
+  it('shifts the cards between to make room for a carried card', () => {
+    // The first of four carried to the third place.
+    expect([0, 1, 2, 3].map((i) => handShift(i, 0, 2))).toEqual([2, 0, 1, 3]);
+    // The last carried to the second.
+    expect([0, 1, 2, 3].map((i) => handShift(i, 3, 1))).toEqual([0, 2, 3, 1]);
+    expect([0, 1, 2].map((i) => handShift(i, 1, 1))).toEqual([0, 1, 2]);
   });
 });
 

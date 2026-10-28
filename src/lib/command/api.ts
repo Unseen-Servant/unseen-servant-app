@@ -123,6 +123,7 @@ export const commandApi = {
   launch: (campaign: string, beat: string) => invoke<LiveSet>('command_launch', { campaign, beat }),
   setLive: (campaign: string, note: string, live: boolean) =>
     invoke<LiveSet>('command_set_live', { campaign, note, live }),
+  orderLive: (campaign: string, notes: string[]) => invoke<LiveSet>('command_order_live', { campaign, notes }),
   stop: (campaign: string) => invoke<LiveSet>('command_stop', { campaign }),
   /** A line at the end of the session note's own text. */
   jot: (campaign: string, session: string, text: string) => invoke<string>('command_jot', { campaign, session, text }),

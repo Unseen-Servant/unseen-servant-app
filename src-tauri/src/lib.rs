@@ -595,6 +595,7 @@ pub fn run() {
             command::command_get_live,
             command::command_launch,
             command::command_set_live,
+            command::command_order_live,
             command::command_stop,
             command::command_jot,
             command::command_send_targets,

@@ -464,6 +464,11 @@
     void run(async () => onLive(await commandApi.stop(campaign)));
   }
 
+  /** The card tray's order, dragged. */
+  function orderLive(notes: string[]) {
+    return run(async () => onLive(await commandApi.orderLive(campaign, notes)));
+  }
+
   // -- menus --------------------------------------------------------------
 
   let menu: OpenMenu | null = null;
@@ -671,6 +676,7 @@
       bind:open={trayOpen}
       onPoint={(path) => (pointed = path)}
       onMenu={cardMenu}
+      onOrder={orderLive}
       {stand}
       onStand={(s) => (standing = s)}
       bind:this={tray}

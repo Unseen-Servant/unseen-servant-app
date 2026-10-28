@@ -9,12 +9,14 @@
   // the dimmed board, the board's height, and folds the tray to its
   // nameplates, where a right-click stands up more; a right-click on a
   // standing card puts it back. A click on the board, Esc or a new live set
-  // puts them all back, and the hand comes back. Folded, the tray is its
+  // puts them all back, and the hand comes back. A card drags along the
+  // hand to put the live set in another order. Folded, the tray is its
   // plate, the hand as nameplates that bring their card up when pointed at.
   import { onDestroy, onMount } from 'svelte';
   import { CARET_RIGHT } from '../ui/iconPaths';
+  import { grab } from '../ui/grab';
   import CardFace from './CardFace.svelte';
-  import { handStep, type Card, type CardData } from './board';
+  import { handPlace, handShift, handStep, type Card, type CardData } from './board';
   import type { OpenMenu } from './menu';
   import { m } from '../paraglide/messages';
 
@@ -28,6 +30,9 @@
   /** The note pointed at, or null: the board outlines its card. */
   export let onPoint: (path: string | null) => void;
   export let onMenu: (card: Card, e: MouseEvent, from: Pick<OpenMenu, 'anchor' | 'onPlace' | 'onClose'>) => void;
+  /** The hand dragged into a new order: the live set's notes in it.
+   *  Settles once the live set has answered. */
+  export let onOrder: (notes: string[]) => Promise<void>;
   /** The board over the tray, in px: its height, and how far the session
    *  player or the jot bar, and the rail, reach in from its sides. The
    *  spread stands between them. */
@@ -163,6 +168,7 @@
    *  along the hand should still step through them in turn. Past the last
    *  card's edge is the empty tray, no card's. */
   function track(e: PointerEvent & { currentTarget: HTMLElement }) {
+    if (moving) return;
     const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
     if (x > (cards.length - 1) * step + CARD_REM * rem) {
       point(null);
@@ -171,7 +177,88 @@
     const at = step > 0 ? Math.min(Math.floor(x / step), cards.length - 1) : cards.length - 1;
     point(cards[Math.max(at, 0)]?.path ?? null);
   }
+
+  // -- reordering -----------------------------------------------------------
+  //
+  // A card drags along the hand, and the hand makes room for it as it
+  // goes: the cards between slide a place aside, and the card shows, dimmed
+  // as a carried row is, in the place nearest where it rides. Nothing is
+  // pointed at meanwhile, so no card grows up over the board. Off the
+  // hand, it shows back in its own place, where a drop leaves it.
+  const CARD_MIME = 'application/x-command-tray-card';
+  const isCardDrag = (e: DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === CARD_MIME);
+
+  /** The card carried and the place it shows at: while it's carried and,
+   *  once dropped, until the live set answers in its new order. */
+  let moving: { path: string; to: number } | null = null;
+  let carrying = false;
+  /** How far into the card it was taken, so its place follows the card
+   *  rather than the pointer. */
+  let grabX = 0;
+  $: from = moving ? cards.findIndex((c) => c.path === moving?.path) : -1;
+
+  function startDrag(e: DragEvent & { currentTarget: HTMLElement }, path: string) {
+    deselect();
+    point(null);
+    grabX = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    moving = { path, to: cards.findIndex((c) => c.path === path) };
+    carrying = true;
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(CARD_MIME, path);
+  }
+
+  // The drag's end reaches the window, from a card a new live set took
+  // out of the hand too. After a drop, the hand keeps the card's new place
+  // for the live set's answer.
+  function endDrag() {
+    if (!carrying) return;
+    carrying = false;
+    moving = null;
+  }
+
+  function placeAt(e: DragEvent & { currentTarget: HTMLElement }, path: string) {
+    const left = e.clientX - e.currentTarget.getBoundingClientRect().left - grabX;
+    const to = handPlace(left, cards.length, step);
+    if (moving?.to !== to) moving = { path, to };
+  }
+
+  function overHand(e: DragEvent & { currentTarget: HTMLElement }) {
+    if (!carrying || !moving || !isCardDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    placeAt(e, moving.path);
+  }
+
+  // WebKit sends a dragleave between the hand's own elements, so leaving
+  // is judged by where the pointer is (TrackGrid leaveGrid).
+  function leaveHand(e: DragEvent & { currentTarget: HTMLElement }) {
+    const box = e.currentTarget.getBoundingClientRect();
+    if (e.clientX > box.left && e.clientX < box.right && e.clientY > box.top && e.clientY < box.bottom) return;
+    if (carrying && moving && from >= 0) moving = { path: moving.path, to: from };
+  }
+
+  function dropOnHand(e: DragEvent & { currentTarget: HTMLElement }) {
+    if (!carrying || !moving || !isCardDrag(e)) return;
+    e.preventDefault();
+    carrying = false;
+    placeAt(e, moving.path);
+    const move = moving;
+    const order = cards.map((c) => c.path ?? '');
+    const at = order.indexOf(move.path);
+    if (at < 0 || at === move.to) {
+      moving = null;
+      return;
+    }
+    order.splice(move.to, 0, ...order.splice(at, 1));
+    void onOrder(order).then(() => {
+      if (moving === move) moving = null;
+    });
+  }
 </script>
+
+<svelte:window on:dragend={endDrag} />
 
 <section class="tray" aria-label={m.command_tray_label()}>
   <div class="nameplate">
@@ -261,11 +348,17 @@
         class="cards"
         role="presentation"
         bind:clientWidth={room}
+        class:sorting={!!moving}
         on:pointermove={track}
         on:pointerleave={() => point(null)}
+        on:dragenter={overHand}
+        on:dragover={overHand}
+        on:dragleave={leaveHand}
+        on:drop={dropOnHand}
       >
         {#each held as d, i (d.card.id)}
           {@const path = d.card.path ?? ''}
+          {@const at = moving && from >= 0 ? handShift(i, from, moving.to) : i}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
             class="slot"
@@ -274,12 +367,15 @@
             data-path={path}
             class:look={pointed === path || selected === path}
             class:selected={selected === path}
-            style:left="{i * step}px"
+            class:carried={carrying && moving?.path === path}
+            style:left="{at * step}px"
             style:width="{CARD_REM}rem"
-            style:z-index={selected === path ? held.length + 1 : pointed === path ? held.length : i}
+            style:z-index={selected === path ? held.length + 1 : pointed === path ? held.length : at}
             on:mousedown={() => (wasSelected = selected === path)}
             on:click={(e) => select(d.card, e)}
             on:contextmenu|preventDefault={() => flip(path)}
+            use:grab
+            on:dragstart={(e) => startDrag(e, path)}
           >
             <div class="lift" style:transform={selected === path && lift ? `translateY(-${lift}px)` : null}>
               <CardFace data={d} held />
@@ -520,6 +616,17 @@
     height: auto;
     min-height: 100%;
     max-height: 28rem;
+  }
+
+  /* A card carried along the hand: the cards slide aside for it, and it
+     shows where it lands at a carried row's 0.4 (CollectionsPanel
+     .dragging). */
+  .cards.sorting .slot {
+    transition: left var(--transition-fast);
+  }
+
+  .slot.carried {
+    opacity: 0.4;
   }
 
   /* -- spread ------------------------------------------------------------ */

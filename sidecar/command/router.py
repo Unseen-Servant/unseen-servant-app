@@ -175,6 +175,11 @@ class LiveNote(BaseModel):
     live: bool
 
 
+class LiveOrder(BaseModel):
+    campaign: str
+    notes: list[str]
+
+
 class Stop(BaseModel):
     campaign: str
 
@@ -688,6 +693,20 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
             notes = [n for n in current["notes"] if n != body.note]
             if body.live:
                 notes.append(body.note)
+            snapshot = live.set(body.campaign, current["beat"], notes)
+        announce(snapshot)
+        return snapshot
+
+    @router.post("/live/order")
+    def live_order(body: LiveOrder):
+        """Put the live set's notes in the order the card tray was dragged
+        into. A note no longer live is passed over, and one gone live
+        since joins at the end."""
+        campaign_path(body.campaign)
+        with write_lock:
+            current = live.get(body.campaign)
+            notes = [n for n in body.notes if n in current["notes"]]
+            notes += [n for n in current["notes"] if n not in notes]
             snapshot = live.set(body.campaign, current["beat"], notes)
         announce(snapshot)
         return snapshot

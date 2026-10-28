@@ -780,6 +780,15 @@ pub async fn command_set_live(
     .await
 }
 
+/// Put the live set's notes in this order: the card tray's, dragged.
+#[tauri::command]
+pub async fn command_order_live(campaign: String, notes: Vec<String>) -> Result<LiveSet, String> {
+    answer(client().post(api("/live/order")).json(&serde_json::json!({
+        "campaign": campaign, "notes": notes,
+    })))
+    .await
+}
+
 #[tauri::command]
 pub async fn command_stop(campaign: String) -> Result<LiveSet, String> {
     answer(

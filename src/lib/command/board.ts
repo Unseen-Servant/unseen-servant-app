@@ -283,6 +283,21 @@ export function handStep(count: number, room: number, width: number, gap: number
   return Math.max(0, (room - width) / (count - 1));
 }
 
+/** The place in a hand of `count` cards `step` px apart nearest a card
+ *  carried with its left edge `left` px in. */
+export function handPlace(left: number, count: number, step: number): number {
+  return step > 0 ? Math.max(0, Math.min(Math.round(left / step), count - 1)) : 0;
+}
+
+/** Where card `i` of the hand shows while card `from` is carried to place
+ *  `to`: the cards between shift a place to make room for it. */
+export function handShift(i: number, from: number, to: number): number {
+  if (i === from) return to;
+  if (from < to && i > from && i <= to) return i - 1;
+  if (from > to && i >= to && i < from) return i + 1;
+  return i;
+}
+
 /** What putting a card at `frame` writes: a placed card is framed; an
  *  auto-placed note is placed, under a new id the returned op carries. */
 export function frameOp(card: Card, frame: Frame): BoardOp {

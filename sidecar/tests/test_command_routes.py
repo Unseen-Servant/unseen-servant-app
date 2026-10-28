@@ -253,6 +253,23 @@ def test_improvising_changes_the_live_set_not_the_beat(table):
     assert (stopped["beat"], stopped["notes"]) == (None, [])
 
 
+def test_the_card_tray_reorders_the_live_set(table):
+    table.post("/api/command/live/launch", json={"campaign": "Strahd", "beat": "Beats/Ambush.md"})
+    table.post("/api/command/live/note", json={"campaign": "Strahd", "note": "NPCs/Ireena.md", "live": True})
+    moved = table.post("/api/command/live/order", json={
+        "campaign": "Strahd", "notes": ["NPCs/Ireena.md", "NPCs/Ismark.md"],
+    }).json()
+    assert (moved["beat"], moved["notes"]) == ("Beats/Ambush.md", ["NPCs/Ireena.md", "NPCs/Ismark.md"])
+    assert table.get("/api/command/live", params={"campaign": "Strahd"}).json() == moved
+
+    # A tray a change behind: what left the set stays out, what joined it
+    # keeps a place at the end.
+    stale = table.post("/api/command/live/order", json={
+        "campaign": "Strahd", "notes": ["NPCs/Gone.md", "NPCs/Ismark.md"],
+    }).json()
+    assert stale["notes"] == ["NPCs/Ismark.md", "NPCs/Ireena.md"]
+
+
 def test_a_jot_lands_at_the_end_of_the_session_note(table, campaign_root):
     assert table.post("/api/command/jot", json={
         "campaign": "Strahd", "session": "Sessions/Session 1.md", "text": "the party insulted the burgomaster",
