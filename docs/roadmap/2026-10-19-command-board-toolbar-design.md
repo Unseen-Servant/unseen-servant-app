@@ -60,7 +60,7 @@ Play's board gets a creation toolbar modelled on Miro's: a column of tool keys w
 - **The current tool:**
   - Its key is raised (`--bg-header`), as the bar's wells raise their pick.
   - While any tool but Select is current, its lamp is lit purple: it's a mode, since it changes what a click or a drag on the board does. Hand counts.
-  - Select is the resting tool and has no lamp.
+  - Select is the resting tool: its lamp stays dark, so the bank is dark while no mode is on. *Until 2026-10-28* its slot held no lamp, LatchKey's empty socket, which in a bank of seven read as a missing part.
   - **Icons** (Font Awesome Free 7.3.1): arrow-pointer, hand, file-lines (Note), font, note-sticky, diagram-project (Line) and object-group (Frame; 7.x has no vector-square), with rotate-left and rotate-right for undo and redo, and expand (the beat rows' frame key) for fit all.
 - **One shot:** a creation tool makes one thing, then hands back to Select, as Miro's do. Esc returns to Select at any time.
 - **Cursor:** a crosshair while a creation tool is armed.

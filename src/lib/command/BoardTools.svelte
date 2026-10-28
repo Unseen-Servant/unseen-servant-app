@@ -102,8 +102,9 @@
         on:click={() => onTool(t.tool)}
       >
         <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={t.path} /></svg>
-        <!-- Select is the board at rest: its slot holds no lamp. -->
-        <span class="lamp" class:lit={tool === t.tool && t.tool !== 'select'} class:removed={t.tool === 'select'} aria-hidden="true"></span>
+        <!-- Select is the board at rest: its lamp stays dark, as the bank's
+             do while no mode is on. -->
+        <span class="lamp" class:lit={tool === t.tool && t.tool !== 'select'} aria-hidden="true"></span>
       </button>
     {/each}
   </div>
@@ -230,14 +231,5 @@
   .key.open .lamp.lit {
     background: var(--text-active);
     filter: var(--glow-active);
-  }
-
-  .key .lamp.removed {
-    background: transparent;
-    outline: 1px solid var(--border-subtle);
-  }
-
-  .key.open .lamp.removed {
-    outline-color: var(--bg-app);
   }
 </style>
