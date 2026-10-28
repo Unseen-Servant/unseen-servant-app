@@ -7,7 +7,8 @@
   // note. A right-click stands the card up in the middle of the dimmed
   // board, or puts it back; the tray stays as it was. A card drags along
   // the hand to put the live set in another order. Folded, the tray is its
-  // plate, the hand as nameplates that bring their card up when pointed at.
+  // plate, the hand as nameplates that bring their card up when pointed at
+  // and, clicked as right-clicked, stand it up or put it back.
   import { onDestroy, onMount } from 'svelte';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import { grab } from '../ui/grab';
@@ -171,6 +172,7 @@
                 <CardFace data={d} held />
               </div>
             {/if}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
               class="note-plate"
               role="button"
@@ -181,6 +183,7 @@
               class:pointed={pointed === path}
               style:--pigment={d.pigment}
               title={d.name}
+              on:click={() => onStand(d.card)}
               on:contextmenu|preventDefault={() => onStand(d.card)}
             >
               {d.name}
