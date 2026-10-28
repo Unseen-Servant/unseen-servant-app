@@ -9,6 +9,7 @@
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import type { Viewport } from '@xyflow/svelte';
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { load } from '@tauri-apps/plugin-store';
   import ActionButton from '../ui/ActionButton.svelte';
   import LatchKey from '../ui/LatchKey.svelte';
   import RenameField from '../ui/RenameField.svelte';
@@ -20,6 +21,7 @@
   import { chordHint } from '../shell/keybindings';
   import { appContext, setCampaign, setSession } from '../shell/shellState';
   import { hoist } from '../shell/hoist';
+  import { parseEnum } from '../shell/storeParsers';
   import { m } from '../paraglide/messages';
   import BeatColumn from './BeatColumn.svelte';
   import CommandMenu from './CommandMenu.svelte';
@@ -84,8 +86,8 @@
   let unlisten: Promise<UnlistenFn> | null = null;
   let unlistenLive: Promise<UnlistenFn> | null = null;
 
-  /** Which view this panel shows. Per window: Prep on the laptop and Play
-   *  on the second screen is two windows. */
+  /** Which view this panel shows, kept across launches as Legend Lore's
+   *  tree or systems view is. */
   let mode: 'prep' | 'play' = 'prep';
   /** The open campaign's live set (design §6.2), newest by `seq`. */
   let live: LiveSet | null = null;
@@ -241,6 +243,26 @@
   async function loadRoot() {
     settings = await commandApi.getSettings();
     campaigns = settings.root ? await commandApi.listCampaigns() : [];
+  }
+
+  async function loadMode() {
+    try {
+      const store = await load('settings.json');
+      mode = parseEnum(await store.get('commandMode'), ['prep', 'play'] as const) ?? mode;
+    } catch (e) {
+      console.log('Could not load commandMode:', e);
+    }
+  }
+
+  async function setMode(next: 'prep' | 'play') {
+    mode = next;
+    try {
+      const store = await load('settings.json');
+      await store.set('commandMode', next);
+      await store.save();
+    } catch (e) {
+      console.log('Could not persist commandMode:', e);
+    }
   }
 
   async function leaveCampaign() {
@@ -452,7 +474,7 @@
     // Tab: Prep ⇄ Play, Live's key for its two views, as Legend Lore's
     // tree ⇄ systems. ⇧Tab too: with two views, direction means nothing.
     if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && index) {
-      mode = mode === 'prep' ? 'play' : 'prep';
+      void setMode(mode === 'prep' ? 'play' : 'prep');
       return true;
     }
     // ⌘B: the view's sidebars, as it is Legend Lore's collections one —
@@ -507,7 +529,11 @@
   onMount(() => {
     unlisten = onVaultChange(onVault);
     unlistenLive = onLiveChange(applyLive);
-    run(loadRoot).then(() => (mounted = true));
+    // The view first, so a campaign reopened in Play doesn't flash Prep.
+    run(async () => {
+      await loadMode();
+      await loadRoot();
+    }).then(() => (mounted = true));
   });
 
   onDestroy(() => {
@@ -1290,7 +1316,7 @@
         <button
           class="view-segment"
           class:current={mode === 'prep'}
-          on:click={() => (mode = 'prep')}
+          on:click={() => void setMode('prep')}
           title={m.command_panel_prep() + chordHint('view.toggle')}
           aria-label={m.command_panel_prep()}
           aria-pressed={mode === 'prep'}
@@ -1303,7 +1329,7 @@
         <button
           class="view-segment"
           class:current={mode === 'play'}
-          on:click={() => (mode = 'play')}
+          on:click={() => void setMode('play')}
           title={m.command_panel_play() + chordHint('view.toggle')}
           aria-label={m.command_panel_play()}
           aria-pressed={mode === 'play'}
