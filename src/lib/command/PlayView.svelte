@@ -7,7 +7,6 @@
   // sidecar's.
   import { onDestroy, setContext, tick } from 'svelte';
   import { writable } from 'svelte/store';
-  import { openUrl } from '@tauri-apps/plugin-opener';
   import type { Viewport } from '@xyflow/svelte';
   import Arrangement from './Arrangement.svelte';
   import Board from './Board.svelte';
@@ -485,7 +484,6 @@
   function stand(card: Card) {
     const path = card.path;
     if (!path) return;
-    deselect();
     standing = standing.includes(path) ? standing.filter((p) => p !== path) : [...standing, path];
   }
 
@@ -495,97 +493,6 @@
     if (!stood.length) return false;
     standing = [];
     return true;
-  }
-
-  // -- the selected card --------------------------------------------------
-
-  /** Where a note's card was clicked: in the tray, standing, or on the
-   *  board. */
-  type Place = 'tray' | 'stand' | 'board';
-
-  /** The card clicked, one at a time, until its menu closes. In the tray
-   *  or standing it stays up, whole, raised and in the accent rule, with
-   *  its menu under it at its width; on the board, the board's selection
-   *  shows it. */
-  let selected: { path: string; at: Place } | null = null;
-  /** How far the selected card rises clear of its menu, in px, where the
-   *  window has no room under it: the menu takes its foot and the card
-   *  stands on the menu. A standing card is set that far up the stand. */
-  let lift = 0;
-  /** Selected at the press: the click closes its menu, as a second click
-   *  on a menu's key does, rather than opening it again. */
-  let wasSelected = false;
-
-  // The menu opens once the double-click time has passed with no second
-  // click, as a click on Legend Lore's selected collection waits
-  // (CollectionsPanel): a double-click opens the note instead.
-  const DOUBLE_CLICK_MS = 350;
-  let pendingMenu: ReturnType<typeof setTimeout> | null = null;
-  function deselect() {
-    if (pendingMenu) clearTimeout(pendingMenu);
-    pendingMenu = null;
-    selected = null;
-    lift = 0;
-  }
-  onDestroy(() => pendingMenu && clearTimeout(pendingMenu));
-
-  const isSelected = (path: string, at: Place) => selected?.path === path && selected.at === at;
-
-  function press(path: string, at: Place) {
-    wasSelected = isSelected(path, at);
-  }
-
-  /** A click on a note's card selects it, and its menu opens under `face`.
-   *  A link or a key keeps its own click. */
-  function select(card: Card, at: Place, e: MouseEvent, face: () => Element) {
-    if ((e.target as HTMLElement).closest('a, button')) return;
-    const again = wasSelected;
-    wasSelected = false;
-    deselect();
-    const path = card.path;
-    if (e.detail > 1 || again || !path) return;
-    selected = { path, at };
-    pendingMenu = setTimeout(() => {
-      pendingMenu = null;
-      const el = face();
-      const root = getComputedStyle(document.documentElement);
-      let anchor = el.getBoundingClientRect();
-      // A board card is as wide as the zoom makes it: its menu keeps a
-      // menu's width, at the card's left.
-      if (at === 'board') {
-        const width = Math.min(
-          Math.max(anchor.width, parseFloat(root.getPropertyValue('--menu-width'))),
-          parseFloat(root.getPropertyValue('--menu-max-width')),
-        );
-        anchor = new DOMRect(anchor.x, anchor.y, width, anchor.height);
-      }
-      cardMenu(card, e, {
-        anchor,
-        onPlace: (box) => {
-          const rise = anchor.bottom + 0.25 * parseFloat(root.fontSize) - box.top;
-          if (at === 'board' || rise <= 0 || !isSelected(path, at)) return;
-          const floor = at === 'stand' ? (el.parentElement?.getBoundingClientRect().bottom ?? anchor.bottom) : anchor.bottom;
-          lift = floor - anchor.bottom + rise;
-        },
-        onClose: () => {
-          if (isSelected(path, at)) deselect();
-        },
-      });
-    }, DOUBLE_CLICK_MS);
-  }
-
-  function standClick(card: Card, e: MouseEvent & { currentTarget: HTMLElement }) {
-    const el = e.currentTarget;
-    select(card, 'stand', e, () => el);
-  }
-
-  /** A press on the board, which keeps it from the window, where an open
-   *  menu closes on it: it closes here, and a menu not yet open won't
-   *  open over a drag. */
-  function boardPress(card: Card | null) {
-    if (card?.path) press(card.path, 'board');
-    if (pendingMenu) deselect();
-    closeMenu();
   }
 
   /** A right-click on a board card: a note's or an image's stands it up,
@@ -599,23 +506,8 @@
 
   let menu: OpenMenu | null = null;
 
-  /** A card's menu, at the pointer or, from a click on a note's card, at
-   *  the card (`from`). */
-  function cardMenu(card: Card, e: MouseEvent, from?: Pick<OpenMenu, 'anchor' | 'onPlace' | 'onClose'>) {
+  function cardMenu(card: Card, e: MouseEvent) {
     const items: MenuItem[] = [];
-    const note = card.path ? notesByPath.get(card.path) : undefined;
-    if (note) {
-      const playing = liveNotes.has(note.path);
-      const image = note.type === 'image';
-      items.push(
-        action(playing ? m.command_play_take_out() : m.command_play_play(), () => setLive(note.path, !playing)),
-        action(image ? m.command_play_show_image() : m.command_play_edit_note(), () => onEdit(note.path)),
-      );
-      // An image isn't spent (images design §2).
-      if (!image) items.push(keyed(note.spent ? m.command_play_mark_unspent() : m.command_play_mark_spent(), 'command.spend', () => onSpent(note, !note.spent)));
-      const source = note.source;
-      if (source) items.push(action(m.command_play_open_source(), () => void openUrl(source).catch(() => {})));
-    }
     if (card.kind === 'text') items.push(action(m.command_play_edit_text(), () => (editing = card.id)));
     if (card.kind === 'group') items.push(action(m.command_play_rename_frame(), () => (editing = card.id)));
     if (card.kind === 'text' || card.kind === 'group') {
@@ -626,13 +518,7 @@
       const label = card.kind === 'group' ? m.command_play_remove_frame() : m.command_play_remove_card();
       items.push(action(label, () => apply([{ op: 'remove', id: card.id }]), true));
     }
-    if (items.length) menu = { x: e.clientX, y: e.clientY, items, ...from };
-    else from?.onClose?.();
-  }
-
-  function closeMenu() {
-    menu?.onClose?.();
-    menu = null;
+    if (items.length) menu = { x: e.clientX, y: e.clientY, items };
   }
 
   function lineMenu(id: string, e: MouseEvent) {
@@ -703,8 +589,7 @@
         onLeave={(viewport) => boardViews.set(boardKey, viewport)}
         onOps={(ops) => apply(ops)}
         onCardMenu={boardMenu}
-        onCardClick={(card, e, face) => standable(card) && select(card, 'board', e, () => face)}
-        onPress={boardPress}
+        onPress={() => (menu = null)}
         onLineMenu={lineMenu}
         {tool}
         {editing}
@@ -728,18 +613,10 @@
       <div class="stand">
         <div class="clear" style:min-width="{clearance.left}px"></div>
         {#each stood as card (card.id)}
-          {@const path = card.path ?? ''}
-          {@const lifted = selected?.at === 'stand' && selected.path === path && lift > 0}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
             class="standing"
-            class:lifted
             role="presentation"
-            data-path={path}
-            style:margin-bottom={lifted ? `${lift}px` : null}
-            style:max-height={lifted ? `calc(100% - ${lift}px)` : null}
-            on:mousedown={() => press(path, 'stand')}
-            on:click={(e) => standClick(card, e)}
+            data-path={card.path}
             on:contextmenu|preventDefault={() => stand(card)}
           >
             <CardFace data={dataOf(card)} held />
@@ -833,25 +710,13 @@
       bind:open={trayOpen}
       onPoint={(path) => (pointed = path)}
       onOrder={orderLive}
-      selected={selected?.at === 'tray' ? selected.path : null}
-      lift={selected?.at === 'tray' ? lift : 0}
-      onPress={(path) => press(path, 'tray')}
-      onSelect={(card, e, face) => select(card, 'tray', e, face)}
-      onDeselect={deselect}
       onStand={stand}
     />
   {/if}
 </div>
 
 {#if menu}
-  <CommandMenu
-    x={menu.x}
-    y={menu.y}
-    items={menu.items}
-    anchor={menu.anchor ?? null}
-    onPlace={menu.onPlace ?? null}
-    onClose={closeMenu}
-  />
+  <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
 {/if}
 
 <style>
@@ -906,11 +771,6 @@
     display: flex;
     flex-direction: column;
     pointer-events: auto;
-  }
-
-  /* Selected, on its menu: set on the floor, as high as it rises (lift). */
-  .standing.lifted {
-    align-self: flex-end;
   }
 
   .standing :global(.card) {

@@ -14,11 +14,6 @@
   export let y: number;
   export let items: MenuItem[];
   export let onClose: () => void;
-  /** A card the menu opens at instead of the pointer, its width: under it,
-   *  or over its foot when the window has no room there, and `onPlace`
-   *  tells the opener where, to lift the card clear. */
-  export let anchor: DOMRect | null = null;
-  export let onPlace: ((box: DOMRect) => void) | null = null;
 
   let el: HTMLDivElement;
   let pos = { x, y };
@@ -85,20 +80,12 @@
     claimMenuSlot(close);
     await tick();
     const box = el.getBoundingClientRect();
-    let at = { x, y };
-    if (anchor) {
-      const padding = 8;
-      const under = anchor.bottom + 0.25 * parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const fits = under + box.height <= window.innerHeight - padding;
-      at = { x: anchor.left, y: fits ? under : anchor.bottom - box.height };
-    }
     pos = clampToViewport(
-      at,
+      { x, y },
       { width: box.width, height: box.height },
       { width: window.innerWidth, height: window.innerHeight },
     );
     measured = true;
-    onPlace?.(new DOMRect(pos.x, pos.y, box.width, box.height));
   });
 
   onDestroy(() => {
@@ -109,16 +96,7 @@
 
 <svelte:window on:mousedown={onWindowMousedown} on:blur={close} />
 
-<div
-  class="command-menu"
-  class:measured
-  class:anchored={!!anchor}
-  bind:this={el}
-  style:left="{pos.x}px"
-  style:top="{pos.y}px"
-  style:width={anchor ? `${anchor.width}px` : null}
-  role="menu"
->
+<div class="command-menu" class:measured bind:this={el} style:left="{pos.x}px" style:top="{pos.y}px" role="menu">
   {#each items as item, i (i)}
     {#if item.kind === 'divider'}
       <hr class="menu-divider" />
@@ -201,13 +179,6 @@
     max-height: var(--menu-max-height);
     overflow-y: auto;
     padding: 0.15rem 0;
-  }
-
-  /* At a card, its width, whatever that is. */
-  .command-menu.anchored {
-    box-sizing: border-box;
-    min-width: 0;
-    max-width: none;
   }
 
   .command-menu.measured {

@@ -16,8 +16,8 @@
   // clicked, Text, Sticky and Frame make one there, Line draws from
   // anywhere on a card. With Select, the selection bar floats over
   // selected text cards, stickies and frames, or over a selected line. A
-  // card's click and right-click go to Play, which opens a note card's
-  // menu or stands it up (PlayView).
+  // card's right-click goes to Play, which stands a note card up or opens
+  // another's menu (PlayView).
   import {
     Background,
     BackgroundVariant,
@@ -88,10 +88,10 @@
   export let onLeave: (viewport: Viewport) => void;
   export let onOps: (ops: BoardOp[]) => void;
   export let onCardMenu: (card: Card, e: MouseEvent) => void;
-  /** A click on a card with Select, `face` the card clicked. */
-  export let onCardClick: (card: Card, e: MouseEvent, face: Element) => void;
-  /** A press on the board, on a card or not. */
-  export let onPress: (card: Card | null) => void;
+  /** A press on the board, on a card or not. Svelte Flow's drag and pan
+   *  keep it from the window, where an open menu closes on it, so the
+   *  board reports it first. */
+  export let onPress: () => void;
   export let onLineMenu: (id: string, e: MouseEvent) => void;
   export let tool: Tool;
   /** The card or line being edited in place: a line shows its field. */
@@ -401,24 +401,6 @@
     return false;
   }
 
-  /** A click that adds to the selection, or that starts a line from a
-   *  card's point, isn't passed on. */
-  function nodeClick({ node, event }: { node: Node; event: MouseEvent | TouchEvent }) {
-    const card = cardOf(node.id);
-    const target = event.target as Element;
-    const face = target.closest('.svelte-flow__node');
-    if (!card || !face || tool !== 'select' || !(event instanceof MouseEvent)) return;
-    if (event.shiftKey || event.metaKey || target.closest('.svelte-flow__handle')) return;
-    onCardClick(card, event, face);
-  }
-
-  /** Svelte Flow's drag and pan keep a press from the window, where an
-   *  open menu closes on it: the board reports it first. */
-  function pressBoard(e: MouseEvent) {
-    const id = (e.target as Element).closest('.svelte-flow__node')?.getAttribute('data-id');
-    onPress((id && cardOf(id)) || null);
-  }
-
   function nodeMenu({ node, event }: { node: Node; event: MouseEvent }) {
     const card = cardOf(node.id);
     if (!card) return;
@@ -445,7 +427,7 @@
   class:hand={tool === 'hand'}
   class:linking={tool === 'line'}
   bind:this={boardEl}
-  on:mousedown|capture={pressBoard}
+  on:mousedown|capture={() => onPress()}
   on:keydown={keepBackspace}
   on:dragover={dragOver}
   on:drop={drop}
@@ -478,7 +460,6 @@
     onconnectend={() => tool === 'line' && onToolDone()}
     onedgeclick={lineClick}
     onbeforedelete={beforeDelete}
-    onnodeclick={nodeClick}
     onnodecontextmenu={nodeMenu}
     onedgecontextmenu={edgeMenu}
   >

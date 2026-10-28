@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
-- **Cards stand over the board.** In Play, a right-click on a card in the card tray or on the board shows it in the middle of the dimmed board; a click on the board puts it back, and a click on a card opens its menu under it
+- **Cards stand over the board.** In Play, a right-click on a card in the card tray or on the board shows it in the middle of the dimmed board, in place of its menu; a click on the board puts it back
 - **Tray cards move by drag.** In Play, a drag along the card tray puts a card in a different place in the live set
 
 ## [4.3.0] - 2026-10-25

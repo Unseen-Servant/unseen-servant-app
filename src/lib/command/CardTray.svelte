@@ -3,13 +3,11 @@
   // docked under the board as a deckbuilder's hand sits under its table.
   // Each card keeps its reading width; past what fits they overlap evenly,
   // so every one stays in view. Pointing at a card brings it to the front,
-  // whole, and outlines its card on the board. A click selects a card, one
-  // at a time, as on the board (PlayView): it stays up, whole and raised,
-  // with its menu over it, and a double-click opens its note. A right-click
-  // stands the card up in the middle of the dimmed board, or puts it back;
-  // the tray stays as it was. A card drags along the hand to put the live
-  // set in another order. Folded, the tray is its plate, the hand as
-  // nameplates that bring their card up when pointed at.
+  // whole, and outlines its card on the board. A double-click opens its
+  // note. A right-click stands the card up in the middle of the dimmed
+  // board, or puts it back; the tray stays as it was. A card drags along
+  // the hand to put the live set in another order. Folded, the tray is its
+  // plate, the hand as nameplates that bring their card up when pointed at.
   import { onDestroy, onMount } from 'svelte';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import { grab } from '../ui/grab';
@@ -29,33 +27,11 @@
   /** The hand dragged into a new order: the live set's notes in it.
    *  Settles once the live set has answered. */
   export let onOrder: (notes: string[]) => Promise<void>;
-  /** The card selected here (PlayView): it stays up, whole, raised and in
-   *  the accent rule, with its menu under it at its width. */
-  export let selected: string | null;
-  /** How far the selected card rises clear of its menu, in px: the window
-   *  has no room under a card in the tray, so the menu takes its foot and
-   *  the card stands on the menu. */
-  export let lift: number;
-  /** A press on a card, before the menu open closes on it. */
-  export let onPress: (path: string) => void;
-  /** A click on a card: its menu opens at `face` once the double-click
-   *  time has passed. */
-  export let onSelect: (card: Card, e: MouseEvent, face: () => Element) => void;
-  export let onDeselect: () => void;
   /** A right-click stands a card in the middle of the board, or puts it
    *  back. */
   export let onStand: (card: Card) => void;
 
   $: held = cards.map(dataOf);
-
-  // -- the selected card ----------------------------------------------------
-
-  /** The menu goes at the card in the hand, or at a nameplate's card above
-   *  it. */
-  function select(card: Card, e: MouseEvent & { currentTarget: HTMLElement }) {
-    const at = e.currentTarget;
-    onSelect(card, e, () => (at.matches('.note-plate') ? (at.parentElement?.querySelector('.peek .card') ?? at) : at));
-  }
 
   // -- pointing -------------------------------------------------------------
 
@@ -113,7 +89,6 @@
   $: from = moving ? cards.findIndex((c) => c.path === moving?.path) : -1;
 
   function startDrag(e: DragEvent & { currentTarget: HTMLElement }, path: string) {
-    onDeselect();
     point(null);
     grabX = e.clientX - e.currentTarget.getBoundingClientRect().left;
     moving = { path, to: cards.findIndex((c) => c.path === path) };
@@ -191,16 +166,11 @@
         {#each held as d, i (d.card.id)}
           {@const path = d.card.path ?? ''}
           <div class="plate-slot" role="presentation" on:pointerenter={() => point(path)} on:pointerleave={() => point(null)}>
-            {#if pointed === path || selected === path}
-              <div
-                class="peek"
-                class:end={i >= held.length / 2}
-                style:transform={selected === path && lift ? `translateY(-${lift}px)` : null}
-              >
+            {#if pointed === path}
+              <div class="peek" class:end={i >= held.length / 2}>
                 <CardFace data={d} held />
               </div>
             {/if}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
               class="note-plate"
               role="button"
@@ -208,11 +178,9 @@
               data-path={path}
               class:pigmented={!!d.pigment}
               class:spent={!!d.spent}
-              class:pointed={pointed === path || selected === path}
+              class:pointed={pointed === path}
               style:--pigment={d.pigment}
               title={d.name}
-              on:mousedown={() => onPress(path)}
-              on:click={(e) => select(d.card, e)}
               on:contextmenu|preventDefault={() => onStand(d.card)}
             >
               {d.name}
@@ -240,27 +208,21 @@
         {#each held as d, i (d.card.id)}
           {@const path = d.card.path ?? ''}
           {@const at = moving && from >= 0 ? handShift(i, from, moving.to) : i}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
             class="slot"
             role="button"
             tabindex="-1"
             data-path={path}
-            class:look={pointed === path || selected === path}
-            class:selected={selected === path}
+            class:look={pointed === path}
             class:carried={carrying && moving?.path === path}
             style:left="{at * step}px"
             style:width="{CARD_REM}rem"
-            style:z-index={selected === path ? held.length + 1 : pointed === path ? held.length : at}
-            on:mousedown={() => onPress(path)}
-            on:click={(e) => select(d.card, e)}
+            style:z-index={pointed === path ? held.length : at}
             on:contextmenu|preventDefault={() => onStand(d.card)}
             use:grab
             on:dragstart={(e) => startDrag(e, path)}
           >
-            <div class="lift" style:transform={selected === path && lift ? `translateY(-${lift}px)` : null}>
-              <CardFace data={d} held />
-            </div>
+            <div class="lift"><CardFace data={d} held /></div>
           </div>
         {/each}
       </div>
@@ -483,16 +445,6 @@
 
   /* Looked at: a note longer than the tray grows up over the board until
      all of it shows, or the board's height would. */
-  /* Selected: the board's selected card's accent rule, raised a step, as
-     a card readied to play, then onto its menu (lift). */
-  .slot.selected :global(.card) {
-    border-color: var(--text-accent);
-  }
-
-  .slot.selected .lift {
-    transform: translateY(-0.4rem);
-  }
-
   .slot.look .lift {
     height: auto;
     min-height: 100%;
