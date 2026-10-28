@@ -99,6 +99,9 @@
   --border-accent: rgb(182, 159, 129);
   --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Play's board under the cards standing over it: a step darker than a
+     dialog's scrim, so a card reads over the board's busy vellum. */
+  --scrim-board: rgba(0, 0, 0, 0.75);
   /* Roving keyboard focus on list rows. Same parchment as the global
      :focus-visible outline below, drawn inset because a dense list has
      no room for that rule's 2px offset. A ring rather than a fill so it
