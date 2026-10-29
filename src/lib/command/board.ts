@@ -298,6 +298,79 @@ export function handShift(i: number, from: number, to: number): number {
   return i;
 }
 
+/** The standing cards' sizes, in px: a column's narrowest and widest
+ *  (a reading measure), the gap between cards, and the least a card is
+ *  cut to (its head and a few lines). */
+export interface StandSizes {
+  min: number;
+  max: number;
+  gap: number;
+  least: number;
+}
+
+/** Where the standing cards go on a board `width` × `height` px, a gap
+ *  clear of `left` and `right` px at its sides (the session player and
+ *  the rail), as the cards are of each other, each `heights[i]` px tall at
+ *  the columns' width: columns as many as fit and no more than the
+ *  cards, each card in turn into the shortest. A column taller than the
+ *  board shares its height among its cards in proportion, none cut under
+ *  `least`. The columns' tops line up, the spread centred between the
+ *  sides and on the board's middle line. */
+export function standSpread(
+  heights: number[],
+  area: { width: number; height: number; left: number; right: number },
+  sizes: StandSizes,
+): { width: number; boxes: { x: number; y: number; height: number }[] } {
+  const { min, max, gap, least } = sizes;
+  const start = area.left + gap;
+  const end = area.width - area.right - gap;
+  const room = Math.max(0, end - start);
+  const count = Math.max(1, Math.min(heights.length, Math.floor((room + gap) / (min + gap))));
+  const width = Math.max(0, Math.min(max, (room - (count - 1) * gap) / count));
+  const columns: number[][] = Array.from({ length: count }, () => []);
+  const tall = (c: number[]) => c.reduce((sum, i) => sum + heights[i], 0) + Math.max(0, c.length - 1) * gap;
+  heights.forEach((_, i) => {
+    let shortest = 0;
+    for (let c = 1; c < count; c++) if (tall(columns[c]) < tall(columns[shortest])) shortest = c;
+    columns[shortest].push(i);
+  });
+  const cut = columns.map((c) =>
+    cutColumn(
+      c.map((i) => heights[i]),
+      area.height - Math.max(0, c.length - 1) * gap,
+      least,
+    ),
+  );
+  const used = Math.max(...cut.map((c) => c.reduce((sum, h) => sum + h, 0) + Math.max(0, c.length - 1) * gap));
+  const top = Math.max(0, (area.height - used) / 2);
+  const span = count * width + (count - 1) * gap;
+  const left = start + Math.max(0, room - span) / 2;
+  const boxes: { x: number; y: number; height: number }[] = [];
+  columns.forEach((c, k) => {
+    let y = top;
+    c.forEach((i, j) => {
+      boxes[i] = { x: left + k * (width + gap), y, height: cut[k][j] };
+      y += cut[k][j] + gap;
+    });
+  });
+  return { width, boxes };
+}
+
+/** Cards `heights` tall cut to share `free` px: a card the cut would take
+ *  under `least` keeps that much, or its own height if less, and the
+ *  rest share what's left in proportion. */
+function cutColumn(heights: number[], free: number, least: number): number[] {
+  const kept = new Set<number>();
+  for (;;) {
+    const rest = heights.reduce((sum, h, j) => (kept.has(j) ? sum : sum + h), 0);
+    const room = free - heights.reduce((sum, h, j) => (kept.has(j) ? sum + Math.min(h, least) : sum), 0);
+    const scale = rest > room ? room / rest : 1;
+    const under = heights.flatMap((h, j) => (!kept.has(j) && h * scale < Math.min(h, least) ? [j] : []));
+    if (!under.length) return heights.map((h, j) => (kept.has(j) ? Math.min(h, least) : h * scale));
+    for (const j of under) kept.add(j);
+  }
+}
+
 /** What putting a card at `frame` writes: a placed card is framed; an
  *  auto-placed note is placed, under a new id the returned op carries. */
 export function frameOp(card: Card, frame: Frame): BoardOp {

@@ -5,7 +5,7 @@
   // plays one note. The board's file and the jot bar's lines in the
   // session note are the only things written — what's live is the
   // sidecar's.
-  import { onDestroy, setContext, tick } from 'svelte';
+  import { onDestroy, onMount, setContext, tick } from 'svelte';
   import { writable } from 'svelte/store';
   import type { Viewport } from '@xyflow/svelte';
   import Arrangement from './Arrangement.svelte';
@@ -33,6 +33,7 @@
     lines as boardLines,
     newId,
     placeAll,
+    standSpread,
     type Card,
     type CardActions,
     type CardData,
@@ -408,15 +409,15 @@
   let playerWidth = 0;
   $: covered = player && playerWidth ? player.offsetLeft + playerWidth : 0;
 
-  /** Standing cards keep clear of the session player and the jot bar
-   *  under it on the left, and the rail on the right. */
+  /** Standing cards keep clear of the session player on the left and the
+   *  rail on the right, and stand above the jot bar in the corner, as it
+   *  grows with its text. */
   let stageWidth = 0;
-  let jotBox: HTMLElement | undefined;
-  let jotWidth = 0;
+  let jotHeight = 0;
   let rail: HTMLElement | undefined;
   let railWidth = 0;
   $: clearance = {
-    left: Math.max(covered, jotBox && jotWidth ? jotBox.offsetLeft + jotWidth : 0),
+    left: covered,
     right: rail && railWidth ? stageWidth - rail.offsetLeft : 0,
   };
 
@@ -493,6 +494,33 @@
     if (!stood.length) return false;
     standing = [];
     return true;
+  }
+
+  /** Each standing card's own height at the columns' width, from its
+   *  unseen copy (measure), as its note or its picture loads. */
+  let natural = new Map<string, number>();
+  let stageHeight = 0;
+  let rem = 16;
+  onMount(() => (rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || rem));
+  /** In columns across the board's middle, from the stand's 0.5rem top to
+   *  a gap above the jot bar: a reading measure down to 22rem, and a card
+   *  cut to share an overfull column keeps its head and three lines. */
+  $: spread = standSpread(
+    stood.map((c) => natural.get(c.path ?? '') ?? 0),
+    { width: stageWidth, height: stageHeight - 1.5 * rem - jotHeight, ...clearance },
+    { min: 22 * rem, max: 28 * rem, gap: 0.5 * rem, least: 6.5 * rem },
+  );
+
+  function measure(el: HTMLElement, path: string) {
+    const seen = new ResizeObserver(([entry]) => (natural = new Map(natural).set(path, entry.contentRect.height)));
+    seen.observe(el);
+    return {
+      destroy() {
+        seen.disconnect();
+        natural.delete(path);
+        natural = natural;
+      },
+    };
   }
 
   /** A right-click on a board card: a note's or an image's stands it up,
@@ -574,7 +602,7 @@
 </script>
 
 <div class="play">
-  <div class="stage" bind:clientWidth={stageWidth}>
+  <div class="stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight}>
     {#if view}
       <Board
         cards={allCards}
@@ -609,21 +637,31 @@
            player, the rail and the jot bar stay lit over it. -->
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="scrim" role="presentation" on:click={putBack}></div>
-      <!-- The standing cards side by side across the board's middle, each
-           its note's height up to the board's. -->
-      <div class="stand">
-        <div class="clear" style:min-width="{clearance.left}px"></div>
+      <!-- Each standing card at the columns' width and its own height,
+           unseen, for the spread to measure. -->
+      <div class="measure" style:width="{spread.width}px" aria-hidden="true">
         {#each stood as card (card.id)}
+          <div use:measure={card.path ?? ''}><CardFace data={dataOf(card)} held /></div>
+        {/each}
+      </div>
+      <!-- The standing cards in columns across the board's middle, each
+           its note's height up to the board's (standSpread). -->
+      <div class="stand">
+        {#each stood as card, i (card.id)}
+          {@const box = spread.boxes[i]}
           <div
             class="standing"
             role="presentation"
             data-path={card.path}
+            style:left="{box.x}px"
+            style:top="{box.y}px"
+            style:width="{spread.width}px"
+            style:height="{box.height}px"
             on:contextmenu|preventDefault={() => stand(card)}
           >
             <CardFace data={dataOf(card)} held />
           </div>
         {/each}
-        <div class="clear" style:min-width="{clearance.right}px"></div>
       </div>
     {/if}
 
@@ -676,7 +714,7 @@
 
     <!-- The jot bar, in the board's bottom corner (⌘J): a line at the end
          of the session note, which the key beside it (and ⇧⌘J) opens. -->
-    <div class="jot" bind:this={jotBox} bind:offsetWidth={jotWidth}>
+    <div class="jot" bind:offsetHeight={jotHeight}>
       <textarea
         class="jot-bar"
         rows="1"
@@ -745,30 +783,29 @@
     background: var(--scrim-board);
   }
 
-  /* Over the scrim, from the board's top to its foot, the cards on its
-     middle line. A click between them falls to the dimmed board, which
+  /* Laid out, so it measures, but never seen nor in the stage's way. */
+  .measure {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Over the scrim, from the board's top to its foot, where the spread
+     sets the cards. A click between them falls to the dimmed board, which
      puts them back. */
   .stand {
     position: absolute;
     inset: 0.5rem 0;
     z-index: 5;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
     pointer-events: none;
   }
 
-  /* The room each side keeps clear. Both take the same share, so the cards
-     stand in the board's middle, until they need the narrower side's. */
-  .clear {
-    flex: 1 0 0;
-  }
-
-  /* A reading measure each, narrower when more stand than fit. */
   .standing {
-    flex: 0 1 28rem;
-    min-width: 0;
-    max-height: 100%;
+    position: absolute;
     display: flex;
     flex-direction: column;
     pointer-events: auto;

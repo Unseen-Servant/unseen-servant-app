@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handPlace, handShift, handStep, IMAGE_CARD, imageCard, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
+import { CARD, FRAME_PAD, FRAME_TOP, GAP, NOTE_HREF, applyOps, around, arrowhead, bodyOf, cards, connectOps, duplicateOps, facing, frameDepths, frameOp, handOf, handPlace, handShift, handStep, IMAGE_CARD, standSpread, imageCard, inside, lines, linkify, paint, placeAll, rehypeMissingLinks, type Card } from './board';
 import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
@@ -183,6 +183,52 @@ describe('the card tray', () => {
     // The last carried to the second.
     expect([0, 1, 2, 3].map((i) => handShift(i, 3, 1))).toEqual([0, 2, 3, 1]);
     expect([0, 1, 2].map((i) => handShift(i, 1, 1))).toEqual([0, 1, 2]);
+  });
+});
+
+describe('the standing cards', () => {
+  const sizes = { min: 352, max: 448, gap: 8, least: 104 };
+  const board = { width: 1280, height: 528, left: 359, right: 34 };
+
+  it('stands one card at its reading width and height, centred between the sides', () => {
+    const { width, boxes } = standSpread([200], board, sizes);
+    expect(width).toBe(448);
+    // As far from the session player as from the rail.
+    expect(boxes).toEqual([{ x: 578.5, y: 164, height: 200 }]);
+    expect(boxes[0].x - 359).toBe(1280 - 34 - (boxes[0].x + 448));
+  });
+
+  it('puts each card in turn into the shortest column, tops lined up', () => {
+    const { width, boxes } = standSpread([500, 120, 150], board, sizes);
+    // Two columns fit between the session player and the rail, not three.
+    expect(width).toBe(431.5);
+    // A gap clear of the session player and the rail, as of each other.
+    expect(boxes.map((b) => b.x)).toEqual([367, 806.5, 806.5]);
+    expect(boxes.map((b) => b.y)).toEqual([14, 14, 142]);
+  });
+
+  it('shares an overfull column among its cards, none cut under the least', () => {
+    const { boxes } = standSpread([600, 900, 50, 50, 300], board, sizes);
+    // The first column holds 600, 50, 50 and 300; the second, 900.
+    expect(boxes.map((b) => b.x)).toEqual([367, 806.5, 367, 367, 367]);
+    expect(boxes[1]).toEqual({ x: 806.5, y: 0, height: 528 });
+    expect(boxes[1].x + 431.5).toBe(1280 - 34 - 8);
+    // The short cards keep their height, and the 600 and 300 share the
+    // rest in proportion, the 300 above the least.
+    expect(boxes[2].height).toBe(50);
+    expect(boxes[3].height).toBe(50);
+    expect(boxes[0].height + boxes[4].height).toBeCloseTo(528 - 3 * 8 - 100);
+    expect(boxes[0].height / boxes[4].height).toBeCloseTo(2);
+    expect(boxes[4].y + boxes[4].height).toBeCloseTo(528);
+  });
+
+  it('keeps clear of a wide side, and stands one column where only one fits', () => {
+    const { width, boxes } = standSpread([100, 100], { width: 700, height: 528, left: 359, right: 34 }, sizes);
+    expect(width).toBe(291);
+    expect(boxes.map((b) => b.x)).toEqual([367, 367]);
+    // A card the share would cut under the least keeps the least.
+    const cut = standSpread([1000, 200], { width: 700, height: 528, left: 359, right: 34 }, sizes).boxes;
+    expect(cut.map((b) => b.height)).toEqual([416, 104]);
   });
 });
 
