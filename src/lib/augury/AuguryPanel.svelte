@@ -1074,7 +1074,10 @@
     font-size: 0.75rem;
     cursor: pointer;
     padding: 0;
-    transition: color var(--transition-fast), transform var(--transition-fast);
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast),
+      transform var(--transition-fast);
   }
 
   .pad:hover:not(:disabled) {
@@ -1187,9 +1190,11 @@
   }
 
   /* Loaded dice are content: parchment, where a mode's key would light
-     purple. */
+     purple. A loaded pad is lit from behind, as a pad controller's are: a
+     wash of its colour over its face, in its well. */
   .pad.loaded {
     color: var(--text-accent);
+    background: color-mix(in srgb, var(--text-accent) 16%, transparent);
   }
 
   .pad.loaded:hover {
@@ -1198,6 +1203,7 @@
 
   .pad-well.pigmented .pad.loaded {
     color: var(--pigment);
+    background: color-mix(in srgb, var(--pigment) 16%, transparent);
   }
 
   .lamp {

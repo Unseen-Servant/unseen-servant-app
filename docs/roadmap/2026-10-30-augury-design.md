@@ -56,6 +56,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 - **The head** is the tool's header bar, as Legend Lore's and Command's are: 40 px on `--bg-header`, with the window key at the right end. The rack bar names the tool, so the panel doesn't. The set browser sits in it, where a pad controller has its program display.
 - **The formula row** has the field, the advantage and disadvantage latches, then clear (✕) and roll (▶). None of them moves when the dice set changes. The field shows about 13 characters and scrolls past them.
 - **The faceplate** (2026-10-31): Augury's ground is one plate in the plates' grey (`--bg-faceplate`), and every part is a well sunk into it. The display and the tape, which hold data, sit on warm vellum (`--bg-vellum`), a step down; the keys' and pads' wells are the dark app ground, two steps down. Borders alone told the parts apart before, on a ground the same as the wells'.
+- **Backlit pads** (2026-10-31): a loaded pad (dice of its in the formula, a macro's dice held, a word die's answer showing, the ±1 pad holding a number) is lit from behind, as a pad controller's are: a 16% wash of parchment, or of its pigment, over its face, inside its well. An exception to the app's no-filled-buttons rule, kept to the lit state: a pad at rest is its bare well.
 - **The matrix** is 4×4 and always all there. A pad with no die is dark. The bottom-right pad of every number set is the ±1 pad, so a set holds up to 15 dice.
 
 ## 4. The formula
