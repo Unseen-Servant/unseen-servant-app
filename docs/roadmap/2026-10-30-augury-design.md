@@ -4,7 +4,7 @@
 
 ## 0. TL;DR
 
-Augury is the workstation's dice roller, a fourth tool in the rack beside Legend Lore and Command. It is small on purpose: a narrow column that fits beside both at 1280 px. It looks like a MIDI pad controller. A display names a dice set, ◀ ▶ browse the sets, and `[load]` puts the set on a 4×4 pad matrix. Pressing a pad adds its die to a formula in `xdy` notation, which the GM can also type; right-clicking takes one away. A ±1 pad in the corner moves the formula's number, and advantage or disadvantage rolls the formula twice and keeps the higher or lower total. A big seven-segment readout shows the total, with a level meter and each die's value under it. Dice sets: Standard, Zocchi (the 14 dice of DCC's chain), Oracle (dice with words on their faces), Tracks (a note drawn at random from each of Command's tracks) and the GM's own.
+Augury is the workstation's dice roller, a fourth tool in the rack beside Legend Lore and Command. It is small on purpose: a narrow column that fits beside both at 1280 px. It looks like a MIDI pad controller. A display names a dice set, ◀ ▶ browse the sets, and load (⏎) puts the set on a 4×4 pad matrix. Pressing a pad adds its die to a formula in `xdy` notation, which the GM can also type; right-clicking takes one away. A ±1 pad in the corner moves the formula's number, and advantage or disadvantage rolls the formula twice and keeps the higher or lower total. A big seven-segment readout shows the total, with a level meter and each die's value under it. Dice sets: Standard, Zocchi (the 14 dice of DCC's chain), Oracle (dice with words on their faces), Tracks (a note drawn at random from each of Command's tracks) and the GM's own.
 
 ---
 
@@ -27,7 +27,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ```
 ┌──────────────────────────────────────────┐
-│ ◀ ▪ Zocchi        ▶  [load]          ⧉   │  header bar: set browser, window key
+│ ◀ ▪ Zocchi        ▶ ⏎ ✎              ⧉   │  header bar: set strip (browse, load, edit), window key
 ├──────────────────────────────────────────┤
 │ ┌──────────────────────────────────────┐ │
 │ │    _   _                         ▯   │ │  readout: seven-segment total
@@ -77,14 +77,14 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ## 6. Dice sets
 
-- **The browser:** ◀ and ▶ step through the sets and wrap at the ends. They change only the display; the pads keep the loaded set until `[load]`. A lamp left of the name (the rack's 6 px square cell) is lit while the set on display is the one on the pads. Browse away and it goes dark and `[load]` comes alive. The header has one bracket key for what the display allows: `[load]` for a set not on the pads (*New set* included), `[edit]` / `[done]` for the loaded set when the GM can edit it; on the loaded Standard or Zocchi it is a dead `[load]`.
+- **The set strip:** one well of keys, as a pad controller's program section, each with one job: ◀ and ▶ step through the sets and wrap at the ends; the display names the set; ⏎ (Font Awesome's arrow-right-to-bracket) loads it; ✎ edits it. A faint rule parts browsing from the keys that act on what's browsed. ◀ ▶ change only the display; the pads keep the loaded set until ⏎, which is dimmed while the display shows the loaded set. A lamp left of the name (the rack's 6 px square cell) is lit while the set on display is the one on the pads. ✎ is the loaded set's, dimmed unless it's one of the GM's. Nothing in the strip moves between play and edit mode. Load and edit carry lamps under their glyphs: load's lit parchment while the display shows a set waiting to load, edit's purple while editing; the arrows and the name, with none, sit centred. (Bracket keys came first: `[load]`, then `[edit]` turning into `[done]` with `[delete]` beside it, which took the width and read nothing like hardware.)
 - **Loading keeps the formula**, so `1d20` from Standard and `1d7` from a custom set roll together.
 - **Standard:** d4 d6 d8 d10 / d12 d20 d100, the seven-die set. Fixed.
 - **Zocchi:** the 14 dice of DCC's chain in order, row by row: d3 d4 d5 d6 / d7 d8 d10 d12 / d14 d16 d20 d24 / d30 d100. Stepping up or down the chain is the next or previous pad. Fixed.
 - **Oracle:** four word dice (§7). Fixed, as Standard and Zocchi are: its dice are particular, made-for-purpose keys, not a starting point (user, 2026-10-30). The GM's own word dice go in a custom set. Its corner pad is dark: words take no numbers.
 - **Tracks:** a pad for each track of the campaign open in Command, in Command's order and pigment, the first fifteen. A track is a word die whose faces are its unspent notes and images: a press draws one, and its name prints on the readout in the track's pigment; roll again draws again. A spent note is used up, so a draw never lands on one, and a track with none left can't be pressed. With no campaign open the pads are dark and the display's tooltip says why. Fixed: the tracks are Command's to change. Augury reads them through Rust (`command_draw_tracks`), the way Legend Lore's Send to Command crosses between the tools, and again whenever the campaign or its folder changes (`command://vault`).
-- **Custom sets:** *New set* is the entry past the last set, and `[load]` on it makes *Custom 1*, *Custom 2*… (the first number free), loads it and opens it for editing with its name's field open. In edit mode a custom set's name is clicked to rename it (no two sets share a name), and `[delete]` beside `[done]`, in danger's hue, deletes it after a confirmation. The browser's arrows step aside in edit mode, since browsing ends it. (A right-click menu on the display did this first and was dropped the same day: nobody finds a right-click, and `+ new set` → `[new]` → *Custom 1* read as three names for one thing.) A custom set holds up to 15 number dice of any size (a d25) and word dice side by side, with the ±1 pad in its corner. The ids are `custom-<time>`.
-- **Edit mode.** In play a click adds a die and a right-click takes one away, and a double-click's first click would add one, so editing is a mode, as on a pad controller: `[edit]` turns the loaded set's pads into fields and `[done]` (or Esc) turns them back. Empty pads show dashed with a `+` (the app's "not yet real" edge), and the ±1 pad rests.
+- **Custom sets:** *New set* is the entry past the last set, and ⏎ on it makes *Custom 1*, *Custom 2*… (the first number free), loads it and opens it for editing with its name's field open. In edit mode a custom set's name is clicked to rename it (no two sets share a name), and a ✕ at its end, red under the pointer, deletes it after a confirmation: the ✕ every pad shows in edit mode, so whatever edit mode can remove shows one. (A right-click menu on the display did this first and was dropped the same day: nobody finds a right-click, and `+ new set` → `[new]` → *Custom 1* read as three names for one thing.) A custom set holds up to 15 number dice of any size (a d25) and word dice side by side, with the ±1 pad in its corner. The ids are `custom-<time>`.
+- **Edit mode.** In play a click adds a die and a right-click takes one away, and a double-click's first click would add one, so editing is a mode, as on a pad controller: ✎ turns the loaded set's pads into fields, lighting its lamp purple (a mode switched on), and ✎ again (or Esc) turns them back. Meanwhile ◀ ▶ and ⏎ dim and go inert, as Command dims its Prep keys in Play: browsing or loading would end editing. Empty pads show dashed with a `+` (the app's "not yet real" edge), and the ±1 pad rests.
 - **Pads are placed, not sorted.** In edit mode a click opens the pad's field in place: `25` or `d25` makes a die of that size (2–1000), any other words name a word die, and a lone `d` (a die begun) and a formula are refused (a formula would roll as dice, never as that die). A word die renamed keeps its faces, and any pad its pigment. A filled pad shows a small ✕ in its corner, red under the pointer, which clears it; emptying its field does too. A right-click opens the pad's menu: *Pigment* (§8) and *Edit faces* for a word die. (*Clear pad* sat in that menu first; behind a right-click it went unfound.)
 - **The last loaded set** is remembered.
 
@@ -116,7 +116,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ## 10. Order of work
 
-1. **The panel and number dice.** Augury in the rack and as a pop-out (`panels.ts`, `panels.rs`, `PanelView`), on the first launch's view 2 beside Command, opening at its minimum. Formula parsing and rolling, with tests. Readout, level meter and breakdown. Field, clear and roll keys, Enter and Esc. The matrix, Standard and Zocchi, the browser and `[load]`, the remembered set. Right-click, ±1, advantage and disadvantage.
+1. **The panel and number dice.** Augury in the rack and as a pop-out (`panels.ts`, `panels.rs`, `PanelView`), on the first launch's view 2 beside Command, opening at its minimum. Formula parsing and rolling, with tests. Readout, level meter and breakdown. Field, clear and roll keys, Enter and Esc. The matrix, Standard and Zocchi, the browser and its load key, the remembered set. Right-click, ±1, advantage and disadvantage.
 2. **Oracle.** Word dice, the word readout, Oracle's four dice, editing a word die's faces.
 3. **Custom sets and pigments.** `+ new set`, renaming and deleting, edit mode, placing and clearing pads, the pad menu, pigments in the pads and the breakdown. Then the Tracks set.
 4. **Help and keys.** Help → Guides → Augury, the shortcut sheet, CHANGELOG.
@@ -126,7 +126,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 - The name: Augury, after the divination spell, as the other tools are named after spells.
 - Seven-segment lamps for the total, with a level meter and the breakdown kept.
 - Calculator semantics: the formula stays after a roll; the first press after it starts a new one.
-- Dice sets on a MIDI-style browser with `[load]`, not a row of bank keys, so the GM can keep any number of sets.
+- Dice sets on a MIDI-style browser with a load key, not a row of bank keys, so the GM can keep any number of sets. Its keys are one strip of glyph keys with fixed jobs (user, 2026-10-30).
 - A 4×4 matrix. Zocchi is the full 14-dice chain.
 - Word pads roll at once.
 - Pads of the same die told apart by pigment, shown as an edge on the pad.

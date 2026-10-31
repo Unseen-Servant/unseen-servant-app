@@ -11,10 +11,12 @@
   // makes each track of the campaign open in Command such a die, its faces
   // the track's unspent notes.
   //
-  // The GM's own sets are edited in place (§6): [edit] turns the pads into
+  // The GM's own sets are edited in place (§6): edit (✎) turns the pads into
   // fields, a click changes one and a right-click opens its menu, since in
-  // play those gestures add and take away dice. The header turns with them:
-  // the set's name is clicked to rename it, and [delete] sits beside [done].
+  // play those gestures add and take away dice. The header's strip keeps
+  // its keys where they are: edit's lamp lights, the keys that would end
+  // editing dim, the set's name is clicked to rename it, and a ✕ at its end
+  // deletes it, as each pad's ✕ clears the pad.
   import { onMount, onDestroy, type Snippet } from 'svelte';
   import { load } from '@tauri-apps/plugin-store';
   import CommandMenu from '../command/CommandMenu.svelte';
@@ -60,6 +62,13 @@
 
   export let windowKey: Snippet | undefined = undefined;
 
+  // Font Awesome "arrow-right-to-bracket" (src/lib/ui/icons/arrow-right-to-bracket-solid-full.svg):
+  // load, the set on the display going onto the pads.
+  const LOAD =
+    'M416 160L480 160C497.7 160 512 174.3 512 192L512 448C512 465.7 497.7 480 480 480L416 480C398.3 480 384 494.3 384 512C384 529.7 398.3 544 416 544L480 544C533 544 576 501 576 448L576 192C576 139 533 96 480 96L416 96C398.3 96 384 110.3 384 128C384 145.7 398.3 160 416 160zM406.6 342.6C419.1 330.1 419.1 309.8 406.6 297.3L278.6 169.3C266.1 156.8 245.8 156.8 233.3 169.3C220.8 181.8 220.8 202.1 233.3 214.6L306.7 288L96 288C78.3 288 64 302.3 64 320C64 337.7 78.3 352 96 352L306.7 352L233.3 425.4C220.8 437.9 220.8 458.2 233.3 470.7C245.8 483.2 266.1 483.2 278.6 470.7L406.6 342.7z';
+  // Font Awesome "pen-to-square" (src/lib/ui/icons/pen-to-square-solid-full.svg)
+  const PEN =
+    'M535.6 85.7C513.7 63.8 478.3 63.8 456.4 85.7L432 110.1L529.9 208L554.3 183.6C576.2 161.7 576.2 126.3 554.3 104.4L535.6 85.7zM236.4 305.7C230.3 311.8 225.6 319.3 222.9 327.6L193.3 416.4C190.4 425 192.7 434.5 199.1 441C205.5 447.5 215 449.7 223.7 446.8L312.5 417.2C320.7 414.5 328.2 409.8 334.4 403.7L496 241.9L398.1 144L236.4 305.7zM160 128C107 128 64 171 64 224L64 480C64 533 107 576 160 576L416 576C469 576 512 533 512 480L512 384C512 366.3 497.7 352 480 352C462.3 352 448 366.3 448 384L448 480C448 497.7 433.7 512 416 512L160 512C142.3 512 128 497.7 128 480L128 224C128 206.3 142.3 192 160 192L256 192C273.7 192 288 177.7 288 160C288 142.3 273.7 128 256 128L160 128z';
   // Font Awesome "xmark" (src/lib/ui/icons/xmark-solid-full.svg)
   const XMARK =
     'M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z';
@@ -117,21 +126,10 @@
           : m.augury_new_title();
   $: bonus = numberOf(terms ?? []);
   $: facesPad = facesOf === null ? null : set.pads[facesOf];
-  // One key on the header for what the display allows: load the set shown
-  // (the new one included), or edit the loaded one if it can be.
-  $: control =
-    browsedId === NEW
-      ? { label: m.augury_load(), title: m.augury_new_title(), run: createSet, off: false }
-      : browsedId !== set.id
-        ? { label: m.augury_load(), title: m.augury_load_title({ set: browsedName }), run: loadSet, off: false }
-        : set.editable
-          ? {
-              label: editing ? m.augury_done() : m.augury_edit(),
-              title: editing ? m.augury_done_title() : m.augury_edit_title(),
-              run: () => (editing ? stopEditing() : (editing = true)),
-              off: false,
-            }
-          : { label: m.augury_load(), title: m.augury_load_title({ set: browsedName }), run: loadSet, off: true };
+  // Load takes the set on the display onto the pads (New set makes one
+  // first); edit is the loaded set's, when it's one of the GM's.
+  $: canLoad = !editing && browsedId !== set.id;
+  $: canEdit = editing || (browsedId === set.id && set.editable);
 
   // A changed formula has no result yet, so the readout goes dark.
   function unroll() {
@@ -288,9 +286,18 @@
   }
 
   function loadSet() {
+    if (browsedId === NEW) {
+      createSet();
+      return;
+    }
     loadedId = browsedId;
     stopEditing();
     void save('augurySet', loadedId);
+  }
+
+  function toggleEditing() {
+    if (editing) stopEditing();
+    else editing = true;
   }
 
   function createSet() {
@@ -439,30 +446,26 @@
 </script>
 
 <section class="augury" class:dormant={$focusPath.tool !== 'augury'}>
-  <!-- The set browser sits in the header, where a pad controller has its
-       program display. -->
   <header class="bar">
+    <!-- A pad controller's program section: one strip of keys, each with one
+         job. Edit mode lights edit's lamp and dims the keys that would end
+         it, so nothing in the strip moves. Load and edit carry lamps: load's
+         lit parchment while a set waits on the display, edit's purple while
+         editing. -->
     <div class="well browser" role="group" aria-label={m.augury_sets_label()}>
-      <!-- Browsing ends editing, so while editing the arrows give the name
-           their room. -->
-      {#if !editing}
-        <button
-          type="button"
-          class="key"
-          title={m.augury_set_previous()}
-          aria-label={m.augury_set_previous()}
-          on:click={() => step(-1)}
-        >
-          <svg class="back" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-        </button>
-      {/if}
+      <button
+        type="button"
+        class="key"
+        disabled={editing}
+        title={m.augury_set_previous()}
+        aria-label={m.augury_set_previous()}
+        on:click={() => step(-1)}
+      >
+        <svg class="back" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+      </button>
       <!-- The rack's tool lamp (RackBar .cell): lit while the set on the
            display is the one on the pads. -->
-      <span
-        class="display"
-        class:new={browsedId === NEW}
-        title={displayTitle}
-      >
+      <span class="display" class:new={browsedId === NEW} title={displayTitle}>
         <span class="cell" class:lit={browsedId === set.id} aria-hidden="true"></span>
         {#if renaming && browsed}
           <span class="name-field">
@@ -484,44 +487,57 @@
           >
             {browsedName}
           </button>
+          <!-- Edit mode's ✕, as every pad shows one: the set itself can go. -->
+          <button
+            type="button"
+            class="clear"
+            title={m.augury_delete_title()}
+            aria-label={m.augury_delete_title()}
+            on:click={() => void deleteSet(set.id, set.name())}
+          >
+            <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={XMARK} /></svg>
+          </button>
         {:else}
           <span class="set-name readout-label">{browsedName}</span>
         {/if}
       </span>
-      {#if !editing}
-        <button
-          type="button"
-          class="key"
-          title={m.augury_set_next()}
-          aria-label={m.augury_set_next()}
-          on:click={() => step(1)}
-        >
-          <svg viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-        </button>
-      {/if}
-    </div>
-    <button
-      type="button"
-      class="plate-btn"
-      disabled={control.off}
-      aria-pressed={browsedId === set.id && set.editable ? editing : undefined}
-      title={control.title}
-      on:click={control.run}
-    >
-      {control.label}
-    </button>
-    <!-- Removal in danger's hue, on the same bracketed shape. -->
-    {#if editing}
       <button
         type="button"
-        class="plate-btn danger"
-        title={m.augury_delete_title()}
-        on:click={() => void deleteSet(set.id, set.name())}
+        class="key"
+        disabled={editing}
+        title={m.augury_set_next()}
+        aria-label={m.augury_set_next()}
+        on:click={() => step(1)}
       >
-        {m.augury_delete()}
+        <svg viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
       </button>
-    {/if}
-    <span class="spacer"></span>
+      <!-- Browsing, then acting on what's browsed. -->
+      <span class="rule" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="key"
+        disabled={!canLoad}
+        title={browsedId === NEW ? m.augury_new_title() : m.augury_load_title({ set: browsedName })}
+        aria-label={browsedId === NEW ? m.augury_new_title() : m.augury_load_title({ set: browsedName })}
+        on:click={loadSet}
+      >
+        <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={LOAD} /></svg>
+        <span class="lamp" class:lit={canLoad} aria-hidden="true"></span>
+      </button>
+      <!-- A mode switched on: its lamp lights purple, LatchKey's way. -->
+      <button
+        type="button"
+        class="key"
+        disabled={!canEdit}
+        aria-pressed={editing}
+        title={editing ? m.augury_done_title() : m.augury_edit_title()}
+        aria-label={m.augury_edit_label()}
+        on:click={toggleEditing}
+      >
+        <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={PEN} /></svg>
+        <span class="lamp mode" class:lit={editing} aria-hidden="true"></span>
+      </button>
+    </div>
     {@render windowKey?.()}
   </header>
 
@@ -727,18 +743,11 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    justify-content: space-between;
     height: var(--header-height);
     padding: 1px 0.5rem 0;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .spacer {
-    flex: 1;
-  }
-
-  .plate-btn {
-    flex-shrink: 0;
   }
 
   /* The board tools' wells and keys (BoardTools .well, .key). */
@@ -853,10 +862,29 @@
     color: var(--text-primary);
   }
 
-  .plate-btn.danger,
-  .plate-btn.danger:hover::before,
-  .plate-btn.danger:hover::after {
-    color: var(--text-danger);
+  /* The status bar's rule (StatusBar .rule), in the well's own edge grey:
+     on the well's darker ground the bar's grey would stand out. */
+  .rule {
+    flex-shrink: 0;
+    width: 1px;
+    height: 12px;
+    margin: 0 0.15rem;
+    background: var(--border-subtle);
+  }
+
+  /* Load and edit stack a glyph over a lamp, as LatchKey's keys do; the
+     arrows, with no lamp, centre theirs. */
+  .browser .key {
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  /* The pads' ✕ (.clear), in line at the end of the set's name. */
+  .display .clear {
+    position: static;
+    flex-shrink: 0;
+    width: 12px;
+    margin-left: auto;
   }
 
   /* RackBar .cell, verbatim. */
