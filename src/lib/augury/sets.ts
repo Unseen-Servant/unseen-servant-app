@@ -5,7 +5,7 @@
 import { PIGMENTS } from '../legend-lore/palette';
 import { m } from '../paraglide/messages';
 import { parseRecord } from '../shell/storeParsers';
-import { MAX_SIZE, MIN_SIZE, parseFormula } from './dice';
+import { formatFormula, MAX_SIZE, MIN_SIZE, parseFormula } from './dice';
 import type { DrawTrack } from './tracks';
 
 export const PADS = 16;
@@ -13,13 +13,16 @@ export const PADS = 16;
  *  up to 15 dice. */
 export const DICE_PADS = PADS - 1;
 
-/** A pad's die: a size, or a word die's name and faces (design §7). A
- *  pigment tells two pads of the same die apart (§8). */
+/** A pad's die: a size, a word die's name and faces (design §7), or a
+ *  macro, a formula under a name (§13). A pigment tells two pads of the
+ *  same die apart (§8). */
 export type Pad =
   | { kind: 'die'; size: number; pigment?: string }
-  | { kind: 'word'; name: string; faces: string[]; pigment?: string };
+  | { kind: 'word'; name: string; faces: string[]; pigment?: string }
+  | { kind: 'macro'; name: string; formula: string; pigment?: string };
 
 export type WordPad = Extract<Pad, { kind: 'word' }>;
+export type MacroPad = Extract<Pad, { kind: 'macro' }>;
 
 export interface DiceSet {
   id: string;
@@ -119,28 +122,41 @@ export function newSet(custom: CustomSet[], id: string): CustomSet {
   return { id, name: m.augury_custom_name({ n }), pads: onPads([]) };
 }
 
-/** What a pad's field makes of its entry (design §6): `25` or `d25` is a
- *  die of that size, any other words name a word die. A lone `d` is a die
- *  begun, not a name. A word die keeps its faces when renamed, and any pad
- *  its pigment. A refusal says why. */
+/** What a pad's field makes of its entry (design §6, §13): `25`, `d25` or
+ *  `1d25` is a die of that size; `dmg = 2d10+1d6` a macro, and a formula
+ *  alone one named by its formula; any other words name a word die. A lone
+ *  `d` is a die begun, not a name. A word die keeps its faces when renamed,
+ *  and any pad its pigment. A refusal says why. */
 export function padFromEntry(text: string, was: Pad | null): { pad: Pad } | { refused: string } {
   const entry = text.trim();
   const pigment = was?.pigment ? { pigment: was.pigment } : {};
   if (/^d$/i.test(entry)) return { refused: m.augury_pad_unfinished_refused() };
-  const size = /^d?(\d+)$/i.exec(entry);
+  const size = /^(?:1?d)?(\d+)$/i.exec(entry);
   if (size) {
     const n = Number(size[1]);
     if (n < MIN_SIZE || n > MAX_SIZE) return { refused: m.augury_pad_size_refused({ min: MIN_SIZE, max: MAX_SIZE }) };
     return { pad: { kind: 'die', size: n, ...pigment } };
   }
-  // A formula would roll as dice when typed, never as this word die.
-  if (parseFormula(entry)) return { refused: m.augury_pad_formula_refused() };
+  const eq = entry.indexOf('=');
+  // A word die's name never reads as a formula: typed, it would roll as dice.
+  const terms = parseFormula(eq < 0 ? entry : entry.slice(eq + 1));
+  if (eq >= 0 && !terms?.length) return { refused: m.augury_pad_macro_refused() };
+  if (terms?.length) {
+    const formula = formatFormula(terms);
+    return { pad: { kind: 'macro', name: (eq > 0 && entry.slice(0, eq).trim()) || formula, formula, ...pigment } };
+  }
   return { pad: { kind: 'word', name: entry, faces: was?.kind === 'word' ? was.faces : [], ...pigment } };
 }
 
-/** A pad's text: its die, or its word die's name. */
+/** A pad's text: its die, or its word die's or macro's name. */
 export function padLabel(pad: Pad): string {
   return pad.kind === 'die' ? `d${pad.size}` : pad.name;
+}
+
+/** What a pad's field opens with: its label, and a named macro's formula
+ *  after its name, as it was typed. */
+export function padEntry(pad: Pad): string {
+  return pad.kind === 'macro' && pad.name !== pad.formula ? `${pad.name} = ${pad.formula}` : padLabel(pad);
 }
 
 // ---- the settings store -----------------------------------------------------
@@ -155,6 +171,10 @@ function parsePad(v: unknown): Pad | null {
   if (r.kind === 'word' && typeof r.name === 'string' && r.name.trim() && Array.isArray(r.faces)) {
     const faces = r.faces.filter((f): f is string => typeof f === 'string' && f.trim() !== '');
     return { kind: 'word', name: r.name.trim(), faces, ...pigment };
+  }
+  if (r.kind === 'macro' && typeof r.name === 'string' && r.name.trim() && typeof r.formula === 'string') {
+    const terms = parseFormula(r.formula);
+    if (terms?.length) return { kind: 'macro', name: r.name.trim(), formula: formatFormula(terms), ...pigment };
   }
   return null;
 }

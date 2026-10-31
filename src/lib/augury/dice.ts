@@ -126,19 +126,45 @@ export function reattach(typed: Term[], was: Term[]): Term[] {
   });
 }
 
-/** The ±1 pad: the formula's last number moved by one, dropped at zero,
- *  or a new number at the end. Null past MAX_NUMBER. */
-export function bump(terms: Term[], by: 1 | -1): Term[] | null {
+/** The ±1 pad: the formula's last number moved by one (a macro's number
+ *  by its value), dropped at zero, or a new number at the end. Null past
+ *  MAX_NUMBER. */
+export function bump(terms: Term[], by: number): Term[] | null {
+  if (by === 0) return terms;
   let at = -1;
   terms.forEach((t, i) => {
     if (t.kind === 'number') at = i;
   });
-  if (at < 0) return [...terms, { kind: 'number', sign: by, value: 1 }];
+  if (at < 0) {
+    return Math.abs(by) > MAX_NUMBER ? null : [...terms, { kind: 'number', sign: by < 0 ? -1 : 1, value: Math.abs(by) }];
+  }
   const t = terms[at] as Extract<Term, { kind: 'number' }>;
   const value = t.sign * t.value + by;
   if (Math.abs(value) > MAX_NUMBER) return null;
   if (value === 0) return terms.filter((_, i) => i !== at);
   return terms.map((u, i) => (i === at ? { kind: 'number', sign: value < 0 ? -1 : 1, value: Math.abs(value) } : u));
+}
+
+/** A macro pad's press (`by` 1) or right-click (-1): each of its dice
+ *  stepped in as its own pad would step it, in the macro's pigment, and its
+ *  numbers bumped by their value. Null past a limit. */
+export function addTerms(terms: Term[], add: Term[], by: 1 | -1, pigment?: string): Term[] | null {
+  let next: Term[] | null = terms;
+  for (const t of add) {
+    if (t.kind === 'number') next = bump(next, by * t.sign * t.value);
+    else for (let n = 0; n < t.count && next; n++) next = stepDie(next, t.size, by * t.sign > 0 ? 1 : -1, pigment);
+    if (!next) return null;
+  }
+  return next;
+}
+
+/** Whether the formula holds a macro's dice, each die at least as many
+ *  times and the same way: its pad's lamp. A macro of numbers alone holds
+ *  nothing to show. */
+export function holds(terms: Term[], add: Term[], pigment?: string): boolean {
+  const sizes = [...new Set(add.flatMap((t) => (t.kind === 'dice' ? [t.size] : [])))];
+  const wants = sizes.map((size) => [diceOf(add, size), diceOf(terms, size, pigment)]).filter(([want]) => want !== 0);
+  return wants.length > 0 && wants.every(([want, has]) => Math.sign(has) === Math.sign(want) && Math.abs(has) >= Math.abs(want));
 }
 
 export function bounds(terms: Term[]): { min: number; max: number } {

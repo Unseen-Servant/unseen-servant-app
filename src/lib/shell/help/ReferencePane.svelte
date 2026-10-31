@@ -44,6 +44,8 @@
         [m.glossary_dice_set, m.glossary_dice_set_desc],
         [m.glossary_word_die, m.glossary_word_die_desc],
         [m.glossary_pigment, m.glossary_pigment_desc],
+        [m.glossary_macro, m.glossary_macro_desc],
+        [m.glossary_tape, m.glossary_tape_desc],
       ],
     },
     {

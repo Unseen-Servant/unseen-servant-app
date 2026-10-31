@@ -4,15 +4,18 @@
   // also type, and a roll lands on the readout. After a roll the formula
   // stays, so rolling again is the reroll; the first die pad pressed after
   // it starts a new formula, as a calculator's first key after = does. A
-  // right-click takes from the formula there. The ±1 pad in the corner moves
-  // its number, and after a roll the total without new dice: the one pad
-  // that never starts a new formula, since no roll starts with a bonus. A
-  // word die's pad rolls at once, and its name stands in the field. Tracks
-  // makes each track of the campaign open in Command such a die, its faces
-  // the track's unspent notes.
+  // right-click takes from the formula there. A macro's pad adds its whole
+  // formula, as its dice's pads would. The ±1 pad in the corner moves its
+  // number, and after a roll the total without new dice: the one pad that
+  // never starts a new formula, since no roll starts with a bonus. A word
+  // die's pad rolls at once, and its name stands in the field. Tracks makes
+  // each track of the campaign open in Command such a die, its faces the
+  // track's unspent notes. A roll that leaves the readout goes onto the tape
+  // under the pads, which rises over them, inside the panel's box.
   //
   // The GM's own sets are edited in place (§6): edit (✎) turns the pads into
-  // fields, a click changes one and a right-click opens its menu, since in
+  // fields, a click opens one's entry across its row (room for a macro's
+  // formula) and a right-click opens its menu, since in
   // play those gestures add and take away dice. The header's strip keeps
   // its keys where they are: edit's lamp lights, the keys that would end
   // editing dim, the set's name is clicked to rename it, and a ✕ at its end
@@ -33,11 +36,15 @@
   import RenameField from '../ui/RenameField.svelte';
   import FacesEditor from './FacesEditor.svelte';
   import Readout from './Readout.svelte';
+  import Tape from './Tape.svelte';
+  import { print, type TapeLine } from './tape';
   import { drawTracks, onVaultChange, type DrawTrack } from './tracks';
   import {
+    addTerms,
     bump,
     diceOf,
     formatFormula,
+    holds,
     numberOf,
     parseFormula,
     pickFace,
@@ -52,10 +59,12 @@
   import {
     allSets,
     newSet,
+    padEntry,
     padFromEntry,
     padLabel,
     parseSets,
     TRACKS,
+    type MacroPad,
     type Pad,
     type StoredSets,
     type WordPad,
@@ -91,6 +100,12 @@
   let seq = 0;
   // The field holds the formula on the readout, so the next press starts anew.
   let rolled = false;
+  // How the readout's roll was made, to print it as it was once the edge or
+  // the field has moved on.
+  let rolledAs: { edge: Edge | null; die: WordPad | null } = { edge: null, die: null };
+  let tape: TapeLine[] = [];
+  let printed = 0;
+  let tapeOpen = false;
 
   let stored: StoredSets = { custom: [] };
   // The campaign open in Command and its tracks, for the Tracks set.
@@ -132,9 +147,16 @@
   $: canLoad = !editing && browsedId !== set.id;
   $: canEdit = editing || (browsedId === set.id && set.editable);
 
+  // The readout's roll onto the tape, as it leaves the readout.
+  function retire() {
+    if (outcome) tape = print(tape, { id: ++printed, kind: 'dice', edge: rolledAs.edge, outcome });
+    else if (answer && rolledAs.die) tape = print(tape, { id: ++printed, kind: 'word', die: rolledAs.die, face: answer.face });
+  }
+
   // A changed formula has no result yet, so the readout goes dark.
   function unroll() {
     if (!rolled) return;
+    retire();
     rolled = false;
     outcome = null;
     answer = null;
@@ -174,12 +196,20 @@
 
   // A press after a roll, or over a word die, starts a new formula with no
   // edge; a right-click (by -1) takes from the dice there.
-  function pressDie(pad: Extract<Pad, { kind: 'die' }>, by: 1 | -1) {
+  function press(by: 1 | -1, add: (base: Term[]) => Term[] | null) {
     const fresh = (rolled && by > 0) || word !== null;
-    const next = stepDie(fresh ? [] : (terms ?? []), pad.size, by, pad.pigment);
+    const next = add(fresh ? [] : (terms ?? []));
     if (!next) return;
     if (fresh) edge = null;
     setTerms(next);
+  }
+
+  function pressDie(pad: Extract<Pad, { kind: 'die' }>, by: 1 | -1) {
+    press(by, (base) => stepDie(base, pad.size, by, pad.pigment));
+  }
+
+  function pressMacro(pad: MacroPad, by: 1 | -1) {
+    press(by, (base) => addTerms(base, parseFormula(pad.formula) ?? [], by, pad.pigment));
   }
 
   function pressWord(pad: WordPad) {
@@ -220,6 +250,7 @@
     if (word) {
       word = current(word);
       if (word.faces.length === 0) return;
+      retire();
       answer = { face: pickFace(word.faces), pigment: word.pigment };
       outcome = null;
     } else {
@@ -228,14 +259,33 @@
         return;
       }
       if (terms.length === 0) return;
+      retire();
       outcome = rollOutcome(terms, edge);
       answer = null;
     }
+    rolledAs = { edge: word ? null : edge, die: word };
     seq += 1;
     rolled = true;
   }
 
+  // A line of the tape back in the field as it was rolled, for ↵ to roll
+  // again; the readout's roll goes onto the tape as it leaves.
+  function recall(line: TapeLine) {
+    if (line.kind === 'dice') {
+      edge = line.edge;
+      setTerms(line.outcome.kept.terms);
+      return;
+    }
+    unroll();
+    word = line.die;
+    terms = null;
+    text = line.die.name;
+    edge = null;
+    refused = false;
+  }
+
   function clear() {
+    retire();
     text = '';
     terms = [];
     word = null;
@@ -296,9 +346,13 @@
     void save('augurySet', loadedId);
   }
 
+  // Editing is the pads', so the tape goes back down off them.
   function toggleEditing() {
     if (editing) stopEditing();
-    else editing = true;
+    else {
+      editing = true;
+      tapeOpen = false;
+    }
   }
 
   function createSet() {
@@ -306,6 +360,7 @@
     stored = { ...stored, custom: [...stored.custom, made] };
     loadedId = browsedId = made.id;
     editing = true;
+    tapeOpen = false;
     // Named Custom N, with its name open to change at once.
     renaming = true;
     void save('augurySets', stored);
@@ -341,7 +396,9 @@
   }
 
   function plain(pad: Pad): Pad {
-    return pad.kind === 'die' ? { kind: 'die', size: pad.size } : { kind: 'word', name: pad.name, faces: pad.faces };
+    if (pad.kind === 'die') return { kind: 'die', size: pad.size };
+    if (pad.kind === 'macro') return { kind: 'macro', name: pad.name, formula: pad.formula };
+    return { kind: 'word', name: pad.name, faces: pad.faces };
   }
 
   // Off the matrix: the pad's ✕ in edit mode, or its field emptied. A word
@@ -617,106 +674,141 @@
       </div>
     </div>
 
-    <div class="pads" class:editing role="group" aria-label={m.augury_pads_label()}>
-      {#each set.pads as pad, i (i)}
-        <!-- A pigment shows on the pad's edge at rest, and lights its label
-             and lamp once loaded, where a plain pad's light parchment. -->
-        <div
-          class="pad-well"
-          class:pigmented={!!pad?.pigment}
-          class:blank={editing && !pad && entry !== i}
-          class:open={facesOf === i}
-          style:--pigment={pad?.pigment ?? null}
-        >
-          {#if entry === i}
-            <span class="pad-field">
-              <RenameField
-                value={pad ? padLabel(pad) : ''}
-                label={m.augury_pad_entry_label()}
-                onCommit={(typed) => commitEntry(i, typed)}
-                onCancel={() => (entry = null)}
-                onEmpty={() => clearPad(i)}
-              />
-            </span>
-          {:else if editing}
-            <button
-              type="button"
-              class="pad"
-              class:word={pad?.kind === 'word'}
-              title={pad ? m.augury_pad_edit_title() : m.augury_pad_add_title()}
-              on:click={() => (entry = i)}
-              on:contextmenu|preventDefault={(e) => padMenu(e, i)}
-            >
-              <span class="pad-text">{pad ? padLabel(pad) : '+'}</span>
-              <span class="lamp" aria-hidden="true"></span>
-            </button>
-            {#if pad}
-              <!-- Edit mode's way off a pad, in sight on every one: a small
-                   ✕ in the corner, danger's hue under the pointer. -->
+    <!-- The tape, raised, stands where the pads are. -->
+    {#if !tapeOpen}
+      <div class="pads" class:editing role="group" aria-label={m.augury_pads_label()}>
+        {#each set.pads as pad, i (i)}
+          <!-- A pigment shows on the pad's edge at rest, and lights its label
+               and lamp once loaded, where a plain pad's light parchment. -->
+          <div
+            class="pad-well"
+            class:pigmented={!!pad?.pigment}
+            class:blank={editing && !pad}
+            class:open={facesOf === i}
+            style:--pigment={pad?.pigment ?? null}
+          >
+            {#if editing}
               <button
                 type="button"
-                class="clear"
-                title={m.augury_pad_clear()}
-                aria-label={m.augury_pad_clear()}
-                on:click={() => clearPad(i)}
+                class="pad"
+                class:word={pad?.kind === 'word' || (pad?.kind === 'macro' && pad.name !== pad.formula)}
+                class:macro={pad?.kind === 'macro' && pad.name !== pad.formula}
+                title={pad ? m.augury_pad_edit_title() : m.augury_pad_add_title()}
+                on:click={() => (entry = i)}
+                on:contextmenu|preventDefault={(e) => padMenu(e, i)}
               >
-                <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={XMARK} /></svg>
+                <span class="pad-text">{pad ? padLabel(pad) : '+'}</span>
+                {#if pad?.kind === 'macro' && pad.name !== pad.formula}
+                  <span class="pad-formula">{pad.formula}</span>
+                {/if}
+                <span class="lamp" aria-hidden="true"></span>
+              </button>
+              {#if pad}
+                <!-- Edit mode's way off a pad, in sight on every one: a small
+                     ✕ in the corner, danger's hue under the pointer. -->
+                <button
+                  type="button"
+                  class="clear"
+                  title={m.augury_pad_clear()}
+                  aria-label={m.augury_pad_clear()}
+                  on:click={() => clearPad(i)}
+                >
+                  <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={XMARK} /></svg>
+                </button>
+              {/if}
+            {:else if pad?.kind === 'die'}
+              {@const count = diceOf(terms ?? [], pad.size, pad.pigment)}
+              <button
+                type="button"
+                class="pad"
+                class:loaded={count !== 0}
+                title={m.augury_pad_title({ size: pad.size })}
+                on:click={() => pressDie(pad, 1)}
+                on:contextmenu|preventDefault={() => pressDie(pad, -1)}
+              >
+                <span>{count === 0 ? `d${pad.size}` : `${count}d${pad.size}`}</span>
+                <span class="lamp" class:lit={count !== 0} aria-hidden="true"></span>
+              </button>
+            {:else if pad?.kind === 'macro'}
+              <!-- A named macro shows its formula under the name; one named by
+                   its formula shows it once, as notation. -->
+              {@const named = pad.name !== pad.formula}
+              {@const lit = holds(terms ?? [], parseFormula(pad.formula) ?? [], pad.pigment)}
+              <button
+                type="button"
+                class="pad"
+                class:word={named}
+                class:macro={named}
+                class:loaded={lit}
+                title={m.augury_macro_pad_title({ formula: pad.formula })}
+                on:click={() => pressMacro(pad, 1)}
+                on:contextmenu|preventDefault={() => pressMacro(pad, -1)}
+              >
+                <span class="pad-text">{pad.name}</span>
+                {#if named}<span class="pad-formula">{pad.formula}</span>{/if}
+                <span class="lamp" class:lit aria-hidden="true"></span>
+              </button>
+            {:else if pad?.kind === 'word'}
+              {@const lit = word !== null && word.name === pad.name && word.pigment === pad.pigment}
+              <button
+                type="button"
+                class="pad word"
+                class:loaded={lit}
+                disabled={pad.faces.length === 0}
+                title={set.id === TRACKS
+                  ? pad.faces.length
+                    ? m.augury_track_pad_title({ name: pad.name })
+                    : m.augury_track_pad_empty({ name: pad.name })
+                  : pad.faces.length
+                    ? m.augury_word_pad_title({ name: pad.name })
+                    : m.augury_word_pad_empty({ name: pad.name })}
+                on:click={() => pressWord(pad)}
+                on:contextmenu|preventDefault
+              >
+                <span class="pad-text">{pad.name}</span>
+                <span class="lamp" class:lit aria-hidden="true"></span>
               </button>
             {/if}
-          {:else if pad?.kind === 'die'}
-            {@const count = diceOf(terms ?? [], pad.size, pad.pigment)}
+          </div>
+        {/each}
+        <!-- The ±1 pad, in the same corner of every number set. -->
+        <div class="pad-well">
+          {#if set.bonus}
             <button
               type="button"
               class="pad"
-              class:loaded={count !== 0}
-              title={m.augury_pad_title({ size: pad.size })}
-              on:click={() => pressDie(pad, 1)}
-              on:contextmenu|preventDefault={() => pressDie(pad, -1)}
+              class:loaded={bonus !== 0}
+              disabled={editing || word !== null}
+              title={m.augury_bonus_title()}
+              on:click={() => bumpBy(1)}
+              on:contextmenu|preventDefault={() => bumpBy(-1)}
             >
-              <span>{count === 0 ? `d${pad.size}` : `${count}d${pad.size}`}</span>
-              <span class="lamp" class:lit={count !== 0} aria-hidden="true"></span>
-            </button>
-          {:else if pad?.kind === 'word'}
-            {@const lit = word !== null && word.name === pad.name && word.pigment === pad.pigment}
-            <button
-              type="button"
-              class="pad word"
-              class:loaded={lit}
-              disabled={pad.faces.length === 0}
-              title={set.id === TRACKS
-                ? pad.faces.length
-                  ? m.augury_track_pad_title({ name: pad.name })
-                  : m.augury_track_pad_empty({ name: pad.name })
-                : pad.faces.length
-                  ? m.augury_word_pad_title({ name: pad.name })
-                  : m.augury_word_pad_empty({ name: pad.name })}
-              on:click={() => pressWord(pad)}
-              on:contextmenu|preventDefault
-            >
-              <span class="pad-text">{pad.name}</span>
-              <span class="lamp" class:lit aria-hidden="true"></span>
+              <span>{bonus === 0 ? '+1' : bonus > 0 ? `+${bonus}` : `${bonus}`}</span>
+              <span class="lamp" class:lit={bonus !== 0} aria-hidden="true"></span>
             </button>
           {/if}
         </div>
-      {/each}
-      <!-- The ±1 pad, in the same corner of every number set. -->
-      <div class="pad-well">
-        {#if set.bonus}
-          <button
-            type="button"
-            class="pad"
-            class:loaded={bonus !== 0}
-            disabled={editing || word !== null}
-            title={m.augury_bonus_title()}
-            on:click={() => bumpBy(1)}
-            on:contextmenu|preventDefault={() => bumpBy(-1)}
-          >
-            <span>{bonus === 0 ? '+1' : bonus > 0 ? `+${bonus}` : `${bonus}`}</span>
-            <span class="lamp" class:lit={bonus !== 0} aria-hidden="true"></span>
-          </button>
+        <!-- A pad's entry opens across its row, over its neighbours, so a
+             macro's formula has room. -->
+        {#if entry !== null}
+          {@const at = entry}
+          {@const pad = set.pads[at]}
+          {#key at}
+            <span class="pad-field" style:--row={Math.floor(at / 4)} title={m.augury_pad_entry_label()}>
+              <RenameField
+                value={pad ? padEntry(pad) : ''}
+                label={m.augury_pad_entry_label()}
+                onCommit={(typed) => commitEntry(at, typed)}
+                onCancel={() => (entry = null)}
+                onEmpty={() => clearPad(at)}
+              />
+            </span>
+          {/key}
         {/if}
       </div>
-    </div>
+    {/if}
+
+    <Tape lines={tape} open={tapeOpen} onToggle={() => (tapeOpen = !tapeOpen)} onRecall={recall} />
   </div>
 </section>
 
@@ -729,11 +821,12 @@
     --ring-focus: var(--ring-dormant);
   }
 
+  /* The faceplate: every part of the instrument is a well sunk into it. */
   .augury {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--bg-app);
+    background: var(--bg-faceplate);
     color: var(--text-primary);
   }
 
@@ -946,6 +1039,7 @@
   /* Four equal columns whatever the pads say: a bare 1fr would grow to fit
      a long name, so each column's floor is zero and the name ellipsizes. */
   .pads {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
@@ -1010,14 +1104,44 @@
     white-space: nowrap;
   }
 
+  /* A named macro: its name, then its formula small in notation's mono. */
+  .pad.macro {
+    gap: 2px;
+  }
+
+  .pad.macro .pad-text {
+    line-height: 1.1;
+  }
+
+  .pad-formula {
+    max-width: 100%;
+    padding: 0 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    line-height: 1.1;
+    color: var(--text-tertiary);
+  }
+
+  /* The entry: a pad's well stretched over its row (gap 4px), holding the
+     rename field and its ring. */
   .pad-field {
-    flex: 1;
-    min-width: 0;
+    position: absolute;
+    top: calc(var(--row) * (2.4rem + 4px));
+    left: 0;
+    right: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
-    padding: 0 0.3rem;
+    height: 2.4rem;
+    padding: 0 0.5rem;
     font-family: var(--font-mono);
     font-size: 0.75rem;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-well);
   }
 
   .clear {

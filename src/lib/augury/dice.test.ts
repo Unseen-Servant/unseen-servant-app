@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+  addTerms,
   bounds,
   bump,
   diceOf,
   drawFace,
   formatFormula,
+  holds,
   level,
   numberOf,
   parseFormula,
@@ -119,6 +121,36 @@ test('the ±1 pad counts the numbers, and moves the last one, dropping it at zer
   expect(bump([d(1, 20), n(1)], -1)).toEqual([d(1, 20)]);
   expect(bump([n(2), d(1, 20), n(1, -1)], -1)).toEqual([n(2), d(1, 20), n(2, -1)]);
   expect(bump([n(999)], 1)).toBeNull();
+});
+
+describe('a macro pad', () => {
+  const dmg = parseFormula('2d10+1d6-1d4+3')!;
+
+  test('adds its whole formula, merging with what the field holds', () => {
+    expect(addTerms([], dmg, 1)).toEqual([d(2, 10), d(1, 6), d(1, 4, -1), n(3)]);
+    expect(formatFormula(addTerms([d(1, 6), n(1)], dmg, 1)!)).toBe('2d6+4+2d10-1d4');
+    expect(addTerms(addTerms([], dmg, 1)!, dmg, 1)).toEqual([d(4, 10), d(2, 6), d(2, 4, -1), n(6)]);
+  });
+
+  test('a right-click takes it back out, as its dice’s pads would', () => {
+    expect(addTerms(addTerms([d(1, 20)], dmg, 1)!, dmg, -1)).toEqual([d(1, 20)]);
+    expect(addTerms([], parseFormula('1d6+2')!, -1)).toEqual([d(1, 6, -1), n(2, -1)]);
+  });
+
+  test('carries its pigment onto its dice, and stops at the limits', () => {
+    const OCHRE = '#e6c667';
+    expect(addTerms([], parseFormula('1d12')!, 1, OCHRE)).toEqual([{ kind: 'dice', sign: 1, count: 1, size: 12, pigment: OCHRE }]);
+    expect(addTerms([d(99, 6)], parseFormula('2d6')!, 1)).toBeNull();
+    expect(addTerms([n(998)], parseFormula('1d6+2')!, 1)).toBeNull();
+  });
+
+  test('its lamp lights while the formula holds its dice, the same way', () => {
+    expect(holds([d(2, 10), d(1, 6), d(1, 4, -1), n(3)], dmg)).toBe(true);
+    expect(holds([d(4, 10), d(2, 6), d(1, 4, -1)], dmg)).toBe(true);
+    expect(holds([d(2, 10), d(1, 6)], dmg)).toBe(false);
+    expect(holds([d(2, 10), d(1, 6), d(1, 4)], dmg)).toBe(false);
+    expect(holds([n(3)], parseFormula('3')!)).toBe(false);
+  });
 });
 
 test('bounds run from every die on its low face to every die on its high one', () => {

@@ -52,15 +52,15 @@
 </div>
 
 <style>
-  /* The readout's well and height (Readout .readout), ringed while its
-     text has the caret. */
+  /* The readout's display window and height (Readout .readout), ringed
+     while its text has the caret. */
   .faces {
     height: 5.5rem;
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
     padding: 0.4rem 0.65rem;
-    background: var(--bg-app);
+    background: var(--bg-vellum);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-well);
     box-shadow: var(--ring-focus);

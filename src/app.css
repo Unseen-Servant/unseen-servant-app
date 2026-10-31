@@ -85,10 +85,15 @@
   --bg-active-focused: #7c61a8;
   --bg-selected: rgb(182, 159, 129);
   --bg-selected-focused: rgb(236, 204, 162);
-  /* The inspector's reading surface: the app ground under an 8% parchment
-     wash — the tint recipe, lit warm rather than a step up the greys, so
-     the text reads apart from the list without matching the plates. */
+  /* A reading surface — the inspector's, Augury's display and tape: the app
+     ground under an 8% parchment wash — the tint recipe, lit warm rather
+     than a step up the greys, so the text reads apart from the list without
+     matching the plates. */
   --bg-vellum: color-mix(in srgb, var(--text-accent) 8%, var(--bg-app));
+  /* Augury's faceplate: the instrument is one plate, in the plates' grey,
+     with its wells sunk into it — the display and the tape, which hold
+     data, a step down on vellum, the keys' wells two. */
+  --bg-faceplate: var(--bg-header);
 
   /* Text colors */
   --text-primary: #d4cfc9;

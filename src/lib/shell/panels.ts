@@ -10,7 +10,7 @@
 export const PANELS = [
   { id: 'legend-lore', title: 'Legend Lore', rackMin: { w: 560, h: 320 }, compact: false },
   { id: 'command', title: 'Command', rackMin: { w: 420, h: 280 }, compact: false },
-  { id: 'augury', title: 'Augury', rackMin: { w: 270, h: 356 }, compact: true },
+  { id: 'augury', title: 'Augury', rackMin: { w: 270, h: 391 }, compact: true },
   { id: 'servant', title: 'Servant', rackMin: { w: 380, h: 280 }, compact: false },
 ] as const;
 

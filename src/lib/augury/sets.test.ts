@@ -1,5 +1,16 @@
 import { describe, expect, test } from 'vitest';
-import { allSets, DICE_PADS, newSet, ORACLE, padFromEntry, parseSets, TRACKS, type CustomSet, type Pad } from './sets';
+import {
+  allSets,
+  DICE_PADS,
+  newSet,
+  ORACLE,
+  padEntry,
+  padFromEntry,
+  parseSets,
+  TRACKS,
+  type CustomSet,
+  type Pad,
+} from './sets';
 
 const OCHRE = '#e6c667';
 
@@ -59,12 +70,28 @@ describe('a pad’s entry', () => {
     expect(padFromEntry('D12', null)).toEqual({ pad: { kind: 'die', size: 12 } });
   });
 
-  test('a size out of range, a die begun or a formula is refused', () => {
+  test('a size out of range, a die begun or a macro with no formula is refused', () => {
     expect(padFromEntry('d', null)).toHaveProperty('refused');
     expect(padFromEntry(' D ', null)).toHaveProperty('refused');
     expect(padFromEntry('1', null)).toHaveProperty('refused');
     expect(padFromEntry('1001', null)).toHaveProperty('refused');
-    expect(padFromEntry('2d6', null)).toHaveProperty('refused');
+    expect(padFromEntry('dmg =', null)).toHaveProperty('refused');
+    expect(padFromEntry('dmg = lots', null)).toHaveProperty('refused');
+  });
+
+  test('a name, = and a formula is a macro, and a formula alone one named by it', () => {
+    expect(padFromEntry('dmg = 2d10 + d6', null)).toEqual({ pad: { kind: 'macro', name: 'dmg', formula: '2d10+1d6' } });
+    expect(padFromEntry('2D10+1d6', null)).toEqual({ pad: { kind: 'macro', name: '2d10+1d6', formula: '2d10+1d6' } });
+    expect(padFromEntry('= 1d8+2', null)).toEqual({ pad: { kind: 'macro', name: '1d8+2', formula: '1d8+2' } });
+    expect(padFromEntry('1d20', null)).toEqual({ pad: { kind: 'die', size: 20 } });
+    const was: Pad = { kind: 'die', size: 12, pigment: OCHRE };
+    expect(padFromEntry('hope = 1d12', was)).toEqual({ pad: { kind: 'macro', name: 'hope', formula: '1d12', pigment: OCHRE } });
+  });
+
+  test('a macro’s field opens as it was typed', () => {
+    expect(padEntry({ kind: 'macro', name: 'dmg', formula: '2d10+1d6' })).toBe('dmg = 2d10+1d6');
+    expect(padEntry({ kind: 'macro', name: '2d10+1d6', formula: '2d10+1d6' })).toBe('2d10+1d6');
+    expect(padEntry({ kind: 'die', size: 25 })).toBe('d25');
   });
 
   test('other words name a word die, which keeps its faces and pigment when renamed', () => {
@@ -77,11 +104,16 @@ describe('a pad’s entry', () => {
 
 describe('parseSets', () => {
   test('reads back what was saved', () => {
-    const pads = [{ kind: 'die', size: 12, pigment: OCHRE }, null, { kind: 'word', name: 'Omen', faces: ['Ill', 'Fair'] }];
+    const pads = [
+      { kind: 'die', size: 12, pigment: OCHRE },
+      null,
+      { kind: 'word', name: 'Omen', faces: ['Ill', 'Fair'] },
+      { kind: 'macro', name: 'dmg', formula: '2d10+1d6' },
+    ];
     const saved = { custom: [{ id: 'custom-1', name: 'Duality', pads }] };
     const got = parseSets(JSON.parse(JSON.stringify(saved)));
     expect(got.custom[0].name).toBe('Duality');
-    expect(got.custom[0].pads.slice(0, 3)).toEqual(pads);
+    expect(got.custom[0].pads.slice(0, 4)).toEqual(pads);
     expect(got.custom[0].pads).toHaveLength(DICE_PADS);
   });
 
@@ -94,12 +126,17 @@ describe('parseSets', () => {
         {
           id: 'custom-4',
           name: 'Odd',
-          pads: [{ kind: 'die', size: 1 }, { kind: 'word', name: ' ', faces: [] }, { kind: 'die', size: 6, pigment: '#ff0000' }],
+          pads: [
+            { kind: 'die', size: 1 },
+            { kind: 'word', name: ' ', faces: [] },
+            { kind: 'die', size: 6, pigment: '#ff0000' },
+            { kind: 'macro', name: 'dmg', formula: 'lots' },
+          ],
         },
       ],
     });
     expect(got.custom.map((c) => c.id)).toEqual(['custom-4']);
-    expect(got.custom[0].pads.slice(0, 3)).toEqual([null, null, { kind: 'die', size: 6 }]);
+    expect(got.custom[0].pads.slice(0, 4)).toEqual([null, null, { kind: 'die', size: 6 }, null]);
   });
 
   test('anything else is no saved sets', () => {

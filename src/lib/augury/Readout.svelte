@@ -5,6 +5,7 @@
   // follow, dimmed. A word die's face (§7) prints where the digits stand,
   // with the meter and the breakdown dark.
   import { m } from '../paraglide/messages';
+  import Breakdown from './Breakdown.svelte';
   import { level, type Roll } from './dice';
   import { DIGIT_VIEWBOX, isLit, readoutCells, SEGMENTS } from './sevenSegment';
 
@@ -19,34 +20,6 @@
 
   $: cells = readoutCells(result ? result.total : null);
   $: lit = result ? level(result, METER_CELLS) : 0;
-  $: parts = result ? breakdown(result, true) : [];
-  // The dropped roll's dice alone: its numbers are the kept roll's.
-  $: droppedParts = dropped ? breakdown(dropped, false) : [];
-  $: title = [plain(parts), droppedParts.length ? m.augury_dropped({ faces: plain(droppedParts) }) : '']
-    .filter(Boolean)
-    .join(' · ');
-
-  interface Part {
-    /** − before a term taken away, + before a number; an added die term has none. */
-    sign: string;
-    /** A dice term's faces, each in its own window; null for a number. */
-    faces: number[] | null;
-    value: number;
-    /** A pigmented pad's term: its windows take the pigment on their edge. */
-    pigment?: string;
-  }
-
-  function breakdown(r: Roll, numbers: boolean): Part[] {
-    return r.terms.flatMap((t, i): Part[] => {
-      if (t.kind === 'number') return numbers ? [{ sign: t.sign < 0 ? '−' : '+', faces: null, value: t.value }] : [];
-      return [{ sign: t.sign < 0 ? '−' : '', faces: r.faces[i], value: 0, pigment: t.pigment }];
-    });
-  }
-
-  // The tooltip's words for the line: faces apart by a space, terms by two.
-  function plain(ps: Part[]): string {
-    return ps.map((p) => p.sign + (p.faces ? p.faces.join(' ') : String(p.value))).join('  ');
-  }
 </script>
 
 <div class="readout">
@@ -81,27 +54,24 @@
       {/each}
     </div>
   </div>
-  <!-- One line, so the pads below never move; the tooltip holds the rest.
-       Each die's face sits in its own window, like a mechanical counter's,
-       so no glyph has to separate them; a gap sets the terms apart. Written
-       without whitespace between tags: the margins do the spacing. -->
-  <div class="breakdown" {title}>
-    {#each parts as part}<span class="term">{part.sign}{#if part.faces}{#each part.faces as face}<span class="die" class:pigmented={!!part.pigment} style:--pigment={part.pigment ?? null}>{face}</span>{/each}{:else}{part.value}{/if}</span>{/each}{#if droppedParts.length}<span class="dropped">{#each droppedParts as part}<span class="term">{part.sign}{#each part.faces ?? [] as face}<span class="die" class:pigmented={!!part.pigment} style:--pigment={part.pigment ?? null}>{face}</span>{/each}</span>{/each}</span>{/if}
-  </div>
+  <Breakdown {result} {dropped} />
   <span class="announce" role="status">{word ? word.face : result ? m.augury_rolled({ total: result.total }) : ''}</span>
 </div>
 
 <style>
-  /* A readout sits in the panel, not on it: the well recipe. */
-  /* A set height, which the faces editor shares, so the pads below never
-     move. */
+  /* A display window sunk in the faceplate: the well recipe on a warm
+     ground (--bg-vellum), lit from behind, where the keys' wells are dark.
+     Its unlit lamps are ghosts of the lit ones, as a segment display's
+     are. A set height, which the faces editor shares, so the pads below
+     never move. */
   .readout {
+    --ghost: color-mix(in srgb, var(--text-accent) 12%, transparent);
     height: 5.5rem;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
     padding: 0.55rem 0.65rem 0.4rem;
-    background: var(--bg-app);
+    background: var(--bg-vellum);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-well);
   }
@@ -122,10 +92,10 @@
     height: 2.8rem;
   }
 
-  /* Each segment is a lamp: a dark slot at rest, parchment lit — the total
-     is data. No glow: a result isn't a state anyone switched on. */
+  /* Each segment is a lamp: a ghost at rest, parchment lit — the total is
+     data. No glow: a result isn't a state anyone switched on. */
   polygon {
-    fill: var(--border-subtle);
+    fill: var(--ghost);
   }
 
   polygon.lit {
@@ -186,8 +156,8 @@
 
   /* The status bar's meter cells (StatusBar .meter-cell) turned on their
      side and stacked, filling from the bottom as a level meter does, as tall
-     as the digits so the breakdown has the full width under them; unlit in
-     the search gauge's grey, which shows on this ground. */
+     as the digits so the breakdown has the full width under them; unlit,
+     the segments' ghost. */
   .meter {
     display: flex;
     flex-direction: column-reverse;
@@ -200,55 +170,11 @@
     width: 8px;
     height: 3px;
     border-radius: var(--radius-cell);
-    background: var(--border-subtle);
+    background: var(--ghost);
   }
 
   .meter-cell.lit {
     background: var(--text-accent);
-  }
-
-  /* A fixed height, so a line of windows can't push the pads down. */
-  .breakdown {
-    height: 1.25rem;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    line-height: 1.25rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .term + .term {
-    margin-left: 0.6rem;
-  }
-
-  /* A die's window: the readout's own edge at a small radius, recessed in
-     the well, never filled. */
-  .die {
-    display: inline-block;
-    vertical-align: middle;
-    min-width: 1.15rem;
-    padding: 0 0.2rem;
-    line-height: 1rem;
-    text-align: center;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-  }
-
-  .die + .die {
-    margin-left: 2px;
-  }
-
-  .die.pigmented {
-    border-color: var(--pigment);
-  }
-
-  /* The dropped roll is out of the total: the app's out-of-scope dim. */
-  .dropped {
-    margin-left: 0.9rem;
-    opacity: var(--opacity-out-of-scope);
   }
 
   .announce {

@@ -1,6 +1,6 @@
 # Augury (2026-10-30)
 
-**Status:** settled 2026-10-30 (§11). Built 2026-10-30–31: steps 1–3, then step 4 (Help → Guides → Augury, a glossary group, the shortcut sheet's Augury section, the CHANGELOG).
+**Status:** settled 2026-10-30 (§11). Built 2026-10-30–31: steps 1–3, then step 4 (Help → Guides → Augury, a glossary group, the shortcut sheet's Augury section, the CHANGELOG). Macros and the tape added 2026-10-31 (§13).
 
 ## 0. TL;DR
 
@@ -16,7 +16,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ## 2. Rules
 
-1. **Small in both directions.** Augury's minimum is 270×356, and it opens at that size: mounted from the rack bar it takes a column of its minimum width, its box in the rack stops at its minimum height with bare rack below (a short unit in a tall bay; a tool carried onto that bare rack goes beneath it), and its own window opens at its minimum. At 1280 px, Legend Lore (560) and Command (420) leave about 280 px beside them.
+1. **Small in both directions.** Augury's minimum is 270×391, and it opens at that size: mounted from the rack bar it takes a column of its minimum width, its box in the rack stops at its minimum height with bare rack below (a short unit in a tall bay; a tool carried onto that bare rack goes beneath it), and its own window opens at its minimum. At 1280 px, Legend Lore (560) and Command (420) leave about 280 px beside them.
 2. **The app's instrument panel, not a casino.** Keys in wells, lamps, readouts and the pigment palette. No dice art, no 3D dice, no sound.
 3. **Augury reads no game's rules.** It shows each die and the total. It does not say "with Hope" or call a critical; colours make the dice easy to tell apart, and the GM reads them.
 4. **Everything the GM builds is theirs.** Dice sets are plain JSON in the settings store, per machine.
@@ -47,11 +47,15 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 │ ├────────┼────────┼────────┼────────┤    │
 │ │  d30   │  d100  │        │   +2   │    │  the ±1 pad, in every number set
 │ └────────┴────────┴────────┴────────┘    │
+│ ┌──┐ ┌──────────────────────────────┐    │
+│ │▤ │ │ 1d20+5      ▕14▏ +5       19 │    │  tape: the roll before this one (§13)
+│ └──┘ └──────────────────────────────┘    │
 └──────────────────────────────────────────┘
 ```
 
 - **The head** is the tool's header bar, as Legend Lore's and Command's are: 40 px on `--bg-header`, with the window key at the right end. The rack bar names the tool, so the panel doesn't. The set browser sits in it, where a pad controller has its program display.
 - **The formula row** has the field, the advantage and disadvantage latches, then clear (✕) and roll (▶). None of them moves when the dice set changes. The field shows about 13 characters and scrolls past them.
+- **The faceplate** (2026-10-31): Augury's ground is one plate in the plates' grey (`--bg-faceplate`), and every part is a well sunk into it. The display and the tape, which hold data, sit on warm vellum (`--bg-vellum`), a step down; the keys' and pads' wells are the dark app ground, two steps down. Borders alone told the parts apart before, on a ground the same as the wells'.
 - **The matrix** is 4×4 and always all there. A pad with no die is dark. The bottom-right pad of every number set is the ±1 pad, so a set holds up to 15 dice.
 
 ## 4. The formula
@@ -69,7 +73,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ## 5. The readout
 
-- **The total** is drawn in seven-segment digits as SVG: each segment is a lamp, parchment (`--text-accent`) when lit and a dark slot when off. Not a font: the app has no display fonts. Three digit cells at rest, showing `888` unlit; a longer total adds cells, and a negative one lights the minus segment of the cell before it.
+- **The total** is drawn in seven-segment digits as SVG: each segment is a lamp, parchment (`--text-accent`) when lit and a ghost of that parchment when off (12%), as a segment display's unlit segments show through its glass; the meter's unlit cells too. Not a font: the app has no display fonts. Three digit cells at rest, showing `888` unlit; a longer total adds cells, and a negative one lights the minus segment of the cell before it.
 - **The level meter** is a column of ten LED cells at the readout's right edge, as tall as the digits so the breakdown runs the full width under both, filling from the bottom: where the total fell between the formula's least and greatest possible results. 15 on `3d6+3` lights six. A formula with one possible result lights all ten.
 - **The breakdown** under the digits shows each die's face in its own small window, like the windows of a mechanical counter, in roll order; a gap sets the terms apart, and numbers stay bare: `▕3▏▕5▏▕4▏  ▕6▏  +2`. The windows need no separator glyph (a middle dot was tried and dropped). In Crimson tabular figures at a readable size, not a micro label, because Hope against Fear is read there. Under advantage or disadvantage the dropped roll's dice follow, at the app's out-of-scope dim. One line, so the pads never move: a long one ends in an ellipsis, and its tooltip holds the rest.
 - **A word result** (§7) prints in the well in IBM Plex Mono (`--font-readout`, the site's mono, bundled), parchment, and wraps to two lines at a smaller size past sixteen characters. The digits, meter and breakdown go dark.
@@ -83,9 +87,9 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 - **Zocchi:** the 14 dice of DCC's chain in order, row by row: d3 d4 d5 d6 / d7 d8 d10 d12 / d14 d16 d20 d24 / d30 d100. Stepping up or down the chain is the next or previous pad. Fixed.
 - **Oracle:** four word dice (§7). Fixed, as Standard and Zocchi are: its dice are particular, made-for-purpose keys, not a starting point (user, 2026-10-30). The GM's own word dice go in a custom set. Its corner pad is dark: words take no numbers.
 - **Tracks:** a pad for each track of the campaign open in Command, in Command's order and pigment, the first fifteen. A track is a word die whose faces are its unspent notes and images: a press draws one, and its name prints on the readout in the track's pigment; roll again draws again. A spent note is used up, so a draw never lands on one, and a track with none left can't be pressed. With no campaign open the pads are dark and the display's tooltip says why. Fixed: the tracks are Command's to change. Augury reads them through Rust (`command_draw_tracks`), the way Legend Lore's Send to Command crosses between the tools, and again whenever the campaign or its folder changes (`command://vault`).
-- **Custom sets:** *New set* is the entry past the last set, and ⏎ on it makes *Custom 1*, *Custom 2*… (the first number free), loads it and opens it for editing with its name's field open. In edit mode a custom set's name is clicked to rename it (no two sets share a name), and a ✕ at its end, red under the pointer, deletes it after a confirmation: the ✕ every pad shows in edit mode, so whatever edit mode can remove shows one. (A right-click menu on the display did this first and was dropped the same day: nobody finds a right-click, and `+ new set` → `[new]` → *Custom 1* read as three names for one thing.) A custom set holds up to 15 number dice of any size (a d25) and word dice side by side, with the ±1 pad in its corner. The ids are `custom-<time>`.
+- **Custom sets:** *New set* is the entry past the last set, and ⏎ on it makes *Custom 1*, *Custom 2*… (the first number free), loads it and opens it for editing with its name's field open. In edit mode a custom set's name is clicked to rename it (no two sets share a name), and a ✕ at its end, red under the pointer, deletes it after a confirmation: the ✕ every pad shows in edit mode, so whatever edit mode can remove shows one. (A right-click menu on the display did this first and was dropped the same day: nobody finds a right-click, and `+ new set` → `[new]` → *Custom 1* read as three names for one thing.) A custom set holds up to 15 number dice of any size (a d25), word dice and macros side by side, with the ±1 pad in its corner. The ids are `custom-<time>`.
 - **Edit mode.** In play a click adds a die and a right-click takes one away, and a double-click's first click would add one, so editing is a mode, as on a pad controller: ✎ turns the loaded set's pads into fields, lighting its lamp purple (a mode switched on), and ✎ again (or Esc) turns them back. Meanwhile ◀ ▶ and ⏎ dim and go inert, as Command dims its Prep keys in Play: browsing or loading would end editing. Empty pads show dashed with a `+` (the app's "not yet real" edge), and the ±1 pad rests.
-- **Pads are placed, not sorted.** In edit mode a click opens the pad's field in place: `25` or `d25` makes a die of that size (2–1000), any other words name a word die, and a lone `d` (a die begun) and a formula are refused (a formula would roll as dice, never as that die). A word die renamed keeps its faces, and any pad its pigment. A filled pad shows a small ✕ in its corner, red under the pointer, which clears it; emptying its field does too. A right-click opens the pad's menu: *Pigment* (§8) and *Edit faces* for a word die. (*Clear pad* sat in that menu first; behind a right-click it went unfound.)
+- **Pads are placed, not sorted.** In edit mode a click opens the pad's field across its row (§13): `25`, `d25` or `1d25` makes a die of that size (2–1000), a formula or a name, `=` and a formula makes a macro (§13), any other words name a word die, and a lone `d` (a die begun) is refused. A word die's name never reads as a formula, which would roll as dice when typed. A word die renamed keeps its faces, and any pad its pigment. A filled pad shows a small ✕ in its corner, red under the pointer, which clears it; emptying its field does too. A right-click opens the pad's menu: *Pigment* (§8) and *Edit faces* for a word die. (*Clear pad* sat in that menu first; behind a right-click it went unfound.)
 - **The last loaded set** is remembered.
 
 ## 7. Oracle and word dice
@@ -120,6 +124,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 2. **Oracle.** Word dice, the word readout, Oracle's four dice, editing a word die's faces.
 3. **Custom sets and pigments.** `+ new set`, renaming and deleting, edit mode, placing and clearing pads, the pad menu, pigments in the pads and the breakdown. Then the Tracks set.
 4. **Help and keys.** Help → Guides → Augury, a glossary group (formula, dice set, word die, pigment), the shortcut sheet (↵ rolls, Esc stops editing or clears, a line on the pads' click and right-click), the keys' hints, CHANGELOG.
+5. **Macros and the tape** (§13), with their guide sections, glossary terms and CHANGELOG lines.
 
 ## 11. Settled (2026-10-30)
 
@@ -138,7 +143,6 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ## 12. Not doing, or not yet
 
-- A roll history.
 - Keep-highest on part of a formula (`4d6kh3`) and exploding dice.
 - Game rules: Hope against Fear, criticals, success counting.
 - Colours for high or low rolls.
@@ -148,3 +152,13 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 - An MCP tool for rolling.
 - Opening a drawn note in Command.
 - A pigment tint on the field's terms (§8).
+
+## 13. Macros and the tape (2026-10-31)
+
+- **A macro is a formula on a pad**, so a roll the GM makes all session is one press: `dmg = 2d10+1d6` in a custom set's pad field, the name before `=`. A formula typed alone (`2d10+1d6`) is a macro named by its formula; `1d20`, one die, stays a die pad. A named macro's pad shows its name with its formula small under it, in notation's mono.
+- **A press adds the macro's terms** to the formula as its dice's own pads would, in the pad's pigment when it has one, and a right-click takes them away; the first press after a roll starts a new formula. So `dmg` then `d6` gives `2d10+2d6`, and adv, dis and ±1 apply as to any formula. It doesn't roll at once, as a word die does: a word die can't join a formula, and a macro can, at the cost of one ↵. The pad's lamp is lit while the formula holds its dice. Macros hold number dice and numbers, no word dice, and only custom sets have them.
+- **A pad's entry opens across its row**, over its neighbours, so a macro's formula has room. It used to open inside the pad.
+- **The tape** keeps the rolls that left the readout, newest on top: the readout shows the roll, the tape the ones before it. A roll goes onto it when a new roll replaces it, its formula changes or Esc clears it. ±1 after a roll moves the total on the readout, so the tape prints the total the roll ended with. It holds 50 lines in the panel: not saved, and empty again when the app starts or Augury moves between the rack and its own window.
+- **Its slot** sits under the pads: the tape's key (Font Awesome's receipt; a latch with its lamp removed, raised while the tape is up: a view, not a mode) beside a one-line well showing the last line, so the roll before this one stays in sight, such as an attack's beside its damage's. The row raised the minimum from 270×356 to 270×391. The header strip had no room for a sixth key at 270 px without cutting the set's name short.
+- **Raised**, the tape rises out of its slot over the pads, as a printing calculator's paper rises: the newest line stays at the bottom by the slot, the older ones stack above it, and it scrolls up past what fits. The key stays where it was, at the slot. Augury's box never changes size; the pads come back when the tape goes down, and ✎ lowers it, since editing is the pads'. (It first unrolled down the rack, stretching Augury's box to its whole slot; the user disliked the tool changing size, and that went the same day.)
+- **A line** shows the formula (with adv or dis), the dice in their windows as the readout's breakdown draws them (`Breakdown.svelte`), and the total in parchment; a word die's line shows its name and the face, in its pigment. A click puts the line's formula and edge, or its word die, back in the field, and ↵ rolls it again.

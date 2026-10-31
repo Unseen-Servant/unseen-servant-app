@@ -138,7 +138,7 @@ describe('landing', () => {
   });
 
   test('a compact tool is drawn at its minimum height, at the top of its slot', () => {
-    expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 700 })).toEqual({ x: 5, y: 0, w: 300, h: 356 });
+    expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 700 })).toEqual({ x: 5, y: 0, w: 300, h: 391 });
     expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 200 }).h).toBe(200);
     expect(boxOf('command', { x: 5, y: 0, w: 300, h: 700 }).h).toBe(700);
   });

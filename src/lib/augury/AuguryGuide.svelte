@@ -21,6 +21,11 @@
   </section>
 
   <section class="field">
+    <h3 class="field-title section-title">{m.augury_guide_tape()}</h3>
+    <p class="field-desc"><ParaglideMessage message={m.augury_guide_tape_desc} {strong} /></p>
+  </section>
+
+  <section class="field">
     <h3 class="field-title section-title">{m.augury_guide_bonus()}</h3>
     <p class="field-desc"><ParaglideMessage message={m.augury_guide_bonus_desc} {strong} /></p>
   </section>

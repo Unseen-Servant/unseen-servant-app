@@ -40,13 +40,13 @@ const PANELS: [PanelSpec; 4] = [
         size: (720.0, 560.0),
         min_size: (420.0, 320.0),
     },
-    // Compact (panels.ts): it opens at its smallest, the rack's 270×356 plus
+    // Compact (panels.ts): it opens at its smallest, the rack's 270×391 plus
     // the pop-out's status bar.
     PanelSpec {
         id: "augury",
         title: "Augury",
-        size: (270.0, 384.0),
-        min_size: (270.0, 384.0),
+        size: (270.0, 419.0),
+        min_size: (270.0, 419.0),
     },
     PanelSpec {
         id: "servant",
