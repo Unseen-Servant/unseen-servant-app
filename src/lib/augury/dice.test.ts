@@ -8,6 +8,8 @@ import {
   level,
   numberOf,
   parseFormula,
+  pickFace,
+  reattach,
   refigure,
   roll,
   rollOutcome,
@@ -79,6 +81,33 @@ describe('a pad press and right-click', () => {
     expect(diceOf([d(2, 6), d(1, 6), d(1, 6, -1), d(1, 8)], 6)).toBe(2);
     expect(diceOf([d(2, 6, -1)], 6)).toBe(-2);
   });
+});
+
+describe('pigments', () => {
+  const OCHRE = '#e6c667';
+  const ORCHIL = '#c29ce9';
+  const hope = (count = 1): Term => ({ kind: 'dice', sign: 1, count, size: 12, pigment: OCHRE });
+  const fear = (count = 1): Term => ({ kind: 'dice', sign: 1, count, size: 12, pigment: ORCHIL });
+
+  test('two pads of the same die are two terms, each counted on its own pad', () => {
+    const both = stepDie(stepDie([], 12, 1, OCHRE)!, 12, 1, ORCHIL)!;
+    expect(both).toEqual([hope(), fear()]);
+    expect(formatFormula(both)).toBe('1d12+1d12');
+    expect(diceOf(both, 12, OCHRE)).toBe(1);
+    expect(diceOf(both, 12)).toBe(0);
+    expect(stepDie(both, 12, 1, OCHRE)).toEqual([hope(2), fear()]);
+  });
+
+  test('typing keeps each pigment where the term still stands for the same die', () => {
+    expect(reattach(parseFormula('1d12+1d12+2')!, [hope(), fear()])).toEqual([hope(), fear(), n(2)]);
+    expect(reattach(parseFormula('1d12+1d8')!, [hope(), fear()])).toEqual([hope(), d(1, 8)]);
+    expect(reattach(parseFormula('1d6')!, [])).toEqual([d(1, 6)]);
+  });
+});
+
+test('a word die picks one of its faces', () => {
+  expect(pickFace(['Rain', 'Fog', 'Storm'], () => 2)).toBe('Fog');
+  expect(pickFace(['Only'])).toBe('Only');
 });
 
 test('the ±1 pad counts the numbers, and moves the last one, dropping it at zero', () => {

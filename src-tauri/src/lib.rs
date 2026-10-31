@@ -599,6 +599,7 @@ pub fn run() {
             command::command_stop,
             command::command_jot,
             command::command_send_targets,
+            command::command_draw_tracks,
             command::command_send,
             command::command_add_image,
             command::command_pick_images,

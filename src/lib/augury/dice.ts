@@ -8,8 +8,11 @@ export const MIN_SIZE = 2;
 export const MAX_SIZE = 1000;
 export const MAX_NUMBER = 999;
 
+/** A dice term from a pigmented pad carries the pigment, so two pads of
+ *  the same die stay two terms (design §8); the field's text doesn't show
+ *  it, and a term typed by hand has none. */
 export type Term =
-  | { kind: 'dice'; sign: 1 | -1; count: number; size: number }
+  | { kind: 'dice'; sign: 1 | -1; count: number; size: number; pigment?: string }
   | { kind: 'number'; sign: 1 | -1; value: number };
 
 /** Roll the formula twice and keep the higher total, or the lower. */
@@ -77,10 +80,13 @@ export function formatFormula(terms: Term[]): string {
     .join('');
 }
 
-/** A pad's count: the dice of its size the formula adds, less those it
- *  takes away. */
-export function diceOf(terms: Term[], size: number): number {
-  return terms.reduce((n, t) => (t.kind === 'dice' && t.size === size ? n + t.sign * t.count : n), 0);
+const samePad = (t: Term, size: number, pigment: string | undefined) =>
+  t.kind === 'dice' && t.size === size && t.pigment === pigment;
+
+/** A pad's count: the dice of its size and pigment the formula adds, less
+ *  those it takes away. */
+export function diceOf(terms: Term[], size: number, pigment?: string): number {
+  return terms.reduce((n, t) => (t.kind === 'dice' && samePad(t, size, pigment) ? n + t.sign * t.count : n), 0);
 }
 
 /** The formula's numbers summed: the ±1 pad's count. */
@@ -92,8 +98,8 @@ export function numberOf(terms: Term[]): number {
  *  A term of its size running the other way shrinks first, so each undoes
  *  the other; past zero a term running this way grows, or starts at the
  *  end. Null once the formula holds MAX_DICE. */
-export function stepDie(terms: Term[], size: number, by: 1 | -1): Term[] | null {
-  const along = (sign: number) => terms.findIndex((t) => t.kind === 'dice' && t.size === size && t.sign === sign);
+export function stepDie(terms: Term[], size: number, by: 1 | -1, pigment?: string): Term[] | null {
+  const along = (sign: number) => terms.findIndex((t) => samePad(t, size, pigment) && t.sign === sign);
   const back = along(-by);
   if (back >= 0) {
     const t = terms[back] as Extract<Term, { kind: 'dice' }>;
@@ -103,8 +109,21 @@ export function stepDie(terms: Term[], size: number, by: 1 | -1): Term[] | null 
   }
   if (terms.reduce((n, t) => (t.kind === 'dice' ? n + t.count : n), 0) >= MAX_DICE) return null;
   const at = along(by);
-  if (at < 0) return [...terms, { kind: 'dice', sign: by, count: 1, size }];
+  if (at < 0) return [...terms, { kind: 'dice', sign: by, count: 1, size, ...(pigment ? { pigment } : {}) }];
   return terms.map((u, i) => (i === at && u.kind === 'dice' ? { ...u, count: u.count + 1 } : u));
+}
+
+/** The formula as typed, with each dice term keeping the pigment of the
+ *  term it stands in for: the same place among the dice terms, the same
+ *  die and sign. A typed `+1d6` stays plain. */
+export function reattach(typed: Term[], was: Term[]): Term[] {
+  const before = was.filter((t) => t.kind === 'dice');
+  let next = 0;
+  return typed.map((t) => {
+    if (t.kind !== 'dice') return t;
+    const old = before[next++];
+    return old?.kind === 'dice' && old.pigment && old.size === t.size && old.sign === t.sign ? { ...t, pigment: old.pigment } : t;
+  });
 }
 
 /** The ±1 pad: the formula's last number moved by one, dropped at zero,
@@ -186,6 +205,11 @@ export function refigure(r: Roll, terms: Term[]): Roll {
     terms,
     terms.map((t) => (t.kind === 'dice' ? dice[next++] : [])),
   );
+}
+
+/** A word die's face, each as likely (design §7). */
+export function pickFace(faces: string[], draw: (sides: number) => number = drawFace): string {
+  return faces.length === 1 ? faces[0] : faces[draw(faces.length) - 1];
 }
 
 /** How many of the level meter's cells a roll lights: where its total fell

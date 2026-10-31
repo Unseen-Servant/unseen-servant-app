@@ -168,6 +168,22 @@ pub struct SendTargets {
     kinds: std::collections::BTreeMap<String, String>,
 }
 
+/// One track for Augury's Tracks set: its pigment and its unspent clips by
+/// name, which a pad draws one of at random (Augury design §6).
+#[derive(Serialize, Debug, PartialEq)]
+pub struct DrawTrack {
+    name: String,
+    pigment: Option<String>,
+    notes: Vec<String>,
+}
+
+/// What Augury's Tracks set draws from: the open campaign's tracks.
+#[derive(Serialize, Debug)]
+pub struct DrawTracks {
+    campaign: Option<String>,
+    tracks: Vec<DrawTrack>,
+}
+
 /// What Send to Command kept, a hit as a note or an image from the tree:
 /// the campaign it went to and its path there.
 #[derive(Serialize, Debug)]
@@ -864,6 +880,46 @@ pub async fn command_send_targets(
     })
 }
 
+/// A campaign's tracks in display order, each with its unspent clips: a
+/// spent note is used up, so a draw never lands on one.
+fn draw_tracks(index: CampaignIndex) -> Vec<DrawTrack> {
+    index
+        .tracks
+        .iter()
+        .map(|track| DrawTrack {
+            name: track.clone(),
+            pigment: index.pigments.get(track).cloned(),
+            notes: index
+                .notes
+                .iter()
+                .filter(|n| n.track.as_deref() == Some(track.as_str()) && n.spent.is_none())
+                .map(|n| n.name.clone())
+                .collect(),
+        })
+        .collect()
+}
+
+/// The open campaign's tracks for Augury's Tracks set. A crossing between
+/// tools' windows, so it goes through Rust as Send to Command's does: Augury
+/// asks, Rust knows the campaign. No campaign open, no tracks.
+#[tauri::command]
+pub async fn command_draw_tracks(
+    state: tauri::State<'_, AppContext>,
+) -> Result<DrawTracks, String> {
+    let Some(campaign) = state.campaign() else {
+        return Ok(DrawTracks {
+            campaign: None,
+            tracks: Vec::new(),
+        });
+    };
+    let index: CampaignIndex =
+        answer(client().get(api_query("/campaign", &[("name", &campaign)])?)).await?;
+    Ok(DrawTracks {
+        campaign: Some(campaign),
+        tracks: draw_tracks(index),
+    })
+}
+
 /// Keep a Legend Lore hit as a note in the open campaign: in `track`, or
 /// on its shelf when there's none. The one crossing between the tools'
 /// windows (architecture D4): Legend Lore asks Rust, and Command hears of
@@ -1172,6 +1228,34 @@ mod tests {
         });
         let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
         assert_eq!(serde_json::to_value(index).unwrap(), sidecar);
+    }
+
+    #[test]
+    fn draw_tracks_keeps_each_tracks_unspent_clips_in_track_order() {
+        let index: CampaignIndex = serde_json::from_value(serde_json::json!({
+            "name": "Strahd", "tracks": ["NPCs", "Maps", "Secrets"], "ambiguous": [],
+            "notes": [
+                {"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18", "type": "note"},
+                {"name": "Ireena", "path": "NPCs/Vallaki/Ireena.md", "track": "NPCs", "group": "Vallaki", "spent": null, "type": "note"},
+                {"name": "Barovia.png", "path": "Maps/Barovia.png", "track": "Maps", "group": null, "spent": null, "type": "image"},
+                {"name": "Loose", "path": "Loose.md", "track": null, "group": null, "spent": null, "type": "note"},
+            ],
+            "note_order": {}, "pigments": {"NPCs": "#d07c87"}, "beats": [], "sessions": [],
+        }))
+        .unwrap();
+        let track = |name: &str, pigment: Option<&str>, notes: &[&str]| DrawTrack {
+            name: name.into(),
+            pigment: pigment.map(Into::into),
+            notes: notes.iter().map(|n| n.to_string()).collect(),
+        };
+        assert_eq!(
+            draw_tracks(index),
+            vec![
+                track("NPCs", Some("#d07c87"), &["Ireena"]),
+                track("Maps", None, &["Barovia.png"]),
+                track("Secrets", None, &[]),
+            ]
+        );
     }
 
     #[test]

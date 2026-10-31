@@ -199,8 +199,8 @@ It is built on [Tauri](https://tauri.app), [Svelte](https://svelte.dev),
 [ONNX Runtime](https://onnxruntime.ai) with an MS MARCO MiniLM cross-encoder,
 [SymSpell](https://github.com/wolfgarbe/SymSpell),
 [sqlite-vec](https://github.com/asg017/sqlite-vec),
-[Font Awesome](https://fontawesome.com), and the Crimson Text and Almendra
-typefaces. [ACKNOWLEDGEMENTS.txt](ACKNOWLEDGEMENTS.txt) lists every component
+[Font Awesome](https://fontawesome.com), and the Crimson Text, Almendra and
+IBM Plex Mono typefaces. [ACKNOWLEDGEMENTS.txt](ACKNOWLEDGEMENTS.txt) lists every component
 with its licence, and ships in the app under **Help → About**.
 
 Unseen Servant is not affiliated with or endorsed by any project or product

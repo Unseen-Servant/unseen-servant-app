@@ -53,6 +53,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* --- Design Tokens --- */
 
 :root {
@@ -60,6 +68,9 @@
   --font-body: 'Crimson Text', Georgia, serif;
   --font-heading: 'Almendra', serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  /* A readout that prints words, as Augury's does a word die's face: the
+     site's mono, bundled, where a hardware display would spell. */
+  --font-readout: 'IBM Plex Mono', var(--font-mono);
 
   /* Background colors. The greys are warm iron, not neutral: each keeps
      its old OKLCH lightness, with chroma 0.006 at hue 75 (toward the

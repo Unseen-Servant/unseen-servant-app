@@ -1,5 +1,6 @@
 Copyright 2010 The Crimson Text Project Authors (https://github.com/googlefonts/Crimson)
 Copyright (c) 2011-2012, Ana Sanfelippo (anasanfe@gmail.com), with Reserved Font Name 'Almendra'
+Copyright 2017 IBM Corp., with Reserved Font Name 'Plex' (IBM Plex Mono)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

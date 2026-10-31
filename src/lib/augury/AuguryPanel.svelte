@@ -2,82 +2,199 @@
   // Augury, the dice roller (docs/roadmap/2026-10-30-augury-design.md). The
   // loaded dice set's pads feed a formula in xdy notation, which the GM can
   // also type, and a roll lands on the readout. After a roll the formula
-  // stays, so rolling again is the reroll; the first pad press after it
-  // starts a new formula, as a calculator's first key after = does. A
+  // stays, so rolling again is the reroll; the first die pad pressed after
+  // it starts a new formula, as a calculator's first key after = does. A
   // right-click takes from the formula there. The ±1 pad in the corner moves
   // its number, and after a roll the total without new dice: the one pad
-  // that never starts a new formula, since no roll starts with a bonus.
-  import { onDestroy, onMount, type Snippet } from 'svelte';
+  // that never starts a new formula, since no roll starts with a bonus. A
+  // word die's pad rolls at once, and its name stands in the field. Tracks
+  // makes each track of the campaign open in Command such a die, its faces
+  // the track's unspent notes.
+  //
+  // The GM's own sets are edited in place (§6): [edit] turns the pads into
+  // fields, a click changes one and a right-click opens its menu, since in
+  // play those gestures add and take away dice. The header turns with them:
+  // the set's name is clicked to rename it, and [delete] sits beside [done].
+  import { onMount, onDestroy, type Snippet } from 'svelte';
   import { load } from '@tauri-apps/plugin-store';
+  import CommandMenu from '../command/CommandMenu.svelte';
+  import { action, picks, type OpenMenu } from '../command/menu';
+  import { PIGMENTS } from '../legend-lore/palette';
   import { m } from '../paraglide/messages';
+  import { confirmPrompt } from '../shell/confirmStore';
   import { focusPath } from '../shell/focus';
   import { bindKeys } from '../shell/keys';
-  import { parseEnum } from '../shell/storeParsers';
+  import { appContext } from '../shell/shellState';
+  import { parseString } from '../shell/storeParsers';
   import { CARET_RIGHT, PLAY } from '../ui/iconPaths';
+  import RenameField from '../ui/RenameField.svelte';
+  import FacesEditor from './FacesEditor.svelte';
   import Readout from './Readout.svelte';
+  import { drawTracks, onVaultChange, type DrawTrack } from './tracks';
   import {
     bump,
     diceOf,
     formatFormula,
     numberOf,
     parseFormula,
+    pickFace,
+    reattach,
     refigure,
     rollOutcome,
     stepDie,
     type Edge,
     type Outcome,
+    type Term,
   } from './dice';
-  import { SETS } from './sets';
+  import {
+    allSets,
+    newSet,
+    padFromEntry,
+    padLabel,
+    parseSets,
+    TRACKS,
+    type Pad,
+    type StoredSets,
+    type WordPad,
+  } from './sets';
 
   export let windowKey: Snippet | undefined = undefined;
 
   // Font Awesome "xmark" (src/lib/ui/icons/xmark-solid-full.svg)
   const XMARK =
     'M183.1 137.4C170.6 124.9 150.3 124.9 137.8 137.4C125.3 149.9 125.3 170.2 137.8 182.7L275.2 320L137.9 457.4C125.4 469.9 125.4 490.2 137.9 502.7C150.4 515.2 170.7 515.2 183.2 502.7L320.5 365.3L457.9 502.6C470.4 515.1 490.7 515.1 503.2 502.6C515.7 490.1 515.7 469.8 503.2 457.3L365.8 320L503.1 182.6C515.6 170.1 515.6 149.8 503.1 137.3C490.6 124.8 470.3 124.8 457.8 137.3L320.5 274.7L183.1 137.4z';
+  // The browser's last entry, past the sets: loading it makes a new set of
+  // the GM's, empty, and opens it for editing.
+  const NEW = 'new';
 
   let text = '';
+  // The field's terms, null while it doesn't read as dice.
+  let terms: Term[] | null = [];
+  // A word die in the field instead of dice.
+  let word: WordPad | null = null;
   let refused = false;
   let outcome: Outcome | null = null;
+  let answer: { face: string; pigment?: string } | null = null;
   // Advantage or disadvantage, part of the formula: it stays for a reroll
   // and goes with a new formula.
   let edge: Edge | null = null;
   let seq = 0;
   // The field holds the formula on the readout, so the next press starts anew.
   let rolled = false;
+
+  let stored: StoredSets = { custom: [] };
+  // The campaign open in Command and its tracks, for the Tracks set.
+  let campaign: string | null = null;
+  let open: DrawTrack[] = [];
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let unlistenVault: Promise<() => void> | undefined;
   // The set on the pads, and the one on the display: ◀ ▶ move only the
   // display, and [load] brings its set onto the pads.
-  let loaded = 0;
-  let browsed = 0;
+  let loadedId = 'standard';
+  let browsedId = 'standard';
+  let editing = false;
+  // While editing: the pad whose field is open, and the word die whose faces
+  // are in the readout's well.
+  let entry: number | null = null;
+  let facesOf: number | null = null;
+  let renaming = false;
+  let menu: OpenMenu | null = null;
 
-  $: terms = parseFormula(text);
+  $: sets = allSets(stored, open);
+  // Tracks follows Command: read again when the campaign changes or its
+  // folder does.
+  $: $appContext.campaign, refreshTracks();
+  $: set = sets.find((s) => s.id === loadedId) ?? sets[0];
+  $: browsed = sets.find((s) => s.id === browsedId) ?? null;
+  $: browsedName = browsed ? browsed.name() : m.augury_new_set();
+  $: displayTitle =
+    browsedId === TRACKS && !campaign
+      ? m.augury_tracks_none()
+      : browsedId === set.id
+        ? m.augury_set_on_pads({ set: browsedName })
+        : browsed
+          ? m.augury_set_off_pads({ set: browsedName })
+          : m.augury_new_title();
   $: bonus = numberOf(terms ?? []);
-  $: pads = SETS[loaded].pads;
-  $: browsedName = SETS[browsed].name();
+  $: facesPad = facesOf === null ? null : set.pads[facesOf];
+  // One key on the header for what the display allows: load the set shown
+  // (the new one included), or edit the loaded one if it can be.
+  $: control =
+    browsedId === NEW
+      ? { label: m.augury_load(), title: m.augury_new_title(), run: createSet, off: false }
+      : browsedId !== set.id
+        ? { label: m.augury_load(), title: m.augury_load_title({ set: browsedName }), run: loadSet, off: false }
+        : set.editable
+          ? {
+              label: editing ? m.augury_done() : m.augury_edit(),
+              title: editing ? m.augury_done_title() : m.augury_edit_title(),
+              run: () => (editing ? stopEditing() : (editing = true)),
+              off: false,
+            }
+          : { label: m.augury_load(), title: m.augury_load_title({ set: browsedName }), run: loadSet, off: true };
 
   // A changed formula has no result yet, so the readout goes dark.
   function unroll() {
     if (!rolled) return;
     rolled = false;
     outcome = null;
+    answer = null;
   }
 
-  function setFormula(next: string) {
-    text = next;
+  function setTerms(next: Term[]) {
+    terms = next;
+    word = null;
+    text = formatFormula(next);
     refused = false;
     unroll();
   }
 
-  // A press after a roll starts a new formula, with no edge; a right-click
-  // (by -1) takes from the formula there.
-  function press(size: number, by: 1 | -1) {
-    const fresh = rolled && by > 0;
-    const next = stepDie(fresh ? [] : (terms ?? []), size, by);
+  // Typed, the dice keep their pigments where they stand for the same die,
+  // and a word die's name alone is that die.
+  function onInput(value: string) {
+    text = value;
+    refused = false;
+    const typed = parseFormula(value);
+    word = typed ? null : wordNamed(value);
+    terms = typed && reattach(typed, terms ?? []);
+    unroll();
+  }
+
+  // The die as its set has it now: a track's notes change in Command, and
+  // a GM's word die's faces in edit mode, between rolls of the same die.
+  function current(die: WordPad): WordPad {
+    const now = set.pads.find((p) => p?.kind === 'word' && p.name === die.name && p.pigment === die.pigment);
+    return now?.kind === 'word' ? now : die;
+  }
+
+  function wordNamed(value: string): WordPad | null {
+    const name = value.trim().toLowerCase();
+    const pad = set.pads.find((p) => p?.kind === 'word' && p.name.toLowerCase() === name);
+    return pad?.kind === 'word' ? pad : null;
+  }
+
+  // A press after a roll, or over a word die, starts a new formula with no
+  // edge; a right-click (by -1) takes from the dice there.
+  function pressDie(pad: Extract<Pad, { kind: 'die' }>, by: 1 | -1) {
+    const fresh = (rolled && by > 0) || word !== null;
+    const next = stepDie(fresh ? [] : (terms ?? []), pad.size, by, pad.pigment);
     if (!next) return;
     if (fresh) edge = null;
-    setFormula(formatFormula(next));
+    setTerms(next);
+  }
+
+  function pressWord(pad: WordPad) {
+    if (pad.faces.length === 0) return;
+    word = pad;
+    terms = null;
+    text = pad.name;
+    edge = null;
+    refused = false;
+    rollNow();
   }
 
   function bumpBy(by: 1 | -1) {
+    if (word) return;
     if (terms === null) {
       refused = true;
       return;
@@ -85,11 +202,12 @@
     const next = bump(terms, by);
     if (!next) return;
     if (!rolled || !outcome) {
-      setFormula(formatFormula(next));
+      setTerms(next);
       return;
     }
     // Only the number moved: the dice on the readout stay, and the total
     // moves with it.
+    terms = next;
     text = formatFormula(next);
     outcome = { kept: refigure(outcome.kept, next), dropped: outcome.dropped && refigure(outcome.dropped, next) };
   }
@@ -100,48 +218,199 @@
   }
 
   function rollNow() {
-    if (terms === null) {
-      refused = true;
-      return;
+    if (word) {
+      word = current(word);
+      if (word.faces.length === 0) return;
+      answer = { face: pickFace(word.faces), pigment: word.pigment };
+      outcome = null;
+    } else {
+      if (terms === null) {
+        refused = true;
+        return;
+      }
+      if (terms.length === 0) return;
+      outcome = rollOutcome(terms, edge);
+      answer = null;
     }
-    if (terms.length === 0) return;
-    outcome = rollOutcome(terms, edge);
     seq += 1;
     rolled = true;
   }
 
   function clear() {
     text = '';
+    terms = [];
+    word = null;
     refused = false;
     outcome = null;
+    answer = null;
     edge = null;
     rolled = false;
   }
 
+  // ---- the sets ---------------------------------------------------------
+
   function step(by: number) {
-    browsed = (browsed + by + SETS.length) % SETS.length;
+    const ids = [...sets.map((s) => s.id), NEW];
+    browsedId = ids[(ids.indexOf(browsedId) + by + ids.length) % ids.length];
+    renaming = false;
+    stopEditing();
   }
 
-  async function loadSet() {
-    loaded = browsed;
+  function stopEditing() {
+    editing = false;
+    renaming = false;
+    entry = null;
+    facesOf = null;
+  }
+
+  // A beat after the last change: the folder changes in bursts while Command
+  // writes.
+  function refreshTracks() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => {
+      try {
+        const got = await drawTracks();
+        campaign = got.campaign;
+        open = got.tracks;
+      } catch (e) {
+        console.error('Failed to read the tracks to draw from:', e);
+      }
+    }, 300);
+  }
+
+  async function save(key: 'augurySet' | 'augurySets', value: unknown) {
     try {
       const store = await load('settings.json');
-      await store.set('augurySet', SETS[loaded].id);
+      await store.set(key, value);
     } catch (e) {
-      console.error('Failed to save the loaded dice set:', e);
+      console.error(`Failed to save ${key}:`, e);
     }
+  }
+
+  function loadSet() {
+    loadedId = browsedId;
+    stopEditing();
+    void save('augurySet', loadedId);
+  }
+
+  function createSet() {
+    const made = newSet(stored.custom, `custom-${Date.now()}`);
+    stored = { ...stored, custom: [...stored.custom, made] };
+    loadedId = browsedId = made.id;
+    editing = true;
+    // Named Custom N, with its name open to change at once.
+    renaming = true;
+    void save('augurySets', stored);
+    void save('augurySet', loadedId);
+  }
+
+  // Each write names its set, so one that lands late (the faces editor
+  // closing as another set loads) can't fall on the wrong one.
+  function putPad(id: string, i: number, pad: Pad | null) {
+    const pads = [...(allSets(stored).find((s) => s.id === id)?.pads ?? [])];
+    if (i >= pads.length) return;
+    pads[i] = pad;
+    stored = { ...stored, custom: stored.custom.map((c) => (c.id === id ? { ...c, pads } : c)) };
+    void save('augurySets', stored);
+  }
+
+  function commitEntry(i: number, typed: string): string | null {
+    const made = padFromEntry(typed, set.pads[i]);
+    if ('refused' in made) return made.refused;
+    putPad(set.id, i, made.pad);
+    entry = null;
+    // A new word die opens on its faces.
+    if (made.pad.kind === 'word' && made.pad.faces.length === 0) facesOf = i;
+    return null;
+  }
+
+  // A word die needs a face to roll: closed with none, it goes back to an
+  // empty pad rather than staying on the matrix doing nothing.
+  function putFaces(id: string, i: number, faces: string[]) {
+    const pad = allSets(stored).find((s) => s.id === id)?.pads[i];
+    if (pad?.kind === 'word') putPad(id, i, faces.length ? { ...pad, faces } : null);
+    if (facesOf === i) facesOf = null;
+  }
+
+  function plain(pad: Pad): Pad {
+    return pad.kind === 'die' ? { kind: 'die', size: pad.size } : { kind: 'word', name: pad.name, faces: pad.faces };
+  }
+
+  // Off the matrix: the pad's ✕ in edit mode, or its field emptied. A word
+  // die's faces editor closes with it, and finds no pad to write to.
+  function clearPad(i: number) {
+    if (entry === i) entry = null;
+    if (facesOf === i) facesOf = null;
+    putPad(set.id, i, null);
+  }
+
+  // In edit mode a pad's right-click is its menu: Command's track pigment
+  // row, and its faces for a word die.
+  function padMenu(e: MouseEvent, i: number) {
+    const pad = set.pads[i];
+    if (!pad) return;
+    const id = set.id;
+    menu = {
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        picks(m.augury_pad_pigment(), [
+          ...PIGMENTS.map((p) => ({
+            label: p.name,
+            swatch: p.hex,
+            on: pad.pigment === p.hex,
+            action: () => putPad(id, i, { ...plain(pad), pigment: p.hex }),
+          })),
+          { label: m.augury_pad_pigment_none(), swatch: null, on: !pad.pigment, action: () => putPad(id, i, plain(pad)) },
+        ]),
+        ...(pad.kind === 'word' ? [action(m.augury_pad_edit_faces(), () => (facesOf = i))] : []),
+      ],
+    };
+  }
+
+  function renameSet(name: string): string | null {
+    if (sets.some((s) => s.id !== browsedId && s.name().toLowerCase() === name.toLowerCase())) {
+      return m.augury_set_name_taken();
+    }
+    stored = { ...stored, custom: stored.custom.map((c) => (c.id === browsedId ? { ...c, name } : c)) };
+    renaming = false;
+    void save('augurySets', stored);
+    return null;
+  }
+
+  async function deleteSet(id: string, name: string) {
+    const confirmed = await confirmPrompt.request({
+      title: m.augury_delete_set_title({ set: name }),
+      message: m.augury_delete_set_message(),
+      confirmLabel: m.augury_delete_set(),
+      danger: true,
+    });
+    if (!confirmed) return;
+    stored = { ...stored, custom: stored.custom.filter((c) => c.id !== id) };
+    if (loadedId === id) {
+      loadedId = 'standard';
+      stopEditing();
+      void save('augurySet', loadedId);
+    }
+    browsedId = loadedId;
+    void save('augurySets', stored);
   }
 
   const unbindKeys = bindKeys(
     (event, ctx) => {
-      if (ctx.menu || event.metaKey || event.ctrlKey || event.altKey) return false;
+      // A field that took the key (a pad's or a set's name) keeps it.
+      if (event.defaultPrevented || ctx.menu || event.metaKey || event.ctrlKey || event.altKey) return false;
       // A focused key's Enter is its own press.
       if (event.key === 'Enter' && !(event.target instanceof HTMLButtonElement)) {
         rollNow();
         return true;
       }
+      if (event.key === 'Escape' && editing) {
+        stopEditing();
+        return true;
+      }
       // With nothing to clear, Esc goes on down the app's ladder.
-      if (event.key === 'Escape' && (text !== '' || outcome || edge)) {
+      if (event.key === 'Escape' && (text !== '' || outcome || answer || edge)) {
         clear();
         return true;
       }
@@ -151,19 +420,22 @@
   );
 
   onMount(async () => {
+    unlistenVault = onVaultChange(refreshTracks);
     try {
       const store = await load('settings.json');
-      const id = parseEnum(
-        await store.get('augurySet'),
-        SETS.map((s) => s.id),
-      );
-      if (id) loaded = browsed = SETS.findIndex((s) => s.id === id);
+      stored = parseSets(await store.get('augurySets'));
+      const id = parseString(await store.get('augurySet'));
+      if (id && allSets(stored).some((s) => s.id === id)) loadedId = browsedId = id;
     } catch (e) {
-      console.error('Failed to read the loaded dice set:', e);
+      console.error('Failed to read the dice sets:', e);
     }
   });
 
-  onDestroy(unbindKeys);
+  onDestroy(() => {
+    unbindKeys();
+    clearTimeout(refreshTimer);
+    void unlistenVault?.then((stop) => stop());
+  });
 </script>
 
 <section class="augury" class:dormant={$focusPath.tool !== 'augury'}>
@@ -171,51 +443,98 @@
        program display. -->
   <header class="bar">
     <div class="well browser" role="group" aria-label={m.augury_sets_label()}>
-      <button
-        type="button"
-        class="key"
-        title={m.augury_set_previous()}
-        aria-label={m.augury_set_previous()}
-        on:click={() => step(-1)}
-      >
-        <svg class="back" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-      </button>
+      <!-- Browsing ends editing, so while editing the arrows give the name
+           their room. -->
+      {#if !editing}
+        <button
+          type="button"
+          class="key"
+          title={m.augury_set_previous()}
+          aria-label={m.augury_set_previous()}
+          on:click={() => step(-1)}
+        >
+          <svg class="back" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+        </button>
+      {/if}
       <!-- The rack's tool lamp (RackBar .cell): lit while the set on the
            display is the one on the pads. -->
       <span
         class="display"
-        title={browsed === loaded
-          ? m.augury_set_on_pads({ set: browsedName })
-          : m.augury_set_off_pads({ set: browsedName })}
+        class:new={browsedId === NEW}
+        title={displayTitle}
       >
-        <span class="cell" class:lit={browsed === loaded} aria-hidden="true"></span>
-        <span class="set-name readout-label">{browsedName}</span>
+        <span class="cell" class:lit={browsedId === set.id} aria-hidden="true"></span>
+        {#if renaming && browsed}
+          <span class="name-field">
+            <RenameField
+              value={browsedName}
+              label={m.augury_set_name_label()}
+              onCommit={renameSet}
+              onCancel={() => (renaming = false)}
+            />
+          </span>
+        {:else if editing}
+          <!-- A set of the GM's takes a new name as a pad takes a new die:
+               a click opens its field. -->
+          <button
+            type="button"
+            class="set-name readout-label renamable"
+            title={m.augury_set_rename_title()}
+            on:click={() => (renaming = true)}
+          >
+            {browsedName}
+          </button>
+        {:else}
+          <span class="set-name readout-label">{browsedName}</span>
+        {/if}
       </span>
-      <button
-        type="button"
-        class="key"
-        title={m.augury_set_next()}
-        aria-label={m.augury_set_next()}
-        on:click={() => step(1)}
-      >
-        <svg viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-      </button>
+      {#if !editing}
+        <button
+          type="button"
+          class="key"
+          title={m.augury_set_next()}
+          aria-label={m.augury_set_next()}
+          on:click={() => step(1)}
+        >
+          <svg viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+        </button>
+      {/if}
     </div>
     <button
       type="button"
       class="plate-btn"
-      disabled={browsed === loaded}
-      title={m.augury_load_title({ set: browsedName })}
-      on:click={loadSet}
+      disabled={control.off}
+      aria-pressed={browsedId === set.id && set.editable ? editing : undefined}
+      title={control.title}
+      on:click={control.run}
     >
-      {m.augury_load()}
+      {control.label}
     </button>
+    <!-- Removal in danger's hue, on the same bracketed shape. -->
+    {#if editing}
+      <button
+        type="button"
+        class="plate-btn danger"
+        title={m.augury_delete_title()}
+        on:click={() => void deleteSet(set.id, set.name())}
+      >
+        {m.augury_delete()}
+      </button>
+    {/if}
     <span class="spacer"></span>
     {@render windowKey?.()}
   </header>
 
   <div class="body">
-    <Readout result={outcome?.kept ?? null} dropped={outcome?.dropped ?? null} {seq} />
+    {#if facesOf !== null && facesPad?.kind === 'word'}
+      {@const at = facesOf}
+      {@const id = set.id}
+      {#key `${id}:${at}`}
+        <FacesEditor name={facesPad.name} faces={facesPad.faces} onDone={(faces) => putFaces(id, at, faces)} />
+      {/key}
+    {:else}
+      <Readout result={outcome?.kept ?? null} dropped={outcome?.dropped ?? null} word={answer} {seq} />
+    {/if}
 
     <div class="formula-row">
       <input
@@ -228,13 +547,15 @@
         spellcheck="false"
         autocomplete="off"
         autocapitalize="off"
-        on:input={(e) => setFormula(e.currentTarget.value)}
+        on:input={(e) => onInput(e.currentTarget.value)}
       />
-      <!-- Latches: a mode on the formula, so the lamp lights purple. -->
+      <!-- Latches: a mode on the formula, so the lamp lights purple. A word
+           die rolls once, so they wait while one is in the field. -->
       <div class="well" role="group" aria-label={m.augury_edge_label()}>
         <button
           type="button"
           class="key text-key"
+          disabled={word !== null}
           aria-pressed={edge === 'advantage'}
           title={m.augury_advantage_title()}
           on:click={() => toggleEdge('advantage')}
@@ -245,6 +566,7 @@
         <button
           type="button"
           class="key text-key"
+          disabled={word !== null}
           aria-pressed={edge === 'disadvantage'}
           title={m.augury_disadvantage_title()}
           on:click={() => toggleEdge('disadvantage')}
@@ -258,7 +580,7 @@
         <button
           type="button"
           class="key"
-          disabled={text === '' && !outcome && !edge}
+          disabled={text === '' && !outcome && !answer && !edge}
           title={m.augury_clear()}
           aria-label={m.augury_clear()}
           on:click={clear}
@@ -278,42 +600,112 @@
       </div>
     </div>
 
-    <div class="pads" role="group" aria-label={m.augury_pads_label()}>
-      {#each pads as size, i (i)}
-        <div class="pad-well">
-          {#if size !== null}
-            {@const count = diceOf(terms ?? [], size)}
+    <div class="pads" class:editing role="group" aria-label={m.augury_pads_label()}>
+      {#each set.pads as pad, i (i)}
+        <!-- A pigment shows on the pad's edge at rest, and lights its label
+             and lamp once loaded, where a plain pad's light parchment. -->
+        <div
+          class="pad-well"
+          class:pigmented={!!pad?.pigment}
+          class:blank={editing && !pad && entry !== i}
+          class:open={facesOf === i}
+          style:--pigment={pad?.pigment ?? null}
+        >
+          {#if entry === i}
+            <span class="pad-field">
+              <RenameField
+                value={pad ? padLabel(pad) : ''}
+                label={m.augury_pad_entry_label()}
+                onCommit={(typed) => commitEntry(i, typed)}
+                onCancel={() => (entry = null)}
+                onEmpty={() => clearPad(i)}
+              />
+            </span>
+          {:else if editing}
+            <button
+              type="button"
+              class="pad"
+              class:word={pad?.kind === 'word'}
+              title={pad ? m.augury_pad_edit_title() : m.augury_pad_add_title()}
+              on:click={() => (entry = i)}
+              on:contextmenu|preventDefault={(e) => padMenu(e, i)}
+            >
+              <span class="pad-text">{pad ? padLabel(pad) : '+'}</span>
+              <span class="lamp" aria-hidden="true"></span>
+            </button>
+            {#if pad}
+              <!-- Edit mode's way off a pad, in sight on every one: a small
+                   ✕ in the corner, danger's hue under the pointer. -->
+              <button
+                type="button"
+                class="clear"
+                title={m.augury_pad_clear()}
+                aria-label={m.augury_pad_clear()}
+                on:click={() => clearPad(i)}
+              >
+                <svg viewBox="0 0 640 640" fill="currentColor" aria-hidden="true"><path d={XMARK} /></svg>
+              </button>
+            {/if}
+          {:else if pad?.kind === 'die'}
+            {@const count = diceOf(terms ?? [], pad.size, pad.pigment)}
             <button
               type="button"
               class="pad"
               class:loaded={count !== 0}
-              title={m.augury_pad_title({ size })}
-              on:click={() => press(size, 1)}
-              on:contextmenu|preventDefault={() => press(size, -1)}
+              title={m.augury_pad_title({ size: pad.size })}
+              on:click={() => pressDie(pad, 1)}
+              on:contextmenu|preventDefault={() => pressDie(pad, -1)}
             >
-              <span>{count === 0 ? `d${size}` : `${count}d${size}`}</span>
+              <span>{count === 0 ? `d${pad.size}` : `${count}d${pad.size}`}</span>
               <span class="lamp" class:lit={count !== 0} aria-hidden="true"></span>
+            </button>
+          {:else if pad?.kind === 'word'}
+            {@const lit = word !== null && word.name === pad.name && word.pigment === pad.pigment}
+            <button
+              type="button"
+              class="pad word"
+              class:loaded={lit}
+              disabled={pad.faces.length === 0}
+              title={set.id === TRACKS
+                ? pad.faces.length
+                  ? m.augury_track_pad_title({ name: pad.name })
+                  : m.augury_track_pad_empty({ name: pad.name })
+                : pad.faces.length
+                  ? m.augury_word_pad_title({ name: pad.name })
+                  : m.augury_word_pad_empty({ name: pad.name })}
+              on:click={() => pressWord(pad)}
+              on:contextmenu|preventDefault
+            >
+              <span class="pad-text">{pad.name}</span>
+              <span class="lamp" class:lit aria-hidden="true"></span>
             </button>
           {/if}
         </div>
       {/each}
       <!-- The ±1 pad, in the same corner of every number set. -->
       <div class="pad-well">
-        <button
-          type="button"
-          class="pad"
-          class:loaded={bonus !== 0}
-          title={m.augury_bonus_title()}
-          on:click={() => bumpBy(1)}
-          on:contextmenu|preventDefault={() => bumpBy(-1)}
-        >
-          <span>{bonus === 0 ? '+1' : bonus > 0 ? `+${bonus}` : `${bonus}`}</span>
-          <span class="lamp" class:lit={bonus !== 0} aria-hidden="true"></span>
-        </button>
+        {#if set.bonus}
+          <button
+            type="button"
+            class="pad"
+            class:loaded={bonus !== 0}
+            disabled={editing || word !== null}
+            title={m.augury_bonus_title()}
+            on:click={() => bumpBy(1)}
+            on:contextmenu|preventDefault={() => bumpBy(-1)}
+          >
+            <span>{bonus === 0 ? '+1' : bonus > 0 ? `+${bonus}` : `${bonus}`}</span>
+            <span class="lamp" class:lit={bonus !== 0} aria-hidden="true"></span>
+          </button>
+        {/if}
       </div>
     </div>
   </div>
 </section>
+
+{#if menu}
+  <CommandMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => (menu = null)} />
+{/if}
 
 <style>
   .augury.dormant {
@@ -434,6 +826,39 @@
     white-space: nowrap;
   }
 
+  /* The entry past the sets is what a set would be: a step down the ramp. */
+  .display.new .set-name {
+    color: var(--text-tertiary);
+  }
+
+  .name-field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    font-size: 0.8rem;
+  }
+
+  /* The name as a key in edit mode: the label as it was, a step up the
+     ramp under the pointer. */
+  .renamable {
+    padding: 0;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: text;
+    transition: color var(--transition-fast);
+  }
+
+  .renamable:hover {
+    color: var(--text-primary);
+  }
+
+  .plate-btn.danger,
+  .plate-btn.danger:hover::before,
+  .plate-btn.danger:hover::after {
+    color: var(--text-danger);
+  }
+
   /* RackBar .cell, verbatim. */
   .cell {
     flex-shrink: 0;
@@ -489,16 +914,20 @@
     box-shadow: var(--ring-refused);
   }
 
+  /* Four equal columns whatever the pads say: a bare 1fr would grow to fit
+     a long name, so each column's floor is zero and the name ellipsizes. */
   .pads {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
   }
 
   /* Each pad is a key in its own well, so the matrix reads as sixteen pads;
      one with no die is the bare well. */
   .pad-well {
+    position: relative;
     display: flex;
+    min-width: 0;
     height: 2.4rem;
     padding: 2px;
     background: var(--bg-app);
@@ -525,12 +954,83 @@
     transition: color var(--transition-fast), transform var(--transition-fast);
   }
 
-  .pad:hover {
+  .pad:hover:not(:disabled) {
     color: var(--text-primary);
   }
 
-  .pad:active {
+  .pad:active:not(:disabled) {
     transform: scale(0.97);
+  }
+
+  .pad:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  /* A word die's name is words, not notation. */
+  .pad.word {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+  }
+
+  .pad-text {
+    max-width: 100%;
+    padding: 0 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pad-field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .clear {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+
+  .clear:hover {
+    color: var(--text-danger);
+  }
+
+  .clear svg {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* In edit mode an empty pad is dashed: the app's not-yet-real edge. */
+  .pad-well.blank {
+    border-style: dashed;
+    border-color: var(--text-tertiary);
+  }
+
+  .pad-well.pigmented {
+    border-color: var(--pigment);
+  }
+
+  /* The word die whose faces are in the readout's well. */
+  .pad-well.open {
+    box-shadow: var(--ring-focus);
   }
 
   /* Loaded dice are content: parchment, where a mode's key would light
@@ -541,6 +1041,10 @@
 
   .pad.loaded:hover {
     filter: brightness(1.2);
+  }
+
+  .pad-well.pigmented .pad.loaded {
+    color: var(--pigment);
   }
 
   .lamp {
@@ -554,6 +1058,11 @@
   .lamp.lit {
     background: var(--text-accent);
     filter: var(--glow-accent);
+  }
+
+  .pad-well.pigmented .lamp.lit {
+    background: var(--pigment);
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--pigment) 50%, transparent));
   }
 
   /* LatchKey's lamp: a mode switched on lights the transport's purple. */

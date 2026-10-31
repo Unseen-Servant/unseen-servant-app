@@ -11,6 +11,7 @@ Fonts and icons
 
   Crimson Text  OFL-1.1  [1]
   Almendra  OFL-1.1  [1]
+  IBM Plex Mono  OFL-1.1  [1]
   Font Awesome Free 7 icons, by Fonticons, Inc. CC BY 4.0, https://fontawesome.com/license/free
   Model Context Protocol logo, by the MCP project. MIT, https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg
 
@@ -790,11 +791,12 @@ Bundled embedding server
 Licence texts
 
 ==============================================================================
-[1] Used by: Crimson Text, Almendra
+[1] Used by: Crimson Text, Almendra, IBM Plex Mono
 ==============================================================================
 
 Copyright 2010 The Crimson Text Project Authors (https://github.com/googlefonts/Crimson)
 Copyright (c) 2011-2012, Ana Sanfelippo (anasanfe@gmail.com), with Reserved Font Name 'Almendra'
+Copyright 2017 IBM Corp., with Reserved Font Name 'Plex' (IBM Plex Mono)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

@@ -203,6 +203,7 @@ def main() -> None:
         "",
         f"  Crimson Text  OFL-1.1  {refs('Crimson Text', [fonts])}",
         f"  Almendra  OFL-1.1  {refs('Almendra', [fonts])}",
+        f"  IBM Plex Mono  OFL-1.1  {refs('IBM Plex Mono', [fonts])}",
         f"  {FONT_AWESOME}",
         f"  {MCP_LOGO}",
         "",

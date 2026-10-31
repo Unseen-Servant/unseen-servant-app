@@ -21,6 +21,10 @@
    *  refused, or nothing when it took; the owner then closes the field. */
   export let onCommit: (name: string) => Promise<string | null | void> | string | null | void;
   export let onCancel: () => void;
+  /** Where emptying means removing (Augury's pads): called when a field
+   *  that held a name is emptied and committed. Without it, an emptied name
+   *  just closes. */
+  export let onEmpty: (() => void) | undefined = undefined;
 
   const original = value;
   let input: HTMLInputElement;
@@ -33,6 +37,10 @@
   async function commit() {
     if (pending) return;
     const name = input.value.trim();
+    if (!name && original && onEmpty) {
+      onEmpty();
+      return;
+    }
     if (!name || name === original) {
       onCancel();
       return;
