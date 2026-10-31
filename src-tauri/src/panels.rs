@@ -27,7 +27,7 @@ struct PanelSpec {
 
 /// The frontend's manifest (`src/lib/shell/panels.ts`) carries the same ids;
 /// window defaults live here because Rust creates the windows.
-const PANELS: [PanelSpec; 3] = [
+const PANELS: [PanelSpec; 4] = [
     PanelSpec {
         id: "legend-lore",
         title: "Legend Lore",
@@ -39,6 +39,14 @@ const PANELS: [PanelSpec; 3] = [
         title: "Command",
         size: (720.0, 560.0),
         min_size: (420.0, 320.0),
+    },
+    // Compact (panels.ts): it opens at its smallest, the rack's 270×360 plus
+    // the pop-out's status bar.
+    PanelSpec {
+        id: "augury",
+        title: "Augury",
+        size: (270.0, 390.0),
+        min_size: (270.0, 390.0),
     },
     PanelSpec {
         id: "servant",

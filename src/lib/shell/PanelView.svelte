@@ -4,6 +4,7 @@
   // which is what keeps a panel the same docked or standalone (PANELS.md).
   import LegendLorePanel from '../legend-lore/LegendLorePanel.svelte';
   import CommandPanel from '../command/CommandPanel.svelte';
+  import AuguryPanel from '../augury/AuguryPanel.svelte';
   import ServantPanel from '../servant/ServantPanel.svelte';
   import type { Snippet } from 'svelte';
   import type { PanelId } from './panels';
@@ -25,6 +26,8 @@
   <LegendLorePanel {windowKey} {statusSlot} />
 {:else if id === 'command'}
   <CommandPanel {active} {windowKey} {statusSlot} {filled} {onFill} />
+{:else if id === 'augury'}
+  <AuguryPanel {windowKey} />
 {:else}
   <ServantPanel />
 {/if}

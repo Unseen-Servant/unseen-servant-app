@@ -43,7 +43,9 @@
   /** The private type a tool's key carries into the rack. */
   const CARRY = 'application/x-unseen-rack-tool';
 
-  let views: RackView[] = defaultViews();
+  // The rack sits one rail in from the window's sides; until it's measured,
+  // the window's width places a compact tool on the first launch's views.
+  let views: RackView[] = defaultViews(window.innerWidth - 2 * RAIL);
   let current = 0;
   let loaded = false;
   let focused: PanelId | null = null;
@@ -114,7 +116,7 @@
   function toggle(id: PanelId) {
     if (!present.includes(id)) {
       if (view.locked) return;
-      commit({ ...view, root: mount(view.root, id) });
+      commit({ ...view, root: mount(view.root, id, rackW) });
       focused = id;
     } else if (focused !== id && !popped.has(id)) {
       if (filling !== id) filling = null;
@@ -146,7 +148,7 @@
       else {
         const free = view.locked ? views.findIndex((v) => !v.locked) : current;
         const into = free >= 0 ? free : current;
-        views[into] = { ...views[into], root: mount(views[into].root, id) };
+        views[into] = { ...views[into], root: mount(views[into].root, id, rackW) };
         filling = null;
         current = into;
         void save();

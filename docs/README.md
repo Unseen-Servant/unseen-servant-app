@@ -38,6 +38,7 @@ files.
 - [Command MCP tools](roadmap/2026-10-18-command-mcp-tools-design.md) — audit after a prep-through-MCP run; 8 → 16 tools and the order to build them
 - [Command board toolbar](roadmap/2026-10-19-command-board-toolbar-design.md) — Miro's creation toolbar for Play's board, limited to what JSON Canvas holds
 - [Command images](roadmap/2026-10-20-command-images-design.md) — images as clips, image tracks, and Legend Lore's images
+- [Augury](roadmap/2026-10-30-augury-design.md) — the dice roller: dice sets on a pad matrix, seven-segment readout, Oracle word dice
 
 ## retrieval/
 

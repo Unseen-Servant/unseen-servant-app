@@ -51,6 +51,15 @@ describe('tree edits', () => {
   test('mounting fills an empty view, then takes a column on the right', () => {
     expect(mount(null, 'command')).toEqual(CMD);
     expect(mount(LL, 'command')).toEqual(row(0.6, LL, CMD));
+    // A compact tool comes in at its minimum width, once the rack is measured.
+    const AUG = { kind: 'tool', id: 'augury' } as const;
+    expect(layout(mount(CMD, 'augury', 1275), 1275, 700, false).rects.get('augury')!.w).toBe(270);
+    for (const w of [1275, 1440, 1713, 2550]) {
+      const got = layout(mount(row(0.37, LL, CMD), 'augury', w), w, 700, false).rects.get('augury')!.w;
+      expect(got - 270, `at ${w}`).toBeGreaterThanOrEqual(0);
+      expect(got - 270, `at ${w}`).toBeLessThanOrEqual(1);
+    }
+    expect(mount(CMD, 'augury')).toEqual(row(0.6, CMD, AUG));
   });
 });
 
@@ -158,8 +167,8 @@ describe('parseViews', () => {
   });
 });
 
-test('first launch puts each tool on its own view, where its tab was', () => {
-  expect(defaultViews().map((v) => toolsIn(v.root))).toEqual([['legend-lore'], ['command'], [], [], [], [], [], []]);
+test('first launch puts Legend Lore on view 1 and Command on 2 with Augury beside it', () => {
+  expect(defaultViews().map((v) => toolsIn(v.root))).toEqual([['legend-lore'], ['command', 'augury'], [], [], [], [], [], []]);
 });
 
 describe('neighbour', () => {

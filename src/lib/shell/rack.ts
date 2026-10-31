@@ -61,14 +61,20 @@ function minOf(id: PanelId): { w: number; h: number } {
   return PANELS.find((p) => p.id === id)!.rackMin;
 }
 
+function isCompact(id: PanelId): boolean {
+  return PANELS.find((p) => p.id === id)!.compact;
+}
+
 export function emptyViews(): RackView[] {
   return Array.from({ length: VIEW_COUNT }, () => ({ root: null, locked: false }));
 }
 
-/** First launch: each tool on the view its tab used to be. */
-export function defaultViews(): RackView[] {
+/** First launch: Legend Lore on view 1, where its tab used to be, and
+ *  Command on 2 with Augury mounted beside it in a rack `w` wide. */
+export function defaultViews(w = 0): RackView[] {
   const views = emptyViews();
-  RACK_TOOLS.forEach((t, i) => (views[i] = { root: { kind: 'tool', id: t.id }, locked: false }));
+  views[0] = { root: { kind: 'tool', id: 'legend-lore' }, locked: false };
+  views[1] = { root: mount({ kind: 'tool', id: 'command' }, 'augury', w), locked: false };
   return views;
 }
 
@@ -193,15 +199,21 @@ export function without(node: RackNode | null, id: PanelId): RackNode | null {
 }
 
 /** Mounting from the rack bar: the tool takes a column on the right, or
- *  the whole of an empty view. */
-export function mount(root: RackNode | null, id: PanelId): RackNode {
+ *  the whole of an empty view. A compact tool's column is its minimum width
+ *  in a rack `w` wide (known once measured); the columns already there keep
+ *  their proportions in what's left. Half a pixel per column covers their
+ *  rounding in layout, so the new column never lands a pixel short. */
+export function mount(root: RackNode | null, id: PanelId, w = 0): RackNode {
   const tool: RackNode = { kind: 'tool', id };
   if (!root) return tool;
-  if (root.kind === 'split' && root.dir === 'row') {
-    const n = root.children.length;
-    return { ...root, children: [...root.children, tool], sizes: [...root.sizes.map((s) => (s * n) / (n + 1)), 1 / (n + 1)] };
+  const row = root.kind === 'split' && root.dir === 'row';
+  const n = row ? root.children.length : 1;
+  const span = w - RAIL * n;
+  const share = isCompact(id) && span > 0 ? Math.min((minOf(id).w + n / 2) / span, 0.5) : row ? 1 / (n + 1) : 0.4;
+  if (row) {
+    return { ...root, children: [...root.children, tool], sizes: [...root.sizes.map((s) => s * (1 - share)), share] };
   }
-  return { kind: 'split', dir: 'row', sizes: [0.6, 0.4], children: [root, tool] };
+  return { kind: 'split', dir: 'row', sizes: [1 - share, share], children: [root, tool] };
 }
 
 /** `id` beside `target`, on the side `zone` names. Next to a sibling in a
