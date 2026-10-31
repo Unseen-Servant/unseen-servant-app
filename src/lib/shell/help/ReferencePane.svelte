@@ -38,6 +38,15 @@
       ],
     },
     {
+      group: () => 'Augury',
+      terms: [
+        [m.glossary_formula, m.glossary_formula_desc],
+        [m.glossary_dice_set, m.glossary_dice_set_desc],
+        [m.glossary_word_die, m.glossary_word_die_desc],
+        [m.glossary_pigment, m.glossary_pigment_desc],
+      ],
+    },
+    {
       group: m.reference_machinery,
       terms: [
         [m.glossary_sidecar, m.glossary_sidecar_desc],

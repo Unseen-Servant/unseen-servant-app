@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Augury is a dice roller in the rack.** A 4×4 pad matrix or a typed formula (`3d6+2`) rolls dice, and the readout shows the total and each die
+- **Dice sets load onto the pads:** Standard, Zocchi (the DCC dice chain from d3 to d100) and sets that users make with any die size
+- **Word dice give answers.** Oracle rolls Yes/No (weighted toward yes), Weather, Mood and Direction, and a custom set holds word dice that users write
+- **Tracks draws a note** at random from each track of the campaign open in Command, and skips spent notes
+- **Pigments tell two pads of the same die apart**, as Daggerheart's Hope and Fear d12s do
+- **`adv` and `dis` roll the formula twice** and keep the higher or the lower total; the corner pad adds or removes 1, also after a roll
+
 ### Changed
 
 - **Cards stand over the board.** In Play, a right-click on a card in the card tray or on the board shows it in the middle of the dimmed board, in place of its menu; a click on the board puts it back

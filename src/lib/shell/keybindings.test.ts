@@ -367,6 +367,9 @@ describe('liveScopes', () => {
     expect(liveScopes({ tool: 'legend-lore', region: 'collections' })).toEqual(new Set([...base, 'collections']));
     expect(liveScopes({ tool: 'legend-lore', region: 'filters' })).toEqual(new Set([...base, 'filterPanel']));
   });
+  test('Augury: its own, and none of the other tools\' shared keys', () => {
+    expect(liveScopes({ tool: 'augury', region: null })).toEqual(new Set(['global', 'augury']));
+  });
   test("Command: either tool's, its own, and its view's", () => {
     expect(liveScopes({ tool: 'command', region: 'grid' })).toEqual(new Set(['global', 'tool', 'command', 'commandPrep']));
     expect(liveScopes({ tool: 'command', region: 'play' })).toEqual(new Set(['global', 'tool', 'command', 'commandPlay']));

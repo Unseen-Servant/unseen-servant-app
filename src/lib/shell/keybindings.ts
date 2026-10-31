@@ -27,6 +27,7 @@ export type KeyScope =
   | 'command'
   | 'commandPrep'
   | 'commandPlay'
+  | 'augury'
   | 'contextMenu'
   | 'modal';
 
@@ -220,6 +221,11 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'command.boardFitLive',  keys: { mac: '⌥3',   other: 'Alt+3' },         label: m.keys_fit_live_cards_in_view, scope: 'commandPlay' },
   { id: 'command.boardFill',     keys: { mac: '⇧⌘F',  other: 'Ctrl+Shift+F' },  label: m.keys_fill_rack_with_board_and, scope: 'commandPlay' },
 
+  // Augury, from anywhere in it (AuguryPanel's handler). A press after a roll
+  // rerolls; Esc ends editing first, then clears.
+  { id: 'augury.roll',           keys: { mac: '↵',    other: 'Enter' },         label: m.keys_augury_roll, scope: 'augury' },
+  { id: 'augury.clear',          keys: { mac: 'Esc',  other: 'Esc' },           label: m.keys_augury_clear, scope: 'augury' },
+
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: m.keys_move_down_row, scope: 'contextMenu' },
   { id: 'contextMenu.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: m.keys_move_up_row, scope: 'contextMenu' },
@@ -255,7 +261,8 @@ const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
 
 // The scopes the sheet shows as live for a focus path (focus.ts): global
 // always, either tool's while one has the keyboard, Legend Lore's bar
-// whenever it does, the scope of the region that does, and Command's view. A menu can't be open under the sheet, so its scope
+// whenever it does, the scope of the region that does, Command's view, and
+// Augury's own. A menu can't be open under the sheet, so its scope
 // never is; the modal one isn't on the sheet.
 export function liveScopes(path: FocusPath): Set<KeyScope> {
   const live = new Set<KeyScope>(['global']);
@@ -264,6 +271,7 @@ export function liveScopes(path: FocusPath): Set<KeyScope> {
     live.add('command');
     live.add(path.region === 'play' ? 'commandPlay' : 'commandPrep');
   }
+  if (path.tool === 'augury') live.add('augury');
   if (path.tool === 'legend-lore') {
     live.add('searchInput');
     const region: Record<string, KeyScope> = {

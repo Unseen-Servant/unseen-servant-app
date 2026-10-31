@@ -1,6 +1,6 @@
 # Augury (2026-10-30)
 
-**Status:** settled 2026-10-30 (§11). Steps 1–3 built 2026-10-30; step 4 to come.
+**Status:** settled 2026-10-30 (§11). Built 2026-10-30–31: steps 1–3, then step 4 (Help → Guides → Augury, a glossary group, the shortcut sheet's Augury section, the CHANGELOG).
 
 ## 0. TL;DR
 
@@ -119,7 +119,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 1. **The panel and number dice.** Augury in the rack and as a pop-out (`panels.ts`, `panels.rs`, `PanelView`), on the first launch's view 2 beside Command, opening at its minimum. Formula parsing and rolling, with tests. Readout, level meter and breakdown. Field, clear and roll keys, Enter and Esc. The matrix, Standard and Zocchi, the browser and its load key, the remembered set. Right-click, ±1, advantage and disadvantage.
 2. **Oracle.** Word dice, the word readout, Oracle's four dice, editing a word die's faces.
 3. **Custom sets and pigments.** `+ new set`, renaming and deleting, edit mode, placing and clearing pads, the pad menu, pigments in the pads and the breakdown. Then the Tracks set.
-4. **Help and keys.** Help → Guides → Augury, the shortcut sheet, CHANGELOG.
+4. **Help and keys.** Help → Guides → Augury, a glossary group (formula, dice set, word die, pigment), the shortcut sheet (↵ rolls, Esc stops editing or clears, a line on the pads' click and right-click), the keys' hints, CHANGELOG.
 
 ## 11. Settled (2026-10-30)
 

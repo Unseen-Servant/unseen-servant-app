@@ -25,6 +25,7 @@
   import { m } from '../paraglide/messages';
   import { confirmPrompt } from '../shell/confirmStore';
   import { focusPath } from '../shell/focus';
+  import { chordHint } from '../shell/keybindings';
   import { bindKeys } from '../shell/keys';
   import { appContext } from '../shell/shellState';
   import { parseString } from '../shell/storeParsers';
@@ -530,7 +531,7 @@
         class="key"
         disabled={!canEdit}
         aria-pressed={editing}
-        title={editing ? m.augury_done_title() : m.augury_edit_title()}
+        title={editing ? m.augury_done_title() + chordHint('augury.clear') : m.augury_edit_title()}
         aria-label={m.augury_edit_label()}
         on:click={toggleEditing}
       >
@@ -597,7 +598,7 @@
           type="button"
           class="key"
           disabled={text === '' && !outcome && !answer && !edge}
-          title={m.augury_clear()}
+          title={m.augury_clear() + chordHint('augury.clear')}
           aria-label={m.augury_clear()}
           on:click={clear}
         >
@@ -607,7 +608,7 @@
           type="button"
           class="key"
           disabled={text.trim() === ''}
-          title={m.augury_roll()}
+          title={m.augury_roll() + chordHint('augury.roll')}
           aria-label={m.augury_roll()}
           on:click={rollNow}
         >
