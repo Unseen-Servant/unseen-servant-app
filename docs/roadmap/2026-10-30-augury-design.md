@@ -153,6 +153,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 - An MCP tool for rolling.
 - Opening a drawn note in Command.
 - A pigment tint on the field's terms (§8).
+- Printed section labels on the faceplate. Tried 2026-10-31: the set's name over the pads repeated the header's, and *Tape* over the slot said little for a line of height.
 
 ## 13. Macros and the tape (2026-10-31)
 
