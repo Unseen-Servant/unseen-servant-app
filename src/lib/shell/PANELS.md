@@ -21,7 +21,12 @@ rack bar or by bare 1–8 while no field has the caret. A view is a tree of
 splits with one tool per slot (`rack.ts`); views start empty, and the user
 builds them by pressing a tool's key (it takes a column on the right) or
 carrying the key onto an edge of a slot (split) or its middle (swap). The
-rails between slots drag to resize, never below a tool's `rackMin`. Each
+rails between slots drag to resize, never below a tool's `rackMin`. A
+compact tool (`panels.ts`, Augury) is a short unit in a tall bay: mounted
+from the rack bar it takes a column of its minimum width, its box stops at
+its minimum height at the top of its slot (`boxOf`), and the bare rack below
+the box counts as the slot's foot, so a tool carried there goes beneath it,
+the compact one keeping its minimum. Each
 view's layout and lock are saved in the settings store (`rackViews`,
 `rackView`). The lock key beside the view picker holds the view that shows:
 nothing in it is mounted, taken out, carried, resized or popped out until

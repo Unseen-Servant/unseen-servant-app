@@ -65,6 +65,14 @@ function isCompact(id: PanelId): boolean {
   return PANELS.find((p) => p.id === id)!.compact;
 }
 
+/** The box a tool is drawn in within its slot: a compact tool's hugs its
+ *  minimum height at the slot's top, a short unit in a tall bay, with bare
+ *  rack below. The slot itself, and the rails, stay as the layout puts
+ *  them. */
+export function boxOf(id: PanelId, r: Rect): Rect {
+  return isCompact(id) ? { ...r, h: Math.min(r.h, minOf(id).h) } : r;
+}
+
 export function emptyViews(): RackView[] {
   return Array.from({ length: VIEW_COUNT }, () => ({ root: null, locked: false }));
 }
@@ -216,26 +224,33 @@ export function mount(root: RackNode | null, id: PanelId, w = 0): RackNode {
   return { kind: 'split', dir: 'row', sizes: [1 - share, share], children: [root, tool] };
 }
 
-/** `id` beside `target`, on the side `zone` names. Next to a sibling in a
- *  split already running that way it joins the split, halving the target's
- *  share, rather than nesting a new one. */
-function besides(node: RackNode, target: PanelId, zone: Exclude<Zone, 'center'>, id: PanelId): RackNode {
+/** `id` beside `target`, on the side `zone` names, the target keeping
+ *  `keep` of its slot (half, but for a compact one). Next to a sibling in a
+ *  split already running that way it joins the split, sharing out the
+ *  target's share, rather than nesting a new one. */
+function besides(node: RackNode, target: PanelId, zone: Exclude<Zone, 'center'>, id: PanelId, keep = 0.5): RackNode {
   const dir: Dir = zone === 'left' || zone === 'right' ? 'row' : 'col';
   const first = zone === 'left' || zone === 'top';
   const tool: RackNode = { kind: 'tool', id };
   if (node.kind === 'tool') {
     if (node.id !== target) return node;
-    return { kind: 'split', dir, sizes: [0.5, 0.5], children: first ? [tool, node] : [node, tool] };
+    return {
+      kind: 'split',
+      dir,
+      sizes: first ? [1 - keep, keep] : [keep, 1 - keep],
+      children: first ? [tool, node] : [node, tool],
+    };
   }
   const at = node.children.findIndex((c) => c.kind === 'tool' && c.id === target);
   if (at >= 0 && node.dir === dir) {
     const children = [...node.children];
     const sizes = [...node.sizes];
+    const share = node.sizes[at];
     children.splice(first ? at : at + 1, 0, tool);
-    sizes.splice(at, 1, node.sizes[at] / 2, node.sizes[at] / 2);
+    sizes.splice(at, 1, ...(first ? [share * (1 - keep), share * keep] : [share * keep, share * (1 - keep)]));
     return { ...node, children, sizes };
   }
-  return { ...node, children: node.children.map((c) => besides(c, target, zone, id)) };
+  return { ...node, children: node.children.map((c) => besides(c, target, zone, id, keep)) };
 }
 
 /** `a` where `b` was and `b` where `a` was. */
@@ -280,12 +295,15 @@ export function zoneAt(r: Rect, x: number, y: number): Zone {
   return depth < EDGE ? zone : 'center';
 }
 
-function halfOf(r: Rect, zone: Zone): Rect {
+/** The part of a slot a tool carried to its edge would take: what the
+ *  target doesn't keep. */
+function partOf(r: Rect, zone: Zone, keep: number): Rect {
+  const give = 1 - keep;
   switch (zone) {
-    case 'left': return { ...r, w: r.w / 2 };
-    case 'right': return { ...r, x: r.x + r.w / 2, w: r.w / 2 };
-    case 'top': return { ...r, h: r.h / 2 };
-    case 'bottom': return { ...r, y: r.y + r.h / 2, h: r.h / 2 };
+    case 'left': return { ...r, w: r.w * give };
+    case 'right': return { ...r, x: r.x + r.w * keep, w: r.w * give };
+    case 'top': return { ...r, h: r.h * give };
+    case 'bottom': return { ...r, y: r.y + r.h * keep, h: r.h * give };
     default: return r;
   }
 }
@@ -304,11 +322,18 @@ export function landing(view: RackView, id: PanelId, x: number, y: number, w: nu
     if (x < r.x || x >= r.x + r.w || y < r.y || y >= r.y + r.h) continue;
     if (target === id) return { ok: false, reason: 'self', rect: r };
     if (view.locked) return { ok: false, reason: 'locked', rect: r };
-    const zone = zoneAt(r, x, y);
+    // A compact tool's edges and middle are its box's; under the box is
+    // bare rack, and a tool carried there goes beneath it.
+    const box = boxOf(target, r);
+    const zone = y >= box.y + box.h ? 'bottom' : zoneAt(box, x, y);
+    // A compact tool keeps its minimum (and the rail and a pixel of
+    // rounding); the carried tool takes the rest.
+    const along = zone === 'left' || zone === 'right' ? 'w' : 'h';
+    const keep = isCompact(target) ? Math.min(1, (minOf(target)[along] + RAIL + 1) / r[along]) : 0.5;
     const rest = without(view.root, id)!;
     const root =
       zone !== 'center'
-        ? besides(rest, target, zone, id)
+        ? besides(rest, target, zone, id, keep)
         : toolsIn(view.root).includes(id)
           ? swap(view.root, id, target)
           : replaceAt(rest, pathTo(rest, target)!, { kind: 'tool', id });
@@ -317,7 +342,7 @@ export function landing(view: RackView, id: PanelId, x: number, y: number, w: nu
       const got = after.get(t);
       return !got || (got.w >= minOf(t).w && got.h >= minOf(t).h);
     });
-    const rect = halfOf(r, zone);
+    const rect = partOf(r, zone, keep);
     return fits ? { ok: true, root, rect } : { ok: false, reason: 'room', rect };
   }
   return null;

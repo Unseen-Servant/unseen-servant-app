@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   RAIL,
+  boxOf,
   defaultViews,
   landing,
   layout,
@@ -119,6 +120,27 @@ describe('landing', () => {
     expect(landing(view(LL, true), 'command', 640, 740, 1280, 760)).toMatchObject({ ok: false, reason: 'locked' });
     expect(landing(view(null, true), 'command', 10, 10, 1280, 760)).toMatchObject({ ok: false, reason: 'locked' });
     expect(landing(view(row(0.6, LL, CMD)), 'command', 1100, 380, 1280, 760)).toMatchObject({ ok: false, reason: 'self' });
+  });
+
+  test('under a compact tool is bare rack: a tool carried there goes beneath it, which keeps its minimum', () => {
+    const AUG: RackNode = { kind: 'tool', id: 'augury' };
+    // Mid-height in the slot, under Augury's box: below it, not a swap.
+    const got = landing(view(AUG), 'command', 600, 500, 1275, 727);
+    expect(got).toMatchObject({ ok: true });
+    const root = (got as { root: RackNode }).root as Extract<RackNode, { kind: 'split' }>;
+    expect(root.dir).toBe('col');
+    expect(root.children).toEqual([AUG, CMD]);
+    const aug = layout(root, 1275, 727, false).rects.get('augury')!;
+    expect(aug.h).toBeGreaterThanOrEqual(boxOf('augury', aug).h);
+    expect(aug.h).toBeLessThan(boxOf('augury', aug).h + RAIL + 3);
+    // Inside its box the middle still swaps.
+    expect(landing(view(AUG), 'command', 600, 150, 1275, 727)).toMatchObject({ ok: true, root: CMD });
+  });
+
+  test('a compact tool is drawn at its minimum height, at the top of its slot', () => {
+    expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 700 })).toEqual({ x: 5, y: 0, w: 300, h: 356 });
+    expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 200 }).h).toBe(200);
+    expect(boxOf('command', { x: 5, y: 0, w: 300, h: 700 }).h).toBe(700);
   });
 
   test('a split that would leave either tool under its minimum is refused', () => {

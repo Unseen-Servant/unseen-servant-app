@@ -24,6 +24,7 @@
     RACK_TOOLS,
     RAIL,
     VIEW_COUNT,
+    boxOf,
     defaultViews,
     landing,
     layout,
@@ -327,12 +328,15 @@
     {#if loaded}
       {#each RACK_TOOLS as tool (tool.id)}
         {@const r = placed.rects.get(tool.id)}
+        <!-- A compact tool's box hugs its minimum height, with bare rack
+             below it (rack.ts boxOf). -->
+        {@const b = r && filled !== tool.id ? boxOf(tool.id, r) : r}
         <div
           class="slot"
-          class:shown={!!r}
+          class:shown={!!b}
           class:keyed={focused === tool.id}
           class:filled={filled === tool.id}
-          style={r ? `left: ${r.x}px; top: ${r.y}px; width: ${r.w}px; height: ${r.h}px` : undefined}
+          style={b ? `left: ${b.x}px; top: ${b.y}px; width: ${b.w}px; height: ${b.h}px` : undefined}
           on:pointerdown|capture={() => (focused = tool.id)}
           role="presentation"
         >

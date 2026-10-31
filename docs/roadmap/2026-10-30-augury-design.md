@@ -16,7 +16,7 @@ Augury is the workstation's dice roller, a fourth tool in the rack beside Legend
 
 ## 2. Rules
 
-1. **Small in both directions.** Augury's minimum is 270×360, and it opens at that size: mounted from the rack bar it takes a column of its minimum width, and its own window opens at its minimum. At 1280 px, Legend Lore (560) and Command (420) leave about 280 px beside them.
+1. **Small in both directions.** Augury's minimum is 270×356, and it opens at that size: mounted from the rack bar it takes a column of its minimum width, its box in the rack stops at its minimum height with bare rack below (a short unit in a tall bay; a tool carried onto that bare rack goes beneath it), and its own window opens at its minimum. At 1280 px, Legend Lore (560) and Command (420) leave about 280 px beside them.
 2. **The app's instrument panel, not a casino.** Keys in wells, lamps, readouts and the pigment palette. No dice art, no 3D dice, no sound.
 3. **Augury reads no game's rules.** It shows each die and the total. It does not say "with Hope" or call a critical; colours make the dice easy to tell apart, and the GM reads them.
 4. **Everything the GM builds is theirs.** Dice sets are plain JSON in the settings store, per machine.
