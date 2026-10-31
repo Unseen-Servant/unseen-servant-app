@@ -73,14 +73,15 @@
     white-space: nowrap;
   }
 
+  /* The readout's mono, as the face prints there once rolled. */
   textarea {
     flex: 1;
     min-height: 0;
     padding: 0;
     resize: none;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    line-height: 1.25;
+    font-family: var(--font-readout);
+    font-size: 0.85rem;
+    line-height: 1.3;
     color: var(--text-primary);
     caret-color: var(--text-accent);
     background: transparent;
