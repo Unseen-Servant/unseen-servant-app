@@ -8,6 +8,8 @@
 
   export let result: Roll | null;
   export let dropped: Roll | null = null;
+  // Off on the tape, whose line carries its own tooltip.
+  export let tooltip = true;
 
   $: parts = result ? breakdown(result, true) : [];
   // The dropped roll's dice alone: its numbers are the kept roll's.
@@ -42,7 +44,7 @@
 <!-- Each die's face sits in its own window, like a mechanical counter's, so
      no glyph has to separate them; a gap sets the terms apart. Written
      without whitespace between tags: the margins do the spacing. -->
-<div class="breakdown" {title}>
+<div class="breakdown" title={tooltip ? title : undefined}>
   {#each parts as part}<span class="term">{part.sign}{#if part.faces}{#each part.faces as face}<span class="die" class:pigmented={!!part.pigment} style:--pigment={part.pigment ?? null}>{face}</span>{/each}{:else}{part.value}{/if}</span>{/each}{#if droppedParts.length}<span class="dropped">{#each droppedParts as part}<span class="term">{part.sign}{#each part.faces ?? [] as face}<span class="die" class:pigmented={!!part.pigment} style:--pigment={part.pigment ?? null}>{face}</span>{/each}</span>{/each}</span>{/if}
 </div>
 

@@ -51,7 +51,7 @@
       >
         <span class="formula">{formula}</span>
         {#if line.kind === 'dice'}
-          <Breakdown result={line.outcome.kept} dropped={line.outcome.dropped} />
+          <Breakdown result={line.outcome.kept} dropped={line.outcome.dropped} tooltip={false} />
           <span class="total">{line.outcome.kept.total}</span>
         {:else}
           <span class="face" class:pigmented={!!line.die.pigment} style:--pigment={line.die.pigment ?? null}>{line.face}</span>
@@ -97,7 +97,12 @@
   }
 
   /* One row height (1.65rem), as every clickable row. The formula as typed,
-     the dice in their windows, the total as data on the right. */
+     the dice in their windows, the total as data on the right. Printed on
+     the paper, not set in a list: hover brightens the print a step up the
+     ramp, as a pad's label does, and sets a parchment marker at its left
+     edge, rather than filling the row grey. Colours only: a filter or an
+     opacity fade would lift the line onto a layer of its own, which WebKit
+     snaps to the pixel and the lines above shift with it. */
   .line {
     flex-shrink: 0;
     display: grid;
@@ -108,19 +113,34 @@
     padding: 0 0.45rem;
     background: transparent;
     border: none;
-    border-radius: var(--radius-md);
     color: var(--text-secondary);
     text-align: left;
     cursor: pointer;
+    position: relative;
+  }
+
+  .line::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: var(--radius-sm);
+    background: transparent;
     transition: background var(--transition-fast);
   }
 
-  .line:hover {
-    background: var(--bg-focused);
+  .line:hover::before {
+    background: var(--text-accent);
   }
 
-  .line:active {
-    transform: scale(0.97);
+  .line:hover .formula {
+    color: var(--text-secondary);
+  }
+
+  .line:hover :global(.breakdown) {
+    color: var(--text-primary);
   }
 
   .line.word {
