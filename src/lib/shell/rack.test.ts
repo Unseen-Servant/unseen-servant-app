@@ -33,6 +33,21 @@ describe('layout', () => {
     expect(rails).toEqual([{ path: [], index: 0, dir: 'row', rect: { x: ll.w, y: 0, w: RAIL, h: 760 }, span: 1280 - RAIL, inert: false }]);
   });
 
+  test('a narrower rack keeps every tool at its minimum, taking from the ones with room', () => {
+    // Augury mounted on a wide monitor, then the window moved to a laptop.
+    const root = mount(row(0.6, LL, CMD), 'augury', 2550);
+    const wide = layout(root, 2550, 700, false).rects;
+    const { rects } = layout(root, 1718, 700, false);
+    expect(rects.get('augury')!.w).toBe(270);
+    expect(rects.get('command')!.w).toBeGreaterThanOrEqual(420);
+    expect(rects.get('legend-lore')!.w).toBeGreaterThanOrEqual(560);
+    const [ll, cmd, aug] = (['legend-lore', 'command', 'augury'] as const).map((id) => rects.get(id)!);
+    expect(ll.w + cmd.w + aug.w + 2 * RAIL).toBe(1718);
+    expect(aug.x + aug.w).toBe(1718);
+    // Back on the monitor, the old proportions.
+    expect(layout(root, 2550, 700, false).rects).toEqual(wide);
+  });
+
   test('a locked view holds every rail still', () => {
     expect(layout(col(0.5, CMD, LL), 1280, 760, true).rails[0].inert).toBe(true);
   });
@@ -112,8 +127,13 @@ describe('landing', () => {
   test('the middle of another tool swaps the two; the slots keep their sizes', () => {
     const got = landing(view(row(0.5, LL, CMD)), 'command', 320, 380, 1280, 760);
     expect(got).toMatchObject({ ok: true, root: row(0.5, CMD, LL) });
-    // At 60/40 the swap would leave Legend Lore 508px of its 560.
-    expect(landing(view(row(0.6, LL, CMD)), 'command', 380, 380, 1280, 760)).toMatchObject({ ok: false, reason: 'room' });
+    // At 60/40 the swap's share would leave Legend Lore 508px of its 560;
+    // it keeps its minimum, and Command takes the rest.
+    const uneven = landing(view(row(0.6, LL, CMD)), 'command', 380, 380, 1280, 760);
+    expect(uneven).toMatchObject({ ok: true, root: row(0.6, CMD, LL) });
+    expect(layout((uneven as { root: RackNode }).root, 1280, 760, false).rects.get('legend-lore')!.w).toBe(560);
+    // Short of room for both minimums, it's refused.
+    expect(landing(view(row(0.6, LL, CMD)), 'command', 380, 380, 900, 760)).toMatchObject({ ok: false, reason: 'room' });
   });
 
   test('a locked view refuses drops, empty or not, and so does the tool\'s own slot', () => {

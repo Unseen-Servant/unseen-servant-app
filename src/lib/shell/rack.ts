@@ -109,11 +109,10 @@ function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect
   const row = node.dir === 'row';
   const n = node.children.length;
   const span = (row ? r.w : r.h) - RAIL * (n - 1);
+  const lens = lengths(node, span);
   let at = row ? r.x : r.y;
-  let used = 0;
   node.children.forEach((child, i) => {
-    const len = i === n - 1 ? span - used : Math.round(span * node.sizes[i]);
-    used += len;
+    const len = lens[i];
     place(child, row ? { ...r, x: at, w: len } : { ...r, y: at, h: len }, [...path, i], rects, rails, locked);
     at += len;
     if (i === n - 1) return;
@@ -126,6 +125,33 @@ function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect
       inert: locked,
     });
     at += RAIL;
+  });
+}
+
+/** Each child's length along a split `span` long: its share, but never
+ *  under its minimum while the split has room for every one. A child short
+ *  of its minimum (a window moved to a smaller screen scales every share
+ *  down) takes what it lacks from the others, each in proportion to its
+ *  room above its own minimum. The shares stay as saved, so a wider window
+ *  gives the old proportions back. Rounded on the running total, so the
+ *  lengths fill the span and a length that is a whole number stays one. */
+function lengths(node: Split, span: number): number[] {
+  const mins = node.children.map((c) => minAlong(c, node.dir));
+  let want = node.sizes.map((s) => span * s);
+  if (mins.reduce((a, b) => a + b, 0) <= span) {
+    const lack = want.reduce((sum, w, i) => sum + Math.max(0, mins[i] - w), 0);
+    const room = want.map((w, i) => Math.max(0, w - mins[i]));
+    const spare = room.reduce((a, b) => a + b, 0);
+    if (lack > 0 && spare > 0) want = want.map((w, i) => (w < mins[i] ? mins[i] : w - (lack * room[i]) / spare));
+  }
+  let sum = 0;
+  let edge = 0;
+  return want.map((w, i) => {
+    sum += w;
+    const next = i === want.length - 1 ? span : Math.round(sum);
+    const len = next - edge;
+    edge = next;
+    return len;
   });
 }
 
