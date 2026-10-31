@@ -544,7 +544,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "sqlite-vec", specifier = "==0.1.9" },
-    { name = "symspellpy", specifier = "==6.10.0" },
+    { name = "symspellpy", specifier = "==6.10.1" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "watchfiles", specifier = "==1.3.0" },
 ]
@@ -1563,11 +1563,11 @@ wheels = [
 
 [[package]]
 name = "symspellpy"
-version = "6.10.0"
+version = "6.10.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b2/99/f488bd2a64d4846dde560c6c1ad539aedba7fb95a21d21273b0c21a16762/symspellpy-6.10.0.tar.gz", hash = "sha256:7434e15c92b2af6ec0141df98f249b35a7ddc5496a410c2649c1ac74d84a3dfb", size = 2616545, upload-time = "2026-07-11T15:36:44.997Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/b0/ebc2743e5411d63fdafe665ca91412caf59b3d98f39a192263d6ffdf205a/symspellpy-6.10.1.tar.gz", hash = "sha256:391506047a292c4990001ae642a3d896bbd7dfd2a4e06e62f89224ed8b23d24e", size = 2617790, upload-time = "2026-10-27T04:16:30.858Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c2/02/1124824a3e2842f42f45278f8eef94c5cb989055064e3473e8281f5deb0c/symspellpy-6.10.0-py3-none-any.whl", hash = "sha256:e31707f6d6e06b89973588c02c0c7941c9ca1e3144859a8e2e46d8b815dda75e", size = 2612381, upload-time = "2026-07-11T15:36:43.279Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/fa/7cf9f79a50d49c60d64be552a06291e6a8adcff733518575017622fbc80f/symspellpy-6.10.1-py3-none-any.whl", hash = "sha256:a653a6c125839a21ada87c3e044d690fc3b39872efbd7b7270db3de9471315e1", size = 2612466, upload-time = "2026-10-27T04:16:29.073Z" },
 ]
 
 [[package]]
