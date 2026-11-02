@@ -65,12 +65,24 @@ function isCompact(id: PanelId): boolean {
   return PANELS.find((p) => p.id === id)!.compact;
 }
 
+/** A tool's shapes, narrowest first: its minimum, standing, and a compact
+ *  tool's wide shape, lying down. */
+function shapesOf(id: PanelId): { w: number; h: number }[] {
+  const p = PANELS.find((t) => t.id === id)!;
+  return 'wide' in p ? [p.rackMin, p.wide] : [p.rackMin];
+}
+
+/** The shape a tool takes in a slot `w` wide: the widest that fits. */
+function shapeAt(id: PanelId, w: number): { w: number; h: number } {
+  return shapesOf(id).filter((s) => s.w <= w).at(-1) ?? minOf(id);
+}
+
 /** The box a tool is drawn in within its slot: a compact tool's hugs its
- *  minimum height at the slot's top, a short unit in a tall bay, with bare
+ *  shape's height at the slot's top, a short unit in a tall bay, with bare
  *  rack below. The slot itself, and the rails, stay as the layout puts
  *  them. */
 export function boxOf(id: PanelId, r: Rect): Rect {
-  return isCompact(id) ? { ...r, h: Math.min(r.h, minOf(id).h) } : r;
+  return isCompact(id) ? { ...r, h: Math.min(r.h, shapeAt(id, r.w).h) } : r;
 }
 
 export function emptyViews(): RackView[] {
@@ -109,7 +121,7 @@ function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect
   const row = node.dir === 'row';
   const n = node.children.length;
   const span = (row ? r.w : r.h) - RAIL * (n - 1);
-  const lens = lengths(node, span);
+  const lens = lengths(node, span, row ? r.h : r.w);
   let at = row ? r.x : r.y;
   node.children.forEach((child, i) => {
     const len = lens[i];
@@ -135,8 +147,8 @@ function place(node: RackNode, r: Rect, path: number[], rects: Map<PanelId, Rect
  *  room above its own minimum. The shares stay as saved, so a wider window
  *  gives the old proportions back. Rounded on the running total, so the
  *  lengths fill the span and a length that is a whole number stays one. */
-function lengths(node: Split, span: number): number[] {
-  const mins = node.children.map((c) => minAlong(c, node.dir));
+function lengths(node: Split, span: number, cross: number): number[] {
+  const mins = node.children.map((c) => minAlong(c, node.dir, cross));
   let want = node.sizes.map((s) => span * s);
   if (mins.reduce((a, b) => a + b, 0) <= span) {
     const lack = want.reduce((sum, w, i) => sum + Math.max(0, mins[i] - w), 0);
@@ -193,10 +205,21 @@ export function neighbour(rects: Map<PanelId, Rect>, among: readonly PanelId[], 
   return best;
 }
 
-export function minAlong(node: RackNode, dir: Dir): number {
-  if (node.kind === 'tool') return dir === 'row' ? minOf(node.id).w : minOf(node.id).h;
-  const mins = node.children.map((c) => minAlong(c, dir));
-  return node.dir === dir ? mins.reduce((a, b) => a + b, 0) + RAIL * (mins.length - 1) : Math.max(...mins);
+/** The least length a subtree can be given along `dir`, `cross` long the
+ *  other way: the least of its shapes that fit across, so a tool that lies
+ *  down needs less height once it has the width, and more width in a slot
+ *  too short to stand in. A split across `dir` gives each child its share
+ *  of `cross`. */
+export function minAlong(node: RackNode, dir: Dir, cross: number): number {
+  const row = dir === 'row';
+  if (node.kind === 'tool') {
+    const fit = shapesOf(node.id).filter((s) => (row ? s.h : s.w) <= cross);
+    return Math.min(...(fit.length ? fit : [minOf(node.id)]).map((s) => (row ? s.w : s.h)));
+  }
+  const n = node.children.length;
+  if (node.dir === dir) return node.children.reduce((sum, c) => sum + minAlong(c, dir, cross), 0) + RAIL * (n - 1);
+  const span = cross - RAIL * (n - 1);
+  return Math.max(...node.children.map((c, i) => minAlong(c, dir, span * node.sizes[i])));
 }
 
 // ---- edits ------------------------------------------------------------------
@@ -290,15 +313,32 @@ function swap(node: RackNode, a: PanelId, b: PanelId): RackNode {
 }
 
 /** The rail between two neighbours moved by `delta` px, as far as either
- *  side's minimum allows. */
+ *  side's minimum allows. A compact tool beside a rail at its side takes
+ *  the width of the shape the drag is nearest that its neighbour leaves
+ *  room for: standing or lying down, nothing between. Half a pixel over
+ *  covers rounding in layout, as in `mount`. */
 export function resize(root: RackNode, rail: Rail, delta: number): RackNode {
   const split = nodeAt(root, rail.path) as Split;
+  const cross = rail.dir === 'row' ? rail.rect.h : rail.rect.w;
   const a0 = split.sizes[rail.index];
   const b0 = split.sizes[rail.index + 1];
-  const lo = minAlong(split.children[rail.index], rail.dir) / rail.span;
-  const hi = a0 + b0 - minAlong(split.children[rail.index + 1], rail.dir) / rail.span;
+  const lo = minAlong(split.children[rail.index], rail.dir, cross) / rail.span;
+  const hi = a0 + b0 - minAlong(split.children[rail.index + 1], rail.dir, cross) / rail.span;
   if (lo > hi) return root;
-  const a = Math.min(Math.max(a0 + delta / rail.span, lo), hi);
+  let a = Math.min(Math.max(a0 + delta / rail.span, lo), hi);
+  const at = [rail.index, rail.index + 1].find((i) => {
+    const c = split.children[i];
+    return rail.dir === 'row' && c.kind === 'tool' && isCompact(c.id);
+  });
+  if (at !== undefined) {
+    const own = (s: number) => (at === rail.index ? s : a0 + b0 - s);
+    const want = own(a0 + delta / rail.span);
+    const fits = shapesOf((split.children[at] as { id: PanelId }).id)
+      .filter((s) => s.h <= cross)
+      .map((s) => own((s.w + 0.5) / rail.span))
+      .filter((s) => s >= lo && s <= hi);
+    if (fits.length > 0) a = fits.reduce((best, s) => (Math.abs(own(s) - want) < Math.abs(own(best) - want) ? s : best));
+  }
   const sizes = [...split.sizes];
   sizes[rail.index] = a;
   sizes[rail.index + 1] = a0 + b0 - a;
@@ -352,10 +392,10 @@ export function landing(view: RackView, id: PanelId, x: number, y: number, w: nu
     // bare rack, and a tool carried there goes beneath it.
     const box = boxOf(target, r);
     const zone = y >= box.y + box.h ? 'bottom' : zoneAt(box, x, y);
-    // A compact tool keeps its minimum (and the rail and a pixel of
+    // A compact tool keeps its shape (and the rail and a pixel of
     // rounding); the carried tool takes the rest.
     const along = zone === 'left' || zone === 'right' ? 'w' : 'h';
-    const keep = isCompact(target) ? Math.min(1, (minOf(target)[along] + RAIL + 1) / r[along]) : 0.5;
+    const keep = isCompact(target) ? Math.min(1, (shapeAt(target, r.w)[along] + RAIL + 1) / r[along]) : 0.5;
     const rest = without(view.root, id)!;
     const root =
       zone !== 'center'
@@ -366,7 +406,7 @@ export function landing(view: RackView, id: PanelId, x: number, y: number, w: nu
     const after = layout(root, w, h, view.locked).rects;
     const fits = [id, target].every((t) => {
       const got = after.get(t);
-      return !got || (got.w >= minOf(t).w && got.h >= minOf(t).h);
+      return !got || shapesOf(t).some((s) => got.w >= s.w && got.h >= s.h);
     });
     const rect = partOf(r, zone, keep);
     return fits ? { ok: true, root, rect } : { ok: false, reason: 'room', rect };

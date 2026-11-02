@@ -29,7 +29,10 @@ compact tool (`panels.ts`, Augury) is a short unit in a tall bay: mounted
 from the rack bar it takes a column of its minimum width, its box stops at
 its minimum height at the top of its slot (`boxOf`), and the bare rack below
 the box counts as the slot's foot, so a tool carried there goes beneath it,
-the compact one keeping its minimum. Each
+the compact one keeping its shape. A compact tool may lie down
+(`wide` in `panels.ts`): in a slot at least that wide its box is that tall,
+so a rail at its side snaps its column to one shape's width or the
+other's, and stacked in a column that wide it needs only that height. Each
 view's layout and lock are saved in the settings store (`rackViews`,
 `rackView`). The lock key beside the view picker holds the view that shows:
 nothing in it is mounted, taken out, carried, resized or popped out until

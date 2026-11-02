@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **`adv` and `dis` roll the formula twice** and keep the higher or the lower total; the corner pad adds or removes 1, also after a roll
 - **A pad holds a macro:** a formula under a name, such as `dmg = 2d10+1d6`, that one press adds to the formula
 - **The tape keeps earlier rolls** under the pads, and a click on one puts its formula back to roll again
+- **Augury lies down when it is wide,** with the pads beside the readout; a drag on its side snaps it between the tall and the wide layout
 
 ### Changed
 

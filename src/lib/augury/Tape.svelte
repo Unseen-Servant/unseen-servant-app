@@ -13,6 +13,8 @@
 
   export let lines: TapeLine[];
   export let open: boolean;
+  /** Augury lying down: the key and the paper take places in its grid. */
+  export let wide = false;
   export let onToggle: () => void;
   export let onRecall: (line: TapeLine) => void;
 
@@ -29,7 +31,7 @@
   }
 </script>
 
-<div class="tape" class:open>
+<div class="tape" class:open class:wide>
   <LatchKey
     {open}
     lamp={false}
@@ -79,6 +81,28 @@
 
   .tape.open :global(.key-well) {
     align-self: flex-end;
+  }
+
+  /* Lying down (AuguryPanel), the key and the paper are the panel's grid
+     items: the paper in the slot beside the key, and raised, in the pads'
+     place, its newest line level with the key. */
+  .tape.wide {
+    display: contents;
+  }
+
+  .tape.wide :global(.key-well) {
+    grid-area: key;
+    align-self: end;
+  }
+
+  .tape.wide .paper {
+    grid-area: slot;
+    align-self: end;
+  }
+
+  .tape.wide.open .paper {
+    grid-area: pads;
+    align-self: stretch;
   }
 
   /* Paper: a reading surface like the display (--bg-vellum), where the

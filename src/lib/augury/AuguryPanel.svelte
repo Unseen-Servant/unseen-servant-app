@@ -106,6 +106,14 @@
   let tape: TapeLine[] = [];
   let printed = 0;
   let tapeOpen = false;
+  // Lying down (panels.ts `wide`): the box has room for the pads beside the
+  // display (two columns of 254px, the gap and the inset) and is too short
+  // to stand in (385px). The rack gives one shape or the other (rack.ts
+  // boxOf), and Augury's own window settles on one when a drag ends
+  // (panels.rs).
+  let boxW = 0;
+  let boxH = 0;
+  $: wide = boxW >= 531 && boxH < 385;
 
   let stored: StoredSets = { custom: [] };
   // The campaign open in Command and its tracks, for the Tracks set.
@@ -503,7 +511,13 @@
   });
 </script>
 
-<section class="augury" class:dormant={$focusPath.tool !== 'augury'}>
+<section
+  class="augury"
+  class:dormant={$focusPath.tool !== 'augury'}
+  class:wide
+  bind:clientWidth={boxW}
+  bind:clientHeight={boxH}
+>
   <header class="bar">
     <!-- A pad controller's program section: one strip of keys, each with one
          job. Edit mode lights edit's lamp and dims the keys that would end
@@ -600,15 +614,17 @@
   </header>
 
   <div class="body">
-    {#if facesOf !== null && facesPad?.kind === 'word'}
-      {@const at = facesOf}
-      {@const id = set.id}
-      {#key `${id}:${at}`}
-        <FacesEditor name={facesPad.name} faces={facesPad.faces} onDone={(faces) => putFaces(id, at, faces)} />
-      {/key}
-    {:else}
-      <Readout result={outcome?.kept ?? null} dropped={outcome?.dropped ?? null} word={answer} {seq} />
-    {/if}
+    <div class="readout-area">
+      {#if facesOf !== null && facesPad?.kind === 'word'}
+        {@const at = facesOf}
+        {@const id = set.id}
+        {#key `${id}:${at}`}
+          <FacesEditor name={facesPad.name} faces={facesPad.faces} onDone={(faces) => putFaces(id, at, faces)} />
+        {/key}
+      {:else}
+        <Readout result={outcome?.kept ?? null} dropped={outcome?.dropped ?? null} word={answer} {seq} />
+      {/if}
+    </div>
 
     <div class="formula-row">
       <input
@@ -808,7 +824,7 @@
       </div>
     {/if}
 
-    <Tape lines={tape} open={tapeOpen} onToggle={() => (tapeOpen = !tapeOpen)} onRecall={recall} />
+    <Tape lines={tape} open={tapeOpen} {wide} onToggle={() => (tapeOpen = !tapeOpen)} onRecall={recall} />
   </div>
 </section>
 
@@ -1004,6 +1020,33 @@
     flex-direction: column;
     gap: 0.4rem;
     padding: 0.5rem;
+  }
+
+  /* Lying down: the display, the field and the tape's slot on the left,
+     the pads on the right at the standing panel's width; the left side
+     takes any room past that. Raised, the tape's paper takes the pads'
+     place (Tape.svelte). */
+  .wide .body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 254px;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'readout readout pads'
+      'formula formula pads'
+      'key slot pads';
+    gap: 0.4rem;
+  }
+
+  .wide .readout-area {
+    grid-area: readout;
+  }
+
+  .wide .formula-row {
+    grid-area: formula;
+  }
+
+  .wide .pads {
+    grid-area: pads;
   }
 
   .formula-row {

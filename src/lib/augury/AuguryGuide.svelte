@@ -44,6 +44,11 @@
     <h3 class="field-title section-title">{m.augury_guide_custom()}</h3>
     <p class="field-desc"><ParaglideMessage message={m.augury_guide_custom_desc} {em} {strong} /></p>
   </section>
+
+  <section class="field">
+    <h3 class="field-title section-title">{m.augury_guide_wide()}</h3>
+    <p class="field-desc">{m.augury_guide_wide_desc()}</p>
+  </section>
 </div>
 
 <style>

@@ -10,8 +10,13 @@
 
 use serde::Serialize;
 use std::collections::BTreeSet;
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Mutex, PoisonError};
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use std::time::Duration;
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
+};
 
 pub const CHANGED_EVENT: &str = "panels://changed";
 /// To the main window: bring this panel forward in the rack (`show_panel`).
@@ -23,6 +28,9 @@ struct PanelSpec {
     title: &'static str,
     size: (f64, f64),
     min_size: (f64, f64),
+    /// A compact tool's second shape, lying down (panels.ts `wide`): its
+    /// window settles on this or `size` once a drag ends.
+    wide: Option<(f64, f64)>,
 }
 
 /// The frontend's manifest (`src/lib/shell/panels.ts`) carries the same ids;
@@ -33,26 +41,31 @@ const PANELS: [PanelSpec; 4] = [
         title: "Legend Lore",
         size: (1280.0, 800.0),
         min_size: (940.0, 600.0),
+        wide: None,
     },
     PanelSpec {
         id: "command",
         title: "Command",
         size: (720.0, 560.0),
         min_size: (420.0, 320.0),
+        wide: None,
     },
     // Compact (panels.ts): it opens at its smallest, the rack's 270×391 plus
-    // the pop-out's status bar.
+    // the pop-out's status bar, and lies down at the rack's 540×225 plus
+    // the same.
     PanelSpec {
         id: "augury",
         title: "Augury",
         size: (270.0, 419.0),
-        min_size: (270.0, 419.0),
+        min_size: (270.0, 253.0),
+        wide: Some((540.0, 253.0)),
     },
     PanelSpec {
         id: "servant",
         title: "Servant",
         size: (560.0, 640.0),
         min_size: (380.0, 320.0),
+        wide: None,
     },
 ];
 
@@ -139,7 +152,7 @@ pub async fn pop_out_panel(app: AppHandle, id: String) -> Result<(), String> {
     }
     let (width, height) = spec.size;
     let (min_width, min_height) = spec.min_size;
-    WebviewWindowBuilder::new(
+    let window = WebviewWindowBuilder::new(
         &app,
         &label,
         WebviewUrl::App(format!("panel/{}", spec.id).into()),
@@ -152,8 +165,70 @@ pub async fn pop_out_panel(app: AppHandle, id: String) -> Result<(), String> {
     .disable_drag_drop_handler()
     .build()
     .map_err(|e| format!("Failed to open the {} window: {e}", spec.title))?;
+    if let Some(wide) = spec.wide {
+        settle_on_resize(&window, spec.size, wide);
+    }
     broadcast(&app, app.state::<PoppedPanels>().insert(spec.id));
     Ok(())
+}
+
+/// How long a window's size holds still before the drag counts as over:
+/// macOS reports no end to a live resize.
+const SETTLE_AFTER: Duration = Duration::from_millis(300);
+
+/// A tool with two shapes settles its window on one once a drag ends, as a
+/// rail in the rack snaps it (rack.ts `resize`). One thread per window
+/// waits out each burst of resizes, and ends with the window.
+fn settle_on_resize(window: &WebviewWindow, standing: (f64, f64), wide: (f64, f64)) {
+    // true for a resize, false once the window is gone.
+    let (tx, rx) = mpsc::channel::<bool>();
+    window.on_window_event(move |event| match event {
+        WindowEvent::Resized(_) => {
+            let _ = tx.send(true);
+        }
+        WindowEvent::Destroyed => {
+            let _ = tx.send(false);
+        }
+        _ => {}
+    });
+    let window = window.clone();
+    std::thread::spawn(move || {
+        while let Ok(true) = rx.recv() {
+            loop {
+                match rx.recv_timeout(SETTLE_AFTER) {
+                    Ok(true) => continue,
+                    Err(RecvTimeoutError::Timeout) => break,
+                    Ok(false) | Err(RecvTimeoutError::Disconnected) => return,
+                }
+            }
+            settle(&window, standing, wide);
+        }
+    });
+}
+
+/// The window at the shape its width is nearer, unless it's maximised or
+/// full screen, where the GM asked for the whole screen.
+fn settle(window: &WebviewWindow, standing: (f64, f64), wide: (f64, f64)) {
+    if window.is_maximized().unwrap_or(true) || window.is_fullscreen().unwrap_or(true) {
+        return;
+    }
+    let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) else {
+        return;
+    };
+    let size = size.to_logical::<f64>(scale);
+    let (width, height) = shape_for(size.width, standing, wide);
+    if (size.width - width).abs() >= 1.0 || (size.height - height).abs() >= 1.0 {
+        let _ = window.set_size(LogicalSize::new(width, height));
+    }
+}
+
+/// Lying down from halfway between the two widths, standing short of it.
+fn shape_for(width: f64, standing: (f64, f64), wide: (f64, f64)) -> (f64, f64) {
+    if width >= (standing.0 + wide.0) / 2.0 {
+        wide
+    } else {
+        standing
+    }
 }
 
 /// Close a panel's own window and bring the main window forward; the panel
@@ -219,6 +294,20 @@ mod tests {
         assert_eq!(panel_of_label("splash"), None);
         assert_eq!(panel_of_label("panel-nope"), None);
         assert_eq!(panel_of_label("legend-lore"), None);
+    }
+
+    #[test]
+    fn a_window_settles_on_the_shape_its_width_is_nearer() {
+        let augury = spec("augury").unwrap();
+        let wide = augury.wide.unwrap();
+        assert_eq!(shape_for(300.0, augury.size, wide), augury.size);
+        assert_eq!(shape_for(404.0, augury.size, wide), augury.size);
+        assert_eq!(shape_for(405.0, augury.size, wide), wide);
+        assert_eq!(shape_for(900.0, augury.size, wide), wide);
+        // Either shape fits the window's minimum.
+        for (w, h) in [augury.size, wide] {
+            assert!(w >= augury.min_size.0 && h >= augury.min_size.1);
+        }
     }
 
     #[test]

@@ -88,6 +88,28 @@ describe('resize', () => {
     expect(next.sizes[0] + next.sizes[1]).toBeCloseTo(1);
   });
 
+  test('snaps a compact tool beside the rail standing or lying down, whichever the drag is nearest', () => {
+    const root = mount(CMD, 'augury', 1275);
+    const rail = layout(root, 1275, 727, false).rails[0];
+    const width = (delta: number) => layout(resize(root, rail, delta), 1275, 727, false).rects.get('augury')!.w;
+    for (const [delta, w] of [[-100, 270], [-200, 540], [-700, 540], [50, 270]]) {
+      expect(width(delta) - w, `by ${delta}`).toBeGreaterThanOrEqual(0);
+      expect(width(delta) - w, `by ${delta}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test('stacked in a column wide enough to lie down in, a compact tool stops at its wide shape\'s height', () => {
+    const AUG: RackNode = { kind: 'tool', id: 'augury' };
+    const root = col(0.5, CMD, AUG);
+    const height = (w: number) => {
+      const rail = layout(root, w, 727, false).rails[0];
+      return layout(resize(root, rail, 1000), w, 727, false).rects.get('augury')!.h;
+    };
+    expect(height(700)).toBeCloseTo(225, 0);
+    // Too narrow to lie down, it stands.
+    expect(height(500)).toBeCloseTo(391, 0);
+  });
+
   test('stops at either neighbour\'s minimum', () => {
     const root = row(0.6, LL, CMD);
     const rail = layout(root, 1280, 760, false).rails[0];
@@ -161,6 +183,11 @@ describe('landing', () => {
     expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 700 })).toEqual({ x: 5, y: 0, w: 300, h: 391 });
     expect(boxOf('augury', { x: 5, y: 0, w: 300, h: 200 }).h).toBe(200);
     expect(boxOf('command', { x: 5, y: 0, w: 300, h: 700 }).h).toBe(700);
+  });
+
+  test('a compact tool lies down in a slot as wide as its wide shape, as tall as that', () => {
+    expect(boxOf('augury', { x: 5, y: 0, w: 540, h: 700 }).h).toBe(225);
+    expect(boxOf('augury', { x: 5, y: 0, w: 539, h: 700 }).h).toBe(391);
   });
 
   test('a split that would leave either tool under its minimum is refused', () => {
