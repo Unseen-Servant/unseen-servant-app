@@ -1551,5 +1551,16 @@
   "foresight_out_title": "Out of the fight: {name}",
   "foresight_in_title": "Back into the fight: {name}",
   "foresight_status_round": "Round {round}",
-  "foresight_status_title": "Foresight: round {round}, {name}'s turn"
+  "foresight_status_title": "Foresight: round {round}, {name}'s turn",
+  "foresight_rename": "Rename",
+  "foresight_duplicate": "Duplicate",
+  "foresight_remove": "Remove",
+  "foresight_row_rename_label": "Rename {name}",
+  "foresight_cell_label": "{name}: {column}",
+  "foresight_column_add_title": "Add a column",
+  "foresight_column_placeholder": "Column name…",
+  "foresight_column_new_label": "The new column's name",
+  "foresight_column_rename_label": "Rename the column {column}",
+  "foresight_remove_column_title": "Remove the column {column}?",
+  "foresight_remove_column_message": "Its cells go with it, in every row of this encounter."
 }

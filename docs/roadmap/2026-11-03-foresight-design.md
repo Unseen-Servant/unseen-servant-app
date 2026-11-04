@@ -1,6 +1,6 @@
 # Foresight (2026-11-03)
 
-**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Step 1 built 2026-11-03 (§11). Two words are under review (§12).
+**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Steps 1 and 2 built 2026-11-03 (§11). Two words are under review (§12).
 
 ## 0. TL;DR
 
@@ -123,8 +123,8 @@ Goblins hide in the ditch; the boss stays on the ridge.
 ## 10. Keys, storage and architecture
 
 - **Keys,** while Foresight has the keyboard: **⇧Space** passes the turn (in Command's Play it launches the next beat: the same "advance"); **↓/J and ↑/K** move the focused row, as on Command's session player; **M** takes the focused row out or back in; **⌘D** duplicates it with the next number and its cells; **R** renames it, as on Command's rows. Bare 1–8 stay the rack's.
-- **Rows** drag to reorder (the row is the handle, `use:grab`). Right-click on a row: *Open note* (when linked), *Duplicate*, *Remove* (red).
-- **The settings store** keeps the open encounter per campaign (`foresightOpen`), per machine. Everything else is in the note.
+- **Rows** drag to reorder (the row is the handle, `use:grab`). Right-click on a row: *Open note* (when linked), *Rename*, *Duplicate*, *Remove* (red).
+- **The settings store** keeps the open encounter per campaign (`foresightOpen`) and the last encounter's columns (`foresightColumns`), per machine. Everything else is in the note.
 - **The sidecar:** the encounter's reader and writer live beside Command's (`sidecar/command/encounter.py`, routes under `/api/command/encounter`), since an encounter is a note and shares the vault, the write lock, the hash check and the watcher. Parsing is lenient: a table Foresight can't read is shown as it is and left alone.
 - **Rust:** `command_*_encounter` commands in `command.rs`, as Augury's `command_draw_tracks` lives there; *Open in Foresight* crosses windows as `command_send` does.
 - **The frontend:** `src/lib/foresight/`, `panels.ts` and `panels.rs` (rack minimum, pop-out size), `PanelView`. The first launch's view 2 puts Foresight under Augury, beside Command.
@@ -152,6 +152,16 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - ↓/J ↑/K, R, ⌘D, the row menu, and Enter/Esc in cells (§6, §10).
 - New encounters land in a track named *Encounters* even if the GM files old ones elsewhere (§3).
 - No floor and no ceiling on numbers (§6).
+
+**Filled in while building step 2 (2026-11-03), not yet discussed:**
+
+- A bare number entered in a cell with a max keeps the max (`12/21`, then `15`, reads `15/21`); a cell is emptied to drop it. A number entered over text or nothing becomes the cell, `+3` as `3`.
+- The first column's header renames like the others (it can't move or go), so the GM can call it *Name* while *Combatant* is under review; the next encounter takes it.
+- Removing a column that holds cells asks first; an empty one goes at once.
+- With Foresight empty, the plate edits the columns the next encounter will take.
+- ↓/J ↑/K with no row selected start from the turn's row. Esc lets go of the selection.
+- The row menu has *Rename* too; *Open note* waits for step 3.
+- At 270 px the name column keeps 4.5rem and the text columns give way; a column of figures is 2.9rem.
 - The reader and writer in Command's sidecar package rather than a package of their own (§10).
 
 ## 13. Settled (2026-11-01–03)

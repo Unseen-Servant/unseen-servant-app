@@ -101,3 +101,143 @@ export function addRow(e: Encounter, name: string): Encounter {
   const holder = e.rows.find((r) => r.name === e.turn);
   return { ...e, rows, turn: holder && !holder.out ? e.turn : (rows.find((r) => !r.out)?.name ?? null) };
 }
+
+// ---- cells -------------------------------------------------------------------
+
+const NUMBER = /^(-?\d+)(?:\s*\/\s*(-?\d+))?$/;
+
+/** A cell's number and its max, or null when it holds text or nothing. */
+export function parseNumber(cell: string): { value: number; max: number | null } | null {
+  const m = NUMBER.exec(cell.trim());
+  return m ? { value: Number(m[1]), max: m[2] === undefined ? null : Number(m[2]) } : null;
+}
+
+function written(value: number, max: number | null): string {
+  return max === null ? String(value) : `${value}/${max}`;
+}
+
+/** What a cell holds once `typed` is entered over `before`. In a cell
+ *  holding a number, −7 or +3 does the arithmetic and a bare number
+ *  replaces the value, its max kept; n/max sets both. Anywhere a number
+ *  becomes the cell, and anything else is text. No floor and no ceiling:
+ *  the GM's numbers mean what the GM's game says. */
+export function enterCell(before: string, typed: string): string {
+  const text = typed.trim().replace(/−/g, '-');
+  const was = parseNumber(before);
+  const delta = /^([+-])\s*(\d+)$/.exec(text);
+  if (was && delta) return written(was.value + (delta[1] === '-' ? -1 : 1) * Number(delta[2]), was.max);
+  if (delta) return String((delta[1] === '-' ? -1 : 1) * Number(delta[2]));
+  const now = parseNumber(text);
+  if (now && now.max === null && was) return written(now.value, was.max);
+  if (now) return written(now.value, now.max);
+  return typed.trim();
+}
+
+/** Whether column `c` reads as figures: every filled cell holds a number. */
+export function isFigures(rows: EncounterRow[], c: number): boolean {
+  const filled = rows.map((r) => r.cells[c - 1] ?? '').filter((v) => v.trim() !== '');
+  return filled.length > 0 && filled.every((v) => parseNumber(v) !== null);
+}
+
+/** Row `name`'s cell under column `c` (1 for the first after the names). */
+export function setCell(e: Encounter, name: string, c: number, value: string): Encounter {
+  return {
+    ...e,
+    rows: e.rows.map((r) => (r.name === name ? { ...r, cells: r.cells.map((v, i) => (i === c - 1 ? value : v)) } : r)),
+  };
+}
+
+// ---- rows --------------------------------------------------------------------
+
+/** Row `name` renamed, a taken name numbered (`freeName`). A linked row
+ *  keeps its link, the new name its alias; the turn follows. */
+export function renameRow(e: Encounter, name: string, wanted: string): Encounter {
+  const others = e.rows.filter((r) => r.name !== name);
+  const next = freeName(wanted, others);
+  return {
+    ...e,
+    rows: e.rows.map((r) => (r.name === name ? { ...r, name: next } : r)),
+    turn: e.turn === name ? next : e.turn,
+  };
+}
+
+/** The name a copy of `name` takes: its base with the next number, Goblin 2
+ *  after Goblin 1 and Goblin, Wolf 2 after Wolf. */
+export function nextNumbered(name: string, rows: EncounterRow[]): string {
+  const base = name.replace(/ \d+$/, '');
+  const key = base.toLocaleLowerCase();
+  let n = 1;
+  for (const r of rows) {
+    const lower = r.name.toLocaleLowerCase();
+    if (lower.startsWith(`${key} `) && /^\d+$/.test(lower.slice(key.length + 1))) {
+      n = Math.max(n, Number(lower.slice(key.length + 1)));
+    }
+  }
+  return freeName(`${base} ${n + 1}`, rows);
+}
+
+/** A copy of row `name` under it: the next number, its link and its cells,
+ *  in the fight. */
+export function duplicateRow(e: Encounter, name: string): Encounter {
+  const at = e.rows.findIndex((r) => r.name === name);
+  if (at < 0) return e;
+  const copy = { ...e.rows[at], name: nextNumbered(name, e.rows), out: false, cells: [...e.rows[at].cells] };
+  return { ...e, rows: [...e.rows.slice(0, at + 1), copy, ...e.rows.slice(at + 1)] };
+}
+
+/** Row `name` gone. On its turn, the turn passes on first. */
+export function removeRow(e: Encounter, name: string): Encounter {
+  const passed = e.turn === name ? { ...e, ...step(e, 1) } : e;
+  const rows = passed.rows.filter((r) => r.name !== name);
+  const turn = passed.turn === name ? null : passed.turn;
+  return { ...passed, rows, turn: turn ?? rows.find((r) => !r.out)?.name ?? null };
+}
+
+/** Row `name` moved to stand before the row now at `to` (the rows' length
+ *  for the end). The turn stays with whoever has it. */
+export function moveRow(e: Encounter, name: string, to: number): Encounter {
+  const from = e.rows.findIndex((r) => r.name === name);
+  if (from < 0 || to === from || to === from + 1) return e;
+  const rows = [...e.rows];
+  const [row] = rows.splice(from, 1);
+  rows.splice(to > from ? to - 1 : to, 0, row);
+  return { ...e, rows };
+}
+
+// ---- columns -----------------------------------------------------------------
+
+type Table = Pick<Encounter, 'columns' | 'rows'>;
+
+/** A column named `name` at the end, empty. */
+export function addColumn<T extends Table>(t: T, name: string): T {
+  return { ...t, columns: [...t.columns, name], rows: t.rows.map((r) => ({ ...r, cells: [...r.cells, ''] })) };
+}
+
+/** Column `c` renamed; the first, the rows' names, too. */
+export function renameColumn<T extends Table>(t: T, c: number, name: string): T {
+  return { ...t, columns: t.columns.map((col, i) => (i === c ? name : col)) };
+}
+
+/** Column `c` and its cells gone. The first stays. */
+export function removeColumn<T extends Table>(t: T, c: number): T {
+  if (c < 1) return t;
+  return {
+    ...t,
+    columns: t.columns.filter((_, i) => i !== c),
+    rows: t.rows.map((r) => ({ ...r, cells: r.cells.filter((_, i) => i !== c - 1) })),
+  };
+}
+
+/** Column `c` moved, with its cells, to stand before the column now at
+ *  `to` (the columns' length for the end). The first stays first. */
+export function moveColumn<T extends Table>(t: T, c: number, to: number): T {
+  if (c < 1 || to < 1 || to === c || to === c + 1) return t;
+  const order = t.columns.map((_, i) => i);
+  order.splice(c, 1);
+  order.splice(to > c ? to - 1 : to, 0, c);
+  return {
+    ...t,
+    columns: order.map((i) => t.columns[i]),
+    rows: t.rows.map((r) => ({ ...r, cells: order.slice(1).map((i) => r.cells[i - 1] ?? '') })),
+  };
+}
