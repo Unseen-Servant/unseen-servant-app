@@ -184,6 +184,34 @@ pub struct DrawTracks {
     tracks: Vec<DrawTrack>,
 }
 
+/// One row of an encounter's table (Foresight design §3): its name, the
+/// note it links to as the link spells it, whether it's out of the fight,
+/// and a cell for each column after the first.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EncounterRow {
+    name: String,
+    #[serde(default)]
+    link: Option<String>,
+    #[serde(default)]
+    out: bool,
+    #[serde(default)]
+    cells: Vec<String>,
+}
+
+/// An encounter as Foresight shows it: the note's table, `round` and
+/// `turn`, the hash a save is checked against, and its spent date.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Encounter {
+    path: String,
+    name: String,
+    hash: String,
+    spent: Option<String>,
+    round: u32,
+    turn: Option<String>,
+    columns: Vec<String>,
+    rows: Vec<EncounterRow>,
+}
+
 /// What Send to Command kept, a hit as a note or an image from the tree:
 /// the campaign it went to and its path there.
 #[derive(Serialize, Debug)]
@@ -720,6 +748,58 @@ pub async fn command_set_spent(
     })))
     .await
     .map(|s| s.spent)
+}
+
+// -- encounters: Foresight's (Foresight design §3) -------------------------
+
+#[tauri::command]
+pub async fn command_read_encounter(campaign: String, path: String) -> Result<Encounter, String> {
+    answer(client().get(api_query(
+        "/encounter",
+        &[("campaign", &campaign), ("path", &path)],
+    )?))
+    .await
+}
+
+/// Write an encounter's table, round and turn over its note, if the note is
+/// still the version read (`base_hash`); a conflict carries the hash now on
+/// disk, as a note's save does.
+#[tauri::command]
+pub async fn command_save_encounter(
+    campaign: String,
+    path: String,
+    base_hash: String,
+    round: u32,
+    turn: Option<String>,
+    columns: Vec<String>,
+    rows: Vec<EncounterRow>,
+) -> Result<SaveOutcome, String> {
+    let response = client()
+        .put(api("/encounter"))
+        .json(&serde_json::json!({
+            "campaign": campaign, "path": path, "base_hash": base_hash,
+            "round": round, "turn": turn, "columns": columns, "rows": rows,
+        }))
+        .timeout(TIMEOUT)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to the sidecar: {}", e))?;
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    save_outcome(status, &body)
+}
+
+/// A new encounter, `Encounter N` in the Encounters track, holding `rows`.
+#[tauri::command]
+pub async fn command_create_encounter(
+    campaign: String,
+    columns: Vec<String>,
+    rows: Vec<EncounterRow>,
+) -> Result<Encounter, String> {
+    answer(client().post(api("/encounter")).json(&serde_json::json!({
+        "campaign": campaign, "columns": columns, "rows": rows,
+    })))
+    .await
 }
 
 // -- play: the board, the live set, jots ------------------------------------
@@ -1272,6 +1352,27 @@ mod tests {
         });
         let parsed: LiveSet = serde_json::from_value(live.clone()).unwrap();
         assert_eq!(serde_json::to_value(parsed).unwrap(), live);
+    }
+
+    #[test]
+    fn an_encounter_keeps_its_fields_on_the_way_through() {
+        let encounter = serde_json::json!({
+            "path": "Encounters/Encounter 4.md", "name": "Encounter 4", "hash": "abc",
+            "spent": null, "round": 3, "turn": "Goblin 2", "columns": ["Combatant", "HP"],
+            "rows": [
+                {"name": "Kira", "link": "Kira", "out": false, "cells": [""]},
+                {"name": "Goblin 1", "link": "Goblin", "out": true, "cells": ["0/7"]},
+            ],
+        });
+        let parsed: Encounter = serde_json::from_value(encounter.clone()).unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap(), encounter);
+
+        // A row sent with its name alone takes no link, in the fight, no cells.
+        let row: EncounterRow = serde_json::from_value(serde_json::json!({"name": "Kira"})).unwrap();
+        assert_eq!(
+            serde_json::to_value(row).unwrap(),
+            serde_json::json!({"name": "Kira", "link": null, "out": false, "cells": []}),
+        );
     }
 
     #[test]

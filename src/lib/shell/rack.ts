@@ -90,11 +90,26 @@ export function emptyViews(): RackView[] {
 }
 
 /** First launch: Legend Lore on view 1, where its tab used to be, and
- *  Command on 2 with Augury mounted beside it in a rack `w` wide. */
-export function defaultViews(w = 0): RackView[] {
+ *  Command on 2 with Augury mounted beside it in a rack `w` wide, Foresight
+ *  under Augury's box in a rack `h` tall, as a carry under the box puts it
+ *  (`landing`). A share short of the box would lay Augury down, so `h` is
+ *  the rack's measured height, not a guess. */
+export function defaultViews(w = 0, h = 0): RackView[] {
   const views = emptyViews();
   views[0] = { root: { kind: 'tool', id: 'legend-lore' }, locked: false };
-  views[1] = { root: mount({ kind: 'tool', id: 'command' }, 'augury', w), locked: false };
+  const augury = minOf('augury').h + RAIL + 1;
+  const keep = h > 0 ? Math.min(1, augury / h) : 0.5;
+  const column: RackNode = {
+    kind: 'split',
+    dir: 'col',
+    sizes: [keep, 1 - keep],
+    children: [
+      { kind: 'tool', id: 'augury' },
+      { kind: 'tool', id: 'foresight' },
+    ],
+  };
+  const root = mount({ kind: 'tool', id: 'command' }, 'augury', w) as Split;
+  views[1] = { root: { ...root, children: [root.children[0], column] }, locked: false };
   return views;
 }
 

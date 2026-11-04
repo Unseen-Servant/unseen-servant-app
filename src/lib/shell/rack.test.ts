@@ -236,8 +236,25 @@ describe('parseViews', () => {
   });
 });
 
-test('first launch puts Legend Lore on view 1 and Command on 2 with Augury beside it', () => {
-  expect(defaultViews().map((v) => toolsIn(v.root))).toEqual([['legend-lore'], ['command', 'augury'], [], [], [], [], [], []]);
+test('first launch puts Legend Lore on view 1 and Command on 2 with Augury beside it, Foresight under it', () => {
+  expect(defaultViews().map((v) => toolsIn(v.root))).toEqual([
+    ['legend-lore'],
+    ['command', 'augury', 'foresight'],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+  ]);
+  // Augury's box at the column's top, Foresight taking the rest of it.
+  const rects = layout(defaultViews(1270, 727)[1].root, 1270, 727, false).rects;
+  const [aug, fore] = [rects.get('augury')!, rects.get('foresight')!];
+  expect([aug.w, fore.w]).toEqual([270, 270]);
+  expect(boxOf('augury', aug).h).toBe(391);
+  expect(aug.h).toBeLessThan(391 + RAIL);
+  expect(fore.y).toBe(aug.h + RAIL);
+  expect(fore.y + fore.h).toBe(727);
 });
 
 describe('neighbour', () => {

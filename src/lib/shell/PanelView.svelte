@@ -5,6 +5,7 @@
   import LegendLorePanel from '../legend-lore/LegendLorePanel.svelte';
   import CommandPanel from '../command/CommandPanel.svelte';
   import AuguryPanel from '../augury/AuguryPanel.svelte';
+  import ForesightPanel from '../foresight/ForesightPanel.svelte';
   import ServantPanel from '../servant/ServantPanel.svelte';
   import type { Snippet } from 'svelte';
   import type { PanelId } from './panels';
@@ -28,6 +29,8 @@
   <CommandPanel {active} {windowKey} {statusSlot} {filled} {onFill} />
 {:else if id === 'augury'}
   <AuguryPanel {windowKey} />
+{:else if id === 'foresight'}
+  <ForesightPanel {windowKey} {statusSlot} />
 {:else}
   <ServantPanel />
 {/if}

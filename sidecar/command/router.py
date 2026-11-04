@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from . import board, jot, prep, vault
+from . import board, encounter, jot, prep, vault
 from .events import VaultWatcher
 from .live import LiveSets
 from .settings import default_root, load_settings, save_settings
@@ -151,6 +151,29 @@ class Spent(BaseModel):
     campaign: str
     path: str
     spent: bool
+
+
+class EncounterRow(BaseModel):
+    name: str
+    link: str | None = None
+    out: bool = False
+    cells: list[str] = []
+
+
+class EncounterSave(BaseModel):
+    campaign: str
+    path: str
+    base_hash: str
+    round: int
+    turn: str | None
+    columns: list[str]
+    rows: list[EncounterRow]
+
+
+class EncounterCreate(BaseModel):
+    campaign: str
+    columns: list[str]
+    rows: list[EncounterRow]
 
 
 class BoardEdit(BaseModel):
@@ -617,6 +640,33 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
     def set_spent(body: Spent):
         with write_lock:
             return {"spent": prep.set_spent(campaign_path(body.campaign), body.path, body.spent)}
+
+    # -- encounters: Foresight's (Foresight design §3) --------------------
+
+    def rows(body: list[EncounterRow]) -> list[encounter.Row]:
+        return [encounter.Row(r.name, r.link, r.out, list(r.cells)) for r in body]
+
+    @router.get("/encounter")
+    def get_encounter(campaign: str, path: str):
+        return encounter.read(campaign_path(campaign), path)
+
+    @router.put("/encounter")
+    def save_encounter(body: EncounterSave):
+        """The encounter's table, round and turn, written over the note if
+        it's still the version Foresight read; refused with the hash now on
+        disk otherwise, as a note's save is."""
+        with write_lock:
+            new_hash = encounter.save(
+                campaign_path(body.campaign), body.path, body.base_hash,
+                body.round, body.turn, body.columns, rows(body.rows),
+            )
+        return {"hash": new_hash}
+
+    @router.post("/encounter")
+    def create_encounter(body: EncounterCreate):
+        """A new encounter, `Encounter N` in the Encounters track."""
+        with write_lock:
+            return encounter.create(campaign_path(body.campaign), body.columns, rows(body.rows))
 
     # -- play: the board, the live set, jots (design §5.2, §5.3) -----------
 

@@ -154,6 +154,8 @@ def date_value(value) -> str | None:
 def _render(key: str, value, nl: str) -> list[str]:
     if isinstance(value, (date, datetime)):
         return [f"{key}: {date_value(value)}{nl}"]
+    if isinstance(value, int) and not isinstance(value, bool):
+        return [f"{key}: {value}{nl}"]
     if isinstance(value, list):
         if not value:
             return [f"{key}: []{nl}"]
@@ -195,8 +197,8 @@ def _expected(value):
 
 
 def set_key(text: str, key: str, value) -> str:
-    """`text` with top-level `key` set to `value` (a date, a string or a list
-    of strings), or removed when `value` is None. Only that key's lines
+    """`text` with top-level `key` set to `value` (a date, a whole number, a
+    string or a list of strings), or removed when `value` is None. Only that key's lines
     change. Refuses (FrontmatterError) when the frontmatter doesn't parse, or
     when the result wouldn't read back as intended."""
     parts = split(text)

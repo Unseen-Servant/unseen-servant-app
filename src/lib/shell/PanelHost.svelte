@@ -47,6 +47,9 @@
   // The rack sits one rail in from the window's sides; until it's measured,
   // the window's width places a compact tool on the first launch's views.
   let views: RackView[] = defaultViews(window.innerWidth - 2 * RAIL);
+  // No rack saved yet: the first launch's views are laid out again once the
+  // rack is measured, so Augury's box sits over Foresight to the pixel.
+  let unsaved = false;
   let current = 0;
   let loaded = false;
   let focused: PanelId | null = null;
@@ -62,6 +65,10 @@
   // to the layout lets go of it.
   let filling: PanelId | null = null;
 
+  $: if (unsaved && rackW > 0 && rackH > 0) {
+    unsaved = false;
+    views = defaultViews(rackW, rackH);
+  }
   $: view = views[current];
   $: present = toolsIn(view.root);
   $: popped = new Set($poppedPanels.popped);
@@ -78,7 +85,9 @@
   onMount(async () => {
     try {
       const store = await load('settings.json');
-      views = parseViews(await store.get('rackViews')) ?? views;
+      const saved = parseViews(await store.get('rackViews'));
+      if (saved) views = saved;
+      else unsaved = true;
       const at = await store.get('rackView');
       if (typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < VIEW_COUNT) current = at;
     } catch (e) {

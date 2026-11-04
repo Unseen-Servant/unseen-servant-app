@@ -85,6 +85,34 @@ def test_note_create_read_save_and_conflict(cmd, campaign_root):
     assert (campaign_root / "Strahd" / "NPCs" / "Ismark.md").read_text() == "Hello\n"
 
 
+def test_encounter_create_read_save_and_conflict(cmd, campaign_root):
+    made = cmd.post("/api/command/encounter", json={
+        "campaign": "Strahd", "columns": ["Combatant", "HP"], "rows": [{"name": "Kira"}],
+    }).json()
+    assert (made["path"], made["round"], made["turn"]) == ("Encounters/Encounter 1.md", 1, "Kira")
+    assert "Encounters" in cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()["tracks"]
+
+    rows = [{"name": "Kira", "cells": ["12"]}, {"name": "Goblin 2", "link": "Goblin", "out": True}]
+    body = {
+        "campaign": "Strahd", "path": made["path"], "base_hash": made["hash"],
+        "round": 2, "turn": "Kira", "columns": ["Combatant", "HP"], "rows": rows,
+    }
+    saved = cmd.put("/api/command/encounter", json=body)
+    assert saved.status_code == 200
+    read = cmd.get("/api/command/encounter", params={"campaign": "Strahd", "path": made["path"]}).json()
+    assert read["hash"] == saved.json()["hash"]
+    assert read["rows"][1] == {"name": "Goblin 2", "link": "Goblin", "out": True, "cells": [""]}
+
+    # From the stale hash, refused with the hash on disk, as a note's save is.
+    stale = cmd.put("/api/command/encounter", json={**body, "round": 9})
+    assert stale.status_code == 409
+    assert stale.json()["hash"] == read["hash"]
+
+    # A note that isn't an encounter isn't read as one.
+    cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Ismark"})
+    assert cmd.get("/api/command/encounter", params={"campaign": "Strahd", "path": "NPCs/Ismark.md"}).status_code == 422
+
+
 def test_opening_a_session_from_outside_takes_the_open_campaigns_sessions_only(cmd):
     cmd.post("/api/command/sessions", json={"campaign": "Strahd"})
     cmd.post("/api/command/notes", json={"campaign": "Strahd", "folder": "NPCs", "name": "Ismark"})

@@ -35,7 +35,7 @@ struct PanelSpec {
 
 /// The frontend's manifest (`src/lib/shell/panels.ts`) carries the same ids;
 /// window defaults live here because Rust creates the windows.
-const PANELS: [PanelSpec; 4] = [
+const PANELS: [PanelSpec; 5] = [
     PanelSpec {
         id: "legend-lore",
         title: "Legend Lore",
@@ -59,6 +59,15 @@ const PANELS: [PanelSpec; 4] = [
         size: (270.0, 419.0),
         min_size: (270.0, 253.0),
         wide: Some((540.0, 253.0)),
+    },
+    // Narrow as Augury, so the two stack in one column; tall enough for a
+    // fight's rows. Its rack minimum is 270×280, plus the status bar here.
+    PanelSpec {
+        id: "foresight",
+        title: "Foresight",
+        size: (300.0, 520.0),
+        min_size: (270.0, 308.0),
+        wide: None,
     },
     PanelSpec {
         id: "servant",

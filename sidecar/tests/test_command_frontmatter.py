@@ -82,6 +82,13 @@ def test_set_key_appends_a_new_key_at_the_end():
     assert out == "---\nrole: ally\nspent: 2026-10-18\n---\nBody\n"
 
 
+def test_set_key_writes_a_whole_number_bare():
+    # Foresight's round (Foresight design §3); a bool is no number.
+    assert fm.set_key("", "round", 3) == "---\nround: 3\n---\n"
+    assert fm.load(fm.set_key("---\nround: 2\n---\n", "round", 12)) == {"round": 12}
+    assert fm.set_key("", "turn", "Goblin 2") == '---\nturn: "Goblin 2"\n---\n'
+
+
 def test_removing_the_only_key_drops_the_block():
     assert fm.set_key("---\nspent: 2026-10-18\n---\nBody\n", "spent", None) == "Body\n"
     assert fm.set_key("---\nrole: ally\nspent: yes\n---\nB", "spent", None) == "---\nrole: ally\n---\nB"

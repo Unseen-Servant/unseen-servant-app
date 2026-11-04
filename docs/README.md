@@ -39,6 +39,7 @@ files.
 - [Command board toolbar](roadmap/2026-10-19-command-board-toolbar-design.md) — Miro's creation toolbar for Play's board, limited to what JSON Canvas holds
 - [Command images](roadmap/2026-10-20-command-images-design.md) — images as clips, image tracks, and Legend Lore's images
 - [Augury](roadmap/2026-10-30-augury-design.md) — the dice roller: dice sets on a pad matrix, seven-segment readout, Oracle word dice
+- [Foresight](roadmap/2026-11-03-foresight-design.md) — the turn tracker: a step sequencer of rows, an encounter as a note, clearing as spending
 
 ## retrieval/
 
