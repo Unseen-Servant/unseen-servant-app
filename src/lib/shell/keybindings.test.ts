@@ -273,6 +273,7 @@ describe('switch bindings', () => {
     expect(ids).toContain('collections.play');
     expect(ids).toContain('collections.arm');
     expect(ids).toContain('command.arm');
+    expect(ids).toContain('foresight.out');
     expect(ids).toContain('scope.bypass');
     expect(ids).toContain('systems.solo');
     expect(ids).toContain('systems.mute');
@@ -369,6 +370,9 @@ describe('liveScopes', () => {
   });
   test('Augury: its own, and none of the other tools\' shared keys', () => {
     expect(liveScopes({ tool: 'augury', region: null })).toEqual(new Set(['global', 'augury']));
+  });
+  test('Foresight: its own, and none of the other tools\' shared keys', () => {
+    expect(liveScopes({ tool: 'foresight', region: null })).toEqual(new Set(['global', 'foresight']));
   });
   test("Command: either tool's, its own, and its view's", () => {
     expect(liveScopes({ tool: 'command', region: 'grid' })).toEqual(new Set(['global', 'tool', 'command', 'commandPrep']));

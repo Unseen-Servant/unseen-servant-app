@@ -35,14 +35,14 @@
   import { linkedNote } from '../command/columns';
   import CommandMenu from '../command/CommandMenu.svelte';
   import InlineName from '../command/InlineName.svelte';
-  import { action, type OpenMenu } from '../command/menu';
+  import { action, keyed, type OpenMenu } from '../command/menu';
   import { CARD_MIME, TRACK_MIME, draggedNote, isCardDrag, isNoteDrag, isTrackDrag } from '../command/noteDrag';
   import type { CampaignIndex, NoteEntry } from '../command/types';
   import { m } from '../paraglide/messages';
   import { confirmPrompt } from '../shell/confirmStore';
   import { focusPath } from '../shell/focus';
   import { hoist } from '../shell/hoist';
-  import { eventMatchKey } from '../shell/keybindings';
+  import { chordHint, eventMatchKey } from '../shell/keybindings';
   import { bindKeys } from '../shell/keys';
   import { appContext } from '../shell/shellState';
   import { parseRecord, parseStringArray } from '../shell/storeParsers';
@@ -512,8 +512,8 @@
       y: e.clientY,
       items: [
         ...(row.link ? [action(m.foresight_open_note(), () => void openLinked(row))] : []),
-        action(m.foresight_rename(), () => (renamingRow = row.name)),
-        action(m.foresight_duplicate(), () => duplicate(row.name)),
+        keyed(m.foresight_rename(), 'foresight.rename', () => (renamingRow = row.name)),
+        keyed(m.foresight_duplicate(), 'foresight.duplicate', () => duplicate(row.name)),
         action(m.foresight_remove(), () => remove(row.name), true),
       ],
     };
@@ -753,7 +753,7 @@
         type="button"
         class="key"
         disabled={!enc}
-        title={m.foresight_turn_next()}
+        title={m.foresight_turn_next() + chordHint('foresight.next')}
         aria-label={m.foresight_turn_next()}
         on:click={() => pass(1)}
       >
@@ -910,7 +910,7 @@
           class:mute-on={row.out}
           aria-pressed={row.out}
           aria-label={m.foresight_out_label()}
-          title={row.out ? m.foresight_in_title({ name: row.name }) : m.foresight_out_title({ name: row.name })}
+          title={(row.out ? m.foresight_in_title({ name: row.name }) : m.foresight_out_title({ name: row.name })) + chordHint('foresight.out')}
           on:click|stopPropagation={() => toggle(row.name)}>M</button
         >
       </li>

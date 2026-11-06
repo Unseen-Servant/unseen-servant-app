@@ -1,6 +1,6 @@
 # Foresight (2026-11-03)
 
-**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Steps 1 to 3 built 2026-11-03–05 (§11). Two words are under review (§12).
+**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Built 2026-11-03–05: steps 1 to 3, then step 4 (Help → Guides → Foresight, a glossary group, the shortcut sheet's Foresight section, the CHANGELOG). Two words are under review (§12).
 
 ## 0. TL;DR
 
@@ -136,7 +136,7 @@ Goblins hide in the ditch; the boss stays on the ridge.
 1. **The panel and the note.** Foresight in the rack and as a pop-out, on the first launch's view 2. The sidecar's reader and writer with tests: `round`/`turn`, the first table, struck-through names, aliases, text around the table kept, hash-checked writes. The head, plate and rows; turn and round (▶ ◀ ⇧Space, wrap, skip); M; the status bar section. New encounter on the first row; clearing spends.
 2. **Cells and columns.** Editing cells, the arithmetic, figures by content. `+`, renaming, moving and removing columns; columns carried to the next encounter. ↓/J ↑/K, R, ⌘D, row drag, the row menu.
 3. **The link with Command.** Drops of notes, nameplates and encounter cards; aliases for repeats; `[[` in the empty row; double-click opens the linked note in Command; *Open in Foresight* through Rust.
-4. **Help and keys.** Help → Guides → Foresight, a glossary group (encounter, turn, round, out of the fight), the shortcut sheet, the keys' hints, CHANGELOG.
+4. **Help and keys.** Help → Guides → Foresight, a glossary group (encounter, turn, round, out of the fight), the shortcut sheet (⇧Space, M, ⌘D and Esc in a Foresight section, a line each on a cell's arithmetic and `[[`), the keys' hints, CHANGELOG.
 
 ## 12. Open
 
@@ -174,6 +174,11 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - Several board cards carried together all join.
 - An encounter renamed or moved, in Command, Finder or Obsidian, is followed: when its path is gone, Foresight reads the campaign's encounters for the hash it holds. If the note's text changed in the same move, nothing matches and Foresight empties. A rename while Foresight isn't running isn't followed either: the stored path finds nothing, and Foresight opens empty.
 - The reader and writer in Command's sidecar package rather than a package of their own (§10).
+
+**Filled in while building step 4 (2026-11-05), not yet discussed:**
+
+- ↓/J ↑/K and R read the same as on Command's lists, so the sheet shows them once, under *Any list*, live while Foresight has the keyboard. Its own section holds what is Foresight's alone.
+- ◀ has no key: only passing the turn forward does.
 
 ## 13. Settled (2026-11-01–03)
 

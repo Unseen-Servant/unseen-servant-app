@@ -2,6 +2,7 @@
   import GettingStartedSteps from '../../legend-lore/GettingStartedSteps.svelte';
   import CommandGuide from '../../command/CommandGuide.svelte';
   import AuguryGuide from '../../augury/AuguryGuide.svelte';
+  import ForesightGuide from '../../foresight/ForesightGuide.svelte';
   import ServantGuide from '../../servant/ServantGuide.svelte';
 
   export let folderSelected: boolean = false;
@@ -27,6 +28,10 @@
   <h3 class="pane-title ledger-label second">Augury</h3>
 
   <AuguryGuide />
+
+  <h3 class="pane-title ledger-label second">Foresight</h3>
+
+  <ForesightGuide />
 
   <!-- MCP reaches both tools, so its step is the Servant's, not one tool's. -->
   <h3 class="pane-title ledger-label second">Servant</h3>

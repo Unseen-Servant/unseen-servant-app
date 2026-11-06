@@ -49,6 +49,15 @@
       ],
     },
     {
+      group: () => 'Foresight',
+      terms: [
+        [m.glossary_encounter, m.glossary_encounter_desc],
+        [m.glossary_turn, m.glossary_turn_desc, '⇧Space'],
+        [m.glossary_round, m.glossary_round_desc],
+        [m.glossary_out_of_fight, m.glossary_out_of_fight_desc, 'M'],
+      ],
+    },
+    {
       group: m.reference_machinery,
       terms: [
         [m.glossary_sidecar, m.glossary_sidecar_desc],

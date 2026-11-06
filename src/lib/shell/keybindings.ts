@@ -28,6 +28,7 @@ export type KeyScope =
   | 'commandPrep'
   | 'commandPlay'
   | 'augury'
+  | 'foresight'
   | 'contextMenu'
   | 'modal';
 
@@ -226,6 +227,16 @@ export const KEYBINDINGS: KeybindingEntry[] = [
   { id: 'augury.roll',           keys: { mac: '↵',    other: 'Enter' },         label: m.keys_augury_roll, scope: 'augury' },
   { id: 'augury.clear',          keys: { mac: 'Esc',  other: 'Esc' },           label: m.keys_augury_clear, scope: 'augury' },
 
+  // Foresight, from anywhere in it (ForesightPanel's handler). ↓/J ↑/K start
+  // from the turn's row; M, R, ⌘D and Esc act on the selected row.
+  { id: 'foresight.next',        keys: { mac: '⇧Space', other: 'Shift+Space' }, label: m.keys_foresight_next, scope: 'foresight' },
+  { id: 'foresight.down',        keys: { mac: '↓ / J', other: '↓ / J' },        label: m.keys_move_down_row, scope: 'foresight' },
+  { id: 'foresight.up',          keys: { mac: '↑ / K', other: '↑ / K' },        label: m.keys_move_up_row, scope: 'foresight' },
+  { id: 'foresight.out',         keys: { mac: 'M',    other: 'M' },             label: m.keys_foresight_out, scope: 'foresight', switch: true },
+  { id: 'foresight.rename',      keys: { mac: 'R',    other: 'R' },             label: m.keys_rename_row, scope: 'foresight' },
+  { id: 'foresight.duplicate',   keys: { mac: '⌘D',   other: 'Ctrl+D' },        label: m.keys_foresight_duplicate, scope: 'foresight' },
+  { id: 'foresight.release',     keys: { mac: 'Esc',  other: 'Esc' },           label: m.keys_foresight_release, scope: 'foresight' },
+
   // Context menu (when open)
   { id: 'contextMenu.next',      keys: { mac: '↓ / J', other: '↓ / J' },        label: m.keys_move_down_row, scope: 'contextMenu' },
   { id: 'contextMenu.prev',      keys: { mac: '↑ / K', other: '↑ / K' },        label: m.keys_move_up_row, scope: 'contextMenu' },
@@ -262,7 +273,7 @@ const BY_ID = new Map(KEYBINDINGS.map(k => [k.id, k]));
 // The scopes the sheet shows as live for a focus path (focus.ts): global
 // always, either tool's while one has the keyboard, Legend Lore's bar
 // whenever it does, the scope of the region that does, Command's view, and
-// Augury's own. A menu can't be open under the sheet, so its scope
+// Augury's and Foresight's own. A menu can't be open under the sheet, so its scope
 // never is; the modal one isn't on the sheet.
 export function liveScopes(path: FocusPath): Set<KeyScope> {
   const live = new Set<KeyScope>(['global']);
@@ -272,6 +283,7 @@ export function liveScopes(path: FocusPath): Set<KeyScope> {
     live.add(path.region === 'play' ? 'commandPlay' : 'commandPrep');
   }
   if (path.tool === 'augury') live.add('augury');
+  if (path.tool === 'foresight') live.add('foresight');
   if (path.tool === 'legend-lore') {
     live.add('searchInput');
     const region: Record<string, KeyScope> = {

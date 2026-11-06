@@ -36,6 +36,7 @@
     { key: 'commandPlay', label: m.sheet_play },
     { key: 'board', label: m.sheet_board },
     { key: 'augury', label: () => 'Augury' },
+    { key: 'foresight', label: () => 'Foresight' },
     { key: 'contextMenu', label: m.sheet_menus },
   ];
 
@@ -49,7 +50,7 @@
 
   const LISTS = new Set<KeyScope>([
     'fileTree', 'systemsView', 'collections', 'filterPanel', 'searchResults',
-    'commandPrep', 'commandPlay', 'contextMenu',
+    'commandPrep', 'commandPlay', 'foresight', 'contextMenu',
   ]);
   const COMMAND_LISTS = new Set<KeyScope>(['commandPrep', 'commandPlay']);
 
@@ -60,6 +61,7 @@
     transport: [m.sheet_note_hold],
     searchInput: [m.sheet_note_mention, m.sheet_note_filter],
     augury: [m.sheet_note_augury_pads],
+    foresight: [m.sheet_note_foresight_cells, m.sheet_note_foresight_link],
   };
   // Odd parts are the keys.
   const noteParts = (note: string): string[] => note.split('`');
