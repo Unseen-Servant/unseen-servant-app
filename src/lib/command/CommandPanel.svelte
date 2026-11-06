@@ -31,7 +31,7 @@
   import SessionStatus from './SessionStatus.svelte';
   import ShelfSidebar from './ShelfSidebar.svelte';
   import TrackGrid from './TrackGrid.svelte';
-  import { commandApi, onLiveChange, onVaultChange, type PlanEdit, type PlanOp } from './api';
+  import { commandApi, onLiveChange, onOpenNote, onVaultChange, type PlanEdit, type PlanOp } from './api';
   import { bodyKey } from './board';
   import { columns, isAmbiguous, isNewRowKey, linkableNames, linkedNote, nameParts, type Column } from './columns';
   import { isDeleteChord, jumpEdge } from '../shell/keybindings';
@@ -85,6 +85,7 @@
   let mounted = false;
   let unlisten: Promise<UnlistenFn> | null = null;
   let unlistenLive: Promise<UnlistenFn> | null = null;
+  let unlistenOpen: Promise<UnlistenFn> | null = null;
 
   /** Which view this panel shows, kept across launches as Legend Lore's
    *  tree or systems view is. */
@@ -529,6 +530,9 @@
   onMount(() => {
     unlisten = onVaultChange(onVault);
     unlistenLive = onLiveChange(applyLive);
+    unlistenOpen = onOpenNote((at) => {
+      if (at.campaign === campaign) openPath(at.path);
+    });
     // The view first, so a campaign reopened in Play doesn't flash Prep.
     run(async () => {
       await loadMode();
@@ -541,6 +545,7 @@
     if (refreshTimer) clearTimeout(refreshTimer);
     void unlisten?.then((stop) => stop());
     void unlistenLive?.then((stop) => stop());
+    void unlistenOpen?.then((stop) => stop());
     void buffer.close();
   });
 
@@ -568,6 +573,11 @@
       freshOpen = true;
       await buffer.open(path);
     });
+  }
+
+  /** *Open in Foresight*: Foresight may be in its own window. */
+  function openEncounter(note: NoteEntry) {
+    run(() => commandApi.openEncounter(campaign!, note.path));
   }
 
   /** `[close]`: the note, saved first, or the image. */
@@ -1423,6 +1433,7 @@
             onReveal={(note) => reveal(note.path)}
             onTrash={(note) => trashNote(note)}
             onCopy={copyNote}
+            onOpenEncounter={openEncounter}
             onAddPlace={addPlace}
             onForgetPlace={forgetPlace}
           />
@@ -1459,6 +1470,7 @@
             onDropImages={dropImages}
             onReorderNotes={orderNotes}
             onRevealTrack={(track) => reveal(track)}
+            onOpenEncounter={openEncounter}
           />
         </div>
 

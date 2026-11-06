@@ -54,6 +54,8 @@
   export let onReveal: (note: NoteEntry) => void;
   export let onTrash: (note: NoteEntry) => void;
   export let onCopy: (from: CopySource, note: NoteEntry) => void;
+  /** *Open in Foresight*, on an encounter still to play. */
+  export let onOpenEncounter: (note: NoteEntry) => void;
   /** Resolves the folder added, or null when the GM cancelled. */
   export let onAddPlace: () => Promise<string | null>;
   export let onForgetPlace: (path: string) => void;
@@ -263,8 +265,11 @@
     onSelect(note);
     const fitting = index.tracks.filter((t) => (index.kinds[t] ?? 'note') === note.type);
     const groups = [
-      // An image isn't spent (images design §2).
-      note.type === 'image' ? [] : [keyed(note.spent ? m.command_shelf_mark_unspent() : m.command_shelf_mark_spent(), 'command.spend', () => onSpent(note, !note.spent))],
+      [
+        ...(note.encounter && !note.spent ? [action(m.command_shelf_open_in_foresight(), () => onOpenEncounter(note))] : []),
+        // An image isn't spent (images design §2).
+        ...(note.type === 'image' ? [] : [keyed(note.spent ? m.command_shelf_mark_unspent() : m.command_shelf_mark_spent(), 'command.spend', () => onSpent(note, !note.spent))]),
+      ],
       // The grid's Move to flyout, in the columns' order: the shelf at the
       // left, for a loose note, then the tracks of its kind, as Live keeps
       // audio clips off MIDI tracks (images design §3.2).

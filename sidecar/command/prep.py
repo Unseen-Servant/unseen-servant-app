@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 
 from . import vault
 from . import frontmatter as fm
+from .encounter import is_encounter
 
 BEATS, SESSIONS, SHELF = vault.RESERVED
 
@@ -60,6 +61,7 @@ def index(campaign: Path) -> dict:
         n["spent"] = fm.spent_value(meta.get("spent"))
         source = meta.get("source")
         n["source"] = source if isinstance(source, str) and source.strip() else None
+        n["encounter"] = is_encounter(meta)
 
     def ref(entry, of: str) -> dict:
         target, spelled = fm.link_target(entry), fm.link_path(entry)

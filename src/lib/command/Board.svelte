@@ -63,6 +63,7 @@
     type Tool,
   } from './board';
   import { carriesFiles, droppedImages } from './embeds';
+  import { carryCards, dropCards } from './noteDrag';
   import { isTyping } from '../shell/focus';
   import type { BoardOp, CampaignIndex, Side } from './types';
 
@@ -208,7 +209,15 @@
     }
   }
 
-  function drag({ nodes: dragged }: { nodes: Node[] }) {
+  /** The notes of the cards carried, and where the pointer is. */
+  const carriedBy = (moved: Node[], event: MouseEvent | TouchEvent) => ({
+    paths: moved.flatMap((n) => cardOf(n.id)?.path ?? []),
+    at: 'clientX' in event ? event : event.changedTouches[0],
+  });
+
+  function drag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    const { paths, at: pointer } = carriedBy(dragged, event);
+    if (paths.length) carryCards(paths, pointer.clientX, pointer.clientY);
     const lead = dragged.find((n) => lifted.has(n.id));
     if (!lead || !carried.size) return;
     const start = lifted.get(lead.id)!;
@@ -220,7 +229,19 @@
     });
   }
 
-  function dragStop({ nodes: moved }: { nodes: Node[] }) {
+  function dragStop({ nodes: moved, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    // Taken by another tool past the board's edge: the cards stay put.
+    const { paths, at: pointer } = carriedBy(moved, event);
+    if (paths.length && dropCards(paths, pointer.clientX, pointer.clientY)) {
+      carried = new Map();
+      lifted = new Map();
+      const back = new Set(moved.map((n) => n.id));
+      nodes = nodes.map((n) => {
+        const card = back.has(n.id) ? cardOf(n.id) : undefined;
+        return card ? { ...n, position: { x: card.x, y: card.y } } : n;
+      });
+      return;
+    }
     const at = new Map(moved.map((n) => [n.id, n.position]));
     for (const n of nodes) if (carried.has(n.id)) at.set(n.id, n.position);
     carried = new Map();

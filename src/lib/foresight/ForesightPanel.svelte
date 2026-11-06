@@ -20,13 +20,24 @@
   // Foresight is empty. A click on a cell opens it; a number cell takes −7
   // or +3 (encounter.ts enterCell). Rows drag to reorder, and the clicked
   // row takes the keys: ↓/J ↑/K, M, R, ⌘D.
+  //
+  // Command's drags land here: a note joins as a row linked to it, between
+  // rows or at the end, a track's nameplate brings its notes, and an
+  // encounter note opens. Drops don't cross windows, so `[[` in the empty
+  // row offers the notes too, and Command's *Open in Foresight* and a
+  // double-click on a linked name go through Rust. A note gone from its
+  // path was renamed or moved, wherever that was done: an encounter with
+  // the hash Foresight holds is it, and it's followed there.
   import { onDestroy, tick, type Snippet } from 'svelte';
   import { load } from '@tauri-apps/plugin-store';
   import { DIGIT_VIEWBOX, SEGMENTS, isLit, readoutCells } from '../augury/sevenSegment';
   import { commandApi, onVaultChange } from '../command/api';
+  import { linkedNote } from '../command/columns';
   import CommandMenu from '../command/CommandMenu.svelte';
   import InlineName from '../command/InlineName.svelte';
   import { action, type OpenMenu } from '../command/menu';
+  import { CARD_MIME, TRACK_MIME, draggedNote, isCardDrag, isNoteDrag, isTrackDrag } from '../command/noteDrag';
+  import type { CampaignIndex, NoteEntry } from '../command/types';
   import { m } from '../paraglide/messages';
   import { confirmPrompt } from '../shell/confirmStore';
   import { focusPath } from '../shell/focus';
@@ -38,15 +49,21 @@
   import { grab } from '../ui/grab';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import RenameField from '../ui/RenameField.svelte';
+  import NameField from './NameField.svelte';
   import {
     addColumn,
+    addNotes,
     addRow,
     duplicateRow,
     encounterApi,
     enterCell,
     isFigures,
+    isRowNote,
+    landing,
+    linkName,
     moveColumn,
     moveRow,
+    onOpenEncounter,
     removeColumn,
     removeRow,
     renameColumn,
@@ -54,6 +71,8 @@
     setCell,
     step,
     toggleOut,
+    trackNotes,
+    typedLink,
     type Encounter,
     type EncounterRow,
   } from './encounter';
@@ -87,10 +106,16 @@
   let rowDrop: number | null = null;
   let draggingColumn: number | null = null;
   let columnDrop: number | null = null;
+  // An encounter from Command over the panel: a drop opens it.
+  let opening = false;
   let rowEls: Record<string, HTMLElement> = {};
-  // The first row is making the encounter; names given meanwhile wait.
+  // The campaign's index, read when a drag or the empty row needs it and
+  // kept until a note other than the open encounter changes.
+  let known: CampaignIndex | null = null;
+  let knowing: Promise<CampaignIndex | null> | null = null;
+  // The first row is making the encounter; rows added meanwhile wait.
   let creating = false;
-  let waiting: string[] = [];
+  let waiting: ((e: Encounter) => Encounter)[] = [];
   // One write at a time: `dirty` while the state on screen isn't on disk
   // yet, `stale` when the note changed under a write and is read again.
   // `version` counts the states shown, so a read begun before one of them
@@ -184,6 +209,7 @@
     shown = campaign;
     enc = null;
     closeAll();
+    forgetIndex();
     waiting = [];
     await ready;
     const path = campaign ? opened[campaign] : undefined;
@@ -197,6 +223,57 @@
     } catch (e) {
       console.error('Failed to read the encounter:', e);
     }
+  }
+
+  function forgetIndex() {
+    known = null;
+    knowing = null;
+  }
+
+  function indexFor(): Promise<CampaignIndex | null> {
+    const campaign = shown;
+    if (!campaign) return Promise.resolve(null);
+    knowing ??= commandApi.getCampaign(campaign).then(
+      (got) => {
+        if (shown === campaign) known = got;
+        return got;
+      },
+      (e) => {
+        console.error('Failed to read the campaign:', e);
+        knowing = null;
+        return null;
+      },
+    );
+    return knowing;
+  }
+
+  /** Open an encounter of the campaign; the one open is on disk already, so
+   *  nothing is lost. A spent one stays Command's to un-spend. */
+  async function openEncounter(campaign: string, path: string) {
+    await flushed;
+    try {
+      const got = await encounterApi.read(campaign, path);
+      if (shown !== campaign || got.spent) return;
+      closeAll();
+      enc = shape(got);
+      version += 1;
+      keepOpened({ ...opened, [campaign]: path });
+    } catch (e) {
+      console.error('Failed to open the encounter:', e);
+    }
+  }
+
+  /** The open encounter's note, gone from its path: the encounter with the
+   *  version Foresight holds, wherever it went, or null. */
+  async function relocated(campaign: string, gone: Encounter): Promise<Encounter | null> {
+    forgetIndex();
+    const index = await indexFor();
+    for (const note of index?.notes ?? []) {
+      if (!note.encounter || note.path === gone.path) continue;
+      const got = await encounterApi.read(campaign, note.path).catch(() => null);
+      if (got?.hash === gone.hash) return got;
+    }
+    return null;
   }
 
   /** Read the open encounter again after a change on disk. Foresight's own
@@ -222,10 +299,16 @@
         if (selected && !enc.rows.some((r) => r.name === selected)) selected = null;
       }
     } catch (e) {
-      // Moved, renamed, deleted, or no longer an encounter: Foresight is
-      // empty, and finds it again if it comes back.
-      console.error('Failed to read the encounter again:', e);
-      if (shown === campaign && enc?.path === path && !writing) {
+      // Renamed or moved: follow it, and write what the move may have
+      // refused. Deleted, or no longer an encounter: Foresight is empty.
+      if (shown !== campaign || enc?.path !== path || writing) return;
+      const moved = await relocated(campaign, enc);
+      if (shown !== campaign || enc?.path !== path || writing) return;
+      if (moved) {
+        keepOpened({ ...opened, [campaign]: moved.path });
+        change({ ...enc, path: moved.path, name: moved.name });
+      } else {
+        console.error('Failed to read the encounter again:', e);
         enc = null;
         closeAll();
       }
@@ -233,7 +316,9 @@
   }
 
   const unlistenVault = onVaultChange((event) => {
-    if (!enc || (event.campaign !== null && (event.campaign !== shown || !event.paths.includes(enc.path)))) return;
+    const here = event.campaign === null || event.campaign === shown;
+    if (here && (!event.paths.length || event.paths.some((p) => p !== enc?.path))) forgetIndex();
+    if (!enc || !here || (event.campaign !== null && !event.paths.includes(enc.path))) return;
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => void refresh(), 150);
   });
@@ -276,6 +361,10 @@
       await refresh();
     }
   }
+
+  const unlistenOpen = onOpenEncounter((at) => {
+    if (at.campaign === shown) void openEncounter(at.campaign, at.path);
+  });
 
   /** A change to the columns: the open encounter's, or with none open the
    *  ones the next encounter takes. */
@@ -345,30 +434,57 @@
     return true;
   }
 
-  async function addNamed(name: string) {
+  /** Add rows to the open encounter, or make one to hold them. */
+  async function addTo(edit: (e: Encounter) => Encounter) {
     const campaign = shown;
     if (!campaign) return;
     if (enc) {
-      change(addRow(enc, name));
+      change(edit(enc));
       return;
     }
     if (creating) {
-      waiting = [...waiting, name];
+      waiting = [...waiting, edit];
       return;
     }
     creating = true;
     try {
-      const made = await encounterApi.create(campaign, columns, [{ name, link: null, out: false, cells: [] }]);
+      const blank: Encounter = { path: '', name: '', hash: '', spent: null, round: 1, turn: null, columns, rows: [] };
+      const made = await encounterApi.create(campaign, columns, edit(blank).rows);
       if (shown !== campaign) return;
       keepOpened({ ...opened, [campaign]: made.path });
       enc = shape(made);
-      if (waiting.length) change(waiting.reduce(addRow, enc));
+      if (waiting.length) change(waiting.reduce((e, add) => add(e), enc));
     } catch (e) {
       console.error('Failed to start an encounter:', e);
     } finally {
       creating = false;
       waiting = [];
     }
+  }
+
+  /** The empty row's name: a note taken from `[[`'s offer, a link typed in
+   *  its brackets, or a plain name. */
+  async function commitName(text: string, note: NoteEntry | null) {
+    named += 1;
+    const typed = note ? null : typedLink(text);
+    const index = note || typed ? await indexFor() : null;
+    // An alias typed is the GM's name for the row; without one, a note it
+    // names joins as a dropped note does.
+    const plain = typed && typed.name === linkName(typed.link);
+    const linked = note ?? (index && plain ? linkedNote(index, typed.link) : undefined);
+    if (linked && index) void addTo((e) => addNotes(e, [linked], index.notes));
+    else if (typed) void addTo((e) => addRow(e, typed.name, typed.link));
+    else void addTo((e) => addRow(e, note?.name ?? text));
+  }
+
+  /** A double-click on a linked name, or *Open note*: the note, in Command,
+   *  wherever it is. A link to nothing goes nowhere. */
+  async function openLinked(row: EncounterRow) {
+    const campaign = shown;
+    if (!campaign || !row.link) return;
+    const index = await indexFor();
+    const note = index && linkedNote(index, row.link);
+    if (note) await commandApi.openNote(campaign, note.path).catch((e) => console.error('Failed to open the note:', e));
   }
 
   /** Clearing is spending: the note is spent and stays in the campaign. */
@@ -395,6 +511,7 @@
       x: e.clientX,
       y: e.clientY,
       items: [
+        ...(row.link ? [action(m.foresight_open_note(), () => void openLinked(row))] : []),
         action(m.foresight_rename(), () => (renamingRow = row.name)),
         action(m.foresight_duplicate(), () => duplicate(row.name)),
         action(m.foresight_remove(), () => remove(row.name), true),
@@ -436,20 +553,78 @@
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   }
 
-  /** A row over row `i` (the empty row is the rows' length) points between
-   *  rows, by which half of the row the pointer is in. */
+  /** A row or a note over row `i` (the empty row is the rows' length)
+   *  points between rows, by which half of the row the pointer is in. */
   function overRow(e: DragEvent, i: number) {
-    if (draggingRow === null) return;
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const slot = i < rows.length && e.clientY >= box.top + box.height / 2 ? i + 1 : i;
+    if (draggingRow === null) {
+      overPanel(e, slot);
+      return;
+    }
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    rowDrop = i < rows.length && e.clientY >= box.top + box.height / 2 ? i + 1 : i;
+    rowDrop = slot;
   }
 
   function dropRow(e: DragEvent) {
+    if (draggingRow === null) return;
     e.preventDefault();
-    if (enc && draggingRow !== null && rowDrop !== null) change(moveRow(enc, draggingRow, rowDrop));
+    if (enc && rowDrop !== null) change(moveRow(enc, draggingRow, rowDrop));
     endDrag();
+  }
+
+  // ---- drags from Command ----------------------------------------------------
+
+  /** What a drag from Command carries, read while the event lasts. */
+  type Carry = { note: NoteEntry } | { paths: string[] } | { track: string };
+
+  function carryOf(e: DragEvent): Carry | null {
+    const data = e.dataTransfer;
+    if (!data) return null;
+    const note = isNoteDrag(e) ? draggedNote() : null;
+    if (note) return { note };
+    if (isCardDrag(e)) return { paths: data.getData(CARD_MIME).split('\n').filter(Boolean) };
+    if (isTrackDrag(e)) return { track: data.getData(TRACK_MIME) };
+    return null;
+  }
+
+  /** The carried notes as the campaign has them. A note from elsewhere, the
+   *  shelf's other campaigns, isn't one of them. */
+  function notesOf(carry: Carry, index: CampaignIndex): NoteEntry[] {
+    if ('track' in carry) return trackNotes(index, carry.track);
+    const paths = 'note' in carry ? [carry.note.path] : carry.paths;
+    return paths.flatMap((p) => index.notes.find((n) => n.path === p) ?? []);
+  }
+
+  /** Over the panel, a row's slot given or the end. Until the index is read
+   *  only a note's own entry says what the drop would do; rows, otherwise. */
+  function overPanel(e: DragEvent, slot: number) {
+    if (e.defaultPrevented || !shown) return;
+    const carry = carryOf(e);
+    if (!carry) return;
+    const notes = known ? notesOf(carry, known) : 'note' in carry ? [carry.note] : null;
+    const lands = notes ? landing(notes) : 'rows';
+    opening = lands === 'open';
+    rowDrop = lands === 'rows' ? slot : null;
+    if (lands === 'none') return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  }
+
+  async function dropOnPanel(e: DragEvent) {
+    const campaign = shown;
+    const carry = carryOf(e);
+    if (!campaign || !carry) return;
+    e.preventDefault();
+    const slot = rowDrop ?? undefined;
+    endDrag();
+    const index = await indexFor();
+    if (!index || shown !== campaign) return;
+    const notes = notesOf(carry, index);
+    const lands = landing(notes);
+    if (lands === 'open') void openEncounter(campaign, notes[0].path);
+    if (lands === 'rows') void addTo((t) => addNotes(t, notes.filter(isRowNote), index.notes, slot));
   }
 
   function startColumnDrag(e: DragEvent, c: number) {
@@ -468,8 +643,9 @@
   }
 
   function dropColumnAt(e: DragEvent) {
+    if (draggingColumn === null) return;
     e.preventDefault();
-    if (draggingColumn !== null && columnDrop !== null) {
+    if (columnDrop !== null) {
       const [from, to] = [draggingColumn, columnDrop];
       editColumns((t) => moveColumn(t, from, to));
     }
@@ -482,12 +658,14 @@
     rowDrop = null;
     draggingColumn = null;
     columnDrop = null;
+    opening = false;
   }
 
   function leave(e: DragEvent) {
     if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
       rowDrop = null;
       columnDrop = null;
+      opening = false;
     }
   }
 
@@ -532,10 +710,21 @@
     unbindKeys();
     clearTimeout(refreshTimer);
     void unlistenVault.then((stop) => stop());
+    void unlistenOpen.then((stop) => stop());
   });
 </script>
 
-<section class="foresight" class:dormant={$focusPath.tool !== 'foresight'} style:--grid={grid}>
+<section
+  class="foresight"
+  class:dormant={$focusPath.tool !== 'foresight'}
+  class:opening
+  role="presentation"
+  style:--grid={grid}
+  on:dragenter={(e) => carryOf(e) && void indexFor()}
+  on:dragover={(e) => overPanel(e, rows.length)}
+  on:dragleave={leave}
+  on:drop={dropOnPanel}
+>
   <header class="bar">
     <span class="title readout-label" title={enc?.name}>{enc?.name ?? ''}</span>
     <div class="well" role="group" aria-label={m.foresight_turn_label()}>
@@ -594,7 +783,7 @@
 
   <!-- The plate names the columns, the rows' names first; Command's track
        plates are edited the same way. -->
-  <div class="plate nameplate" role="presentation" on:dragleave={leave}>
+  <div class="plate nameplate">
     <span aria-hidden="true"></span>
     {#each columns as column, c (c)}
       {#if renamingColumn === c}
@@ -654,7 +843,7 @@
     >
   </div>
 
-  <ol class="rows" aria-label={m.foresight_rows_label()} on:dragleave={leave}>
+  <ol class="rows" aria-label={m.foresight_rows_label()}>
     {#each rows as row, i (row.name)}
       {@const playing = row.name === enc?.turn}
       {@const open = renamingRow === row.name || editing?.row === row.name}
@@ -687,7 +876,8 @@
             />
           </span>
         {:else}
-          <span class="name" title={row.name}>{row.name}</span>
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <span class="name" title={row.name} on:dblclick={() => void openLinked(row)}>{row.name}</span>
         {/if}
         {#each row.cells as cell, c (c)}
           {#if editing?.row === row.name && editing.col === c + 1}
@@ -737,14 +927,11 @@
       {#if naming}
         {#key named}
           <span class="field">
-            <InlineName
-              bare
+            <NameField
               placeholder={m.foresight_name_placeholder()}
               label={m.foresight_name_label()}
-              onCommit={(name) => {
-                named += 1;
-                void addNamed(name);
-              }}
+              notes={known?.notes ?? []}
+              onCommit={(text, note) => void commitName(text, note)}
               onCancel={() => (naming = false)}
             />
           </span>
@@ -755,7 +942,10 @@
           class="ghost"
           disabled={!shown}
           title={shown ? m.foresight_new_row_title() : m.foresight_no_campaign()}
-          on:click={() => (naming = true)}
+          on:click={() => {
+            naming = true;
+            void indexFor();
+          }}
         >
           {m.foresight_name_placeholder()}
         </button>
@@ -790,6 +980,12 @@
     flex-direction: column;
     background: var(--bg-app);
     color: var(--text-primary);
+  }
+
+  /* The dashed parchment of what a drop would become (BeatColumn .drop-into). */
+  .foresight.opening {
+    outline: var(--outline-drop);
+    outline-offset: -1px;
   }
 
   /* Augury's bar: the same height, inset and rule. */
@@ -1127,10 +1323,6 @@
 
   .field {
     font-size: 0.9rem;
-  }
-
-  .field :global(.inline-name::placeholder) {
-    font-style: italic;
   }
 
   /* Status bar section (Command's SessionStatus). */

@@ -1,6 +1,6 @@
 # Foresight (2026-11-03)
 
-**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Steps 1 and 2 built 2026-11-03 (§11). Two words are under review (§12).
+**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Steps 1 to 3 built 2026-11-03–05 (§11). Two words are under review (§12).
 
 ## 0. TL;DR
 
@@ -110,10 +110,11 @@ Goblins hide in the ditch; the boss stays on the ridge.
 
 ## 9. The link with Command
 
-- **A note dropped on Foresight joins as a row** linked to it: a track's row, a shelf row, a board card. Dropped between rows, it lands there; elsewhere, at the end.
+- **A note dropped on Foresight joins as a row** linked to it: a track's row, a shelf row, a tray card or a board card. Dropped between rows, it lands there; elsewhere, at the end.
 - **A track's nameplate dropped on Foresight adds all its notes,** so the PCs track brings the party in one move.
 - **The same note dropped again** adds the next number as an alias (§3).
 - **An encounter note dropped on Foresight opens it** (§8), whatever its track.
+- **A board card** is Svelte Flow's to drag, and no drag event leaves the board, so past its edge the board speaks a card drag's events itself (`noteDrag.ts` `carryCards`, `dropCards`). Taken by Foresight, the card goes back to its place on the board.
 - **These are the rack's first drops from one tool to another.** The drop reads Command's own drag payloads (`noteDrag.ts`, the track and card types), so later tools can take them the same way, such as a Legend Lore result dropped on Command. Drops don't cross windows (Command design D4), so when either tool is popped out:
   - **`[[` in the empty row** offers the campaign's note names, as Command's editor does;
   - **right-click on an encounter note** in Command has *Open in Foresight*, through Rust, as *Send to Command* crosses from Legend Lore.
@@ -126,7 +127,7 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - **Rows** drag to reorder (the row is the handle, `use:grab`). Right-click on a row: *Open note* (when linked), *Rename*, *Duplicate*, *Remove* (red).
 - **The settings store** keeps the open encounter per campaign (`foresightOpen`) and the last encounter's columns (`foresightColumns`), per machine. Everything else is in the note.
 - **The sidecar:** the encounter's reader and writer live beside Command's (`sidecar/command/encounter.py`, routes under `/api/command/encounter`), since an encounter is a note and shares the vault, the write lock, the hash check and the watcher. Parsing is lenient: a table Foresight can't read is shown as it is and left alone.
-- **Rust:** `command_*_encounter` commands in `command.rs`, as Augury's `command_draw_tracks` lives there; *Open in Foresight* crosses windows as `command_send` does.
+- **Rust:** `command_*_encounter` commands in `command.rs`, as Augury's `command_draw_tracks` lives there. *Open in Foresight* and opening a linked note cross windows as `command_send` does: `command_open_encounter` and `command_open_note` bring the tool forward and emit `foresight://open` or `command://open`. The campaign's index says which notes are encounters (`encounter`).
 - **The frontend:** `src/lib/foresight/`, `panels.ts` and `panels.rs` (rack minimum, pop-out size), `PanelView`. The first launch's view 2 puts Foresight under Augury, beside Command.
 - **The Servant** reads and edits encounters with the note tools it has (`read_note`, `find_notes`, `edit_note`, which keeps the frontmatter). Making one needs `round`, so an encounter tool waits (§14).
 
@@ -162,6 +163,16 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - ↓/J ↑/K with no row selected start from the turn's row. Esc lets go of the selection.
 - The row menu has *Rename* too; *Open note* waits for step 3.
 - At 270 px the name column keeps 4.5rem and the text columns give way; a column of figures is 2.9rem.
+
+**Filled in while building step 3 (2026-11-05), not yet discussed:**
+
+- A nameplate brings the track's notes still to play, in its column's order: no spent notes, images or encounters.
+- A repeat dropped comes in with empty cells; ⌘D is the way to copy them.
+- `[[` offers notes, not beats, sessions, images or encounters. A name typed in brackets joins as a dropped note does, a typed alias is kept, and a link to no note stays a link.
+- A spent encounter is refused: no outline, no *Open in Foresight*. Un-spending is Command's.
+- *Open in Foresight* is on track and shelf rows. A right-click on a board note card stands it up, so a board card opens by being dropped.
+- Several board cards carried together all join.
+- An encounter renamed or moved, in Command, Finder or Obsidian, is followed: when its path is gone, Foresight reads the campaign's encounters for the hash it holds. If the note's text changed in the same move, nothing matches and Foresight empties. A rename while Foresight isn't running isn't followed either: the stored path finds nothing, and Foresight opens empty.
 - The reader and writer in Command's sidecar package rather than a package of their own (§10).
 
 ## 13. Settled (2026-11-01–03)

@@ -591,6 +591,8 @@ pub fn run() {
             command::command_read_encounter,
             command::command_save_encounter,
             command::command_create_encounter,
+            command::command_open_note,
+            command::command_open_encounter,
             command::command_set_spend_on_launch,
             command::command_get_board,
             command::command_edit_board,

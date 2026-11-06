@@ -4,7 +4,9 @@
 // here, pure: whose turn comes next, the round, the rows out of the fight.
 
 import { invoke } from '@tauri-apps/api/core';
-import type { SaveOutcome } from '../command/types';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { columns } from '../command/columns';
+import type { CampaignIndex, NoteEntry, SaveOutcome } from '../command/types';
 
 export interface EncounterRow {
   name: string;
@@ -46,6 +48,11 @@ export const encounterApi = {
   create: (campaign: string, columns: string[], rows: EncounterRow[]) =>
     invoke<Encounter>('command_create_encounter', { campaign, columns, rows }),
 };
+
+/** Command asks Foresight to open an encounter (commandApi.openEncounter). */
+export function onOpenEncounter(handler: (at: { campaign: string; path: string }) => void): Promise<UnlistenFn> {
+  return listen<{ campaign: string; path: string }>('foresight://open', (e) => handler(e.payload));
+}
 
 /** The turn passed `by` one row, forward or back, over the rows out of the
  *  fight. Past the last row it wraps to the first and the round counts up;
@@ -93,13 +100,18 @@ export function freeName(wanted: string, rows: EncounterRow[]): string {
   return candidate;
 }
 
-/** A row named `name` added at the end, with an empty cell for each column
- *  after the first. The turn is its when no row had it. */
-export function addRow(e: Encounter, name: string): Encounter {
-  const row: EncounterRow = { name: freeName(name, e.rows), link: null, out: false, cells: e.columns.slice(1).map(() => '') };
-  const rows = [...e.rows, row];
-  const holder = e.rows.find((r) => r.name === e.turn);
+/** The encounter with `rows`, the turn going to the first in the fight when
+ *  no row in the fight had it. */
+function withRows(e: Encounter, rows: EncounterRow[]): Encounter {
+  const holder = rows.find((r) => r.name === e.turn);
   return { ...e, rows, turn: holder && !holder.out ? e.turn : (rows.find((r) => !r.out)?.name ?? null) };
+}
+
+/** A row named `name` added at the end, linked to `link` when it has one,
+ *  with an empty cell for each column after the first. */
+export function addRow(e: Encounter, name: string, link: string | null = null): Encounter {
+  const row: EncounterRow = { name: freeName(name, e.rows), link, out: false, cells: e.columns.slice(1).map(() => '') };
+  return withRows(e, [...e.rows, row]);
 }
 
 // ---- cells -------------------------------------------------------------------
@@ -241,3 +253,82 @@ export function moveColumn<T extends Table>(t: T, c: number, to: number): T {
     rows: t.rows.map((r) => ({ ...r, cells: order.slice(1).map((i) => r.cells[i - 1] ?? '') })),
   };
 }
+
+// ---- the link with Command ---------------------------------------------------
+
+/** What a link with no alias shows: its note's name, without folders,
+ *  heading or `.md` (encounter.py `_shown`). */
+export function linkName(link: string): string {
+  const target = link.split(/[#^]/, 1)[0].trim();
+  return (target.split('/').at(-1) ?? '').replace(/\.md$/, '');
+}
+
+/** The link a row writes for `note`: its name, or its path when another note
+ *  shares the name, so Obsidian opens this one (prep.py `_link`). */
+export function linkTo(note: NoteEntry, notes: NoteEntry[]): string {
+  const name = note.name.toLocaleLowerCase();
+  const shared = notes.some((n) => n.path !== note.path && n.name.toLocaleLowerCase() === name);
+  return shared ? note.path.replace(/\.md$/, '') : note.name;
+}
+
+/** Whether a row can stand for `note`: not an image, an encounter, a beat
+ *  or a session. */
+export function isRowNote(note: NoteEntry): boolean {
+  const track = note.track?.toLocaleLowerCase();
+  return note.type === 'note' && !note.encounter && track !== 'beats' && track !== 'sessions';
+}
+
+/** `notes` as rows from `at` (the end when it's past the rows). A note a row
+ *  links to already comes in as the next number, its alias: Goblin 2. */
+export function addNotes(e: Encounter, notes: NoteEntry[], all: NoteEntry[], at = e.rows.length): Encounter {
+  const added: EncounterRow[] = [];
+  for (const note of notes) {
+    const rows = [...e.rows, ...added];
+    const name = note.name.toLocaleLowerCase();
+    const again = rows.some((r) => r.link !== null && linkName(r.link).toLocaleLowerCase() === name);
+    added.push({
+      name: again ? nextNumbered(note.name, rows) : freeName(note.name, rows),
+      link: linkTo(note, all),
+      out: false,
+      cells: e.columns.slice(1).map(() => ''),
+    });
+  }
+  const to = Math.min(at, e.rows.length);
+  return withRows(e, [...e.rows.slice(0, to), ...added, ...e.rows.slice(to)]);
+}
+
+/** A track's notes for a nameplate dropped on Foresight: those still to
+ *  play, as its column shows them, that a row can stand for. */
+export function trackNotes(index: CampaignIndex, track: string): NoteEntry[] {
+  const column = columns(index).find((c) => c.track === track);
+  return (column?.groups ?? []).flatMap((g) => g.notes).filter(isRowNote);
+}
+
+/** What notes carried onto Foresight do: open the one encounter, join as
+ *  rows, or nothing (an image alone; a spent encounter, Command's to
+ *  un-spend). */
+export function landing(notes: NoteEntry[]): 'open' | 'rows' | 'none' {
+  if (notes.length === 1 && notes[0].encounter) return notes[0].spent ? 'none' : 'open';
+  return notes.some(isRowNote) ? 'rows' : 'none';
+}
+
+/** The notes `[[` offers for `typed`: names starting with it first, then
+ *  names holding it, at most eight. */
+export function completions(notes: NoteEntry[], typed: string): NoteEntry[] {
+  const q = typed.trim().toLocaleLowerCase();
+  const names = notes.filter(isRowNote).map((note) => ({ note, name: note.name.toLocaleLowerCase() }));
+  const hits = names.filter((n) => n.name.includes(q));
+  hits.sort((a, b) => Number(b.name.startsWith(q)) - Number(a.name.startsWith(q)) || a.name.localeCompare(b.name));
+  return hits.slice(0, 8).map((n) => n.note);
+}
+
+/** The link in a name typed with its brackets, closed or not, an alias
+ *  naming the row; null for a plain name. */
+export function typedLink(text: string): { link: string; name: string } | null {
+  const m = /^\[\[([^[\]]+?)(?:\]\]?)?$/.exec(text.trim());
+  if (!m) return null;
+  const [target, alias] = m[1].split(/\\?\|/, 2);
+  const link = target.trim();
+  return link ? { link, name: alias?.trim() || linkName(link) } : null;
+}
+

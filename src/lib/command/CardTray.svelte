@@ -13,6 +13,7 @@
   import { grab } from '../ui/grab';
   import CardFace from './CardFace.svelte';
   import { handPlace, handShift, handStep, type Card, type CardData } from './board';
+  import { CARD_MIME, isCardDrag } from './noteDrag';
   import { m } from '../paraglide/messages';
 
   /** The hand: the board's cards for the live set (handOf). */
@@ -75,9 +76,6 @@
   // as a carried row is, in the place nearest where it rides. Nothing is
   // pointed at meanwhile, so no card grows up over the board. Off the
   // hand, it shows back in its own place, where a drop leaves it.
-  const CARD_MIME = 'application/x-command-tray-card';
-  const isCardDrag = (e: DragEvent) =>
-    Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === CARD_MIME);
 
   /** The card carried and the place it shows at: while it's carried and,
    *  once dropped, until the live set answers in its new order. */

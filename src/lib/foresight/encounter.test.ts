@@ -1,11 +1,18 @@
 import { describe, expect, test } from 'vitest';
+import type { CampaignIndex, NoteEntry } from '../command/types';
 import {
   addColumn,
+  addNotes,
   addRow,
+  completions,
   duplicateRow,
   enterCell,
   freeName,
   isFigures,
+  isRowNote,
+  landing,
+  linkName,
+  linkTo,
   moveColumn,
   moveRow,
   nextNumbered,
@@ -16,6 +23,8 @@ import {
   setCell,
   step,
   toggleOut,
+  trackNotes,
+  typedLink,
   type Encounter,
   type EncounterRow,
 } from './encounter';
@@ -199,3 +208,101 @@ describe('columns', () => {
     expect(moveColumn(table(), 2, 0)).toEqual(table());
   });
 });
+
+describe('the link with Command', () => {
+  const note = (path: string, more: Partial<NoteEntry> = {}): NoteEntry => ({
+    name: path.split('/').at(-1)!.replace(/\.md$/, ''),
+    path,
+    track: path.includes('/') ? path.split('/')[0] : null,
+    group: null,
+    spent: null,
+    source: null,
+    type: 'note',
+    encounter: false,
+    ...more,
+  });
+  const goblin = note('Monsters/Goblin.md');
+  const kira = note('PCs/Kira.md');
+
+  test('a link shows its note name', () => {
+    expect(linkName('Monsters/Goblin')).toBe('Goblin');
+    expect(linkName('Goblin#Tactics')).toBe('Goblin');
+    expect(linkName('Goblin.md')).toBe('Goblin');
+  });
+
+  test('a link is the name, or the path when another note shares it', () => {
+    expect(linkTo(goblin, [goblin, kira])).toBe('Goblin');
+    expect(linkTo(goblin, [goblin, note('Beats/Goblin.md')])).toBe('Monsters/Goblin');
+  });
+
+  test('a row stands for a note, not an image, an encounter, a beat or a session', () => {
+    expect(isRowNote(goblin)).toBe(true);
+    expect(isRowNote(note('Maps/Keep.png', { type: 'image' }))).toBe(false);
+    expect(isRowNote(note('Encounters/Encounter 1.md', { encounter: true }))).toBe(false);
+    expect(isRowNote(note('Beats/Ambush.md'))).toBe(false);
+    expect(isRowNote(note('Sessions/Session 1.md'))).toBe(false);
+  });
+
+  test('notes join linked, between rows or at the end, and the turn stays', () => {
+    const e = enc([row('A'), row('B')], 'B');
+    const got = addNotes(e, [goblin, kira], [goblin, kira], 1);
+    expect(got.rows.map((r) => [r.name, r.link])).toEqual([
+      ['A', null],
+      ['Goblin', 'Goblin'],
+      ['Kira', 'Kira'],
+      ['B', null],
+    ]);
+    expect(got.rows[1].cells).toEqual(['', '']);
+    expect(got.turn).toBe('B');
+    expect(addNotes(e, [goblin], [goblin], 99).rows.at(-1)?.name).toBe('Goblin');
+  });
+
+  test('the same note again takes the next number as its alias', () => {
+    const once = addNotes(enc([], null), [goblin], [goblin]);
+    expect(once.turn).toBe('Goblin');
+    const twice = addNotes(once, [goblin], [goblin]);
+    expect(twice.rows[1]).toMatchObject({ name: 'Goblin 2', link: 'Goblin' });
+    const numbered = enc([{ ...row('Goblin 1'), link: 'Goblin' }, { ...row('Goblin 3'), link: 'Monsters/Goblin' }], 'Goblin 1');
+    expect(addNotes(numbered, [goblin], [goblin]).rows[2].name).toBe('Goblin 4');
+    // A typed row of that name is no link: the note takes the free name.
+    expect(addNotes(enc([row('Goblin')], 'Goblin'), [goblin], [goblin]).rows[1].name).toBe('Goblin 2');
+  });
+
+  test('a track brings its notes still to play, as its column shows them', () => {
+    const index = {
+      name: 'C',
+      tracks: ['PCs', 'Maps'],
+      notes: [kira, note('PCs/Bram.md'), note('PCs/Odo.md', { spent: '2026-11-01' }), note('Maps/Keep.png', { type: 'image' })],
+      note_order: { PCs: ['Kira', 'Bram'] },
+    } as unknown as CampaignIndex;
+    expect(trackNotes(index, 'PCs').map((n) => n.name)).toEqual(['Kira', 'Bram']);
+    expect(trackNotes(index, 'Maps')).toEqual([]);
+    expect(trackNotes(index, 'Gone')).toEqual([]);
+  });
+
+  test('one encounter opens, a spent one stays Command\'s, and notes join', () => {
+    const encounter = note('Encounters/Encounter 1.md', { encounter: true });
+    expect(landing([encounter])).toBe('open');
+    expect(landing([{ ...encounter, spent: '2026-11-01' }])).toBe('none');
+    expect(landing([goblin])).toBe('rows');
+    expect(landing([goblin, encounter])).toBe('rows');
+    expect(landing([note('Maps/Keep.png', { type: 'image' })])).toBe('none');
+    expect(landing([])).toBe('none');
+  });
+
+  test('[[ offers names starting with what is typed first, and no more than eight', () => {
+    const notes = [note('NPCs/Hobgoblin.md'), goblin, note('Monsters/Goblin boss.md'), kira, note('Encounters/Goblins.md', { encounter: true })];
+    expect(completions(notes, 'gob').map((n) => n.name)).toEqual(['Goblin', 'Goblin boss', 'Hobgoblin']);
+    expect(completions(notes, '').length).toBe(4);
+    expect(completions(Array.from({ length: 12 }, (_, i) => note(`NPCs/N${i}.md`)), 'n')).toHaveLength(8);
+  });
+
+  test('a name typed in brackets is a link, closed or not', () => {
+    expect(typedLink('[[Kira]]')).toEqual({ link: 'Kira', name: 'Kira' });
+    expect(typedLink('[[Monsters/Goblin')).toEqual({ link: 'Monsters/Goblin', name: 'Goblin' });
+    expect(typedLink('[[Goblin|Sneak]]')).toEqual({ link: 'Goblin', name: 'Sneak' });
+    expect(typedLink('Kira')).toBeNull();
+    expect(typedLink('[[')).toBeNull();
+  });
+});
+

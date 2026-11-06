@@ -1562,5 +1562,8 @@
   "foresight_column_new_label": "The new column's name",
   "foresight_column_rename_label": "Rename the column {column}",
   "foresight_remove_column_title": "Remove the column {column}?",
-  "foresight_remove_column_message": "Its cells go with it, in every row of this encounter."
+  "foresight_remove_column_message": "Its cells go with it, in every row of this encounter.",
+  "command_tracks_open_in_foresight": "Open in Foresight",
+  "command_shelf_open_in_foresight": "Open in Foresight",
+  "foresight_open_note": "Open note"
 }

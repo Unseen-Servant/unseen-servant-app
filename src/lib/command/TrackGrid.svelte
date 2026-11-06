@@ -24,7 +24,7 @@
   import { action, divider, keyed, picks, submenu, type MenuItem, type OpenMenu } from './menu';
   import { PIGMENTS } from '../legend-lore/palette';
   import { carriesFiles, droppedImages } from './embeds';
-  import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
+  import { TRACK_MIME, draggedNote, endNoteDrag, isNoteDrag, isTrackDrag, startNoteDrag } from './noteDrag';
   import { planMoveTo } from './prep';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import { m } from '../paraglide/messages';
@@ -81,6 +81,8 @@
   export let onDropImages: (files: File[], track: string) => void;
   /** A folder's notes by name, in the order they were dragged into. */
   export let onReorderNotes: (folder: string, names: string[]) => void;
+  /** *Open in Foresight*, on an encounter still to play. */
+  export let onOpenEncounter: (note: NoteEntry) => void;
 
   /** How many of each track's notes the focused beat holds, for its plate. */
   $: inBeat = new Map(
@@ -198,6 +200,7 @@
       x,
       y,
       items: [
+        ...(note.encounter && !note.spent ? [action(m.command_tracks_open_in_foresight(), () => onOpenEncounter(note))] : []),
         // An image isn't spent (images design §2).
         ...(note.type === 'image' ? [] : [keyed(note.spent ? m.command_tracks_mark_unspent() : m.command_tracks_mark_spent(), 'command.spend', () => onSpent(note, !note.spent)), divider]),
         // In the columns' order: the shelf at the left, then the tracks.
@@ -224,9 +227,6 @@
   // other group's, in this column or another, it moves to that folder in
   // that place, an order the campaign keeps. Dropped elsewhere on another
   // track's column, it moves to that track.
-  const TRACK_MIME = 'application/x-command-track';
-  const isTrackDrag = (e: DragEvent) =>
-    Array.from(e.dataTransfer?.types ?? []).some((t) => t.toLowerCase() === TRACK_MIME);
 
   let draggingTrack: string | null = null;
   /** Where the dragged track lands: before column `dropAt`, or after the last. */

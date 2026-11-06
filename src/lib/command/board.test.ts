@@ -4,7 +4,7 @@ import type { BoardView, CampaignIndex, NoteEntry } from './types';
 
 const note = (path: string): NoteEntry => {
   const parts = path.split('/');
-  return { name: parts[parts.length - 1].replace(/\.md$/, ''), path, track: parts.length > 1 ? parts[0] : null, group: null, spent: null, source: null, type: path.endsWith('.md') ? 'note' : 'image' };
+  return { name: parts[parts.length - 1].replace(/\.md$/, ''), path, track: parts.length > 1 ? parts[0] : null, group: null, spent: null, source: null, encounter: false, type: path.endsWith('.md') ? 'note' : 'image' };
 };
 
 const index: CampaignIndex = {

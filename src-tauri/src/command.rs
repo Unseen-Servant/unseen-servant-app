@@ -21,6 +21,12 @@ pub const VAULT_EVENT: &str = "command://vault";
 /// whole snapshot. `seq` grows with every change to that campaign's set.
 pub const LIVE_EVENT: &str = "command://live";
 
+/// To every window: show this note in Command, `{ campaign, path }`.
+pub const OPEN_NOTE_EVENT: &str = "command://open";
+
+/// To every window: open this encounter in Foresight, `{ campaign, path }`.
+pub const OPEN_ENCOUNTER_EVENT: &str = "foresight://open";
+
 /// Generous: a rename rewrites links across every note in the campaign.
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// Short: quitting waits on it, and a blank folder is all a timeout costs.
@@ -57,6 +63,9 @@ pub struct NoteEntry {
     /// "note", or "image" for a picture a track holds (images design §3).
     #[serde(rename = "type")]
     kind: String,
+    /// Its frontmatter has `round`: Foresight opens it (Foresight design §3).
+    #[serde(default)]
+    encounter: bool,
 }
 
 /// A link from a beat or a session's plan: the name it gives, and the note
@@ -802,6 +811,44 @@ pub async fn command_create_encounter(
     .await
 }
 
+/// What one tool asks of the other: a note of a campaign, to show.
+#[derive(Serialize, Clone, Debug)]
+struct OpenAt {
+    campaign: String,
+    path: String,
+}
+
+/// Bring `tool` forward and hand it the note. A crossing between the tools'
+/// windows, so it goes through Rust as Send to Command's does: either tool
+/// may be popped out, and drops don't cross windows.
+fn open_in(
+    app: &AppHandle,
+    tool: &str,
+    event: &str,
+    campaign: String,
+    path: String,
+) -> Result<(), String> {
+    crate::panels::show_panel(app, tool);
+    app.emit(event, OpenAt { campaign, path })
+        .map_err(|e| e.to_string())
+}
+
+/// Foresight's double-click on a linked name: the note, in Command.
+#[tauri::command]
+pub fn command_open_note(app: AppHandle, campaign: String, path: String) -> Result<(), String> {
+    open_in(&app, "command", OPEN_NOTE_EVENT, campaign, path)
+}
+
+/// Command's *Open in Foresight* on an encounter note.
+#[tauri::command]
+pub fn command_open_encounter(
+    app: AppHandle,
+    campaign: String,
+    path: String,
+) -> Result<(), String> {
+    open_in(&app, "foresight", OPEN_ENCOUNTER_EVENT, campaign, path)
+}
+
 // -- play: the board, the live set, jots ------------------------------------
 
 /// A session's board: JSON Canvas `nodes` and `edges` exactly as on disk,
@@ -1294,9 +1341,9 @@ mod tests {
         let sidecar = serde_json::json!({
             "name": "Strahd", "tracks": ["NPCs"], "ambiguous": [],
             "notes": [{"name": "Ismark", "path": "NPCs/Ismark.md", "track": "NPCs", "group": null, "spent": "2026-10-18",
-                       "source": "file:///b.pdf#page=3", "type": "note"},
+                       "source": "file:///b.pdf#page=3", "type": "note", "encounter": true},
                       {"name": "Barovia.png", "path": "Maps/Barovia.png", "track": "Maps", "group": null, "spent": null,
-                       "source": null, "type": "image"}],
+                       "source": null, "type": "image", "encounter": false}],
             "note_order": {"NPCs": ["Ismark", "Ireena"]},
             "pigments": {"NPCs": "#d07c87"},
             "beats": [{"name": "Ambush", "path": "Beats/Ambush.md", "spent": null,

@@ -51,6 +51,13 @@ def test_index_reads_spent_marks(camp):
     assert notes["NPCs/Ismark.md"]["spent"] is None
 
 
+def test_index_says_which_notes_are_encounters(camp):
+    write(camp / "Encounters" / "Ambush.md", "---\nround: 2\n---\n")
+    notes = {n["path"]: n for n in prep.index(camp)["notes"]}
+    assert notes["Encounters/Ambush.md"]["encounter"] is True
+    assert notes["NPCs/Ismark.md"]["encounter"] is False
+
+
 def test_index_resolves_beat_members_however_they_are_spelled(camp):
     ambush = next(b for b in prep.index(camp)["beats"] if b["name"] == "Ambush")
     assert ambush["notes"] == [

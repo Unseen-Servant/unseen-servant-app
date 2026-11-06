@@ -15,6 +15,8 @@ export interface NoteEntry {
   /** A note, or an image a track or the shelf holds: a clip too, named
    *  with its extension and never spent (images design §3). */
   type: 'note' | 'image';
+  /** Its frontmatter has `round`: Foresight opens it. */
+  encounter: boolean;
 }
 
 /** A link in a beat or a plan: the name it gives and the note it resolves

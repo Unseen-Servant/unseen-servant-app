@@ -112,6 +112,10 @@ export const commandApi = {
     }),
   setSpent: (campaign: string, path: string, spent: boolean) =>
     invoke<string | null>('command_set_spent', { campaign, path, spent }),
+  /** Bring Command forward with this note open, from any window. */
+  openNote: (campaign: string, path: string) => invoke<void>('command_open_note', { campaign, path }),
+  /** Bring Foresight forward with this encounter open, from any window. */
+  openEncounter: (campaign: string, path: string) => invoke<void>('command_open_encounter', { campaign, path }),
   setSpendOnLaunch: (enabled: boolean) => invoke<CommandSettings>('command_set_spend_on_launch', { enabled }),
   getBoard: (campaign: string, session: string) => invoke<BoardView>('command_get_board', { campaign, session }),
   editBoard: (campaign: string, session: string, ops: BoardOp[]) =>
@@ -134,6 +138,11 @@ export const commandApi = {
 /** Follow every campaign's live set, relayed by Rust as whole snapshots. */
 export function onLiveChange(handler: (live: LiveSet) => void): Promise<UnlistenFn> {
   return listen<LiveSet>('command://live', (e) => handler(e.payload));
+}
+
+/** Another tool asks for a note (commandApi.openNote). */
+export function onOpenNote(handler: (at: { campaign: string; path: string }) => void): Promise<UnlistenFn> {
+  return listen<{ campaign: string; path: string }>('command://open', (e) => handler(e.payload));
 }
 
 /** Follow the campaign folder's change events, relayed by Rust. */
