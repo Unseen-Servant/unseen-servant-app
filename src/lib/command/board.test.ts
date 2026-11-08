@@ -14,6 +14,7 @@ const index: CampaignIndex = {
   note_order: {},
   pigments: {},
   kinds: {},
+  encounter_columns: {},
   ambiguous: [],
   beats: [],
   sessions: [],

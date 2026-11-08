@@ -1,5 +1,5 @@
 // Foresight's encounter (docs/roadmap/2026-11-03-foresight-design.md): a note
-// whose table is the tracker, read and written by the sidecar
+// in an encounter track, whose table is the tracker, read and written by the sidecar
 // (sidecar/command/encounter.py) through Rust (command.rs). The turn logic is
 // here, pure: whose turn comes next, the round, the rows out of the fight.
 
@@ -22,6 +22,8 @@ export interface EncounterRow {
 export interface Encounter {
   path: string;
   name: string;
+  /** The encounter track holding it. */
+  track: string;
   /** The version read, which a save is checked against. */
   hash: string;
   spent: string | null;
@@ -45,8 +47,13 @@ export const encounterApi = {
       columns: e.columns,
       rows: e.rows,
     }),
-  create: (campaign: string, columns: string[], rows: EncounterRow[]) =>
-    invoke<Encounter>('command_create_encounter', { campaign, columns, rows }),
+  /** In `track`, or with none the campaign's first encounter track, or a new
+   *  one. */
+  create: (campaign: string, track: string | null, columns: string[], rows: EncounterRow[]) =>
+    invoke<Encounter>('command_create_encounter', { campaign, track, columns, rows }),
+  /** The columns `track`'s next encounter takes. */
+  saveColumns: (campaign: string, track: string, columns: string[]) =>
+    invoke<void>('command_save_encounter_columns', { campaign, track, columns }),
 };
 
 /** Command asks Foresight to open an encounter (commandApi.openEncounter). */
@@ -302,6 +309,33 @@ export function addNotes(e: Encounter, notes: NoteEntry[], all: NoteEntry[], at 
 export function trackNotes(index: CampaignIndex, track: string): NoteEntry[] {
   const column = columns(index).find((c) => c.track === track);
   return (column?.groups ?? []).flatMap((g) => g.notes).filter(isRowNote);
+}
+
+/** The campaign's encounter tracks, in its order. */
+export function encounterTracks(index: CampaignIndex): string[] {
+  return index.tracks.filter((t) => index.kinds[t] === 'encounter');
+}
+
+/** The track `by` along from `from`, wrapping as Augury's sets do. From a
+ *  track that's gone, the first or the last. */
+export function stepTrack(tracks: string[], from: string | null, by: 1 | -1): string | null {
+  if (!tracks.length) return null;
+  const at = from === null ? -1 : tracks.indexOf(from);
+  if (at < 0) return by > 0 ? tracks[0] : tracks[tracks.length - 1];
+  return tracks[(at + by + tracks.length) % tracks.length];
+}
+
+/** A track's encounters still to run, as its column shows them. */
+export function trackEncounters(index: CampaignIndex, track: string): NoteEntry[] {
+  const column = columns(index).find((c) => c.track === track);
+  return (column?.groups ?? []).flatMap((g) => g.notes).filter((n) => n.encounter);
+}
+
+/** The encounter to open on arriving at a track: the one last open there
+ *  while it's still to run, else the track's first. */
+export function arrival(index: CampaignIndex, track: string, last: string | undefined): string | null {
+  const notes = trackEncounters(index, track);
+  return notes.find((n) => n.path === last)?.path ?? notes[0]?.path ?? null;
 }
 
 /** What notes carried onto Foresight do: open the one encounter, join as

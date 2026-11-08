@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columns, folderOrder, isAmbiguous, linkableNames, linkedNote, nameParts, placeableNotes } from './columns';
+import { columns, fitsTrack, folderOrder, isAmbiguous, linkableNames, linkedNote, nameParts, placeableNotes } from './columns';
 import { insertion, openTarget } from './wikilinks';
 import type { CampaignIndex, NoteEntry } from './types';
 
@@ -28,6 +28,7 @@ const index: CampaignIndex = {
   note_order: {},
   pigments: {},
   kinds: {},
+  encounter_columns: {},
   ambiguous: ['NPCs/Barovia/Doru.md'],
   beats: [],
   sessions: [],
@@ -121,6 +122,17 @@ describe('columns', () => {
     expect(names('i')).toEqual(['ireena', 'Ismark', 'Overview', 'Session 9', 'Session 10']);
     expect(names('am')).toEqual([]);
     expect(placeableNotes(index, '', 2)).toHaveLength(2);
+  });
+});
+
+describe('fitsTrack', () => {
+  it('takes images in an image track, notes in any other', () => {
+    expect(fitsTrack('image', 'image')).toBe(true);
+    expect(fitsTrack('image', 'note')).toBe(false);
+    expect(fitsTrack('note', 'note')).toBe(true);
+    expect(fitsTrack('encounter', 'note')).toBe(true);
+    expect(fitsTrack('encounter', 'image')).toBe(false);
+    expect(fitsTrack(undefined, 'note')).toBe(true);
   });
 });
 

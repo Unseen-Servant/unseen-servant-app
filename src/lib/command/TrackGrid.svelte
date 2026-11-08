@@ -28,8 +28,8 @@
   import { planMoveTo } from './prep';
   import { CARET_RIGHT } from '../ui/iconPaths';
   import { m } from '../paraglide/messages';
-  import { folderOrder, nameParts, newRowKey, type Column, type NoteGroup } from './columns';
-  import type { NoteEntry } from './types';
+  import { fitsTrack, folderOrder, nameParts, newRowKey, type Column, type NoteGroup } from './columns';
+  import type { NoteEntry, TrackKind } from './types';
 
   /** Where a menu opened from the keyboard sits: in from the row's edge,
    *  under it, where a right-click would land. */
@@ -39,7 +39,7 @@
   /** Each track's pigment, by name. */
   export let pigments: Record<string, string>;
   /** What each track makes, by name: notes, or images (images design §3.2). */
-  export let kinds: Record<string, 'note' | 'image'>;
+  export let kinds: Record<string, TrackKind>;
   export let openPath: string | null;
   /** Notes in the focused beat. */
   export let members: Set<string>;
@@ -68,7 +68,7 @@
   export let onRevealNote: (note: NoteEntry) => void;
   /** A new track named, holding notes or images, after the track `after`
    *  or, with none, at the end. */
-  export let onCreateTrack: (name: string, kind: 'note' | 'image', after: string | null) => void;
+  export let onCreateTrack: (name: string, kind: TrackKind, after: string | null) => void;
   export let onRenameTrack: (track: string, name: string) => Promise<string | null>;
   export let onTrashTrack: (column: Column) => void;
   export let onRevealTrack: (track: string) => void;
@@ -92,7 +92,7 @@
   let creatingIn: string | null = null;
   /** A track being named: what it holds, and the track it goes after (null:
    *  at the end). */
-  let inserting: { kind: 'note' | 'image'; after: string | null } | null = null;
+  let inserting: { kind: TrackKind; after: string | null } | null = null;
   /** Where its column stands: after that track, or in the ghost column at
    *  the end when it goes last. */
   $: insertAfter =
@@ -100,16 +100,17 @@
       ? inserting.after
       : null;
 
-  /** Insert a track holding notes or images, named in place: Ableton's
-   *  Insert Audio and MIDI Track (images design §3.2). Its kind is chosen
-   *  here, as a Live track's is. */
-  export function insertTrack(kind: 'note' | 'image', after: string | null = null) {
+  /** Insert a track holding notes, images or encounters, named in place:
+   *  Ableton's Insert Audio and MIDI Track (images design §3.2). Its kind is
+   *  chosen here, as a Live track's is. */
+  export function insertTrack(kind: TrackKind, after: string | null = null) {
     inserting = { kind, after };
   }
 
   const insertItems = (after: string | null): MenuItem[] => [
     keyed(m.command_tracks_insert_note(), 'command.insertNoteTrack', () => insertTrack('note', after)),
     keyed(m.command_tracks_insert_image(), 'command.insertImageTrack', () => insertTrack('image', after)),
+    action(m.command_tracks_insert_encounter(), () => insertTrack('encounter', after)),
   ];
 
   /** `+ track`: which kind, in a menu under the key. */
@@ -159,7 +160,7 @@
   /** Whether a note, or an image, files onto `track`: only onto a track of
    *  its kind, as Live keeps audio clips off MIDI tracks (images design
    *  §3.2). The shelf takes both. */
-  const fits = (note: NoteEntry, track: string) => (kinds[track] ?? 'note') === note.type;
+  const fits = (note: NoteEntry, track: string) => fitsTrack(kinds[track], note.type);
 
   /** ⌘N on a note of the grid: a new one named in its track's empty row;
    *  an image track asks for pictures, as its row does. */
@@ -504,8 +505,8 @@
     <span class="track-number" aria-hidden="true">{number}</span>
     <InlineName
       bare
-      placeholder={inserting?.kind === 'image' ? m.command_tracks_image_track_name() : m.command_tracks_track_name()}
-      label={inserting?.kind === 'image' ? m.command_tracks_new_image_track() : m.command_tracks_new_track()}
+      placeholder={inserting?.kind === 'image' ? m.command_tracks_image_track_name() : inserting?.kind === 'encounter' ? m.command_tracks_encounter_track_name() : m.command_tracks_track_name()}
+      label={inserting?.kind === 'image' ? m.command_tracks_new_image_track() : inserting?.kind === 'encounter' ? m.command_tracks_new_encounter_track() : m.command_tracks_new_track()}
       onCommit={(name) => {
         const { kind, after } = inserting!;
         inserting = null;

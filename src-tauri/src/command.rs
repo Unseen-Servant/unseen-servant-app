@@ -63,7 +63,7 @@ pub struct NoteEntry {
     /// "note", or "image" for a picture a track holds (images design §3).
     #[serde(rename = "type")]
     kind: String,
-    /// Its frontmatter has `round`: Foresight opens it (Foresight design §3).
+    /// It's in an encounter track: Foresight opens it (Foresight design §3).
     #[serde(default)]
     encounter: bool,
 }
@@ -108,9 +108,14 @@ pub struct CampaignIndex {
     /// Every image in the campaign, by path, for notes' embeds (#407).
     #[serde(default)]
     images: Vec<String>,
-    /// Each track's kind, "note" or "image" (images design §3.2).
+    /// Each track's kind, "note", "image" or "encounter" (images design
+    /// §3.2, Foresight design §3).
     #[serde(default)]
     kinds: std::collections::BTreeMap<String, String>,
+    /// The columns each encounter track's next encounter takes (Foresight
+    /// design §6).
+    #[serde(default)]
+    encounter_columns: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// A place's notes, as a campaign's index lists them.
@@ -213,6 +218,8 @@ pub struct EncounterRow {
 pub struct Encounter {
     path: String,
     name: String,
+    /// The encounter track that holds it.
+    track: String,
     hash: String,
     spent: Option<String>,
     round: u32,
@@ -798,17 +805,33 @@ pub async fn command_save_encounter(
     save_outcome(status, &body)
 }
 
-/// A new encounter, `Encounter N` in the Encounters track, holding `rows`.
+/// A new encounter in `track`, named after it, holding `rows`. With no track
+/// named, the campaign's first encounter track, or a new one.
 #[tauri::command]
 pub async fn command_create_encounter(
     campaign: String,
+    track: Option<String>,
     columns: Vec<String>,
     rows: Vec<EncounterRow>,
 ) -> Result<Encounter, String> {
     answer(client().post(api("/encounter")).json(&serde_json::json!({
-        "campaign": campaign, "columns": columns, "rows": rows,
+        "campaign": campaign, "track": track, "columns": columns, "rows": rows,
     })))
     .await
+}
+
+/// The columns `track`'s next encounter takes, kept with the campaign.
+#[tauri::command]
+pub async fn command_save_encounter_columns(
+    campaign: String,
+    track: String,
+    columns: Vec<String>,
+) -> Result<(), String> {
+    answer::<serde_json::Value>(client().put(api("/tracks/columns")).json(&serde_json::json!({
+        "campaign": campaign, "track": track, "columns": columns,
+    })))
+    .await
+    .map(|_| ())
 }
 
 /// What one tool asks of the other: a note of a campaign, to show.
@@ -1351,7 +1374,8 @@ mod tests {
             "sessions": [{"name": "Session 1", "path": "Sessions/Session 1.md", "date": "2026-10-18",
                           "beats": [{"link": "Ambush", "path": "Beats/Ambush.md"}]}],
             "images": ["Maps/Barovia.png"],
-            "kinds": {"Maps": "image", "NPCs": "note"},
+            "kinds": {"Maps": "image", "NPCs": "note", "Chase": "encounter"},
+            "encounter_columns": {"Chase": ["Name", "Lead"]},
         });
         let index: CampaignIndex = serde_json::from_value(sidecar.clone()).unwrap();
         assert_eq!(serde_json::to_value(index).unwrap(), sidecar);
@@ -1404,7 +1428,7 @@ mod tests {
     #[test]
     fn an_encounter_keeps_its_fields_on_the_way_through() {
         let encounter = serde_json::json!({
-            "path": "Encounters/Encounter 4.md", "name": "Encounter 4", "hash": "abc",
+            "path": "Encounters/Encounter 4.md", "name": "Encounter 4", "track": "Encounters", "hash": "abc",
             "spent": null, "round": 3, "turn": "Goblin 2", "columns": ["Combatant", "HP"],
             "rows": [
                 {"name": "Kira", "link": "Kira", "out": false, "cells": [""]},

@@ -64,6 +64,12 @@ class TrackPigment(BaseModel):
     pigment: str | None
 
 
+class TrackColumns(BaseModel):
+    campaign: str
+    track: str
+    columns: list[str]
+
+
 class TrackKind(BaseModel):
     campaign: str
     track: str
@@ -172,6 +178,7 @@ class EncounterSave(BaseModel):
 
 class EncounterCreate(BaseModel):
     campaign: str
+    track: str | None = None
     columns: list[str]
     rows: list[EncounterRow]
 
@@ -505,10 +512,18 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.put("/tracks/kind")
     def kind_track(body: TrackKind):
-        """Whether a track holds notes or images (images design §3.2), kept
-        with the campaign's presentation. Every track's kind, after."""
+        """Whether a track holds notes, images or encounters (images design
+        §3.2), kept with the campaign's presentation. Every track's kind,
+        after."""
         with write_lock:
             return {"kinds": vault.save_track_kind(campaign_path(body.campaign), body.track, body.kind)}
+
+    @router.put("/tracks/columns")
+    def columns_track(body: TrackColumns):
+        """The columns an encounter track's next encounter takes (Foresight
+        design §6), kept with the campaign's presentation."""
+        with write_lock:
+            return {"columns": vault.save_encounter_columns(campaign_path(body.campaign), body.track, body.columns)}
 
     # -- notes -------------------------------------------------------------
 
@@ -664,9 +679,9 @@ def build_router(app, data_dir: Path | None) -> APIRouter:
 
     @router.post("/encounter")
     def create_encounter(body: EncounterCreate):
-        """A new encounter, `Encounter N` in the Encounters track."""
+        """A new encounter in an encounter track, named after it."""
         with write_lock:
-            return encounter.create(campaign_path(body.campaign), body.columns, rows(body.rows))
+            return encounter.create(campaign_path(body.campaign), body.columns, rows(body.rows), body.track)
 
     # -- play: the board, the live set, jots (design §5.2, §5.3) -----------
 

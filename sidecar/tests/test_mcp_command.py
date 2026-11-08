@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import mcp_server
-from command import events, prep
+from command import events, prep, vault
 from legend_lore.granularity import ParentDoc
 from server import create_app
 
@@ -215,6 +215,8 @@ def test_create_track_then_move_a_note_onto_it(strahd, app):
     )
     assert run(mcp_server.create_track("factions")) == 'Strahd has a track named "Factions" already.'
     assert run(mcp_server.create_track("Beats")) == "'Beats' is reserved for Command's own notes"
+    assert run(mcp_server.create_track("Chase", encounter=True)).startswith("Created the encounter track Chase in Strahd.")
+    assert vault.track_kinds(strahd / "Strahd")["Chase"] == "encounter"
     # A link by path follows the note; the beat that holds it still does.
     village = strahd / "Strahd" / "Locations" / "Village of Barovia.md"
     village.write_text("Where [[NPCs/Ismark]] waits.\n")

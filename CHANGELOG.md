@@ -18,8 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **The tape keeps earlier rolls** under the pads, and a click on one puts its formula back to roll again
 - **Augury lies down when it is wide,** with the pads beside the readout; a drag on its side snaps it between the tall and the wide layout
 - **Foresight is a turn tracker in the rack.** It keeps the order, whose turn it is and the round, and ▶ or `⇧Space` passes the turn
-- **An encounter is a note.** Its table is the tracker, each change goes to the note at once, and the text around the table stays
-- **Columns belong to the GM.** `+` adds one, and `-7` or `+3` in a cell with a number does the arithmetic
+- **An encounter is a note in an encounter track.** The GM names the track, and its notes take that name and a number (`Chase 2`)
+- **Foresight's top line changes encounter track,** and the key under it picks an encounter or starts a new one
+- **The note's table is the tracker.** Each change goes to the note at once, and the text around the table stays
+- **Each track keeps its own columns.** `+` adds a column, and `-7` or `+3` in a cell with a number does the arithmetic
 - **`M` takes a row out of the fight.** The turn skips the row until `M` brings it back, and no row goes out by itself
 - **Notes drop on Foresight as rows.** A note from a track, the shelf, the card tray or the board joins linked to its note, and a track's nameplate adds its notes
 - **Encounters open from Command** with a drop or _Open in Foresight_, and a double-click on a linked row opens its note in Command

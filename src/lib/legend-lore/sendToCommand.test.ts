@@ -46,4 +46,10 @@ describe('targetsFor', () => {
     expect(targetsFor(targets, 'note').tracks).toEqual(['NPCs', 'Loot']);
     expect(targetsFor(targets, 'image').tracks).toEqual(['Maps']);
   });
+
+  it("doesn't offer an encounter track: a hit there would become an encounter", () => {
+    const targets = { campaign: 'Strahd', tracks: ['NPCs', 'Chase'], kinds: { NPCs: 'note', Chase: 'encounter' } as const };
+    expect(targetsFor(targets, 'note').tracks).toEqual(['NPCs']);
+    expect(targetsFor(targets, 'image').tracks).toEqual([]);
+  });
 });

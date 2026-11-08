@@ -16,7 +16,7 @@
   import { carriesFiles, droppedImages } from './embeds';
   import { draggedNote, endNoteDrag, isNoteDrag, startNoteDrag } from './noteDrag';
   import { action, divider, keyed, submenu, type OpenMenu } from './menu';
-  import { nameParts, newRowKey } from './columns';
+  import { fitsTrack, nameParts, newRowKey } from './columns';
   import type { CampaignIndex, CopySource, NoteEntry } from './types';
   import { m } from '../paraglide/messages';
 
@@ -263,7 +263,7 @@
 
   function noteMenuAt(x: number, y: number, note: NoteEntry) {
     onSelect(note);
-    const fitting = index.tracks.filter((t) => (index.kinds[t] ?? 'note') === note.type);
+    const fitting = index.tracks.filter((t) => fitsTrack(index.kinds[t], note.type));
     const groups = [
       [
         ...(note.encounter && !note.spent ? [action(m.command_shelf_open_in_foresight(), () => onOpenEncounter(note))] : []),

@@ -339,7 +339,9 @@ def save_track_pigment(campaign: Path, track: str, pigment: str | None) -> dict[
 
 
 # What a track holds, as Ableton's MIDI and audio tracks (images design §3.2).
-_KINDS = ("note", "image")
+# An encounter track holds notes, each of them an encounter (Foresight design
+# §3); only a saved kind makes one, never what's in the folder.
+_KINDS = ("note", "image", "encounter")
 
 
 def _saved_kinds(campaign: Path) -> dict[str, str]:
@@ -376,21 +378,48 @@ def track_kinds(campaign: Path, notes: list[NoteEntry] | None = None) -> dict[st
 
 
 def save_track_kind(campaign: Path, track: str, kind: str) -> dict[str, str]:
-    """Make ``track`` hold notes or images; other tracks' are kept. Every
-    track's kind, after."""
+    """Make ``track`` hold notes, images or encounters; other tracks' are
+    kept. Every track's kind, after."""
     if track not in _track_folders(campaign):
         raise NotFound(f"No track named {track!r}")
     if kind not in _KINDS:
-        raise Invalid(f"A track holds {' or '.join(_KINDS)}s")
+        raise Invalid("A track holds notes, images or encounters")
     _save_list(campaign, "kinds", {**_saved_kinds(campaign), track: kind})
     return track_kinds(campaign)
 
 
+def is_encounter_track(campaign: Path, track: str) -> bool:
+    return _saved_kinds(campaign).get(track) == "encounter"
+
+
+def encounter_columns(campaign: Path) -> dict[str, list[str]]:
+    """The columns each encounter track's next encounter takes (Foresight
+    design §6), kept with the campaign's presentation."""
+    raw = _presentation(campaign).get("encounter_columns", {})
+    if not isinstance(raw, dict):
+        return {}
+    return {t: c for t, c in raw.items() if isinstance(c, list) and c and all(isinstance(x, str) for x in c)}
+
+
+def save_encounter_columns(campaign: Path, track: str, columns: list[str]) -> dict[str, list[str]]:
+    """The columns ``track``'s next encounter takes; other tracks' are kept.
+    Every track's, after."""
+    if track not in _track_folders(campaign):
+        raise NotFound(f"No track named {track!r}")
+    if not is_encounter_track(campaign, track):
+        raise Invalid(f"{track} isn't an encounter track")
+    if not columns or any(not c.strip() for c in columns):
+        raise Invalid("Every column needs a name")
+    _save_list(campaign, "encounter_columns", {**encounter_columns(campaign), track: columns})
+    return encounter_columns(campaign)
+
+
 def _check_fits(campaign: Path, folder: Path, image: bool, src: Path | None = None) -> None:
-    """Refuse to put an image in a note track, or a note in an image track,
-    as Live keeps audio clips off MIDI tracks; one put there in Finder still
-    shows (images design §3.2). The shelf holds both, and moving within the
-    track it's already in makes nothing new."""
+    """Refuse to put an image in a track of notes, or a note in an image
+    track, as Live keeps audio clips off MIDI tracks; one put there in
+    Finder still shows (images design §3.2). An encounter track holds notes.
+    The shelf holds both, and moving within the track it's already in makes
+    nothing new."""
     parts = folder.relative_to(campaign).parts
     track = parts[0] if parts else None
     if track is None or _is_reserved(track):
@@ -398,9 +427,10 @@ def _check_fits(campaign: Path, folder: Path, image: bool, src: Path | None = No
     if src is not None and src.relative_to(campaign).parts[0] == track:
         return
     kind = track_kinds(campaign).get(track)
-    if kind is not None and kind != ("image" if image else "note"):
+    if kind is not None and (kind == "image") != image:
         clip = "an image" if image else "a note"
-        raise Invalid(f"{track} is {'an image' if kind == 'image' else 'a note'} track: {clip} goes in {clip} track or on the shelf")
+        held = {"image": "an image", "encounter": "an encounter"}.get(kind, "a note")
+        raise Invalid(f"{track} is {held} track: {clip} goes in {clip} track or on the shelf")
 
 
 def track_order(campaign: Path) -> list[str]:
@@ -432,6 +462,7 @@ def scan(campaign: Path) -> dict:
         "pigments": track_pigments(campaign),
         "ambiguous": [n.path for n in notes if seen[key(n)] > 1],
         "kinds": track_kinds(campaign, notes),
+        "encounter_columns": encounter_columns(campaign),
         # Wherever they sit, since Obsidian's attachment folder is the
         # GM's choice: the app resolves a note's embeds against these.
         "images": [_rel(campaign, p) for p in _walk(campaign, _is_image_file)],
@@ -1052,6 +1083,7 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
     notes = note_order(campaign)
     pigments = track_pigments(campaign)
     kinds = _saved_kinds(campaign)
+    columns = encounter_columns(campaign)
     moves = _relocate(campaign, campaign / name, campaign / new_name)
     _save_order(campaign, order)
     # Its notes keep their order, a subfolder's too.
@@ -1063,6 +1095,9 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
     # And its kind.
     if name in kinds:
         _save_list(campaign, "kinds", {new_name if t == name else t: k for t, k in kinds.items()})
+    # And an encounter track, its columns.
+    if name in columns:
+        _save_list(campaign, "encounter_columns", {new_name if t == name else t: c for t, c in columns.items()})
     return _rewrite_campaign(campaign, moves)
 
 

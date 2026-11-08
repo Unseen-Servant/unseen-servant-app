@@ -3,21 +3,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type {
-  BoardOp,
-  BoardView,
-  CampaignIndex,
-  CommandSettings,
-  CopySource,
-  LiveSet,
-  Moved,
-  NewSession,
-  Note,
-  NoteEntry,
-  Renamed,
-  SaveOutcome,
-  VaultEvent,
-} from './types';
+import type { BoardOp, BoardView, CampaignIndex, CommandSettings, CopySource, LiveSet, Moved, NewSession, Note, NoteEntry, Renamed, SaveOutcome, TrackKind, VaultEvent } from './types';
 
 export type PlanOp = 'add' | 'move' | 'remove';
 
@@ -55,7 +41,7 @@ export const commandApi = {
   pigmentTrack: (campaign: string, track: string, pigment: string | null) =>
     invoke<Record<string, string>>('command_pigment_track', { campaign, track, pigment }),
   /** Whether a track holds notes or images; answers with every track's. */
-  kindTrack: (campaign: string, track: string, kind: 'note' | 'image') =>
+  kindTrack: (campaign: string, track: string, kind: TrackKind) =>
     invoke<Record<string, 'note' | 'image'>>('command_kind_track', { campaign, track, kind }),
   /** Images picked with the native picker, copied into `track`: their
    *  paths, none when the GM cancels. */

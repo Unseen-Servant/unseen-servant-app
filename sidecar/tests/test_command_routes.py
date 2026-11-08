@@ -89,8 +89,21 @@ def test_encounter_create_read_save_and_conflict(cmd, campaign_root):
     made = cmd.post("/api/command/encounter", json={
         "campaign": "Strahd", "columns": ["Combatant", "HP"], "rows": [{"name": "Kira"}],
     }).json()
-    assert (made["path"], made["round"], made["turn"]) == ("Encounters/Encounter 1.md", 1, "Kira")
-    assert "Encounters" in cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()["tracks"]
+    assert (made["path"], made["track"], made["round"], made["turn"]) == ("Encounter/Encounter 1.md", "Encounter", 1, "Kira")
+    tracks = cmd.get("/api/command/tracks", params={"campaign": "Strahd"}).json()
+    assert "Encounter" in tracks["tracks"] and tracks["kinds"]["Encounter"] == "encounter"
+
+    # Named by its track, and its columns kept with the campaign.
+    cmd.post("/api/command/tracks", json={"campaign": "Strahd", "name": "Chase"})
+    cmd.put("/api/command/tracks/kind", json={"campaign": "Strahd", "track": "Chase", "kind": "encounter"})
+    chase = cmd.post("/api/command/encounter", json={
+        "campaign": "Strahd", "track": "Chase", "columns": ["Name"], "rows": [{"name": "Thief"}],
+    }).json()
+    assert chase["path"] == "Chase/Chase 1.md"
+    kept = cmd.put("/api/command/tracks/columns", json={"campaign": "Strahd", "track": "Chase", "columns": ["Name", "Lead"]})
+    assert kept.json() == {"columns": {"Chase": ["Name", "Lead"]}}
+    assert cmd.get("/api/command/campaign", params={"name": "Strahd"}).json()["encounter_columns"] == {"Chase": ["Name", "Lead"]}
+    assert cmd.put("/api/command/tracks/columns", json={"campaign": "Strahd", "track": "NPCs", "columns": ["N"]}).status_code == 422
 
     rows = [{"name": "Kira", "cells": ["12"]}, {"name": "Goblin 2", "link": "Goblin", "out": True}]
     body = {

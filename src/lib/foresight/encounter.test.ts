@@ -4,8 +4,10 @@ import {
   addColumn,
   addNotes,
   addRow,
+  arrival,
   completions,
   duplicateRow,
+  encounterTracks,
   enterCell,
   freeName,
   isFigures,
@@ -22,7 +24,9 @@ import {
   renameRow,
   setCell,
   step,
+  stepTrack,
   toggleOut,
+  trackEncounters,
   trackNotes,
   typedLink,
   type Encounter,
@@ -34,8 +38,20 @@ function row(name: string, out = false): EncounterRow {
 }
 
 function enc(rows: EncounterRow[], turn: string | null, round = 1): Encounter {
-  return { path: 'Encounters/Encounter 1.md', name: 'Encounter 1', hash: 'h', spent: null, round, turn, columns: ['Combatant', 'HP', 'Remarks'], rows };
+  return { path: 'Encounter/Encounter 1.md', name: 'Encounter 1', track: 'Encounter', hash: 'h', spent: null, round, turn, columns: ['Combatant', 'HP', 'Remarks'], rows };
 }
+
+const note = (path: string, more: Partial<NoteEntry> = {}): NoteEntry => ({
+  name: path.split('/').at(-1)!.replace(/\.md$/, ''),
+  path,
+  track: path.includes('/') ? path.split('/')[0] : null,
+  group: null,
+  spent: null,
+  source: null,
+  type: 'note',
+  encounter: false,
+  ...more,
+});
 
 describe('step', () => {
   const rows = [row('Goblin boss'), row('Kira'), row('Goblin 1', true), row('Bram')];
@@ -210,17 +226,6 @@ describe('columns', () => {
 });
 
 describe('the link with Command', () => {
-  const note = (path: string, more: Partial<NoteEntry> = {}): NoteEntry => ({
-    name: path.split('/').at(-1)!.replace(/\.md$/, ''),
-    path,
-    track: path.includes('/') ? path.split('/')[0] : null,
-    group: null,
-    spent: null,
-    source: null,
-    type: 'note',
-    encounter: false,
-    ...more,
-  });
   const goblin = note('Monsters/Goblin.md');
   const kira = note('PCs/Kira.md');
 
@@ -306,3 +311,47 @@ describe('the link with Command', () => {
   });
 });
 
+describe('encounter tracks', () => {
+  const index = {
+    name: 'C',
+    tracks: ['PCs', 'Chase', 'Encounter'],
+    kinds: { PCs: 'note', Chase: 'encounter', Encounter: 'encounter' },
+    notes: [
+      note('PCs/Kira.md'),
+      note('Encounter/Encounter 2.md', { encounter: true }),
+      note('Encounter/Encounter 1.md', { encounter: true }),
+      note('Encounter/Spent.md', { encounter: true, spent: '2026-11-01' }),
+    ],
+    note_order: { Encounter: ['Encounter 2', 'Encounter 1'] },
+  } as unknown as CampaignIndex;
+
+  test('the encounter tracks, in the campaign\'s order', () => {
+    expect(encounterTracks(index)).toEqual(['Chase', 'Encounter']);
+  });
+
+  test('stepping wraps both ways, and starts somewhere from a track that\'s gone', () => {
+    const tracks = ['A', 'B', 'C'];
+    expect(stepTrack(tracks, 'A', 1)).toBe('B');
+    expect(stepTrack(tracks, 'C', 1)).toBe('A');
+    expect(stepTrack(tracks, 'A', -1)).toBe('C');
+    expect(stepTrack(tracks, 'Gone', 1)).toBe('A');
+    expect(stepTrack(tracks, 'Gone', -1)).toBe('C');
+    expect(stepTrack(tracks, null, 1)).toBe('A');
+    expect(stepTrack([], 'A', 1)).toBeNull();
+  });
+
+  test('a track\'s encounters are those still to run, as its column shows them', () => {
+    expect(trackEncounters(index, 'Encounter').map((n) => n.name)).toEqual(['Encounter 2', 'Encounter 1']);
+    expect(trackEncounters(index, 'Chase')).toEqual([]);
+    expect(trackEncounters(index, 'Gone')).toEqual([]);
+  });
+
+  test('arriving opens the one last open there, else the first', () => {
+    expect(arrival(index, 'Encounter', 'Encounter/Encounter 1.md')).toBe('Encounter/Encounter 1.md');
+    expect(arrival(index, 'Encounter', undefined)).toBe('Encounter/Encounter 2.md');
+    // Spent since, or moved away: the first.
+    expect(arrival(index, 'Encounter', 'Encounter/Spent.md')).toBe('Encounter/Encounter 2.md');
+    expect(arrival(index, 'Encounter', 'PCs/Kira.md')).toBe('Encounter/Encounter 2.md');
+    expect(arrival(index, 'Chase', undefined)).toBeNull();
+  });
+});

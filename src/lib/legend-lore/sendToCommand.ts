@@ -14,7 +14,7 @@ export interface SendTargets {
   tracks: string[];
   /** Each track's kind: a hit goes to a note track, an image to an image
    *  track (images design §3.2). */
-  kinds: Record<string, 'note' | 'image'>;
+  kinds: Record<string, 'note' | 'image' | 'encounter'>;
 }
 
 export interface Sent {

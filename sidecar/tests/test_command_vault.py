@@ -680,3 +680,55 @@ def test_discard_removes_a_blank_untitled_and_nothing_else(root):
     assert not vault.discard_if_blank(root, "Untitled")
     assert (root / "Untitled" / "Shelf" / "Hunch.md").exists()
     assert sorted(vault.list_campaigns(root)) == ["Tomb", "Untitled"]
+
+
+# ---------------------------------------------------------------------------
+# Encounter tracks (Foresight design §3, §6)
+# ---------------------------------------------------------------------------
+
+def test_an_encounter_track_holds_notes(camp):
+    (camp / "Chase").mkdir()
+    assert vault.save_track_kind(camp, "Chase", "encounter")["Chase"] == "encounter"
+    assert vault.is_encounter_track(camp, "Chase")
+    assert not vault.is_encounter_track(camp, "NPCs")
+    # Notes go in, and move out. Images don't.
+    rel = vault.create_note(camp, "Chase", "Over the roofs")
+    moved, _ = vault.move_note(camp, rel, "NPCs")
+    moved, _ = vault.move_note(camp, moved, "Chase")
+    assert moved == "Chase/Over the roofs.md"
+    with pytest.raises(vault.Invalid, match="Chase is an encounter track"):
+        vault._check_fits(camp, camp / "Chase", image=True)
+
+
+def test_only_a_saved_kind_makes_an_encounter_track(camp):
+    # Whatever the folder holds, or is called.
+    (camp / "Encounters").mkdir()
+    (camp / "Encounters" / "Old.md").write_text("---\nround: 2\n---\n")
+    assert vault.track_kinds(camp)["Encounters"] == "note"
+
+
+def test_columns_are_kept_per_encounter_track(camp):
+    for t in ("Chase", "Dinner"):
+        (camp / t).mkdir()
+        vault.save_track_kind(camp, t, "encounter")
+    vault.save_encounter_columns(camp, "Chase", ["Name", "Lead"])
+    assert vault.save_encounter_columns(camp, "Dinner", ["Guest", "Trust"]) == {
+        "Chase": ["Name", "Lead"],
+        "Dinner": ["Guest", "Trust"],
+    }
+    assert vault.scan(camp)["encounter_columns"]["Chase"] == ["Name", "Lead"]
+    with pytest.raises(vault.Invalid):
+        vault.save_encounter_columns(camp, "NPCs", ["Name"])
+    with pytest.raises(vault.Invalid):
+        vault.save_encounter_columns(camp, "Chase", ["Name", "  "])
+    with pytest.raises(vault.NotFound):
+        vault.save_encounter_columns(camp, "Gone", ["Name"])
+
+
+def test_an_encounter_tracks_rename_carries_its_kind_and_columns(camp):
+    (camp / "Chase").mkdir()
+    vault.save_track_kind(camp, "Chase", "encounter")
+    vault.save_encounter_columns(camp, "Chase", ["Name", "Lead"])
+    vault.rename_track(camp, "Chase", "Pursuit")
+    assert vault.track_kinds(camp)["Pursuit"] == "encounter"
+    assert vault.encounter_columns(camp) == {"Pursuit": ["Name", "Lead"]}

@@ -40,7 +40,7 @@
   import { hoverLive } from '../ui/inputModality';
   import { NoteBuffer, type BufferState } from './noteBuffer';
   import { activeSession, beatOrder, memberPaths, planRows, sessionNotePaths, unscheduled, type PlanRow } from './prep';
-  import type { BeatEntry, BoardView, CampaignIndex, CommandSettings, CopySource, LiveSet, NoteEntry, VaultEvent } from './types';
+  import type { BeatEntry, BoardView, CampaignIndex, CommandSettings, CopySource, LiveSet, NoteEntry, TrackKind, VaultEvent } from './types';
 
   // True while the panel has the keyboard: window-level keys do nothing
   // otherwise (PANELS.md).
@@ -1001,9 +1001,10 @@
 
   // -- tracks -------------------------------------------------------------
 
-  /** A track holding notes or images, its kind kept so it doesn't follow
-   *  what's put in it (images design §3.2), after `after` or at the end. */
-  function createTrack(name: string, kind: 'note' | 'image', after: string | null) {
+  /** A track holding notes, images or encounters, its kind kept so it
+   *  doesn't follow what's put in it (images design §3.2), after `after` or
+   *  at the end. */
+  function createTrack(name: string, kind: TrackKind, after: string | null) {
     run(async () => {
       const made = await commandApi.createTrack(campaign!, name);
       await commandApi.kindTrack(campaign!, made, kind);

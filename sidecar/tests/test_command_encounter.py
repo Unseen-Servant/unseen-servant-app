@@ -1,7 +1,7 @@
 """Foresight's encounters (command/encounter.py, Foresight design §3).
 
-An encounter is a note with `round`; its first table is the tracker. These
-pin how the table, the struck-through names and the aliases read back, and
+An encounter is a note in an encounter track; its first table is the tracker.
+These pin what the track decides, how the table, the struck-through names and the aliases read back, and
 that a write changes the table and the two keys and nothing else.
 """
 
@@ -44,6 +44,7 @@ def camp(tmp_path):
     c = tmp_path / "Strahd"
     write(c / "Encounters" / "Encounter 4.md", FOUGHT)
     write(c / "Monsters" / "Goblin.md", "Small and cruel.\n")
+    vault.save_track_kind(c, "Encounters", "encounter")
     return c
 
 
@@ -70,7 +71,31 @@ def test_the_first_table_is_the_tracker(camp):
     ]
 
 
-def test_a_note_without_round_is_not_an_encounter(camp):
+def test_the_track_decides_not_the_note(camp):
+    # Written in Obsidian, with no keys and no table, and in the track.
+    write(camp / "Encounters" / "Bargain.md", "They trade in secrets.\n")
+    enc = encounter.read(camp, "Encounters/Bargain.md")
+    assert enc["track"] == "Encounters"
+    assert (enc["round"], enc["turn"], enc["columns"], enc["rows"]) == (1, None, [], [])
+    # In a subfolder of the track too.
+    write(camp / "Encounters" / "Road" / "Ford.md", "Wolves.\n")
+    assert encounter.read(camp, "Encounters/Road/Ford.md")["track"] == "Encounters"
+    # And a note with the keys elsewhere is a plain note.
+    write(camp / "Monsters" / "Fought.md", FOUGHT)
+    with pytest.raises(Invalid):
+        encounter.read(camp, "Monsters/Fought.md")
+
+
+def test_a_plain_note_moved_in_takes_its_keys_on_the_first_write(camp):
+    write(camp / "Encounters" / "Bargain.md", "They trade in secrets.\n")
+    enc = encounter.read(camp, "Encounters/Bargain.md")
+    encounter.save(camp, "Encounters/Bargain.md", enc["hash"], 1, "Envoy", ["Guest"], [Row("Envoy")])
+    assert (camp / "Encounters" / "Bargain.md").read_text() == (
+        "---\nround: 1\nturn: \"Envoy\"\n---\nThey trade in secrets.\n\n| Guest |\n|-------|\n| Envoy |\n"
+    )
+
+
+def test_a_note_outside_an_encounter_track_is_not_an_encounter(camp):
     with pytest.raises(Invalid):
         encounter.read(camp, "Monsters/Goblin.md")
 
@@ -206,7 +231,7 @@ def test_names_are_unique_and_the_turn_names_a_row(camp):
         encounter.save(camp, rel, enc["hash"], 1, None, cols, [Row("  ")])
 
 
-def test_a_note_that_lost_its_round_is_not_written(camp):
+def test_a_note_moved_out_is_not_written(camp):
     write(camp / "Monsters" / "Wolf.md", "Pack tactics.\n")
     with pytest.raises(Invalid):
         encounter.save(camp, "Monsters/Wolf.md", vault.content_hash(b"Pack tactics.\n"), 1, None, ["N"], [])
@@ -216,9 +241,11 @@ def test_a_note_that_lost_its_round_is_not_written(camp):
 # A new encounter
 # ---------------------------------------------------------------------------
 
-def test_a_new_encounter_is_numbered_in_the_encounters_track(camp):
+def test_a_new_encounter_takes_its_tracks_name_and_a_number(camp):
+    write(camp / "Encounters" / "Encounters 4.md", "")
     enc = encounter.create(camp, ["Combatant", "HP", "Remarks"], [Row("Kira")])
-    assert enc["path"] == "Encounters/Encounter 5.md"
+    assert enc["path"] == "Encounters/Encounters 5.md"
+    assert enc["track"] == "Encounters"
     assert enc["round"] == 1 and enc["turn"] == "Kira"
     assert rows_of(enc) == [("Kira", None, False, ["", ""])]
     assert (camp / enc["path"]).read_text() == (
@@ -229,22 +256,40 @@ def test_a_new_encounter_is_numbered_in_the_encounters_track(camp):
     )
 
 
-def test_the_encounters_track_is_made_a_note_track_on_first_use(tmp_path):
+def test_a_campaign_with_none_makes_the_encounter_track_on_first_use(tmp_path):
     c = tmp_path / "Fresh"
     c.mkdir()
     enc = encounter.create(c, ["Combatant"], [Row("Kira")])
-    assert enc["path"] == "Encounters/Encounter 1.md"
-    assert vault.track_order(c) == ["Encounters"]
-    assert vault.track_kinds(c) == {"Encounters": "note"}
+    assert enc["path"] == "Encounter/Encounter 1.md"
+    assert vault.track_order(c) == ["Encounter"]
+    assert vault.track_kinds(c) == {"Encounter": "encounter"}
 
 
-def test_an_encounters_folder_is_used_as_it_is_spelled(tmp_path):
+def test_a_plain_folder_with_that_name_is_left_alone(tmp_path):
     c = tmp_path / "Fresh"
-    (c / "encounters").mkdir(parents=True)
-    assert encounter.create(c, ["Combatant"], [Row("Kira")])["path"] == "encounters/Encounter 1.md"
+    write(c / "encounter" / "Old notes.md", "Mine.\n")
+    assert encounter.create(c, ["Combatant"], [Row("Kira")])["path"] == "Encounter 2/Encounter 2 1.md"
+    assert vault.track_kinds(c)["encounter"] == "note"
 
 
-def test_a_name_taken_elsewhere_is_passed_over(camp):
-    write(camp / "NPCs" / "Encounter 5.md", "")
-    write(camp / "Secrets" / "encounter 6.md", "")
-    assert encounter.next_name(camp) == "Encounter 7"
+def test_a_new_encounter_goes_in_the_track_asked_for(camp):
+    (camp / "Chase").mkdir()
+    vault.save_track_kind(camp, "Chase", "encounter")
+    assert encounter.create(camp, ["Name"], [Row("Thief")], track="Chase")["path"] == "Chase/Chase 1.md"
+    assert encounter.create(camp, ["Name"], [Row("Thief")], track="Chase")["path"] == "Chase/Chase 2.md"
+    with pytest.raises(Invalid):
+        encounter.create(camp, ["Name"], [Row("Thief")], track="Monsters")
+
+
+def test_with_no_track_asked_for_the_first_encounter_track_takes_it(camp):
+    (camp / "Chase").mkdir()
+    vault.save_track_kind(camp, "Chase", "encounter")
+    first = next(t for t in vault.track_order(camp) if vault.is_encounter_track(camp, t))
+    assert encounter.create(camp, ["Name"], [Row("Thief")])["track"] == first
+
+
+def test_the_name_as_written_with_no_singular_and_taken_names_passed_over(camp):
+    write(camp / "NPCs" / "Encounters 5.md", "")
+    write(camp / "Secrets" / "encounters 6.md", "")
+    assert encounter.next_name(camp, "Encounters") == "Encounters 7"
+    assert encounter.next_name(camp, "A (b)") == "A (b) 1"

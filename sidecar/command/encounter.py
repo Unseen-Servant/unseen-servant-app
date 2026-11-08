@@ -1,8 +1,9 @@
 """Foresight's encounters (docs/roadmap/2026-11-03-foresight-design.md §3).
 
-An encounter is a note whose frontmatter has ``round``; Foresight owns
-``round`` and ``turn``, the name of the row whose turn it is. The first table
-in the body is the tracker: its header row is the column list, its first
+An encounter is a note in an encounter track, a track type the GM names; the
+track decides, so a note written elsewhere and moved in is one. Foresight owns
+``round`` and ``turn``, the name of the row whose turn it is, and writes them
+on its first change. The first table in the body is the tracker: its header row is the column list, its first
 column holds the rows' names, a name struck through (``~~Goblin 1~~``) is out
 of the fight, and a link's alias names a second row from the same note
 (``[[Goblin\\|Goblin 2]]``, the pipe escaped as a table needs). Text around
@@ -23,9 +24,7 @@ from pathlib import Path, PurePosixPath
 from . import frontmatter as fm
 from . import vault
 
-# Where a new encounter goes, and what it's called (`Encounter N`), as
-# sessions are numbered.
-TRACK = "Encounters"
+# What the first encounter track is called, when a campaign has none yet.
 NAME = "Encounter"
 
 _FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")
@@ -177,8 +176,10 @@ def _turn(value, rows: list[Row]) -> str | None:
     return first.name if first else None
 
 
-def is_encounter(meta: dict) -> bool:
-    return "round" in meta
+def is_encounter(campaign: Path, rel: str) -> bool:
+    """Whether the note at ``rel`` is in an encounter track."""
+    parts = PurePosixPath(rel).parts
+    return len(parts) > 1 and vault.is_encounter_track(campaign, parts[0])
 
 
 def read(campaign: Path, rel: str) -> dict:
@@ -186,14 +187,15 @@ def read(campaign: Path, rel: str) -> dict:
     a save is checked against, and whether it's spent."""
     note = vault.read_note(campaign, rel)
     meta = fm.load(note["content"])
-    if not is_encounter(meta):
-        raise vault.Invalid(f"{note['name']!r} isn't an encounter: its frontmatter has no round")
+    if not is_encounter(campaign, rel):
+        raise vault.Invalid(f"{note['name']!r} isn't in an encounter track")
     body = fm.split(note["content"]).body
     table = _find(body.splitlines(keepends=True))
     rows = table.rows if table else []
     return {
         "path": note["path"],
         "name": note["name"],
+        "track": PurePosixPath(note["path"]).parts[0],
         "hash": note["hash"],
         "spent": fm.spent_value(meta.get("spent")),
         "round": _round(meta.get("round")),
@@ -297,8 +299,8 @@ def save(
     note = vault.read_note(campaign, rel)
     if note["hash"] != base_hash:
         raise vault.Conflict(f"{rel!r} changed on disk", current_hash=note["hash"])
-    if not is_encounter(fm.load(note["content"])):
-        raise vault.Invalid(f"{note['name']!r} isn't an encounter: its frontmatter has no round")
+    if not is_encounter(campaign, rel):
+        raise vault.Invalid(f"{note['name']!r} isn't in an encounter track")
     _check(columns, rows, turn)
     text = _with_table(note["content"], columns, rows)
     text = fm.set_key(text, "round", max(1, round_))
@@ -308,35 +310,48 @@ def save(
     return vault.write_note(campaign, rel, text, base_hash)
 
 
-def _folder(campaign: Path) -> str:
-    """The Encounters track as it is on disk, made a note track the first
-    time it's needed."""
-    for p in campaign.iterdir():
-        if p.is_dir() and p.name.casefold() == TRACK.casefold():
-            return p.name
-    vault.create_track(campaign, TRACK)
-    vault.save_track_kind(campaign, TRACK, "note")
-    return TRACK
-
-
-def next_name(campaign: Path) -> str:
-    """`Encounter N`, N one more than the highest in a note's name of that
-    shape, and free."""
-    taken = {n["name"].casefold() for n in vault.scan(campaign)["notes"]}
-    numbers = [int(m.group(1)) for name in taken if (m := re.fullmatch(rf"{NAME.casefold()} (\d+)", name))]
-    n = max(numbers, default=0) + 1
-    while f"{NAME} {n}".casefold() in taken:
+def _folder(campaign: Path, track: str | None) -> str:
+    """The encounter track asked for, else the campaign's first, made the
+    first time it's needed. A plain folder that has its name is left alone."""
+    if track is not None:
+        if not vault.is_encounter_track(campaign, track):
+            raise vault.Invalid(f"{track} isn't an encounter track")
+        return track
+    kinds = vault.track_kinds(campaign)
+    first = next((t for t in vault.track_order(campaign) if kinds[t] == "encounter"), None)
+    if first is not None:
+        return first
+    taken = {p.name.casefold() for p in campaign.iterdir() if p.is_dir()}
+    name, n = NAME, 1
+    while name.casefold() in taken:
         n += 1
-    return f"{NAME} {n}"
+        name = f"{NAME} {n}"
+    made = vault.create_track(campaign, name)
+    vault.save_track_kind(campaign, made, "encounter")
+    return made
 
 
-def create(campaign: Path, columns: list[str], rows: list[Row]) -> dict:
-    """A new encounter in the Encounters track holding ``rows``, at round 1
-    with the turn on its first row in the fight."""
+def next_name(campaign: Path, track: str) -> str:
+    """The track's name as written and a number, one more than the highest
+    in a note's name of that shape, and free. No singular is worked out."""
+    taken = {n["name"].casefold() for n in vault.scan(campaign)["notes"]}
+    shape = re.compile(rf"{re.escape(track.casefold())} (\d+)")
+    numbers = [int(m.group(1)) for name in taken if (m := shape.fullmatch(name))]
+    n = max(numbers, default=0) + 1
+    while f"{track} {n}".casefold() in taken:
+        n += 1
+    return f"{track} {n}"
+
+
+def create(campaign: Path, columns: list[str], rows: list[Row], track: str | None = None) -> dict:
+    """A new encounter in ``track`` holding ``rows``, at round 1 with the
+    turn on its first row in the fight. With no track named, the campaign's
+    first encounter track, or a new one."""
     first = next((r for r in rows if not r.out), None)
     turn = first.name if first else None
     _check(columns, rows, turn)
-    rel = vault.create_note(campaign, _folder(campaign), next_name(campaign))
+    folder = _folder(campaign, track)
+    rel = vault.create_note(campaign, folder, next_name(campaign, folder))
     text = fm.set_key("", "round", 1)
     text = fm.set_key(text, "turn", turn)
     text = _with_table(text, columns, rows)

@@ -52,10 +52,14 @@ def test_index_reads_spent_marks(camp):
 
 
 def test_index_says_which_notes_are_encounters(camp):
-    write(camp / "Encounters" / "Ambush.md", "---\nround: 2\n---\n")
+    # The track decides, whatever the note holds.
+    write(camp / "Encounters" / "Ambush.md", "Words alone.\n")
+    write(camp / "NPCs" / "Fought.md", "---\nround: 2\n---\n")
+    vault.save_track_kind(camp, "Encounters", "encounter")
     notes = {n["path"]: n for n in prep.index(camp)["notes"]}
     assert notes["Encounters/Ambush.md"]["encounter"] is True
     assert notes["NPCs/Ismark.md"]["encounter"] is False
+    assert notes["NPCs/Fought.md"]["encounter"] is False
 
 
 def test_index_resolves_beat_members_however_they_are_spelled(camp):

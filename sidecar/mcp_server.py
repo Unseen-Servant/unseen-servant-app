@@ -1052,14 +1052,17 @@ async def create_note(
 
 
 @mcp.tool()
-async def create_track(name: str, campaign: str | None = None) -> str:
+async def create_track(name: str, encounter: bool = False, campaign: str | None = None) -> str:
     """Make a new track, a folder of notes of one kind, at the end of the
     campaign's tracks: for material the campaign will keep using that no
     track fits (Factions, say). Then create_note() or move_note() files
-    notes on it.
+    notes on it. Every note on an encounter track is an encounter, which
+    the GM runs in Foresight: its first table holds the rows, with one row
+    per line and the names in the first column.
 
     Args:
         name: The track's name.
+        encounter: Make it an encounter track.
         campaign: A campaign name; defaults to the one open in the app.
     """
     index, _ctx, error = await _campaign_index(campaign)
@@ -1071,7 +1074,12 @@ async def create_track(name: str, campaign: str | None = None) -> str:
     made = await sidecar.post("/api/command/tracks", {"campaign": index["name"], "name": name})
     if isinstance(made, str):
         return made
-    return f"Created the track {made['name']} in {index['name']}. Its tracks: {', '.join([*index['tracks'], made['name']])}."
+    if encounter:
+        kinds = await sidecar.put("/api/command/tracks/kind", {"campaign": index["name"], "track": made["name"], "kind": "encounter"})
+        if isinstance(kinds, str):
+            return kinds
+    kind = "encounter track" if encounter else "track"
+    return f"Created the {kind} {made['name']} in {index['name']}. Its tracks: {', '.join([*index['tracks'], made['name']])}."
 
 
 @mcp.tool()

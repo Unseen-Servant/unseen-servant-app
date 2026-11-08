@@ -4,7 +4,7 @@
 // the GM dragged them into, then by name. Spent notes leave their groups
 // for the track's spent list, folded at the column's foot.
 
-import type { CampaignIndex, NoteEntry } from './types';
+import type { CampaignIndex, NoteEntry, TrackKind } from './types';
 
 export interface NoteGroup {
   /** Subfolder path below the track; null for notes directly in it. */
@@ -32,6 +32,12 @@ const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensiti
 export function nameParts(note: NoteEntry): { stem: string; ext: string } {
   const dot = note.type === 'image' ? note.name.lastIndexOf('.') : -1;
   return dot > 0 ? { stem: note.name.slice(0, dot), ext: note.name.slice(dot) } : { stem: note.name, ext: '' };
+}
+
+/** Whether a track of this kind takes a clip of this type: images in an
+ *  image track, notes in the others (images design §3.2). */
+export function fitsTrack(kind: TrackKind | undefined, type: NoteEntry['type']): boolean {
+  return (kind === 'image' ? 'image' : 'note') === type;
 }
 
 export function columns(index: CampaignIndex): Column[] {

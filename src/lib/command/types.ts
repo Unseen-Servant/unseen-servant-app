@@ -15,7 +15,7 @@ export interface NoteEntry {
   /** A note, or an image a track or the shelf holds: a clip too, named
    *  with its extension and never spent (images design §3). */
   type: 'note' | 'image';
-  /** Its frontmatter has `round`: Foresight opens it. */
+  /** It's in an encounter track: Foresight opens it. */
   encounter: boolean;
 }
 
@@ -54,7 +54,10 @@ export interface CampaignIndex {
   pigments: Record<string, string>;
   /** What each track makes, as the GM chose it or its folder says: notes,
    *  or images (images design §3.2). It never hides a file. */
-  kinds: Record<string, 'note' | 'image'>;
+  kinds: Record<string, TrackKind>;
+  /** The columns each encounter track's next encounter takes (Foresight
+   *  design §6). */
+  encounter_columns: Record<string, string[]>;
   /** The notes sharing their name with another of their kind (a beat may
    *  share a note's), by path. */
   ambiguous: string[];
@@ -103,6 +106,10 @@ export interface Renamed {
 }
 
 /** `command://vault`. A null campaign means anything may have changed. */
+/** What a track holds (images design §3.2). An encounter track holds notes,
+ *  each of them an encounter (Foresight design §3). */
+export type TrackKind = 'note' | 'image' | 'encounter';
+
 export interface VaultEvent {
   type: 'vault';
   campaign: string | null;
