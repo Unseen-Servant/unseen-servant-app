@@ -92,8 +92,8 @@ export function emptyViews(): RackView[] {
 /** First launch: Legend Lore on view 1, where its tab used to be, and
  *  Command on 2 with Augury mounted beside it in a rack `w` wide, Foresight
  *  under Augury's box in a rack `h` tall, as a carry under the box puts it
- *  (`landing`). A share short of the box would lay Augury down, so `h` is
- *  the rack's measured height, not a guess. */
+ *  (`landing`). `h` is the rack's measured height, not a guess, so the share
+ *  is the box's and Foresight starts right under it. */
 export function defaultViews(w = 0, h = 0): RackView[] {
   const views = emptyViews();
   views[0] = { root: { kind: 'tool', id: 'legend-lore' }, locked: false };
@@ -220,11 +220,22 @@ export function neighbour(rects: Map<PanelId, Rect>, among: readonly PanelId[], 
   return best;
 }
 
+/** The lengths along `dir` where a subtree's needs across can change: its
+ *  tools' shapes, summed along a split that runs that way. */
+function stops(node: RackNode, dir: Dir): number[] {
+  if (node.kind === 'tool') return shapesOf(node.id).map((s) => (dir === 'row' ? s.w : s.h));
+  const each = node.children.map((c) => stops(c, dir));
+  if (node.dir !== dir) return each.flat();
+  return each.reduce((sums, s) => sums.flatMap((a) => s.map((b) => a + RAIL + b)));
+}
+
 /** The least length a subtree can be given along `dir`, `cross` long the
  *  other way: the least of its shapes that fit across, so a tool that lies
  *  down needs less height once it has the width, and more width in a slot
- *  too short to stand in. A split across `dir` gives each child its share
- *  of `cross`. */
+ *  too short to stand in. A split across `dir` needs the least length at
+ *  which its children all fit across at their own minimums, whatever their
+ *  shares, since `lengths` gives a child what it lacks from the others: a
+ *  short share doesn't hold a column wide. */
 export function minAlong(node: RackNode, dir: Dir, cross: number): number {
   const row = dir === 'row';
   if (node.kind === 'tool') {
@@ -234,7 +245,10 @@ export function minAlong(node: RackNode, dir: Dir, cross: number): number {
   const n = node.children.length;
   if (node.dir === dir) return node.children.reduce((sum, c) => sum + minAlong(c, dir, cross), 0) + RAIL * (n - 1);
   const span = cross - RAIL * (n - 1);
-  return Math.max(...node.children.map((c, i) => minAlong(c, dir, span * node.sizes[i])));
+  const across: Dir = row ? 'col' : 'row';
+  const fits = (len: number) => node.children.reduce((sum, c) => sum + minAlong(c, across, len), 0) <= span;
+  const least = Math.max(...node.children.map((c) => minAlong(c, dir, Infinity)));
+  return [least, ...stops(node, dir).filter((s) => s > least).sort((a, b) => a - b)].find(fits) ?? least;
 }
 
 // ---- edits ------------------------------------------------------------------

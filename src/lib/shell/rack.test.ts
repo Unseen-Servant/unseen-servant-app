@@ -98,6 +98,17 @@ describe('resize', () => {
     }
   });
 
+  test('snaps a compact tool back from lying down to standing, past the halfway mark', () => {
+    const AUG: RackNode = { kind: 'tool', id: 'augury' };
+    const root = row(1 - 540.5 / (1275 - RAIL), CMD, AUG);
+    const rail = layout(root, 1275, 727, false).rails[0];
+    expect(layout(root, 1275, 727, false).rects.get('augury')!.w).toBeGreaterThanOrEqual(540);
+    const width = (delta: number) => layout(resize(root, rail, delta), 1275, 727, false).rects.get('augury')!.w;
+    expect(width(100)).toBeGreaterThanOrEqual(540);
+    expect(width(200)).toBeLessThanOrEqual(271);
+    expect(width(1000)).toBeLessThanOrEqual(271);
+  });
+
   test('stacked in a column wide enough to lie down in, a compact tool stops at its wide shape\'s height', () => {
     const AUG: RackNode = { kind: 'tool', id: 'augury' };
     const root = col(0.5, CMD, AUG);
@@ -108,6 +119,31 @@ describe('resize', () => {
     expect(height(700)).toBeCloseTo(225, 0);
     // Too narrow to lie down, it stands.
     expect(height(500)).toBeCloseTo(391, 0);
+  });
+
+  test('a column holding a lying-down tool narrows again, the tool standing on room from its neighbour', () => {
+    // Foresight carried under Augury while it lay down: Augury's share of the
+    // column is its wide shape's height, too short to stand in by itself.
+    const AUG: RackNode = { kind: 'tool', id: 'augury' };
+    const FORE: RackNode = { kind: 'tool', id: 'foresight' };
+    const root = row(0.55, CMD, col(0.32, AUG, FORE));
+    const wide = layout(root, 1275, 727, false);
+    expect(wide.rects.get('augury')!.w).toBeGreaterThanOrEqual(540);
+    const rail = wide.rails.find((r) => r.dir === 'row')!;
+    const narrow = layout(resize(root, rail, 1000), 1275, 727, false).rects;
+    expect(narrow.get('augury')!.w).toBeCloseTo(270, -1);
+    // It stands at full height, and its neighbour keeps its minimum.
+    expect(narrow.get('augury')!.h).toBeGreaterThanOrEqual(391);
+    expect(narrow.get('foresight')!.h).toBeGreaterThanOrEqual(280);
+  });
+
+  test('a column too short for the tool to stand beside its neighbour stays wide enough to lie down', () => {
+    const AUG: RackNode = { kind: 'tool', id: 'augury' };
+    const FORE: RackNode = { kind: 'tool', id: 'foresight' };
+    const root = row(0.55, CMD, col(0.32, AUG, FORE));
+    const rail = layout(root, 1275, 600, false).rails.find((r) => r.dir === 'row')!;
+    // 391 + 280 don't fit in 600, and 225 + 280 do.
+    expect(layout(resize(root, rail, 1000), 1275, 600, false).rects.get('augury')!.w).toBeGreaterThanOrEqual(540);
   });
 
   test('stops at either neighbour\'s minimum', () => {
