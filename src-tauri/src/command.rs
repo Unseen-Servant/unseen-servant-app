@@ -827,9 +827,13 @@ pub async fn command_save_encounter_columns(
     track: String,
     columns: Vec<String>,
 ) -> Result<(), String> {
-    answer::<serde_json::Value>(client().put(api("/tracks/columns")).json(&serde_json::json!({
-        "campaign": campaign, "track": track, "columns": columns,
-    })))
+    answer::<serde_json::Value>(
+        client()
+            .put(api("/tracks/columns"))
+            .json(&serde_json::json!({
+                "campaign": campaign, "track": track, "columns": columns,
+            })),
+    )
     .await
     .map(|_| ())
 }
@@ -1439,7 +1443,8 @@ mod tests {
         assert_eq!(serde_json::to_value(parsed).unwrap(), encounter);
 
         // A row sent with its name alone takes no link, in the fight, no cells.
-        let row: EncounterRow = serde_json::from_value(serde_json::json!({"name": "Kira"})).unwrap();
+        let row: EncounterRow =
+            serde_json::from_value(serde_json::json!({"name": "Kira"})).unwrap();
         assert_eq!(
             serde_json::to_value(row).unwrap(),
             serde_json::json!({"name": "Kira", "link": null, "out": false, "cells": []}),
