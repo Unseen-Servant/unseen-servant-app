@@ -116,7 +116,16 @@
         <svg class="caret submenu-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
       </button>
     {:else if item.kind === 'heading'}
-      <div class="menu-heading ledger-label">{item.label}</div>
+      {@const add = item.add}
+      <div class="menu-heading ledger-label" class:adds={!!add}>
+        {#if item.swatch !== undefined}
+          <span class="menu-swatch" class:none={!item.swatch} style:background={item.swatch} aria-hidden="true"></span>
+        {/if}
+        <span class="menu-heading-label">{item.label}</span>
+        {#if add}
+          <button type="button" class="menu-add" title={add.label} aria-label={add.label} on:click={() => pick(add.run)}>+</button>
+        {/if}
+      </div>
     {:else if item.kind === 'picks'}
       <div class="menu-picks" role="group" aria-label={item.label}>
         {#each item.picks as p (p.label)}
@@ -186,7 +195,59 @@
   }
 
   .menu-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     padding: 0.35rem 0.6rem 0.1rem;
+  }
+
+  .menu-heading.adds {
+    padding-right: 0.3rem;
+  }
+
+  /* A track's colour chip (app.css .menu-swatch) as wide as the pip
+     column, so the track's name lines up with its rows' labels. */
+  .menu-heading .menu-swatch {
+    flex-shrink: 0;
+    width: 0.9rem;
+    height: 0.6rem;
+  }
+
+  .menu-heading-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The + at a heading's end, as + ends a plate: grey until the pointer
+     brightens it. */
+  .menu-add {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 18px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    line-height: 1;
+    color: var(--text-tertiary);
+    cursor: pointer;
+  }
+
+  .menu-add:hover {
+    color: var(--text-primary);
+    background: var(--bg-focused);
+  }
+
+  .menu-add:active {
+    transform: scale(0.97);
   }
 
   .menu-row {

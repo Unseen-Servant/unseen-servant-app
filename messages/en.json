@@ -1537,7 +1537,7 @@
   "foresight_turn_previous": "Previous turn",
   "foresight_turn_next": "Next turn",
   "foresight_round_title": "Round {round}",
-  "foresight_clear_label": "Clear the encounter",
+  "foresight_clear_label": "Clear the table",
   "foresight_column_combatant": "Combatant",
   "foresight_column_hp": "HP",
   "foresight_column_remarks": "Remarks",
@@ -1597,7 +1597,7 @@
   "foresight_guide_notes_encounter": "Drop an encounter's note or card on Foresight to open it, or right-click it in a track or on the shelf for {#em}Open in Foresight{/em}. The encounter open before stays as it is, in its note. Launching a beat doesn't open its encounter, so one half run is never replaced: drop the card when you start.",
   "foresight_guide_notes_windows": "Drops don't cross windows. While a tool is popped out, {#strong}[[{/strong} in the empty row offers the campaign's notes: ↑ and ↓ move through them, and {#strong}↵{/strong} or {#strong}Tab{/strong} takes one.",
   "foresight_guide_clear": "Clearing",
-  "foresight_guide_clear_desc": "{#em}Clear the encounter{/em}, at the foot of the encounter's menu, empties Foresight and spends the encounter. The note stays in the campaign among its track's spent notes, with everything written in it, and Foresight stays on the track. To run it again, un-spend it in Command, and it's back in the menu.",
+  "foresight_guide_clear_desc": "{#em}Clear the table{/em}, at the foot of the encounter's menu, empties Foresight and spends the encounter. The note stays in the campaign among its track's spent notes, with everything written in it, and Foresight stays on the track. To run it again, un-spend it in Command, and it's back in the menu.",
   "command_tracks_insert_encounter": "Insert encounter track",
   "command_tracks_encounter_track_name": "Encounter track name…",
   "command_tracks_new_encounter_track": "New encounter track",
@@ -1607,9 +1607,10 @@
   "foresight_selector_title": "Choose an encounter",
   "foresight_selector_path": "{track} › {name}",
   "foresight_new_encounter": "+ New",
+  "foresight_new_encounter_in": "New encounter in {track}",
   "glossary_encounter_track": "Encounter track",
   "glossary_encounter_track_desc": "A track you name, whose every note is an encounter",
   "foresight_guide_tracks": "Encounter tracks",
   "foresight_guide_tracks_desc": "Every note in an encounter track is an encounter, and its new notes take the track's name: a track you call {#em}Chase{/em} holds {#em}Chase 1{/em}, {#em}Chase 2{/em}. One track is enough, or keep as many as you like: the names and the split are yours. {#em}+ New track{/em} in the encounter's menu makes one, as does {#em}Insert encounter track{/em} in Command. A note moved into one becomes an encounter, and one moved out is a plain note again.",
-  "foresight_guide_tracks_switch": "The encounter's name on the top line opens its menu: the encounters still to run in each encounter track, under the track's name, and {#em}+ New{/em} to start another there. With one track, the menu needs no names. With nothing open, the top line names the note the first row will make, such as {#em}Chase 3{/em}. Foresight follows the campaign open in Command and opens on the encounter last open in it."
+  "foresight_guide_tracks_switch": "The encounter's name on the top line opens its menu: each encounter track's name and colour over its encounters still to run, and {#strong}+{/strong} at the end of the name starts another there. With nothing open, the top line names the note the first row will make, such as {#em}Chase 3{/em}. Foresight follows the campaign open in Command and opens on the encounter last open in it."
 }

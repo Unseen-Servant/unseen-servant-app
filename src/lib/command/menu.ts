@@ -5,7 +5,10 @@ export type MenuItem =
   // `chord`: the binding (keybindings.ts) whose key does the same on the
   // selected row, shown as its hint.
   | { kind: 'action'; label: string; danger?: boolean; lamp?: boolean; chord?: string; action: () => void }
-  | { kind: 'heading'; label: string }
+  // `swatch`: a chip of the group's track colour, null for the empty
+  // outline of a track without one; none for a heading that isn't a
+  // track's. `add`: a + at the heading's end that adds to its group.
+  | { kind: 'heading'; label: string; swatch?: string | null; add?: { label: string; run: () => void } }
   // `picks`: choices side by side in one row, each a swatch of the plate it
   // fills (null for none), its name only a tooltip (app.css .menu-picks).
   | { kind: 'picks'; label: string; picks: Pick[] }
@@ -42,7 +45,11 @@ export const keyed = (label: string, chord: string, run: () => void, danger = fa
   chord,
   danger,
 });
-export const heading = (label: string): MenuItem => ({ kind: 'heading', label });
+export const heading = (label: string, more: { swatch?: string | null; add?: { label: string; run: () => void } } = {}): MenuItem => ({
+  kind: 'heading',
+  label,
+  ...more,
+});
 export const choice = (label: string, on: boolean, run: () => void): MenuItem => ({
   kind: 'action',
   label,

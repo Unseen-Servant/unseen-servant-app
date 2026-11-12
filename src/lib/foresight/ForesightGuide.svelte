@@ -19,7 +19,7 @@
   <section class="field">
     <h3 class="field-title section-title">{m.foresight_guide_tracks()}</h3>
     <p class="field-desc"><ParaglideMessage message={m.foresight_guide_tracks_desc} {em} /></p>
-    <p class="field-desc"><ParaglideMessage message={m.foresight_guide_tracks_switch} {em} /></p>
+    <p class="field-desc"><ParaglideMessage message={m.foresight_guide_tracks_switch} {em} {strong} /></p>
   </section>
 
   <section class="field">

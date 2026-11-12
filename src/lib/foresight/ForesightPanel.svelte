@@ -9,8 +9,9 @@
   //
   // One line heads it: the encounter key and the turn. The key reads the
   // open encounter's name, the track only in its tooltip and its menu. The
-  // menu holds the encounter tracks, each with its encounters still to run
-  // and + New, then + New track, and Clear while one is open.
+  // menu holds the encounter tracks, each named with a chip of its colour
+  // and a + over its encounters still to run, then + New track, and Clear
+  // the table while one is open.
   // Empty, Foresight is the bare instrument: the key reads the note its
   // first row will make, and that row makes it, or with no encounter track
   // yet the track too. Clearing spends the note, which stays in the
@@ -301,9 +302,11 @@
     else keepTrack(campaign, track);
   }
 
-  /** The encounter key's menu: each encounter track's encounters still to
-   *  run under its name, and + New; one track needs no name. Then a new
-   *  track, and Clear while an encounter is open, away from the turn's ▶. */
+  /** The encounter key's menu: each encounter track's name, with a chip of
+   *  its colour and a + that starts a new encounter there, over its
+   *  encounters still to run. Then a new track, and Clear while an
+   *  encounter is open, away from the turn's ▶. One row per track keeps
+   *  the menu under its height with a few tracks. */
   async function openSelector() {
     const campaign = shown;
     if (!campaign) return;
@@ -311,21 +314,15 @@
     const index = await indexFor();
     if (!index || shown !== campaign) return;
     const box = selectorEl.getBoundingClientRect();
-    const encountersOf = (track: string | null): MenuItem[] =>
-      (track ? trackEncounters(index, track) : []).map((note) => choice(note.name, note.path === enc?.path, () => void openEncounter(campaign, note.path)));
-    const newTrack = action(m.foresight_new_track_item(), () => (namingTrack = true));
-    let items: MenuItem[];
-    if (tracks.length > 1) {
-      items = [
-        ...tracks.flatMap((t) => [heading(t), ...encountersOf(t), action(m.foresight_new_encounter(), () => void startNew(t))]),
-        divider,
-        newTrack,
-      ];
-    } else {
-      const only = tracks[0] ?? null;
-      const notes = encountersOf(only);
-      items = [...notes, ...(notes.length ? [divider] : []), action(m.foresight_new_encounter(), () => void startNew(only)), newTrack];
-    }
+    const group = (track: string): MenuItem[] => [
+      heading(track, {
+        swatch: index.pigments[track] ?? null,
+        add: { label: m.foresight_new_encounter_in({ track }), run: () => void startNew(track) },
+      }),
+      ...trackEncounters(index, track).map((note) => choice(note.name, note.path === enc?.path, () => void openEncounter(campaign, note.path))),
+    ];
+    let items: MenuItem[] = tracks.length ? tracks.flatMap(group) : [action(m.foresight_new_encounter(), () => void startNew(null))];
+    items = [...items, divider, action(m.foresight_new_track_item(), () => (namingTrack = true))];
     if (enc) items = [...items, divider, action(m.foresight_clear_label(), () => void clear())];
     selectorMenu = { x: box.left, y: box.bottom + 3, items };
     menu = selectorMenu;
