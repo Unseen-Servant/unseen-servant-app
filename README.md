@@ -128,7 +128,10 @@ AI agent ⇄ MCP server (stdio) ⇄ Python sidecar
   interface's calls to it.
 - `sidecar/`: indexing and search (`legend_lore/`), campaign files
   (`command/`), and `mcp_server.py`, which an AI agent launches and which finds
-  the running sidecar through `sidecar.port` in the app's data folder.
+  the running sidecar through `sidecar.port` in the app's data folder. The
+  sidecar answers only a request that carries the token of the current launch
+  (`sidecar.token`, beside the port file), which the app and the MCP server
+  read.
 - `scripts/`: the builds of the sidecar, llama-server and `models/`.
 - `evals/`: the retrieval eval harness. Its corpus is not in the repo
   ([evals/README.md](evals/README.md)).

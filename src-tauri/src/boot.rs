@@ -267,6 +267,7 @@ fn settle_sidecar(
     set("sidecar", StepState::Running, None);
     let mut port_seen = false;
     let port_file = app_data_dir.join("chroma_db").join("sidecar.port");
+    let token_file = app_data_dir.join("chroma_db").join("sidecar.token");
     let sidecar_exited = || {
         let state = app.state::<crate::SidecarState>();
         let Ok(mut guard) = state.0.lock() else {
@@ -286,8 +287,13 @@ fn settle_sidecar(
         },
         sidecar_exited,
     );
+    // The sidecar wrote its token before the port file, so it's there by now.
+    // Without it every call would be refused: that is a sidecar that's down.
+    let result =
+        result.and_then(|port| crate::read_sidecar_token(&token_file).map(|token| (port, token)));
     match result {
-        Ok(port) => {
+        Ok((port, token)) => {
+            crate::set_sidecar_token(&token);
             crate::SIDECAR_PORT.store(port, Ordering::Relaxed);
             set("store", StepState::Done, None);
             true
@@ -370,7 +376,7 @@ fn follow_warmup(
 fn fetch<T: DeserializeOwned>(path: &str) -> Option<T> {
     let url = format!("{}{}", crate::sidecar_url(), path);
     tauri::async_runtime::block_on(async move {
-        let resp = reqwest::Client::new()
+        let resp = crate::sidecar_client()
             .get(url)
             .timeout(Duration::from_secs(5))
             .send()

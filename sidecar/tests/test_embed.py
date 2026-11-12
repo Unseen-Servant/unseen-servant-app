@@ -21,8 +21,10 @@ def server(monkeypatch):
     """Record requests; answer embeds with ``state["response"]``."""
     state = {"requests": [], "response": None}
 
-    def post(url, json, timeout):
-        state["requests"].append({"url": url, "json": json, "timeout": timeout})
+    def post(url, json, timeout, trust_env=True):
+        state["requests"].append(
+            {"url": url, "json": json, "timeout": timeout, "trust_env": trust_env}
+        )
         if url.endswith("/tokenize"):
             words = json["content"].split()
             return httpx.Response(200, json={"tokens": [0] * json.get("add_special", False) * 2 + list(range(len(words)))})
@@ -48,6 +50,17 @@ def test_embed_sends_one_openai_request(server):
     assert vectors == [[0.0, 0.5], [1.0, 0.5]]
 
 
+def test_embed_goes_straight_to_the_server_whatever_the_proxy_settings(server, monkeypatch):
+    """A machine's HTTP proxy has no exception for loopback in httpx, and
+    the request holds the library's text: it must never go that way."""
+    monkeypatch.setattr(embedder, "MAX_INPUT_TOKENS", 5)
+    server["response"] = None
+    embedder.embed(["x"])
+    embedder._fit(BASE, ["one two three four five six seven"])
+    assert server["requests"]
+    assert all(req["trust_env"] is False for req in server["requests"])
+
+
 def test_embed_timeout_defaults_to_120s(server, monkeypatch):
     """Long enough for a slow batch, short enough that a wedged server
     can't hold the sync lock forever."""
@@ -69,13 +82,13 @@ def test_embed_cuts_an_input_over_the_batch_and_retries(server, monkeypatch):
     calls = {"n": 0}
     real = httpx.post
 
-    def reject_once(url, json, timeout):
+    def reject_once(url, json, timeout, trust_env=True):
         if url.endswith("/v1/embeddings") and calls["n"] == 0:
             calls["n"] += 1
             return httpx.Response(500, json={"error": {
                 "code": 500, "message": "input (9 tokens) is too large to process. "
                 "increase the physical batch size (current batch size: 5)"}})
-        return real(url, json=json, timeout=timeout)
+        return real(url, json=json, timeout=timeout, trust_env=trust_env)
 
     monkeypatch.setattr(httpx, "post", reject_once)
     embedder.embed(["short one", "one two three four five six seven"])
@@ -97,7 +110,7 @@ def test_embed_error_without_json_body(server):
 
 
 def test_embed_explains_an_embedder_that_is_not_running(server, monkeypatch):
-    def refused(url, json, timeout):
+    def refused(url, json, timeout, trust_env=True):
         raise httpx.ConnectError("[Errno 61] Connection refused")
 
     monkeypatch.setattr(httpx, "post", refused)
@@ -109,7 +122,7 @@ def test_embed_explains_an_embedder_that_is_not_running(server, monkeypatch):
 
 
 def test_embed_explains_an_embedder_that_does_not_answer(server, monkeypatch):
-    def slow(url, json, timeout):
+    def slow(url, json, timeout, trust_env=True):
         raise httpx.ReadTimeout("timed out")
 
     monkeypatch.setattr(httpx, "post", slow)

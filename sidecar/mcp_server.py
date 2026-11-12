@@ -29,6 +29,7 @@ from mcp.server.mcpserver import MCPServer
 
 
 PORT_FILENAME = "sidecar.port"
+TOKEN_FILENAME = "sidecar.token"
 SIDECAR_URL_DISCOVERY_TIMEOUT = 30.0  # seconds; covers a slow sidecar boot
 
 # Per-request timeout for sidecar HTTP calls. httpx defaults to 5s, but a
@@ -106,6 +107,25 @@ def current_sidecar_url(args) -> str | None:
     return None
 
 
+def sidecar_headers(args) -> dict[str, str]:
+    """The headers every sidecar request carries: the MCP tag and this
+    launch's token, read from ``sidecar.token`` beside the port file.
+
+    Read per request, as the port is: each launch of the app makes a new
+    token. With no ``--data-dir`` or no file there is none to send, and a
+    sidecar started by the app refuses the request.
+    """
+    headers = dict(MCP_HEADERS)
+    if args.data_dir:
+        try:
+            token = (Path(args.data_dir) / TOKEN_FILENAME).read_text().strip()
+        except OSError:
+            token = ""
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
 def discover_sidecar_url(args) -> str:
     """Resolve the sidecar URL at startup, with a grace window for slow boots.
 
@@ -172,14 +192,21 @@ class SidecarClient:
     def _resolve(self) -> str | None:
         return current_sidecar_url(self._args)
 
+    def _client(self) -> httpx.AsyncClient:
+        # trust_env off: httpx would otherwise send these loopback calls,
+        # note bodies and all, through the machine's HTTP proxy.
+        return httpx.AsyncClient(
+            headers=sidecar_headers(self._args),
+            timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS,
+            trust_env=False,
+        )
+
     async def get(self, path: str) -> dict | str:
         url = self._resolve()
         if url is None:
             return _SIDECAR_DOWN_HINT
         try:
-            async with httpx.AsyncClient(
-                headers=MCP_HEADERS, timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS
-            ) as client:
+            async with self._client() as client:
                 resp = await client.get(f"{url}{path}")
                 resp.raise_for_status()
                 return resp.json()
@@ -195,9 +222,7 @@ class SidecarClient:
         if url is None:
             return _SIDECAR_DOWN_HINT
         try:
-            async with httpx.AsyncClient(
-                headers=MCP_HEADERS, timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS
-            ) as client:
+            async with self._client() as client:
                 resp = await client.post(f"{url}{path}", json=json)
                 resp.raise_for_status()
                 return resp.json()
@@ -213,9 +238,7 @@ class SidecarClient:
         if url is None:
             return _SIDECAR_DOWN_HINT
         try:
-            async with httpx.AsyncClient(
-                headers=MCP_HEADERS, timeout=SIDECAR_REQUEST_TIMEOUT_SECONDS
-            ) as client:
+            async with self._client() as client:
                 resp = await client.put(f"{url}{path}", json=json)
                 resp.raise_for_status()
                 return resp.json()
@@ -1579,13 +1602,19 @@ async def arrange_board(session: str | None = None, campaign: str | None = None)
 # Main
 # ---------------------------------------------------------------------------
 
-def check_sidecar_health(url: str) -> None:
+def check_sidecar_health(url: str, args) -> None:
     """Log whether the FastAPI sidecar is reachable. Non-blocking — the
     MCP server starts regardless, since the sidecar may launch later."""
     try:
-        resp = httpx.get(f"{url}/health", timeout=2.0)
+        resp = httpx.get(
+            f"{url}/health", headers=sidecar_headers(args), timeout=2.0, trust_env=False,
+        )
         resp.raise_for_status()
         print(f"Sidecar is running at {url}", file=sys.stderr)
+    except httpx.HTTPStatusError as e:
+        # Answering, but not to us: a token from another launch, or
+        # something else on a stale port. The tools report it per call.
+        print(f"Warning: Sidecar at {url} refused the health check ({e}).", file=sys.stderr)
     except (httpx.ConnectError, httpx.TimeoutException):
         print(
             f"Warning: Sidecar not reachable at {url}. "
@@ -1603,7 +1632,10 @@ def heartbeat_loop(args) -> None:
         url = current_sidecar_url(args)
         if url:
             try:
-                httpx.post(f"{url}/api/mcp-heartbeat", timeout=2.0)
+                httpx.post(
+                    f"{url}/api/mcp-heartbeat", headers=sidecar_headers(args),
+                    timeout=2.0, trust_env=False,
+                )
             except Exception:
                 pass
         time.sleep(HEARTBEAT_INTERVAL_SECONDS)
@@ -1612,7 +1644,7 @@ def heartbeat_loop(args) -> None:
 if __name__ == "__main__":
     args = parse_args()
     sidecar = SidecarClient(args)
-    check_sidecar_health(discover_sidecar_url(args))
+    check_sidecar_health(discover_sidecar_url(args), args)
     threading.Thread(
         target=heartbeat_loop,
         args=(args,),

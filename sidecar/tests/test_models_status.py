@@ -17,7 +17,7 @@ class _Proc:
 def _stub(monkeypatch, running, health=None):
     monkeypatch.setattr(embedder, "_proc", _Proc() if running else None)
     monkeypatch.setattr(embedder, "_base_url", "http://127.0.0.1:9")
-    monkeypatch.setattr(httpx, "get", lambda url, timeout: httpx.Response(health or 503))
+    monkeypatch.setattr(httpx, "get", lambda url, timeout, trust_env: httpx.Response(health or 503))
 
 
 def test_status_when_runtime_down(monkeypatch):

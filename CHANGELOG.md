@@ -34,6 +34,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Tray cards move by drag.** In Play, a drag along the card tray puts a card in a different place in the live set
 - **Cards answer with the hand tool.** On the board, with the hand tool, a note or image card still plays, opens and stands; a drag still pans and moves nothing
 
+### Fixed
+
+- **Only the app and its MCP server get an answer from the app's local service.** Other programs and web pages on the same computer get a refusal; an AI agent that is already connected continues to work
+- **A system proxy does not receive the app's data.** Search text, note text and book text stay on the computer when the computer uses a proxy
+
 ## [4.3.0] - 2026-10-25
 
 Legend Lore no longer deletes library files: it removes books from the index and leaves the files on disk. Users do not need to index their books again.

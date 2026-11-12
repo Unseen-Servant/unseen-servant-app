@@ -265,7 +265,7 @@ fn api_query(path: &str, params: &[(&str, &str)]) -> Result<reqwest::Url, String
 }
 
 fn client() -> reqwest::Client {
-    reqwest::Client::new()
+    crate::sidecar_client()
 }
 
 /// What to tell the GM when the sidecar refuses: its own `detail` message

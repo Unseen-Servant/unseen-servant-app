@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock, PoisonError, RwLock};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
@@ -77,6 +77,70 @@ fn sidecar_url() -> String {
     format!("http://127.0.0.1:{}", SIDECAR_PORT.load(Ordering::Relaxed))
 }
 
+/// The one client every call to the sidecar goes through, rebuilt with the
+/// launch token once the boot has read it (`set_sidecar_token`).
+static SIDECAR_CLIENT: OnceLock<RwLock<reqwest::Client>> = OnceLock::new();
+
+/// A client for the sidecar and nothing else.
+///
+/// No proxy: reqwest otherwise follows `HTTP_PROXY` and the system proxy,
+/// neither of which excepts loopback, and would hand search queries and note
+/// text to the proxy's host. No idle pool, so each call opens its own
+/// connection, as it did when each built its own client. `token` rides on
+/// every request: the sidecar refuses one without it.
+fn build_sidecar_client(token: Option<&str>) -> reqwest::Client {
+    let mut headers = reqwest::header::HeaderMap::new();
+    let bearer =
+        token.and_then(|t| reqwest::header::HeaderValue::from_str(&format!("Bearer {t}")).ok());
+    if let Some(mut bearer) = bearer {
+        bearer.set_sensitive(true);
+        headers.insert(reqwest::header::AUTHORIZATION, bearer);
+    }
+    reqwest::Client::builder()
+        .no_proxy()
+        .pool_max_idle_per_host(0)
+        .default_headers(headers)
+        .build()
+        // What reqwest::Client::new() does when the TLS backend won't load.
+        .expect("failed to build the sidecar HTTP client")
+}
+
+fn sidecar_client_slot() -> &'static RwLock<reqwest::Client> {
+    SIDECAR_CLIENT.get_or_init(|| RwLock::new(build_sidecar_client(None)))
+}
+
+/// Cheap: a reqwest client is a handle on shared state.
+fn sidecar_client() -> reqwest::Client {
+    sidecar_client_slot()
+        .read()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
+}
+
+fn set_sidecar_token(token: &str) {
+    *sidecar_client_slot()
+        .write()
+        .unwrap_or_else(PoisonError::into_inner) = build_sidecar_client(Some(token));
+}
+
+/// This launch's token, from the file the sidecar writes beside its port
+/// file (`write_token_file` in server.py).
+fn read_sidecar_token(token_file: &Path) -> Result<String, String> {
+    let unreadable = |why: String| {
+        format!(
+            "Can't read the sidecar's token at {}: {}",
+            token_file.display(),
+            why
+        )
+    };
+    let raw = std::fs::read_to_string(token_file).map_err(|e| unreadable(e.to_string()))?;
+    let token = raw.trim();
+    if token.is_empty() {
+        return Err(unreadable("the file is empty".into()));
+    }
+    Ok(token.to_string())
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct ModelStatus {
     role: String,
@@ -96,7 +160,7 @@ struct ModelsStatus {
 /// model); this is a plain proxy, like `check_mcp_status`.
 #[tauri::command]
 async fn check_models_status() -> Result<ModelsStatus, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     match client
         .get(format!("{}/api/models/status", sidecar_url()))
         .timeout(std::time::Duration::from_secs(5))
@@ -113,7 +177,7 @@ async fn check_models_status() -> Result<ModelsStatus, String> {
 
 #[tauri::command]
 async fn check_sidecar_health() -> Result<bool, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     match client
         .get(format!("{}/health", sidecar_url()))
         .timeout(std::time::Duration::from_secs(3))
@@ -133,7 +197,7 @@ struct McpStatus {
 
 #[tauri::command]
 async fn check_mcp_status() -> Result<McpStatus, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     match client
         .get(format!("{}/api/mcp-status", sidecar_url()))
         .timeout(std::time::Duration::from_secs(3))
@@ -408,7 +472,9 @@ fn start_sidecar(
 
     // Stale port file from a previous run would mislead wait_for_sidecar.
     // Sidecar will rewrite it after it binds, but clear it now to be safe.
+    // The token file goes with it: the sidecar writes a new one first.
     let _ = std::fs::remove_file(data_dir.join("sidecar.port"));
+    let _ = std::fs::remove_file(data_dir.join("sidecar.token"));
 
     let mut cmd = Command::new(&program);
     cmd.args(&base_args)
@@ -864,6 +930,62 @@ mod tests {
         assert!(msg.starts_with("Sidecar did not become ready"), "{msg}");
         assert!(!msg.contains("last 20 lines"), "{msg}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn read_sidecar_token_trims_the_file_and_refuses_an_empty_or_missing_one() {
+        let dir = scratch_dir("token");
+        let file = dir.join("sidecar.token");
+        std::fs::write(&file, "s3cret-token\n").unwrap();
+        assert_eq!(read_sidecar_token(&file), Ok("s3cret-token".to_string()));
+
+        std::fs::write(&file, "  \n").unwrap();
+        let empty = read_sidecar_token(&file).unwrap_err();
+        assert!(empty.contains("sidecar.token"), "{empty}");
+        assert!(read_sidecar_token(&dir.join("missing.token")).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The request a client sends to a one-shot local server, as raw text.
+    fn request_sent_by(client: reqwest::Client) -> String {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/health", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = stream.read(&mut buf).unwrap();
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+            }
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+                .unwrap();
+            String::from_utf8_lossy(&request).to_lowercase()
+        });
+        tauri::async_runtime::block_on(client.get(url).send()).unwrap();
+        server.join().unwrap()
+    }
+
+    #[test]
+    fn the_sidecar_client_carries_the_launch_token_on_every_request() {
+        let sent = request_sent_by(build_sidecar_client(Some("s3cret-token")));
+        assert!(
+            sent.contains("authorization: bearer s3cret-token"),
+            "{sent}"
+        );
+        assert!(sent.starts_with("get /health "), "{sent}");
+    }
+
+    #[test]
+    fn the_sidecar_client_sends_no_token_before_the_boot_has_read_one() {
+        let sent = request_sent_by(build_sidecar_client(None));
+        assert!(!sent.contains("authorization"), "{sent}");
     }
 
     #[test]

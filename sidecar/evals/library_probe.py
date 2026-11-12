@@ -88,7 +88,11 @@ def start_sidecar(data_dir: Path, log_path: Path):
     for _ in range(600):
         if port_file.exists():
             try:
-                return proc, f"http://127.0.0.1:{int(port_file.read_text().strip())}"
+                base = f"http://127.0.0.1:{int(port_file.read_text().strip())}"
+                # The launch token, written before the port file: the
+                # sidecar refuses a request without it (server.py).
+                token = (data_dir / "sidecar.token").read_text().strip()
+                return proc, base, token
             except ValueError:
                 pass
         if proc.poll() is not None:
@@ -108,9 +112,10 @@ def main():
     if not args.data_dir.exists():
         sys.exit(f"no indexed data at {args.data_dir}")
 
-    proc, base = start_sidecar(args.data_dir, args.log)
+    proc, base, token = start_sidecar(args.data_dir, args.log)
+    http = httpx.Client(headers={"Authorization": f"Bearer {token}"}, trust_env=False)
     try:
-        stats = httpx.get(f"{base}/api/stats", timeout=60).json()
+        stats = http.get(f"{base}/api/stats", timeout=60).json()
         print(f"library: {stats['total_documents']} books, "
               f"{stats['total_chunks']:,} chunks, n_results={args.n_results}\n")
 
@@ -120,8 +125,8 @@ def main():
 
         for query in DEFAULT_QUERIES:
             body = {"query": query, "n_results": args.n_results}
-            results = httpx.post(f"{base}/api/search", json=body,
-                                 timeout=300).json().get("results", [])
+            results = http.post(f"{base}/api/search", json=body,
+                                timeout=300).json().get("results", [])
             tiers = Counter(r["tier"] for r in results)
             tiers_total.update(tiers)
             for r in results:

@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 use tauri::Emitter;
 
-use super::sidecar_url;
+use super::{sidecar_client, sidecar_url};
 use crate::sse::SseFrames;
 
 // ---------------------------------------------------------------------------
@@ -442,7 +442,7 @@ pub fn list_tree(folder_path: String) -> Result<Vec<FileItem>, String> {
 
 #[tauri::command]
 pub async fn get_index_status(paths: Vec<String>) -> Result<IndexStatusResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/index-status", sidecar_url()))
         .json(&serde_json::json!({ "selected_paths": paths }))
@@ -537,7 +537,7 @@ async fn consume_sync_stream(
 
 #[tauri::command]
 pub async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<SyncResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/sync-index-stream", sidecar_url()))
         .json(&serde_json::json!({ "selected_paths": paths }))
@@ -555,7 +555,7 @@ pub async fn sync_index(app: tauri::AppHandle, paths: Vec<String>) -> Result<Syn
 
 #[tauri::command]
 pub async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/reindex-all-stream", sidecar_url()))
         .send()
@@ -572,7 +572,7 @@ pub async fn reindex_all(app: tauri::AppHandle) -> Result<SyncResult, String> {
 
 #[tauri::command]
 pub async fn reindex_file(path: String) -> Result<ReindexFileResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/reindex-file", sidecar_url()))
         .json(&serde_json::json!({ "path": path }))
@@ -594,7 +594,7 @@ pub async fn reindex_file(path: String) -> Result<ReindexFileResult, String> {
 
 #[tauri::command]
 pub async fn get_document_stats(path: String) -> Result<DocumentStats, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .get(format!("{}/api/sources", sidecar_url()))
         .send()
@@ -619,7 +619,7 @@ pub async fn get_document_stats(path: String) -> Result<DocumentStats, String> {
 
 #[tauri::command]
 pub async fn get_known_game_systems() -> Result<KnownGameSystemsResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .get(format!("{}/api/known-game-systems", sidecar_url()))
         .send()
@@ -636,7 +636,7 @@ pub async fn get_known_game_systems() -> Result<KnownGameSystemsResult, String> 
 
 #[tauri::command]
 pub async fn get_stats() -> Result<StatsResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .get(format!("{}/api/stats", sidecar_url()))
         .send()
@@ -653,7 +653,7 @@ pub async fn get_stats() -> Result<StatsResult, String> {
 
 #[tauri::command]
 pub async fn delete_index() -> Result<DeleteIndexResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/delete-index", sidecar_url()))
         .send()
@@ -679,7 +679,7 @@ pub async fn set_game_systems(
     path: String,
     game_systems: Vec<String>,
 ) -> Result<SetGameSystemResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/set-game-systems", sidecar_url()))
         .json(&serde_json::json!({
@@ -714,7 +714,7 @@ pub async fn create_custom_game_system(
     keywords: Vec<String>,
     color: Option<String>,
 ) -> Result<CustomGameSystemResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/custom-game-systems", sidecar_url()))
         .json(&serde_json::json!({
@@ -747,7 +747,7 @@ pub async fn update_custom_game_system(
     keywords: Vec<String>,
     color: Option<String>,
 ) -> Result<CustomGameSystemResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let encoded_tag = original_tag.replace("&", "%26").replace(" ", "%20");
     let response = client
         .put(format!(
@@ -780,7 +780,7 @@ pub async fn update_custom_game_system(
 
 #[tauri::command]
 pub async fn delete_custom_game_system(tag: String) -> Result<DeleteCustomSystemResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let encoded_tag = tag.replace("&", "%26").replace(" ", "%20");
     let response = client
         .delete(format!(
@@ -811,7 +811,7 @@ pub async fn toggle_builtin_game_system(
     tag: String,
     disabled: bool,
 ) -> Result<ToggleBuiltinResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!(
             "{}/api/custom-game-systems/toggle-builtin",
@@ -845,7 +845,7 @@ pub async fn toggle_builtin_game_system(
 
 #[tauri::command]
 pub async fn get_collections() -> Result<CollectionsResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .get(format!("{}/api/collections", sidecar_url()))
         .send()
@@ -882,7 +882,7 @@ pub async fn search_index(
     // instead of spell-correcting it and prefix-matches it in BM25.
     partial: Option<bool>,
 ) -> Result<SearchResponse, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}/api/search", sidecar_url()))
         .json(&serde_json::json!({
@@ -916,7 +916,7 @@ pub async fn search_index(
 
 #[tauri::command]
 pub async fn get_search_settings() -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .get(format!("{}/api/search-settings", sidecar_url()))
         .send()
@@ -942,7 +942,7 @@ pub async fn get_search_settings() -> Result<serde_json::Value, String> {
 pub async fn update_search_settings(
     partial: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .put(format!("{}/api/search-settings", sidecar_url()))
         .json(&partial)
@@ -972,7 +972,7 @@ pub async fn create_collection(
     description: String,
     color: Option<String>,
 ) -> Result<CollectionMutationResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let mut body = serde_json::json!({
         "name": name,
         "file_paths": file_paths,
@@ -1036,7 +1036,7 @@ pub async fn update_collection(
     color: Option<String>,
     archived: Option<bool>,
 ) -> Result<CollectionMutationResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let mut body = serde_json::Map::new();
     if let Some(paths) = file_paths {
         body.insert("file_paths".to_string(), serde_json::json!(paths));
@@ -1077,7 +1077,7 @@ pub async fn rename_collection(
     name: String,
     new_name: String,
 ) -> Result<CollectionMutationResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(collection_url(&sidecar_url(), &name, Some("rename"))?)
         .json(&serde_json::json!({ "new_name": new_name }))
@@ -1103,7 +1103,7 @@ pub async fn rename_collection(
 
 #[tauri::command]
 pub async fn delete_collection(name: String) -> Result<CollectionDeleteResult, String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .delete(collection_url(&sidecar_url(), &name, None)?)
         .send()
@@ -1210,7 +1210,7 @@ pub async fn rename_file(old_path: String, new_name: String) -> Result<String, S
     let new_path_str = ui_path(&new_path);
 
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let _ = client
         .post(format!("{}/api/file-rename", sidecar_url()))
         .json(&serde_json::json!({
@@ -1251,7 +1251,7 @@ pub async fn rename_folder(old_path: String, new_name: String) -> Result<String,
     let new_path_str = ui_path(&new_path);
 
     // Best-effort sidecar update — if it fails, the next auto-sync will handle it
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let _ = client
         .post(format!("{}/api/folder-rename", sidecar_url()))
         .json(&serde_json::json!({
@@ -1276,7 +1276,7 @@ pub async fn unindex_folder(path: String) -> Result<(), String> {
 
 // Drops index entries only; the files stay on disk.
 async fn post_unindex(route: &str, body: serde_json::Value) -> Result<(), String> {
-    let client = reqwest::Client::new();
+    let client = sidecar_client();
     let response = client
         .post(format!("{}{}", sidecar_url(), route))
         .json(&body)

@@ -57,6 +57,11 @@ READY_TIMEOUT_SECONDS = 60.0
 
 _REPO = Path(__file__).resolve().parents[2]
 
+# Passed to every call: httpx otherwise follows the machine's proxy
+# settings (HTTP_PROXY, macOS and Windows system proxies) with no exception
+# for loopback, and would hand the library's text to the proxy.
+_NO_PROXY = {"trust_env": False}
+
 _lock = threading.Lock()
 _proc: subprocess.Popen | None = None
 _base_url: str | None = None
@@ -183,7 +188,7 @@ def _ready() -> str:
                 "Try again; if it keeps stopping, see llama-server.log."
             )
         try:
-            if httpx.get(f"{_base_url}/health", timeout=2.0).status_code == 200:
+            if httpx.get(f"{_base_url}/health", timeout=2.0, **_NO_PROXY).status_code == 200:
                 return _base_url
         except httpx.HTTPError:
             pass
@@ -206,14 +211,18 @@ def _fit(base: str, texts: list[str]) -> list[str]:
 
     fitted = []
     for text in texts:
-        toks = httpx.post(f"{base}/tokenize", json={"content": text}, timeout=30).json()["tokens"]
+        toks = httpx.post(
+            f"{base}/tokenize", json={"content": text}, timeout=30, **_NO_PROXY,
+        ).json()["tokens"]
         with_specials = httpx.post(
             f"{base}/tokenize", json={"content": text, "add_special": True}, timeout=30,
+            **_NO_PROXY,
         ).json()["tokens"]
         keep = MAX_INPUT_TOKENS - (len(with_specials) - len(toks))
         if len(toks) > keep:
             text = httpx.post(
                 f"{base}/detokenize", json={"tokens": toks[:keep]}, timeout=30,
+                **_NO_PROXY,
             ).json()["content"]
         fitted.append(text)
     return fitted
@@ -240,6 +249,7 @@ def embed(texts: list[str]) -> list[list[float]]:
                 f"{base}/v1/embeddings",
                 json={"model": EMBEDDING_MODEL, "input": texts},
                 timeout=timeout,
+                **_NO_PROXY,
             )
         except httpx.ConnectError as e:
             raise RuntimeError(
@@ -279,7 +289,7 @@ def embedder_status() -> dict:
     ready = False
     if runtime_up:
         try:
-            ready = httpx.get(f"{_base_url}/health", timeout=3.0).status_code == 200
+            ready = httpx.get(f"{_base_url}/health", timeout=3.0, **_NO_PROXY).status_code == 200
         except Exception:
             pass
     return {

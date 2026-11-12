@@ -3,14 +3,21 @@ Unseen Servant sidecar — app construction and process lifecycle.
 
 Started automatically by the Tauri desktop app. Builds one FastAPI app,
 serves liveness and MCP connection state itself, and mounts each tool's
-router (today: Legend Lore, ``legend_lore/router.py``).
+router (``legend_lore/router.py``, ``command/router.py``).
+
+The API listens on loopback, which every local process and every web page
+in a browser can reach. So each launch makes a token (``sidecar.token``,
+beside ``sidecar.port``) and a request without it is refused: the app and
+the MCP server read the file, nothing else can.
 
 Usage:
     python server.py --port 8420 --data-dir /path/to/app/data
 """
 
 import argparse
+import hmac
 import os
+import secrets
 import signal
 import sys
 import threading
@@ -20,6 +27,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 import uvicorn
 
 from legend_lore.embedder import (
@@ -45,6 +54,7 @@ from legend_lore.service import (
 # ---------------------------------------------------------------------------
 
 PORT_FILENAME = "sidecar.port"
+TOKEN_FILENAME = "sidecar.token"
 
 
 def parse_args():
@@ -84,6 +94,61 @@ def remove_port_file(data_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# The launch token
+# ---------------------------------------------------------------------------
+
+def write_token_file(data_dir: Path, token: str) -> None:
+    """Publish this launch's token for the app and the MCP server to read.
+
+    Written before the port file, so whoever finds the port finds the token
+    of the same launch. Readable by the user alone: the token is what keeps
+    other accounts on the machine, and web pages, out of the API.
+    """
+    target = data_dir / TOKEN_FILENAME
+    tmp = target.with_suffix(".token.tmp")
+    # A leftover tmp would keep its old mode: O_EXCL makes the 0600 stick.
+    tmp.unlink(missing_ok=True)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(token)
+    os.replace(tmp, target)
+
+
+def remove_token_file(data_dir: Path) -> None:
+    """Best-effort cleanup of the published token on shutdown."""
+    try:
+        (data_dir / TOKEN_FILENAME).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+class TokenGuard:
+    """Refuse an HTTP request that doesn't carry the launch token.
+
+    Loopback is no boundary by itself: a web page can POST to 127.0.0.1
+    (CORS stops it reading the answer, not the request landing), and a
+    DNS-rebinding page or another local account can read too. Plain ASGI
+    rather than ``@app.middleware`` so the event stream passes untouched.
+    """
+
+    def __init__(self, app, token: str):
+        self.app = app
+        self._expected = f"Bearer {token}".encode()
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            given = dict(scope["headers"]).get(b"authorization", b"")
+            if not hmac.compare_digest(given, self._expected):
+                refusal = JSONResponse(
+                    {"detail": "The sidecar takes requests from Unseen Servant only"},
+                    status_code=401,
+                )
+                await refusal(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
+# ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
@@ -113,6 +178,7 @@ def create_app(
     store: LibraryStore | None = None,
     data_dir: Path | None = None,
     embed_fn=None,
+    token: str | None = None,
 ):
     """Create the FastAPI app, optionally with a pre-configured store.
 
@@ -126,6 +192,9 @@ def create_app(
                   In production, resolved from --data-dir CLI arg.
                   In tests, pass tmp_path.
         embed_fn: ``texts -> vectors``; defaults to ``embedder.embed``.
+        token: The launch token every request must carry, with a loopback
+               ``Host``. ``__main__`` always passes one; None leaves the
+               API open, for tests that drive it in-process.
     """
     if store is None:
         args = parse_args()
@@ -136,6 +205,12 @@ def create_app(
         embed_fn = embed
 
     app = FastAPI(title="Legend Lore Sidecar")
+
+    # Middleware added later wraps what was added before. The token guard
+    # goes in first so that CORS, outside it, still answers a preflight
+    # (which carries no Authorization header).
+    if token is not None:
+        app.add_middleware(TokenGuard, token=token)
 
     # Sidecar binds to 127.0.0.1 only, but the wildcard CORS still let any
     # local origin's webview talk to us. Tightening to the known Tauri
@@ -152,6 +227,13 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Outermost: a request whose Host isn't loopback came through a name
+    # that resolves here (DNS rebinding), whatever else it carries.
+    if token is not None:
+        app.add_middleware(
+            TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"]
+        )
 
     # MCP connection tracking — heartbeat + activity timestamps. Tracked
     # in-memory; any agent reconnect resends a heartbeat within 30s.
@@ -289,6 +371,8 @@ if __name__ == "__main__":
     print(f"Starting sidecar on port {actual_port}, data dir: {data_dir}")
 
     data_dir.mkdir(parents=True, exist_ok=True)
+    token = secrets.token_urlsafe(32)
+    write_token_file(data_dir, token)
     write_port_file(data_dir, actual_port)
 
     # The reranker's model cache. fastembed defaults to the OS temp dir,
@@ -316,7 +400,7 @@ if __name__ == "__main__":
     # sidecar.log, which Rust writes one level above the data dir.
     start_embedder(log_dir=data_dir.parent)
 
-    application = create_app()
+    application = create_app(token=token)
 
     # Same deal one layer up: the first search would otherwise load the
     # cross-encoder and build the spell vocabulary itself (issue #341).
@@ -333,3 +417,4 @@ if __name__ == "__main__":
         asyncio.run(server.serve(sockets=[sock]))
     finally:
         remove_port_file(data_dir)
+        remove_token_file(data_dir)
