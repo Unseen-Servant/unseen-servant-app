@@ -316,13 +316,19 @@ export function encounterTracks(index: CampaignIndex): string[] {
   return index.tracks.filter((t) => index.kinds[t] === 'encounter');
 }
 
-/** The track `by` along from `from`, wrapping as Augury's sets do. From a
- *  track that's gone, the first or the last. */
-export function stepTrack(tracks: string[], from: string | null, by: 1 | -1): string | null {
-  if (!tracks.length) return null;
-  const at = from === null ? -1 : tracks.indexOf(from);
-  if (at < 0) return by > 0 ? tracks[0] : tracks[tracks.length - 1];
-  return tracks[(at + by + tracks.length) % tracks.length];
+/** The name `track`'s next encounter takes, as the sidecar gives it
+ *  (encounter.py next_name): the track's name and one more than the
+ *  highest number in a note named that way, and free. */
+export function nextEncounterName(notes: NoteEntry[], track: string): string {
+  const key = track.toLocaleLowerCase();
+  const taken = new Set(notes.map((note) => note.name.toLocaleLowerCase()));
+  let n = 1;
+  for (const name of taken) {
+    const tail = name.slice(key.length + 1);
+    if (name.startsWith(`${key} `) && /^\d+$/.test(tail)) n = Math.max(n, Number(tail) + 1);
+  }
+  while (taken.has(`${key} ${n}`)) n++;
+  return `${track} ${n}`;
 }
 
 /** A track's encounters still to run, as its column shows them. */

@@ -7,15 +7,17 @@
   // the note elsewhere comes back through the vault watcher; when it lands
   // under a write of Foresight's, the note's version wins.
   //
-  // The top line is Augury's strip: ◀ ▶ step through the encounter tracks, on
-  // the encounter last open in that track or else its first, and + names a
-  // new track. The line under it holds the encounter selector and the turn.
-  // Empty, Foresight is the bare instrument: the first row named in its
-  // empty row makes the track's next note, or with no encounter track yet
-  // the track too. Clearing spends the note, which stays in the campaign. The
-  // track shown (`foresightTrack`) and the last encounter open in each
-  // (`foresightOpen`) are kept per campaign, and Foresight follows the
-  // campaign open in Command, as Augury's Tracks set does.
+  // One line heads it: the encounter key and the turn. The key reads the
+  // open encounter's name, the track only in its tooltip and its menu. The
+  // menu holds the encounter tracks, each with its encounters still to run
+  // and + New, then + New track, and Clear while one is open.
+  // Empty, Foresight is the bare instrument: the key reads the note its
+  // first row will make, and that row makes it, or with no encounter track
+  // yet the track too. Clearing spends the note, which stays in the
+  // campaign. The track shown (`foresightTrack`) and the last encounter open
+  // in each (`foresightOpen`) are kept per campaign, so a campaign opens on
+  // the encounter last open in it, and Foresight follows the campaign open
+  // in Command, as Augury's Tracks set does.
   //
   // The columns are the GM's, edited on the plate with the idioms of
   // Command's tracks: + names one in place, a double-click renames, a drag
@@ -39,7 +41,7 @@
   import { linkedNote } from '../command/columns';
   import CommandMenu from '../command/CommandMenu.svelte';
   import InlineName from '../command/InlineName.svelte';
-  import { action, choice, divider, keyed, type MenuItem, type OpenMenu } from '../command/menu';
+  import { action, choice, divider, heading, keyed, type MenuItem, type OpenMenu } from '../command/menu';
   import { CARD_MIME, TRACK_MIME, draggedNote, isCardDrag, isNoteDrag, isTrackDrag } from '../command/noteDrag';
   import type { CampaignIndex, NoteEntry } from '../command/types';
   import { m } from '../paraglide/messages';
@@ -69,6 +71,7 @@
     linkName,
     moveColumn,
     moveRow,
+    nextEncounterName,
     onOpenEncounter,
     removeColumn,
     removeRow,
@@ -76,7 +79,6 @@
     renameRow,
     setCell,
     step,
-    stepTrack,
     toggleOut,
     trackEncounters,
     trackNotes,
@@ -106,9 +108,7 @@
   // The campaign Foresight has opened its encounter for; a launch can come
   // before the sidecar is up to answer.
   let settled: string | null = null;
-  // The track ◀ ▶ are heading for while it's read, so a second press goes on
-  // from there. `arrivals` counts the openings, so a slower one is dropped.
-  let headed: string | null = null;
+  // `arrivals` counts the openings, so a slower one is dropped.
   let arrivals = 0;
   let namingTrack = false;
   let selectorMenu: OpenMenu | null = null;
@@ -136,6 +136,8 @@
   // The campaign's index, read when a drag or the empty row needs it and
   // kept until a note other than the open encounter changes.
   let known: CampaignIndex | null = null;
+  // The last one read, kept through a read again, for the key's words.
+  let lastKnown: CampaignIndex | null = null;
   let knowing: Promise<CampaignIndex | null> | null = null;
   let indexReads = 0;
   let indexTimer: ReturnType<typeof setTimeout> | undefined;
@@ -174,6 +176,10 @@
     '18px',
   ].join(' ');
   $: cells = readoutCells(enc?.round ?? null, 1);
+  // The key's words: the open encounter, else the note the first row will
+  // make, which names its track.
+  $: keyTrack = here ?? m.foresight_default_track();
+  $: keyName = enc?.name ?? (lastKnown ? nextEncounterName(lastKnown.notes, keyTrack) : '');
   $: turnRow = rows.find((r) => r.name === enc?.turn) ?? null;
   // The open encounter's columns are its track's next one's, while the track
   // is there: renamed, the encounter is about to follow it.
@@ -255,8 +261,8 @@
     enc = null;
     tracks = [];
     kept = {};
+    lastKnown = null;
     settled = null;
-    headed = null;
     closeAll();
     forgetIndex();
     waiting = [];
@@ -282,48 +288,45 @@
    *  to run, else Foresight is empty on it. */
   async function arrive(campaign: string, track: string) {
     const at = ++arrivals;
-    try {
-      await flushed;
-      const index = await indexFor();
-      if (!index || at !== arrivals || shown !== campaign) return;
-      const path = arrival(index, track, opened[campaign]?.[track]);
-      const got = path ? await encounterApi.read(campaign, path).catch(() => null) : null;
-      if (at !== arrivals || shown !== campaign) return;
-      closeAll();
-      version += 1;
-      enc = got && !got.spent ? shape(got) : null;
-      if (enc) keepOpen(campaign, enc);
-      else keepTrack(campaign, track);
-    } finally {
-      if (at === arrivals) headed = null;
-    }
+    await flushed;
+    const index = await indexFor();
+    if (!index || at !== arrivals || shown !== campaign) return;
+    const path = arrival(index, track, opened[campaign]?.[track]);
+    const got = path ? await encounterApi.read(campaign, path).catch(() => null) : null;
+    if (at !== arrivals || shown !== campaign) return;
+    closeAll();
+    version += 1;
+    enc = got && !got.spent ? shape(got) : null;
+    if (enc) keepOpen(campaign, enc);
+    else keepTrack(campaign, track);
   }
 
-  /** ◀ and ▶ on the top line. */
-  function stepTracks(by: 1 | -1) {
-    const campaign = shown;
-    const track = stepTrack(tracks, headed ?? here, by);
-    if (!campaign || !track) return;
-    headed = track;
-    forgetIndex();
-    void arrive(campaign, track);
-  }
-
-  /** The encounter selector: the track's encounters still to run, and a new
-   *  one. */
+  /** The encounter key's menu: each encounter track's encounters still to
+   *  run under its name, and + New; one track needs no name. Then a new
+   *  track, and Clear while an encounter is open, away from the turn's ▶. */
   async function openSelector() {
     const campaign = shown;
     if (!campaign) return;
     forgetIndex();
     const index = await indexFor();
     if (!index || shown !== campaign) return;
-    const notes = here ? trackEncounters(index, here) : [];
     const box = selectorEl.getBoundingClientRect();
-    const items: MenuItem[] = [
-      ...notes.map((note) => choice(note.name, note.path === enc?.path, () => void openEncounter(campaign, note.path))),
-      ...(notes.length ? [divider] : []),
-      action(m.foresight_new_encounter(), () => void startNew(here)),
-    ];
+    const encountersOf = (track: string | null): MenuItem[] =>
+      (track ? trackEncounters(index, track) : []).map((note) => choice(note.name, note.path === enc?.path, () => void openEncounter(campaign, note.path)));
+    const newTrack = action(m.foresight_new_track_item(), () => (namingTrack = true));
+    let items: MenuItem[];
+    if (tracks.length > 1) {
+      items = [
+        ...tracks.flatMap((t) => [heading(t), ...encountersOf(t), action(m.foresight_new_encounter(), () => void startNew(t))]),
+        divider,
+        newTrack,
+      ];
+    } else {
+      const only = tracks[0] ?? null;
+      const notes = encountersOf(only);
+      items = [...notes, ...(notes.length ? [divider] : []), action(m.foresight_new_encounter(), () => void startNew(only)), newTrack];
+    }
+    if (enc) items = [...items, divider, action(m.foresight_clear_label(), () => void clear())];
     selectorMenu = { x: box.left, y: box.bottom + 3, items };
     menu = selectorMenu;
   }
@@ -334,7 +337,6 @@
     const campaign = shown;
     if (!campaign) return;
     arrivals += 1;
-    headed = null;
     await flushed;
     if (shown !== campaign) return;
     closeAll();
@@ -345,7 +347,8 @@
     void indexFor();
   }
 
-  /** `+` on the top line. A name that's taken is refused in the field. */
+  /** *+ New track*, named in the key's place. A name that's taken is
+   *  refused in the field. */
   async function createTrack(name: string): Promise<string | null> {
     const campaign = shown;
     if (!campaign) return null;
@@ -371,6 +374,7 @@
       (got) => {
         if (shown === campaign && read === indexReads) {
           known = got;
+          lastKnown = got;
           tracks = encounterTracks(got);
           if (edits === columnEdits) kept = { ...(kept[''] ? { '': kept[''] } : {}), ...got.encounter_columns };
         }
@@ -389,7 +393,6 @@
    *  nothing is lost. A spent one stays Command's to un-spend. */
   async function openEncounter(campaign: string, path: string) {
     const at = ++arrivals;
-    headed = null;
     await flushed;
     try {
       const got = await encounterApi.read(campaign, path);
@@ -458,7 +461,7 @@
 
   const unlistenVault = onVaultChange((event) => {
     const ours = event.campaign === null || event.campaign === shown;
-    // The top line shows the tracks, so what's forgotten is read again.
+    // The key's words come from the index, so what's forgotten is read again.
     if (ours && (!event.paths.length || event.paths.some((p) => p !== enc?.path))) {
       forgetIndex();
       clearTimeout(indexTimer);
@@ -878,77 +881,38 @@
   on:dragleave={leave}
   on:drop={dropOnPanel}
 >
-  <!-- The top line, Augury's strip: which encounter track. -->
+  <!-- The top line: which encounter, and its turn. -->
   <header class="bar">
-    <div class="well browser" role="group" aria-label={m.foresight_tracks_label()}>
-      <button
-        type="button"
-        class="key"
-        disabled={tracks.length < 2}
-        title={m.foresight_track_previous()}
-        aria-label={m.foresight_track_previous()}
-        on:click={() => stepTracks(-1)}
-      >
-        <svg class="back" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-      </button>
-      <span class="display" class:none={!tracks.length} title={headed ?? here ?? m.foresight_default_track()}>
-        {#if namingTrack}
-          <!-- RenameField rather than InlineName: a name that's taken needs
-               its refusal. -->
-          <span class="track-field">
-            <RenameField
-              value=""
-              placeholder={m.command_tracks_track_name()}
-              label={m.foresight_new_track()}
-              onCommit={createTrack}
-              onCancel={() => (namingTrack = false)}
-            />
-          </span>
-        {:else}
-          <span class="track-name readout-label">{headed ?? here ?? m.foresight_default_track()}</span>
-        {/if}
-      </span>
-      <button
-        type="button"
-        class="key"
-        disabled={tracks.length < 2}
-        title={m.foresight_track_next()}
-        aria-label={m.foresight_track_next()}
-        on:click={() => stepTracks(1)}
-      >
-        <svg viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-      </button>
-      <span class="rule" aria-hidden="true"></span>
-      <button
-        type="button"
-        class="key plus"
-        disabled={!shown}
-        title={m.foresight_new_track()}
-        aria-label={m.foresight_new_track()}
-        on:click={() => (namingTrack = true)}>+</button
-      >
-    </div>
-    {@render windowKey?.()}
-  </header>
-
-  <!-- Which encounter, and its turn. -->
-  <div class="line">
     <div class="pick-well">
-      <button
-        bind:this={selectorEl}
-        type="button"
-        class="pick"
-        class:none={!enc}
-        class:open={menu !== null && menu === selectorMenu}
-        disabled={!shown}
-        title={enc?.name ?? m.foresight_selector_title()}
-        aria-label={m.foresight_selector_title()}
-        on:click={() => void openSelector()}
-      >
-        <span class="pick-name">{enc?.name ?? m.foresight_no_encounter()}</span>
-        <!-- Font Awesome caret-right, turned down by .drop-caret -->
-        <svg class="drop-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
-      </button>
+      {#if namingTrack}
+        <!-- RenameField rather than InlineName: a name that's taken needs
+             its refusal. -->
+        <span class="track-field">
+          <RenameField
+            value=""
+            placeholder={m.command_tracks_track_name()}
+            label={m.foresight_new_track()}
+            onCommit={createTrack}
+            onCancel={() => (namingTrack = false)}
+          />
+        </span>
+      {:else}
+        <button
+          bind:this={selectorEl}
+          type="button"
+          class="pick"
+          class:none={!enc}
+          class:open={menu !== null && menu === selectorMenu}
+          disabled={!shown}
+          title={m.foresight_selector_path({ track: keyTrack, name: keyName })}
+          aria-label={m.foresight_selector_title()}
+          on:click={() => void openSelector()}
+        >
+          <span class="pick-name">{keyName}</span>
+          <!-- Font Awesome caret-right, turned down by .drop-caret -->
+          <svg class="drop-caret" viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
+        </button>
+      {/if}
     </div>
     <div class="well" role="group" aria-label={m.foresight_turn_label()}>
       <button
@@ -982,26 +946,9 @@
       >
         <svg viewBox="96 64 512 512" fill="currentColor" aria-hidden="true"><path d={CARET_RIGHT} /></svg>
       </button>
-      <span class="rule" aria-hidden="true"></span>
-      <!-- Command's spend key: clearing spends the encounter's note. -->
-      <button
-        type="button"
-        class="key"
-        disabled={!enc}
-        title={enc ? m.foresight_clear_title({ name: enc.name }) : m.foresight_clear_label()}
-        aria-label={m.foresight_clear_label()}
-        on:click={() => void clear()}
-      >
-        <!-- Font Awesome "box-archive" icon (src/lib/ui/icons/box-archive-solid-full.svg),
-             its viewBox cropped to the glyph. -->
-        <svg class="spend" viewBox="64 96 512 448" fill="currentColor" aria-hidden="true">
-          <path
-            d="M64 128C64 110.3 78.3 96 96 96L544 96C561.7 96 576 110.3 576 128L576 160C576 177.7 561.7 192 544 192L96 192C78.3 192 64 177.7 64 160L64 128zM96 240L544 240L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 240zM248 304C234.7 304 224 314.7 224 328C224 341.3 234.7 352 248 352L392 352C405.3 352 416 341.3 416 328C416 314.7 405.3 304 392 304L248 304z"
-          />
-        </svg>
-      </button>
     </div>
-  </div>
+    {@render windowKey?.()}
+  </header>
 
   <!-- The plate names the columns, the rows' names first; Command's track
        plates are edited the same way. -->
@@ -1215,62 +1162,22 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.4rem;
     height: var(--header-height);
     padding: 1px 0.5rem 0;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  /* Augury's strip (AuguryPanel .browser, .display, .set-name). */
-  .browser {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .display {
+  /* A new track's name, in the key's place. */
+  .track-field {
     flex: 1;
     min-width: 0;
     display: flex;
     align-items: center;
     height: 22px;
     padding: 0 0.3rem;
-  }
-
-  .track-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* The track the first row will make, a step down the ramp. */
-  .display.none .track-name {
-    color: var(--text-tertiary);
-  }
-
-  .track-field {
-    flex: 1;
-    min-width: 0;
-    display: flex;
     font-size: 0.8rem;
-  }
-
-  .key.plus {
-    font-size: 0.95rem;
-    line-height: 1;
-  }
-
-  .line {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    height: 34px;
-    padding: 0 0.5rem;
-    background: var(--bg-header);
-    border-bottom: 1px solid var(--border-subtle);
   }
 
   /* Command's campaign key in its well (CommandPanel .key-body, .key-face). */
@@ -1312,7 +1219,8 @@
     cursor: default;
   }
 
-  /* No encounter open: off, on the floor in tertiary ink. */
+  /* No encounter open: off, on the floor in tertiary ink, naming the note
+     the first row will make. */
   .pick.none {
     background: transparent;
     font-style: italic;
@@ -1351,7 +1259,8 @@
     color: var(--text-primary);
   }
 
-  /* Augury's set strip (AuguryPanel .well, .key). */
+  /* Augury's set strip (AuguryPanel .well, .key), its keys 22 px rather
+     than 26 so the name keeps its room on the one line. */
   .well {
     flex-shrink: 0;
     display: flex;
@@ -1368,7 +1277,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
+    width: 22px;
     height: 22px;
     padding: 0;
     background: transparent;
@@ -1396,20 +1305,8 @@
     height: 12px;
   }
 
-  .key svg.spend {
-    width: 11px;
-    height: 11px;
-  }
-
   .back {
     transform: scaleX(-1);
-  }
-
-  .well .rule {
-    width: 1px;
-    height: 14px;
-    margin: 0 1px;
-    background: var(--border-subtle);
   }
 
   /* Augury's readout lamps, small. No ghost digit ahead of the round:

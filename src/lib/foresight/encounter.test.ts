@@ -17,6 +17,7 @@ import {
   linkTo,
   moveColumn,
   moveRow,
+  nextEncounterName,
   nextNumbered,
   removeColumn,
   removeRow,
@@ -24,7 +25,6 @@ import {
   renameRow,
   setCell,
   step,
-  stepTrack,
   toggleOut,
   trackEncounters,
   trackNotes,
@@ -329,15 +329,13 @@ describe('encounter tracks', () => {
     expect(encounterTracks(index)).toEqual(['Chase', 'Encounter']);
   });
 
-  test('stepping wraps both ways, and starts somewhere from a track that\'s gone', () => {
-    const tracks = ['A', 'B', 'C'];
-    expect(stepTrack(tracks, 'A', 1)).toBe('B');
-    expect(stepTrack(tracks, 'C', 1)).toBe('A');
-    expect(stepTrack(tracks, 'A', -1)).toBe('C');
-    expect(stepTrack(tracks, 'Gone', 1)).toBe('A');
-    expect(stepTrack(tracks, 'Gone', -1)).toBe('C');
-    expect(stepTrack(tracks, null, 1)).toBe('A');
-    expect(stepTrack([], 'A', 1)).toBeNull();
+  test('the next encounter\'s name: one past the highest number, and free', () => {
+    expect(nextEncounterName(index.notes, 'Encounter')).toBe('Encounter 3');
+    expect(nextEncounterName(index.notes, 'Chase')).toBe('Chase 1');
+    // Any note of that shape counts, wherever it is and whatever its case;
+    // a name with more after the number doesn't.
+    const more = [note('Loose/chase 4.md'), note('Chase/Chase 9b.md'), note('Chase/Chase.md')];
+    expect(nextEncounterName(more, 'Chase')).toBe('Chase 5');
   });
 
   test('a track\'s encounters are those still to run, as its column shows them', () => {

@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Augury lies down when it is wide,** with the pads beside the readout; a drag on its side snaps it between the tall and the wide layout
 - **Foresight is a turn tracker in the rack.** It keeps the order, whose turn it is and the round, and ▶ or `⇧Space` passes the turn
 - **An encounter is a note in an encounter track.** The GM names the track, and its notes take that name and a number (`Chase 2`)
-- **Foresight's top line changes encounter track,** and the key under it picks an encounter or starts a new one
+- **One key on Foresight's top line picks an encounter** from any encounter track, starts a new one or a new track, and clears the encounter
 - **The note's table is the tracker.** Each change goes to the note at once, and the text around the table stays
 - **Each track keeps its own columns.** `+` adds a column, and `-7` or `+3` in a cell with a number does the arithmetic
 - **`M` takes a row out of the fight.** The turn skips the row until `M` brings it back, and no row goes out by itself

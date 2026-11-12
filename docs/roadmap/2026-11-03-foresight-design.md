@@ -1,6 +1,6 @@
 # Foresight (2026-11-03)
 
-**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Built 2026-11-03–05: steps 1 to 3, then step 4 (Help → Guides → Foresight, a glossary group, the shortcut sheet's Foresight section, the CHANGELOG). **Revised 2026-11-08: encounter tracks, a top line to choose the track and a selector to choose the encounter (§3, §4, §6, §8), mocked in the full app, built as step 5 (§11).** One word is under review (§12).
+**Status:** designed 2026-11-01–03 and mocked inside the full app on 2026-11-03 (a scratch copy, not in the repo). Built 2026-11-03–05: steps 1 to 3, then step 4 (Help → Guides → Foresight, a glossary group, the shortcut sheet's Foresight section, the CHANGELOG). **Revised 2026-11-08: encounter tracks, a top line to choose the track and a selector to choose the encounter (§3, §4, §6, §8), mocked in the full app, built as step 5 (§11).** **Revised 2026-11-12: one key for the encounter and its track (§4, §8), on one line, mocked in the full app, built as step 6.** One word is under review (§12).
 
 ## 0. TL;DR
 
@@ -57,8 +57,7 @@ Goblins hide in the ditch; the boss stays on the ridge.
 
 ```
 ┌──────────────────────────────────────┐
-│ ◀ ENCOUNTER           ▶ + │       ⧉  │  top line: the track, a new track, window key
-│ Road ambush ▾          ◀ 3 ▶ ▣       │  second line: encounter selector, turn well (round between the arrows, spend)
+│ Road ambush ▾          ◀ 3 ▶      ⧉  │  top line: encounter key, turn well (round between the arrows), window key
 ├──────────────────────────────────────┤
 │    COMBATANT      HP  REMARKS      + │  plate: the columns
 │ 01 Goblin boss  12/21 frightened     │
@@ -69,10 +68,9 @@ Goblins hide in the ditch; the boss stays on the ridge.
 └──────────────────────────────────────┘
 ```
 
-- **The top line** is Augury's bar and strip, 40 px on `--bg-header`, so the two read as one column in the rack: ◀, the track's name in the set name's voice (`.readout-label`), ▶, a faint rule, then `+`, which names a new encounter track in the name's place. ◀ and ▶ step through the encounter tracks in the campaign's order and wrap, as Augury's sets do, a step down the ramp while there's only one. The window key ends the line.
-- **The second line,** 34 px, holds the encounter selector and the turn well: ◀, the round, ▶, a faint rule, then the spend key (Command's box-archive).
-- **The encounter selector** is Command's campaign key in its well (`.key-body`, `.key-face`, the drop caret): the open encounter's name on the raised fill, sunk while its menu is open. With none open it reads *New*, off: italic, tertiary, on the floor. A numbered name and most two-word names fit at 270 px; a longer one ends in an ellipsis, in full in the tooltip and the menu.
-- **Its menu** is a `CommandMenu` of the track shown: its unspent encounters in the column's order, the open one with its lamp lit, then *+ New*.
+- **The top line** is Augury's bar, 40 px on `--bg-header`, so the two read as one column in the rack. It holds the encounter key, the turn well (◀, the round, ▶, Augury's keys at 22 px rather than 26 so the name keeps its room) and the window key.
+- **The encounter key** is Command's campaign key in its well (`.key-body`, `.key-face`, the drop caret): the open encounter's name on the raised fill, sunk while its menu is open. The track isn't written on it: with one track, the usual case, it would repeat the name (`Encounter 4`). The tooltip has it, `Combat › Road ambush`, as does the menu. With none open the key reads the note the first row will make, *Combat 3*, off: italic, tertiary, on the floor. At 264 px the name has about 98 px; a longer one ends in an ellipsis, in full in the tooltip and the menu.
+- **Its menu** is a `CommandMenu`: under each encounter track's name, its unspent encounters in the column's order, the open one with its lamp lit, and *+ New* to start one there. With one track there's no name, and a divider before *+ New*. Then *+ New track*, which names a new encounter track in the key's place, and *Clear the encounter* while one is open.
 - **The round** is one or more of Augury's seven-segment lamps, small, between the arrows, as Augury's display sits between its own. With no ghost digit ahead of it: beside the name, an unlit leading 8 read as "Encounter 4 83" in the mock.
 - **The plate** is a `.nameplate` naming the columns in `.ledger-label`, with `+` at its end (§6).
 - **A row** is 1.65rem, ruled at its foot as Command's note rows are: its step number in small grey figures (as Command numbers its tracks), the name, one cell per column, and the M key in its own slot at the end.
@@ -108,11 +106,11 @@ Goblins hide in the ditch; the boss stays on the ridge.
 
 ## 8. Starting, clearing, opening
 
-- **An empty Foresight** is the bare instrument: the top line showing its track, the selector reading *New*, the plate with that track's columns, the empty row. No hint lines (the first-run rule). With no encounter track yet, the top line shows *Encounter* a step down the ramp, the track the first row will make.
+- **An empty Foresight** is the bare instrument: the key naming, a step down the ramp, the note the first row will make, the plate with that track's columns, the empty row. No hint lines (the first-run rule). With no encounter track yet, the key reads *Encounter 1*: the first row makes the track *Encounter* too.
 - **The first row added** to an empty Foresight makes the track's next encounter (§3) and opens it.
-- **Clearing is spending.** The spend key sets the encounter note's `spent`, the same key Command's spend key sets, and empties Foresight, which stays on that track. The note stays where it is, among its track's spent notes, and leaves the selector. One not yet fought stays unspent, like a secret not yet revealed. Un-spending is Command's.
-- **Changing track:** ◀ or ▶ on the top line opens the encounter last open in that track, or else its first still to run, or with none empties Foresight on it. The same on opening a campaign. All are notes, so nothing is lost.
-- **Opening an encounter:** pick it in the selector, or drop its note row or its card on Foresight (§9). *+ New* leaves the open one as it is, empties Foresight on that track and opens the empty row's field.
+- **Clearing is spending.** *Clear the encounter*, at the foot of the key's menu, sets the encounter note's `spent`, the same key Command's spend key sets, and empties Foresight, which stays on that track. The note stays where it is, among its track's spent notes, and leaves the menu. One not yet fought stays unspent, like a secret not yet revealed. Un-spending is Command's.
+- **Changing track:** pick another track's encounter in the key's menu, or its *+ New*. Opening a campaign opens the encounter last open in it, or else the first still to run in the track shown, or with none empties Foresight on it. All are notes, so nothing is lost.
+- **Opening an encounter:** pick it in the key's menu, or drop its note row or its card on Foresight (§9). *+ New* leaves the open one as it is, empties Foresight on that track and opens the empty row's field.
 - **Foresight remembers the track shown per campaign and the last encounter open in each track,** and follows the campaign open in Command (the app context), as Augury's Tracks set does.
 
 ## 9. The link with Command
@@ -121,7 +119,7 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - **A track's nameplate dropped on Foresight adds all its notes,** so the PCs track brings the party in one move.
 - **The same note dropped again** adds the next number as an alias (§3).
 - **A note moved between tracks** follows the type: Command's *Move to* and a dragged row offer any track that isn't an image track, and Legend Lore's *Send to Command* offers note tracks only, so a hit doesn't become an encounter.
-- **An encounter note dropped on Foresight opens it** (§8), from whichever encounter track, and the top line follows. A plain note joins as a row, from any other track.
+- **An encounter note dropped on Foresight opens it** (§8), from whichever encounter track, and the key follows. A plain note joins as a row, from any other track.
 - **A board card** is Svelte Flow's to drag, and no drag event leaves the board, so past its edge the board speaks a card drag's events itself (`noteDrag.ts` `carryCards`, `dropCards`). Taken by Foresight, the card goes back to its place on the board.
 - **These are the rack's first drops from one tool to another.** The drop reads Command's own drag payloads (`noteDrag.ts`, the track and card types), so later tools can take them the same way, such as a Legend Lore result dropped on Command. Drops don't cross windows (Command design D4), so when either tool is popped out:
   - **`[[` in the empty row** offers the campaign's note names, as Command's editor does;
@@ -146,6 +144,7 @@ Goblins hide in the ditch; the boss stays on the ridge.
 3. **The link with Command.** Drops of notes, nameplates and encounter cards; aliases for repeats; `[[` in the empty row; double-click opens the linked note in Command; *Open in Foresight* through Rust.
 4. **Help and keys.** Help → Guides → Foresight, a glossary group (encounter, turn, round, out of the fight), the shortcut sheet (⇧Space, M, ⌘D and Esc in a Foresight section, a line each on a cell's arithmetic and `[[`), the keys' hints, CHANGELOG.
 5. **Encounter tracks (2026-11-08).** The `encounter` type in the sidecar, filing and *Move to*; *Insert encounter track*; `is_encounter` by track; `create` and numbering per track; `encounter_columns`, carried by a rename; the top line and its `+`; the selector and *+ New*; the last encounter per track; the empty row's text; Augury's dimmed disabled keys, which Foresight's lack; `create_track`'s type. An empty track's columns right after one of its encounters was open: the mock showed a stale list there, so check it in the full app. Then the guide, glossary and CHANGELOG, which describe the rules this replaces. Before the next tag.
+6. **One encounter key (2026-11-12).** The top line and the second become one: the key, the turn well, the window key. The track's ◀ ▶ and `+` go, and so does the spend key: the menu holds every track's encounters, *+ New track* and *Clear the encounter*. The key reads the next note's name when nothing is open (`nextEncounterName`, the sidecar's `next_name` on the client). Guide and CHANGELOG with it.
 
 ## 12. Open
 
@@ -175,9 +174,9 @@ Goblins hide in the ditch; the boss stays on the ridge.
 
 - The default track is *Encounter*, not *Encounters*, so its first note reads `Encounter 1`.
 - A note takes the track's name as written, with no singular worked out.
-- The second line costs one row at 800 px: seven and the empty one, down from eight. It also gives the name its width back, 96 px at 270, and the keys stay Augury's 26 px.
-- `+` names a new track in a field that commits on a click away, as a rename does: a name that's taken needs its refusal, and Foresight has nowhere else to show one.
-- `+` on the top line only makes tracks. Renaming, reordering and removing them stay Command's.
+- One line heads Foresight, so the table has the row the second line took. The price: the turn's keys are 22 px rather than Augury's 26, and Clear is two clicks away in the menu, no longer beside ▶.
+- *+ New track* names a new track in the key's place, in a field that commits on a click away, as a rename does: a name that's taken needs its refusal, and Foresight has nowhere else to show one.
+- *+ New track* only makes tracks. Renaming, reordering and removing them stay Command's.
 - *Insert encounter track* has no key; note and image tracks keep ⌘T and ⇧⌘T.
 - A track's type isn't changed afterwards, as an image track's isn't. To turn an existing track into one, insert an encounter track and move its notes in. An older *Encounters* folder reads as a plain note track.
 - A note moved in with a table of its own: that table reads as the rows, and Foresight rewrites it on its first change. The cost of letting the track decide.
@@ -188,7 +187,7 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - A nameplate brings the track's notes still to play, in its column's order: no spent notes, images or encounters.
 - A repeat dropped comes in with empty cells; ⌘D is the way to copy them.
 - `[[` offers notes, not beats, sessions, images or encounters. A name typed in brackets joins as a dropped note does, a typed alias is kept, and a link to no note stays a link.
-- A spent encounter is refused: no outline, no *Open in Foresight*, not in the selector. Un-spending is Command's.
+- A spent encounter is refused: no outline, no *Open in Foresight*, not in the key's menu. Un-spending is Command's.
 - *Open in Foresight* is on track and shelf rows. A right-click on a board note card stands it up, so a board card opens by being dropped.
 - Several board cards carried together all join.
 - An encounter renamed or moved, in Command, Finder or Obsidian, is followed: when its path is gone, Foresight reads the campaign's encounters for the hash it holds. If the note's text changed in the same move, nothing matches and Foresight empties. A rename while Foresight isn't running isn't followed either: the stored path finds nothing, and Foresight opens empty.
@@ -212,7 +211,8 @@ Goblins hide in the ditch; the boss stays on the ridge.
 - The round between ◀ and ▶; M shown only while lit, hovered or on the turn (mock, 2026-11-03).
 - A dedicated encounter track, named by the GM, each note in it one encounter; otherwise today's behaviour (user, 2026-11-08: "each note is a new encounter", "exactly same behavior as today").
 - Foresight has an encounter selector; the track decides what is an encounter; columns are remembered per track (user, 2026-11-08).
-- A top line for track selection (user, 2026-11-08). Augury's strip, so the arrows no longer sit beside the round's. Its second line costs a row, "fine for now".
+- A top line for track selection (user, 2026-11-08). Augury's strip, so the arrows no longer sit beside the round's. Its second line costs a row, "fine for now". Merged into the encounter key on 2026-11-12.
+- One key for the encounter and its track, the track written only in its tooltip and menu, Clear in the menu (user, 2026-11-12). Seven ways were mocked in the full app: the name only, the track in small type above it, the key in the track's pigment, a path, the card head's boxed track, two faces in one well, Augury's strip.
 - Arriving at a track with none remembered opens its first encounter (user, 2026-11-08).
 
 ## 14. Not doing, or not yet
