@@ -26,7 +26,7 @@ A TTRPG Gamemaster who:
 unseen-servant-site is private for now.
 
 - **[unseen-servant-spikes](https://github.com/Unseen-Servant/unseen-servant-spikes)**: research spikes. Their FINDINGS inform key architectural decisions here. Docs that cite a spike link its FINDINGS and still state the outcome.
-- **unseen-servant-site**: the landing page, which distributes the app. Its product description must match the app's actual features.
+- **[unseen-servant-site](https://github.com/Unseen-Servant/unseen-servant-site)**: the landing page, which distributes the app. Its product description must match the app's actual features.
 
 ---
 
@@ -63,13 +63,6 @@ The CHANGELOG and the GitHub release notes use Simplified Technical English.
 - Use plain verbs ("is in the app", "does not need"). No slogans, taglines or bold headline sentences.
 - Each release opens with one summary paragraph, then one line per change: a bold lead and one clause. CI, dependency and build-tooling changes stay out.
 - The release notes are the CHANGELOG section: set the draft with `gh release edit vX.Y.Z --notes-file`.
-
----
-
-## Guidelines
-
-- **Ship less:** nothing beyond the request — no speculative features, abstractions, or configurability.
-- **Surgical changes:** every changed line traces to the request. Match the surrounding style; remove what your own change orphaned, and mention unrelated dead code rather than deleting it.
 
 ---
 
